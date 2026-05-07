@@ -4,9 +4,9 @@ import { authManager } from '$lib/managers/auth-manager.svelte';
 import {
   RepresentativeFaceSource,
   SharedSpaceRole,
+  type PersonStatisticsResponseDto,
   type SharedSpaceMemberResponseDto,
   type SharedSpacePersonResponseDto,
-  type PersonStatisticsResponseDto,
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
 import { modalManager } from '@immich/ui';

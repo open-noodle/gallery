@@ -1,12 +1,12 @@
-import '@testing-library/jest-dom';
 import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info-cache';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { locale } from '$lib/stores/preferences.store';
 import type { PeopleFaceStatisticsResponseDto } from '@immich/sdk';
+import '@testing-library/jest-dom';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { init, register, waitLocale } from 'svelte-i18n';
 import type { Component } from 'svelte';
+import { init, register, waitLocale } from 'svelte-i18n';
 import PeopleFaceStatisticsInfo from './people-face-statistics-info.svelte';
 
 function deferred<T>() {
@@ -19,9 +19,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-const statistics = (
-  overrides: Partial<PeopleFaceStatisticsResponseDto> = {},
-): PeopleFaceStatisticsResponseDto => ({
+const statistics = (overrides: Partial<PeopleFaceStatisticsResponseDto> = {}): PeopleFaceStatisticsResponseDto => ({
   assignedHiddenFaceCount: 3456,
   assignedVisibleFaceCount: 2345,
   detectedFaceCount: 1234,

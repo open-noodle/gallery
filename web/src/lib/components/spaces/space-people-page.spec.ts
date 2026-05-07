@@ -3,8 +3,8 @@ import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info-cache';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import {
-  type PeopleFaceStatisticsResponseDto,
   SharedSpaceRole,
+  type PeopleFaceStatisticsResponseDto,
   type SharedSpaceMemberResponseDto,
   type SharedSpacePeopleStatisticsResponseDto,
   type SharedSpacePersonResponseDto,
@@ -94,9 +94,7 @@ function makePerson(overrides: Partial<SharedSpacePersonResponseDto> = {}): Shar
   } as SharedSpacePersonResponseDto;
 }
 
-function makeFaceStatistics(
-  overrides: Partial<PeopleFaceStatisticsResponseDto> = {},
-): PeopleFaceStatisticsResponseDto {
+function makeFaceStatistics(overrides: Partial<PeopleFaceStatisticsResponseDto> = {}): PeopleFaceStatisticsResponseDto {
   return {
     assignedHiddenFaceCount: 3456,
     assignedVisibleFaceCount: 2345,
@@ -168,7 +166,7 @@ describe('Spaces people page', () => {
       peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 1980 },
     });
 
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10) \u00b7 1,980 faces');
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10) \u00B7 1,980 faces');
   });
 
   it('derives the heading person count from overview statistics instead of loaded rows', () => {
@@ -177,7 +175,7 @@ describe('Spaces people page', () => {
       peopleStatistics: { total: 60, hidden: 4, detectedFaceCount: 100 },
     });
 
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(56) \u00b7 100 faces');
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(56) \u00B7 100 faces');
   });
 
   it('shows detected faces when all space people are hidden', () => {
@@ -186,7 +184,7 @@ describe('Spaces people page', () => {
       peopleStatistics: { total: 1, hidden: 1, detectedFaceCount: 42 },
     });
 
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(0) \u00b7 42 faces');
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(0) \u00B7 42 faces');
   });
 
   it('omits the heading description for an empty scope with no detected faces', () => {
@@ -331,7 +329,7 @@ describe('Spaces people page', () => {
 
     await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
     await waitFor(() => {
-      expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00b7 7 faces');
+      expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00B7 7 faces');
     });
     expect(screen.getByRole('button', { name: 'view_face_statistics_details' })).toBeInTheDocument();
 
@@ -355,7 +353,7 @@ describe('Spaces people page', () => {
     bobPeopleRequest.resolve([people[1]]);
     bobStatsRequest.resolve({ total: 1, hidden: 0, detectedFaceCount: 9 });
     await waitFor(() => {
-      expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00b7 9 faces');
+      expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00B7 9 faces');
     });
 
     await userEvent.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
@@ -398,7 +396,7 @@ describe('Spaces people page', () => {
 
     await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
     await waitFor(() => {
-      expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00b7 7 faces');
+      expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00B7 7 faces');
     });
 
     await userEvent.click(screen.getByLabelText('clear_value'));
@@ -423,7 +421,7 @@ describe('Spaces people page', () => {
 
     expect(screen.getByDisplayValue('Charlie')).toBeInTheDocument();
     expect(screen.queryByDisplayValue('Alice')).not.toBeInTheDocument();
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00b7 9 faces');
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00B7 9 faces');
   });
 
   it('does not show stale search errors after navigating to another space', async () => {
@@ -532,7 +530,7 @@ describe('Spaces people page', () => {
     await userEvent.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('unable_to_load_face_statistics');
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10) \u00b7 2,901 faces');
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10) \u00B7 2,901 faces');
   });
 
   it('hides the face statistics details button when overview statistics are unavailable', () => {
@@ -571,7 +569,7 @@ describe('Spaces people page', () => {
     expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Ali' }, expect.any(Object));
     expect(screen.getByDisplayValue('Alice')).toBeInTheDocument();
     expect(screen.queryByDisplayValue('Bob')).not.toBeInTheDocument();
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00b7 7 faces');
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00B7 7 faces');
   });
 
   it('clears search statistics back to the unfiltered space scope', async () => {
@@ -636,7 +634,7 @@ describe('Spaces people page', () => {
         sharedSpacePersonUpdateDto: { isHidden: true },
       });
     });
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00b7 42 faces');
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00B7 42 faces');
   });
 
   it('renders circular thumbnails for each person', async () => {

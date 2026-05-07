@@ -409,10 +409,7 @@
   }
 </script>
 
-<UserPageLayout
-  title={$t('spaces_people_title')}
-  description={headerDescription}
->
+<UserPageLayout title={$t('spaces_people_title')} description={headerDescription}>
   {#snippet descriptionTrailing()}
     {#if showFaceStatisticsInfo}
       <PeopleFaceStatisticsInfo cacheKey={spaceFaceStatisticsCacheKey} loadStatistics={loadSpaceFaceStatistics} />

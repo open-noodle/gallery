@@ -27,5 +27,5 @@ export const formatPeopleHeaderDescription = ({
   }
 
   const faceLabel = detectedFaceCount === 1 ? faceSingular : facePlural;
-  return `${peopleText} \u00b7 ${detectedFaceCount.toLocaleString(locale)} ${faceLabel}`;
+  return `${peopleText} \u00B7 ${detectedFaceCount.toLocaleString(locale)} ${faceLabel}`;
 };

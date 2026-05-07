@@ -261,9 +261,7 @@
       showZeroPeople: hasUnsupportedStatsFilter || (overviewStatistics?.detectedFaceCount ?? 0) > 0,
     }),
   );
-  let showFaceStatisticsInfo = $derived(
-    !!overviewStatistics && !hasUnsupportedStatsFilter && !!headerDescription,
-  );
+  let showFaceStatisticsInfo = $derived(!!overviewStatistics && !hasUnsupportedStatsFilter && !!headerDescription);
   let globalFaceStatisticsCacheKey = $derived(`user:${authManager.user.id}:global:people:withSharedSpaces=true`);
   const loadGlobalFaceStatistics = () => getPeopleFaceStatistics({ withSharedSpaces: true });
   let showPeople = $derived(searchName ? searchedPeopleLocal : visiblePeople);

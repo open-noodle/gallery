@@ -4,9 +4,9 @@ import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info-cache';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import {
-  type PeopleFaceStatisticsResponseDto,
   RepresentativeFaceSource,
   Type,
+  type PeopleFaceStatisticsResponseDto,
   type PeopleStatisticsResponseDto,
   type PersonResponseDto,
   type SharedSpacePersonResponseDto,
@@ -87,9 +87,7 @@ function makeSpacePerson(overrides: Partial<SharedSpacePersonResponseDto> = {}):
   };
 }
 
-function makeFaceStatistics(
-  overrides: Partial<PeopleFaceStatisticsResponseDto> = {},
-): PeopleFaceStatisticsResponseDto {
+function makeFaceStatistics(overrides: Partial<PeopleFaceStatisticsResponseDto> = {}): PeopleFaceStatisticsResponseDto {
   return {
     assignedHiddenFaceCount: 3456,
     assignedVisibleFaceCount: 2345,
@@ -99,13 +97,17 @@ function makeFaceStatistics(
   };
 }
 
-function renderPage(
-  people: PersonResponseDto[] = [makePerson()],
-  peopleStatistics: PeopleStatisticsResponseDto | null = {
+function getDefaultPeopleStatistics(people: PersonResponseDto[]): PeopleStatisticsResponseDto {
+  return {
     total: people.length,
     hidden: people.filter((person) => person.isHidden).length,
     detectedFaceCount: 0,
-  },
+  };
+}
+
+function renderPage(
+  people: PersonResponseDto[] = [makePerson()],
+  peopleStatistics: PeopleStatisticsResponseDto | null = getDefaultPeopleStatistics(people),
 ) {
   return render(PeoplePage, {
     props: {
@@ -159,19 +161,19 @@ describe('Global people page', () => {
   it('shows visible people and detected faces in the heading', () => {
     renderPage([makePerson({ id: 'p1' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
 
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10) \u00b7 2,901 faces');
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10) \u00B7 2,901 faces');
   });
 
   it('derives the heading person count from overview statistics instead of loaded rows', () => {
     renderPage([makePerson({ id: 'p1' })], { total: 60, hidden: 4, detectedFaceCount: 100 });
 
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(56) \u00b7 100 faces');
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(56) \u00B7 100 faces');
   });
 
   it('shows detected faces when all people are hidden', () => {
     renderPage([makePerson({ id: 'p1', isHidden: true })], { total: 1, hidden: 1, detectedFaceCount: 42 });
 
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(0) \u00b7 42 faces');
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(0) \u00B7 42 faces');
   });
 
   it('omits the heading description for an empty scope with no detected faces', () => {
@@ -263,7 +265,7 @@ describe('Global people page', () => {
     await userEvent.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('unable_to_load_face_statistics');
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10) \u00b7 2,901 faces');
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10) \u00B7 2,901 faces');
   });
 
   it('hides the face count while global name search is active because it is unsupported by overview stats', async () => {
@@ -278,7 +280,7 @@ describe('Global people page', () => {
     await waitFor(() => {
       expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1)');
     });
-    expect(screen.getByTestId('user-page-layout').getAttribute('data-description')).not.toContain('faces');
+    expect(screen.getByTestId('user-page-layout').dataset.description ?? '').not.toContain('faces');
   });
 
   it('hides the face statistics details button during unsupported global name search', async () => {
