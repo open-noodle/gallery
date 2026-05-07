@@ -52,7 +52,7 @@ export class TimelineService extends BaseService {
         const partnerIds = await getMyPartnerIds({
           userId: auth.user.id,
           repository: this.partnerRepository,
-          timelineEnabled: !options.personId || undefined,
+          timelineEnabled: true,
         });
         userIds.push(...partnerIds);
       }
