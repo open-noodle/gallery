@@ -574,7 +574,13 @@ export class PersonService extends BaseService {
     let jobs: JobItem[] = [];
     const assets = this.assetJobRepository.streamForDetectFacesJob(force);
     for await (const asset of assets) {
-      jobs.push({ name: JobName.AssetDetectFaces, data: { id: asset.id } });
+      jobs.push({
+        name: JobName.AssetDetectFaces,
+        data: {
+          id: asset.id,
+          ...(force === true ? { force: true } : {}),
+        },
+      });
 
       if (jobs.length >= JOBS_ASSET_PAGINATION_SIZE) {
         await this.jobRepository.queueAll(jobs);
@@ -592,7 +598,7 @@ export class PersonService extends BaseService {
   }
 
   @OnJob({ name: JobName.AssetDetectFaces, queue: QueueName.FaceDetection })
-  async handleDetectFaces({ id }: JobOf<JobName.AssetDetectFaces>): Promise<JobStatus> {
+  async handleDetectFaces({ id, force }: JobOf<JobName.AssetDetectFaces>): Promise<JobStatus> {
     const { machineLearning } = await this.getConfig({ withCache: true });
     if (!isFacialRecognitionEnabled(machineLearning)) {
       return JobStatus.Skipped;
@@ -665,8 +671,15 @@ export class PersonService extends BaseService {
 
     if (facesToAdd.length > 0) {
       this.logger.log(`Detected ${facesToAdd.length} new faces in asset ${id}`);
-      const jobs = facesToAdd.map((face) => ({ name: JobName.FacialRecognition, data: { id: face.id } }) as const);
-      await this.jobRepository.queueAll([{ name: JobName.FacialRecognitionQueueAll, data: { force: false } }, ...jobs]);
+      if (force) {
+        await this.jobRepository.queue({ name: JobName.FacialRecognitionQueueAll, data: { force: true } });
+      } else {
+        const jobs = facesToAdd.map((face) => ({ name: JobName.FacialRecognition, data: { id: face.id } }) as const);
+        await this.jobRepository.queueAll([
+          { name: JobName.FacialRecognitionQueueAll, data: { force: false } },
+          ...jobs,
+        ]);
+      }
     } else if (embeddings.length > 0) {
       this.logger.log(`Added ${embeddings.length} face embeddings for asset ${id}`);
     }
