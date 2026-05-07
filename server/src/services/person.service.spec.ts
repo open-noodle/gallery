@@ -286,6 +286,7 @@ describe(PersonService.name, () => {
       (mocks.faceIdentity as any).getAccessiblePeopleFaceStatistics.mockResolvedValue({
         detectedFaceCount: 11,
         assignedVisibleFaceCount: 7,
+        namedVisiblePersonCount: 3,
         assignedHiddenFaceCount: 2,
         unassignedFaceCount: 2,
       });
@@ -295,6 +296,7 @@ describe(PersonService.name, () => {
       ).resolves.toEqual({
         detectedFaceCount: 11,
         assignedVisibleFaceCount: 7,
+        namedVisiblePersonCount: 3,
         assignedHiddenFaceCount: 2,
         unassignedFaceCount: 2,
       });
@@ -310,6 +312,7 @@ describe(PersonService.name, () => {
       (mocks.person as any).getPeopleFaceStatistics.mockResolvedValue({
         detectedFaceCount: 5,
         assignedVisibleFaceCount: 4,
+        namedVisiblePersonCount: 2,
         assignedHiddenFaceCount: 1,
         unassignedFaceCount: 0,
       });
@@ -317,6 +320,7 @@ describe(PersonService.name, () => {
       await expect(sut.getPeopleFaceStatistics(auth, { page: 1, size: 50 } as any)).resolves.toEqual({
         detectedFaceCount: 5,
         assignedVisibleFaceCount: 4,
+        namedVisiblePersonCount: 2,
         assignedHiddenFaceCount: 1,
         unassignedFaceCount: 0,
       });
