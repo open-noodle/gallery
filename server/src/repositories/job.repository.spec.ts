@@ -313,7 +313,7 @@ describe(JobRepository.name, () => {
   );
 
   it.each(['waiting', 'delayed', 'paused'] as const)(
-    'upgrades a pending %s non-force facial-recognition coordinator when force is requested',
+    'replaces a pending %s non-force facial-recognition coordinator when force is requested',
     async (state) => {
       const { sut, queue } = setup();
       const existingJob = {
@@ -329,11 +329,38 @@ describe(JobRepository.name, () => {
 
       expect(queue.getJob).toHaveBeenCalledWith(JobName.FacialRecognitionQueueAll);
       expect(existingJob.getState).toHaveBeenCalled();
-      expect(existingJob.remove).not.toHaveBeenCalled();
-      expect(existingJob.updateData).toHaveBeenCalledWith({ force: true });
-      expect(queue.add).not.toHaveBeenCalled();
+      expect(existingJob.remove).toHaveBeenCalled();
+      expect(existingJob.updateData).not.toHaveBeenCalled();
+      expect(queue.drain).toHaveBeenCalledWith(true);
+      expect(queue.add).toHaveBeenCalledWith(
+        JobName.FacialRecognitionQueueAll,
+        { force: true },
+        {
+          jobId: JobName.FacialRecognitionQueueAll,
+          removeOnComplete: true,
+        },
+      );
     },
   );
+
+  it('drains pending facial-recognition work before queueing a new force coordinator', async () => {
+    const { sut, queue } = setup();
+    setHandlers(sut, [JobName.FacialRecognitionQueueAll]);
+
+    await sut.queue({ name: JobName.FacialRecognitionQueueAll, data: { force: true } });
+
+    expect(queue.getJob).toHaveBeenCalledWith(JobName.FacialRecognitionQueueAll);
+    expect(queue.drain).toHaveBeenCalledWith(true);
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.FacialRecognitionQueueAll,
+      { force: true },
+      {
+        jobId: JobName.FacialRecognitionQueueAll,
+        removeOnComplete: true,
+      },
+    );
+    expect(queue.drain.mock.invocationCallOrder[0]).toBeLessThan(queue.add.mock.invocationCallOrder[0]);
+  });
 
   it('queues a force follow-up coordinator when a non-force coordinator is active', async () => {
     const { sut, queue } = setup();
@@ -380,6 +407,28 @@ describe(JobRepository.name, () => {
     expect(existingJob.getState).toHaveBeenCalled();
     expect(existingJob.remove).not.toHaveBeenCalled();
     expect(existingJob.updateData).not.toHaveBeenCalled();
+    expect(queue.add).not.toHaveBeenCalled();
+  });
+
+  it('does not queue another coordinator when the force follow-up coordinator is already active', async () => {
+    const { sut, queue } = setup();
+    const activeForceFollowUp = {
+      data: { force: true },
+      getState: vi.fn().mockResolvedValue('active'),
+      remove: vi.fn().mockResolvedValue(undefined),
+    };
+    queue.getJob.mockImplementation(async (jobId: string) =>
+      jobId === 'FacialRecognitionQueueAll/force' ? activeForceFollowUp : undefined,
+    );
+    setHandlers(sut, [JobName.FacialRecognitionQueueAll]);
+
+    await sut.queue({ name: JobName.FacialRecognitionQueueAll, data: { force: true } });
+
+    expect(queue.getJob).toHaveBeenCalledWith(JobName.FacialRecognitionQueueAll);
+    expect(queue.getJob).toHaveBeenCalledWith('FacialRecognitionQueueAll/force');
+    expect(activeForceFollowUp.getState).toHaveBeenCalled();
+    expect(activeForceFollowUp.remove).not.toHaveBeenCalled();
+    expect(queue.drain).not.toHaveBeenCalled();
     expect(queue.add).not.toHaveBeenCalled();
   });
 

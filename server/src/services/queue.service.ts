@@ -191,10 +191,6 @@ export class QueueService extends BaseService {
 
     await this.eventRepository.emit('QueueStart', { name });
 
-    if (replacePendingFacialRecognition) {
-      await this.jobRepository.empty(QueueName.FacialRecognition, true);
-    }
-
     switch (name) {
       case QueueName.VideoConversion: {
         return this.jobRepository.queue({ name: JobName.AssetEncodeVideoQueueAll, data: { force } });

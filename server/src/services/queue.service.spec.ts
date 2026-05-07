@@ -497,32 +497,30 @@ describe(QueueService.name, () => {
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
-    it('force-starts facial recognition by draining pending work before queueing even when active', async () => {
+    it('force-starts facial recognition through the coordinator without pre-draining active work', async () => {
       mocks.job.isActive.mockResolvedValue(true);
       mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
 
       await sut.runCommandLegacy(QueueName.FacialRecognition, { command: QueueCommand.Start, force: true });
 
-      expect(mocks.job.empty).toHaveBeenCalledWith(QueueName.FacialRecognition, true);
+      expect(mocks.job.empty).not.toHaveBeenCalled();
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.FacialRecognitionQueueAll,
         data: { force: true },
       });
-      expect(mocks.job.empty.mock.invocationCallOrder[0]).toBeLessThan(mocks.job.queue.mock.invocationCallOrder[0]);
     });
 
-    it('force-starts facial recognition by draining pending work before queueing when inactive', async () => {
+    it('delegates inactive force-start pending replacement to the facial-recognition coordinator', async () => {
       mocks.job.isActive.mockResolvedValue(false);
       mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
 
       await sut.runCommandLegacy(QueueName.FacialRecognition, { command: QueueCommand.Start, force: true });
 
-      expect(mocks.job.empty).toHaveBeenCalledWith(QueueName.FacialRecognition, true);
+      expect(mocks.job.empty).not.toHaveBeenCalled();
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.FacialRecognitionQueueAll,
         data: { force: true },
       });
-      expect(mocks.job.empty.mock.invocationCallOrder[0]).toBeLessThan(mocks.job.queue.mock.invocationCallOrder[0]);
     });
 
     it('still rejects non-force facial recognition starts while active', async () => {

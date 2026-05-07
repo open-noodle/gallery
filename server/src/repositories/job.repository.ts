@@ -383,12 +383,26 @@ export class JobRepository {
   ): Promise<{ add: true; options: JobsOptions } | { add: false }> {
     const existingJob = await queue.getJob(JobName.FacialRecognitionQueueAll);
     if (!existingJob) {
+      if (data.force === true) {
+        const forceFollowUpJob = await queue.getJob(FORCE_FACIAL_RECOGNITION_QUEUE_ALL_JOB_ID);
+        if (forceFollowUpJob) {
+          const forceFollowUpState = (await forceFollowUpJob.getState()) as string;
+          if (forceFollowUpState === 'active' && forceFollowUpJob.data?.force === true) {
+            return { add: false };
+          }
+        }
+
+        await queue.drain(true);
+      }
       return { add: true, options };
     }
 
     const state = (await existingJob.getState()) as string;
     if (state === 'failed') {
       await existingJob.remove();
+      if (data.force === true) {
+        await queue.drain(true);
+      }
       return { add: true, options };
     }
 
@@ -397,8 +411,9 @@ export class JobRepository {
     }
 
     if (state === 'waiting' || state === 'delayed' || state === 'paused') {
-      await existingJob.updateData(data);
-      return { add: false };
+      await existingJob.remove();
+      await queue.drain(true);
+      return { add: true, options };
     }
 
     if (state === 'active') {
