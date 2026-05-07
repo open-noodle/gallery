@@ -27,6 +27,9 @@ const setup = (counts: JobCounts[] = []) => {
   const queue = {
     add: vi.fn().mockResolvedValue({}),
     addBulk: vi.fn().mockResolvedValue([]),
+    clean: vi.fn().mockResolvedValue([]),
+    drain: vi.fn().mockResolvedValue(undefined),
+    getJob: vi.fn().mockResolvedValue(undefined),
     getJobCounts: vi.fn().mockResolvedValue(emptyCounts()),
     getJobs: vi.fn().mockResolvedValue([]),
     isPaused: vi.fn().mockResolvedValue(false),
@@ -105,6 +108,31 @@ describe(JobRepository.name, () => {
     expect(logger.warn).toHaveBeenCalledWith(
       `Waiting for ${QueueName.FaceDetection} queue to finish (0 active, 0 waiting, 0 delayed, 1 paused); queue is paused`,
     );
+  });
+
+  it('drains delayed jobs when requested', async () => {
+    const { sut, queue } = setup();
+
+    await sut.empty(QueueName.FacialRecognition, true);
+
+    expect(queue.drain).toHaveBeenCalledWith(true);
+  });
+
+  it('keeps the manual empty default drain behavior', async () => {
+    const { sut, queue } = setup();
+
+    await sut.empty(QueueName.FacialRecognition);
+
+    expect(queue.drain).toHaveBeenCalledWith(false);
+  });
+
+  it('does not clean active completed or failed jobs when draining delayed jobs', async () => {
+    const { sut, queue } = setup();
+
+    await sut.empty(QueueName.FacialRecognition, true);
+
+    expect(queue.drain).toHaveBeenCalledWith(true);
+    expect(queue.clean).not.toHaveBeenCalled();
   });
 
   it('returns queue counts and oldest job ages', async () => {
@@ -228,5 +256,146 @@ describe(JobRepository.name, () => {
       { identityId: 'identity-1', cursor: 'cursor-2', limit: 1000 },
       { jobId: 'shared-space-person-metadata-backfill/identity/identity-1/cursor-2', removeOnFail: true },
     );
+  });
+
+  it('removes a failed stable facial-recognition coordinator before requeueing it', async () => {
+    const { sut, queue } = setup();
+    const failedJob = {
+      getState: vi.fn().mockResolvedValue('failed'),
+      remove: vi.fn().mockResolvedValue(undefined),
+    };
+    queue.getJob.mockResolvedValue(failedJob);
+    setHandlers(sut, [JobName.FacialRecognitionQueueAll]);
+
+    await sut.queue({ name: JobName.FacialRecognitionQueueAll, data: { force: true } });
+
+    expect(queue.getJob).toHaveBeenCalledWith(JobName.FacialRecognitionQueueAll);
+    expect(failedJob.getState).toHaveBeenCalled();
+    expect(failedJob.remove).toHaveBeenCalled();
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.FacialRecognitionQueueAll,
+      { force: true },
+      {
+        jobId: JobName.FacialRecognitionQueueAll,
+        removeOnComplete: true,
+      },
+    );
+  });
+
+  it.each(['active', 'waiting', 'delayed', 'paused'] as const)(
+    'does not remove a %s stable facial-recognition coordinator',
+    async (state) => {
+      const { sut, queue } = setup();
+      const existingJob = {
+        getState: vi.fn().mockResolvedValue(state),
+        remove: vi.fn().mockResolvedValue(undefined),
+      };
+      queue.getJob.mockResolvedValue(existingJob);
+      setHandlers(sut, [JobName.FacialRecognitionQueueAll]);
+
+      await sut.queue({ name: JobName.FacialRecognitionQueueAll, data: { force: true } });
+
+      expect(queue.getJob).toHaveBeenCalledWith(JobName.FacialRecognitionQueueAll);
+      expect(existingJob.getState).toHaveBeenCalled();
+      expect(existingJob.remove).not.toHaveBeenCalled();
+      expect(queue.add).toHaveBeenCalledWith(
+        JobName.FacialRecognitionQueueAll,
+        { force: true },
+        {
+          jobId: JobName.FacialRecognitionQueueAll,
+          removeOnComplete: true,
+        },
+      );
+    },
+  );
+
+  it('does not remove failed stable shared-space jobs while queueing duplicates', async () => {
+    const { sut, queue } = setup();
+    const failedJob = {
+      getState: vi.fn().mockResolvedValue('failed'),
+      remove: vi.fn().mockResolvedValue(undefined),
+    };
+    queue.getJob.mockResolvedValue(failedJob);
+    setHandlers(sut, [JobName.SharedSpaceFaceMatchPage]);
+
+    await sut.queue({ name: JobName.SharedSpaceFaceMatchPage, data: { spaceId: 'space-1' } });
+
+    expect(queue.getJob).not.toHaveBeenCalled();
+    expect(failedJob.remove).not.toHaveBeenCalled();
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SharedSpaceFaceMatchPage,
+      { spaceId: 'space-1' },
+      {
+        jobId: 'shared-space-face-match-page/space-1/start',
+        removeOnComplete: true,
+      },
+    );
+  });
+
+  it('uses stable visible-failure job ids for shared-space face pipeline jobs', async () => {
+    const { sut, queue } = setup();
+    setHandlers(sut, [
+      JobName.SharedSpaceFaceMatch,
+      JobName.SharedSpaceFaceMatchAll,
+      JobName.SharedSpaceFaceMatchPage,
+      JobName.SharedSpacePersonDedup,
+      JobName.SharedSpaceIdentityReconciliation,
+    ]);
+
+    await sut.queueAll([
+      { name: JobName.SharedSpaceFaceMatch, data: { spaceId: 'space-1', assetId: 'asset-1' } },
+      { name: JobName.SharedSpaceFaceMatch, data: { spaceId: 'space-1', assetId: 'asset-1' } },
+      { name: JobName.SharedSpaceFaceMatch, data: { spaceId: 'space-2', assetId: 'asset-1' } },
+      { name: JobName.SharedSpaceFaceMatchAll, data: { spaceId: 'space-1' } },
+      { name: JobName.SharedSpaceFaceMatchPage, data: { spaceId: 'space-1' } },
+      { name: JobName.SharedSpaceFaceMatchPage, data: { spaceId: 'space-1', afterAssetId: 'asset-9' } },
+      { name: JobName.SharedSpacePersonDedup, data: { spaceId: 'space-1' } },
+      { name: JobName.SharedSpaceIdentityReconciliation, data: { spaceId: 'space-1' } },
+    ]);
+
+    expect(queue.addBulk).not.toHaveBeenCalled();
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SharedSpaceFaceMatch,
+      { spaceId: 'space-1', assetId: 'asset-1' },
+      {
+        jobId: 'shared-space-face-match/space-1/asset-1',
+        removeOnComplete: true,
+      },
+    );
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SharedSpaceFaceMatch,
+      { spaceId: 'space-2', assetId: 'asset-1' },
+      {
+        jobId: 'shared-space-face-match/space-2/asset-1',
+        removeOnComplete: true,
+      },
+    );
+    expect(queue.add).toHaveBeenCalledWith(JobName.SharedSpaceFaceMatchAll, { spaceId: 'space-1' }, {
+      jobId: 'shared-space-face-match-all/space-1',
+      removeOnComplete: true,
+    });
+    expect(queue.add).toHaveBeenCalledWith(JobName.SharedSpaceFaceMatchPage, { spaceId: 'space-1' }, {
+      jobId: 'shared-space-face-match-page/space-1/start',
+      removeOnComplete: true,
+    });
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SharedSpaceFaceMatchPage,
+      { spaceId: 'space-1', afterAssetId: 'asset-9' },
+      {
+        jobId: 'shared-space-face-match-page/space-1/after/asset-9',
+        removeOnComplete: true,
+      },
+    );
+    expect(queue.add).toHaveBeenCalledWith(JobName.SharedSpacePersonDedup, { spaceId: 'space-1' }, {
+      jobId: 'space-dedup-space-1',
+      removeOnComplete: true,
+    });
+    expect(queue.add).toHaveBeenCalledWith(JobName.SharedSpaceIdentityReconciliation, { spaceId: 'space-1' }, {
+      jobId: 'space-identity-reconcile-space-1-all-members-all-people',
+      removeOnComplete: true,
+    });
+    for (const [, , options] of queue.add.mock.calls) {
+      expect(options).not.toHaveProperty('removeOnFail', true);
+    }
   });
 });
