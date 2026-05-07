@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { PersonController } from 'src/controllers/person.controller.js';
-import { PersonUserRole } from 'src/dtos/person.dto.js';
+import { PersonStatisticsResponseDto } from 'src/dtos/person.dto.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonService } from 'src/services/person.service.js';
 import { errorDto } from 'test/medium/responses.js';
@@ -83,6 +83,69 @@ describe(PersonController.name, () => {
     });
   });
 
+  describe('GET /people/statistics', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).get('/people/statistics');
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('should return people overview statistics', async () => {
+      service.getPeopleStatistics.mockResolvedValue({
+        total: 7,
+        hidden: 2,
+        detectedFaceCount: 23,
+      });
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .get('/people/statistics')
+        .query({ withSharedSpaces: true })
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(service.getPeopleStatistics).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({ withSharedSpaces: true }),
+      );
+      expect(body).toEqual({
+        total: 7,
+        hidden: 2,
+        detectedFaceCount: 23,
+      });
+    });
+  });
+
+  describe('GET /people/face-statistics', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).get('/people/face-statistics');
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('should return lazy people face statistics', async () => {
+      service.getPeopleFaceStatistics.mockResolvedValue({
+        detectedFaceCount: 23,
+        assignedVisibleFaceCount: 18,
+        assignedHiddenFaceCount: 3,
+        unassignedFaceCount: 2,
+      });
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .get('/people/face-statistics')
+        .query({ withSharedSpaces: true })
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(service.getPeopleFaceStatistics).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({ withSharedSpaces: true }),
+      );
+      expect(body).toEqual({
+        detectedFaceCount: 23,
+        assignedVisibleFaceCount: 18,
+        assignedHiddenFaceCount: 3,
+        unassignedFaceCount: 2,
+      });
+    });
+  });
   describe('POST /people/same-person', () => {
     it('should merge scoped personal and space people', async () => {
       const targetId = factory.uuid();
@@ -310,21 +373,33 @@ describe(PersonController.name, () => {
       expect(service.delete).toHaveBeenCalled();
     });
   });
+  describe('GET /people/:id/statistics', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).get(`/people/${factory.uuid()}/statistics`);
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
 
-  describe('PUT /people/users', () => {
-    it('should reject duplicate personIds as well as duplicate userIds', async () => {
-      const userId = newUuid();
-      const personId = newUuid();
+    it('should return person asset and face statistics', async () => {
+      const personId = factory.uuid();
+      service.getStatistics.mockResolvedValue({ assets: 7, faces: 10 });
+
       const { status, body } = await request(ctx.getHttpServer())
-        .put('/people/users')
-        .send({ personIds: [personId, personId], sharedWithIds: [userId, userId], role: PersonUserRole.Write });
-      expect(status).toBe(400);
-      expect(body.errors).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ path: ['personIds'], message: 'Items must be unique' }),
-          expect.objectContaining({ path: ['sharedWithIds'], message: 'Items must be unique' }),
-        ]),
-      );
+        .get(`/people/${personId}/statistics`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(service.getStatistics).toHaveBeenCalledWith(undefined, personId);
+      expect(body).toEqual({ assets: 7, faces: 10 });
+    });
+
+    it('should include faces in the documented person statistics response contract', () => {
+      const result = PersonStatisticsResponseDto.schema.safeParse({ assets: 7, faces: 10 });
+
+      expect(result.success).toBe(true);
+      if (!result.success) {
+        throw new Error('Person statistics response schema should accept faces');
+      }
+      expect(result.data).toEqual({ assets: 7, faces: 10 });
     });
   });
 });

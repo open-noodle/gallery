@@ -3,6 +3,7 @@
   import { page } from '$app/state';
   import { scrollMemory } from '#lib/actions/scroll-memory.ts';
   import ActionMenuItem from '#lib/components/ActionMenuItem.svelte';
+  import PeopleFaceStatisticsInfo from '#lib/components/people/people-face-statistics-info.svelte';
   import PeopleManagementGrid from '#lib/components/people/people-management-grid.svelte';
   import type { ManagedPerson } from '#lib/components/people/people-types.ts';
   import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
@@ -12,7 +13,6 @@
   import OnEvents from '#lib/components/OnEvents.svelte';
   import { QueryParameter, SessionStorageKey } from '#lib/constants.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
-  import PeopleFilterModal from '#lib/modals/PeopleFilterModal.svelte';
   import PersonMergeSuggestionModal from '#lib/modals/PersonMergeSuggestionModal.svelte';
   import { Route } from '#lib/route.ts';
   import { getPersonActions } from '#lib/services/person.service.ts';
@@ -23,8 +23,10 @@
   import { getGlobalPersonHref, getGlobalPersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { clearQueryParam } from '#lib/utils/navigation.ts';
+  import { formatPeopleHeaderDescription } from '#lib/utils/people-statistics.ts';
   import {
     getAllPeople,
+    getPeopleFaceStatistics,
     getPerson,
     searchPerson,
     updatePerson,
@@ -263,11 +265,29 @@
   let people = $derived(data.people.people);
   const { ManageAccess } = $derived(getPeopleUserActions($t, clusterGroupUsers, nextPage ? undefined : people));
 
-  // hidden people are only shown when explicitly filtering for them
-  let visiblePeople = $derived(data.filter.isHidden ? people : people.filter((people) => !people.isHidden));
-  let countVisiblePeople = $derived(
-    searchName ? searchedPeopleLocal.length : data.people.total - (data.filter.isHidden ? 0 : data.people.hidden),
+  let visiblePeople = $derived(people.filter((people) => !people.isHidden));
+  let overviewStatistics = $derived(data.peopleStatistics);
+  let peopleCountStatistics = $derived(overviewStatistics ?? data.people);
+  let hasUnsupportedStatsFilter = $derived(
+    !!page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE) || !!searchName.trim(),
   );
+  let countVisiblePeople = $derived(
+    searchName ? searchedPeopleLocal.length : peopleCountStatistics.total - peopleCountStatistics.hidden,
+  );
+  let headerDescription = $derived(
+    formatPeopleHeaderDescription({
+      visiblePeopleCount: countVisiblePeople,
+      detectedFaceCount: overviewStatistics?.detectedFaceCount,
+      locale: $locale,
+      faceSingular: $t('face'),
+      facePlural: $t('faces'),
+      includeFaceCount: !!overviewStatistics && !hasUnsupportedStatsFilter,
+      showZeroPeople: hasUnsupportedStatsFilter || (overviewStatistics?.detectedFaceCount ?? 0) > 0,
+    }),
+  );
+  let showFaceStatisticsInfo = $derived(!!overviewStatistics && !hasUnsupportedStatsFilter && !!headerDescription);
+  let globalFaceStatisticsCacheKey = $derived(`user:${authManager.user.id}:global:people:withSharedSpaces=true`);
+  const loadGlobalFaceStatistics = () => getPeopleFaceStatistics({ withSharedSpaces: true });
   let showPeople = $derived(searchName ? searchedPeopleLocal : visiblePeople);
 
   const getPersonHref = (person: PersonResponseDto) => getGlobalPersonHref(person, Route.people());
@@ -394,7 +414,7 @@
 
 <UserPageLayout
   title={$t('people')}
-  description={countVisiblePeople === 0 && !searchName ? undefined : `(${countVisiblePeople.toLocaleString($locale)})`}
+  description={headerDescription}
   use={[
     [
       scrollMemory,
@@ -413,6 +433,12 @@
     ],
   ]}
 >
+  {#snippet descriptionTrailing()}
+    {#if showFaceStatisticsInfo}
+      <PeopleFaceStatisticsInfo cacheKey={globalFaceStatisticsCacheKey} loadStatistics={loadGlobalFaceStatistics} />
+    {/if}
+  {/snippet}
+
   {#snippet buttons()}
     <div class="flex items-center justify-center gap-2">
       {#if people.length > 0}
