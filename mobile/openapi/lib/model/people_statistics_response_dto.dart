@@ -10,15 +10,15 @@
 
 part of openapi.api;
 
-class SharedSpacePeopleStatisticsResponseDto {
-  /// Returns a new [SharedSpacePeopleStatisticsResponseDto] instance.
-  SharedSpacePeopleStatisticsResponseDto({
+class PeopleStatisticsResponseDto {
+  /// Returns a new [PeopleStatisticsResponseDto] instance.
+  PeopleStatisticsResponseDto({
     required this.detectedFaceCount,
     required this.hidden,
     required this.total,
   });
 
-  /// Number of detected faces in the shared-space people scope
+  /// Number of detected faces in the accessible people scope
   ///
   /// Minimum value: 0
   /// Maximum value: 9007199254740991
@@ -37,7 +37,7 @@ class SharedSpacePeopleStatisticsResponseDto {
   int total;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is SharedSpacePeopleStatisticsResponseDto &&
+  bool operator ==(Object other) => identical(this, other) || other is PeopleStatisticsResponseDto &&
     other.detectedFaceCount == detectedFaceCount &&
     other.hidden == hidden &&
     other.total == total;
@@ -50,7 +50,7 @@ class SharedSpacePeopleStatisticsResponseDto {
     (total.hashCode);
 
   @override
-  String toString() => 'SharedSpacePeopleStatisticsResponseDto[detectedFaceCount=$detectedFaceCount, hidden=$hidden, total=$total]';
+  String toString() => 'PeopleStatisticsResponseDto[detectedFaceCount=$detectedFaceCount, hidden=$hidden, total=$total]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -60,15 +60,15 @@ class SharedSpacePeopleStatisticsResponseDto {
     return json;
   }
 
-  /// Returns a new [SharedSpacePeopleStatisticsResponseDto] instance and imports its values from
+  /// Returns a new [PeopleStatisticsResponseDto] instance and imports its values from
   /// [value] if it's a [Map], null otherwise.
   // ignore: prefer_constructors_over_static_methods
-  static SharedSpacePeopleStatisticsResponseDto? fromJson(dynamic value) {
-    upgradeDto(value, "SharedSpacePeopleStatisticsResponseDto");
+  static PeopleStatisticsResponseDto? fromJson(dynamic value) {
+    upgradeDto(value, "PeopleStatisticsResponseDto");
     if (value is Map) {
       final json = value.cast<String, dynamic>();
 
-      return SharedSpacePeopleStatisticsResponseDto(
+      return PeopleStatisticsResponseDto(
         detectedFaceCount: mapValueOfType<int>(json, r'detectedFaceCount')!,
         hidden: mapValueOfType<int>(json, r'hidden')!,
         total: mapValueOfType<int>(json, r'total')!,
@@ -77,11 +77,11 @@ class SharedSpacePeopleStatisticsResponseDto {
     return null;
   }
 
-  static List<SharedSpacePeopleStatisticsResponseDto> listFromJson(dynamic json, {bool growable = false,}) {
-    final result = <SharedSpacePeopleStatisticsResponseDto>[];
+  static List<PeopleStatisticsResponseDto> listFromJson(dynamic json, {bool growable = false,}) {
+    final result = <PeopleStatisticsResponseDto>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
-        final value = SharedSpacePeopleStatisticsResponseDto.fromJson(row);
+        final value = PeopleStatisticsResponseDto.fromJson(row);
         if (value != null) {
           result.add(value);
         }
@@ -90,12 +90,12 @@ class SharedSpacePeopleStatisticsResponseDto {
     return result.toList(growable: growable);
   }
 
-  static Map<String, SharedSpacePeopleStatisticsResponseDto> mapFromJson(dynamic json) {
-    final map = <String, SharedSpacePeopleStatisticsResponseDto>{};
+  static Map<String, PeopleStatisticsResponseDto> mapFromJson(dynamic json) {
+    final map = <String, PeopleStatisticsResponseDto>{};
     if (json is Map && json.isNotEmpty) {
       json = json.cast<String, dynamic>(); // ignore: parameter_assignments
       for (final entry in json.entries) {
-        final value = SharedSpacePeopleStatisticsResponseDto.fromJson(entry.value);
+        final value = PeopleStatisticsResponseDto.fromJson(entry.value);
         if (value != null) {
           map[entry.key] = value;
         }
@@ -104,14 +104,14 @@ class SharedSpacePeopleStatisticsResponseDto {
     return map;
   }
 
-  // maps a json object with a list of SharedSpacePeopleStatisticsResponseDto-objects as value to a dart map
-  static Map<String, List<SharedSpacePeopleStatisticsResponseDto>> mapListFromJson(dynamic json, {bool growable = false,}) {
-    final map = <String, List<SharedSpacePeopleStatisticsResponseDto>>{};
+  // maps a json object with a list of PeopleStatisticsResponseDto-objects as value to a dart map
+  static Map<String, List<PeopleStatisticsResponseDto>> mapListFromJson(dynamic json, {bool growable = false,}) {
+    final map = <String, List<PeopleStatisticsResponseDto>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = SharedSpacePeopleStatisticsResponseDto.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = PeopleStatisticsResponseDto.listFromJson(entry.value, growable: growable,);
       }
     }
     return map;
