@@ -23,6 +23,26 @@ beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
 
+const expectStats = (
+  result: {
+    detectedFaceCount: number;
+    assignedVisibleFaceCount: number;
+    assignedHiddenFaceCount: number;
+    unassignedFaceCount: number;
+  },
+  expected: {
+    detectedFaceCount: number;
+    assignedVisibleFaceCount: number;
+    assignedHiddenFaceCount: number;
+    unassignedFaceCount: number;
+  },
+) => {
+  expect(Number(result.detectedFaceCount)).toBe(expected.detectedFaceCount);
+  expect(Number(result.assignedVisibleFaceCount)).toBe(expected.assignedVisibleFaceCount);
+  expect(Number(result.assignedHiddenFaceCount)).toBe(expected.assignedHiddenFaceCount);
+  expect(Number(result.unassignedFaceCount)).toBe(expected.unassignedFaceCount);
+};
+
 describe(SharedSpaceRepository.name, () => {
   // ==========================================
   // Space CRUD
@@ -1958,7 +1978,10 @@ describe(SharedSpaceRepository.name, () => {
       const { assetFace: assignedFace } = await ctx.newAssetFace({ assetId: assignedAsset.id });
       await sut.addPersonFaces([{ personId: person.id, assetFaceId: assignedFace.id }], { skipRecount: true });
 
-      const { asset: identityOnlyAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { asset: identityOnlyAsset } = await ctx.newAsset({
+        ownerId: user.id,
+        visibility: AssetVisibility.Timeline,
+      });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: identityOnlyAsset.id, addedById: user.id });
       const { assetFace: identityOnlyFace } = await ctx.newAssetFace({ assetId: identityOnlyAsset.id });
       await ctx.database
@@ -2015,26 +2038,6 @@ describe(SharedSpaceRepository.name, () => {
   });
 
   describe('getPeopleFaceStatisticsBySpaceId', () => {
-    const expectStats = (
-      result: {
-        detectedFaceCount: number;
-        assignedVisibleFaceCount: number;
-        assignedHiddenFaceCount: number;
-        unassignedFaceCount: number;
-      },
-      expected: {
-        detectedFaceCount: number;
-        assignedVisibleFaceCount: number;
-        assignedHiddenFaceCount: number;
-        unassignedFaceCount: number;
-      },
-    ) => {
-      expect(Number(result.detectedFaceCount)).toBe(expected.detectedFaceCount);
-      expect(Number(result.assignedVisibleFaceCount)).toBe(expected.assignedVisibleFaceCount);
-      expect(Number(result.assignedHiddenFaceCount)).toBe(expected.assignedHiddenFaceCount);
-      expect(Number(result.unassignedFaceCount)).toBe(expected.unassignedFaceCount);
-    };
-
     it('getPeopleFaceStatisticsBySpaceId splits selected-space faces into visible, hidden, and unassigned buckets', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
@@ -2271,7 +2274,11 @@ describe(SharedSpaceRepository.name, () => {
       const { assetFace: assignedFace } = await ctx.newAssetFace({ assetId: matchingAsset.id });
       await ctx.newAssetFace({ assetId: matchingAsset.id });
       const { assetFace: nonMatchingFace } = await ctx.newAssetFace({ assetId: nonMatchingAsset.id });
-      const person = await sut.createPerson({ spaceId: space.id, name: 'Alice', representativeFaceId: assignedFace.id });
+      const person = await sut.createPerson({
+        spaceId: space.id,
+        name: 'Alice',
+        representativeFaceId: assignedFace.id,
+      });
       await sut.addPersonFaces(
         [
           { personId: person.id, assetFaceId: assignedFace.id },

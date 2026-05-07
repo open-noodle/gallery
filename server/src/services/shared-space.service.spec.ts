@@ -4567,7 +4567,7 @@ describe(SharedSpaceService.name, () => {
     });
 
     it('rejects non-members before reading statistics', async () => {
-      mocks.sharedSpace.getMember.mockResolvedValue(undefined);
+      mocks.sharedSpace.getMember.mockResolvedValue();
 
       await expect(sut.getSpacePersonStatistics(factory.auth(), 'space-1', 'person-1')).rejects.toThrow(
         'Not a member',

@@ -139,9 +139,7 @@ describe(SharedSpaceController.name, () => {
 
   describe('GET /shared-spaces/:id/people/:personId/statistics', () => {
     it('should be an authenticated route', async () => {
-      await request(ctx.getHttpServer()).get(
-        `/shared-spaces/${factory.uuid()}/people/${factory.uuid()}/statistics`,
-      );
+      await request(ctx.getHttpServer()).get(`/shared-spaces/${factory.uuid()}/people/${factory.uuid()}/statistics`);
 
       expect(ctx.authenticate).toHaveBeenCalled();
     });

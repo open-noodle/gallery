@@ -527,7 +527,12 @@ export class PersonRepository {
         .innerJoin('asset_face', 'asset_face.personId', 'person.id')
         .innerJoin('asset', 'asset.id', 'asset_face.assetId')
         .select((eb) => eb.fn.count(eb.fn('distinct', ['person.id'])).as('total'))
-        .select((eb) => eb.fn.count(eb.fn('distinct', ['person.id'])).filterWhere('person.isHidden', '=', true).as('hidden'))
+        .select((eb) =>
+          eb.fn
+            .count(eb.fn('distinct', ['person.id']))
+            .filterWhere('person.isHidden', '=', true)
+            .as('hidden'),
+        )
         .where('person.ownerId', '=', userId)
         .where('asset.ownerId', '=', userId)
         .where('asset.deletedAt', 'is', null)

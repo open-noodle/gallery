@@ -215,13 +215,13 @@ describe(PersonService.name, () => {
         detectedFaceCount: 11,
       });
 
-      await expect(sut.getPeopleStatistics(auth, { withSharedSpaces: true, page: 4, size: 10 } as any)).resolves.toEqual(
-        {
-          total: 3,
-          hidden: 1,
-          detectedFaceCount: 11,
-        },
-      );
+      await expect(
+        sut.getPeopleStatistics(auth, { withSharedSpaces: true, page: 4, size: 10 } as any),
+      ).resolves.toEqual({
+        total: 3,
+        hidden: 1,
+        detectedFaceCount: 11,
+      });
 
       expect((mocks.faceIdentity as any).getAccessiblePeopleStatistics).toHaveBeenCalledWith(auth.user.id, {
         minimumFaceCount: 3,
@@ -2549,7 +2549,10 @@ describe(PersonService.name, () => {
       (mocks.faceIdentity as any).getAccessiblePersonStatistics.mockResolvedValue({ assets: 7, faces: 9 });
 
       await expect(sut.getStatistics(auth, person.id)).resolves.toEqual({ assets: 7, faces: 9 });
-      expect((mocks.faceIdentity as any).getAccessiblePersonStatistics).toHaveBeenCalledWith(auth.user.id, 'identity-1');
+      expect((mocks.faceIdentity as any).getAccessiblePersonStatistics).toHaveBeenCalledWith(
+        auth.user.id,
+        'identity-1',
+      );
       expect(mocks.person.getStatistics).not.toHaveBeenCalled();
     });
 
@@ -2557,16 +2560,13 @@ describe(PersonService.name, () => {
       const auth = AuthFactory.create();
       const personId = newUuid();
 
-      mocks.person.getById.mockResolvedValue(undefined);
+      mocks.person.getById.mockResolvedValue();
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
       (mocks.faceIdentity as any).getAccessibleProfileIdentityId.mockResolvedValue('identity-from-space');
       (mocks.faceIdentity as any).getAccessiblePersonStatistics.mockResolvedValue({ assets: 11, faces: 13 });
 
       await expect(sut.getStatistics(auth, personId)).resolves.toEqual({ assets: 11, faces: 13 });
-      expect((mocks.faceIdentity as any).getAccessibleProfileIdentityId).toHaveBeenCalledWith(
-        auth.user.id,
-        personId,
-      );
+      expect((mocks.faceIdentity as any).getAccessibleProfileIdentityId).toHaveBeenCalledWith(auth.user.id, personId);
       expect((mocks.faceIdentity as any).getAccessiblePersonStatistics).toHaveBeenCalledWith(
         auth.user.id,
         'identity-from-space',
@@ -2577,9 +2577,9 @@ describe(PersonService.name, () => {
       const auth = AuthFactory.create();
       const personId = newUuid();
 
-      mocks.person.getById.mockResolvedValue(undefined);
+      mocks.person.getById.mockResolvedValue();
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
-      (mocks.faceIdentity as any).getAccessibleProfileIdentityId.mockResolvedValue(undefined);
+      (mocks.faceIdentity as any).getAccessibleProfileIdentityId.mockResolvedValue();
 
       await expect(sut.getStatistics(auth, personId)).rejects.toThrow('Not found or no person.read access');
       expect((mocks.faceIdentity as any).getAccessiblePersonStatistics).not.toHaveBeenCalled();

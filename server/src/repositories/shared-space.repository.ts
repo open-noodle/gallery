@@ -741,7 +741,7 @@ export class SharedSpaceRepository {
     const visibilityFilter = sql`"asset"."visibility" IN (${sql.join(visibleSpaceAssetVisibilities)})`;
     const takenAfterFilter = options.takenAfter ? sql`AND "asset"."fileCreatedAt" >= ${options.takenAfter}` : sql``;
     const takenBeforeFilter = options.takenBefore ? sql`AND "asset"."fileCreatedAt" < ${options.takenBefore}` : sql``;
-    const petPersonFilter = !options.petsEnabled ? sql`AND "shared_space_person"."type" != 'pet'` : sql``;
+    const petPersonFilter = options.petsEnabled ? sql`` : sql`AND "shared_space_person"."type" != 'pet'`;
     const namedPersonFilter = options.named ? sql`AND "shared_space_person"."name" != ''` : sql``;
     const namePersonFilter = namePattern
       ? sql`AND "shared_space_person"."name" ILIKE ${namePattern} ESCAPE '\\'`
@@ -775,8 +775,9 @@ export class SharedSpaceRepository {
               ${namePersonFilter}
           )
         `
-      : !options.petsEnabled
-        ? sql`
+      : options.petsEnabled
+        ? sql``
+        : sql`
             AND NOT EXISTS (
               SELECT 1
               FROM "shared_space_person_face"
@@ -786,8 +787,7 @@ export class SharedSpaceRepository {
                 AND "shared_space_person"."spaceId" = ${spaceId}
                 AND "shared_space_person"."type" = 'pet'
             )
-          `
-        : sql``;
+          `;
 
     const result = await sql<{ total: number; hidden: number; detectedFaceCount: number }>`
       WITH "asset_scope" AS (
@@ -870,7 +870,7 @@ export class SharedSpaceRepository {
     const visibilityFilter = sql`"asset"."visibility" IN (${sql.join(visibleSpaceAssetVisibilities)})`;
     const takenAfterFilter = options.takenAfter ? sql`AND "asset"."fileCreatedAt" >= ${options.takenAfter}` : sql``;
     const takenBeforeFilter = options.takenBefore ? sql`AND "asset"."fileCreatedAt" < ${options.takenBefore}` : sql``;
-    const petPersonFilter = !options.petsEnabled ? sql`AND "shared_space_person"."type" != 'pet'` : sql``;
+    const petPersonFilter = options.petsEnabled ? sql`` : sql`AND "shared_space_person"."type" != 'pet'`;
     const namedPersonFilter = options.named ? sql`AND "shared_space_person"."name" != ''` : sql``;
     const namePersonFilter = namePattern
       ? sql`AND "shared_space_person"."name" ILIKE ${namePattern} ESCAPE '\\'`
@@ -878,9 +878,9 @@ export class SharedSpaceRepository {
     const hasAssignedPersonFaceFilter = !!options.named || !!namePattern;
     const includeFaceFilter = hasAssignedPersonFaceFilter
       ? sql`WHERE "hasMatchingAssignment" = true`
-      : !options.petsEnabled
-        ? sql`WHERE "hasPetAssignment" = false`
-        : sql``;
+      : options.petsEnabled
+        ? sql``
+        : sql`WHERE "hasPetAssignment" = false`;
 
     const result = await sql<PeopleFaceStatistics>`
       WITH "asset_scope" AS (
