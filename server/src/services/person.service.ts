@@ -800,7 +800,11 @@ export class PersonService extends BaseService {
   }
 
   @OnJob({ name: JobName.FacialRecognition, queue: QueueName.FacialRecognition })
-  async handleRecognizeFaces({ id, deferred }: JobOf<JobName.FacialRecognition>): Promise<JobStatus> {
+  async handleRecognizeFaces({
+    id,
+    deferred,
+    skipSharedSpaceMatch,
+  }: JobOf<JobName.FacialRecognition>): Promise<JobStatus> {
     const { machineLearning } = await this.getConfig({ withCache: true });
     if (!isFacialRecognitionEnabled(machineLearning)) {
       return JobStatus.Skipped;
@@ -825,6 +829,10 @@ export class PersonService extends BaseService {
     if (face.personId) {
       this.logger.debug(`Face ${id} already has a person assigned`);
       await this.replaceFaceIdentity(face.personId, face.id, 'owner-person');
+
+      if (skipSharedSpaceMatch) {
+        return JobStatus.Skipped;
+      }
 
       // Still queue space face matching — this face may belong to a space
       // that was created/linked after the face was originally recognized.
@@ -859,7 +867,9 @@ export class PersonService extends BaseService {
         });
 
     // `matches` also includes the face itself
-    if (machineLearning.facialRecognition.minFaces > 1 && matches.length <= 1 && !accessibleIdentityMatch) {
+    const matchedOnlySelf =
+      machineLearning.facialRecognition.minFaces > 1 && matches.length <= 1 && !accessibleIdentityMatch;
+    if (matchedOnlySelf && !skipSharedSpaceMatch) {
       this.logger.debug(`Face ${id} only matched the face itself, skipping`);
       return JobStatus.Skipped;
     }
@@ -869,7 +879,19 @@ export class PersonService extends BaseService {
       face.asset.visibility === AssetVisibility.Timeline;
     if (!isCore && !deferred) {
       this.logger.debug(`Deferring non-core face ${id} for later processing`);
-      await this.jobRepository.queue({ name: JobName.FacialRecognition, data: { id, deferred: true } });
+      await this.jobRepository.queue({
+        name: JobName.FacialRecognition,
+        data: {
+          id,
+          deferred: true,
+          ...(skipSharedSpaceMatch ? { skipSharedSpaceMatch: true } : {}),
+        },
+      });
+      return JobStatus.Skipped;
+    }
+
+    if (matchedOnlySelf) {
+      this.logger.debug(`Face ${id} only matched the face itself, skipping`);
       return JobStatus.Skipped;
     }
 
@@ -908,6 +930,10 @@ export class PersonService extends BaseService {
         sourceIdentityId,
         match: personId === createdPersonId ? accessibleIdentityMatch : undefined,
       });
+    }
+
+    if (skipSharedSpaceMatch) {
+      return JobStatus.Success;
     }
 
     // Queue shared space face matching for any spaces containing this asset
