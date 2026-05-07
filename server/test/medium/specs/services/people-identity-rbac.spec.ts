@@ -894,6 +894,53 @@ describe('People identity RBAC projection', () => {
     expect(afterRemoval).toEqual({ people: [], total: 0, hidden: 0, hasNextPage: false });
   });
 
+  it('matches one photo independently across ten face-recognition spaces', async () => {
+    const { ctx, sut: sharedSpaceService, faceIdentityRepository } = setupSharedSpace();
+    const { user: owner } = await ctx.newUser();
+    const { result: person } = await ctx.newPerson({ ownerId: owner.id, name: 'Ten Space Source' });
+    const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+    const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    await ctx.database.insertInto('face_search').values({ faceId, embedding: newEmbedding() }).execute();
+    const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+    await faceIdentityRepository.linkFace({ assetFaceId: faceId, identityId: identity.id, source: 'owner-person' });
+
+    const spaces = [];
+    for (let index = 0; index < 10; index++) {
+      const { space } = await ctx.newSharedSpace({
+        createdById: owner.id,
+        faceRecognitionEnabled: true,
+        name: `Space ${index}`,
+      });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+      spaces.push(space);
+    }
+
+    for (const space of spaces) {
+      await sharedSpaceService.handleSharedSpaceFaceMatch({ spaceId: space.id, assetId: asset.id });
+    }
+
+    const faceRows = await ctx.database
+      .selectFrom('shared_space_person_face')
+      .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_face.personId')
+      .select([
+        'shared_space_person.id as personId',
+        'shared_space_person.spaceId as spaceId',
+        'shared_space_person.identityId as identityId',
+      ])
+      .where('shared_space_person_face.assetFaceId', '=', faceId)
+      .execute();
+
+    expect(faceRows).toHaveLength(10);
+    expect(new Set(faceRows.map((row) => row.spaceId))).toEqual(new Set(spaces.map((space) => space.id)));
+    expect(new Set(faceRows.map((row) => row.personId)).size).toBe(10);
+    expect(faceRows).toEqual(
+      expect.arrayContaining(
+        spaces.map((space) => expect.objectContaining({ spaceId: space.id, identityId: identity.id })),
+      ),
+    );
+  });
+
   it('inherits an owner name into a space person and updates global people for later invitees after owner rename', async () => {
     const { ctx, sut, faceIdentityRepository } = setup();
     const { sut: sharedSpaceService } = setupSharedSpace();

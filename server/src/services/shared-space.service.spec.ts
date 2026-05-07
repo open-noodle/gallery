@@ -3725,7 +3725,9 @@ describe(SharedSpaceService.name, () => {
 
     it('does not queue final follow-up for empty, deleted, or disabled spaces', async () => {
       const spaceId = newUuid();
-      mocks.sharedSpace.getById.mockResolvedValueOnce(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.sharedSpace.getById.mockResolvedValueOnce(
+        factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }),
+      );
       mocks.sharedSpace.getAssetIdsInSpacePage.mockResolvedValueOnce([]);
 
       expect(await sut.handleSharedSpaceFaceMatchPage({ spaceId, batchSize: 2 })).toBe(JobStatus.Success);
@@ -3733,10 +3735,14 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getById.mockResolvedValueOnce(void 0);
       expect(await sut.handleSharedSpaceFaceMatchPage({ spaceId, batchSize: 2 })).toBe(JobStatus.Skipped);
 
-      mocks.sharedSpace.getById.mockResolvedValueOnce(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: false }));
+      mocks.sharedSpace.getById.mockResolvedValueOnce(
+        factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: false }),
+      );
       expect(await sut.handleSharedSpaceFaceMatchPage({ spaceId, batchSize: 2 })).toBe(JobStatus.Skipped);
 
-      expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpacePersonDedup }));
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.SharedSpacePersonDedup }),
+      );
       expect(mocks.job.queue).not.toHaveBeenCalledWith(
         expect.objectContaining({ name: JobName.SharedSpaceIdentityReconciliation }),
       );
@@ -3752,7 +3758,9 @@ describe(SharedSpaceService.name, () => {
 
       expect(await sut.handleSharedSpaceFaceMatchPage({ spaceId, batchSize: 2 })).toBe(JobStatus.Success);
 
-      expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpacePersonDedup }));
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.SharedSpacePersonDedup }),
+      );
       expect(mocks.job.queue).not.toHaveBeenCalledWith(
         expect.objectContaining({ name: JobName.SharedSpaceIdentityReconciliation }),
       );
@@ -3932,7 +3940,9 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.job.queue).not.toHaveBeenCalledWith(
         expect.objectContaining({ name: JobName.SharedSpaceFaceMatchPage }),
       );
-      expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpacePersonDedup }));
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.SharedSpacePersonDedup }),
+      );
       expect(mocks.job.queue).not.toHaveBeenCalledWith(
         expect.objectContaining({ name: JobName.SharedSpaceIdentityReconciliation }),
       );
@@ -3956,7 +3966,9 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.job.queue).not.toHaveBeenCalledWith(
         expect.objectContaining({ name: JobName.SharedSpaceFaceMatchPage }),
       );
-      expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpacePersonDedup }));
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.SharedSpacePersonDedup }),
+      );
       expect(mocks.job.queue).not.toHaveBeenCalledWith(
         expect.objectContaining({ name: JobName.SharedSpaceIdentityReconciliation }),
       );

@@ -28,8 +28,8 @@ const setup = (counts: JobCounts[] = []) => {
     add: vi.fn().mockResolvedValue({}),
     addBulk: vi.fn().mockResolvedValue([]),
     clean: vi.fn().mockResolvedValue([]),
-    drain: vi.fn().mockResolvedValue(undefined),
-    getJob: vi.fn().mockResolvedValue(undefined),
+    drain: vi.fn().mockResolvedValue(void 0),
+    getJob: vi.fn().mockResolvedValue(void 0),
     getJobCounts: vi.fn().mockResolvedValue(emptyCounts()),
     getJobs: vi.fn().mockResolvedValue([]),
     isPaused: vi.fn().mockResolvedValue(false),
@@ -262,7 +262,7 @@ describe(JobRepository.name, () => {
     const { sut, queue } = setup();
     const failedJob = {
       getState: vi.fn().mockResolvedValue('failed'),
-      remove: vi.fn().mockResolvedValue(undefined),
+      remove: vi.fn().mockResolvedValue(void 0),
     };
     queue.getJob.mockResolvedValue(failedJob);
     setHandlers(sut, [JobName.FacialRecognitionQueueAll]);
@@ -289,8 +289,8 @@ describe(JobRepository.name, () => {
       const existingJob = {
         data: { force: true },
         getState: vi.fn().mockResolvedValue(state),
-        remove: vi.fn().mockResolvedValue(undefined),
-        updateData: vi.fn().mockResolvedValue(undefined),
+        remove: vi.fn().mockResolvedValue(void 0),
+        updateData: vi.fn().mockResolvedValue(void 0),
       };
       queue.getJob.mockResolvedValue(existingJob);
       setHandlers(sut, [JobName.FacialRecognitionQueueAll]);
@@ -319,8 +319,8 @@ describe(JobRepository.name, () => {
       const existingJob = {
         data: { force: false, nightly: true },
         getState: vi.fn().mockResolvedValue(state),
-        remove: vi.fn().mockResolvedValue(undefined),
-        updateData: vi.fn().mockResolvedValue(undefined),
+        remove: vi.fn().mockResolvedValue(void 0),
+        updateData: vi.fn().mockResolvedValue(void 0),
       };
       queue.getJob.mockResolvedValue(existingJob);
       setHandlers(sut, [JobName.FacialRecognitionQueueAll]);
@@ -367,8 +367,8 @@ describe(JobRepository.name, () => {
     const existingJob = {
       data: { force: false },
       getState: vi.fn().mockResolvedValue('active'),
-      remove: vi.fn().mockResolvedValue(undefined),
-      updateData: vi.fn().mockResolvedValue(undefined),
+      remove: vi.fn().mockResolvedValue(void 0),
+      updateData: vi.fn().mockResolvedValue(void 0),
     };
     queue.getJob.mockResolvedValue(existingJob);
     setHandlers(sut, [JobName.FacialRecognitionQueueAll]);
@@ -395,8 +395,8 @@ describe(JobRepository.name, () => {
     const existingJob = {
       data: { force: true },
       getState: vi.fn().mockResolvedValue('active'),
-      remove: vi.fn().mockResolvedValue(undefined),
-      updateData: vi.fn().mockResolvedValue(undefined),
+      remove: vi.fn().mockResolvedValue(void 0),
+      updateData: vi.fn().mockResolvedValue(void 0),
     };
     queue.getJob.mockResolvedValue(existingJob);
     setHandlers(sut, [JobName.FacialRecognitionQueueAll]);
@@ -415,10 +415,10 @@ describe(JobRepository.name, () => {
     const activeForceFollowUp = {
       data: { force: true },
       getState: vi.fn().mockResolvedValue('active'),
-      remove: vi.fn().mockResolvedValue(undefined),
+      remove: vi.fn().mockResolvedValue(void 0),
     };
-    queue.getJob.mockImplementation(async (jobId: string) =>
-      jobId === 'FacialRecognitionQueueAll/force' ? activeForceFollowUp : undefined,
+    queue.getJob.mockImplementation((jobId: string) =>
+      Promise.resolve(jobId === 'FacialRecognitionQueueAll/force' ? activeForceFollowUp : void 0),
     );
     setHandlers(sut, [JobName.FacialRecognitionQueueAll]);
 
@@ -436,7 +436,7 @@ describe(JobRepository.name, () => {
     const { sut, queue } = setup();
     const failedJob = {
       getState: vi.fn().mockResolvedValue('failed'),
-      remove: vi.fn().mockResolvedValue(undefined),
+      remove: vi.fn().mockResolvedValue(void 0),
     };
     queue.getJob.mockResolvedValue(failedJob);
     setHandlers(sut, [JobName.SharedSpaceFaceMatchPage]);
@@ -493,14 +493,22 @@ describe(JobRepository.name, () => {
         removeOnComplete: true,
       },
     );
-    expect(queue.add).toHaveBeenCalledWith(JobName.SharedSpaceFaceMatchAll, { spaceId: 'space-1' }, {
-      jobId: 'shared-space-face-match-all/space-1',
-      removeOnComplete: true,
-    });
-    expect(queue.add).toHaveBeenCalledWith(JobName.SharedSpaceFaceMatchPage, { spaceId: 'space-1' }, {
-      jobId: 'shared-space-face-match-page/space-1/start',
-      removeOnComplete: true,
-    });
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SharedSpaceFaceMatchAll,
+      { spaceId: 'space-1' },
+      {
+        jobId: 'shared-space-face-match-all/space-1',
+        removeOnComplete: true,
+      },
+    );
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SharedSpaceFaceMatchPage,
+      { spaceId: 'space-1' },
+      {
+        jobId: 'shared-space-face-match-page/space-1/start',
+        removeOnComplete: true,
+      },
+    );
     expect(queue.add).toHaveBeenCalledWith(
       JobName.SharedSpaceFaceMatchPage,
       { spaceId: 'space-1', afterAssetId: 'asset-9' },
@@ -509,16 +517,24 @@ describe(JobRepository.name, () => {
         removeOnComplete: true,
       },
     );
-    expect(queue.add).toHaveBeenCalledWith(JobName.SharedSpacePersonDedup, { spaceId: 'space-1' }, {
-      jobId: 'space-dedup-space-1',
-      removeOnComplete: true,
-    });
-    expect(queue.add).toHaveBeenCalledWith(JobName.SharedSpaceIdentityReconciliation, { spaceId: 'space-1' }, {
-      jobId: 'space-identity-reconcile-space-1-all-members-all-people',
-      removeOnComplete: true,
-    });
-    for (const [, , options] of queue.add.mock.calls) {
-      expect(options).not.toHaveProperty('removeOnFail', true);
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SharedSpacePersonDedup,
+      { spaceId: 'space-1' },
+      {
+        jobId: 'space-dedup-space-1',
+        removeOnComplete: true,
+      },
+    );
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SharedSpaceIdentityReconciliation,
+      { spaceId: 'space-1' },
+      {
+        jobId: 'space-identity-reconcile-space-1-all-members-all-people',
+        removeOnComplete: true,
+      },
+    );
+    for (const call of queue.add.mock.calls) {
+      expect(call[2]).not.toHaveProperty('removeOnFail', true);
     }
   });
 });
