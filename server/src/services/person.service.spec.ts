@@ -33,7 +33,7 @@ import {
   getForDetectedFaces,
   getForFacialRecognitionJob,
 } from 'test/mappers';
-import { newDate, newUuid } from 'test/small.factory';
+import { factory, newDate, newUuid } from 'test/small.factory';
 import { makeStream, newTestService, ServiceMocks } from 'test/utils';
 
 describe(PersonService.name, () => {
@@ -1265,13 +1265,82 @@ describe(PersonService.name, () => {
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
           name: JobName.FacialRecognition,
-          data: { id: face.id, deferred: false },
+          data: { id: face.id, deferred: false, skipSharedSpaceMatch: true },
         },
       ]);
       expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.FacialRecognitionState, {
         lastRun: expect.any(String),
       });
       expect(mocks.person.vacuum).toHaveBeenCalledWith({ reindexVectors: false });
+    });
+
+    it('force recognition drains stale facial-recognition work after prerequisites and before clearing space people', async () => {
+      const face = AssetFaceFactory.create();
+      mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
+      mocks.person.getAllFaces.mockReturnValue(makeStream([face]));
+      mocks.person.getAllWithoutFaces.mockResolvedValue([]);
+      mocks.sharedSpace.deleteAllPersonFaces.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deleteAllPersons.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue([]);
+
+      await sut.handleQueueRecognizeFaces({ force: true });
+
+      expect(mocks.job.waitForQueueCompletion).toHaveBeenCalledWith(
+        QueueName.ThumbnailGeneration,
+        QueueName.FaceDetection,
+      );
+      expect(mocks.job.empty).toHaveBeenCalledWith(QueueName.FacialRecognition, true);
+      expect(mocks.job.waitForQueueCompletion.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.job.empty.mock.invocationCallOrder[0],
+      );
+      expect(mocks.job.empty.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.person.unassignFaces.mock.invocationCallOrder[0],
+      );
+      expect(mocks.job.empty.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.faceIdentity.unlinkFacesBySourceType.mock.invocationCallOrder[0],
+      );
+      expect(mocks.job.empty.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.sharedSpace.deleteAllPersonFaces.mock.invocationCallOrder[0],
+      );
+      expect(mocks.job.empty.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.sharedSpace.deleteAllPersons.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('force recognition queues personal face jobs with shared-space matching suppressed', async () => {
+      const face = AssetFaceFactory.create();
+      mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
+      mocks.person.getAllFaces.mockReturnValue(makeStream([face]));
+      mocks.person.getAllWithoutFaces.mockResolvedValue([]);
+      mocks.sharedSpace.deleteAllPersonFaces.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deleteAllPersons.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue([]);
+
+      await sut.handleQueueRecognizeFaces({ force: true });
+
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        {
+          name: JobName.FacialRecognition,
+          data: { id: face.id, deferred: false, skipSharedSpaceMatch: true },
+        },
+      ]);
+    });
+
+    it('non-force recognition keeps incremental shared-space matching enabled', async () => {
+      const face = AssetFaceFactory.create();
+      mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
+      mocks.person.getAllFaces.mockReturnValue(makeStream([face]));
+      mocks.person.getAllWithoutFaces.mockResolvedValue([]);
+
+      await sut.handleQueueRecognizeFaces({ force: false });
+
+      expect(mocks.job.empty).not.toHaveBeenCalledWith(QueueName.FacialRecognition, true);
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        {
+          name: JobName.FacialRecognition,
+          data: { id: face.id, deferred: false },
+        },
+      ]);
     });
 
     it('should unlink existing ML identity links when force resets recognition assignments', async () => {
@@ -1346,6 +1415,11 @@ describe(PersonService.name, () => {
       expect(mocks.systemMetadata.get).toHaveBeenCalledWith(SystemMetadataKey.FacialRecognitionState);
       expect(mocks.person.getLatestFaceDate).toHaveBeenCalledOnce();
       expect(mocks.person.getAllFaces).not.toHaveBeenCalled();
+      expect(mocks.job.empty).not.toHaveBeenCalledWith(QueueName.FacialRecognition, true);
+      expect(mocks.person.unassignFaces).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.unlinkFacesBySourceType).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.deleteAllPersonFaces).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.deleteAllPersons).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
       expect(mocks.systemMetadata.set).not.toHaveBeenCalled();
       expect(mocks.person.vacuum).not.toHaveBeenCalled();
@@ -1378,7 +1452,7 @@ describe(PersonService.name, () => {
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
           name: JobName.FacialRecognition,
-          data: { id: face.id, deferred: false },
+          data: { id: face.id, deferred: false, skipSharedSpaceMatch: true },
         },
       ]);
       expect(mocks.person.delete).toHaveBeenCalledWith([person.id]);

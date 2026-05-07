@@ -714,6 +714,10 @@ export class PersonService extends BaseService {
       }
     }
 
+    if (force) {
+      await this.jobRepository.empty(QueueName.FacialRecognition, true);
+    }
+
     const { waiting } = await this.jobRepository.getJobCounts(QueueName.FacialRecognition);
 
     if (force) {
@@ -741,9 +745,19 @@ export class PersonService extends BaseService {
       force ? undefined : { personId: null, sourceType: SourceType.MachineLearning },
     );
 
-    let jobs: { name: JobName.FacialRecognition; data: { id: string; deferred: false } }[] = [];
+    let jobs: {
+      name: JobName.FacialRecognition;
+      data: { id: string; deferred: false; skipSharedSpaceMatch?: true };
+    }[] = [];
     for await (const face of facePagination) {
-      jobs.push({ name: JobName.FacialRecognition, data: { id: face.id, deferred: false } });
+      jobs.push({
+        name: JobName.FacialRecognition,
+        data: {
+          id: face.id,
+          deferred: false,
+          ...(force ? { skipSharedSpaceMatch: true as const } : {}),
+        },
+      });
 
       if (jobs.length === JOBS_ASSET_PAGINATION_SIZE) {
         await this.jobRepository.queueAll(jobs);
