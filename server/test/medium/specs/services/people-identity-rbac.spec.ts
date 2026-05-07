@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { SearchSuggestionType } from 'src/dtos/search.dto';
-import { AssetVisibility, SharedSpaceRole } from 'src/enum';
+import { AssetVisibility, JobName, SharedSpaceRole } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { ConfigRepository } from 'src/repositories/config.repository';
@@ -65,6 +65,29 @@ const setupSharedSpace = (db?: Kysely<DB>) => {
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
   return { ctx, sut, faceIdentityRepository: ctx.get(FaceIdentityRepository), jobs };
+};
+
+const drainSharedSpaceFaceJobs = async (sharedSpaceService: SharedSpaceService, jobs: Mocked<JobRepository>) => {
+  let cursor = 0;
+  while (cursor < jobs.queue.mock.calls.length) {
+    const queued = jobs.queue.mock.calls.slice(cursor).map(([job]) => job);
+    cursor = jobs.queue.mock.calls.length;
+
+    for (const job of queued) {
+      if (job.name === JobName.SharedSpaceFaceMatchAll) {
+        await sharedSpaceService.handleSharedSpaceFaceMatchAll(job.data);
+      }
+      if (job.name === JobName.SharedSpaceFaceMatchPage) {
+        await sharedSpaceService.handleSharedSpaceFaceMatchPage(job.data);
+      }
+      if (job.name === JobName.SharedSpacePersonDedup) {
+        await sharedSpaceService.handleSharedSpacePersonDedup(job.data);
+      }
+      if (job.name === JobName.SharedSpaceIdentityReconciliation) {
+        await sharedSpaceService.handleSharedSpaceIdentityReconciliation(job.data);
+      }
+    }
+  }
 };
 
 const setupSearch = (db?: Kysely<DB>) => {
@@ -1245,15 +1268,7 @@ describe('People identity RBAC projection', () => {
       }),
     );
 
-    const queuedOnJoin = sharedJobs.queue.mock.calls.map(([job]) => job);
-    for (const job of queuedOnJoin) {
-      if (job.name === 'SharedSpaceFaceMatchAll') {
-        await sharedSpaceService.handleSharedSpaceFaceMatchAll(job.data);
-      }
-      if (job.name === 'SharedSpaceIdentityReconciliation') {
-        await sharedSpaceService.handleSharedSpaceIdentityReconciliation(job.data);
-      }
-    }
+    await drainSharedSpaceFaceJobs(sharedSpaceService, sharedJobs);
 
     const spacePeople = await sharedSpaceService.getSpacePeople(authFor(owner), space.id);
     expect(spacePeople).toEqual([expect.objectContaining({ name: 'Owner Shared Name' })]);
