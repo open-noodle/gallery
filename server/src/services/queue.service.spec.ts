@@ -497,6 +497,56 @@ describe(QueueService.name, () => {
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
+    it('force-starts facial recognition by draining pending work before queueing even when active', async () => {
+      mocks.job.isActive.mockResolvedValue(true);
+      mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
+
+      await sut.runCommandLegacy(QueueName.FacialRecognition, { command: QueueCommand.Start, force: true });
+
+      expect(mocks.job.empty).toHaveBeenCalledWith(QueueName.FacialRecognition, true);
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.FacialRecognitionQueueAll,
+        data: { force: true },
+      });
+      expect(mocks.job.empty.mock.invocationCallOrder[0]).toBeLessThan(mocks.job.queue.mock.invocationCallOrder[0]);
+    });
+
+    it('force-starts facial recognition by draining pending work before queueing when inactive', async () => {
+      mocks.job.isActive.mockResolvedValue(false);
+      mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
+
+      await sut.runCommandLegacy(QueueName.FacialRecognition, { command: QueueCommand.Start, force: true });
+
+      expect(mocks.job.empty).toHaveBeenCalledWith(QueueName.FacialRecognition, true);
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.FacialRecognitionQueueAll,
+        data: { force: true },
+      });
+      expect(mocks.job.empty.mock.invocationCallOrder[0]).toBeLessThan(mocks.job.queue.mock.invocationCallOrder[0]);
+    });
+
+    it('still rejects non-force facial recognition starts while active', async () => {
+      mocks.job.isActive.mockResolvedValue(true);
+
+      await expect(
+        sut.runCommandLegacy(QueueName.FacialRecognition, { command: QueueCommand.Start, force: false }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(mocks.job.empty).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it('still rejects active force starts for queues other than facial recognition', async () => {
+      mocks.job.isActive.mockResolvedValue(true);
+
+      await expect(
+        sut.runCommandLegacy(QueueName.VideoConversion, { command: QueueCommand.Start, force: true }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(mocks.job.empty).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
     it('should handle a start video conversion command', async () => {
       mocks.job.isActive.mockResolvedValue(false);
       mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());

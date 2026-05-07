@@ -183,12 +183,17 @@ export class QueueService extends BaseService {
   }
 
   private async start(name: QueueName, { force }: QueueCommandDto): Promise<void> {
+    const replacePendingFacialRecognition = name === QueueName.FacialRecognition && force === true;
     const isActive = await this.jobRepository.isActive(name);
-    if (isActive) {
+    if (isActive && !replacePendingFacialRecognition) {
       throw new BadRequestException(`Job is already running`);
     }
 
     await this.eventRepository.emit('QueueStart', { name });
+
+    if (replacePendingFacialRecognition) {
+      await this.jobRepository.empty(QueueName.FacialRecognition, true);
+    }
 
     switch (name) {
       case QueueName.VideoConversion: {
