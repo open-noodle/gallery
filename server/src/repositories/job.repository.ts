@@ -21,6 +21,8 @@ type JobMapItem = {
 
 const WORKER_WATCH_INTERVAL_MS = 30_000;
 
+const FORCE_FACIAL_RECOGNITION_QUEUE_ALL_JOB_ID = `${JobName.FacialRecognitionQueueAll}/force`;
+
 export type QueueTelemetryStatus = 'active' | 'completed' | 'failed' | 'delayed' | 'waiting' | 'paused';
 export type QueueTelemetryStalenessStatus = 'waiting' | 'delayed' | 'failed';
 
@@ -192,8 +194,8 @@ export class JobRepository {
     return this.getQueue(name).resume();
   }
 
-  empty(name: QueueName) {
-    return this.getQueue(name).drain();
+  empty(name: QueueName, delayed = false): Promise<void> {
+    return this.getQueue(name).drain(delayed);
   }
 
   clear(name: QueueName, type: QueueCleanType) {
@@ -257,7 +259,17 @@ export class JobRepository {
 
       if (job.options?.jobId || job.options?.deduplication) {
         // need to use add() instead of addBulk() for jobId/deduplication to take effect
-        promises.push(this.getQueue(queueName).add(item.name, item.data, job.options));
+        const queue = this.getQueue(queueName);
+        if (item.name === JobName.FacialRecognitionQueueAll) {
+          const action = await this.prepareFacialRecognitionQueueAll(queue, item.data, job.options);
+          if (!action.add) {
+            continue;
+          }
+
+          job.options = action.options;
+        }
+
+        promises.push(queue.add(item.name, item.data, job.options));
       } else {
         itemsByQueue[queueName] ||= [];
         itemsByQueue[queueName].push(job);
@@ -332,7 +344,7 @@ export class JobRepository {
         return { priority: 1 };
       }
       case JobName.FacialRecognitionQueueAll: {
-        return { deduplication: { id: JobName.FacialRecognitionQueueAll } };
+        return { jobId: JobName.FacialRecognitionQueueAll, removeOnComplete: true };
       }
       case JobName.FaceIdentityBackfill: {
         const data = item.data as { stage?: string; cursor?: string };
@@ -350,14 +362,34 @@ export class JobRepository {
       case JobName.SharedSpaceBulkAddAssets: {
         return { jobId: `bulk-add-${item.data.spaceId}-${item.data.userId}` };
       }
+      case JobName.SharedSpaceFaceMatch: {
+        return {
+          jobId: `shared-space-face-match/${item.data.spaceId}/${item.data.assetId}`,
+          removeOnComplete: true,
+        };
+      }
+      case JobName.SharedSpaceFaceMatchAll: {
+        return {
+          jobId: `shared-space-face-match-all/${item.data.spaceId}`,
+          removeOnComplete: true,
+        };
+      }
+      case JobName.SharedSpaceFaceMatchPage: {
+        const data = item.data as { spaceId: string; afterAssetId?: string };
+        const cursor = data.afterAssetId ? `after/${data.afterAssetId}` : 'start';
+        return {
+          jobId: `shared-space-face-match-page/${data.spaceId}/${cursor}`,
+          removeOnComplete: true,
+        };
+      }
       case JobName.SharedSpacePersonDedup: {
-        return { jobId: `space-dedup-${item.data.spaceId}` };
+        return { jobId: `space-dedup-${item.data.spaceId}`, removeOnComplete: true };
       }
       case JobName.SharedSpaceIdentityReconciliation: {
         const data = item.data as { spaceId: string; userId?: string; spacePersonId?: string };
         return {
           jobId: `space-identity-reconcile-${data.spaceId}-${data.userId ?? 'all-members'}-${data.spacePersonId ?? 'all-people'}`,
-          removeOnFail: true,
+          removeOnComplete: true,
         };
       }
       case JobName.SharedSpacePersonMetadataBackfill: {
@@ -372,6 +404,72 @@ export class JobRepository {
         return null;
       }
     }
+  }
+
+  private async removeFailedStableJob(queue: Queue, jobId: string) {
+    const existingJob = await queue.getJob(jobId);
+    if (!existingJob) {
+      return;
+    }
+
+    const state = (await existingJob.getState()) as string;
+    if (state === 'failed') {
+      await existingJob.remove();
+    }
+  }
+
+  private async prepareFacialRecognitionQueueAll(
+    queue: Queue,
+    data: JobOf<JobName.FacialRecognitionQueueAll>,
+    options: JobsOptions,
+  ): Promise<{ add: true; options: JobsOptions } | { add: false }> {
+    const existingJob = await queue.getJob(JobName.FacialRecognitionQueueAll);
+    if (!existingJob) {
+      if (data.force === true) {
+        const forceFollowUpJob = await queue.getJob(FORCE_FACIAL_RECOGNITION_QUEUE_ALL_JOB_ID);
+        if (forceFollowUpJob) {
+          const forceFollowUpState = (await forceFollowUpJob.getState()) as string;
+          if (forceFollowUpState === 'active' && forceFollowUpJob.data?.force === true) {
+            return { add: false };
+          }
+        }
+
+        await queue.drain(true);
+      }
+      return { add: true, options };
+    }
+
+    const state = (await existingJob.getState()) as string;
+    if (state === 'failed') {
+      await existingJob.remove();
+      if (data.force === true) {
+        await queue.drain(true);
+      }
+      return { add: true, options };
+    }
+
+    if (data.force !== true) {
+      return { add: true, options };
+    }
+
+    if (state === 'waiting' || state === 'delayed' || state === 'paused') {
+      await existingJob.remove();
+      await queue.drain(true);
+      return { add: true, options };
+    }
+
+    if (state === 'active') {
+      if (existingJob.data?.force === true) {
+        return { add: false };
+      }
+
+      await queue.drain(true);
+      const forceOptions = { ...options, jobId: FORCE_FACIAL_RECOGNITION_QUEUE_ALL_JOB_ID };
+      await this.removeFailedStableJob(queue, FORCE_FACIAL_RECOGNITION_QUEUE_ALL_JOB_ID);
+      return { add: true, options: forceOptions };
+    }
+
+    return { add: true, options };
   }
 
   private getQueue(queue: QueueName): Queue {
