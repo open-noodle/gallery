@@ -593,7 +593,10 @@ export class PersonService extends BaseService {
 
     for await (const assets of batched(this.assetJobRepository.streamForDetectFacesJob(force))) {
       await this.jobRepository.queueAll(
-        assets.map((asset) => ({ name: JobName.AssetDetectFaces, data: { id: asset.id } })),
+        assets.map((asset) => ({
+          name: JobName.AssetDetectFaces as const,
+          data: { id: asset.id, ...(force === true ? { force: true as const } : {}) },
+        })),
       );
     }
 
@@ -605,7 +608,7 @@ export class PersonService extends BaseService {
   }
 
   @OnJob({ name: JobName.AssetDetectFaces, queue: QueueName.FaceDetection })
-  async handleDetectFaces({ id }: JobOf<JobName.AssetDetectFaces>): Promise<JobStatus> {
+  async handleDetectFaces({ id, force }: JobOf<JobName.AssetDetectFaces>): Promise<JobStatus> {
     const { machineLearning } = await this.getConfig({ withCache: true });
     if (!isFacialRecognitionEnabled(machineLearning)) {
       return JobStatus.Skipped;
@@ -678,8 +681,15 @@ export class PersonService extends BaseService {
 
     if (facesToAdd.length > 0) {
       this.logger.log(`Detected ${facesToAdd.length} new faces in asset ${id}`);
-      const jobs = facesToAdd.map((face) => ({ name: JobName.FacialRecognition, data: { id: face.id } }) as const);
-      await this.jobRepository.queueAll([{ name: JobName.FacialRecognitionQueueAll, data: { force: false } }, ...jobs]);
+      if (force) {
+        await this.jobRepository.queue({ name: JobName.FacialRecognitionQueueAll, data: { force: true } });
+      } else {
+        const jobs = facesToAdd.map((face) => ({ name: JobName.FacialRecognition, data: { id: face.id } }) as const);
+        await this.jobRepository.queueAll([
+          { name: JobName.FacialRecognitionQueueAll, data: { force: false } },
+          ...jobs,
+        ]);
+      }
     } else if (embeddings.length > 0) {
       this.logger.log(`Added ${embeddings.length} face embeddings for asset ${id}`);
     }
@@ -731,6 +741,10 @@ export class PersonService extends BaseService {
       }
     }
 
+    if (force) {
+      await this.jobRepository.empty(QueueName.FacialRecognition, true);
+    }
+
     const { waiting } = await this.jobRepository.getJobCounts(QueueName.FacialRecognition);
 
     if (force) {
@@ -762,14 +776,22 @@ export class PersonService extends BaseService {
     );
     for await (const batch of batched(faces)) {
       await this.jobRepository.queueAll(
-        batch.map((face) => ({ name: JobName.FacialRecognition, data: { id: face.id, deferred: false } })),
+        batch.map((face) => ({
+          name: JobName.FacialRecognition as const,
+          data: {
+            id: face.id,
+            deferred: false as const,
+            ...(force ? { skipSharedSpaceMatch: true as const } : {}),
+          },
+        })),
       );
     }
 
     // Queue SharedSpaceFaceMatchAll AFTER recognition jobs so it runs last.
     // This catches EXIF/manual-sourced faces whose personIds survive
-    // unassignFaces (non-ML source). Queued after recognition jobs so
-    // ML faces have been processed by the per-face space matching path first.
+    // unassignFaces (non-ML source). Force-created recognition jobs suppress
+    // incremental space matching, so the paged rebuild is the authoritative
+    // shared-space reconciliation pass.
     if (force) {
       const spaceIds = await this.sharedSpaceRepository.getSpaceIdsWithFaceRecognitionEnabled();
       await this.jobRepository.queueAll(
@@ -786,7 +808,11 @@ export class PersonService extends BaseService {
   }
 
   @OnJob({ name: JobName.FacialRecognition, queue: QueueName.FacialRecognition })
-  async handleRecognizeFaces({ id, deferred }: JobOf<JobName.FacialRecognition>): Promise<JobStatus> {
+  async handleRecognizeFaces({
+    id,
+    deferred,
+    skipSharedSpaceMatch,
+  }: JobOf<JobName.FacialRecognition>): Promise<JobStatus> {
     const { machineLearning } = await this.getConfig({ withCache: true });
     if (!isFacialRecognitionEnabled(machineLearning)) {
       return JobStatus.Skipped;
@@ -811,6 +837,10 @@ export class PersonService extends BaseService {
     if (face.personGroupId) {
       this.logger.debug(`Face ${id} already has a person assigned`);
       await this.replaceFaceIdentity(face.personId, face.id, 'owner-person');
+
+      if (skipSharedSpaceMatch) {
+        return JobStatus.Skipped;
+      }
 
       // Still queue space face matching — this face may belong to a space
       // that was created/linked after the face was originally recognized.
@@ -846,7 +876,9 @@ export class PersonService extends BaseService {
         });
 
     // `matches` also includes the face itself
-    if (machineLearning.facialRecognition.minFaces > 1 && matches.length <= 1 && !accessibleIdentityMatch) {
+    const matchedOnlySelf =
+      machineLearning.facialRecognition.minFaces > 1 && matches.length <= 1 && !accessibleIdentityMatch;
+    if (matchedOnlySelf && !skipSharedSpaceMatch) {
       this.logger.debug(`Face ${id} only matched the face itself, skipping`);
       return JobStatus.Skipped;
     }
@@ -856,7 +888,19 @@ export class PersonService extends BaseService {
       face.asset.visibility === AssetVisibility.Timeline;
     if (!isCore && !deferred) {
       this.logger.debug(`Deferring non-core face ${id} for later processing`);
-      await this.jobRepository.queue({ name: JobName.FacialRecognition, data: { id, deferred: true } });
+      await this.jobRepository.queue({
+        name: JobName.FacialRecognition,
+        data: {
+          id,
+          deferred: true,
+          ...(skipSharedSpaceMatch ? { skipSharedSpaceMatch: true } : {}),
+        },
+      });
+      return JobStatus.Skipped;
+    }
+
+    if (matchedOnlySelf) {
+      this.logger.debug(`Face ${id} only matched the face itself, skipping`);
       return JobStatus.Skipped;
     }
 
@@ -904,6 +948,10 @@ export class PersonService extends BaseService {
         sourceIdentityId,
         match: personCreated ? accessibleIdentityMatch : undefined,
       });
+    }
+
+    if (skipSharedSpaceMatch) {
+      return JobStatus.Success;
     }
 
     // Queue shared space face matching for any spaces containing this asset
