@@ -250,6 +250,10 @@ export interface SuggestionScopeOptions {
   takenBefore?: Date;
 }
 
+interface ExifSuggestionScopeOptions extends SuggestionScopeOptions {
+  isNotInAlbum?: boolean;
+}
+
 interface FilterSuggestionFilterOptions {
   personIds?: string[];
   identityIds?: string[];
@@ -262,9 +266,10 @@ interface FilterSuggestionFilterOptions {
   rating?: number;
   mediaType?: AssetType;
   isFavorite?: boolean;
+  isNotInAlbum?: boolean;
 }
 
-export interface GetStatesOptions extends SuggestionScopeOptions {
+export interface GetStatesOptions extends ExifSuggestionScopeOptions {
   country?: string;
 }
 
@@ -272,17 +277,17 @@ export interface GetCitiesOptions extends SuggestionScopeOptions, FilterSuggesti
   state?: string;
 }
 
-export interface GetCameraModelsOptions extends SuggestionScopeOptions {
+export interface GetCameraModelsOptions extends ExifSuggestionScopeOptions {
   make?: string;
   lensModel?: string;
 }
 
-export interface GetCameraMakesOptions extends SuggestionScopeOptions {
+export interface GetCameraMakesOptions extends ExifSuggestionScopeOptions {
   model?: string;
   lensModel?: string;
 }
 
-export interface GetCameraLensModelsOptions extends SuggestionScopeOptions {
+export interface GetCameraLensModelsOptions extends ExifSuggestionScopeOptions {
   make?: string;
   model?: string;
 }
@@ -1068,7 +1073,7 @@ export class SearchRepository {
       .execute();
   }
 
-  async getCountries(userIds: string[], options?: SuggestionScopeOptions): Promise<string[]> {
+  async getCountries(userIds: string[], options?: ExifSuggestionScopeOptions): Promise<string[]> {
     const res = await this.getExifField('country', userIds, options).execute();
     return res.map((row) => row.country!);
   }
@@ -1283,7 +1288,7 @@ export class SearchRepository {
   private applySuggestionScope<T extends SelectQueryBuilder<DB, any, any>>(
     qb: T,
     userIds: string[],
-    options?: SuggestionScopeOptions,
+    options?: ExifSuggestionScopeOptions,
   ) {
     return qb
       .$if(!!options?.albumId, (qb) =>
@@ -1363,7 +1368,7 @@ export class SearchRepository {
   private getExifField<K extends 'city' | 'state' | 'country' | 'make' | 'model' | 'lensModel'>(
     field: K,
     userIds: string[],
-    options?: SuggestionScopeOptions,
+    options?: ExifSuggestionScopeOptions,
   ) {
     return this.applySuggestionScope(
       this.db
@@ -1378,6 +1383,11 @@ export class SearchRepository {
       userIds,
       options,
     )
+      .$if(!!options?.isNotInAlbum && !options?.albumId, (qb) =>
+        qb.where((eb) =>
+          eb.not(eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id'))),
+        ),
+      )
       .$if(!!options?.takenAfter, (qb) => qb.where('asset.fileCreatedAt', '>=', options!.takenAfter!))
       .$if(!!options?.takenBefore, (qb) => qb.where('asset.fileCreatedAt', '<', options!.takenBefore!));
   }
@@ -1395,6 +1405,11 @@ export class SearchRepository {
       options,
     )
       .$if(!!options.forceEmptyResult, (qb) => qb.where(sql<SqlBool>`false`))
+      .$if(!!options.isNotInAlbum && !options.albumId, (qb) =>
+        qb.where((eb) =>
+          eb.not(eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id'))),
+        ),
+      )
       .$if(!!options.takenAfter, (qb) => qb.where('asset.fileCreatedAt', '>=', options.takenAfter!))
       .$if(!!options.takenBefore, (qb) => qb.where('asset.fileCreatedAt', '<', options.takenBefore!))
       .$if(needsExifJoin, (qb) =>
