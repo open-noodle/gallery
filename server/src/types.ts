@@ -251,8 +251,16 @@ export interface IDeleteFilesJob extends IBaseJob {
   files: Array<string | null | undefined>;
 }
 
+export interface IAssetDetectFacesJob extends IEntityJob {
+  force?: boolean;
+}
+
 export interface IDeferrableJob extends IEntityJob {
   deferred?: boolean;
+}
+
+export interface IFacialRecognitionJob extends IDeferrableJob {
+  skipSharedSpaceMatch?: boolean;
 }
 
 export interface INightlyJob extends IBaseJob {
@@ -271,6 +279,12 @@ export interface ISharedSpaceFaceMatchJob extends IBaseJob {
 
 export interface ISharedSpaceFaceMatchAllJob extends IBaseJob {
   spaceId: string;
+}
+
+export interface ISharedSpaceFaceMatchPageJob extends IBaseJob {
+  spaceId: string;
+  afterAssetId?: string;
+  batchSize?: number;
 }
 
 export interface ISharedSpaceLibraryFaceSyncJob extends IBaseJob {
@@ -444,10 +458,11 @@ export type JobItem =
 
   // Facial Recognition
   | { name: JobName.AssetDetectFacesQueueAll; data: IBaseJob }
-  | { name: JobName.AssetDetectFaces; data: IEntityJob }
+  | { name: JobName.AssetDetectFaces; data: IAssetDetectFacesJob }
   | { name: JobName.FacialRecognitionQueueAll; data: IFacialRecognitionQueueAll }
   | { name: JobName.FacialRecognition; data: IDeferrableJob }
   | { name: JobName.PersonGenerateThumbnail; data: IPersonJob }
+  | { name: JobName.FacialRecognition; data: IFacialRecognitionJob }
   | { name: JobName.FaceIdentityBackfill; data: IFaceIdentityBackfillJob }
 
   // Smart Search
@@ -530,6 +545,7 @@ export type JobItem =
   // Shared Space Face Recognition
   | { name: JobName.SharedSpaceFaceMatch; data: ISharedSpaceFaceMatchJob }
   | { name: JobName.SharedSpaceFaceMatchAll; data: ISharedSpaceFaceMatchAllJob }
+  | { name: JobName.SharedSpaceFaceMatchPage; data: ISharedSpaceFaceMatchPageJob }
   | { name: JobName.SharedSpaceLibraryFaceSync; data: ISharedSpaceLibraryFaceSyncJob }
   | { name: JobName.SharedSpaceIdentityReconciliation; data: ISharedSpaceIdentityReconciliationJob }
   | { name: JobName.SharedSpacePersonDedup; data: ISharedSpacePersonDedupJob }
