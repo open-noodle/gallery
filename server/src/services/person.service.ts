@@ -45,7 +45,10 @@ import {
   SystemMetadataKey,
   VectorIndex,
 } from 'src/enum.js';
-import type { AccessibleIdentityFaceMatch } from 'src/repositories/face-identity.repository.js';
+import type {
+  AccessibleIdentityFaceMatch,
+  SharedSpaceFaceMatchBackfillTarget,
+} from 'src/repositories/face-identity.repository.js';
 import { BoundingBox } from 'src/repositories/machine-learning.repository.js';
 import { PersonId, UpdateFacesData } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -116,7 +119,9 @@ export class PersonService extends BaseService {
       withHidden,
       closestFaceAssetId,
     });
-    const { total, hidden } = await this.personRepository.getNumberOfPeople(auth.user.id);
+    const { total, hidden } = await this.personRepository.getNumberOfPeople(auth.user.id, {
+      minimumFaceCount: machineLearning.facialRecognition.minFaces,
+    });
 
     return {
       people: items.map((person) => mapPerson(person)),
@@ -139,7 +144,9 @@ export class PersonService extends BaseService {
       });
     }
 
-    return this.personRepository.getPeopleOverviewStatistics(auth.user.id);
+    return this.personRepository.getPeopleOverviewStatistics(auth.user.id, {
+      minimumFaceCount: machineLearning.facialRecognition.minFaces,
+    });
   }
 
   async getPeopleFaceStatistics(auth: AuthDto, dto: PersonSearchDto): Promise<PeopleFaceStatisticsResponseDto> {
@@ -533,15 +540,16 @@ export class PersonService extends BaseService {
   async handleFaceIdentityBackfill({
     stage = 'person',
     cursor,
+    continuationId,
   }: JobOf<JobName.FaceIdentityBackfill>): Promise<JobStatus> {
-    let processed = 0;
+    const affectedSpaceAssets: SharedSpaceFaceMatchBackfillTarget[] = [];
 
     if (stage === 'person') {
       const result = await this.faceIdentityRepository.backfillPersonalIdentities({
         cursor,
         limit: FACE_IDENTITY_BACKFILL_CHUNK_SIZE,
       });
-      processed += result.processed;
+      affectedSpaceAssets.push(...this.getAffectedSpaceAssets(result));
 
       if (result.nextCursor) {
         await this.jobRepository.queue({
@@ -556,7 +564,7 @@ export class PersonService extends BaseService {
       cursor: stage === 'space-person' ? cursor : undefined,
       limit: FACE_IDENTITY_BACKFILL_CHUNK_SIZE,
     });
-    processed += result.processed;
+    affectedSpaceAssets.push(...this.getAffectedSpaceAssets(result));
 
     if (result.conflictCount > 0) {
       this.logger.warn(`Face identity backfill left ${result.conflictCount} space people unresolved`);
@@ -570,20 +578,73 @@ export class PersonService extends BaseService {
       return JobStatus.Success;
     }
 
-    const shouldRebuildSpacePeople = processed > 0 || (await this.faceIdentityRepository.hasBackfillWork());
+    const work = await this.faceIdentityRepository.getBackfillWork();
 
-    if (shouldRebuildSpacePeople) {
-      const spaceIds = await this.sharedSpaceRepository.getSpaceIdsWithFaceRecognitionEnabled();
-      await this.jobRepository.queueAll(
-        spaceIds.map((spaceId) => ({
-          name: JobName.SharedSpaceFaceMatchAll as const,
-          data: { spaceId },
-        })),
-      );
-      await this.queueSpacePersonMetadataBackfill();
+    if (work.hasPersonalIdentityWork || work.hasSpacePersonIdentityWork) {
+      await this.jobRepository.queue({
+        name: JobName.FaceIdentityBackfill,
+        data: { continuationId: this.getNextFaceIdentityBackfillContinuationId(continuationId) },
+      });
+      return JobStatus.Success;
     }
 
+    const pendingTargets = await this.faceIdentityRepository.getPendingSharedSpaceFaceMatchBackfillTargets();
+
+    if (work.hasSharedSpaceProjectionWork) {
+      const projectionTargets = await this.faceIdentityRepository.getSharedSpaceFaceMatchBackfillTargets();
+      if (projectionTargets.length === 0) {
+        this.logger.warn('Face identity projection backfill work was reported but no targets were found');
+      }
+      affectedSpaceAssets.push(...projectionTargets);
+    }
+
+    await this.queueSharedSpaceFaceMatchTargets([...pendingTargets, ...affectedSpaceAssets]);
+    await this.faceIdentityRepository.deletePendingSharedSpaceFaceMatchBackfillTargets(pendingTargets);
+
     return JobStatus.Success;
+  }
+
+  private getNextFaceIdentityBackfillContinuationId(currentContinuationId?: string): string {
+    return currentContinuationId === 'a' ? 'b' : 'a';
+  }
+
+  private getAffectedSpaceAssets(result: object): SharedSpaceFaceMatchBackfillTarget[] {
+    return (result as { affectedSpaceAssets?: SharedSpaceFaceMatchBackfillTarget[] }).affectedSpaceAssets ?? [];
+  }
+
+  private async queueSharedSpaceFaceMatchTargets(
+    targets: SharedSpaceFaceMatchBackfillTarget[],
+  ): Promise<SharedSpaceFaceMatchBackfillTarget[]> {
+    const uniqueTargets = [
+      ...new Map(
+        targets
+          .toSorted((a, b) => a.spaceId.localeCompare(b.spaceId) || a.assetId.localeCompare(b.assetId))
+          .map((target) => [`${target.spaceId}:${target.assetId}`, target]),
+      ).values(),
+    ];
+
+    if (uniqueTargets.length === 0) {
+      return [];
+    }
+
+    let jobs: JobItem[] = [];
+    for (const { spaceId, assetId } of uniqueTargets) {
+      jobs.push({
+        name: JobName.SharedSpaceFaceMatch as const,
+        data: { spaceId, assetId, source: 'identity-backfill' },
+      });
+
+      if (jobs.length >= JOBS_ASSET_PAGINATION_SIZE) {
+        await this.jobRepository.queueAll(jobs);
+        jobs = [];
+      }
+    }
+
+    if (jobs.length > 0) {
+      await this.jobRepository.queueAll(jobs);
+    }
+
+    return uniqueTargets;
   }
 
   @OnJob({ name: JobName.AssetDetectFacesQueueAll, queue: QueueName.FaceDetection })

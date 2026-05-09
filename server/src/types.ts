@@ -270,11 +270,13 @@ export interface INightlyJob extends IBaseJob {
 export interface IFaceIdentityBackfillJob extends IBaseJob {
   stage?: 'person' | 'space-person';
   cursor?: string;
+  continuationId?: string;
 }
 
 export interface ISharedSpaceFaceMatchJob extends IBaseJob {
   spaceId: string;
   assetId: string;
+  source?: 'identity-backfill';
 }
 
 export interface ISharedSpaceFaceMatchAllJob extends IBaseJob {
@@ -460,7 +462,6 @@ export type JobItem =
   | { name: JobName.AssetDetectFacesQueueAll; data: IBaseJob }
   | { name: JobName.AssetDetectFaces; data: IAssetDetectFacesJob }
   | { name: JobName.FacialRecognitionQueueAll; data: IFacialRecognitionQueueAll }
-  | { name: JobName.FacialRecognition; data: IDeferrableJob }
   | { name: JobName.PersonGenerateThumbnail; data: IPersonJob }
   | { name: JobName.FacialRecognition; data: IFacialRecognitionJob }
   | { name: JobName.FaceIdentityBackfill; data: IFaceIdentityBackfillJob }

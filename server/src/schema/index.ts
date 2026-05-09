@@ -84,6 +84,7 @@ import { SharedSpaceActivityTable } from 'src/schema/tables/shared-space-activit
 import { SharedSpaceAssetAuditTable } from 'src/schema/tables/shared-space-asset-audit.table.js';
 import { SharedSpaceAssetTable } from 'src/schema/tables/shared-space-asset.table.js';
 import { SharedSpaceAuditTable } from 'src/schema/tables/shared-space-audit.table.js';
+import { SharedSpaceFaceMatchBackfillTargetTable } from 'src/schema/tables/shared-space-face-match-backfill-target.table.js';
 import { SharedSpaceLibraryAuditTable } from 'src/schema/tables/shared-space-library-audit.table.js';
 import { SharedSpaceLibraryTable } from 'src/schema/tables/shared-space-library.table.js';
 import { SharedSpaceMemberAuditTable } from 'src/schema/tables/shared-space-member-audit.table.js';
@@ -177,6 +178,7 @@ export class ImmichDatabase {
     SharedSpaceMemberAuditTable,
     SharedSpaceAssetTable,
     SharedSpaceAssetAuditTable,
+    SharedSpaceFaceMatchBackfillTargetTable,
     SharedSpaceLibraryTable,
     SharedSpaceLibraryAuditTable,
     SharedSpaceActivityTable,
@@ -322,6 +324,7 @@ export interface DB {
   shared_space_member_audit: SharedSpaceMemberAuditTable;
   shared_space_asset: SharedSpaceAssetTable;
   shared_space_asset_audit: SharedSpaceAssetAuditTable;
+  shared_space_face_match_backfill_target: SharedSpaceFaceMatchBackfillTargetTable;
   shared_space_library: SharedSpaceLibraryTable;
   shared_space_library_audit: SharedSpaceLibraryAuditTable;
   shared_space_activity: SharedSpaceActivityTable;
