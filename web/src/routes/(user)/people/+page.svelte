@@ -13,6 +13,7 @@
   import OnEvents from '#lib/components/OnEvents.svelte';
   import { QueryParameter, SessionStorageKey } from '#lib/constants.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
   import PersonMergeSuggestionModal from '#lib/modals/PersonMergeSuggestionModal.svelte';
   import { Route } from '#lib/route.ts';
   import { getPersonActions } from '#lib/services/person.service.ts';
@@ -274,6 +275,7 @@
   let countVisiblePeople = $derived(
     searchName ? searchedPeopleLocal.length : peopleCountStatistics.total - peopleCountStatistics.hidden,
   );
+  let peopleStatisticsEnabled = $derived(featureFlagsManager.value.peopleStatistics);
   let headerDescription = $derived(
     formatPeopleHeaderDescription({
       visiblePeopleCount: countVisiblePeople,
@@ -281,11 +283,14 @@
       locale: $locale,
       faceSingular: $t('face'),
       facePlural: $t('faces'),
-      includeFaceCount: !!overviewStatistics && !hasUnsupportedStatsFilter,
-      showZeroPeople: hasUnsupportedStatsFilter || (overviewStatistics?.detectedFaceCount ?? 0) > 0,
+      includeFaceCount: peopleStatisticsEnabled && !!overviewStatistics && !hasUnsupportedStatsFilter,
+      showZeroPeople:
+        hasUnsupportedStatsFilter || (peopleStatisticsEnabled && (overviewStatistics?.detectedFaceCount ?? 0) > 0),
     }),
   );
-  let showFaceStatisticsInfo = $derived(!!overviewStatistics && !hasUnsupportedStatsFilter && !!headerDescription);
+  let showFaceStatisticsInfo = $derived(
+    peopleStatisticsEnabled && !!overviewStatistics && !hasUnsupportedStatsFilter && !!headerDescription,
+  );
   let globalFaceStatisticsCacheKey = $derived(`user:${authManager.user.id}:global:people:withSharedSpaces=true`);
   const loadGlobalFaceStatistics = () => getPeopleFaceStatistics({ withSharedSpaces: true });
   let showPeople = $derived(searchName ? searchedPeopleLocal : visiblePeople);
