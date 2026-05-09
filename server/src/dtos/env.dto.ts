@@ -74,6 +74,7 @@ export const EnvSchema = z
     IMMICH_THIRD_PARTY_DOCUMENTATION_URL: z.string().optional(),
     IMMICH_THIRD_PARTY_SUPPORT_URL: z.string().optional(),
     IMMICH_ALLOW_SETUP: stringBool.optional(),
+    IMMICH_PEOPLE_STATISTICS_ENABLED: stringBool.optional(),
     IMMICH_TRUSTED_PROXIES: trustedProxiesSchema,
     IMMICH_WORKERS_INCLUDE: z.string().optional(),
     IMMICH_WORKERS_EXCLUDE: z.string().optional(),
