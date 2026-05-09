@@ -144,7 +144,7 @@ describe('/people', () => {
 
       expect(status).toBe(200);
       expect(body.hasNextPage).toBe(false);
-      expect(body.total).toBe(10);
+      expect(body.total).toBe(10); // Eligible persons
       expect(body.hidden).toBe(1); // 'hidden_person'
 
       const people = body.people as PersonResponseDto[];
