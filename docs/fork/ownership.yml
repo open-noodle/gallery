@@ -77,16 +77,18 @@ features:
         - server/src/schema/migrations-gallery/*Library*.ts
     mobile:
       drift_versions:
-        owned: [23, 24]
+        owned: [23, 24, 25]
         shipped: true
         owner: gallery
         expected_callbacks:
           23: [sharedSpaceEntity, sharedSpaceAssetEntity]
           24: [libraryEntity, sharedSpaceLibraryEntity]
+          25: [idxSharedSpaceAssetAssetSpace, idxSharedSpaceLibraryLibrarySpace]
       paths:
         - mobile/lib/infrastructure/repositories/db.repository.dart
         - mobile/drift_schemas/main/drift_schema_v23.json
         - mobile/drift_schemas/main/drift_schema_v24.json
+        - mobile/drift_schemas/main/drift_schema_v25.json
     required_checks: [e2e-rebase-smoke, mobile-drift-rebase-check]
 
   storage-and-media:
