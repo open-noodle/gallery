@@ -14,7 +14,6 @@ import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { MachineLearningRepository } from 'src/repositories/machine-learning.repository.js';
-import { PartnerRepository } from 'src/repositories/partner.repository.js';
 import { PersonUserRepository } from 'src/repositories/person-user.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
@@ -45,7 +44,6 @@ const setup = (db?: Kysely<DB>) => {
       SystemMetadataRepository,
       UserRepository,
       ClusterGroupRepository,
-      PartnerRepository,
     ],
     mock: [JobRepository, LoggingRepository, StorageRepository, MachineLearningRepository],
   });
@@ -128,7 +126,6 @@ describe(PersonService.name, () => {
       const { person: sharedWithMe } = await ctx.newPerson({ ownerId: user3.id, name: 'Shared with me' });
       await ctx.newAssetFace({ assetId: asset.id, personGroupId: sharedByMe.personGroupId });
       await ctx.newAssetFace({ assetId: asset.id, personGroupId: notShared.personGroupId });
-      await ctx.newAssetFace({ assetId: asset.id, personGroupId: sharedWithMe.personGroupId });
       await ctx.newPersonUser({
         personGroupId: sharedByMe.personGroupId,
         sharedById: user1.id,
