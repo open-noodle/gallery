@@ -5,7 +5,7 @@ metadata:
   upstream_branch: main
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: 919deb87a6477d5058e0fa7b3960d30de577b495
+  last_verified_fork_head: 5daa06a5af7e0c6464aa7998ef0751384205c1e6
 
 coverage_ignore:
   - docs/superpowers/**
@@ -305,6 +305,7 @@ features:
       - cli/**
       - docker/**
       - docs/**
+      - e2e-auth-server/**
       - i18n/**
       - misc/**
       - open-api/**
@@ -352,6 +353,8 @@ features:
         - server/src/schema/migrations-gallery/1778300000000-AddLibraryUserTable.ts
         - server/src/schema/migrations-gallery/1778400000000-AddFaceIdentities.ts
         - server/src/schema/migrations-gallery/1778500000000-AddSpacePersonRepresentativeFaceSource.ts
+        - server/src/schema/migrations-gallery/1778600000000-SortSpacePeopleByNameIndex.ts
+        - server/src/schema/migrations-gallery/1778700000000-AddSharedSpaceFaceMatchBackfillTarget.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
 checks:
