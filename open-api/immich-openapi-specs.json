@@ -26675,6 +26675,10 @@
             "description": "Whether real-time transcoding is enabled",
             "type": "boolean"
           },
+          "peopleStatistics": {
+            "description": "Whether the people face statistics UI is enabled",
+            "type": "boolean"
+          },
           "reverseGeocoding": {
             "description": "Whether reverse geocoding is enabled",
             "type": "boolean"
@@ -26708,6 +26712,7 @@
           "ocr",
           "passwordLogin",
           "realtimeTranscoding",
+          "peopleStatistics",
           "reverseGeocoding",
           "search",
           "sidecar",
