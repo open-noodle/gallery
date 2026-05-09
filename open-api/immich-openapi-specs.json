@@ -26544,6 +26544,10 @@
             "description": "Whether password login is enabled",
             "type": "boolean"
           },
+          "peopleStatistics": {
+            "description": "Whether the people face statistics UI is enabled",
+            "type": "boolean"
+          },
           "reverseGeocoding": {
             "description": "Whether reverse geocoding is enabled",
             "type": "boolean"
@@ -26576,6 +26580,7 @@
           "oauthAutoLaunch",
           "ocr",
           "passwordLogin",
+          "peopleStatistics",
           "reverseGeocoding",
           "search",
           "sidecar",
