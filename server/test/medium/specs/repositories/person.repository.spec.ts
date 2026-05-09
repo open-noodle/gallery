@@ -3,7 +3,7 @@ import { AssetFileType, AssetVisibility } from 'src/enum.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonUserRepository } from 'src/repositories/person-user.repository.js';
-import { PersonRepository, type PersonSearchOptions } from 'src/repositories/person.repository.js';
+import { PersonRepository } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
 import { MediumTestContext, newMediumService } from 'test/medium.factory.js';
@@ -20,12 +20,8 @@ const setup = (db?: Kysely<DB>) => {
   return { ctx, sut: ctx.get(PersonRepository) };
 };
 
-const listFor = async (sut: PersonRepository, userId: string, options?: Partial<PersonSearchOptions>) => {
-  const { items } = await sut.getAllForUser({ take: 100, skip: 0 }, userId, {
-    withHidden: false,
-    partnerIds: [],
-    ...options,
-  });
+const listFor = async (sut: PersonRepository, userId: string, options?: { withHidden: boolean }) => {
+  const { items } = await sut.getAllForUser({ take: 100, skip: 0 }, userId, options);
   return items;
 };
 
@@ -37,14 +33,8 @@ const newNamedPerson = async (ctx: MediumTestContext, ownerId: string, name: str
   return person;
 };
 
-const otherPeopleOf = async (
-  sut: PersonRepository,
-  ctx: MediumTestContext,
-  userId: string,
-  groupId: string,
-  partnerIds: string[],
-) => {
-  const listItems = await listFor(sut, userId, { partnerIds });
+const otherPeopleOf = async (sut: PersonRepository, ctx: MediumTestContext, userId: string, groupId: string) => {
+  const listItems = await listFor(sut, userId);
   const listed = listItems.find((item) => item.personGroupId === groupId);
   const forUser = await sut.getForUser({ userId, personGroupId: groupId });
   const byGroupId = await sut.getByGroupId({ ownerId: userId, personGroupId: groupId });
@@ -181,7 +171,7 @@ describe(PersonRepository.name, () => {
       ]);
 
       const expected = [{ sharedById: owner.id, role: PersonUserRole.Write, name: 'Alice', birthDate: null }];
-      const results = await otherPeopleOf(sut, ctx, recipient.id, person.personGroupId, [owner.id]);
+      const results = await otherPeopleOf(sut, ctx, recipient.id, person.personGroupId);
 
       expect(results.getAllForUser).toEqual(expected);
       expect(results.getForUser).toEqual(expected);
@@ -213,7 +203,7 @@ describe(PersonRepository.name, () => {
       ]);
 
       const expected = [{ sharedById: owner.id, role: PersonUserRole.Read, name: 'Alice', birthDate: null }];
-      const results = await otherPeopleOf(sut, ctx, first.id, person.personGroupId, [owner.id]);
+      const results = await otherPeopleOf(sut, ctx, first.id, person.personGroupId);
 
       expect(results.getAllForUser).toEqual(expected);
       expect(results.getForUser).toEqual(expected);
@@ -230,7 +220,7 @@ describe(PersonRepository.name, () => {
         .values({ ownerId: other.id, name: 'Alice', personGroupId: person.personGroupId })
         .execute();
 
-      const results = await otherPeopleOf(sut, ctx, other.id, person.personGroupId, [owner.id]);
+      const results = await otherPeopleOf(sut, ctx, other.id, person.personGroupId);
 
       expect(results.getForUser).toEqual([]);
       expect(results.getByGroupId).toEqual([]);
@@ -395,6 +385,33 @@ describe(PersonRepository.name, () => {
         total: 0,
         hidden: 0,
         detectedFaceCount: 0,
+      });
+    });
+
+    it('counts only people eligible for the personal people list when minimumFaceCount is set', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { person: belowThreshold } = await ctx.newPerson({ ownerId: user.id, name: '' });
+      const { person: eligibleUnnamed } = await ctx.newPerson({ ownerId: user.id, name: '' });
+      const { person: eligibleNamedHidden } = await ctx.newPerson({ ownerId: user.id, name: 'Hidden', isHidden: true });
+
+      await ctx.newAssetFace({ assetId: asset.id, personId: belowThreshold.id });
+      await ctx.newAssetFace({ assetId: asset.id, personId: belowThreshold.id });
+      await ctx.newAssetFace({ assetId: asset.id, personId: eligibleUnnamed.id });
+      await ctx.newAssetFace({ assetId: asset.id, personId: eligibleUnnamed.id });
+      await ctx.newAssetFace({ assetId: asset.id, personId: eligibleUnnamed.id });
+      await ctx.newAssetFace({ assetId: asset.id, personId: eligibleNamedHidden.id });
+      await ctx.newAssetFace({ assetId: asset.id, personId: null });
+
+      await expect(sut.getNumberOfPeople(user.id, { minimumFaceCount: 3 })).resolves.toEqual({
+        total: 2,
+        hidden: 1,
+      });
+      await expect(sut.getPeopleOverviewStatistics(user.id, { minimumFaceCount: 3 })).resolves.toEqual({
+        total: 2,
+        hidden: 1,
+        detectedFaceCount: 7,
       });
     });
   });
