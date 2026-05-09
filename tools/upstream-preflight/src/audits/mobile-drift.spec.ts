@@ -25,11 +25,40 @@ describe('analyzeMobileDriftFiles', () => {
 
     expect(result.ok).toBe(false);
     expect(result.details.join('\n')).toContain(
-      'Upstream touches shipped Gallery Drift version v23',
+      'Upstream touches shipped Gallery Drift version v23/v24',
     );
     expect(result.details.join('\n')).toContain(
       'renumber incoming upstream migrations to v25/v26',
     );
+  });
+
+  it('passes when an incoming upstream migration is renumbered above the highest shipped Gallery version', () => {
+    const result = analyzeMobileDriftFiles({
+      galleryOwnedVersions: [23, 24, 25],
+      galleryVersionsShipped: true,
+      expectedGalleryCallbacks: {
+        23: ['sharedSpaceEntity'],
+        24: ['libraryEntity'],
+        25: ['idxSharedSpaceAssetAssetSpace'],
+      },
+      currentDbRepository: `
+        int get schemaVersion => 26;
+        from22To23: (m, v23) async { await m.createTable(v23.sharedSpaceEntity); }
+        from23To24: (m, v24) async { await m.createTable(v24.libraryEntity); }
+        from24To25: (m, v25) async { await m.createIndex(v25.idxSharedSpaceAssetAssetSpace); }
+        from25To26: (m, v26) async { await m.renameColumn(v26.remoteAssetEntity, 'duration_in_seconds', v26.remoteAssetEntity.durationMs); }
+      `,
+      currentSnapshots: [
+        'drift_schema_v22.json',
+        'drift_schema_v23.json',
+        'drift_schema_v24.json',
+        'drift_schema_v25.json',
+        'drift_schema_v26.json',
+      ],
+      upstreamTouchedFiles: ['mobile/drift_schemas/main/drift_schema_v23.json'],
+    });
+
+    expect(result.ok).toBe(true);
   });
 
   it('passes when shipped Gallery versions are untouched and callbacks exist', () => {
