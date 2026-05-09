@@ -76,20 +76,30 @@ export function analyzeMobileDriftFiles(input: MobileDriftInput): AuditResult {
       ),
     )
     .sort((left, right) => left - right);
-  const highestOwnedVersion = Math.max(...input.galleryOwnedVersions);
+  const highestOwnedVersion =
+    input.galleryOwnedVersions.length > 0
+      ? Math.max(...input.galleryOwnedVersions)
+      : undefined;
   const renumberedVersions = touchedOwnedVersions.map(
-    (_, index) => highestOwnedVersion + index + 1,
+    (_, index) => (highestOwnedVersion ?? 0) + index + 1,
   );
-  for (const version of input.galleryOwnedVersions) {
-    const upstreamTouchesVersion = input.upstreamTouchedFiles.some((file) =>
-      file.includes(`drift_schema_v${version}.json`),
+  if (
+    input.galleryVersionsShipped &&
+    touchedOwnedVersions.length > 0 &&
+    renumberedVersions.some(
+      (version) =>
+        !snapshotCounts.has(version) ||
+        !input.currentDbRepository.includes(
+          `from${version - 1}To${version}`,
+        ),
+    )
+  ) {
+    pushDetail(
+      `Upstream touches shipped Gallery Drift version ${formatVersions(touchedOwnedVersions)}; keep Gallery ${formatVersions(input.galleryOwnedVersions)} and renumber incoming upstream migrations to ${formatVersions(renumberedVersions)}`,
     );
-    if (input.galleryVersionsShipped && upstreamTouchesVersion) {
-      pushDetail(
-        `Upstream touches shipped Gallery Drift version v${version}; keep Gallery ${formatVersions(input.galleryOwnedVersions)} and renumber incoming upstream migrations to ${formatVersions(renumberedVersions)}`,
-      );
-    }
+  }
 
+  for (const version of input.galleryOwnedVersions) {
     const expectedMarkers = input.expectedGalleryCallbacks?.[version] ?? [];
     const callbackName = `from${version - 1}To${version}`;
     if (!input.currentDbRepository.includes(callbackName)) {
