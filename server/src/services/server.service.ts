@@ -130,7 +130,7 @@ export class ServerService extends BaseService {
       notifications,
       ffmpeg,
     } = await this.getConfig({ withCache: true });
-    const { configFile } = this.configRepository.getEnv();
+    const { configFile, peopleStatistics } = this.configRepository.getEnv();
 
     return {
       smartSearch: isSmartSearchEnabled(machineLearning),
@@ -150,6 +150,7 @@ export class ServerService extends BaseService {
       configFile: !!configFile,
       email: notifications.smtp.enabled,
       realtimeTranscoding: ffmpeg.realtime.enabled,
+      peopleStatistics,
     };
   }
 
