@@ -936,12 +936,15 @@ from
   "similarity_threshold",
   "person"
 where
-  "person"."ownerId" = $5
-  and f_unaccent ("person"."name") %> f_unaccent ($6)
+  "person"."ownerId" = $1
+  and (
+    f_unaccent ("person"."name") ILIKE '%' || f_unaccent ($2) || '%'
+    OR f_unaccent ("person"."name") %> f_unaccent ($3)
+  )
 order by
-  f_unaccent ("person"."name") <->>> f_unaccent ($7)
+  f_unaccent ("person"."name") <->>> f_unaccent ($4)
 limit
-  $8
+  $5
 
 -- PersonRepository.getDistinctNames
 select distinct
