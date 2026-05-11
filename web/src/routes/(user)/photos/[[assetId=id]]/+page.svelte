@@ -57,6 +57,7 @@
   import {
     buildPhotosTimelineOptions,
     getPhotosPersonFilterThumbnailUrl,
+    getPhotosPersonFilterId,
     handlePhotosRemoveFilter,
   } from '$lib/utils/photos-filter-options';
   import {
@@ -157,12 +158,12 @@
       ...(nextFilters.isFavorite === undefined ? { withSharedSpaces: true } : {}),
     });
     const mappedPeople = response.people.map((p) => ({
-      id: p.id,
+      id: getPhotosPersonFilterId(p),
       name: p.name,
       thumbnailUrl: getPhotosPersonFilterThumbnailUrl(p),
     }));
     for (const p of response.people) {
-      personNames.set(p.id, p.name);
+      personNames.set(getPhotosPersonFilterId(p), p.name);
     }
     for (const t of response.tags) {
       tagNames.set(t.id, t.value);
@@ -260,7 +261,7 @@
       }
 
       for (const p of facets.people) {
-        personNames.set(p.id, p.name);
+        personNames.set(getPhotosPersonFilterId(p), p.name);
       }
       for (const t of facets.tags) {
         tagNames.set(t.id, t.value);
