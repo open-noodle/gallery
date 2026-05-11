@@ -961,7 +961,7 @@ describe(MediaService.name, () => {
       });
     });
 
-    it('should convert HEIC through ffmpeg before decoding thumbnails', async () => {
+    it('should convert HEIC through the HEIF converter before decoding thumbnails', async () => {
       const asset = AssetFactory.from({ originalFileName: 'IMG_1234.HEIC', originalPath: '/original/IMG_1234.HEIC' })
         .exif({ fileSizeInByte: 5000, orientation: ExifOrientation.Rotate90CW.toString() })
         .build();
@@ -969,7 +969,7 @@ describe(MediaService.name, () => {
 
       await sut.handleGenerateThumbnails({ id: asset.id });
 
-      expect(mocks.media.extractFrame).toHaveBeenCalledWith(asset.originalPath, expect.stringContaining('.jpeg'), 0);
+      expect(mocks.media.convertHeifToJpeg).toHaveBeenCalledWith(asset.originalPath, expect.stringContaining('.jpeg'));
       expect(mocks.media.decodeImage).toHaveBeenCalledOnce();
       expect(mocks.media.decodeImage).toHaveBeenCalledWith(expect.stringContaining('.jpeg'), {
         colorspace: Colorspace.Srgb,
@@ -2051,7 +2051,7 @@ describe(MediaService.name, () => {
       expect(mocks.media.generateThumbnail).toHaveBeenCalled();
     });
 
-    it('should convert HEIC through ffmpeg before decoding person thumbnails', async () => {
+    it('should convert HEIC through the HEIF converter before decoding person thumbnails', async () => {
       const person = PersonFactory.create();
       const data = {
         ...personThumbnailStub.newThumbnailMiddle,
@@ -2068,7 +2068,7 @@ describe(MediaService.name, () => {
 
       await expect(sut.handleGeneratePersonThumbnail({ id: person.id })).resolves.toBe(JobStatus.Success);
 
-      expect(mocks.media.extractFrame).toHaveBeenCalledWith(data.originalPath, expect.stringContaining('.jpeg'), 0);
+      expect(mocks.media.convertHeifToJpeg).toHaveBeenCalledWith(data.originalPath, expect.stringContaining('.jpeg'));
       expect(mocks.media.decodeImage).toHaveBeenCalledWith(expect.stringContaining('.jpeg'), {
         colorspace: Colorspace.P3,
         orientation: ExifOrientation.Horizontal,
