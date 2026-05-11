@@ -66,7 +66,7 @@ export const getKyselyConfig = (connection: DatabaseConnectionParams): KyselyCon
         return;
       }
 
-      if (isAssetChecksumConstraint(event.error)) {
+      if (isAssetChecksumConstraint(event.error) || isStaleAssetForeignKeyConstraint(event.error)) {
         return;
       }
 
@@ -106,6 +106,20 @@ export const isAssetChecksumConstraint = (error: unknown) =>
 
 export const isVideoStreamSessionPkConstraint = (error: unknown) =>
   (error as PostgresError)?.constraint_name === VIDEO_STREAM_SESSION_PK_CONSTRAINT;
+
+const STALE_ASSET_FOREIGN_KEY_CONSTRAINTS = new Set([
+  'asset_file_assetId_fkey',
+  'asset_job_status_assetId_fkey',
+]);
+
+export const isStaleAssetForeignKeyConstraint = (error: unknown) => {
+  const postgresError = error as PostgresError;
+  return (
+    postgresError?.code === '23503' &&
+    postgresError.constraint_name !== undefined &&
+    STALE_ASSET_FOREIGN_KEY_CONSTRAINTS.has(postgresError.constraint_name)
+  );
+};
 
 export function withDefaultVisibility<O>(qb: SelectQueryBuilder<DB, 'asset', O>) {
   return qb.where('asset.visibility', 'in', [sql.lit(AssetVisibility.Archive), sql.lit(AssetVisibility.Timeline)]);
