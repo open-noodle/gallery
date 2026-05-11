@@ -116,6 +116,7 @@ function renderPage(
       name: 'Current User',
       role: SharedSpaceRole.Editor,
       showInTimeline: false,
+      sharePersonMetadata: true,
       joinedAt: '2026-01-01T00:00:00.000Z',
     },
   ];
