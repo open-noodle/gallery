@@ -3,13 +3,13 @@ import { Injectable } from '@nestjs/common';
 import { ModuleRef, Reflector } from '@nestjs/core';
 import { JobType, JobsOptions, Queue, Worker } from 'bullmq';
 import { setTimeout } from 'node:timers/promises';
+import type { JobCounts, JobItem, JobOf, JobTypeCounts } from 'src/types.js';
 import { JobConfig } from 'src/decorators.js';
 import { QueueJobResponseDto, QueueJobSearchDto } from 'src/dtos/queue.dto.js';
 import { ImmichWorker, JobName, JobStatus, MetadataKey, QueueCleanType, QueueJobStatus, QueueName } from 'src/enum.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
-import type { JobCounts, JobItem, JobOf } from 'src/types.js';
 import { ImmichStartupError, getKeyByValue, getMethodNames } from 'src/utils/misc.js';
 
 type JobMapItem = {
@@ -210,6 +210,35 @@ export class JobRepository {
       'delayed',
       'waiting',
     ) as unknown as Promise<JobCounts>;
+  }
+
+  async getJobTypes(name: QueueName): Promise<JobTypeCounts[]> {
+    const statuses = ['active', 'waiting', 'delayed', 'paused'] as const;
+    const counts = new Map<JobName, JobTypeCounts>();
+    const seenJobs = new Set<string>();
+
+    for (const status of statuses) {
+      const jobs = await this.getQueue(name).getJobs(status, 0, 1000, true);
+      for (const job of jobs) {
+        const actualStatus = typeof job.getState === 'function' ? await job.getState() : status;
+        if (!statuses.includes(actualStatus as (typeof statuses)[number])) {
+          continue;
+        }
+
+        const jobKey = job.id ?? `${job.name}:${actualStatus}:${seenJobs.size}`;
+        if (seenJobs.has(jobKey)) {
+          continue;
+        }
+        seenJobs.add(jobKey);
+
+        const jobName = job.name as JobName;
+        const count = counts.get(jobName) ?? { name: jobName, active: 0, waiting: 0, delayed: 0, paused: 0 };
+        count[actualStatus as (typeof statuses)[number]]++;
+        counts.set(jobName, count);
+      }
+    }
+
+    return [...counts.values()];
   }
 
   async getTelemetryMetrics(now = Date.now()): Promise<QueueTelemetryMetrics> {
