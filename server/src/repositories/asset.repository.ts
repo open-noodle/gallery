@@ -1601,11 +1601,7 @@ export class AssetRepository {
 
   private async filterRowsForExistingAssets<T extends { assetId: string }>(rows: T[]): Promise<T[]> {
     const assetIds = [...new Set(rows.map(({ assetId }) => assetId))];
-    const existingAssets = await this.db
-      .selectFrom('asset')
-      .select('id')
-      .where('id', 'in', assetIds)
-      .execute();
+    const existingAssets = await this.db.selectFrom('asset').select('id').where('id', 'in', assetIds).execute();
     const existingAssetIds = new Set(existingAssets.map(({ id }) => id));
 
     return rows.filter(({ assetId }) => existingAssetIds.has(assetId));
