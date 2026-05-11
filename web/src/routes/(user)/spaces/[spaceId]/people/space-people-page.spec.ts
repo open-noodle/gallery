@@ -81,12 +81,14 @@ function makeSpacePerson(overrides: Partial<SharedSpacePersonResponseDto> = {}):
 
 function renderPage(
   people: SharedSpacePersonResponseDto[],
-  peopleStatistics: SharedSpacePeopleStatisticsResponseDto = {
+  peopleStatistics?: SharedSpacePeopleStatisticsResponseDto,
+) {
+  peopleStatistics ??= {
     total: people.length,
     hidden: people.filter((person) => person.isHidden).length,
     detectedFaceCount: 0,
-  },
-) {
+  };
+
   const space: SharedSpaceResponseDto = {
     id: 'space-1',
     name: 'Test Space',
