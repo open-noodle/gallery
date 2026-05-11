@@ -421,6 +421,14 @@ export interface JobCounts {
   waiting: number;
 }
 
+export interface JobTypeCounts {
+  name: JobName;
+  active: number;
+  waiting: number;
+  delayed: number;
+  paused: number;
+}
+
 export type JobItem =
   // Audit
   | { name: JobName.AuditTableCleanup; data?: IBaseJob }
