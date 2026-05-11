@@ -21,10 +21,6 @@ ENV IMMICH_ENV=development
 ENV NVIDIA_DRIVER_CAPABILITIES=all
 ENV NVIDIA_VISIBLE_DEVICES=all
 
-RUN apt-get update --allow-releaseinfo-change && \
-  apt-get install -y --no-install-recommends --fix-missing libheif-examples && \
-  rm -rf /var/lib/apt/lists/*
-
 WORKDIR /usr/src/app
 
 ENTRYPOINT ["tini", "--", "/bin/bash", "-c"]
