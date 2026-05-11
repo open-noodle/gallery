@@ -471,6 +471,15 @@ export class MediaRepository {
     });
   }
 
+  async convertHeifToJpeg(input: string, output: string): Promise<void> {
+    try {
+      await execFile('heif-convert', ['-q', '95', input, output]);
+    } catch (error: any) {
+      this.logger.error(error.stderr || error.message || error);
+      throw error;
+    }
+  }
+
   async getImageMetadata(input: string | Buffer): Promise<ImageDimensions & { isTransparent: boolean }> {
     const { width = 0, height = 0, hasAlpha = false } = await sharp(input, { unlimited: true }).metadata();
     return { width, height, isTransparent: hasAlpha };
