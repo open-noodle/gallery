@@ -455,11 +455,12 @@ export class MediaRepository {
     });
   }
 
-  extractFrame(input: string, output: string, timeSeconds: number): Promise<void> {
+  extractFrame(input: string, output: string, timeSeconds: number, streamIndex?: number): Promise<void> {
     return new Promise((resolve, reject) => {
+      const outputOptions = streamIndex === undefined ? [] : ['-map', `0:${streamIndex}`];
       ffmpeg(input, { niceness: 10 })
         .inputOptions([`-ss`, `${timeSeconds}`])
-        .outputOptions(['-frames:v', '1', '-q:v', '2'])
+        .outputOptions([...outputOptions, '-frames:v', '1', '-q:v', '2'])
         .output(output)
         .on('start', (command: string) => this.logger.debug(command))
         .on('error', (error, _, stderr) => {
@@ -469,15 +470,6 @@ export class MediaRepository {
         .on('end', () => resolve())
         .run();
     });
-  }
-
-  async convertHeifToJpeg(input: string, output: string): Promise<void> {
-    try {
-      await execFile('heif-convert', ['-q', '95', input, output]);
-    } catch (error: any) {
-      this.logger.error(error.stderr || error.message || error);
-      throw error;
-    }
   }
 
   async getImageMetadata(input: string | Buffer): Promise<ImageDimensions & { isTransparent: boolean }> {
