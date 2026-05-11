@@ -79,10 +79,7 @@ function makeSpacePerson(overrides: Partial<SharedSpacePersonResponseDto> = {}):
   };
 }
 
-function renderPage(
-  people: SharedSpacePersonResponseDto[],
-  peopleStatistics?: SharedSpacePeopleStatisticsResponseDto,
-) {
+function renderPage(people: SharedSpacePersonResponseDto[], peopleStatistics?: SharedSpacePeopleStatisticsResponseDto) {
   peopleStatistics ??= {
     total: people.length,
     hidden: people.filter((person) => person.isHidden).length,
