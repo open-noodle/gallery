@@ -20,6 +20,7 @@
     mdiSelectionSearch,
   } from '@mdi/js';
   import { type Component } from 'svelte';
+  import { SvelteMap } from 'svelte/reactivity';
   import { t } from 'svelte-i18n';
 
   interface Props {
@@ -40,7 +41,7 @@
   let isIdle = $derived(statistics.active + statistics.waiting === 0 && !queue.isPaused);
   let multipleButtons = $derived(allText || refreshText);
   let jobTypeRows = $derived.by(() => {
-    const rows = new Map<string, Pick<QueueJobTypeCounts, 'active' | 'waiting' | 'delayed' | 'paused'>>();
+    const rows = new SvelteMap<string, Pick<QueueJobTypeCounts, 'active' | 'waiting' | 'delayed' | 'paused'>>();
     for (const jobType of queue.jobTypes ?? []) {
       const label = getQueueJobTypeLabel(jobType.name);
       const row = rows.get(label) ?? { active: 0, waiting: 0, delayed: 0, paused: 0 };
