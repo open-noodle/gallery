@@ -134,7 +134,7 @@ export class QueueService extends BaseService {
       }
     }
 
-    const response = await this.getByName(name);
+    const response = await this.getByName(name, { includeJobTypes: false });
 
     return mapQueueLegacy(response);
   }
@@ -144,7 +144,9 @@ export class QueueService extends BaseService {
   }
 
   async getAllLegacy(auth: AuthDto): Promise<QueuesResponseLegacyDto> {
-    const responses = await this.getAll(auth);
+    const responses = await Promise.all(
+      Object.values(QueueName).map((name) => this.getByName(name, { includeJobTypes: false })),
+    );
     return mapQueuesLegacy(responses);
   }
 
@@ -176,11 +178,14 @@ export class QueueService extends BaseService {
     }
   }
 
-  private async getByName(name: QueueName): Promise<QueueResponseDto> {
+  private async getByName(
+    name: QueueName,
+    { includeJobTypes = true }: { includeJobTypes?: boolean } = {},
+  ): Promise<QueueResponseDto> {
     const [statistics, isPaused, jobTypes] = await Promise.all([
       this.jobRepository.getJobCounts(name),
       this.jobRepository.isPaused(name),
-      this.jobRepository.getJobTypes(name),
+      includeJobTypes ? this.jobRepository.getJobTypes(name) : [],
     ]);
     return { name, isPaused, statistics, ...(jobTypes.length > 0 ? { jobTypes } : {}) };
   }
