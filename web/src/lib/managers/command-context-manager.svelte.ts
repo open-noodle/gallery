@@ -4,6 +4,7 @@ import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
 import type { OnArchive, OnDelete, OnFavorite, OnUndoDelete } from '$lib/utils/actions';
 import { isAlbumsRoute, isSpacesRoute } from '$lib/utils/navigation';
 import {
+  AlbumUserRole,
   AssetVisibility,
   SharedSpaceRole,
   type AlbumResponseDto,
@@ -193,12 +194,14 @@ export function registerAlbumContext(albumDto: () => AlbumResponseDto) {
   $effect(() => {
     const currentUserId = authManager.authenticated ? (authManager.user?.id ?? null) : null;
     const album = albumDto();
-    const isMember = album.albumUsers?.some((u) => u.user.id === currentUserId) ?? false;
+    const albumUsers = album.albumUsers ?? [];
+    const ownerId = albumUsers.find(({ role }) => role === AlbumUserRole.Owner)?.user.id ?? albumUsers[0]?.user.id ?? '';
+    const isMember = currentUserId !== null && albumUsers.some((u) => u.user.id === currentUserId);
     commandContextManager.setAlbum({
       id: album.id,
       albumName: album.albumName,
-      ownerId: album.ownerId,
-      isOwner: currentUserId !== null && currentUserId === album.ownerId,
+      ownerId,
+      isOwner: currentUserId !== null && currentUserId === ownerId,
       isMember,
       raw: album,
     });
