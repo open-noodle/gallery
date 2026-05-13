@@ -1,5 +1,5 @@
-import { buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
 import { AssetTypeEnum, AssetVisibility, MapMediaType } from '@immich/sdk';
+import { buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
 
 type MapTimelineSettings = {
   onlyFavorites?: boolean;

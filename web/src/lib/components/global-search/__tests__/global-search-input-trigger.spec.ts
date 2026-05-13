@@ -1,8 +1,8 @@
-import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
-import { storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
+import { storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
 import GlobalSearchInputTrigger from '../global-search-input-trigger.svelte';
 
 const { mockPage } = vi.hoisted(() => ({

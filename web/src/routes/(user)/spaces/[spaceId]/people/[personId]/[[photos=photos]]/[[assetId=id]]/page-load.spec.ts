@@ -1,10 +1,10 @@
-const { authenticate } = vi.hoisted(() => ({ authenticate: vi.fn() }));
-
-vi.mock('$lib/utils/auth', () => ({ authenticate }));
-
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { QueryParameter } from '$lib/constants';
 import { load } from './+page';
+
+const { authenticate } = vi.hoisted(() => ({ authenticate: vi.fn() }));
+
+vi.mock('$lib/utils/auth', () => ({ authenticate }));
 
 describe('space person detail page load', () => {
   beforeEach(() => {

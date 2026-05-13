@@ -1,7 +1,7 @@
-import type { ScanProgress } from '$lib/utils/google-takeout-scanner';
 import '@testing-library/jest-dom';
 import { render } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import type { ScanProgress } from '$lib/utils/google-takeout-scanner';
 import ImportScanStep from '../import-scan-step.svelte';
 
 function makeScanProgress(overrides?: Partial<ScanProgress>): ScanProgress {

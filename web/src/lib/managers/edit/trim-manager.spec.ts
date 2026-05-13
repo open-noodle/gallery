@@ -1,6 +1,6 @@
-import type { EditActions } from '$lib/managers/edit/edit-manager.svelte';
 import { AssetEditAction, type AssetResponseDto } from '@immich/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { EditActions } from '$lib/managers/edit/edit-manager.svelte';
 import { TrimManager } from './trim-manager.svelte';
 
 // originalDuration is server-enriched at runtime, not part of the SDK type

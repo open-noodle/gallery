@@ -1,10 +1,10 @@
+import { AssetTypeEnum, AssetVisibility } from '@immich/sdk';
 import { createFilterState } from '$lib/components/filter-panel/filter-panel';
 import {
   buildMapMarkerOptions,
   buildMapTimeBucketOptions,
   buildMapTimelineOptions,
 } from '$lib/utils/map-filter-options';
-import { AssetTypeEnum, AssetVisibility } from '@immich/sdk';
 
 describe('buildMapMarkerOptions', () => {
   it('includes custom dates in map marker options', () => {
