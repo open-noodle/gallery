@@ -931,6 +931,82 @@ describe('rolling fork sync', () => {
     expect(output.join('\n')).toContain('Synced 2 fork commits');
   });
 
+  it('replays non-merge fork commits and records a merge fork head', () => {
+    const { repo, outputDir, plan } = createRepoWithPlan();
+    const output: string[] = [];
+    repo.git('checkout', '-b', 'fix/fork-sync-merge', 'main');
+    repo.write('fork-merge-1.txt', 'fork merge 1');
+    const firstForkCommit = repo.commit('fix: first fork commit (#563)');
+    repo.write('fork-merge-2.txt', 'fork merge 2');
+    const secondForkCommit = repo.commit('fix: second fork commit (#563)');
+    repo.git('checkout', 'main');
+    repo.git(
+      'merge',
+      '--no-ff',
+      'fix/fork-sync-merge',
+      '-m',
+      'Merge pull request #563 from open-noodle/fix/fork-sync-merge',
+    );
+    const forkHead = repo.git('rev-parse', 'main');
+
+    repo.git(
+      'checkout',
+      '-b',
+      'rebase/upstream-2026-05',
+      plan.metadata.forkHead,
+    );
+    writeRollingState(repo.path, validStateFromPlan(plan), outputDir);
+
+    const exitCode = runRollingSyncForkMainCommand({
+      repoPath: repo.path,
+      outputDir,
+      now: () => '2026-05-09T11:30:00.000Z',
+      fetchFork: () => undefined,
+      runChecks: () => ({ ok: true, commands: ['pnpm check'], output: 'ok' }),
+      write: (message) => output.push(message),
+    });
+
+    expect(exitCode).toBe(0);
+    expect(repo.git('rev-parse', 'HEAD')).not.toBe(forkHead);
+    expect(
+      repo.git(
+        'log',
+        '--cherry-pick',
+        '--right-only',
+        '--no-merges',
+        '--format=%H',
+        `HEAD...${forkHead}`,
+      ),
+    ).toBe('');
+    expect(repo.git('log', '--format=%s', 'HEAD~2..HEAD')).toBe(
+      'fix: second fork commit (#563)\nfix: first fork commit (#563)',
+    );
+    expect(readRollingState(repo.path, outputDir)).toEqual(
+      validStateFromPlan(plan, undefined, {
+        integratedForkHead: forkHead,
+        lastForkSyncAt: '2026-05-09T11:30:00.000Z',
+        appendHistory: [
+          {
+            at: '2026-05-09T11:30:00.000Z',
+            from: plan.metadata.forkHead,
+            to: forkHead,
+            commits: [firstForkCommit, secondForkCommit],
+            checks: ['pnpm check'],
+          },
+        ],
+        checkHistory: [
+          {
+            at: '2026-05-09T11:30:00.000Z',
+            phase: 'fork-sync',
+            commands: ['pnpm check'],
+            ok: true,
+          },
+        ],
+      }),
+    );
+    expect(output.join('\n')).toContain('Synced 2 fork commits');
+  });
+
   it('leaves state unpromoted and recoverable when the first cherry-pick conflicts', () => {
     const { repo, outputDir, plan } = createRepoWithPlan();
     const errors: string[] = [];
