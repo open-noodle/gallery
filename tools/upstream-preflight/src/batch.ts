@@ -48,9 +48,14 @@ export type NextBatchSelection =
 export type NextBatchCommandOptions = {
   repoPath: string;
   outputDir?: string;
+  expectedUpstreamHead?: string;
   checks?: Record<string, CheckEntry>;
   write?: (message: string) => void;
   writeError?: (message: string) => void;
+};
+
+export type BatchPlanValidationOptions = {
+  expectedUpstreamHead?: string;
 };
 
 function batchRisk(commits: ClassifiedCommit[]): RiskLevel {
@@ -255,12 +260,21 @@ export function readPersistedBatchAuditScope(
 export function validatePersistedBatchPlan(
   plan: BatchPlan,
   repoPath: string,
+  options: BatchPlanValidationOptions = {},
 ): void {
-  const currentUpstreamHead = revParse(repoPath, plan.metadata.upstreamRef);
-  if (currentUpstreamHead !== plan.metadata.upstreamHead) {
-    throw new Error(
-      `Persisted batch plan is stale: ${plan.metadata.upstreamRef} is ${currentUpstreamHead}, but batch-plan.json was generated for ${plan.metadata.upstreamHead}. Run make upstream-batch-plan.`,
-    );
+  if (options.expectedUpstreamHead !== undefined) {
+    if (options.expectedUpstreamHead !== plan.metadata.upstreamHead) {
+      throw new Error(
+        `Persisted batch plan target ${plan.metadata.upstreamHead} does not match expected upstream target ${options.expectedUpstreamHead}. Run make upstream-batch-plan and review the new plan before continuing.`,
+      );
+    }
+  } else {
+    const currentUpstreamHead = revParse(repoPath, plan.metadata.upstreamRef);
+    if (currentUpstreamHead !== plan.metadata.upstreamHead) {
+      throw new Error(
+        `Persisted batch plan is stale: ${plan.metadata.upstreamRef} is ${currentUpstreamHead}, but batch-plan.json was generated for ${plan.metadata.upstreamHead}. Run make upstream-batch-plan.`,
+      );
+    }
   }
 
   for (const batch of plan.batches) {
@@ -350,7 +364,9 @@ export function runNextBatchCommand(options: NextBatchCommandOptions): number {
 
   try {
     const plan = readPersistedBatchPlan(options.repoPath, options.outputDir);
-    validatePersistedBatchPlan(plan, options.repoPath);
+    validatePersistedBatchPlan(plan, options.repoPath, {
+      expectedUpstreamHead: options.expectedUpstreamHead,
+    });
     write(
       renderNextBatchMarkdown(
         selectNextBatch(plan, options.repoPath),
