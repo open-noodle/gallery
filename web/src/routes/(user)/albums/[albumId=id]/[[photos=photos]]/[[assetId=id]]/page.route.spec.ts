@@ -3,6 +3,7 @@ import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
+import { AlbumUserRole } from '@immich/sdk';
 import { albumFactory } from '@test-data/factories/album-factory';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
@@ -45,7 +46,8 @@ vi.mock('$lib/utils/navigation', async (importOriginal) => {
 });
 
 function renderPage(album = albumFactory.build({ assetCount: 2 })) {
-  authManager.setUser(userAdminFactory.build({ id: album.ownerId }));
+  const owner = album.albumUsers.find(({ role }) => role === AlbumUserRole.Owner)?.user ?? album.albumUsers[0]?.user;
+  authManager.setUser(userAdminFactory.build({ id: owner?.id ?? 'album-owner' }));
   authManager.setPreferences(preferencesFactory.build());
 
   sdkMock.getFilterSuggestions.mockImplementation((request: { albumId?: string } = {}) => {
