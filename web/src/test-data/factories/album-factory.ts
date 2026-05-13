@@ -1,6 +1,7 @@
 import { faker } from '@faker-js/faker';
-import { AssetOrder, type AlbumResponseDto } from '@immich/sdk';
+import { AlbumUserRole, AssetOrder, type AlbumResponseDto } from '@immich/sdk';
 import { Sync } from 'factory.ts';
+import { userFactory } from './user-factory';
 
 export const albumFactory = Sync.makeFactory<AlbumResponseDto>({
   albumName: Sync.each(() => faker.commerce.product()),
@@ -11,7 +12,7 @@ export const albumFactory = Sync.makeFactory<AlbumResponseDto>({
   updatedAt: Sync.each(() => faker.date.past().toISOString()),
   id: Sync.each(() => faker.string.uuid()),
   shared: false,
-  albumUsers: [],
+  albumUsers: Sync.each(() => [{ user: userFactory.build(), role: AlbumUserRole.Owner }]),
   hasSharedLink: false,
   isActivityEnabled: true,
   order: AssetOrder.Desc,
