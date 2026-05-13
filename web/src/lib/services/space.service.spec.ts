@@ -1,9 +1,9 @@
-import { goto } from '$app/navigation';
-import { eventManager } from '$lib/managers/event-manager.svelte';
-import * as handleErrorModule from '$lib/utils/handle-error';
 import { addAssets } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { goto } from '$app/navigation';
+import { eventManager } from '$lib/managers/event-manager.svelte';
+import * as handleErrorModule from '$lib/utils/handle-error';
 import { addAssetsToSpace } from './space.service';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn().mockResolvedValue(undefined) }));

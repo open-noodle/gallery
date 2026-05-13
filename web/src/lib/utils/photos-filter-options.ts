@@ -1,7 +1,7 @@
+import { AssetOrder, AssetTypeEnum, AssetVisibility, type FilterSuggestionsPersonDto } from '@immich/sdk';
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 import { buildFilterContext } from '$lib/components/filter-panel/filter-panel';
 import { createUrl } from '$lib/utils';
-import { AssetOrder, AssetTypeEnum, AssetVisibility, type FilterSuggestionsPersonDto } from '@immich/sdk';
 
 type PhotosPersonFilterReference = {
   id: string;

@@ -1,6 +1,6 @@
-import { ImportStep } from '$lib/managers/import-manager.svelte';
 import '@testing-library/jest-dom';
 import { render } from '@testing-library/svelte';
+import { ImportStep } from '$lib/managers/import-manager.svelte';
 import ImportStepIndicator from '../import-step-indicator.svelte';
 
 describe('ImportStepIndicator', () => {

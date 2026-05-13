@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { createFilterState } from '$lib/components/filter-panel/filter-panel';
 import {
   buildSearchablePageUrl,
@@ -6,7 +7,6 @@ import {
   getSearchablePageState,
   preserveTransientTemporalFilters,
 } from '$lib/utils/searchable-page-search';
-import { describe, expect, it } from 'vitest';
 
 describe('searchable page URL state', () => {
   it('detects photos as a searchable page', () => {

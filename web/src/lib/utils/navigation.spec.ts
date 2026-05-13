@@ -1,5 +1,5 @@
-import { assetCacheManager } from '$lib/managers/AssetCacheManager.svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { assetCacheManager } from '$lib/managers/AssetCacheManager.svelte';
 import { getAssetInfoFromParam } from './navigation';
 
 vi.mock('$app/navigation', () => ({

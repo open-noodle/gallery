@@ -1,6 +1,6 @@
-import TypedSearchTokenRail from '$lib/components/global-search/typed-search-token-rail.svelte';
 import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
+import TypedSearchTokenRail from '$lib/components/global-search/typed-search-token-rail.svelte';
 
 describe('TypedSearchTokenRail', () => {
   it('renders recognized and pending tokens quietly', () => {
