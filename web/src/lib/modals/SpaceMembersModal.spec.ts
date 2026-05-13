@@ -1,7 +1,10 @@
+import { SharedSpaceRole, type SharedSpaceMemberResponseDto } from '@immich/sdk';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
 import '$lib/__mocks__/sdk.mock';
 import { getVisualViewportMock } from '$lib/__mocks__/visual-viewport.mock';
+import SpaceMembersModal from './SpaceMembersModal.svelte';
 
 // Mock svelte-persisted-store to avoid localStorage issues in test environment
 vi.mock('svelte-persisted-store', async () => {
@@ -18,10 +21,6 @@ vi.mock('$lib/utils/tunables', () => ({
     TIMELINE: { INTERSECTION_EXPAND_TOP: 500, INTERSECTION_EXPAND_BOTTOM: 500 },
   },
 }));
-
-import { SharedSpaceRole, type SharedSpaceMemberResponseDto } from '@immich/sdk';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import SpaceMembersModal from './SpaceMembersModal.svelte';
 
 describe('SpaceMembersModal', () => {
   const spaceId = 'space-1';

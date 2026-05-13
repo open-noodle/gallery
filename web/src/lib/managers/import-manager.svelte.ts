@@ -1,6 +1,6 @@
+import { SvelteSet } from 'svelte/reactivity';
 import type { TakeoutAlbum } from '$lib/utils/google-takeout-parser';
 import type { ScanProgress, ScanResult } from '$lib/utils/google-takeout-scanner';
-import { SvelteSet } from 'svelte/reactivity';
 
 export enum ImportStep {
   Source = 0,

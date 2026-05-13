@@ -1,3 +1,26 @@
+import {
+  getAlbumInfo,
+  getAlbumNames,
+  getAllPeople,
+  getAllSpaces,
+  getAllTags,
+  getMlHealth,
+  getSpace,
+  searchAssets,
+  searchPerson,
+  searchPlaces,
+  searchSmart,
+  type AlbumNameDto,
+  type MetadataSearchDto,
+  type PersonResponseDto,
+  type SharedSpaceResponseDto,
+  type TagResponseDto,
+} from '@immich/sdk';
+import { toastManager } from '@immich/ui';
+import { computeCommandScore } from 'bits-ui';
+import { locale as i18nLocale, t, type Translations } from 'svelte-i18n';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+import { get } from 'svelte/store';
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
@@ -32,29 +55,6 @@ import {
   type TypedSearchTokenSpan,
 } from '$lib/utils/typed-search/typed-search-parser';
 import { resolveTypedSearchFilters, type TypedSearchChoice } from '$lib/utils/typed-search/typed-search-resolver';
-import {
-  getAlbumInfo,
-  getAlbumNames,
-  getAllPeople,
-  getAllSpaces,
-  getAllTags,
-  getMlHealth,
-  getSpace,
-  searchAssets,
-  searchPerson,
-  searchPlaces,
-  searchSmart,
-  type AlbumNameDto,
-  type MetadataSearchDto,
-  type PersonResponseDto,
-  type SharedSpaceResponseDto,
-  type TagResponseDto,
-} from '@immich/sdk';
-import { toastManager } from '@immich/ui';
-import { computeCommandScore } from 'bits-ui';
-import { locale as i18nLocale, t, type Translations } from 'svelte-i18n';
-import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-import { get } from 'svelte/store';
 import { parseScope, personSuggestionsComparator, type ParsedQuery, type Scope } from './cmdk-prefix';
 import { commandContextManager } from './command-context-manager.svelte';
 import { COMMAND_ITEMS, isAlmostExactCommandMatch, type CommandItem } from './command-items';
