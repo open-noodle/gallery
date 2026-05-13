@@ -1,3 +1,5 @@
+import { AssetOrder, AssetTypeEnum, AssetVisibility, Type } from '@immich/sdk';
+import { describe, expect, it } from 'vitest';
 import { createFilterState } from '$lib/components/filter-panel/filter-panel';
 import {
   buildPhotosTimelineOptions,
@@ -5,8 +7,6 @@ import {
   getPhotosPersonFilterThumbnailUrl,
   handlePhotosRemoveFilter,
 } from '$lib/utils/photos-filter-options';
-import { AssetOrder, AssetTypeEnum, AssetVisibility, Type } from '@immich/sdk';
-import { describe, expect, it } from 'vitest';
 
 describe('buildPhotosTimelineOptions', () => {
   it('should return base options with no filters', () => {

@@ -1,6 +1,6 @@
-import SpaceHero from '$lib/components/spaces/space-hero.svelte';
 import type { SharedSpaceResponseDto } from '@immich/sdk';
 import { render, screen } from '@testing-library/svelte';
+import SpaceHero from '$lib/components/spaces/space-hero.svelte';
 
 const makeSpace = (overrides: Partial<SharedSpaceResponseDto> = {}): SharedSpaceResponseDto => ({
   id: 'space-1',

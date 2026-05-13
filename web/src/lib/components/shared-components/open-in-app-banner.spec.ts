@@ -1,6 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { authManager } from '$lib/managers/auth-manager.svelte';
+import { preferencesFactory } from '@test-data/factories/preferences-factory';
+import { userAdminFactory } from '@test-data/factories/user-factory';
+import OpenInAppBanner from './open-in-app-banner.svelte';
 
 type Nav = {
   type: string;
@@ -30,11 +34,6 @@ vi.mock('$app/navigation', () => ({
 }));
 
 vi.mock('$app/state', () => ({ page: pageState }));
-
-import { authManager } from '$lib/managers/auth-manager.svelte';
-import { preferencesFactory } from '@test-data/factories/preferences-factory';
-import { userAdminFactory } from '@test-data/factories/user-factory';
-import OpenInAppBanner from './open-in-app-banner.svelte';
 
 const setUser = (id: string | null) => {
   if (id === null) {

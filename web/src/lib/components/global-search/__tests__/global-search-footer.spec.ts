@@ -1,10 +1,10 @@
-import { GlobalSearchManager } from '$lib/managers/global-search-manager.svelte';
-import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
 import { modalManager } from '@immich/ui';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { GlobalSearchManager } from '$lib/managers/global-search-manager.svelte';
+import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
 import GlobalSearchFooter from '../global-search-footer.svelte';
 
 vi.mock('@immich/sdk', async () => {
