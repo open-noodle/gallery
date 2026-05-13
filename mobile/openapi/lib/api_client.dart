@@ -182,14 +182,6 @@ class ApiClient {
           return valueString == 'true' || valueString == '1';
         case 'DateTime':
           return value is DateTime ? value : DateTime.tryParse(value);
-        case 'ApiKeyCreateDto':
-          return ApiKeyCreateDto.fromJson(value);
-        case 'ApiKeyCreateResponseDto':
-          return ApiKeyCreateResponseDto.fromJson(value);
-        case 'ApiKeyResponseDto':
-          return ApiKeyResponseDto.fromJson(value);
-        case 'ApiKeyUpdateDto':
-          return ApiKeyUpdateDto.fromJson(value);
         case 'ActivityCreateDto':
           return ActivityCreateDto.fromJson(value);
         case 'ActivityResponseDto':
@@ -222,6 +214,14 @@ class ApiClient {
           return AlbumsResponse.fromJson(value);
         case 'AlbumsUpdate':
           return AlbumsUpdate.fromJson(value);
+        case 'ApiKeyCreateDto':
+          return ApiKeyCreateDto.fromJson(value);
+        case 'ApiKeyCreateResponseDto':
+          return ApiKeyCreateResponseDto.fromJson(value);
+        case 'ApiKeyResponseDto':
+          return ApiKeyResponseDto.fromJson(value);
+        case 'ApiKeyUpdateDto':
+          return ApiKeyUpdateDto.fromJson(value);
         case 'AssetBulkDeleteDto':
           return AssetBulkDeleteDto.fromJson(value);
         case 'AssetBulkUpdateDto':
@@ -434,10 +434,10 @@ class ApiClient {
           return MaintenanceStatusResponseDto.fromJson(value);
         case 'ManualJobName':
           return ManualJobNameTypeTransformer().decode(value);
-        case 'MapMediaType':
-          return MapMediaTypeTypeTransformer().decode(value);
         case 'MapMarkerResponseDto':
           return MapMarkerResponseDto.fromJson(value);
+        case 'MapMediaType':
+          return MapMediaTypeTypeTransformer().decode(value);
         case 'MapReverseGeocodeResponseDto':
           return MapReverseGeocodeResponseDto.fromJson(value);
         case 'MemoriesResponse':
