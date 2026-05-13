@@ -6,7 +6,7 @@ import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import ExplorePage from './+page.svelte';
 
-vi.mock('$lib/components/layouts/user-page-layout.svelte', async () => {
+vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
   const { default: MockComponent } = await import('$lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
   return { default: MockComponent };
 });

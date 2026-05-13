@@ -1,5 +1,5 @@
 <script lang="ts">
-  import UserAvatar from '$lib/components/shared-components/user-avatar.svelte';
+  import UserAvatar from '$lib/components/shared-components/UserAvatar.svelte';
   import {
     addMember,
     getAllGroups,

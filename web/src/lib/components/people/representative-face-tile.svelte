@@ -1,5 +1,5 @@
 <script lang="ts">
-  import ImageThumbnail from '$lib/components/assets/thumbnail/image-thumbnail.svelte';
+  import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
   import { Icon, LoadingSpinner } from '@immich/ui';
   import { mdiCheckCircle } from '@mdi/js';
   import { t } from 'svelte-i18n';

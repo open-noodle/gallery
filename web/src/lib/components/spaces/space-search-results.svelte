@@ -2,7 +2,7 @@
   import { page } from '$app/state';
   import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import Portal from '$lib/elements/Portal.svelte';
-  import type { AssetCursor } from '$lib/components/asset-viewer/asset-viewer.svelte';
+  import type { AssetCursor } from '$lib/components/asset-viewer/AssetViewer.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { handlePromiseError } from '$lib/utils';
   import { navigate } from '$lib/utils/navigation';
@@ -188,7 +188,7 @@
 
 <Portal target="body">
   {#if isViewerOpen && cursor}
-    {#await import('$lib/components/asset-viewer/asset-viewer.svelte') then { default: AssetViewer }}
+    {#await import('$lib/components/asset-viewer/AssetViewer.svelte') then { default: AssetViewer }}
       <AssetViewer {cursor} {isShared} {spaceId} onClose={() => handlePromiseError(handleClose())} />
     {/await}
   {/if}
