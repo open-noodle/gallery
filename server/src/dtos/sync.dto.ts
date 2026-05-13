@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-function-type */
 import { ApiProperty } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { ExtraModel } from 'src/decorators';
@@ -464,128 +465,131 @@ class SyncCompleteV1 extends createZodDto(SyncCompleteV1Schema) {}
 
 // --- gallery-fork: shared-space sync DTOs ---
 
-@ExtraModel()
-export class SyncSharedSpaceDeleteV1 {
-  @ApiProperty({ description: 'Shared space ID' })
-  spaceId!: string;
-}
+const SyncSharedSpaceDeleteV1Schema = z
+  .object({
+    spaceId: z.string().describe('Shared space ID'),
+  })
+  .meta({ id: 'SyncSharedSpaceDeleteV1' });
+
+const SyncSharedSpaceToAssetV1Schema = z
+  .object({
+    spaceId: z.string().describe('Shared space ID'),
+    assetId: z.string().describe('Asset ID'),
+  })
+  .meta({ id: 'SyncSharedSpaceToAssetV1' });
+
+const SyncSharedSpaceToAssetDeleteV1Schema = z
+  .object({
+    spaceId: z.string().describe('Shared space ID'),
+    assetId: z.string().describe('Asset ID'),
+  })
+  .meta({ id: 'SyncSharedSpaceToAssetDeleteV1' });
+
+const SyncSharedSpaceV1Schema = z
+  .object({
+    id: z.string().describe('Shared space ID'),
+    name: z.string().describe('Space name'),
+    description: z.string().nullable().describe('Space description'),
+    color: z.string().nullable().describe('Color'),
+    createdById: z.string().describe('Created by user ID'),
+    thumbnailAssetId: z.string().nullable().describe('Thumbnail asset ID'),
+    thumbnailCropY: z.int().nullable().describe('Thumbnail crop Y offset'),
+    faceRecognitionEnabled: z.boolean().describe('Face recognition enabled'),
+    petsEnabled: z.boolean().describe('Pets enabled'),
+    lastActivityAt: isoDatetimeToDate.nullable().describe('Last activity timestamp'),
+    createdAt: isoDatetimeToDate.describe('Created at'),
+    updatedAt: isoDatetimeToDate.describe('Updated at'),
+  })
+  .meta({ id: 'SyncSharedSpaceV1' });
+
+const SyncSharedSpaceMemberDeleteV1Schema = z
+  .object({
+    spaceId: z.string().describe('Shared space ID'),
+    userId: z.string().describe('User ID'),
+  })
+  .meta({ id: 'SyncSharedSpaceMemberDeleteV1' });
+
+const SyncSharedSpaceMemberV1Schema = z
+  .object({
+    spaceId: z.string().describe('Shared space ID'),
+    userId: z.string().describe('User ID'),
+    role: z.string().describe('Member role'),
+    joinedAt: isoDatetimeToDate.describe('When the user joined the space'),
+    showInTimeline: z.boolean().describe('Whether the space contributes to the user timeline'),
+  })
+  .meta({ id: 'SyncSharedSpaceMemberV1' });
+
+const SyncLibraryV1Schema = z
+  .object({
+    id: z.string().describe('Library ID'),
+    name: z.string().describe('Library name'),
+    ownerId: z.string().describe('Owner user ID'),
+    createdAt: isoDatetimeToDate.describe('Created at'),
+    updatedAt: isoDatetimeToDate.describe('Updated at'),
+  })
+  .meta({ id: 'SyncLibraryV1' });
+
+const SyncLibraryDeleteV1Schema = z
+  .object({
+    libraryId: z.string().describe('Library ID'),
+  })
+  .meta({ id: 'SyncLibraryDeleteV1' });
+
+const SyncLibraryAssetDeleteV1Schema = z
+  .object({
+    assetId: z.string().describe('Asset ID'),
+  })
+  .meta({ id: 'SyncLibraryAssetDeleteV1' });
+
+const SyncSharedSpaceLibraryV1Schema = z
+  .object({
+    spaceId: z.string().describe('Shared space ID'),
+    libraryId: z.string().describe('Library ID'),
+    addedById: z.string().nullable().describe('User who added the library to the space'),
+    createdAt: isoDatetimeToDate.describe('Created at'),
+    updatedAt: isoDatetimeToDate.describe('Updated at'),
+  })
+  .meta({ id: 'SyncSharedSpaceLibraryV1' });
+
+const SyncSharedSpaceLibraryDeleteV1Schema = z
+  .object({
+    spaceId: z.string().describe('Shared space ID'),
+    libraryId: z.string().describe('Library ID'),
+  })
+  .meta({ id: 'SyncSharedSpaceLibraryDeleteV1' });
 
 @ExtraModel()
-export class SyncSharedSpaceToAssetV1 {
-  @ApiProperty({ description: 'Shared space ID' })
-  spaceId!: string;
-  @ApiProperty({ description: 'Asset ID' })
-  assetId!: string;
-}
+export class SyncSharedSpaceDeleteV1 extends createZodDto(SyncSharedSpaceDeleteV1Schema) {}
 
 @ExtraModel()
-export class SyncSharedSpaceToAssetDeleteV1 {
-  @ApiProperty({ description: 'Shared space ID' })
-  spaceId!: string;
-  @ApiProperty({ description: 'Asset ID' })
-  assetId!: string;
-}
+export class SyncSharedSpaceToAssetV1 extends createZodDto(SyncSharedSpaceToAssetV1Schema) {}
 
 @ExtraModel()
-export class SyncSharedSpaceV1 {
-  @ApiProperty({ description: 'Shared space ID' })
-  id!: string;
-  @ApiProperty({ description: 'Space name' })
-  name!: string;
-  @ApiProperty({ description: 'Space description' })
-  description!: string | null;
-  @ApiProperty({ description: 'Color' })
-  color!: string | null;
-  @ApiProperty({ description: 'Created by user ID' })
-  createdById!: string;
-  @ApiProperty({ description: 'Thumbnail asset ID' })
-  thumbnailAssetId!: string | null;
-  @ApiProperty({ description: 'Thumbnail crop Y offset' })
-  thumbnailCropY!: number | null;
-  @ApiProperty({ description: 'Face recognition enabled' })
-  faceRecognitionEnabled!: boolean;
-  @ApiProperty({ description: 'Pets enabled' })
-  petsEnabled!: boolean;
-  @ApiProperty({ description: 'Last activity timestamp' })
-  lastActivityAt!: Date | null;
-  @ApiProperty({ description: 'Created at' })
-  createdAt!: Date;
-  @ApiProperty({ description: 'Updated at' })
-  updatedAt!: Date;
-}
+export class SyncSharedSpaceToAssetDeleteV1 extends createZodDto(SyncSharedSpaceToAssetDeleteV1Schema) {}
 
 @ExtraModel()
-export class SyncSharedSpaceMemberDeleteV1 {
-  @ApiProperty({ description: 'Shared space ID' })
-  spaceId!: string;
-  @ApiProperty({ description: 'User ID' })
-  userId!: string;
-}
+export class SyncSharedSpaceV1 extends createZodDto(SyncSharedSpaceV1Schema) {}
 
 @ExtraModel()
-export class SyncSharedSpaceMemberV1 {
-  @ApiProperty({ description: 'Shared space ID' })
-  spaceId!: string;
-  @ApiProperty({ description: 'User ID' })
-  userId!: string;
-  @ApiProperty({ description: 'Member role' })
-  role!: string;
-  @ApiProperty({ description: 'When the user joined the space' })
-  joinedAt!: Date;
-  @ApiProperty({ description: 'Whether the space contributes to the user timeline' })
-  showInTimeline!: boolean;
-}
-
-// Library sync DTOs — minimal shape to support typed `send()` calls in
-// sync.service.ts. Task 29 will polish ApiProperty metadata + regenerate
-// OpenAPI; the runtime types below are what Task 27 needs to compile.
-@ExtraModel()
-export class SyncLibraryV1 {
-  @ApiProperty({ description: 'Library ID' })
-  id!: string;
-  @ApiProperty({ description: 'Library name' })
-  name!: string;
-  @ApiProperty({ description: 'Owner user ID' })
-  ownerId!: string;
-  @ApiProperty({ description: 'Created at' })
-  createdAt!: Date;
-  @ApiProperty({ description: 'Updated at' })
-  updatedAt!: Date;
-}
+export class SyncSharedSpaceMemberDeleteV1 extends createZodDto(SyncSharedSpaceMemberDeleteV1Schema) {}
 
 @ExtraModel()
-export class SyncLibraryDeleteV1 {
-  @ApiProperty({ description: 'Library ID' })
-  libraryId!: string;
-}
+export class SyncSharedSpaceMemberV1 extends createZodDto(SyncSharedSpaceMemberV1Schema) {}
 
 @ExtraModel()
-export class SyncLibraryAssetDeleteV1 {
-  @ApiProperty({ description: 'Asset ID' })
-  assetId!: string;
-}
+export class SyncLibraryV1 extends createZodDto(SyncLibraryV1Schema) {}
 
 @ExtraModel()
-export class SyncSharedSpaceLibraryV1 {
-  @ApiProperty({ description: 'Shared space ID' })
-  spaceId!: string;
-  @ApiProperty({ description: 'Library ID' })
-  libraryId!: string;
-  @ApiProperty({ description: 'User who added the library to the space', nullable: true })
-  addedById!: string | null;
-  @ApiProperty({ description: 'Created at' })
-  createdAt!: Date;
-  @ApiProperty({ description: 'Updated at' })
-  updatedAt!: Date;
-}
+export class SyncLibraryDeleteV1 extends createZodDto(SyncLibraryDeleteV1Schema) {}
 
 @ExtraModel()
-export class SyncSharedSpaceLibraryDeleteV1 {
-  @ApiProperty({ description: 'Shared space ID' })
-  spaceId!: string;
-  @ApiProperty({ description: 'Library ID' })
-  libraryId!: string;
-}
+export class SyncLibraryAssetDeleteV1 extends createZodDto(SyncLibraryAssetDeleteV1Schema) {}
+
+@ExtraModel()
+export class SyncSharedSpaceLibraryV1 extends createZodDto(SyncSharedSpaceLibraryV1Schema) {}
+
+@ExtraModel()
+export class SyncSharedSpaceLibraryDeleteV1 extends createZodDto(SyncSharedSpaceLibraryDeleteV1Schema) {}
 
 export type SyncItem = {
   [SyncEntityType.AuthUserV1]: SyncAuthUserV1;
