@@ -89,9 +89,7 @@ export function analyzeMobileDriftFiles(input: MobileDriftInput): AuditResult {
     renumberedVersions.some(
       (version) =>
         !snapshotCounts.has(version) ||
-        !input.currentDbRepository.includes(
-          `from${version - 1}To${version}`,
-        ),
+        !input.currentDbRepository.includes(`from${version - 1}To${version}`),
     )
   ) {
     pushDetail(
