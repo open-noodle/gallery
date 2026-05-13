@@ -1,9 +1,9 @@
-import { handleSystemConfigSave } from '$lib/services/system-config.service';
 import type { SystemConfigDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { handleSystemConfigSave } from '$lib/services/system-config.service';
 import MemoriesSettings from './MemoriesSettings.svelte';
 
 const makeConfig = (retentionDays = 365) =>

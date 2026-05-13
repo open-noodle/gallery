@@ -1,6 +1,6 @@
-import SpacePeopleStrip from '$lib/components/spaces/space-people-strip.svelte';
 import { RepresentativeFaceSource, type SharedSpacePersonResponseDto } from '@immich/sdk';
 import { fireEvent, render, screen } from '@testing-library/svelte';
+import SpacePeopleStrip from '$lib/components/spaces/space-people-strip.svelte';
 
 const makePerson = (overrides: Partial<SharedSpacePersonResponseDto> = {}): SharedSpacePersonResponseDto => ({
   id: 'person-1',

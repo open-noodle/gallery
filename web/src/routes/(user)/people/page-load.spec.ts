@@ -1,3 +1,6 @@
+import { sdkMock } from '$lib/__mocks__/sdk.mock';
+import { load } from './+page';
+
 const { authenticate, getFormatter } = vi.hoisted(() => ({
   authenticate: vi.fn(),
   getFormatter: vi.fn(),
@@ -5,9 +8,6 @@ const { authenticate, getFormatter } = vi.hoisted(() => ({
 
 vi.mock('$lib/utils/auth', () => ({ authenticate }));
 vi.mock('$lib/utils/i18n', () => ({ getFormatter }));
-
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import { load } from './+page';
 
 describe('people page load', () => {
   const peopleResponse = {

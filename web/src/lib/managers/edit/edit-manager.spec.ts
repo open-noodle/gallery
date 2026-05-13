@@ -1,11 +1,11 @@
+import { editAsset, getAssetInfo, removeAssetEdits } from '@immich/sdk';
+import { toastManager } from '@immich/ui';
+import type { MessageFormatter } from 'svelte-i18n';
 import { EditManager } from '$lib/managers/edit/edit-manager.svelte';
 import { eventManager } from '$lib/managers/event-manager.svelte';
 import { getFormatter } from '$lib/utils/i18n';
-import { editAsset, getAssetInfo, removeAssetEdits } from '@immich/sdk';
-import { toastManager } from '@immich/ui';
 import { assetFactory } from '@test-data/factories/asset-factory';
 import { websocketMock } from '@test-data/mocks/websocket.mock';
-import type { MessageFormatter } from 'svelte-i18n';
 
 vi.mock('@immich/sdk');
 vi.mock('$lib/stores/websocket');

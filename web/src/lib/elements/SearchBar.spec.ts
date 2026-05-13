@@ -1,7 +1,7 @@
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import SearchBar from '$lib/elements/SearchBar.svelte';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
+import SearchBar from '$lib/elements/SearchBar.svelte';
 
 type SearchBarWrapperProps = {
   component: typeof SearchBar;

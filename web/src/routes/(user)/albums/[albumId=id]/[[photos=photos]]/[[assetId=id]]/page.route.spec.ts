@@ -1,16 +1,16 @@
+import { AlbumUserRole } from '@immich/sdk';
+import '@testing-library/jest-dom';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
-import { AlbumUserRole } from '@immich/sdk';
 import { albumFactory } from '@test-data/factories/album-factory';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import AlbumPage from './+page.svelte';
 
 const { registerAlbumContextMock, registerSelectionContextMock } = vi.hoisted(() => ({
