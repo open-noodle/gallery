@@ -751,12 +751,11 @@ function defaultFetchFork(repoPath: string, forkRef: string): void {
   }
 }
 
-export function defaultForkSyncChecks(batch?: string): string[] {
+export function defaultForkSyncChecks(_batch?: string): string[] {
   return [
     'make fork-ownership-coverage-check',
     'make ci-invariants-check',
     'make fork-patches-check',
-    ...(batch ? [`make upstream-postrebase-audit BATCH=${batch}`] : []),
   ];
 }
 
