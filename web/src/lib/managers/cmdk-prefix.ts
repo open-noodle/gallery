@@ -1,5 +1,5 @@
-import { comparePeopleByFavoriteAndName } from '$lib/utils/people-utils';
 import type { PersonResponseDto } from '@immich/sdk';
+import { comparePeopleByFavoriteAndName } from '$lib/utils/people-utils';
 
 export type Scope = 'all' | 'people' | 'tags' | 'collections' | 'nav';
 export type ParsedQuery = { scope: Scope; payload: string };
