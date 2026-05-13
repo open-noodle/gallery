@@ -294,7 +294,15 @@ from
       "album_asset"."albumId"
   ) as "metadata" on "metadata"."albumId" = "album"."id"
 where
-  "album"."ownerId" = $1
+  exists (
+    select
+    from
+      "album_user"
+    where
+      "album_user"."albumId" = "album"."id"
+      and "album_user"."userId" = $1
+      and "album_user"."role" = $2
+  )
   and "album"."deletedAt" is null
 
 -- AlbumRepository.getSharedNames
@@ -333,10 +341,7 @@ where
         "album_user"
       where
         "album_user"."albumId" = "album"."id"
-        and (
-          "album"."ownerId" = $1
-          or "album_user"."userId" = $2
-        )
+        and "album_user"."userId" = $1
     )
     or exists (
       select
@@ -344,7 +349,7 @@ where
         "shared_link"
       where
         "shared_link"."albumId" = "album"."id"
-        and "shared_link"."userId" = $3
+        and "shared_link"."userId" = $2
     )
   )
   and "album"."deletedAt" is null
