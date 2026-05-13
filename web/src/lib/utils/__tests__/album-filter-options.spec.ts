@@ -1,7 +1,7 @@
-import { createFilterState } from '$lib/components/filter-panel/filter-panel';
-import { buildAlbumAssetPickerOptions, buildAlbumTimelineOptions } from '$lib/utils/album-filter-options';
 import { AssetOrder, AssetTypeEnum, AssetVisibility } from '@immich/sdk';
 import { describe, expect, it } from 'vitest';
+import { createFilterState } from '$lib/components/filter-panel/filter-panel';
+import { buildAlbumAssetPickerOptions, buildAlbumTimelineOptions } from '$lib/utils/album-filter-options';
 
 describe('buildAlbumTimelineOptions', () => {
   it('maps all supported filters without changing the passed album order', () => {
