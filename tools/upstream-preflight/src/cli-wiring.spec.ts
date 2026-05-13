@@ -31,4 +31,27 @@ describe('rolling rebase CLI wiring', () => {
     expect(makefile).toContain('.PHONY: upstream-rolling-final-check');
     expect(makefile).toContain('$(UPSTREAM_PREFLIGHT) run rolling-final-check');
   });
+
+  it('forwards rolling Make target options without an extra argument separator', () => {
+    const makefile = fs.readFileSync(
+      path.resolve(process.cwd(), '../../Makefile'),
+      'utf8',
+    );
+
+    expect(makefile).toContain(
+      '$(UPSTREAM_PREFLIGHT) run rolling-start $(if $(ROLLING_RESUME),--resume,)',
+    );
+    expect(makefile).toContain(
+      '$(UPSTREAM_PREFLIGHT) run sync-fork-main $(if $(ROLLING_CONTINUE),--continue,)',
+    );
+    expect(makefile).toContain(
+      '$(UPSTREAM_PREFLIGHT) run postrebase-audit $(if $(BATCH),--batch $(BATCH),)',
+    );
+    expect(makefile).toContain(
+      '$(UPSTREAM_PREFLIGHT) run mobile-drift-check $(if $(BATCH),--batch $(BATCH),)',
+    );
+    expect(makefile).not.toContain('-- --resume');
+    expect(makefile).not.toContain('-- --continue');
+    expect(makefile).not.toContain('-- --batch');
+  });
 });
