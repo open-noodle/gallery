@@ -1,7 +1,7 @@
-import TestWrapper from '$lib/components/TestWrapper.svelte';
 import '@testing-library/jest-dom';
 import { render } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
 import ArchivePage from './+page.svelte';
 
 const { mockAssetMultiSelectManager, mockRegisterSelectionContext } = vi.hoisted(() => ({

@@ -1,6 +1,6 @@
-import { SortOrder } from '$lib/stores/preferences.store';
 import type { Translations } from 'svelte-i18n';
 import { persisted } from 'svelte-persisted-store';
+import { SortOrder } from '$lib/stores/preferences.store';
 
 export enum SpaceSortBy {
   Name = 'Name',

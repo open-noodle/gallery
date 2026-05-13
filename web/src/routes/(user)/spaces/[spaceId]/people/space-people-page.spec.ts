@@ -1,8 +1,3 @@
-import { getAnimateMock } from '$lib/__mocks__/animate.mock';
-import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info-cache';
-import { authManager } from '$lib/managers/auth-manager.svelte';
 import {
   RepresentativeFaceSource,
   SharedSpaceRole,
@@ -11,11 +6,16 @@ import {
   type SharedSpacePersonResponseDto,
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
-import { preferencesFactory } from '@test-data/factories/preferences-factory';
-import { userAdminFactory } from '@test-data/factories/user-factory';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import { getAnimateMock } from '$lib/__mocks__/animate.mock';
+import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
+import { sdkMock } from '$lib/__mocks__/sdk.mock';
+import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info-cache';
+import { authManager } from '$lib/managers/auth-manager.svelte';
+import { preferencesFactory } from '@test-data/factories/preferences-factory';
+import { userAdminFactory } from '@test-data/factories/user-factory';
 import SpacePeoplePage from './+page.svelte';
 
 const { gotoMock, pageStore, featureFlagsMock } = vi.hoisted(() => {

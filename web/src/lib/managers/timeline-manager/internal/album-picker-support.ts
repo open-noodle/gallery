@@ -1,5 +1,4 @@
 import { AssetOrder, type TimeBucketAssetResponseDto, type TimeBucketsResponseDto } from '@immich/sdk';
-
 import type { AssetApiGetTimeBucketsRequest, TimelineManagerOptions } from '../types';
 
 export function getTimelineAlbumQueryOptions(
