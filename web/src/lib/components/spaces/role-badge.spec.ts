@@ -1,5 +1,5 @@
-import RoleBadge from '$lib/components/spaces/role-badge.svelte';
 import { render, screen } from '@testing-library/svelte';
+import RoleBadge from '$lib/components/spaces/role-badge.svelte';
 
 describe('RoleBadge', () => {
   it('should render owner badge with data-testid', () => {

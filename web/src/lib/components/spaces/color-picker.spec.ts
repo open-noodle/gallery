@@ -1,7 +1,7 @@
-import ColorPicker from '$lib/components/spaces/color-picker.svelte';
 import type { UserAvatarColor } from '@immich/sdk';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import ColorPicker from '$lib/components/spaces/color-picker.svelte';
 
 // UserAvatarColor enum values are just lowercase strings
 const Primary = 'primary' as UserAvatarColor;

@@ -1,5 +1,5 @@
-import type { EditAction, EditActions, EditToolManager } from '$lib/managers/edit/edit-manager.svelte';
 import type { AssetResponseDto } from '@immich/sdk';
+import type { EditAction, EditActions, EditToolManager } from '$lib/managers/edit/edit-manager.svelte';
 
 export class TrimManager implements EditToolManager {
   startTime = $state(0);

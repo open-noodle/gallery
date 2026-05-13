@@ -1,6 +1,3 @@
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import SpacePanel from '$lib/components/spaces/space-panel.svelte';
-import { authManager } from '$lib/managers/auth-manager.svelte';
 import {
   SharedSpaceRole,
   type SharedSpaceMemberResponseDto,
@@ -9,6 +6,9 @@ import {
 } from '@immich/sdk';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
+import SpacePanel from '$lib/components/spaces/space-panel.svelte';
+import { authManager } from '$lib/managers/auth-manager.svelte';
 
 function renderPanel(props: Record<string, unknown>) {
   return render(TestWrapper as Component<{ component: typeof SpacePanel; componentProps: typeof props }>, {
