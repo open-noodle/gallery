@@ -12,7 +12,7 @@ vi.mock('@immich/sdk', async (importOriginal) => {
 // Spy on the props forwarded to AssetViewer. The component dynamic-imports asset-viewer.svelte,
 // so we mock the module and record each invocation's props on this array. Tests assert against it.
 const assetViewerPropsCalls: Array<Record<string, unknown>> = [];
-vi.mock('$lib/components/asset-viewer/asset-viewer.svelte', () => {
+vi.mock('$lib/components/asset-viewer/AssetViewer.svelte', () => {
   return {
     default: function MockAssetViewer(_node: unknown, props: Record<string, unknown>) {
       assetViewerPropsCalls.push(props);

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import UserPageLayout from '$lib/components/layouts/user-page-layout.svelte';
-  import EmptyPlaceholder from '$lib/components/shared-components/empty-placeholder.svelte';
+  import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
+  import EmptyPlaceholder from '$lib/components/shared-components/EmptyPlaceholder.svelte';
   import SpaceCard from '$lib/components/spaces/space-card.svelte';
   import SpacesControls from '$lib/components/spaces/spaces-controls.svelte';
   import SpacesTable from '$lib/components/spaces/spaces-table.svelte';
