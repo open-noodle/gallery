@@ -1,9 +1,9 @@
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import { QueryParameter } from '$lib/constants';
 import { AssetVisibility, type AssetResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
+import { QueryParameter } from '$lib/constants';
 import SearchPage from './+page.svelte';
 
 const {

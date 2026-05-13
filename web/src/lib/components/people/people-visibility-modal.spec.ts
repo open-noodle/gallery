@@ -1,7 +1,7 @@
-import { handleError } from '$lib/utils/handle-error';
 import { toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { handleError } from '$lib/utils/handle-error';
 import type { VisibilityPerson } from './people-types';
 import PeopleVisibilityModalWrapper from './people-visibility-modal.test-wrapper.svelte';
 

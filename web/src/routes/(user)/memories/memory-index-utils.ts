@@ -1,6 +1,6 @@
-import { getMemoryTitle } from '$lib/utils';
 import { MemoryType, type MemoryResponseDto } from '@immich/sdk';
 import type { MessageFormatter } from 'svelte-i18n';
+import { getMemoryTitle } from '$lib/utils';
 
 export type MemoryIndexFilter = 'all' | 'saved';
 

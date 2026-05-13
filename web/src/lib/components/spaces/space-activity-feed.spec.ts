@@ -1,7 +1,7 @@
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import SpaceActivityFeed from '$lib/components/spaces/space-activity-feed.svelte';
 import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
+import SpaceActivityFeed from '$lib/components/spaces/space-activity-feed.svelte';
 
 function renderFeed(props: Record<string, unknown>) {
   return render(TestWrapper as Component<{ component: typeof SpaceActivityFeed; componentProps: typeof props }>, {

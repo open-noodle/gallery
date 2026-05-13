@@ -1,3 +1,4 @@
+import type { AssetResponseDto } from '@immich/sdk';
 import {
   getAppleMapsUrl,
   getExifCount,
@@ -5,7 +6,6 @@ import {
   getMapProviderLinks,
   getOpenStreetMapUrl,
 } from '$lib/utils/exif-utils';
-import type { AssetResponseDto } from '@immich/sdk';
 
 describe('getting the exif count', () => {
   it('returns 0 when exifInfo is undefined', () => {

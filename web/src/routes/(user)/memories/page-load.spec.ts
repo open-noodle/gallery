@@ -1,3 +1,5 @@
+import { load } from './+page';
+
 const { authenticate, getFormatter } = vi.hoisted(() => ({
   authenticate: vi.fn(),
   getFormatter: vi.fn(),
@@ -5,8 +7,6 @@ const { authenticate, getFormatter } = vi.hoisted(() => ({
 
 vi.mock('$lib/utils/auth', () => ({ authenticate }));
 vi.mock('$lib/utils/i18n', () => ({ getFormatter }));
-
-import { load } from './+page';
 
 describe('memories page load', () => {
   beforeEach(() => {

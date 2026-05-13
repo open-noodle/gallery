@@ -1,10 +1,10 @@
-import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { MemoryType, searchMemories, type MemoryResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import type { Component } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
 import MemoriesPage from './+page.svelte';
 
 const { searchMemoriesMock, handleErrorMock } = vi.hoisted(() => ({

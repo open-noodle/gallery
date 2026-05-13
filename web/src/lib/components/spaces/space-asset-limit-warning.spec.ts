@@ -1,5 +1,5 @@
-import SpaceAssetLimitWarning from '$lib/components/spaces/space-asset-limit-warning.svelte';
 import { render, screen } from '@testing-library/svelte';
+import SpaceAssetLimitWarning from '$lib/components/spaces/space-asset-limit-warning.svelte';
 
 describe('SpaceAssetLimitWarning', () => {
   it('should not render when selectedCount is within the limit', () => {
