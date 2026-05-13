@@ -813,6 +813,41 @@ describe('rolling fork sync', () => {
     );
   });
 
+  it('runs default fork-sync checks from the repo root when invoked from a package subdirectory', () => {
+    const { repo, outputDir, plan } = createRepoWithPlan({
+      forkCommitsAfterStart: 1,
+    });
+    const packageDir = path.join(repo.path, 'tools/upstream-preflight');
+    fs.mkdirSync(packageDir, { recursive: true });
+    const checkCwds: string[] = [];
+    repo.git(
+      'checkout',
+      '-b',
+      'rebase/upstream-2026-05',
+      plan.metadata.upstreamHead,
+    );
+    writeRollingState(
+      repo.path,
+      validStateFromPlan(plan, 'rebase/upstream-2026-05', {
+        integratedForkHead: plan.metadata.forkHead,
+      }),
+      outputDir,
+    );
+
+    const exitCode = runRollingSyncForkMainCommand({
+      repoPath: packageDir,
+      outputDir,
+      fetchFork: () => undefined,
+      shellRunner: (_command, cwd) => {
+        checkCwds.push(cwd);
+        return { status: 0, stdout: 'ok', stderr: '' };
+      },
+    });
+
+    expect(exitCode).toBe(0);
+    expect(checkCwds).toEqual(defaultForkSyncChecks('01').map(() => repo.path));
+  });
+
   it('no-ops when no fork commits are pending', () => {
     const { repo, outputDir, plan } = createRepoWithPlan();
     const output: string[] = [];
