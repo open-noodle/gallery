@@ -1,7 +1,7 @@
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import type { SharedSpacePersonResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import ManageSpacePeopleVisibilityWrapper from './manage-space-people-visibility.test-wrapper.svelte';
 
 vi.mock('@immich/ui', async (importOriginal) => {

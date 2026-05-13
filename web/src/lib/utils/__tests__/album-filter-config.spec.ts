@@ -1,7 +1,7 @@
-import { createFilterState } from '$lib/components/filter-panel/filter-panel';
-import { buildAlbumAssetPickerFilterConfig, buildAlbumDetailFilterConfig } from '$lib/utils/album-filter-config';
 import { AssetTypeEnum, getFilterSuggestions, getSearchSuggestions, Type } from '@immich/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createFilterState } from '$lib/components/filter-panel/filter-panel';
+import { buildAlbumAssetPickerFilterConfig, buildAlbumDetailFilterConfig } from '$lib/utils/album-filter-config';
 
 vi.mock('@immich/sdk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@immich/sdk')>();

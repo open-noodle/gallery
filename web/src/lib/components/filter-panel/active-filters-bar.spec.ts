@@ -1,7 +1,7 @@
-import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
-import { createFilterState } from '$lib/components/filter-panel/filter-panel';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
+import { createFilterState } from '$lib/components/filter-panel/filter-panel';
 
 describe('ActiveFiltersBar search chip', () => {
   it('should render search chip when searchQuery is set', () => {

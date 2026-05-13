@@ -1,3 +1,7 @@
+import { AssetTypeEnum } from '@immich/sdk';
+import '@testing-library/jest-dom';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import type { Component } from 'svelte';
 import { goto } from '$app/navigation';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
@@ -5,10 +9,6 @@ import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 import { lang } from '$lib/stores/preferences.store';
 import { buildPhotosTimelineOptions } from '$lib/utils/photos-filter-options';
 import { storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
-import { AssetTypeEnum } from '@immich/sdk';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import type { Component } from 'svelte';
 import PhotosPage from './+page.svelte';
 
 const {

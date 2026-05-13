@@ -1,7 +1,7 @@
-import type { NavigationItem } from '$lib/managers/navigation-items';
 import { render } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { beforeAll, describe, expect, it } from 'vitest';
+import type { NavigationItem } from '$lib/managers/navigation-items';
 import CommandRootWrapper from './test-harness/command-root-wrapper.svelte';
 
 beforeAll(async () => {

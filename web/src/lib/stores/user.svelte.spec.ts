@@ -1,8 +1,8 @@
+import { get } from 'svelte/store';
 import { eventManager } from '$lib/managers/event-manager.svelte';
 import { recentSpacesDropdown } from '$lib/stores/preferences.store';
 import { userInteraction } from '$lib/stores/user.svelte';
 import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
-import { get } from 'svelte/store';
 
 describe('userInteraction.recentSpaces', () => {
   beforeEach(() => {
