@@ -1,4 +1,13 @@
 import { writable } from 'svelte/store';
+import type { Mock } from 'vitest';
+// Re-import to get the mocked version for test assertions
+import {
+  closeWebsocketConnection,
+  openWebsocketConnection,
+  waitForWebsocketEvent,
+  websocketEvents,
+  websocketStore,
+} from '$lib/stores/websocket';
 
 /**
  * Reusable mock for `$lib/stores/websocket`.
@@ -23,16 +32,6 @@ vi.mock('$lib/stores/websocket', () => ({
   closeWebsocketConnection: vi.fn(),
   waitForWebsocketEvent: vi.fn(),
 }));
-
-// Re-import to get the mocked version for test assertions
-import {
-  closeWebsocketConnection,
-  openWebsocketConnection,
-  waitForWebsocketEvent,
-  websocketEvents,
-  websocketStore,
-} from '$lib/stores/websocket';
-import type { Mock } from 'vitest';
 
 export const websocketMock = {
   websocketStore: websocketStore as {

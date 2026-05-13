@@ -1,17 +1,17 @@
 import {
-  buildFilterContext,
-  type FilterPanelConfig,
-  type FilterState,
-} from '$lib/components/filter-panel/filter-panel';
-import { createUrl } from '$lib/utils';
-import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '$lib/utils/photos-filter-options';
-import {
   AssetTypeEnum,
   getFilterSuggestions,
   getSearchSuggestions,
   SearchSuggestionType,
   type FilterSuggestionsPersonDto,
 } from '@immich/sdk';
+import {
+  buildFilterContext,
+  type FilterPanelConfig,
+  type FilterState,
+} from '$lib/components/filter-panel/filter-panel';
+import { createUrl } from '$lib/utils';
+import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '$lib/utils/photos-filter-options';
 
 export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
   const sections = [

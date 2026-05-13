@@ -1,6 +1,6 @@
-import FavoritesFilter from '$lib/components/filter-panel/favorites-filter.svelte';
 import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
+import FavoritesFilter from '$lib/components/filter-panel/favorites-filter.svelte';
 
 describe('FavoritesFilter', () => {
   it('should render All and Favorites buttons', () => {

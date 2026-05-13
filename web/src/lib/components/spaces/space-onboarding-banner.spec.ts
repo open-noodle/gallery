@@ -1,6 +1,6 @@
-import SpaceOnboardingBanner from '$lib/components/spaces/space-onboarding-banner.svelte';
 import type { SharedSpaceResponseDto } from '@immich/sdk';
 import { fireEvent, render, screen } from '@testing-library/svelte';
+import SpaceOnboardingBanner from '$lib/components/spaces/space-onboarding-banner.svelte';
 
 const makeSpace = (overrides: Partial<SharedSpaceResponseDto> = {}): SharedSpaceResponseDto => ({
   id: 'space-1',

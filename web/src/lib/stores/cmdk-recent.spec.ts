@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { __resetForTests, addEntry, clearEntries, getEntries, makePlaceId, removeEntry } from './cmdk-recent';
 
 // The cmdk-recent store reads the current user id from the authManager so
 // it can scope entries per user. Tests drive this via a hoisted mock — flipping
@@ -18,8 +19,6 @@ vi.mock('$lib/managers/auth-manager.svelte', () => ({
     },
   },
 }));
-
-import { __resetForTests, addEntry, clearEntries, getEntries, makePlaceId, removeEntry } from './cmdk-recent';
 
 describe('cmdk-recent', () => {
   beforeEach(() => {
