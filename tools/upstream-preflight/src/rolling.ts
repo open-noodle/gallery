@@ -381,12 +381,16 @@ export function runRollingSyncForkMainCommand(
       );
     }
 
-    const pendingCommits = listCommits(
+    const pendingForkCommits = listCommits(
       options.repoPath,
       `${state.integratedForkHead}..${state.forkRef}`,
     ).map((commit) => commit.sha);
+    const pendingCommits = listReplayableForkCommits(
+      options.repoPath,
+      `${state.integratedForkHead}..${state.forkRef}`,
+    );
 
-    if (pendingCommits.length === 0) {
+    if (pendingForkCommits.length === 0) {
       write(`No fork commits pending from ${state.forkRef}`);
       return 0;
     }
@@ -802,6 +806,13 @@ function repoRootForCommands(cwd: string): string {
   }
 }
 
+function listReplayableForkCommits(repoPath: string, range: string): string[] {
+  return runGit(repoPath, ['rev-list', '--reverse', '--no-merges', range])
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
 function defaultShellRunner(
   command: string,
   cwd: string,
@@ -910,22 +921,42 @@ function activeForkSyncIsApplied(
     return true;
   }
 
-  const cherryOutput = runGit(repoPath, [
-    'cherry',
-    'HEAD',
-    activeForkSync.to,
-    activeForkSync.from,
-  ]);
-  const equivalenceBySha = new Map(
-    cherryOutput
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => [line.slice(2), line.startsWith('- ')]),
-  );
+  if (activeForkSync.commits.length > 0) {
+    const cherryOutput = runGit(repoPath, [
+      'cherry',
+      'HEAD',
+      activeForkSync.to,
+      activeForkSync.from,
+    ]);
+    const equivalenceBySha = new Map(
+      cherryOutput
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => [line.slice(2), line.startsWith('- ')]),
+    );
 
-  return activeForkSync.commits.every(
-    (commit) => equivalenceBySha.get(commit) === true,
-  );
+    if (
+      activeForkSync.commits.every(
+        (commit) => equivalenceBySha.get(commit) === true,
+      )
+    ) {
+      return true;
+    }
+  }
+
+  const missingReplayableCommits = runGit(repoPath, [
+    'log',
+    '--cherry-pick',
+    '--right-only',
+    '--no-merges',
+    '--format=%H',
+    `HEAD...${activeForkSync.to}`,
+  ])
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return missingReplayableCommits.length === 0;
 }
 
 function lastCompletedBatchFromPersistedPlan(
