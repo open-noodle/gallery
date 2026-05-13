@@ -113,19 +113,11 @@ class PeopleApi {
   /// Parameters:
   ///
   /// * [BulkIdsDto] bulkIdsDto (required):
-  Future<bool?> deletePeople(BulkIdsDto bulkIdsDto,) async {
+  Future<void> deletePeople(BulkIdsDto bulkIdsDto,) async {
     final response = await deletePeopleWithHttpInfo(bulkIdsDto,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
-    // When a remote server returns no body with a status of 204, we shall not decode it.
-    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
-    // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
-    
-    }
-    return null;
   }
 
   /// Delete person
@@ -170,19 +162,11 @@ class PeopleApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<bool?> deletePerson(String id,) async {
+  Future<void> deletePerson(String id,) async {
     final response = await deletePersonWithHttpInfo(id,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
-    // When a remote server returns no body with a status of 204, we shall not decode it.
-    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
-    // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
-    
-    }
-    return null;
   }
 
   /// Detach a scoped person profile
@@ -226,19 +210,11 @@ class PeopleApi {
   /// Parameters:
   ///
   /// * [DetachScopedPersonDto] detachScopedPersonDto (required):
-  Future<bool?> detachScopedPerson(DetachScopedPersonDto detachScopedPersonDto,) async {
+  Future<void> detachScopedPerson(DetachScopedPersonDto detachScopedPersonDto,) async {
     final response = await detachScopedPersonWithHttpInfo(detachScopedPersonDto,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
-    // When a remote server returns no body with a status of 204, we shall not decode it.
-    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
-    // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
-    
-    }
-    return null;
   }
 
   /// Get all people
@@ -976,19 +952,11 @@ class PeopleApi {
   /// Parameters:
   ///
   /// * [MergeScopedPeopleDto] mergeScopedPeopleDto (required):
-  Future<bool?> mergeScopedPeople(MergeScopedPeopleDto mergeScopedPeopleDto,) async {
+  Future<void> mergeScopedPeople(MergeScopedPeopleDto mergeScopedPeopleDto,) async {
     final response = await mergeScopedPeopleWithHttpInfo(mergeScopedPeopleDto,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
-    // When a remote server returns no body with a status of 204, we shall not decode it.
-    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
-    // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
-    
-    }
-    return null;
   }
 
   /// Reassign faces
