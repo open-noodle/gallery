@@ -254,7 +254,15 @@ export class AlbumRepository {
       .select((eb) => sql<number>`coalesce(${eb.ref('metadata.assetCount')}, 0)::int`.as('assetCount'))
       .select('metadata.startDate as startDate')
       .select('metadata.endDate as endDate')
-      .where('album.ownerId', '=', ownerId)
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('album_user')
+            .whereRef('album_user.albumId', '=', 'album.id')
+            .where('album_user.userId', '=', ownerId)
+            .where('album_user.role', '=', AlbumUserRole.Owner),
+        ),
+      )
       .where('album.deletedAt', 'is', null)
       .execute();
   }
@@ -300,7 +308,7 @@ export class AlbumRepository {
             eb
               .selectFrom('album_user')
               .whereRef('album_user.albumId', '=', 'album.id')
-              .where((eb) => eb.or([eb('album.ownerId', '=', userId), eb('album_user.userId', '=', userId)])),
+              .where('album_user.userId', '=', userId),
           ),
           eb.exists(
             eb
