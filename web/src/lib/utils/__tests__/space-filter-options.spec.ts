@@ -1,7 +1,7 @@
-import { createFilterState } from '$lib/components/filter-panel/filter-panel';
-import { buildSpaceTimelineOptions, handleSpaceRemoveFilter } from '$lib/utils/space-filter-options';
 import { AssetOrder, AssetTypeEnum } from '@immich/sdk';
 import { describe, expect, it } from 'vitest';
+import { createFilterState } from '$lib/components/filter-panel/filter-panel';
+import { buildSpaceTimelineOptions, handleSpaceRemoveFilter } from '$lib/utils/space-filter-options';
 
 describe('buildSpaceTimelineOptions', () => {
   it('maps custom dates and people for spaces timeline options', () => {

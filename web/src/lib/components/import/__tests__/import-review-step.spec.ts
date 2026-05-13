@@ -1,8 +1,8 @@
-import type { ImportOptions } from '$lib/managers/import-manager.svelte';
-import type { TakeoutAlbum, TakeoutMediaItem } from '$lib/utils/google-takeout-parser';
 import '@testing-library/jest-dom';
 import { render } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import type { ImportOptions } from '$lib/managers/import-manager.svelte';
+import type { TakeoutAlbum, TakeoutMediaItem } from '$lib/utils/google-takeout-parser';
 import ImportReviewStep from '../import-review-step.svelte';
 
 function makeItem(overrides?: Partial<TakeoutMediaItem>): TakeoutMediaItem {

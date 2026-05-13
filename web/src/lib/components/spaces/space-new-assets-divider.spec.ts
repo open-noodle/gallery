@@ -1,7 +1,7 @@
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import SpaceNewAssetsDivider from '$lib/components/spaces/space-new-assets-divider.svelte';
 import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
+import SpaceNewAssetsDivider from '$lib/components/spaces/space-new-assets-divider.svelte';
 
 function renderDivider(props: Record<string, unknown>) {
   return render(TestWrapper as Component<{ component: typeof SpaceNewAssetsDivider; componentProps: typeof props }>, {

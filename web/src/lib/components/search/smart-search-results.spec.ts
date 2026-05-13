@@ -1,10 +1,10 @@
+import { AssetOrder } from '@immich/sdk';
+import { render } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
 import { SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
-import { AssetOrder } from '@immich/sdk';
-import { render } from '@testing-library/svelte';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const searchSmartMock = vi.fn();
 vi.mock('@immich/sdk', async (importOriginal) => {

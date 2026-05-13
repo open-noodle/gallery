@@ -1,8 +1,11 @@
+import type { SharedSpaceResponseDto } from '@immich/sdk';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
 import '$lib/__mocks__/sdk.mock';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { getVisualViewportMock } from '$lib/__mocks__/visual-viewport.mock';
+import SpaceLinkedLibrariesModal from './SpaceLinkedLibrariesModal.svelte';
 
 vi.mock('svelte-persisted-store', async () => {
   const { writable } = await import('svelte/store');
@@ -17,10 +20,6 @@ vi.mock('$lib/utils/tunables', () => ({
     TIMELINE: { INTERSECTION_EXPAND_TOP: 500, INTERSECTION_EXPAND_BOTTOM: 500 },
   },
 }));
-
-import type { SharedSpaceResponseDto } from '@immich/sdk';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import SpaceLinkedLibrariesModal from './SpaceLinkedLibrariesModal.svelte';
 
 const makeSpace = (overrides: Partial<SharedSpaceResponseDto> = {}): SharedSpaceResponseDto => ({
   id: 'space-1',

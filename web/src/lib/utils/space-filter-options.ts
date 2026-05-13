@@ -1,5 +1,5 @@
-import { buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
 import { AssetOrder, AssetTypeEnum } from '@immich/sdk';
+import { buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
 
 export function buildSpaceTimelineOptions(spaceId: string, filters: FilterState): Record<string, unknown> {
   const base: Record<string, unknown> = { spaceId, withStacked: true };

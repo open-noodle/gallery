@@ -1,6 +1,6 @@
-import type { CommandItem } from '$lib/managers/command-items';
 import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
+import type { CommandItem } from '$lib/managers/command-items';
 import CommandRow from '../rows/command-row.svelte';
 
 const baseItem: CommandItem = {
