@@ -2,10 +2,10 @@
   import { goto, invalidateAll } from '$app/navigation';
   import { clickOutside } from '$lib/actions/click-outside';
   import { listNavigation } from '$lib/actions/list-navigation';
-  import ImageThumbnail from '$lib/components/assets/thumbnail/image-thumbnail.svelte';
+  import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
   import PeopleMergeSelector from '$lib/components/people/people-merge-selector.svelte';
-  import ButtonContextMenu from '$lib/components/shared-components/context-menu/button-context-menu.svelte';
-  import ControlAppBar from '$lib/components/shared-components/control-app-bar.svelte';
+  import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
+  import ControlAppBar from '$lib/components/shared-components/ControlAppBar.svelte';
   import ArchiveAction from '$lib/components/timeline/actions/ArchiveAction.svelte';
   import ChangeDate from '$lib/components/timeline/actions/ChangeDateAction.svelte';
   import ChangeDescription from '$lib/components/timeline/actions/ChangeDescriptionAction.svelte';

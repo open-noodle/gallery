@@ -1,7 +1,7 @@
 <script lang="ts">
   import { shortcut } from '$lib/actions/shortcut';
   import DeferredPersonThumbnail from '$lib/components/people/deferred-person-thumbnail.svelte';
-  import ImageThumbnail from '$lib/components/assets/thumbnail/image-thumbnail.svelte';
+  import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
   import type { VisibilityChange, VisibilityPerson, VisibilitySaveResult } from '$lib/components/people/people-types';
   import PeopleGrid from '$lib/components/people/people-grid.svelte';
   import { ThumbnailLoadQueue } from '$lib/components/people/thumbnail-load-queue.svelte';
