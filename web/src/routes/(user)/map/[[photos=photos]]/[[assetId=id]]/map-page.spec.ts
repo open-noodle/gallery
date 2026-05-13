@@ -49,7 +49,7 @@ vi.mock('$lib/elements/Portal.svelte', async () => {
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/shared-components/map/map.svelte', async () => {
+vi.mock('$lib/components/shared-components/map/Map.svelte', async () => {
   const { default: MockComponent } = await import('@test-data/mocks/map-component.stub.svelte');
   return { default: MockComponent };
 });
