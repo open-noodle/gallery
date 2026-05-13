@@ -3,14 +3,14 @@
   import { page } from '$app/stores';
   import { QueryParameter, timeBeforeShowLoadingSpinner } from '$lib/constants';
   import SearchBar from '$lib/elements/SearchBar.svelte';
-  import UserPageLayout from '$lib/components/layouts/user-page-layout.svelte';
+  import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
   import PeopleFaceStatisticsInfo from '$lib/components/people/people-face-statistics-info.svelte';
   import PeopleManagementGrid from '$lib/components/people/people-management-grid.svelte';
   import PeopleMergeSelector from '$lib/components/people/people-merge-selector.svelte';
   import type { ManagedPerson } from '$lib/components/people/people-types';
   import ManageSpacePeopleVisibility from '$lib/components/spaces/manage-space-people-visibility.svelte';
-  import ButtonContextMenu from '$lib/components/shared-components/context-menu/button-context-menu.svelte';
-  import MenuOption from '$lib/components/shared-components/context-menu/menu-option.svelte';
+  import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
+  import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import PersonEditBirthDateModal from '$lib/modals/PersonEditBirthDateModal.svelte';
