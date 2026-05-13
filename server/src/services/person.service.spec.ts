@@ -2376,6 +2376,10 @@ describe(PersonService.name, () => {
     beforeEach(() => {
       mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([]);
       (mocks.faceIdentity as any).findClosestAccessibleIdentityForFace = vi.fn().mockResolvedValue(void 0);
+      mocks.faceIdentity.getMergeConflicts.mockResolvedValue({
+        personalProfileConflictCount: 0,
+        spaceProfileConflictCount: 0,
+      });
       mocks.faceIdentity.mergeIdentities.mockResolvedValue({
         personalProfileConflictCount: 0,
         spaceProfileConflictCount: 0,
@@ -2598,10 +2602,57 @@ describe(PersonService.name, () => {
         type: 'person',
         excludeIdentityId: sourceIdentityId,
       });
+      expect(mocks.faceIdentity.getMergeConflicts).toHaveBeenCalledWith({
+        targetIdentityId,
+        sourceIdentityIds: [sourceIdentityId],
+      });
       expect(mocks.faceIdentity.mergeIdentities).toHaveBeenCalledWith({
         targetIdentityId,
         sourceIdentityIds: [sourceIdentityId],
         source: 'shared-space-evidence',
+      });
+    });
+
+    it('skips accessible shared identity merge when same-owner personal conflicts exist', async () => {
+      const asset = AssetFactory.create();
+      const [noPerson, matchedFace] = [
+        AssetFaceFactory.create({ assetId: asset.id }),
+        AssetFaceFactory.from().person().build(),
+      ];
+      const faces = [
+        { ...noPerson, distance: 0 },
+        { ...matchedFace, distance: 0.2 },
+      ] as FaceSearchResult[];
+      const sourceIdentityId = 'source-identity';
+      const targetIdentityId = 'target-identity';
+
+      mocks.systemMetadata.get.mockResolvedValue({ machineLearning: { facialRecognition: { minFaces: 1 } } });
+      mocks.search.searchFaces.mockResolvedValue(faces);
+      mocks.person.getFaceForFacialRecognitionJob.mockResolvedValue(getForFacialRecognitionJob(noPerson, asset));
+      mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: sourceIdentityId } as any);
+      (mocks.faceIdentity as any).findClosestAccessibleIdentityForFace.mockResolvedValue({
+        identityId: targetIdentityId,
+        distance: 0.2,
+      });
+      mocks.faceIdentity.getMergeConflicts.mockResolvedValue({
+        personalProfileConflictCount: 1,
+        spaceProfileConflictCount: 0,
+      });
+      mocks.faceIdentity.mergeIdentities.mockResolvedValue({
+        personalProfileConflictCount: 0,
+        spaceProfileConflictCount: 0,
+      });
+
+      await sut.handleRecognizeFaces({ id: noPerson.id });
+
+      expect(mocks.faceIdentity.getMergeConflicts).toHaveBeenCalledWith({
+        targetIdentityId,
+        sourceIdentityIds: [sourceIdentityId],
+      });
+      expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({
+        name: JobName.SharedSpacePersonMetadataBackfill,
+        data: {},
       });
     });
 
@@ -2813,6 +2864,10 @@ describe(PersonService.name, () => {
         type: 'person',
         excludeIdentityId: null,
       });
+      expect(mocks.faceIdentity.getMergeConflicts).toHaveBeenCalledWith({
+        targetIdentityId,
+        sourceIdentityIds: [sourceIdentityId],
+      });
       expect(mocks.faceIdentity.mergeIdentities).toHaveBeenCalledWith({
         targetIdentityId,
         sourceIdentityIds: [sourceIdentityId],
@@ -2853,6 +2908,10 @@ describe(PersonService.name, () => {
       expect(mocks.person.create).toHaveBeenCalledWith({
         ownerId: asset.ownerId,
         faceAssetId: face.id,
+      });
+      expect(mocks.faceIdentity.getMergeConflicts).toHaveBeenCalledWith({
+        targetIdentityId,
+        sourceIdentityIds: [sourceIdentityId],
       });
       expect(mocks.faceIdentity.mergeIdentities).toHaveBeenCalledWith({
         targetIdentityId,
