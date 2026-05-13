@@ -1,6 +1,6 @@
-import type { ImportProgress } from '$lib/managers/import-manager.svelte';
 import '@testing-library/jest-dom';
 import { render } from '@testing-library/svelte';
+import type { ImportProgress } from '$lib/managers/import-manager.svelte';
 import ImportProgressStep from '../import-progress-step.svelte';
 
 function makeProgress(overrides?: Partial<ImportProgress>): ImportProgress {
