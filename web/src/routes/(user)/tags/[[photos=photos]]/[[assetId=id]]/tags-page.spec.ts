@@ -1,8 +1,8 @@
-import TestWrapper from '$lib/components/TestWrapper.svelte';
 import type { TagResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
 import TagsPage from './+page.svelte';
 
 const { mockAssetMultiSelectManager, mockAuthManager, mockRegisterSelectionContext } = vi.hoisted(() => ({

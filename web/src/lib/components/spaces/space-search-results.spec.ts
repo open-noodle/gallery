@@ -1,7 +1,7 @@
-import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
-import SpaceSearchResults from '$lib/components/spaces/space-search-results.svelte';
 import type { AssetResponseDto } from '@immich/sdk';
 import { fireEvent, render, screen } from '@testing-library/svelte';
+import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
+import SpaceSearchResults from '$lib/components/spaces/space-search-results.svelte';
 
 const getAssetInfoMock = vi.fn();
 vi.mock('@immich/sdk', async (importOriginal) => {

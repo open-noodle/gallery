@@ -1,7 +1,7 @@
+import type { MemoryResponseDto } from '@immich/sdk';
 import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
 import { Route } from '$lib/route';
 import { toTimelineAsset } from '$lib/utils/timeline-util';
-import type { MemoryResponseDto } from '@immich/sdk';
 
 export type MemoryAssetSource = {
   memoryIndex: number;

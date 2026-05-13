@@ -1,6 +1,6 @@
-import { getQueueJobTypeLabel } from '$lib/services/queue.service';
 import { JobName } from '@immich/sdk';
 import { describe, expect, it } from 'vitest';
+import { getQueueJobTypeLabel } from '$lib/services/queue.service';
 
 describe('queue service', () => {
   it('labels shared-space face matching jobs separately from facial recognition', () => {

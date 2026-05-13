@@ -1,6 +1,6 @@
-import UserSidebar from '$lib/components/shared-components/side-bar/UserSidebar.svelte';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
+import UserSidebar from '$lib/components/shared-components/side-bar/UserSidebar.svelte';
 
 const mocks = vi.hoisted(() => ({
   authManager: {

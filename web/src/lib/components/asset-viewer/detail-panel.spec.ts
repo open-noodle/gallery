@@ -1,9 +1,9 @@
-import { getAppleMapsUrl, getGoogleMapsUrl, getOpenStreetMapUrl } from '$lib/utils/exif-utils';
-import { renderWithTooltips } from '$tests/helpers';
 import { AssetTypeEnum, AssetVisibility, type AssetResponseDto } from '@immich/sdk';
-import { assetFactory } from '@test-data/factories/asset-factory';
 import '@testing-library/jest-dom';
 import { screen, waitFor } from '@testing-library/svelte';
+import { getAppleMapsUrl, getGoogleMapsUrl, getOpenStreetMapUrl } from '$lib/utils/exif-utils';
+import { renderWithTooltips } from '$tests/helpers';
+import { assetFactory } from '@test-data/factories/asset-factory';
 import DetailPanel from './DetailPanel.svelte';
 
 const { getAllAlbumsMock, getAssetInfoMock, zoomImageToBase64Mock } = vi.hoisted(() => ({

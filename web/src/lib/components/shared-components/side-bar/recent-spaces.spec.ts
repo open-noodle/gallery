@@ -1,11 +1,12 @@
+import { UserAvatarColor } from '@immich/sdk';
+import { render, screen } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import RecentSpaces from '$lib/components/shared-components/side-bar/recent-spaces.svelte';
 import { pinnedSpaceIds } from '$lib/stores/space-view.store';
 import { userInteraction } from '$lib/stores/user.svelte';
-import { UserAvatarColor } from '@immich/sdk';
+import { handleError } from '$lib/utils/handle-error';
 import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
-import { render, screen } from '@testing-library/svelte';
-import { tick } from 'svelte';
 
 vi.mock('$lib/utils/handle-error', () => ({
   handleError: vi.fn(),
@@ -15,8 +16,6 @@ vi.mock('$lib/utils', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/utils')>()),
   getAssetMediaUrl: vi.fn(({ id }: { id: string }) => `/api/assets/${id}/thumbnail?edited=true`),
 }));
-
-import { handleError } from '$lib/utils/handle-error';
 
 describe('RecentSpaces component', () => {
   beforeEach(() => {
