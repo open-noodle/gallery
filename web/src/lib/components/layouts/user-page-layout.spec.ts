@@ -3,12 +3,12 @@ import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import UserPageLayoutDescriptionTrailingTestWrapper from './user-page-layout-description-trailing.test-wrapper.svelte';
 
-vi.mock('$lib/components/shared-components/navigation-bar/navigation-bar.svelte', async () => {
+vi.mock('$lib/components/shared-components/navigation-bar/NavigationBar.svelte', async () => {
   const module = await import('@test-data/mocks/noop-component.svelte');
   return { default: module.default };
 });
 
-vi.mock('$lib/components/shared-components/side-bar/user-sidebar.svelte', async () => {
+vi.mock('$lib/components/shared-components/side-bar/UserSidebar.svelte', async () => {
   const module = await import('@test-data/mocks/noop-component.svelte');
   return { default: module.default };
 });
