@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
+import { closePaletteOnNavigate } from './close-palette-on-navigate';
 
 vi.mock('$lib/managers/global-search-manager.svelte', () => ({
   globalSearchManager: {
@@ -7,9 +9,6 @@ vi.mock('$lib/managers/global-search-manager.svelte', () => ({
     consumeKeepOpenOnNextNavigate: vi.fn(() => false),
   },
 }));
-
-import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
-import { closePaletteOnNavigate } from './close-palette-on-navigate';
 
 describe('closePaletteOnNavigate', () => {
   beforeEach(() => {

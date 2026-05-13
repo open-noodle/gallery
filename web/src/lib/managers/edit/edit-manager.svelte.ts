@@ -1,10 +1,3 @@
-import TransformTool from '$lib/components/asset-viewer/editor/transform-tool/TransformTool.svelte';
-import TrimTool from '$lib/components/asset-viewer/editor/trim-tool/trim-tool.svelte';
-import { transformManager } from '$lib/managers/edit/transform-manager.svelte';
-import { trimManager } from '$lib/managers/edit/trim-manager.svelte';
-import { eventManager } from '$lib/managers/event-manager.svelte';
-import { waitForWebsocketEvent } from '$lib/stores/websocket';
-import { getFormatter } from '$lib/utils/i18n';
 import {
   AssetTypeEnum,
   editAsset,
@@ -16,6 +9,13 @@ import {
 import { ConfirmModal, modalManager, toastManager } from '@immich/ui';
 import { mdiContentCut, mdiCropRotate } from '@mdi/js';
 import type { Component } from 'svelte';
+import TransformTool from '$lib/components/asset-viewer/editor/transform-tool/TransformTool.svelte';
+import TrimTool from '$lib/components/asset-viewer/editor/trim-tool/trim-tool.svelte';
+import { transformManager } from '$lib/managers/edit/transform-manager.svelte';
+import { trimManager } from '$lib/managers/edit/trim-manager.svelte';
+import { eventManager } from '$lib/managers/event-manager.svelte';
+import { waitForWebsocketEvent } from '$lib/stores/websocket';
+import { getFormatter } from '$lib/utils/i18n';
 
 export type EditAction = AssetEditsCreateDto['edits'][number];
 export type EditActions = EditAction[];

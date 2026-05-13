@@ -1,3 +1,7 @@
+import { AssetVisibility, deleteAssets as deleteBulk, restoreAssets, updateAssets } from '@immich/sdk';
+import { modalManager, toastManager } from '@immich/ui';
+import { get } from 'svelte/store';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_SPACE_ASSETS_PER_REQUEST } from '$lib/constants';
 import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
 import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
@@ -6,10 +10,6 @@ import AssetAddToSpaceModal from '$lib/modals/AssetAddToSpaceModal.svelte';
 import AssetDeleteConfirmModal from '$lib/modals/AssetDeleteConfirmModal.svelte';
 import { showDeleteModal } from '$lib/stores/preferences.store';
 import * as handleErrorModule from '$lib/utils/handle-error';
-import { AssetVisibility, deleteAssets as deleteBulk, restoreAssets, updateAssets } from '@immich/sdk';
-import { modalManager, toastManager } from '@immich/ui';
-import { get } from 'svelte/store';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CommandContext, SelectionCommandContext } from './command-context-manager.svelte';
 import {
   canAddSelectedToAlbum,
