@@ -397,6 +397,47 @@ describe(AssetMediaService.name, () => {
       expect(mocks.user.updateUsage).not.toHaveBeenCalled();
     });
 
+    it('should allow the same file to upload again after post-create processing fails', async () => {
+      const file = {
+        uuid: 'random-uuid',
+        originalPath: 'fake_path/asset_1.heic',
+        mimeType: 'image/heic',
+        checksum: Buffer.from('file hash', 'utf8'),
+        originalName: 'asset_1.HEIC',
+        size: 42,
+      };
+      const error = new Error('failed after asset create');
+      let incompleteRowExists = false;
+
+      mocks.asset.create.mockImplementation(() => {
+        if (incompleteRowExists) {
+          const duplicateError = new Error('unique key violation');
+          (duplicateError as any).constraint_name = ASSET_CHECKSUM_CONSTRAINT;
+          return Promise.reject(duplicateError);
+        }
+
+        incompleteRowExists = true;
+        return Promise.resolve(assetEntity);
+      });
+      mocks.asset.remove.mockImplementation(() => {
+        incompleteRowExists = false;
+        return Promise.resolve();
+      });
+      mocks.event.emit.mockRejectedValueOnce(error);
+
+      await expect(sut.uploadAsset(authStub.user1, createDto, file)).rejects.toThrow(error);
+      await expect(sut.uploadAsset(authStub.user1, createDto, file)).resolves.toEqual({
+        id: assetEntity.id,
+        status: AssetMediaStatus.CREATED,
+      });
+
+      expect(mocks.asset.remove).toHaveBeenCalledWith({ id: assetEntity.id });
+      expect(mocks.asset.create).toHaveBeenCalledTimes(2);
+      expect(mocks.asset.getUploadAssetIdByChecksum).not.toHaveBeenCalled();
+      expect(mocks.user.updateUsage).toHaveBeenCalledTimes(1);
+      expect(mocks.user.updateUsage).toHaveBeenCalledWith(authStub.user1.user.id, file.size);
+    });
+
     it('should keep uploaded disk files when removing the incomplete asset row fails', async () => {
       const file = {
         uuid: 'random-uuid',
