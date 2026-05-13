@@ -82,7 +82,7 @@ vi.mock('$lib/components/shared-components/ControlAppBar.svelte', async () => {
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/shared-components/gallery-viewer/gallery-viewer.svelte', async () => {
+vi.mock('$lib/components/shared-components/gallery-viewer/GalleryViewer.svelte', async () => {
   const { default: MockComponent } = await import('./mock-gallery-viewer.test-wrapper.svelte');
   return { default: MockComponent };
 });
@@ -175,6 +175,8 @@ vi.mock('$lib/utils/navigation', () => ({
 }));
 
 vi.mock('$lib/utils/timeline-util', () => ({
+  isTimelineAsset: vi.fn(Boolean),
+  isTimelineAssets: vi.fn((assets) => Array.isArray(assets)),
   toTimelineAsset: vi.fn((asset) => asset),
 }));
 
