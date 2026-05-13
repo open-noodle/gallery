@@ -4,7 +4,7 @@ import { AssetTypeEnum, AssetVisibility, type AssetResponseDto } from '@immich/s
 import { assetFactory } from '@test-data/factories/asset-factory';
 import '@testing-library/jest-dom';
 import { screen, waitFor } from '@testing-library/svelte';
-import DetailPanel from './detail-panel.svelte';
+import DetailPanel from './DetailPanel.svelte';
 
 const { getAllAlbumsMock, getAssetInfoMock, zoomImageToBase64Mock } = vi.hoisted(() => ({
   getAllAlbumsMock: vi.fn(),
@@ -61,32 +61,32 @@ vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
   },
 }));
 
-vi.mock('$lib/components/shared-components/map/map.svelte', async () => {
+vi.mock('$lib/components/shared-components/map/Map.svelte', async () => {
   const { default: MockComponent } = await import('@test-data/mocks/map-component.stub.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/asset-viewer/detail-panel-date.svelte', async () => {
+vi.mock('$lib/components/asset-viewer/DetailPanelDate.svelte', async () => {
   const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/asset-viewer/detail-panel-description.svelte', async () => {
+vi.mock('$lib/components/asset-viewer/DetailPanelDescription.svelte', async () => {
   const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/asset-viewer/detail-panel-location.svelte', async () => {
+vi.mock('$lib/components/asset-viewer/DetailPanelLocation.svelte', async () => {
   const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/asset-viewer/detail-panel-star-rating.svelte', async () => {
+vi.mock('$lib/components/asset-viewer/DetailPanelStarRating.svelte', async () => {
   const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/asset-viewer/detail-panel-tags.svelte', async () => {
+vi.mock('$lib/components/asset-viewer/DetailPanelTags.svelte', async () => {
   const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
@@ -106,7 +106,7 @@ vi.mock('$lib/components/shared-components/UserAvatar.svelte', async () => {
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/asset-viewer/album-list-item-details.svelte', async () => {
+vi.mock('$lib/components/asset-viewer/AlbumListItemDetails.svelte', async () => {
   const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
