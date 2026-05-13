@@ -101,7 +101,7 @@ vi.mock('$lib/components/OnEvents.svelte', async () => {
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/shared-components/user-avatar.svelte', async () => {
+vi.mock('$lib/components/shared-components/UserAvatar.svelte', async () => {
   const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
