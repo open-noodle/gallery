@@ -7,9 +7,9 @@ import { assetFactory } from '@test-data/factories/asset-factory';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
 import { fireEvent, screen, waitFor } from '@testing-library/svelte';
-import AssetViewer from './asset-viewer.svelte';
+import AssetViewer from './AssetViewer.svelte';
 
-vi.mock('$lib/components/asset-viewer/asset-viewer-nav-bar.svelte', async () => {
+vi.mock('$lib/components/asset-viewer/AssetViewerNavBar.svelte', async () => {
   const { default: MockAssetViewerNavBar } = await import('./asset-viewer-nav-bar.test-wrapper.svelte');
   return { default: MockAssetViewerNavBar };
 });
