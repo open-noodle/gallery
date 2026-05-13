@@ -1,6 +1,6 @@
+import { getMembers, getSpace, getSpacePerson, getSpacePersonStatistics } from '@immich/sdk';
 import { QueryParameter } from '$lib/constants';
 import { authenticate } from '$lib/utils/auth';
-import { getMembers, getSpace, getSpacePerson, getSpacePersonStatistics } from '@immich/sdk';
 import type { PageLoad } from './$types';
 
 const getSafePreviousRoute = (url: URL) => {

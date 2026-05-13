@@ -1,6 +1,14 @@
+import { AssetVisibility, getFilterSuggestions, getMlHealth, searchAssets, searchSmart } from '@immich/sdk';
+import { modalManager } from '@immich/ui';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { goto } from '$app/navigation';
+import { commandContextManager } from '$lib/managers/command-context-manager.svelte';
+import { GlobalSearchManager, type Provider, type Sections } from '$lib/managers/global-search-manager.svelte';
+import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
+import { addEntry, getEntries, __resetForTests as resetRecentStore } from '$lib/stores/cmdk-recent';
+import GlobalSearch from '../global-search.svelte';
 
 // Shared hoisted user mock — navigation provider and render-time recent filter both
 // read `get(user)` / `$user`. Must appear above the component import so Vitest hoists
@@ -44,15 +52,6 @@ const { mockPage } = vi.hoisted(() => ({
   },
 }));
 vi.mock('$app/state', () => ({ page: mockPage }));
-
-import { goto } from '$app/navigation';
-import { commandContextManager } from '$lib/managers/command-context-manager.svelte';
-import { GlobalSearchManager, type Provider, type Sections } from '$lib/managers/global-search-manager.svelte';
-import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
-import { addEntry, getEntries, __resetForTests as resetRecentStore } from '$lib/stores/cmdk-recent';
-import { AssetVisibility, getFilterSuggestions, getMlHealth, searchAssets, searchSmart } from '@immich/sdk';
-import { modalManager } from '@immich/ui';
-import GlobalSearch from '../global-search.svelte';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 

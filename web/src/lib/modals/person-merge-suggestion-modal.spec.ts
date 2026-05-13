@@ -1,9 +1,9 @@
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { Type, type PersonResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach } from 'vitest';
+import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import PersonMergeSuggestionModal from './PersonMergeSuggestionModal.svelte';
 
 vi.mock('../components/assets/thumbnail/ImageThumbnail.svelte', async () => {

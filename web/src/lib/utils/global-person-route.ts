@@ -1,6 +1,6 @@
+import { Type, type PersonResponseDto } from '@immich/sdk';
 import { Route } from '$lib/route';
 import { createUrl, getPeopleThumbnailUrl } from '$lib/utils';
-import { Type, type PersonResponseDto } from '@immich/sdk';
 
 const getPrimaryProfileId = (person: Pick<PersonResponseDto, 'id' | 'primaryProfile'>) =>
   person.primaryProfile?.id ?? person.id;

@@ -1,6 +1,6 @@
-import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
+import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
 import UserPageLayoutDescriptionTrailingTestWrapper from './user-page-layout-description-trailing.test-wrapper.svelte';
 
 vi.mock('$lib/components/shared-components/navigation-bar/NavigationBar.svelte', async () => {
