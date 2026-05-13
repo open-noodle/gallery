@@ -1,5 +1,5 @@
-import QueryRow from '$lib/components/global-search/rows/query-row.svelte';
 import { render, screen } from '@testing-library/svelte';
+import QueryRow from '$lib/components/global-search/rows/query-row.svelte';
 
 describe('query-row', () => {
   it('renders the query recent row with a magnify icon and text', () => {
