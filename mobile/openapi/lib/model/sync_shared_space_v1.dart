@@ -58,7 +58,10 @@ class SyncSharedSpaceV1 {
   String? thumbnailAssetId;
 
   /// Thumbnail crop Y offset
-  num? thumbnailCropY;
+  ///
+  /// Minimum value: -9007199254740991
+  /// Maximum value: 9007199254740991
+  int? thumbnailCropY;
 
   /// Updated at
   DateTime updatedAt;
@@ -104,7 +107,9 @@ class SyncSharedSpaceV1 {
     } else {
     //  json[r'color'] = null;
     }
-      json[r'createdAt'] = this.createdAt.toUtc().toIso8601String();
+      json[r'createdAt'] = _isEpochMarker(r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$/')
+        ? this.createdAt.millisecondsSinceEpoch
+        : this.createdAt.toUtc().toIso8601String();
       json[r'createdById'] = this.createdById;
     if (this.description != null) {
       json[r'description'] = this.description;
@@ -114,7 +119,9 @@ class SyncSharedSpaceV1 {
       json[r'faceRecognitionEnabled'] = this.faceRecognitionEnabled;
       json[r'id'] = this.id;
     if (this.lastActivityAt != null) {
-      json[r'lastActivityAt'] = this.lastActivityAt!.toUtc().toIso8601String();
+      json[r'lastActivityAt'] = _isEpochMarker(r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$/')
+        ? this.lastActivityAt!.millisecondsSinceEpoch
+        : this.lastActivityAt!.toUtc().toIso8601String();
     } else {
     //  json[r'lastActivityAt'] = null;
     }
@@ -130,7 +137,9 @@ class SyncSharedSpaceV1 {
     } else {
     //  json[r'thumbnailCropY'] = null;
     }
-      json[r'updatedAt'] = this.updatedAt.toUtc().toIso8601String();
+      json[r'updatedAt'] = _isEpochMarker(r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$/')
+        ? this.updatedAt.millisecondsSinceEpoch
+        : this.updatedAt.toUtc().toIso8601String();
     return json;
   }
 
@@ -144,19 +153,17 @@ class SyncSharedSpaceV1 {
 
       return SyncSharedSpaceV1(
         color: mapValueOfType<String>(json, r'color'),
-        createdAt: mapDateTime(json, r'createdAt', r'')!,
+        createdAt: mapDateTime(json, r'createdAt', r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$/')!,
         createdById: mapValueOfType<String>(json, r'createdById')!,
         description: mapValueOfType<String>(json, r'description'),
         faceRecognitionEnabled: mapValueOfType<bool>(json, r'faceRecognitionEnabled')!,
         id: mapValueOfType<String>(json, r'id')!,
-        lastActivityAt: mapDateTime(json, r'lastActivityAt', r''),
+        lastActivityAt: mapDateTime(json, r'lastActivityAt', r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$/'),
         name: mapValueOfType<String>(json, r'name')!,
         petsEnabled: mapValueOfType<bool>(json, r'petsEnabled')!,
         thumbnailAssetId: mapValueOfType<String>(json, r'thumbnailAssetId'),
-        thumbnailCropY: json[r'thumbnailCropY'] == null
-            ? null
-            : num.parse('${json[r'thumbnailCropY']}'),
-        updatedAt: mapDateTime(json, r'updatedAt', r'')!,
+        thumbnailCropY: mapValueOfType<int>(json, r'thumbnailCropY'),
+        updatedAt: mapDateTime(json, r'updatedAt', r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$/')!,
       );
     }
     return null;
