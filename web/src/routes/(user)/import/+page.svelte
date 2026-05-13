@@ -1,6 +1,6 @@
 <script lang="ts">
   import ImportWizard from '$lib/components/import/import-wizard.svelte';
-  import UserPageLayout from '$lib/components/layouts/user-page-layout.svelte';
+  import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
   import type { PageData } from './$types';
 
   interface Props {

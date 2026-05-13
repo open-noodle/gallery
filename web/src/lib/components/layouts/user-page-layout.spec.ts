@@ -1,4 +1,4 @@
-import UserPageLayout from '$lib/components/layouts/user-page-layout.svelte';
+import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import UserPageLayoutDescriptionTrailingTestWrapper from './user-page-layout-description-trailing.test-wrapper.svelte';
