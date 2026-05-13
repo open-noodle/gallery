@@ -153,8 +153,8 @@ features:
       - web/src/lib/managers/global-search*.ts
       - web/src/lib/managers/command*.ts
       - web/src/lib/utils/typed-search/**
-      - web/src/lib/components/shared-components/side-bar/purchase-info.svelte
-      - web/src/lib/components/shared-components/purchasing/purchase-content.svelte
+      - web/src/lib/components/shared-components/side-bar/PurchaseInfo.svelte
+      - web/src/lib/components/shared-components/purchasing/PurchaseContent.svelte
       - server/src/controllers/gallery-map.controller.ts
       - server/src/dtos/gallery-map.dto.ts
       - mobile/lib/providers/map/map_marker.provider.dart
