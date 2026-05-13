@@ -49,11 +49,19 @@ class ServerApi {
   /// Delete server product key
   ///
   /// Delete the currently set server product key.
-  Future<void> deleteServerLicense() async {
+  Future<bool?> deleteServerLicense() async {
     final response = await deleteServerLicenseWithHttpInfo();
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
+    
+    }
+    return null;
   }
 
   /// Get server information
@@ -329,19 +337,11 @@ class ServerApi {
   /// Get product key
   ///
   /// Retrieve information about whether the server currently has a product key registered.
-  Future<UserLicense?> getServerLicense() async {
+  Future<void> getServerLicense() async {
     final response = await getServerLicenseWithHttpInfo();
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
-    // When a remote server returns no body with a status of 204, we shall not decode it.
-    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
-    // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'UserLicense',) as UserLicense;
-    
-    }
-    return null;
   }
 
   /// Get statistics

@@ -4046,7 +4046,10 @@ export function getActivityStatistics({ albumId, assetId }: {
 export function deleteActivity({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/activities/${encodeURIComponent(id)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/activities/${encodeURIComponent(id)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -4055,7 +4058,10 @@ export function deleteActivity({ id }: {
  * Unlink all OAuth accounts
  */
 export function unlinkAllOAuthAccountsAdmin(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/admin/auth/unlink-all", {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/admin/auth/unlink-all", {
         ...opts,
         method: "POST"
     }));
@@ -4066,7 +4072,10 @@ export function unlinkAllOAuthAccountsAdmin(opts?: Oazapfts.RequestOpts) {
 export function deleteDatabaseBackup({ databaseBackupDeleteDto }: {
     databaseBackupDeleteDto: DatabaseBackupDeleteDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/admin/database-backups", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: boolean;
+    }>("/admin/database-backups", oazapfts.json({
         ...opts,
         method: "DELETE",
         body: databaseBackupDeleteDto
@@ -4087,7 +4096,10 @@ export function listDatabaseBackups(opts?: Oazapfts.RequestOpts) {
  * Start database backup restore flow
  */
 export function startDatabaseRestoreFlow(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/admin/database-backups/start-restore", {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: boolean;
+    }>("/admin/database-backups/start-restore", {
         ...opts,
         method: "POST"
     }));
@@ -4098,7 +4110,10 @@ export function startDatabaseRestoreFlow(opts?: Oazapfts.RequestOpts) {
 export function uploadDatabaseBackup({ databaseBackupUploadDto }: {
     databaseBackupUploadDto: DatabaseBackupUploadDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/admin/database-backups/upload", oazapfts.multipart({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: boolean;
+    }>("/admin/database-backups/upload", oazapfts.multipart({
         ...opts,
         method: "POST",
         body: databaseBackupUploadDto
@@ -4123,7 +4138,10 @@ export function downloadDatabaseBackup({ filename }: {
 export function setMaintenanceMode({ setMaintenanceModeDto }: {
     setMaintenanceModeDto: SetMaintenanceModeDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/admin/maintenance", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: boolean;
+    }>("/admin/maintenance", oazapfts.json({
         ...opts,
         method: "POST",
         body: setMaintenanceModeDto
@@ -4442,7 +4460,10 @@ export function getAlbumStatistics(opts?: Oazapfts.RequestOpts) {
 export function deleteAlbum({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/albums/${encodeURIComponent(id)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/albums/${encodeURIComponent(id)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -4538,7 +4559,10 @@ export function removeUserFromAlbum({ id, userId }: {
     id: string;
     userId: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/albums/${encodeURIComponent(id)}/user/${encodeURIComponent(userId)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/albums/${encodeURIComponent(id)}/user/${encodeURIComponent(userId)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -4551,7 +4575,10 @@ export function updateAlbumUser({ id, userId, updateAlbumUserDto }: {
     userId: string;
     updateAlbumUserDto: UpdateAlbumUserDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/albums/${encodeURIComponent(id)}/user/${encodeURIComponent(userId)}`, oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/albums/${encodeURIComponent(id)}/user/${encodeURIComponent(userId)}`, oazapfts.json({
         ...opts,
         method: "PUT",
         body: updateAlbumUserDto
@@ -4616,7 +4643,10 @@ export function getMyApiKey(opts?: Oazapfts.RequestOpts) {
 export function deleteApiKey({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/api-keys/${encodeURIComponent(id)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/api-keys/${encodeURIComponent(id)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -4656,7 +4686,10 @@ export function updateApiKey({ id, apiKeyUpdateDto }: {
 export function deleteAssets({ assetBulkDeleteDto }: {
     assetBulkDeleteDto: AssetBulkDeleteDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/assets", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/assets", oazapfts.json({
         ...opts,
         method: "DELETE",
         body: assetBulkDeleteDto
@@ -4695,7 +4728,10 @@ export function uploadAsset({ key, slug, xImmichChecksum, assetMediaCreateDto }:
 export function updateAssets({ assetBulkUpdateDto }: {
     assetBulkUpdateDto: AssetBulkUpdateDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/assets", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/assets", oazapfts.json({
         ...opts,
         method: "PUT",
         body: assetBulkUpdateDto
@@ -4722,7 +4758,10 @@ export function checkBulkUpload({ assetBulkUploadCheckDto }: {
 export function copyAsset({ assetCopyDto }: {
     assetCopyDto: AssetCopyDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/assets/copy", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/assets/copy", oazapfts.json({
         ...opts,
         method: "PUT",
         body: assetCopyDto
@@ -4734,7 +4773,10 @@ export function copyAsset({ assetCopyDto }: {
 export function runAssetJobs({ assetJobsDto }: {
     assetJobsDto: AssetJobsDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/assets/jobs", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/assets/jobs", oazapfts.json({
         ...opts,
         method: "POST",
         body: assetJobsDto
@@ -4746,7 +4788,10 @@ export function runAssetJobs({ assetJobsDto }: {
 export function deleteBulkAssetMetadata({ assetMetadataBulkDeleteDto }: {
     assetMetadataBulkDeleteDto: AssetMetadataBulkDeleteDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/assets/metadata", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/assets/metadata", oazapfts.json({
         ...opts,
         method: "DELETE",
         body: assetMetadataBulkDeleteDto
@@ -4828,7 +4873,10 @@ export function updateAsset({ id, updateAssetDto }: {
 export function removeAssetEdits({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/assets/${encodeURIComponent(id)}/edits`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/assets/${encodeURIComponent(id)}/edits`, {
         ...opts,
         method: "DELETE"
     }));
@@ -4898,7 +4946,10 @@ export function deleteAssetMetadata({ id, key }: {
     id: string;
     key: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/assets/${encodeURIComponent(id)}/metadata/${encodeURIComponent(key)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/assets/${encodeURIComponent(id)}/metadata/${encodeURIComponent(key)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -5055,7 +5106,10 @@ export function logout(opts?: Oazapfts.RequestOpts) {
 export function resetPinCode({ pinCodeResetDto }: {
     pinCodeResetDto: PinCodeResetDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/auth/pin-code", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/auth/pin-code", oazapfts.json({
         ...opts,
         method: "DELETE",
         body: pinCodeResetDto
@@ -5067,7 +5121,10 @@ export function resetPinCode({ pinCodeResetDto }: {
 export function setupPinCode({ pinCodeSetupDto }: {
     pinCodeSetupDto: PinCodeSetupDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/auth/pin-code", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/auth/pin-code", oazapfts.json({
         ...opts,
         method: "POST",
         body: pinCodeSetupDto
@@ -5079,7 +5136,10 @@ export function setupPinCode({ pinCodeSetupDto }: {
 export function changePinCode({ pinCodeChangeDto }: {
     pinCodeChangeDto: PinCodeChangeDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/auth/pin-code", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/auth/pin-code", oazapfts.json({
         ...opts,
         method: "PUT",
         body: pinCodeChangeDto
@@ -5089,7 +5149,10 @@ export function changePinCode({ pinCodeChangeDto }: {
  * Lock auth session
  */
 export function lockAuthSession(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/auth/session/lock", {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/auth/session/lock", {
         ...opts,
         method: "POST"
     }));
@@ -5100,7 +5163,10 @@ export function lockAuthSession(opts?: Oazapfts.RequestOpts) {
 export function unlockAuthSession({ sessionUnlockDto }: {
     sessionUnlockDto: SessionUnlockDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/auth/session/unlock", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/auth/session/unlock", oazapfts.json({
         ...opts,
         method: "POST",
         body: sessionUnlockDto
@@ -5133,7 +5199,10 @@ export function validateAccessToken(opts?: Oazapfts.RequestOpts) {
  * Scan all libraries for classification
  */
 export function scanClassification(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/classification/scan", {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/classification/scan", {
         ...opts,
         method: "POST"
     }));
@@ -5184,7 +5253,10 @@ export function getDownloadInfo({ key, slug, downloadInfoDto }: {
 export function deleteDuplicates({ bulkIdsDto }: {
     bulkIdsDto: BulkIdsDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/duplicates", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/duplicates", oazapfts.json({
         ...opts,
         method: "DELETE",
         body: bulkIdsDto
@@ -5222,7 +5294,10 @@ export function resolveDuplicates({ duplicateResolveDto }: {
 export function deleteDuplicate({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/duplicates/${encodeURIComponent(id)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/duplicates/${encodeURIComponent(id)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -5248,7 +5323,10 @@ export function getFaces({ id }: {
 export function createFace({ assetFaceCreateDto }: {
     assetFaceCreateDto: AssetFaceCreateDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/faces", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: boolean;
+    }>("/faces", oazapfts.json({
         ...opts,
         method: "POST",
         body: assetFaceCreateDto
@@ -5261,7 +5339,10 @@ export function deleteFace({ id, assetFaceDeleteDto }: {
     id: string;
     assetFaceDeleteDto: AssetFaceDeleteDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/faces/${encodeURIComponent(id)}`, oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/faces/${encodeURIComponent(id)}`, oazapfts.json({
         ...opts,
         method: "DELETE",
         body: assetFaceDeleteDto
@@ -5341,7 +5422,10 @@ export function getQueuesLegacy(opts?: Oazapfts.RequestOpts) {
 export function createJob({ jobCreateDto }: {
     jobCreateDto: JobCreateDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/jobs", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/jobs", oazapfts.json({
         ...opts,
         method: "POST",
         body: jobCreateDto
@@ -5395,7 +5479,10 @@ export function createLibrary({ createLibraryDto }: {
 export function deleteLibrary({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/libraries/${encodeURIComponent(id)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/libraries/${encodeURIComponent(id)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -5435,7 +5522,10 @@ export function updateLibrary({ id, updateLibraryDto }: {
 export function scanLibrary({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/libraries/${encodeURIComponent(id)}/scan`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/libraries/${encodeURIComponent(id)}/scan`, {
         ...opts,
         method: "POST"
     }));
@@ -5584,7 +5674,10 @@ export function memoriesStatistics({ $for, isSaved, isTrashed, order, size, $typ
 export function deleteMemory({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/memories/${encodeURIComponent(id)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/memories/${encodeURIComponent(id)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -5656,7 +5749,10 @@ export function addMemoryAssets({ id, bulkIdsDto }: {
 export function deleteNotifications({ notificationDeleteAllDto }: {
     notificationDeleteAllDto: NotificationDeleteAllDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/notifications", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/notifications", oazapfts.json({
         ...opts,
         method: "DELETE",
         body: notificationDeleteAllDto
@@ -5689,7 +5785,10 @@ export function getNotifications({ id, level, $type, unread }: {
 export function updateNotifications({ notificationUpdateAllDto }: {
     notificationUpdateAllDto: NotificationUpdateAllDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/notifications", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/notifications", oazapfts.json({
         ...opts,
         method: "PUT",
         body: notificationUpdateAllDto
@@ -5701,7 +5800,10 @@ export function updateNotifications({ notificationUpdateAllDto }: {
 export function deleteNotification({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/notifications/${encodeURIComponent(id)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/notifications/${encodeURIComponent(id)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -5756,7 +5858,10 @@ export function startOAuth({ oAuthConfigDto }: {
 export function logoutOAuth({ oAuthBackchannelLogoutDto }: {
     oAuthBackchannelLogoutDto: OAuthBackchannelLogoutDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/oauth/backchannel-logout", oazapfts.form({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: boolean;
+    }>("/oauth/backchannel-logout", oazapfts.form({
         ...opts,
         method: "POST",
         body: oAuthBackchannelLogoutDto
@@ -5848,7 +5953,10 @@ export function createPartner({ partnerCreateDto }: {
 export function removePartner({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/partners/${encodeURIComponent(id)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/partners/${encodeURIComponent(id)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -5889,7 +5997,10 @@ export function updatePartner({ id, partnerUpdateDto }: {
 export function deletePeople({ bulkIdsDto }: {
     bulkIdsDto: BulkIdsDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/people", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/people", oazapfts.json({
         ...opts,
         method: "DELETE",
         body: bulkIdsDto
@@ -5956,7 +6067,10 @@ export function updatePeople({ peopleUpdateDto }: {
 export function detachScopedPerson({ detachScopedPersonDto }: {
     detachScopedPersonDto: DetachScopedPersonDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/people/detach-profile", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/people/detach-profile", oazapfts.json({
         ...opts,
         method: "POST",
         body: detachScopedPersonDto
@@ -5993,7 +6107,10 @@ export function getPeopleFaceStatistics({ closestAssetId, closestPersonId, page,
 export function mergeScopedPeople({ mergeScopedPeopleDto }: {
     mergeScopedPeopleDto: MergeScopedPeopleDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/people/same-person", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/people/same-person", oazapfts.json({
         ...opts,
         method: "POST",
         body: mergeScopedPeopleDto
@@ -6030,7 +6147,10 @@ export function getPeopleStatistics({ closestAssetId, closestPersonId, page, siz
 export function deletePerson({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/people/${encodeURIComponent(id)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/people/${encodeURIComponent(id)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -6252,7 +6372,10 @@ export function emptyQueue({ name, queueDeleteDto }: {
     name: QueueName;
     queueDeleteDto: QueueDeleteDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/queues/${encodeURIComponent(name)}/jobs`, oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/queues/${encodeURIComponent(name)}/jobs`, oazapfts.json({
         ...opts,
         method: "DELETE",
         body: queueDeleteDto
@@ -6509,10 +6632,7 @@ export function getSearchSuggestions({ albumId, country, includeNull, isFavorite
     $type: SearchSuggestionType;
     withSharedSpaces?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: string[];
-    }>(`/search/suggestions${QS.query(QS.explode({
+    return oazapfts.ok(oazapfts.fetchText(`/search/suggestions${QS.query(QS.explode({
         albumId,
         country,
         includeNull,
@@ -6646,7 +6766,10 @@ export function getServerFeatures(opts?: Oazapfts.RequestOpts) {
  * Delete server product key
  */
 export function deleteServerLicense(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/server/license", {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/server/license", {
         ...opts,
         method: "DELETE"
     }));
@@ -6766,7 +6889,10 @@ export function getVersionHistory(opts?: Oazapfts.RequestOpts) {
  * Delete all sessions
  */
 export function deleteAllSessions(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/sessions", {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/sessions", {
         ...opts,
         method: "DELETE"
     }));
@@ -6803,7 +6929,10 @@ export function createSession({ sessionCreateDto }: {
 export function deleteSession({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/sessions/${encodeURIComponent(id)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/sessions/${encodeURIComponent(id)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -6830,7 +6959,10 @@ export function updateSession({ id, sessionUpdateDto }: {
 export function lockSession({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/sessions/${encodeURIComponent(id)}/lock`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/sessions/${encodeURIComponent(id)}/lock`, {
         ...opts,
         method: "POST"
     }));
@@ -6910,7 +7042,10 @@ export function getMySharedLink({ key, slug }: {
 export function removeSharedLink({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-links/${encodeURIComponent(id)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/shared-links/${encodeURIComponent(id)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -7008,7 +7143,10 @@ export function createSpace({ sharedSpaceCreateDto }: {
 export function removeSpace({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/shared-spaces/${encodeURIComponent(id)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -7067,7 +7205,10 @@ export function removeAssets({ id, sharedSpaceAssetRemoveDto }: {
     id: string;
     sharedSpaceAssetRemoveDto: SharedSpaceAssetRemoveDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/assets`, oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/assets`, oazapfts.json({
         ...opts,
         method: "DELETE",
         body: sharedSpaceAssetRemoveDto
@@ -7080,7 +7221,10 @@ export function addAssets({ id, sharedSpaceAssetAddDto }: {
     id: string;
     sharedSpaceAssetAddDto: SharedSpaceAssetAddDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/assets`, oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/assets`, oazapfts.json({
         ...opts,
         method: "POST",
         body: sharedSpaceAssetAddDto
@@ -7104,7 +7248,10 @@ export function linkLibrary({ id, sharedSpaceLibraryLinkDto }: {
     id: string;
     sharedSpaceLibraryLinkDto: SharedSpaceLibraryLinkDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/libraries`, oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/libraries`, oazapfts.json({
         ...opts,
         method: "PUT",
         body: sharedSpaceLibraryLinkDto
@@ -7117,7 +7264,10 @@ export function unlinkLibrary({ id, libraryId }: {
     id: string;
     libraryId: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/libraries/${encodeURIComponent(libraryId)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/libraries/${encodeURIComponent(libraryId)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -7203,7 +7353,10 @@ export function removeMember({ id, userId }: {
     id: string;
     userId: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -7276,7 +7429,10 @@ export function getSpacePeople({ id, limit, name, named, offset, takenAfter, tak
 export function deduplicateSpacePeople({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/deduplicate`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/deduplicate`, {
         ...opts,
         method: "POST"
     }));
@@ -7344,7 +7500,10 @@ export function deleteSpacePerson({ id, personId }: {
     id: string;
     personId: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -7387,7 +7546,10 @@ export function deleteSpacePersonAlias({ id, personId }: {
     id: string;
     personId: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/alias`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/alias`, {
         ...opts,
         method: "DELETE"
     }));
@@ -7400,7 +7562,10 @@ export function setSpacePersonAlias({ id, personId, sharedSpacePersonAliasDto }:
     personId: string;
     sharedSpacePersonAliasDto: SharedSpacePersonAliasDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/alias`, oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/alias`, oazapfts.json({
         ...opts,
         method: "PUT",
         body: sharedSpacePersonAliasDto
@@ -7413,10 +7578,7 @@ export function getSpacePersonAssets({ id, personId }: {
     id: string;
     personId: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: string[];
-    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/assets`, {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/assets`, {
         ...opts
     }));
 }
@@ -7462,7 +7624,10 @@ export function mergeSpacePeople({ id, personId, sharedSpacePersonMergeDto }: {
     personId: string;
     sharedSpacePersonMergeDto: SharedSpacePersonMergeDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/merge`, oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/merge`, oazapfts.json({
         ...opts,
         method: "POST",
         body: sharedSpacePersonMergeDto
@@ -7519,7 +7684,10 @@ export function getSpacePersonThumbnail({ id, personId }: {
 export function markSpaceViewed({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/view`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/view`, {
         ...opts,
         method: "PATCH"
     }));
@@ -7530,7 +7698,10 @@ export function markSpaceViewed({ id }: {
 export function deleteStacks({ bulkIdsDto }: {
     bulkIdsDto: BulkIdsDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/stacks", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/stacks", oazapfts.json({
         ...opts,
         method: "DELETE",
         body: bulkIdsDto
@@ -7572,7 +7743,10 @@ export function createStack({ stackCreateDto }: {
 export function deleteStack({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/stacks/${encodeURIComponent(id)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/stacks/${encodeURIComponent(id)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -7613,7 +7787,10 @@ export function removeAssetFromStack({ assetId, id }: {
     assetId: string;
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/stacks/${encodeURIComponent(id)}/assets/${encodeURIComponent(assetId)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/stacks/${encodeURIComponent(id)}/assets/${encodeURIComponent(assetId)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -7667,7 +7844,10 @@ export function getStatus(opts?: Oazapfts.RequestOpts) {
 export function deleteSyncAck({ syncAckDeleteDto }: {
     syncAckDeleteDto: SyncAckDeleteDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/sync/ack", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/sync/ack", oazapfts.json({
         ...opts,
         method: "DELETE",
         body: syncAckDeleteDto
@@ -7690,7 +7870,10 @@ export function getSyncAck(opts?: Oazapfts.RequestOpts) {
 export function sendSyncAck({ syncAckSetDto }: {
     syncAckSetDto: SyncAckSetDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/sync/ack", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: string;
+    }>("/sync/ack", oazapfts.json({
         ...opts,
         method: "POST",
         body: syncAckSetDto
@@ -7702,7 +7885,10 @@ export function sendSyncAck({ syncAckSetDto }: {
 export function getSyncStream({ syncStreamDto }: {
     syncStreamDto: SyncStreamDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/sync/stream", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: boolean;
+    }>("/sync/stream", oazapfts.json({
         ...opts,
         method: "POST",
         body: syncStreamDto
@@ -7773,7 +7959,10 @@ export function getAdminOnboarding(opts?: Oazapfts.RequestOpts) {
 export function updateAdminOnboarding({ adminOnboardingUpdateDto }: {
     adminOnboardingUpdateDto: AdminOnboardingUpdateDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/system-metadata/admin-onboarding", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/system-metadata/admin-onboarding", oazapfts.json({
         ...opts,
         method: "POST",
         body: adminOnboardingUpdateDto
@@ -7863,7 +8052,10 @@ export function bulkTagAssets({ tagBulkAssetsDto }: {
 export function deleteTag({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/tags/${encodeURIComponent(id)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/tags/${encodeURIComponent(id)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -8148,7 +8340,10 @@ export function createGroup({ userGroupCreateDto }: {
 export function removeGroup({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/user-groups/${encodeURIComponent(id)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/user-groups/${encodeURIComponent(id)}`, {
         ...opts,
         method: "DELETE"
     }));
@@ -8239,7 +8434,10 @@ export function updateMyUser({ userUpdateMeDto }: {
  * Delete user product key
  */
 export function deleteUserLicense(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/users/me/license", {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/users/me/license", {
         ...opts,
         method: "DELETE"
     }));
@@ -8274,7 +8472,10 @@ export function setUserLicense({ licenseKeyDto }: {
  * Delete user onboarding
  */
 export function deleteUserOnboarding(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/users/me/onboarding", {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/users/me/onboarding", {
         ...opts,
         method: "DELETE"
     }));
@@ -8335,7 +8536,10 @@ export function updateMyPreferences({ userPreferencesUpdateDto }: {
  * Delete user profile image
  */
 export function deleteProfileImage(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/users/profile-image", {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>("/users/profile-image", {
         ...opts,
         method: "DELETE"
     }));
@@ -8400,10 +8604,7 @@ export function getAssetsByOriginalPath({ path }: {
  * Retrieve unique paths
  */
 export function getUniqueOriginalPaths(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: string[];
-    }>("/view/folder/unique-paths", {
+    return oazapfts.ok(oazapfts.fetchText("/view/folder/unique-paths", {
         ...opts
     }));
 }
@@ -8439,7 +8640,10 @@ export function createWorkflow({ workflowCreateDto }: {
 export function deleteWorkflow({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/workflows/${encodeURIComponent(id)}`, {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 204;
+        data: boolean;
+    }>(`/workflows/${encodeURIComponent(id)}`, {
         ...opts,
         method: "DELETE"
     }));

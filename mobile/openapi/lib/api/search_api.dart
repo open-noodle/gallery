@@ -493,22 +493,11 @@ class SearchApi {
   ///
   /// * [bool] withSharedSpaces:
   ///   Include suggestions from shared spaces the user is a member of
-  Future<List<String>?> getSearchSuggestions(SearchSuggestionType type, { String? albumId, String? country, bool? includeNull, bool? isFavorite, bool? isNotInAlbum, String? lensModel, String? make, String? model, List<String>? personIds, int? rating, String? spaceId, String? state, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, bool? withSharedSpaces, }) async {
+  Future<void> getSearchSuggestions(SearchSuggestionType type, { String? albumId, String? country, bool? includeNull, bool? isFavorite, bool? isNotInAlbum, String? lensModel, String? make, String? model, List<String>? personIds, int? rating, String? spaceId, String? state, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, bool? withSharedSpaces, }) async {
     final response = await getSearchSuggestionsWithHttpInfo(type,  albumId: albumId, country: country, includeNull: includeNull, isFavorite: isFavorite, isNotInAlbum: isNotInAlbum, lensModel: lensModel, make: make, model: model, personIds: personIds, rating: rating, spaceId: spaceId, state: state, tagIds: tagIds, takenAfter: takenAfter, takenBefore: takenBefore, withSharedSpaces: withSharedSpaces, );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
-    // When a remote server returns no body with a status of 204, we shall not decode it.
-    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
-    // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      final responseBody = await _decodeBodyBytes(response);
-      return (await apiClient.deserializeAsync(responseBody, 'List<String>') as List)
-        .cast<String>()
-        .toList(growable: false);
-
-    }
-    return null;
   }
 
   /// Retrieve tag suggestions
