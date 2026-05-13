@@ -1,3 +1,5 @@
+import { AssetOrder, AssetTypeEnum, Type } from '@immich/sdk';
+import { describe, expect, it } from 'vitest';
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 import {
   buildSmartSearchFacetKey,
@@ -6,8 +8,6 @@ import {
   mapSmartSearchFacetsToFilterSuggestions,
   SEARCH_FILTER_DEBOUNCE_MS,
 } from '$lib/utils/space-search';
-import { AssetOrder, AssetTypeEnum, Type } from '@immich/sdk';
-import { describe, expect, it } from 'vitest';
 
 const baseFilters: FilterState = {
   personIds: [],
