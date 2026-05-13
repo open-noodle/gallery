@@ -1,8 +1,8 @@
-import SpaceCard from '$lib/components/spaces/space-card.svelte';
 import type { SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
 import { SharedSpaceRole } from '@immich/sdk';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import SpaceCard from '$lib/components/spaces/space-card.svelte';
 
 const makeMember = (overrides: Partial<SharedSpaceMemberResponseDto> = {}): SharedSpaceMemberResponseDto => ({
   userId: 'user-1',

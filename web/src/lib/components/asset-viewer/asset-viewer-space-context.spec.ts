@@ -1,3 +1,4 @@
+import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import { getResizeObserverMock } from '$lib/__mocks__/resize-observer.mock';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
@@ -6,7 +7,6 @@ import { renderWithTooltips } from '$tests/helpers';
 import { assetFactory } from '@test-data/factories/asset-factory';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
-import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import AssetViewer from './AssetViewer.svelte';
 
 vi.mock('$lib/components/asset-viewer/AssetViewerNavBar.svelte', async () => {

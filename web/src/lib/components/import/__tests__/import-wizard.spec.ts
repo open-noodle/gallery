@@ -1,9 +1,9 @@
-import type { TakeoutMediaItem } from '$lib/utils/google-takeout-parser';
-import { scanTakeoutFiles } from '$lib/utils/google-takeout-scanner';
-import { uploadTakeoutItem } from '$lib/utils/google-takeout-uploader';
 import '@testing-library/jest-dom';
 import { fireEvent, render, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import type { TakeoutMediaItem } from '$lib/utils/google-takeout-parser';
+import { scanTakeoutFiles } from '$lib/utils/google-takeout-scanner';
+import { uploadTakeoutItem } from '$lib/utils/google-takeout-uploader';
 import ImportWizard from '../import-wizard.svelte';
 
 vi.mock('$lib/utils/google-takeout-scanner', () => ({

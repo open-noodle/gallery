@@ -1,4 +1,6 @@
+import { getAlbumNames, type AlbumNameDto } from '@immich/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { GlobalSearchManager } from './global-search-manager.svelte';
 
 // Shared hoisted mocks — same pattern as global-search-manager.svelte.spec.ts so the
 // user/feature-flag modules resolve before the manager is imported. The provider
@@ -27,9 +29,6 @@ const { mockFlags } = vi.hoisted(() => ({
 vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
   featureFlagsManager: mockFlags,
 }));
-
-import { getAlbumNames, type AlbumNameDto } from '@immich/sdk';
-import { GlobalSearchManager } from './global-search-manager.svelte';
 
 vi.mock('@immich/sdk', async () => ({
   ...(await vi.importActual<typeof import('@immich/sdk')>('@immich/sdk')),
