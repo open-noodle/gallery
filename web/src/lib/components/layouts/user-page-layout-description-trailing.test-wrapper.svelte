@@ -1,5 +1,5 @@
 <script lang="ts">
-  import UserPageLayout from './user-page-layout.svelte';
+  import UserPageLayout from './UserPageLayout.svelte';
 </script>
 
 <UserPageLayout title="People" description="(60) \u00b7 2,901 faces">
