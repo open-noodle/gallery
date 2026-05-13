@@ -779,8 +779,9 @@ function runCommandList(
   runner: ShellRunner = defaultShellRunner,
 ): CheckResult {
   const output: string[] = [];
+  const commandCwd = repoRootForCommands(cwd);
   for (const command of commands) {
-    const result = runner(command, cwd);
+    const result = runner(command, commandCwd);
     output.push(result.stdout, result.stderr);
     if (result.status !== 0) {
       return {
@@ -792,6 +793,14 @@ function runCommandList(
   }
 
   return { ok: true, commands, output: output.filter(Boolean).join('\n') };
+}
+
+function repoRootForCommands(cwd: string): string {
+  try {
+    return runGit(cwd, ['rev-parse', '--show-toplevel']);
+  } catch {
+    return cwd;
+  }
 }
 
 function defaultShellRunner(
