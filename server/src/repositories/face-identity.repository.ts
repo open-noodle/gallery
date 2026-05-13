@@ -14,6 +14,7 @@ import type { PeopleFaceStatistics, PersonStatistics } from 'src/repositories/pe
 import { DB } from 'src/schema';
 import { FaceIdentityFaceSource, FaceIdentityFaceTable } from 'src/schema/tables/face-identity-face.table';
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table';
+import { anyUuid } from 'src/utils/database';
 import { asBirthDateString, asDateString } from 'src/utils/date';
 
 export type FaceIdentity = Selectable<FaceIdentityTable>;
@@ -95,6 +96,7 @@ type SpacePersonBackfillIdentityGroup = {
 };
 
 const peopleAssetVisibilities = [AssetVisibility.Archive, AssetVisibility.Timeline];
+const sharedSpaceFaceMatchBackfillTargetInsertChunkSize = 1000;
 
 export type ScopedPersonTokenResolution = {
   identityIds: string[];
@@ -441,7 +443,7 @@ export class FaceIdentityRepository {
 
     const limit = input.limit === undefined ? sql`` : sql`LIMIT ${input.limit}`;
     const assetFaceIds = input.assetFaceIds ? [...new Set(input.assetFaceIds)] : undefined;
-    const assetFaceFilter = assetFaceIds ? sql`AND asset_face.id IN (${sql.join(assetFaceIds)})` : sql``;
+    const assetFaceFilter = assetFaceIds ? sql`AND asset_face.id = ${anyUuid(assetFaceIds)}` : sql``;
     const result = await sql<SharedSpaceFaceMatchBackfillTarget>`
       WITH face_spaces AS (
         SELECT
@@ -552,7 +554,7 @@ export class FaceIdentityRepository {
           AND asset."deletedAt" IS NULL
           AND asset."isOffline" = false
           AND asset.visibility IN (${sql.join(peopleAssetVisibilities)})
-          AND asset_face.id IN (${sql.join(uniqueAssetFaceIds)})
+          AND asset_face.id = ${anyUuid(uniqueAssetFaceIds)}
           AND asset_face."personId" IS NOT NULL
           AND asset_face."deletedAt" IS NULL
           AND asset_face."isVisible" = true
@@ -578,7 +580,7 @@ export class FaceIdentityRepository {
           AND asset."deletedAt" IS NULL
           AND asset."isOffline" = false
           AND asset.visibility IN (${sql.join(peopleAssetVisibilities)})
-          AND asset_face.id IN (${sql.join(uniqueAssetFaceIds)})
+          AND asset_face.id = ${anyUuid(uniqueAssetFaceIds)}
           AND asset_face."personId" IS NOT NULL
           AND asset_face."deletedAt" IS NULL
           AND asset_face."isVisible" = true
@@ -607,11 +609,14 @@ export class FaceIdentityRepository {
       return [];
     }
 
-    await this.db
-      .insertInto('shared_space_face_match_backfill_target')
-      .values(uniqueTargets)
-      .onConflict((oc) => oc.columns(['spaceId', 'assetId']).doUpdateSet({ updatedAt: sql`now()` }))
-      .execute();
+    for (let index = 0; index < uniqueTargets.length; index += sharedSpaceFaceMatchBackfillTargetInsertChunkSize) {
+      const chunk = uniqueTargets.slice(index, index + sharedSpaceFaceMatchBackfillTargetInsertChunkSize);
+      await this.db
+        .insertInto('shared_space_face_match_backfill_target')
+        .values(chunk)
+        .onConflict((oc) => oc.columns(['spaceId', 'assetId']).doUpdateSet({ updatedAt: sql`now()` }))
+        .execute();
+    }
 
     return uniqueTargets;
   }
