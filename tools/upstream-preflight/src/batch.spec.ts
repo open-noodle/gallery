@@ -371,6 +371,20 @@ describe('persisted batch plan validation', () => {
     );
   });
 
+  it('allows a moved upstream ref when the rolling target matches the persisted plan', () => {
+    const { repo, plan } = createRepoWithPersistedPlan();
+    repo.git('checkout', 'upstream');
+    repo.write('upstream/three.txt', 'three');
+    repo.commit('upstream three');
+    repo.git('checkout', 'main');
+
+    expect(() =>
+      validatePersistedBatchPlan(plan, repo.path, {
+        expectedUpstreamHead: plan.metadata.upstreamHead,
+      }),
+    ).not.toThrow();
+  });
+
   it('reads batch audit scope from the persisted plan after the upstream ref moved', () => {
     const { repo, outputDir, plan } = createRepoWithPersistedPlan();
     repo.git('checkout', 'upstream');
@@ -472,6 +486,28 @@ describe('upstream next batch', () => {
 
     expect(exitCode).toBe(1);
     expect(errors.join('\n')).toContain('Persisted batch plan is stale');
+  });
+
+  it('selects the next batch against the rolling target when upstream moved', () => {
+    const { repo, plan, outputDir } = createRepoWithPersistedPlan();
+    repo.git('checkout', 'upstream');
+    repo.write('upstream/three.txt', 'three');
+    repo.commit('upstream three');
+    repo.git('checkout', 'main');
+    const messages: string[] = [];
+
+    const exitCode = runNextBatchCommand({
+      repoPath: repo.path,
+      outputDir,
+      expectedUpstreamHead: plan.metadata.upstreamHead,
+      write: (message) => messages.push(message),
+    });
+
+    expect(exitCode).toBe(0);
+    expect(messages.join('\n')).toContain('Next upstream batch: 01');
+    expect(messages.join('\n')).toContain(
+      `git rebase ${plan.batches[0].tipSha}`,
+    );
   });
 
   it('exits non-zero for missing persisted plans', () => {
