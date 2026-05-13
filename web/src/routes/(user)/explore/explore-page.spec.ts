@@ -1,9 +1,9 @@
-import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { Type, type PersonResponseDto, type SearchExploreResponseDto } from '@immich/sdk';
-import { personFactory } from '@test-data/factories/person-factory';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
+import { personFactory } from '@test-data/factories/person-factory';
 import ExplorePage from './+page.svelte';
 
 vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {

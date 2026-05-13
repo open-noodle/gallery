@@ -1,6 +1,6 @@
-import type { NavigationItem } from '$lib/managers/navigation-items';
 import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
+import type { NavigationItem } from '$lib/managers/navigation-items';
 import NavigationRow from '../rows/navigation-row.svelte';
 
 const baseItem: NavigationItem = {

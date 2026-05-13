@@ -1,4 +1,3 @@
-import { Route } from '$lib/route';
 import type { ServerFeaturesDto } from '@immich/sdk';
 import {
   mdiAccountMultipleOutline,
@@ -33,6 +32,7 @@ import {
   mdiVideoOutline,
   mdiViewAgenda,
 } from '@mdi/js';
+import { Route } from '$lib/route';
 import { isAlmostExactWordMatch } from './cmdk-match';
 
 export type NavigationCategory = 'systemSettings' | 'admin' | 'userPages';

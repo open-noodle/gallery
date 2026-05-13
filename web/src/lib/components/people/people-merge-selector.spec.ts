@@ -1,10 +1,10 @@
-import { getAnimateMock } from '$lib/__mocks__/animate.mock';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { modalManager, toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import type { Component } from 'svelte';
+import { getAnimateMock } from '$lib/__mocks__/animate.mock';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
 import PeopleMergeSelector from './people-merge-selector.svelte';
 
 type TestPerson = {
