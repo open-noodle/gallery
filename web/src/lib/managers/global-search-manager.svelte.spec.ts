@@ -1,4 +1,42 @@
+import {
+  AssetVisibility,
+  getAlbumInfo,
+  getAlbumNames,
+  getAllPeople,
+  getAllSpaces,
+  getAllTags,
+  getMlHealth,
+  getSpace,
+  searchAssets,
+  searchPerson,
+  searchPlaces,
+  searchSmart,
+  type PersonResponseDto,
+  type SharedSpaceResponseDto,
+} from '@immich/sdk';
+import { toastManager } from '@immich/ui';
+import { computeCommandScore } from 'bits-ui';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { goto } from '$app/navigation';
+import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
+import * as recentModule from '$lib/stores/cmdk-recent';
+import { addEntry, getEntries, __resetForTests as resetRecentStore } from '$lib/stores/cmdk-recent';
+import { getTypedSearchDisplayText, storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
+import type { TypedSearchResolveContext } from '$lib/utils/typed-search/typed-search-resolver';
+import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
+import { commandContextManager } from './command-context-manager.svelte';
+import { COMMAND_ITEMS, type CommandItem } from './command-items';
+import {
+  GlobalSearchManager,
+  RECONCILE_ORDER_BY_SCOPE,
+  type EntityItem,
+  type Provider,
+  type ProviderStatus,
+  type SearchMode,
+  type Sections,
+} from './global-search-manager.svelte';
+import { NAVIGATION_ITEMS } from './navigation-items';
+import type { TimelineAsset } from './timeline-manager/types';
 
 // Shared hoisted mocks — used by navigation tests to flip admin/feature-flag state.
 // Must appear BEFORE the GlobalSearchManager import because the manager binds these
@@ -63,45 +101,6 @@ vi.mock('$lib/utils/typed-search/typed-search-name-cache', () => ({
   getTypedSearchDisplayText: vi.fn(() => undefined),
   storeTypedSearchNames: vi.fn(),
 }));
-
-import { goto } from '$app/navigation';
-import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
-import * as recentModule from '$lib/stores/cmdk-recent';
-import { addEntry, getEntries, __resetForTests as resetRecentStore } from '$lib/stores/cmdk-recent';
-import { getTypedSearchDisplayText, storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
-import type { TypedSearchResolveContext } from '$lib/utils/typed-search/typed-search-resolver';
-import {
-  AssetVisibility,
-  getAlbumInfo,
-  getAlbumNames,
-  getAllPeople,
-  getAllSpaces,
-  getAllTags,
-  getMlHealth,
-  getSpace,
-  searchAssets,
-  searchPerson,
-  searchPlaces,
-  searchSmart,
-  type PersonResponseDto,
-  type SharedSpaceResponseDto,
-} from '@immich/sdk';
-import { toastManager } from '@immich/ui';
-import { computeCommandScore } from 'bits-ui';
-import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
-import { commandContextManager } from './command-context-manager.svelte';
-import { COMMAND_ITEMS, type CommandItem } from './command-items';
-import {
-  GlobalSearchManager,
-  RECONCILE_ORDER_BY_SCOPE,
-  type EntityItem,
-  type Provider,
-  type ProviderStatus,
-  type SearchMode,
-  type Sections,
-} from './global-search-manager.svelte';
-import { NAVIGATION_ITEMS } from './navigation-items';
-import type { TimelineAsset } from './timeline-manager/types';
 
 // File-level reset so mock state cannot leak between describe blocks. Tests that
 // mutate these should still set what they want in their own beforeEach, but this

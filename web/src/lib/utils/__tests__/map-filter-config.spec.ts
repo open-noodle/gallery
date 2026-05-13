@@ -1,6 +1,6 @@
-import { buildMapFilterConfig } from '$lib/utils/map-filter-config';
 import { getFilterSuggestions, getSearchSuggestions, Type } from '@immich/sdk';
 import { describe, expect, it, vi } from 'vitest';
+import { buildMapFilterConfig } from '$lib/utils/map-filter-config';
 
 vi.mock('@immich/sdk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@immich/sdk')>();
