@@ -1,6 +1,6 @@
 import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
 import type { AlbumResponseDto, SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
-import { AssetVisibility, SharedSpaceRole } from '@immich/sdk';
+import { AlbumUserRole, AssetVisibility, SharedSpaceRole } from '@immich/sdk';
 import { render } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -105,12 +105,20 @@ describe('CommandContextManager', () => {
   });
 });
 
+const makeAlbumUser = (
+  id: string,
+  role: AlbumUserRole = AlbumUserRole.Owner,
+): AlbumResponseDto['albumUsers'][number] =>
+  ({
+    user: { id },
+    role,
+  }) as AlbumResponseDto['albumUsers'][number];
+
 const makeAlbum = (overrides: Partial<AlbumResponseDto> = {}): AlbumResponseDto =>
   ({
     id: 'a1',
     albumName: 'Test',
-    ownerId: 'u-owner',
-    albumUsers: [],
+    albumUsers: [makeAlbumUser('u-owner')],
     ...overrides,
   }) as unknown as AlbumResponseDto;
 
@@ -128,19 +136,19 @@ describe('registerAlbumContext', () => {
     expect(commandContextManager.getContext().album).toBeNull();
   });
 
-  it('computes isOwner=true when current user matches ownerId', () => {
+  it('computes isOwner=true when current user matches the owner album user', () => {
     mockUser.current = { id: 'u-owner', isAdmin: false };
     const { unmount } = render(RegisterAlbumContextHarness, {
-      props: { thunk: () => makeAlbum({ ownerId: 'u-owner' }) },
+      props: { thunk: () => makeAlbum({ albumUsers: [makeAlbumUser('u-owner')] }) },
     });
     expect(commandContextManager.getContext().album?.isOwner).toBe(true);
     unmount();
   });
 
-  it('computes isOwner=false when user differs from ownerId', () => {
+  it('computes isOwner=false when user differs from the owner album user', () => {
     mockUser.current = { id: 'u-other', isAdmin: false };
     const { unmount } = render(RegisterAlbumContextHarness, {
-      props: { thunk: () => makeAlbum({ ownerId: 'u-owner' }) },
+      props: { thunk: () => makeAlbum({ albumUsers: [makeAlbumUser('u-owner')] }) },
     });
     expect(commandContextManager.getContext().album?.isOwner).toBe(false);
     unmount();
@@ -157,7 +165,7 @@ describe('registerAlbumContext', () => {
   it('sets isMember=true when current user is in albumUsers', () => {
     mockUser.current = { id: 'u-current', isAdmin: false };
     const album = makeAlbum({
-      albumUsers: [{ user: { id: 'u-current' }, role: 'editor' }] as unknown as AlbumResponseDto['albumUsers'],
+      albumUsers: [makeAlbumUser('u-owner'), makeAlbumUser('u-current', AlbumUserRole.Editor)],
     });
     const { unmount } = render(RegisterAlbumContextHarness, { props: { thunk: () => album } });
     expect(commandContextManager.getContext().album?.isMember).toBe(true);
