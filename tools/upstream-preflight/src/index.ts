@@ -33,6 +33,8 @@ import {
 import { renderPreflightMarkdown } from './report';
 import {
   assertNoActiveRollingSync,
+  readRollingState,
+  rollingStatePath,
   runRollingFinalCheckCommand,
   runRollingStartCommand,
   runRollingStatusCommand,
@@ -365,9 +367,14 @@ program
     }
 
     const manifest = loadManifest(resolveCliPath(options.manifest));
+    const rollingStateFile = rollingStatePath(process.cwd(), outputDir);
+    const expectedUpstreamHead = fs.existsSync(rollingStateFile)
+      ? readRollingState(process.cwd(), outputDir).upstreamTargetHead
+      : undefined;
     process.exitCode = runNextBatchCommand({
       repoPath: process.cwd(),
       outputDir,
+      expectedUpstreamHead,
       checks: manifest.checks,
     });
   });
