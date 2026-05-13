@@ -118,7 +118,7 @@ vi.mock('$lib/components/timeline/Timeline.svelte', async () => {
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/assets/thumbnail/image-thumbnail.svelte', async () => {
+vi.mock('$lib/components/assets/thumbnail/ImageThumbnail.svelte', async () => {
   const { default: MockComponent } = await import('@test-data/mocks/image-thumbnail.stub.svelte');
   return { default: MockComponent };
 });

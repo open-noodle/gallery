@@ -15,17 +15,17 @@ const { mockAssetMultiSelectManager, mockRegisterSelectionContext } = vi.hoisted
   mockRegisterSelectionContext: vi.fn(),
 }));
 
-vi.mock('$lib/components/layouts/user-page-layout.svelte', async () => {
+vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
   const { default: MockComponent } = await import('$lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/shared-components/context-menu/button-context-menu.svelte', async () => {
+vi.mock('$lib/components/shared-components/context-menu/ButtonContextMenu.svelte', async () => {
   const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/shared-components/empty-placeholder.svelte', async () => {
+vi.mock('$lib/components/shared-components/EmptyPlaceholder.svelte', async () => {
   const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
