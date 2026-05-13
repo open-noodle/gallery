@@ -769,7 +769,6 @@ describe('rolling fork sync', () => {
       'make fork-ownership-coverage-check',
       'make ci-invariants-check',
       'make fork-patches-check',
-      'make upstream-postrebase-audit BATCH=01',
     ]);
   });
 
