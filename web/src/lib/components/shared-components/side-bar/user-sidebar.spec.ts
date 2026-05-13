@@ -1,4 +1,4 @@
-import UserSidebar from '$lib/components/shared-components/side-bar/user-sidebar.svelte';
+import UserSidebar from '$lib/components/shared-components/side-bar/UserSidebar.svelte';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 
@@ -26,12 +26,12 @@ vi.mock('$lib/components/sidebar/sidebar.svelte', async () => {
   return { default: module.default };
 });
 
-vi.mock('$lib/components/shared-components/side-bar/bottom-info.svelte', async () => {
+vi.mock('$lib/components/shared-components/side-bar/BottomInfo.svelte', async () => {
   const module = await import('@test-data/mocks/noop-component.svelte');
   return { default: module.default };
 });
 
-vi.mock('$lib/components/shared-components/side-bar/recent-albums.svelte', async () => {
+vi.mock('$lib/components/shared-components/side-bar/RecentAlbums.svelte', async () => {
   const module = await import('@test-data/mocks/noop-component.svelte');
   return { default: module.default };
 });
