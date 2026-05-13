@@ -357,6 +357,7 @@ features:
         - server/src/schema/migrations-gallery/1778500000000-AddSpacePersonRepresentativeFaceSource.ts
         - server/src/schema/migrations-gallery/1778600000000-SortSpacePeopleByNameIndex.ts
         - server/src/schema/migrations-gallery/1778700000000-AddSharedSpaceFaceMatchBackfillTarget.ts
+        - server/src/schema/migrations-gallery/1778800000000-ReconcileFaceIdentityIndexOverrides.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
 checks:
