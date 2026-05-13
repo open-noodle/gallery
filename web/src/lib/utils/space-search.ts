@@ -1,6 +1,3 @@
-import { buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
-import { createUrl } from '$lib/utils';
-import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '$lib/utils/photos-filter-options';
 import {
   AssetOrder,
   AssetTypeEnum,
@@ -8,6 +5,9 @@ import {
   type SmartSearchFacetsDto,
   type SmartSearchFacetsResponseDto,
 } from '@immich/sdk';
+import { buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
+import { createUrl } from '$lib/utils';
+import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '$lib/utils/photos-filter-options';
 
 export const SEARCH_FILTER_DEBOUNCE_MS = 250;
 

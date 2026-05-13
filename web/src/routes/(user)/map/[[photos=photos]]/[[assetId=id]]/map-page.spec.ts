@@ -1,9 +1,9 @@
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import { SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import { sdkMock } from '$lib/__mocks__/sdk.mock';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
+import { SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
 import MapPage from './+page.svelte';
 
 const { gotoMock, mockPage, mockAssetViewerManager } = vi.hoisted(() => ({
