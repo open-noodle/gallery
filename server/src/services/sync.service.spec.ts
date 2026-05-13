@@ -76,7 +76,7 @@ describe('send', () => {
     expect(chunks).toEqual([serialize(item)]);
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Writable } from 'node:stream';
-import { AssetVisibility, SyncEntityType, SyncRequestType } from 'src/enum';
+import { AlbumUserRole, AssetVisibility, SyncEntityType, SyncRequestType } from 'src/enum';
 import { SyncService } from 'src/services/sync.service';
 import { toAck } from 'src/utils/sync';
 import { authStub } from 'test/fixtures/auth.stub';
@@ -112,6 +112,7 @@ const makeSub = () => ({
   getUpserts: vi.fn().mockReturnValue(makeStream([])),
   getBackfill: vi.fn().mockReturnValue(makeStream([])),
   getCreatedAfter: vi.fn().mockResolvedValue([]),
+  getAlbumUsers: vi.fn().mockResolvedValue([{ userId: 'u1', role: AlbumUserRole.Owner }]),
   // eslint-disable-next-line unicorn/no-useless-undefined
   cleanupAuditTable: vi.fn().mockResolvedValue(undefined),
   getCreates: vi.fn().mockReturnValue(makeStream([])),
