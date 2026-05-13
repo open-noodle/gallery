@@ -1,7 +1,7 @@
 <script lang="ts">
-  import UserPageLayout from '$lib/components/layouts/user-page-layout.svelte';
+  import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
   import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
-  import EmptyPlaceholder from '$lib/components/shared-components/empty-placeholder.svelte';
+  import EmptyPlaceholder from '$lib/components/shared-components/EmptyPlaceholder.svelte';
   import SearchBar from '$lib/elements/SearchBar.svelte';
   import GroupTab from '$lib/elements/GroupTab.svelte';
   import { locale } from '$lib/stores/preferences.store';

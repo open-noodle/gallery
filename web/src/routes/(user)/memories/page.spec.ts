@@ -20,7 +20,7 @@ vi.mock('@immich/sdk', async () => {
   };
 });
 
-vi.mock('$lib/components/layouts/user-page-layout.svelte', async () => {
+vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
   const { default: MockComponent } = await import('$lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
   return { default: MockComponent };
 });

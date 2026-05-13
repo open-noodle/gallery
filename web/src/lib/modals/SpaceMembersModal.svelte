@@ -1,5 +1,5 @@
 <script lang="ts">
-  import UserAvatar from '$lib/components/shared-components/user-avatar.svelte';
+  import UserAvatar from '$lib/components/shared-components/UserAvatar.svelte';
   import RoleBadge from '$lib/components/spaces/role-badge.svelte';
   import SpaceAddMemberModal from '$lib/modals/SpaceAddMemberModal.svelte';
   import { handleError } from '$lib/utils/handle-error';
