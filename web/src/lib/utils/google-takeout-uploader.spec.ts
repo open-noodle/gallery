@@ -1,6 +1,6 @@
+import { AssetRejectReason, AssetUploadAction } from '@immich/sdk';
 import type { ImportOptions } from '$lib/managers/import-manager.svelte';
 import type { TakeoutMediaItem } from '$lib/utils/google-takeout-parser';
-import { AssetRejectReason, AssetUploadAction } from '@immich/sdk';
 
 vi.mock('@immich/sdk', () => ({
   getBaseUrl: vi.fn(() => 'http://localhost'),

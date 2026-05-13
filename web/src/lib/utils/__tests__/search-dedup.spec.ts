@@ -1,5 +1,5 @@
-import { dedupeAppend } from '$lib/utils/search-dedup';
 import { describe, expect, it } from 'vitest';
+import { dedupeAppend } from '$lib/utils/search-dedup';
 
 describe('dedupeAppend', () => {
   it('appends new items and de-duplicates by id (primary cross-page scenario)', () => {

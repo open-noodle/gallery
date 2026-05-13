@@ -1,6 +1,6 @@
-import AlbumsFilter from '$lib/components/filter-panel/albums-filter.svelte';
 import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
+import AlbumsFilter from '$lib/components/filter-panel/albums-filter.svelte';
 
 describe('AlbumsFilter', () => {
   it('should render All and Has no album buttons', () => {
