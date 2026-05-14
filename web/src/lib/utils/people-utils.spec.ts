@@ -1,7 +1,7 @@
 import type { Faces } from '#lib/managers/asset-viewer-manager.svelte.ts';
 import type { Size } from '#lib/utils/container-utils.ts';
 import { getBoundingBox, zoomImageToBase64 } from '#lib/utils/people-utils.ts';
-import { AssetTypeEnum } from '@immich/sdk';
+import { AssetTypeEnum, type AssetFaceResponseDto } from '@immich/sdk';
 
 const makeFace = (overrides: Partial<Faces> = {}): Faces => ({
   id: 'face-1',
@@ -11,6 +11,12 @@ const makeFace = (overrides: Partial<Faces> = {}): Faces => ({
   boundingBoxY1: 750,
   boundingBoxX2: 2000,
   boundingBoxY2: 1500,
+  ...overrides,
+});
+
+const makeAssetFace = (overrides: Partial<AssetFaceResponseDto> = {}): AssetFaceResponseDto => ({
+  ...makeFace(),
+  person: null,
   ...overrides,
 });
 
@@ -130,7 +136,7 @@ describe(zoomImageToBase64.name, () => {
 
     vi.stubGlobal('Image', TestImage);
 
-    await expect(zoomImageToBase64(makeFace(), 'asset-1', AssetTypeEnum.Video, undefined)).resolves.toBe(
+    await expect(zoomImageToBase64(makeAssetFace(), 'asset-1', AssetTypeEnum.Video, undefined)).resolves.toBe(
       'data:image/png;base64,face',
     );
 
