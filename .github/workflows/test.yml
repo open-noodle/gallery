@@ -204,6 +204,7 @@ jobs:
 
       - name: Run setup @immich/sdk
         run: mise run //:sdk:install && mise run //:sdk:build
+        working-directory: .
 
       - name: Run pnpm install
         run: pnpm install --frozen-lockfile
