@@ -1622,7 +1622,7 @@ describe(MediaService.name, () => {
       await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
 
       expect(mocks.asset.update).toHaveBeenCalledWith(
-        expect.objectContaining({ id: asset.id, duration: expect.any(String) }),
+        expect.objectContaining({ id: asset.id, duration: 19_500 }),
       );
     });
 
