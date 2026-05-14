@@ -2,13 +2,14 @@ import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
 import { AssetEditAction, MirrorAxis } from 'src/dtos/editing.dto.js';
 import { AssetFaceCreateDto } from 'src/dtos/person.dto.js';
-import { AssetFileType, JobName } from 'src/enum.js';
+import { AssetFileType, AssetVisibility, JobName, JobStatus } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { MachineLearningRepository } from 'src/repositories/machine-learning.repository.js';
@@ -20,7 +21,6 @@ import { PersonService } from 'src/services/person.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 
 let defaultDatabase: Kysely<DB>;
 
@@ -47,6 +47,108 @@ beforeAll(async () => {
 });
 
 describe(PersonService.name, () => {
+  describe('mergePerson', () => {
+    it('links reassigned faces to the target identity for identity-filtered timelines', async () => {
+      const { sut, ctx } = setup();
+      const assetRepo = ctx.get(AssetRepository);
+      const faceIdentityRepo = ctx.get(FaceIdentityRepository);
+      const { user } = await ctx.newUser();
+      const { person: target } = await ctx.newPerson({ ownerId: user.id, name: 'Target' });
+      const { person: source } = await ctx.newPerson({ ownerId: user.id, name: 'Source' });
+      const { asset: targetAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: sourceAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: targetAsset.id, personId: target.id });
+      const { assetFace: sourceFace } = await ctx.newAssetFace({ assetId: sourceAsset.id, personId: source.id });
+      const existingTargetIdentity = await faceIdentityRepo.ensurePersonIdentity(target.id);
+      await faceIdentityRepo.replaceFaceIdentity({
+        assetFaceId: targetFace.id,
+        identityId: existingTargetIdentity.id,
+        source: 'owner-person',
+      });
+
+      await sut.mergePerson(factory.auth({ user }), target.id, { ids: [source.id] });
+
+      const targetIdentity = await ctx.database
+        .selectFrom('person')
+        .select('identityId')
+        .where('id', '=', target.id)
+        .executeTakeFirstOrThrow();
+
+      expect(targetIdentity.identityId).toBe(existingTargetIdentity.id);
+
+      const links = await ctx.database
+        .selectFrom('face_identity_face')
+        .select(['assetFaceId', 'identityId', 'source'])
+        .where('assetFaceId', 'in', [targetFace.id, sourceFace.id])
+        .execute();
+
+      expect(links).toEqual(
+        expect.arrayContaining([
+          { assetFaceId: targetFace.id, identityId: targetIdentity.identityId!, source: 'owner-person' },
+          { assetFaceId: sourceFace.id, identityId: targetIdentity.identityId!, source: 'manual' },
+        ]),
+      );
+
+      const buckets = await assetRepo.getTimeBuckets({
+        identityIds: [targetIdentity.identityId!],
+        userIds: [user.id],
+        visibility: AssetVisibility.Timeline,
+      });
+
+      expect(buckets.reduce((total, bucket) => total + Number(bucket.count), 0)).toBe(2);
+    });
+
+    it('repairs previously merged faces when people identity maintenance runs', async () => {
+      const { sut, ctx } = setup();
+      const assetRepo = ctx.get(AssetRepository);
+      const faceIdentityRepo = ctx.get(FaceIdentityRepository);
+      const jobMock = ctx.getMock(JobRepository);
+      const { user } = await ctx.newUser();
+      const { person: target } = await ctx.newPerson({ ownerId: user.id, name: 'Target' });
+      const { person: source } = await ctx.newPerson({ ownerId: user.id, name: 'Source' });
+      const { asset: targetAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: sourceAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: targetAsset.id, personId: target.id });
+      const { assetFace: sourceFace } = await ctx.newAssetFace({ assetId: sourceAsset.id, personId: source.id });
+      const targetIdentity = await faceIdentityRepo.ensurePersonIdentity(target.id);
+      await faceIdentityRepo.replaceFaceIdentity({
+        assetFaceId: targetFace.id,
+        identityId: targetIdentity.id,
+        source: 'owner-person',
+      });
+      await ctx.database
+        .updateTable('asset_face')
+        .set({ personId: target.id })
+        .where('id', '=', sourceFace.id)
+        .execute();
+      await ctx.database.deleteFrom('person').where('id', '=', source.id).execute();
+
+      const bucketsBeforeRepair = await assetRepo.getTimeBuckets({
+        identityIds: [targetIdentity.id],
+        userIds: [user.id],
+        visibility: AssetVisibility.Timeline,
+      });
+      expect(bucketsBeforeRepair.reduce((total, bucket) => total + Number(bucket.count), 0)).toBe(1);
+
+      jobMock.queue.mockResolvedValue();
+      await expect(sut.handleFaceIdentityBackfill({ stage: 'person' })).resolves.toBe(JobStatus.Success);
+
+      const sourceLink = await ctx.database
+        .selectFrom('face_identity_face')
+        .select(['identityId', 'source'])
+        .where('assetFaceId', '=', sourceFace.id)
+        .executeTakeFirstOrThrow();
+      expect(sourceLink).toEqual({ identityId: targetIdentity.id, source: 'backfill' });
+
+      const bucketsAfterRepair = await assetRepo.getTimeBuckets({
+        identityIds: [targetIdentity.id],
+        userIds: [user.id],
+        visibility: AssetVisibility.Timeline,
+      });
+      expect(bucketsAfterRepair.reduce((total, bucket) => total + Number(bucket.count), 0)).toBe(2);
+    });
+  });
+
   describe('delete', () => {
     it('should throw an error when there is no access', async () => {
       const { sut } = setup();
