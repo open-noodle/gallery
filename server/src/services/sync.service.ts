@@ -8,6 +8,7 @@ import { AuthDto } from 'src/dtos/auth.dto.js';
 import {
   SyncAckDeleteDto,
   SyncAckSetDto,
+  SyncAssetV1,
   SyncAssetV2,
   SyncItem,
   SyncStreamDto,
@@ -18,6 +19,7 @@ import { SyncQueryOptions } from 'src/repositories/sync.repository.js';
 import { SessionSyncCheckpointTable } from 'src/schema/tables/sync-checkpoint.table.js';
 import { BaseService } from 'src/services/base.service.js';
 import { hexOrBufferToBase64 } from 'src/utils/bytes.js';
+import { formatSecondsToDuration } from 'src/utils/duration.js';
 import { ClientDisconnectedError, waitForDrain } from 'src/utils/response.js';
 import { SerializeOptions, fromAck, serialize, toAck } from 'src/utils/sync.js';
 
@@ -36,6 +38,15 @@ const mapSyncAssetV2 = ({ checksum, thumbhash, ...data }: AssetLike): SyncAssetV
   checksum: hexOrBufferToBase64(checksum),
   thumbhash: thumbhash ? hexOrBufferToBase64(thumbhash) : null,
 });
+
+const mapSyncAssetV1 = (data: AssetLike): SyncAssetV1 => {
+  const asset = mapSyncAssetV2(data);
+
+  return {
+    ...asset,
+    duration: asset.duration === null ? null : formatSecondsToDuration(asset.duration / 1000),
+  };
+};
 
 const isEntityBackfillComplete = (createId: string, checkpoint: SyncAck | undefined): boolean =>
   createId === checkpoint?.updateId && checkpoint.extraId === COMPLETE_ID;
