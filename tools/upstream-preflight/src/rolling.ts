@@ -369,7 +369,10 @@ export function runRollingSyncForkMainCommand(
       );
     }
 
-    const lastCompletedBatch = lastCompletedBatchFromPersistedPlan(options);
+    const lastCompletedBatch = lastCompletedBatchFromPersistedPlan(
+      options,
+      state.upstreamTargetHead,
+    );
 
     (options.fetchFork ?? defaultFetchFork)(options.repoPath, state.forkRef);
     const currentForkHead = revParse(options.repoPath, state.forkRef);
@@ -961,9 +964,10 @@ function activeForkSyncIsApplied(
 
 function lastCompletedBatchFromPersistedPlan(
   options: Pick<RollingSyncOptions, 'repoPath' | 'outputDir'>,
+  expectedUpstreamHead: string,
 ): string | undefined {
   const plan = readPersistedBatchPlan(options.repoPath, options.outputDir);
-  validatePersistedBatchPlan(plan, options.repoPath);
+  validatePersistedBatchPlan(plan, options.repoPath, { expectedUpstreamHead });
   return lastCompletedBatchId(selectNextBatch(plan, options.repoPath));
 }
 
