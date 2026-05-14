@@ -55,7 +55,6 @@ import {
 } from 'src/utils/asset.util';
 import { updateLockedColumns } from 'src/utils/database';
 import { asDateString, extractTimeZone } from 'src/utils/date';
-import { formatSecondsToDuration, parseDurationToSeconds } from 'src/utils/duration';
 import { batched, findOrFail } from 'src/utils/misc';
 import { transformOcrBoundingBox } from 'src/utils/transform';
 
@@ -689,7 +688,7 @@ export class AssetService extends BaseService {
         ? (existingTrim.parameters as TrimParameters & { originalDuration?: number }).originalDuration
         : undefined;
 
-      const durationSeconds = existingOriginalDuration ?? parseDurationToSeconds(asset.duration);
+      const durationSeconds = existingOriginalDuration ?? (asset.duration === null ? null : asset.duration / 1000);
       if (durationSeconds === null || durationSeconds <= 0) {
         throw new BadRequestException('Video duration is not available');
       }
@@ -776,7 +775,7 @@ export class AssetService extends BaseService {
     if (trimEdit) {
       const params = trimEdit.parameters as TrimParameters & { originalDuration?: number };
       if (params.originalDuration) {
-        const restoredDuration = formatSecondsToDuration(params.originalDuration);
+        const restoredDuration = Math.round(params.originalDuration * 1000);
         await this.assetRepository.update({ id, duration: restoredDuration });
       }
     }
