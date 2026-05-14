@@ -3184,6 +3184,7 @@ describe('tagsDisabled persists across close/reopen', () => {
     await vi.advanceTimersByTimeAsync(200);
     expect(m.sections.tags).toEqual({ status: 'error', message: 'tag_cache_too_large' });
     expect((m as unknown as { tagsDisabled: boolean }).tagsDisabled).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
     vi.mocked(getAllTags).mockClear();
     m.close();
     m.open();

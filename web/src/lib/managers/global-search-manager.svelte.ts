@@ -148,6 +148,7 @@ const PROVIDER_TIMEOUT_MS = 15_000;
 // Frozen so a future engineer cannot accidentally mutate the shared reference and
 // cross-contaminate all five sections.
 const idle = Object.freeze({ status: 'idle' as const });
+const tagCacheTooLarge = Object.freeze({ status: 'error' as const, message: 'tag_cache_too_large' });
 
 function getPersonRoute(person: Pick<PersonResponseDto, 'id' | 'primaryProfile'>): string {
   return getGlobalPersonHref(person);
@@ -2218,6 +2219,10 @@ export class GlobalSearchManager {
         this.sections[key] = idle;
         continue;
       }
+      if (key === 'tags' && this.tagsDisabled) {
+        this.sections.tags = tagCacheTooLarge;
+        continue;
+      }
       if (this.sections[key].status !== 'ok') {
         this.sections[key] = { status: 'loading' };
       }
@@ -2289,6 +2294,10 @@ export class GlobalSearchManager {
     // which delegates to runAlbums() / runSpaces() — see buildProviders().
     for (const key of ENTITY_KEYS_BY_SCOPE[scope]) {
       const provider = this.providers[key];
+      if (key === 'tags' && this.tagsDisabled) {
+        this.sections.tags = tagCacheTooLarge;
+        continue;
+      }
       // minQueryLength gate:
       //   - scope 'all': payload.length >= provider.minQueryLength (existing rule).
       //   - scope !== 'all' with payload: relax minRequired to 1.
@@ -2501,7 +2510,7 @@ export class GlobalSearchManager {
 
   private async runTagsProvider(query: string, signal: AbortSignal): Promise<ProviderStatus<TagResponseDto>> {
     if (this.tagsDisabled) {
-      return { status: 'error', message: 'tag_cache_too_large' };
+      return tagCacheTooLarge;
     }
     if (this.tagsCache === null) {
       try {
