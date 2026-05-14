@@ -1613,9 +1613,7 @@ describe(MediaService.name, () => {
 
       await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
 
-      expect(mocks.asset.update).toHaveBeenCalledWith(
-        expect.objectContaining({ id: asset.id, duration: 19_500 }),
-      );
+      expect(mocks.asset.update).toHaveBeenCalledWith(expect.objectContaining({ id: asset.id, duration: 19_500 }));
     });
 
     it('should generate thumbnails from extracted frame after trim', async () => {

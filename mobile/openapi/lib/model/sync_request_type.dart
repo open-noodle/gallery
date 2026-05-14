@@ -181,3 +181,4 @@ class SyncRequestTypeTypeTransformer {
   /// Singleton [SyncRequestTypeTypeTransformer] instance.
   static SyncRequestTypeTypeTransformer? _instance;
 }
+

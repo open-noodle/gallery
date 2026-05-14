@@ -15,7 +15,6 @@ class TimeBucketAssetResponseDto {
   TimeBucketAssetResponseDto({
     this.city = const [],
     this.country = const [],
-    this.createdAt = const [],
     this.duration = const [],
     this.fileCreatedAt = const [],
     this.id = const [],
@@ -39,9 +38,6 @@ class TimeBucketAssetResponseDto {
 
   /// Array of country names extracted from EXIF GPS data
   List<String?> country;
-
-  /// Array of UTC timestamps when each asset was originally uploaded to Immich
-  List<String> createdAt;
 
   /// Array of video/gif durations in milliseconds (null for static images)
   List<int?> duration;
@@ -95,7 +91,6 @@ class TimeBucketAssetResponseDto {
   bool operator ==(Object other) => identical(this, other) || other is TimeBucketAssetResponseDto &&
     _deepEquality.equals(other.city, city) &&
     _deepEquality.equals(other.country, country) &&
-    _deepEquality.equals(other.createdAt, createdAt) &&
     _deepEquality.equals(other.duration, duration) &&
     _deepEquality.equals(other.fileCreatedAt, fileCreatedAt) &&
     _deepEquality.equals(other.id, id) &&
@@ -118,7 +113,6 @@ class TimeBucketAssetResponseDto {
     // ignore: unnecessary_parenthesis
     (city.hashCode) +
     (country.hashCode) +
-    (createdAt.hashCode) +
     (duration.hashCode) +
     (fileCreatedAt.hashCode) +
     (id.hashCode) +
@@ -137,13 +131,12 @@ class TimeBucketAssetResponseDto {
     (visibility.hashCode);
 
   @override
-  String toString() => 'TimeBucketAssetResponseDto[city=$city, country=$country, createdAt=$createdAt, duration=$duration, fileCreatedAt=$fileCreatedAt, id=$id, isFavorite=$isFavorite, isImage=$isImage, isTrashed=$isTrashed, latitude=$latitude, livePhotoVideoId=$livePhotoVideoId, localOffsetHours=$localOffsetHours, longitude=$longitude, ownerId=$ownerId, projectionType=$projectionType, ratio=$ratio, stack=$stack, thumbhash=$thumbhash, visibility=$visibility]';
+  String toString() => 'TimeBucketAssetResponseDto[city=$city, country=$country, duration=$duration, fileCreatedAt=$fileCreatedAt, id=$id, isFavorite=$isFavorite, isImage=$isImage, isTrashed=$isTrashed, latitude=$latitude, livePhotoVideoId=$livePhotoVideoId, localOffsetHours=$localOffsetHours, longitude=$longitude, ownerId=$ownerId, projectionType=$projectionType, ratio=$ratio, stack=$stack, thumbhash=$thumbhash, visibility=$visibility]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'city'] = this.city;
       json[r'country'] = this.country;
-      json[r'createdAt'] = this.createdAt;
       json[r'duration'] = this.duration;
       json[r'fileCreatedAt'] = this.fileCreatedAt;
       json[r'id'] = this.id;
@@ -173,16 +166,13 @@ class TimeBucketAssetResponseDto {
 
       return TimeBucketAssetResponseDto(
         city: json[r'city'] is Iterable
-            ? (json[r'city'] as Iterable).cast<String>().toList(growable: false)
+            ? (json[r'city'] as Iterable).cast<String?>().toList(growable: false)
             : const [],
         country: json[r'country'] is Iterable
-            ? (json[r'country'] as Iterable).cast<String>().toList(growable: false)
-            : const [],
-        createdAt: json[r'createdAt'] is Iterable
-            ? (json[r'createdAt'] as Iterable).cast<String>().toList(growable: false)
+            ? (json[r'country'] as Iterable).cast<String?>().toList(growable: false)
             : const [],
         duration: json[r'duration'] is Iterable
-            ? (json[r'duration'] as Iterable).cast<int>().toList(growable: false)
+            ? (json[r'duration'] as Iterable).cast<int?>().toList(growable: false)
             : const [],
         fileCreatedAt: json[r'fileCreatedAt'] is Iterable
             ? (json[r'fileCreatedAt'] as Iterable).cast<String>().toList(growable: false)
@@ -200,22 +190,22 @@ class TimeBucketAssetResponseDto {
             ? (json[r'isTrashed'] as Iterable).cast<bool>().toList(growable: false)
             : const [],
         latitude: json[r'latitude'] is Iterable
-            ? (json[r'latitude'] as Iterable).cast<num>().toList(growable: false)
+            ? (json[r'latitude'] as Iterable).cast<num?>().toList(growable: false)
             : const [],
         livePhotoVideoId: json[r'livePhotoVideoId'] is Iterable
-            ? (json[r'livePhotoVideoId'] as Iterable).cast<String>().toList(growable: false)
+            ? (json[r'livePhotoVideoId'] as Iterable).cast<String?>().toList(growable: false)
             : const [],
         localOffsetHours: json[r'localOffsetHours'] is Iterable
             ? (json[r'localOffsetHours'] as Iterable).cast<num>().toList(growable: false)
             : const [],
         longitude: json[r'longitude'] is Iterable
-            ? (json[r'longitude'] as Iterable).cast<num>().toList(growable: false)
+            ? (json[r'longitude'] as Iterable).cast<num?>().toList(growable: false)
             : const [],
         ownerId: json[r'ownerId'] is Iterable
             ? (json[r'ownerId'] as Iterable).cast<String>().toList(growable: false)
             : const [],
         projectionType: json[r'projectionType'] is Iterable
-            ? (json[r'projectionType'] as Iterable).cast<String>().toList(growable: false)
+            ? (json[r'projectionType'] as Iterable).cast<String?>().toList(growable: false)
             : const [],
         ratio: json[r'ratio'] is Iterable
             ? (json[r'ratio'] as Iterable).cast<num>().toList(growable: false)
@@ -226,7 +216,7 @@ class TimeBucketAssetResponseDto {
             ).toList()
           :  const [],
         thumbhash: json[r'thumbhash'] is Iterable
-            ? (json[r'thumbhash'] as Iterable).cast<String>().toList(growable: false)
+            ? (json[r'thumbhash'] as Iterable).cast<String?>().toList(growable: false)
             : const [],
         visibility: AssetVisibility.listFromJson(json[r'visibility']),
       );
@@ -278,7 +268,6 @@ class TimeBucketAssetResponseDto {
   static const requiredKeys = <String>{
     'city',
     'country',
-    'createdAt',
     'duration',
     'fileCreatedAt',
     'id',

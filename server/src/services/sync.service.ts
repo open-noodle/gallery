@@ -7,8 +7,8 @@ import { AuthDto } from 'src/dtos/auth.dto';
 import {
   SyncAckDeleteDto,
   SyncAckSetDto,
-  SyncAssetV1,
   syncAlbumV2ToV1,
+  SyncAssetV1,
   SyncAssetV2,
   SyncItem,
   SyncStreamDto,

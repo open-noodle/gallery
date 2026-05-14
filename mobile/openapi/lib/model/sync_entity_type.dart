@@ -319,3 +319,4 @@ class SyncEntityTypeTypeTransformer {
   /// Singleton [SyncEntityTypeTypeTransformer] instance.
   static SyncEntityTypeTypeTransformer? _instance;
 }
+

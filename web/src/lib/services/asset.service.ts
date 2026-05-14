@@ -235,12 +235,7 @@ export const getAssetActions = ($t: MessageFormatter, asset: AssetResponseDto) =
     if (!asset.duration) {
       return false;
     }
-    const match = asset.duration.match(/^(\d+):(\d{2}):(\d{2})/);
-    if (!match) {
-      return false;
-    }
-    const totalSeconds = Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
-    return totalSeconds >= 2;
+    return asset.duration >= 2000;
   };
 
   const canEdit = () => canEditImage() || canEditVideo();
