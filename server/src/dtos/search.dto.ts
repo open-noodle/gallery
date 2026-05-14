@@ -248,7 +248,7 @@ const FilterSuggestionsRequestBaseSchema = z.object({
   takenBefore: isoDatetimeToDate.optional().describe('Filter by taken date (before)'),
   albumId: z.uuidv4().optional().describe('Scope to a specific album'),
   spaceId: z.uuidv4().optional().describe('Scope to a specific shared space'),
-  withSharedSpaces: stringToBool.optional().describe('Include shared spaces the user is a member of'),
+  withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
 });
 
 const FilterSuggestionsRequestSchema = FilterSuggestionsRequestBaseSchema.pipe(
