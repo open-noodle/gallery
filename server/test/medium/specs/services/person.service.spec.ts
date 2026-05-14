@@ -2,8 +2,8 @@ import { NotFoundException } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
 import { AssetEditAction, MirrorAxis } from 'src/dtos/editing.dto.js';
-import { AssetFaceCreateDto, PersonSearchDto, PersonUserRole } from 'src/dtos/person.dto.js';
-import { AssetFileType, JobName } from 'src/enum.js';
+import { AssetFaceCreateDto } from 'src/dtos/person.dto.js';
+import { AssetFileType, AssetVisibility, JobName, JobStatus } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
@@ -11,6 +11,7 @@ import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ClusterGroupRepository } from 'src/repositories/cluster-group.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { MachineLearningRepository } from 'src/repositories/machine-learning.repository.js';
@@ -24,7 +25,6 @@ import { PersonService } from 'src/services/person.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { factory, newUuid } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 
 let defaultDatabase: Kysely<DB>;
 
@@ -54,254 +54,105 @@ beforeAll(async () => {
 });
 
 describe(PersonService.name, () => {
-  describe('reassignFaces', () => {
-    it('should require access to the person the auth user is assigning to', async () => {
-      const { ctx, sut } = setup();
+  describe('mergePerson', () => {
+    it('links reassigned faces to the target identity for identity-filtered timelines', async () => {
+      const { sut, ctx } = setup();
+      const assetRepo = ctx.get(AssetRepository);
+      const faceIdentityRepo = ctx.get(FaceIdentityRepository);
       const { user } = await ctx.newUser();
-      const { user: user2 } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user2.id });
-
-      await expect(sut.reassignFaces(factory.auth({ user }), person.personGroupId, { data: [] })).rejects.toThrow(
-        'Not found or no person.update access',
-      );
-    });
-
-    it('should allow person owner access', async () => {
-      const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user.id });
-
-      await expect(sut.reassignFaces(factory.auth({ user }), person.personGroupId, { data: [] })).resolves.toEqual([]);
-    });
-
-    it('should not allow shared read only access', async () => {
-      const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
-      const { user: user2 } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user2.id });
-      await ctx.newPersonUser({
-        personGroupId: person.personGroupId,
-        sharedById: user2.id,
-        sharedWithId: user.id,
-        role: PersonUserRole.Read,
+      const { person: target } = await ctx.newPerson({ ownerId: user.id, name: 'Target' });
+      const { person: source } = await ctx.newPerson({ ownerId: user.id, name: 'Source' });
+      const { asset: targetAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: sourceAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: targetAsset.id, personId: target.id });
+      const { assetFace: sourceFace } = await ctx.newAssetFace({ assetId: sourceAsset.id, personId: source.id });
+      const existingTargetIdentity = await faceIdentityRepo.ensurePersonIdentity(target.id);
+      await faceIdentityRepo.replaceFaceIdentity({
+        assetFaceId: targetFace.id,
+        identityId: existingTargetIdentity.id,
+        source: 'owner-person',
       });
 
-      await expect(
-        sut.reassignFaces(factory.auth({ user }), person.personGroupId, {
-          data: [{ personId: person.personGroupId, userId: user2.id, assetId: newUuid() }],
-        }),
-      ).rejects.toThrow('Not found or no person.update access');
-    });
+      await sut.mergePerson(factory.auth({ user }), target.id, { ids: [source.id] });
 
-    it('should allow shared write access', async () => {
-      const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
-      const { user: user2 } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user2.id });
-      await ctx.newPersonUser({
-        personGroupId: person.personGroupId,
-        sharedById: user2.id,
-        sharedWithId: user.id,
-        role: PersonUserRole.Write,
+      const targetIdentity = await ctx.database
+        .selectFrom('person')
+        .select('identityId')
+        .where('id', '=', target.id)
+        .executeTakeFirstOrThrow();
+
+      expect(targetIdentity.identityId).toBe(existingTargetIdentity.id);
+
+      const links = await ctx.database
+        .selectFrom('face_identity_face')
+        .select(['assetFaceId', 'identityId', 'source'])
+        .where('assetFaceId', 'in', [targetFace.id, sourceFace.id])
+        .execute();
+
+      expect(links).toEqual(
+        expect.arrayContaining([
+          { assetFaceId: targetFace.id, identityId: targetIdentity.identityId!, source: 'owner-person' },
+          { assetFaceId: sourceFace.id, identityId: targetIdentity.identityId!, source: 'manual' },
+        ]),
+      );
+
+      const buckets = await assetRepo.getTimeBuckets({
+        identityIds: [targetIdentity.identityId!],
+        userIds: [user.id],
+        visibility: AssetVisibility.Timeline,
       });
 
-      await expect(
-        sut.reassignFaces(factory.auth({ user }), person.personGroupId, {
-          data: [{ personId: person.personGroupId, userId: user2.id, assetId: newUuid() }],
-        }),
-      ).resolves.toEqual([expect.objectContaining({ id: person.personGroupId })]);
+      expect(buckets.reduce((total, bucket) => total + Number(bucket.count), 0)).toBe(2);
     });
-  });
 
-  describe('getAll', () => {
-    it('should filter by sharing direction and user', async () => {
-      const { ctx, sut } = setup(await getKyselyDB());
-      const { user: user1 } = await ctx.newUser();
-      const { user: user2 } = await ctx.newUser({ clusterGroupId: user1.clusterGroupId });
-      const { user: user3 } = await ctx.newUser({ clusterGroupId: user1.clusterGroupId });
-      const { asset } = await ctx.newAsset({ ownerId: user1.id });
-
-      const { person: sharedByMe } = await ctx.newPerson({ ownerId: user1.id, name: 'Shared by me' });
-      const { person: notShared } = await ctx.newPerson({ ownerId: user1.id, name: 'Not shared' });
-      const { person: sharedWithMe } = await ctx.newPerson({ ownerId: user3.id, name: 'Shared with me' });
-      await ctx.newAssetFace({ assetId: asset.id, personGroupId: sharedByMe.personGroupId });
-      await ctx.newAssetFace({ assetId: asset.id, personGroupId: notShared.personGroupId });
-      await ctx.newPersonUser({
-        personGroupId: sharedByMe.personGroupId,
-        sharedById: user1.id,
-        sharedWithId: user2.id,
+    it('repairs previously merged faces when people identity maintenance runs', async () => {
+      const { sut, ctx } = setup();
+      const assetRepo = ctx.get(AssetRepository);
+      const faceIdentityRepo = ctx.get(FaceIdentityRepository);
+      const jobMock = ctx.getMock(JobRepository);
+      const { user } = await ctx.newUser();
+      const { person: target } = await ctx.newPerson({ ownerId: user.id, name: 'Target' });
+      const { person: source } = await ctx.newPerson({ ownerId: user.id, name: 'Source' });
+      const { asset: targetAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: sourceAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: targetAsset.id, personId: target.id });
+      const { assetFace: sourceFace } = await ctx.newAssetFace({ assetId: sourceAsset.id, personId: source.id });
+      const targetIdentity = await faceIdentityRepo.ensurePersonIdentity(target.id);
+      await faceIdentityRepo.replaceFaceIdentity({
+        assetFaceId: targetFace.id,
+        identityId: targetIdentity.id,
+        source: 'owner-person',
       });
-      await ctx.newPersonUser({
-        personGroupId: sharedWithMe.personGroupId,
-        sharedById: user3.id,
-        sharedWithId: user1.id,
+      await ctx.database
+        .updateTable('asset_face')
+        .set({ personId: target.id })
+        .where('id', '=', sourceFace.id)
+        .execute();
+      await ctx.database.deleteFrom('person').where('id', '=', source.id).execute();
+
+      const bucketsBeforeRepair = await assetRepo.getTimeBuckets({
+        identityIds: [targetIdentity.id],
+        userIds: [user.id],
+        visibility: AssetVisibility.Timeline,
       });
+      expect(bucketsBeforeRepair.reduce((total, bucket) => total + Number(bucket.count), 0)).toBe(1);
 
-      const auth = factory.auth({ user: user1 });
-      const getIds = async (dto: Partial<PersonSearchDto>) => {
-        const { people, total } = await sut.getAll(auth, { page: 1, size: 10, ...dto });
-        expect(total).toBe(people.length);
-        return people.map(({ id }) => id).toSorted();
-      };
+      jobMock.queue.mockResolvedValue();
+      await expect(sut.handleFaceIdentityBackfill({ stage: 'person' })).resolves.toBe(JobStatus.Success);
 
-      await expect(getIds({})).resolves.toEqual(
-        [sharedByMe.personGroupId, notShared.personGroupId, sharedWithMe.personGroupId].toSorted(),
-      );
-      await expect(getIds({ sharedById: user1.id })).resolves.toEqual([sharedByMe.personGroupId]);
-      await expect(getIds({ sharedWithId: user2.id })).resolves.toEqual([sharedByMe.personGroupId]);
-      await expect(getIds({ sharedWithId: user3.id })).resolves.toEqual([]);
-      await expect(getIds({ sharedWithId: user1.id })).resolves.toEqual([sharedWithMe.personGroupId]);
-      await expect(getIds({ sharedById: user3.id })).resolves.toEqual([sharedWithMe.personGroupId]);
-      await expect(getIds({ sharedById: user2.id })).resolves.toEqual([]);
-    });
+      const sourceLink = await ctx.database
+        .selectFrom('face_identity_face')
+        .select(['identityId', 'source'])
+        .where('assetFaceId', '=', sourceFace.id)
+        .executeTakeFirstOrThrow();
+      expect(sourceLink).toEqual({ identityId: targetIdentity.id, source: 'backfill' });
 
-    it('should filter by favorite and hidden', async () => {
-      const { ctx, sut } = setup(await getKyselyDB());
-      const { user } = await ctx.newUser();
-      const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { person: favorite } = await ctx.newPerson({ ownerId: user.id, isFavorite: true });
-      const { person: hidden } = await ctx.newPerson({ ownerId: user.id, isHidden: true });
-      const { person: neither } = await ctx.newPerson({ ownerId: user.id });
-      for (const person of [favorite, hidden, neither]) {
-        await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
-      }
-
-      const auth = factory.auth({ user });
-      const getIds = async (dto: Partial<PersonSearchDto>) => {
-        const { people, total } = await sut.getAll(auth, { page: 1, size: 10, withHidden: true, ...dto });
-        expect(total).toBe(people.length);
-        return people.map(({ id }) => id).toSorted();
-      };
-
-      await expect(getIds({ isFavorite: true })).resolves.toEqual([favorite.personGroupId]);
-      await expect(getIds({ isFavorite: false })).resolves.toEqual(
-        [hidden.personGroupId, neither.personGroupId].toSorted(),
-      );
-      await expect(getIds({ isHidden: true })).resolves.toEqual([hidden.personGroupId]);
-      await expect(getIds({ isHidden: false })).resolves.toEqual(
-        [favorite.personGroupId, neither.personGroupId].toSorted(),
-      );
-      await expect(getIds({ isFavorite: true, isHidden: true })).resolves.toEqual([]);
-    });
-
-    it('should include hidden people when filtering by isHidden without withHidden', async () => {
-      const { ctx, sut } = setup(await getKyselyDB());
-      const { user } = await ctx.newUser();
-      const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { person: hidden } = await ctx.newPerson({ ownerId: user.id, isHidden: true });
-      const { person: visible } = await ctx.newPerson({ ownerId: user.id });
-      await ctx.newAssetFace({ assetId: asset.id, personGroupId: hidden.personGroupId });
-      await ctx.newAssetFace({ assetId: asset.id, personGroupId: visible.personGroupId });
-
-      const auth = factory.auth({ user });
-
-      await expect(sut.getAll(auth, { page: 1, size: 10, isHidden: true })).resolves.toEqual(
-        expect.objectContaining({ people: [expect.objectContaining({ id: hidden.personGroupId })], total: 1 }),
-      );
-      await expect(sut.getAll(auth, { page: 1, size: 10, isHidden: false })).resolves.toEqual(
-        expect.objectContaining({ people: [expect.objectContaining({ id: visible.personGroupId })], total: 1 }),
-      );
-    });
-  });
-
-  describe('getById', () => {
-    it('should require person.read access', async () => {
-      const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user.id });
-
-      await expect(sut.getById(factory.auth(), person.personGroupId)).rejects.toThrow(
-        'Not found or no person.read access',
-      );
-    });
-
-    it('should return own version of shared person but copy over a shared name and birth date', async () => {
-      const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
-      const { user: user2 } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user2.id, name: "User2's person", birthDate: new Date() });
-      await ctx.newPersonUser({ personGroupId: person.personGroupId, sharedById: user2.id, sharedWithId: user.id });
-
-      await expect(sut.getById(factory.auth({ user }), person.personGroupId)).resolves.toEqual(
-        expect.objectContaining({
-          id: person.personGroupId,
-          name: person.name,
-          birthDate: expect.any(String),
-          otherPeople: [expect.objectContaining({ sharedById: user2.id })],
-        }),
-      );
-    });
-
-    it('should include the users the person is shared by and shared with', async () => {
-      const { ctx, sut } = setup();
-      const { user: owner } = await ctx.newUser();
-      const { user: user1 } = await ctx.newUser({ clusterGroupId: owner.clusterGroupId });
-      const { person } = await ctx.newPerson({ ownerId: owner.id });
-      await ctx.newPersonUser({
-        personGroupId: person.personGroupId,
-        sharedById: owner.id,
-        sharedWithId: user1.id,
-        role: PersonUserRole.Write,
+      const bucketsAfterRepair = await assetRepo.getTimeBuckets({
+        identityIds: [targetIdentity.id],
+        userIds: [user.id],
+        visibility: AssetVisibility.Timeline,
       });
-
-      await expect(sut.getById(factory.auth({ user: owner }), person.personGroupId)).resolves.toEqual(
-        expect.objectContaining({
-          sharedBy: [],
-          sharedWith: [expect.objectContaining({ id: user1.id, email: user1.email, role: PersonUserRole.Write })],
-        }),
-      );
-      await expect(sut.getById(factory.auth({ user: user1 }), person.personGroupId)).resolves.toEqual(
-        expect.objectContaining({
-          sharedBy: [expect.objectContaining({ id: owner.id, email: owner.email, role: PersonUserRole.Write })],
-          sharedWith: [],
-        }),
-      );
-    });
-  });
-
-  describe('getThumbnail', () => {
-    it('should require person.read access', async () => {
-      const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user.id });
-
-      await expect(sut.getThumbnail(factory.auth(), person.personGroupId)).rejects.toThrow(
-        'Not found or no person.read access',
-      );
-    });
-
-    it('should return own thumbnail path', async () => {
-      const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user.id });
-
-      await expect(sut.getThumbnail(factory.auth({ user }), person.personGroupId)).resolves.toEqual(
-        expect.objectContaining({ path: person.thumbnailPath }),
-      );
-    });
-
-    it('should fall back to shared thumbnail path', async () => {
-      const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
-      const { user: user2 } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user2.id });
-      await ctx.newPersonUser({ personGroupId: person.personGroupId, sharedById: user2.id, sharedWithId: user.id });
-
-      await expect(sut.getThumbnail(factory.auth({ user }), person.personGroupId)).resolves.toEqual(
-        expect.objectContaining({ path: person.thumbnailPath }),
-      );
-    });
-
-    it('should fail if there is no (shared) thumbnail available', async () => {
-      const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
-      const { user: user2 } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user.id, thumbnailPath: undefined });
-      await ctx.newPerson({ ownerId: user2.id, personGroupId: person.personGroupId });
-
-      await expect(sut.getThumbnail(factory.auth({ user }), person.personGroupId)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      expect(bucketsAfterRepair.reduce((total, bucket) => total + Number(bucket.count), 0)).toBe(2);
     });
   });
 
