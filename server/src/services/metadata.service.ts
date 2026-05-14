@@ -35,6 +35,7 @@ import { StorageService } from 'src/services/storage.service.js';
 import { getAssetFiles } from 'src/utils/asset.util.js';
 import { isAssetChecksumConstraint } from 'src/utils/database.js';
 import { mergeTimeZone } from 'src/utils/date.js';
+import { parseDurationToSeconds } from 'src/utils/duration.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { batched, isFaceImportEnabled } from 'src/utils/misc.js';
 import { upsertTags } from 'src/utils/tag.js';
@@ -1200,8 +1201,11 @@ export class MetadataService extends BaseService {
 
   private getDuration(tags: ImmichTags): number | null {
     const duration = tags.Duration;
-    const seconds = typeof duration === 'number' ? duration : Number.parseFloat(duration as string);
-    return Number.isFinite(seconds) ? Math.round(Duration.fromObject({ seconds }).toMillis()) : null;
+    const seconds = typeof duration === 'number' ? duration : parseDurationToSeconds(duration as string);
+    if (seconds === null || !Number.isFinite(seconds)) {
+      return null;
+    }
+    return Math.round(Duration.fromObject({ seconds }).toMillis());
   }
 
   private async getVideoTags(originalPath: string) {
