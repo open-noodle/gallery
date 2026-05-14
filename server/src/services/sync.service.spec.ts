@@ -423,7 +423,7 @@ describe(SyncService.name, () => {
       expect(messages.some((m: any) => m.type === SyncEntityType.PartnerV1)).toBe(true);
     });
 
-    it('should handle AssetsV1 sync type with checksum/thumbhash conversion', async () => {
+    it('should handle AssetsV2 sync type with checksum/thumbhash conversion', async () => {
       const { writable, chunks } = makeWritable();
       const deleteId = newUuid();
       const updateId = newUuid();
@@ -450,16 +450,16 @@ describe(SyncService.name, () => {
         ]),
       );
 
-      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.AssetsV1] });
+      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.AssetsV2] });
 
       const messages = parseChunks(chunks);
-      const assetMsg = messages.find((m: any) => m.type === SyncEntityType.AssetV1);
+      const assetMsg = messages.find((m: any) => m.type === SyncEntityType.AssetV2);
       expect(assetMsg).toBeDefined();
       expect(assetMsg.data.checksum).toBe(checksum.toString('base64'));
       expect(assetMsg.data.thumbhash).toBe(thumbhash.toString('base64'));
     });
 
-    it('should handle AssetsV1 with null thumbhash', async () => {
+    it('should handle AssetsV2 with null thumbhash', async () => {
       const { writable, chunks } = makeWritable();
       const updateId = newUuid();
       const checksum = Buffer.from('fakechecksum');
@@ -484,10 +484,10 @@ describe(SyncService.name, () => {
         ]),
       );
 
-      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.AssetsV1] });
+      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.AssetsV2] });
 
       const messages = parseChunks(chunks);
-      const assetMsg = messages.find((m: any) => m.type === SyncEntityType.AssetV1);
+      const assetMsg = messages.find((m: any) => m.type === SyncEntityType.AssetV2);
       expect(assetMsg).toBeDefined();
       expect(assetMsg.data.thumbhash).toBeNull();
     });
@@ -637,42 +637,17 @@ describe(SyncService.name, () => {
       expect(messages.some((m: any) => m.type === SyncEntityType.AssetFaceV2)).toBe(true);
     });
 
-    it('should handle AssetFacesV1 sync type and convert V2 to V1', async () => {
+    it('should reject deprecated AssetFacesV1 sync type', async () => {
       const { writable, chunks } = makeWritable();
-      const updateId = newUuid();
 
       mocks.session.isPendingSyncReset.mockResolvedValue(false);
       mocks.syncCheckpoint.getAll.mockResolvedValue([]);
       mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
-      syncSubs.assetFace.getDeletes.mockReturnValue(makeStream([]));
-      syncSubs.assetFace.getUpserts.mockReturnValue(
-        makeStream([
-          {
-            updateId,
-            id: 'f1',
-            assetId: 'a1',
-            personId: 'p1',
-            deletedAt: null,
-            isVisible: true,
-            boundingBoxX1: 0,
-            boundingBoxY1: 0,
-            boundingBoxX2: 100,
-            boundingBoxY2: 100,
-            imageHeight: 1000,
-            imageWidth: 1000,
-            sourceType: 'machine-learning',
-          },
-        ]),
+
+      await expect(sut.stream(authStub.user1, writable, { types: [SyncRequestType.AssetFacesV1] })).rejects.toThrow(
+        BadRequestException,
       );
-
-      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.AssetFacesV1] });
-
-      const messages = parseChunks(chunks);
-      const faceMsg = messages.find((m: any) => m.type === SyncEntityType.AssetFaceV1);
-      expect(faceMsg).toBeDefined();
-      // V1 should not have deletedAt or isVisible
-      expect(faceMsg.data.deletedAt).toBeUndefined();
-      expect(faceMsg.data.isVisible).toBeUndefined();
+      expect(chunks).toEqual([]);
     });
 
     it('should handle UserMetadataV1 sync type', async () => {
@@ -715,7 +690,7 @@ describe(SyncService.name, () => {
       expect(messages.some((m: any) => m.type === SyncEntityType.AssetMetadataV1)).toBe(true);
     });
 
-    it('should handle PartnerAssetsV1 with no partners and no checkpoint', async () => {
+    it('should handle PartnerAssetsV2 with no partners and no checkpoint', async () => {
       const { writable, chunks } = makeWritable();
 
       mocks.session.isPendingSyncReset.mockResolvedValue(false);
@@ -725,14 +700,14 @@ describe(SyncService.name, () => {
       syncSubs.partner.getCreatedAfter.mockResolvedValue([]);
       syncSubs.partnerAsset.getUpserts.mockReturnValue(makeStream([]));
 
-      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.PartnerAssetsV1] });
+      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.PartnerAssetsV2] });
 
       const messages = parseChunks(chunks);
       expect(messages).toHaveLength(1);
       expect(messages[0].type).toBe(SyncEntityType.SyncCompleteV1);
     });
 
-    it('should handle PartnerAssetsV1 with new partners and no upsert checkpoint', async () => {
+    it('should handle PartnerAssetsV2 with new partners and no upsert checkpoint', async () => {
       const { writable } = makeWritable();
       const partnerId = newUuid();
       const createId = newUuid();
@@ -744,22 +719,22 @@ describe(SyncService.name, () => {
       syncSubs.partner.getCreatedAfter.mockResolvedValue([{ sharedById: partnerId, createId }]);
       syncSubs.partnerAsset.getUpserts.mockReturnValue(makeStream([]));
 
-      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.PartnerAssetsV1] });
+      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.PartnerAssetsV2] });
 
       expect(mocks.syncCheckpoint.upsertAll).toHaveBeenCalled();
     });
 
-    it('should handle PartnerAssetsV1 backfill with upsert checkpoint', async () => {
+    it('should handle PartnerAssetsV2 backfill with upsert checkpoint', async () => {
       const { writable, chunks } = makeWritable();
       const partnerId = newUuid();
       const createId = newUuid();
       const updateId = newUuid();
       const checksum = Buffer.from('checksum');
 
-      const upsertAck = toAck({ type: SyncEntityType.PartnerAssetV1, updateId: 'some-update-id' });
+      const upsertAck = toAck({ type: SyncEntityType.PartnerAssetV2, updateId: 'some-update-id' });
 
       mocks.session.isPendingSyncReset.mockResolvedValue(false);
-      mocks.syncCheckpoint.getAll.mockResolvedValue([{ type: SyncEntityType.PartnerAssetV1, ack: upsertAck }]);
+      mocks.syncCheckpoint.getAll.mockResolvedValue([{ type: SyncEntityType.PartnerAssetV2, ack: upsertAck }]);
       mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
       syncSubs.partnerAsset.getDeletes.mockReturnValue(makeStream([]));
       syncSubs.partner.getCreatedAfter.mockResolvedValue([{ sharedById: partnerId, createId }]);
@@ -780,10 +755,10 @@ describe(SyncService.name, () => {
       );
       syncSubs.partnerAsset.getUpserts.mockReturnValue(makeStream([]));
 
-      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.PartnerAssetsV1] });
+      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.PartnerAssetsV2] });
 
       const messages = parseChunks(chunks);
-      expect(messages.some((m: any) => m.type === SyncEntityType.PartnerAssetBackfillV1)).toBe(true);
+      expect(messages.some((m: any) => m.type === SyncEntityType.PartnerAssetBackfillV2)).toBe(true);
       expect(messages.some((m: any) => m.type === SyncEntityType.SyncAckV1)).toBe(true);
     });
 
@@ -959,7 +934,7 @@ describe(SyncService.name, () => {
       expect(messages.some((m: any) => m.type === SyncEntityType.PartnerStackBackfillV1)).toBe(true);
     });
 
-    it('should handle AlbumAssetsV1 with creates', async () => {
+    it('should handle AlbumAssetsV2 with creates', async () => {
       const { writable, chunks } = makeWritable();
       const updateId = newUuid();
       const checksum = Buffer.from('checksum');
@@ -984,22 +959,22 @@ describe(SyncService.name, () => {
         ]),
       );
 
-      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.AlbumAssetsV1] });
+      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.AlbumAssetsV2] });
 
       const messages = parseChunks(chunks);
-      expect(messages.some((m: any) => m.type === SyncEntityType.AlbumAssetCreateV1)).toBe(true);
+      expect(messages.some((m: any) => m.type === SyncEntityType.AlbumAssetCreateV2)).toBe(true);
       expect(messages.some((m: any) => m.type === SyncEntityType.SyncAckV1)).toBe(true);
     });
 
-    it('should handle AlbumAssetsV1 with updates when create checkpoint exists', async () => {
+    it('should handle AlbumAssetsV2 with updates when create checkpoint exists', async () => {
       const { writable, chunks } = makeWritable();
       const updateId = newUuid();
       const checksum = Buffer.from('checksum');
 
-      const createAck = toAck({ type: SyncEntityType.AlbumAssetCreateV1, updateId: 'create-ack-id' });
+      const createAck = toAck({ type: SyncEntityType.AlbumAssetCreateV2, updateId: 'create-ack-id' });
 
       mocks.session.isPendingSyncReset.mockResolvedValue(false);
-      mocks.syncCheckpoint.getAll.mockResolvedValue([{ type: SyncEntityType.AlbumAssetCreateV1, ack: createAck }]);
+      mocks.syncCheckpoint.getAll.mockResolvedValue([{ type: SyncEntityType.AlbumAssetCreateV2, ack: createAck }]);
       mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
       syncSubs.album.getCreatedAfter.mockResolvedValue([]);
       syncSubs.albumAsset.getUpdates.mockReturnValue(
@@ -1019,13 +994,13 @@ describe(SyncService.name, () => {
       );
       syncSubs.albumAsset.getCreates.mockReturnValue(makeStream([]));
 
-      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.AlbumAssetsV1] });
+      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.AlbumAssetsV2] });
 
       const messages = parseChunks(chunks);
-      expect(messages.some((m: any) => m.type === SyncEntityType.AlbumAssetUpdateV1)).toBe(true);
+      expect(messages.some((m: any) => m.type === SyncEntityType.AlbumAssetUpdateV2)).toBe(true);
     });
 
-    it('should handle AlbumAssetsV1 with albums and no create checkpoint', async () => {
+    it('should handle AlbumAssetsV2 with albums and no create checkpoint', async () => {
       const { writable } = makeWritable();
       const albumId = newUuid();
       const createId = newUuid();
@@ -1036,7 +1011,7 @@ describe(SyncService.name, () => {
       syncSubs.album.getCreatedAfter.mockResolvedValue([{ id: albumId, createId }]);
       syncSubs.albumAsset.getCreates.mockReturnValue(makeStream([]));
 
-      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.AlbumAssetsV1] });
+      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.AlbumAssetsV2] });
 
       expect(mocks.syncCheckpoint.upsertAll).toHaveBeenCalled();
     });
@@ -1100,7 +1075,7 @@ describe(SyncService.name, () => {
       mocks.syncCheckpoint.getAll.mockResolvedValue([]);
       mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
 
-      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.AssetsV1] });
+      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.AssetsV2] });
 
       // Should not call user sync methods
       expect(syncSubs.user.getDeletes).not.toHaveBeenCalled();
@@ -1115,24 +1090,24 @@ describe(SyncService.name, () => {
       const partnerId = newUuid();
       const createId = newUuid();
 
-      const upsertAck = toAck({ type: SyncEntityType.PartnerAssetV1, updateId: 'some-update-id' });
+      const upsertAck = toAck({ type: SyncEntityType.PartnerAssetV2, updateId: 'some-update-id' });
       const backfillAck = toAck({
-        type: SyncEntityType.PartnerAssetBackfillV1,
+        type: SyncEntityType.PartnerAssetBackfillV2,
         updateId: createId,
         extraId: 'complete',
       });
 
       mocks.session.isPendingSyncReset.mockResolvedValue(false);
       mocks.syncCheckpoint.getAll.mockResolvedValue([
-        { type: SyncEntityType.PartnerAssetV1, ack: upsertAck },
-        { type: SyncEntityType.PartnerAssetBackfillV1, ack: backfillAck },
+        { type: SyncEntityType.PartnerAssetV2, ack: upsertAck },
+        { type: SyncEntityType.PartnerAssetBackfillV2, ack: backfillAck },
       ]);
       mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
       syncSubs.partnerAsset.getDeletes.mockReturnValue(makeStream([]));
       syncSubs.partner.getCreatedAfter.mockResolvedValue([{ sharedById: partnerId, createId }]);
       syncSubs.partnerAsset.getUpserts.mockReturnValue(makeStream([]));
 
-      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.PartnerAssetsV1] });
+      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.PartnerAssetsV2] });
 
       expect(syncSubs.partnerAsset.getBackfill).not.toHaveBeenCalled();
     });
@@ -1143,17 +1118,17 @@ describe(SyncService.name, () => {
       const createId = newUuid();
       const partialExtraId = newUuid();
 
-      const upsertAck = toAck({ type: SyncEntityType.PartnerAssetV1, updateId: 'some-update-id' });
+      const upsertAck = toAck({ type: SyncEntityType.PartnerAssetV2, updateId: 'some-update-id' });
       const backfillAck = toAck({
-        type: SyncEntityType.PartnerAssetBackfillV1,
+        type: SyncEntityType.PartnerAssetBackfillV2,
         updateId: createId,
         extraId: partialExtraId,
       });
 
       mocks.session.isPendingSyncReset.mockResolvedValue(false);
       mocks.syncCheckpoint.getAll.mockResolvedValue([
-        { type: SyncEntityType.PartnerAssetV1, ack: upsertAck },
-        { type: SyncEntityType.PartnerAssetBackfillV1, ack: backfillAck },
+        { type: SyncEntityType.PartnerAssetV2, ack: upsertAck },
+        { type: SyncEntityType.PartnerAssetBackfillV2, ack: backfillAck },
       ]);
       mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
       syncSubs.partnerAsset.getDeletes.mockReturnValue(makeStream([]));
@@ -1161,7 +1136,7 @@ describe(SyncService.name, () => {
       syncSubs.partnerAsset.getBackfill.mockReturnValue(makeStream([]));
       syncSubs.partnerAsset.getUpserts.mockReturnValue(makeStream([]));
 
-      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.PartnerAssetsV1] });
+      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.PartnerAssetsV2] });
 
       expect(syncSubs.partnerAsset.getBackfill).toHaveBeenCalledWith(
         expect.objectContaining({ afterUpdateId: partialExtraId }),
