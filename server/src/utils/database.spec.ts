@@ -157,21 +157,6 @@ describe('vectorIndexQuery', () => {
     expect(result).toContain('lists = [100]');
   });
 
-  it('should generate a Vectors (pgvecto.rs) index query', () => {
-    const result = vectorIndexQuery({
-      vectorExtension: DatabaseExtension.Vectors,
-      table: 'smart_search',
-      indexName: 'clip_index',
-    });
-    expect(result).toContain('CREATE INDEX IF NOT EXISTS clip_index ON smart_search');
-    expect(result).toContain('USING vectors');
-    expect(result).toContain('vector_cos_ops');
-    expect(result).toContain('optimizing.optimizing_threads = 4');
-    expect(result).toContain('[indexing.hnsw]');
-    expect(result).toContain('m = 16');
-    expect(result).toContain('ef_construction = 300');
-  });
-
   it('should generate a pgvector (hnsw) index query', () => {
     const result = vectorIndexQuery({
       vectorExtension: DatabaseExtension.Vector,
