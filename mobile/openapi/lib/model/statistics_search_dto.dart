@@ -155,7 +155,7 @@ class StatisticsSearchDto {
   ///
   /// Minimum value: -1
   /// Maximum value: 5
-  num? rating;
+  int? rating;
 
   /// Shared space ID to filter by
   ///
@@ -520,9 +520,7 @@ class StatisticsSearchDto {
         personIds: json[r'personIds'] is Iterable
             ? (json[r'personIds'] as Iterable).cast<String>().toList(growable: false)
             : const [],
-        rating: json[r'rating'] == null
-            ? null
-            : num.parse('${json[r'rating']}'),
+        rating: mapValueOfType<int>(json, r'rating'),
         spaceId: mapValueOfType<String>(json, r'spaceId'),
         spacePersonIds: json[r'spacePersonIds'] is Iterable
             ? (json[r'spacePersonIds'] as Iterable).cast<String>().toList(growable: false)

@@ -166,13 +166,14 @@ class SmartSearchDto {
   /// Page number
   ///
   /// Minimum value: 1
+  /// Maximum value: 9007199254740991
   ///
   /// Please note: This property should have been non-nullable! Since the specification file
   /// does not include a default value (using the "default:" property), however, the generated
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  num? page;
+  int? page;
 
   /// Filter by person IDs
   List<String> personIds;
@@ -199,7 +200,7 @@ class SmartSearchDto {
   ///
   /// Minimum value: -1
   /// Maximum value: 5
-  num? rating;
+  int? rating;
 
   /// Number of results to return
   ///
@@ -211,7 +212,7 @@ class SmartSearchDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  num? size;
+  int? size;
 
   /// Shared space ID to filter by
   ///
@@ -641,20 +642,14 @@ class SmartSearchDto {
         model: mapValueOfType<String>(json, r'model'),
         ocr: mapValueOfType<String>(json, r'ocr'),
         order: AssetOrder.fromJson(json[r'order']),
-        page: json[r'page'] == null
-            ? null
-            : num.parse('${json[r'page']}'),
+        page: mapValueOfType<int>(json, r'page'),
         personIds: json[r'personIds'] is Iterable
             ? (json[r'personIds'] as Iterable).cast<String>().toList(growable: false)
             : const [],
         query: mapValueOfType<String>(json, r'query'),
         queryAssetId: mapValueOfType<String>(json, r'queryAssetId'),
-        rating: json[r'rating'] == null
-            ? null
-            : num.parse('${json[r'rating']}'),
-        size: json[r'size'] == null
-            ? null
-            : num.parse('${json[r'size']}'),
+        rating: mapValueOfType<int>(json, r'rating'),
+        size: mapValueOfType<int>(json, r'size'),
         spaceId: mapValueOfType<String>(json, r'spaceId'),
         spacePersonIds: json[r'spacePersonIds'] is Iterable
             ? (json[r'spacePersonIds'] as Iterable).cast<String>().toList(growable: false)
