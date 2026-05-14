@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter_udid/flutter_udid.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/constants.dart';
-import 'package:immich_mobile/data/store/passkey.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
@@ -87,12 +86,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return response;
   }
 
-  Future<LoginResponse?> passkeyLogin() async {
-    final response = await _ref.read(PasskeyStore.instance).login();
-    if (response != null) {
-      await saveAuthInfo(accessToken: response.accessToken);
-    }
-
+  Future<LoginResponse> demoLogin() async {
+    final response = await _authService.demoLogin();
+    await saveAuthInfo(accessToken: response.accessToken);
     return response;
   }
 
