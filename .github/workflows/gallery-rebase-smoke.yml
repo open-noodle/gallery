@@ -17,6 +17,7 @@ jobs:
           node-version: 24
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @immich/sdk build
+      - run: pnpm exec playwright install chromium --only-shell
       - name: Start e2e stack
         working-directory: e2e
         run: docker compose up -d --build --wait
