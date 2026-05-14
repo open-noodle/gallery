@@ -1,10 +1,10 @@
-import { LoginResponseDto } from '@immich/sdk';
+import { LoginResponseDto, TranscodePolicy, updateConfig } from '@immich/sdk';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Socket } from 'socket.io-client';
 import { createUserDto } from 'src/fixtures';
 import { errorDto } from 'src/responses';
-import { app, utils } from 'src/utils';
+import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -34,6 +34,10 @@ describe('/assets/:id/edits (video trim)', () => {
     await utils.resetDatabase();
     admin = await utils.adminSetup({ onboarding: false });
 
+    const config = await utils.getSystemConfig(admin.accessToken);
+    config.ffmpeg.transcode = TranscodePolicy.Disabled;
+    await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+
     [websocket, user1] = await Promise.all([
       utils.connectWebsocket(admin.accessToken),
       utils.userSetup(admin.accessToken, createUserDto.create('trim-user')),
@@ -53,9 +57,17 @@ describe('/assets/:id/edits (video trim)', () => {
     await utils.waitForWebsocketEvent({ event: 'assetUpload', id: shortVideoAssetId });
   }, 30_000);
 
-  afterAll(() => {
-    utils.disconnectWebsocket(websocket);
-  });
+  afterAll(async () => {
+    try {
+      await utils.waitForQueueFinish(admin.accessToken, 'metadataExtraction', 60_000);
+      await utils.waitForQueueFinish(admin.accessToken, 'editor', 60_000);
+      await utils.waitForQueueFinish(admin.accessToken, 'thumbnailGeneration', 60_000);
+      await utils.waitForQueueFinish(admin.accessToken, 'videoConversion', 60_000);
+      await utils.resetAdminConfig(admin.accessToken);
+    } finally {
+      utils.disconnectWebsocket(websocket);
+    }
+  }, 120_000);
 
   // --- Rejection tests (run on untrimmed assets, no shared state issues) ---
 
