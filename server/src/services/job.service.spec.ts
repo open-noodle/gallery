@@ -409,7 +409,7 @@ describe(JobService.name, () => {
 
       expect(mocks.asset.getById).toHaveBeenCalledWith(assetId);
       expect(mocks.assetEdit.getWithSyncInfo).toHaveBeenCalledWith(assetId);
-      expect(mocks.websocket.clientSend).toHaveBeenCalledWith('AssetEditReadyV1', ownerId, {
+      expect(mocks.websocket.clientSend).toHaveBeenCalledWith('AssetEditReadyV2', ownerId, {
         asset: expect.objectContaining({ id: assetId, ownerId }),
         edit: edits,
       });
@@ -451,7 +451,7 @@ describe(JobService.name, () => {
       });
 
       expect(mocks.websocket.clientSend).toHaveBeenCalledWith(
-        'AssetEditReadyV1',
+        'AssetEditReadyV2',
         ownerId,
         expect.objectContaining({
           asset: expect.objectContaining({
@@ -613,7 +613,7 @@ describe(JobService.name, () => {
       expect(mocks.websocket.clientSend).not.toHaveBeenCalled();
     });
 
-    it('should send AssetUploadReadyV1 websocket event when asset has exifInfo', async () => {
+    it('should send AssetUploadReadyV2 websocket event when asset has exifInfo', async () => {
       mocks.job.run.mockResolvedValue(JobStatus.Success);
       const id = newUuid();
       const ownerId = newUuid();
@@ -626,7 +626,7 @@ describe(JobService.name, () => {
       });
 
       expect(mocks.websocket.clientSend).toHaveBeenCalledWith('on_upload_success', ownerId, expect.anything());
-      expect(mocks.websocket.clientSend).toHaveBeenCalledWith('AssetUploadReadyV1', ownerId, {
+      expect(mocks.websocket.clientSend).toHaveBeenCalledWith('AssetUploadReadyV2', ownerId, {
         asset: expect.objectContaining({ id, ownerId }),
         exif: expect.objectContaining({
           description: expect.any(String),
@@ -636,7 +636,7 @@ describe(JobService.name, () => {
       });
     });
 
-    it('should not send AssetUploadReadyV1 when asset has no exifInfo', async () => {
+    it('should not send AssetUploadReadyV2 when asset has no exifInfo', async () => {
       mocks.job.run.mockResolvedValue(JobStatus.Success);
       const id = newUuid();
       const ownerId = newUuid();
@@ -650,13 +650,13 @@ describe(JobService.name, () => {
 
       expect(mocks.websocket.clientSend).toHaveBeenCalledWith('on_upload_success', ownerId, expect.anything());
       expect(mocks.websocket.clientSend).not.toHaveBeenCalledWith(
-        'AssetUploadReadyV1',
+        'AssetUploadReadyV2',
         expect.anything(),
         expect.anything(),
       );
     });
 
-    it('should handle asset with thumbhash in AssetUploadReadyV1 event', async () => {
+    it('should handle asset with thumbhash in AssetUploadReadyV2 event', async () => {
       mocks.job.run.mockResolvedValue(JobStatus.Success);
       const id = newUuid();
       const ownerId = newUuid();
@@ -676,7 +676,7 @@ describe(JobService.name, () => {
       });
 
       expect(mocks.websocket.clientSend).toHaveBeenCalledWith(
-        'AssetUploadReadyV1',
+        'AssetUploadReadyV2',
         ownerId,
         expect.objectContaining({
           asset: expect.objectContaining({
@@ -687,7 +687,7 @@ describe(JobService.name, () => {
       );
     });
 
-    it('should handle asset with null thumbhash in AssetUploadReadyV1 event', async () => {
+    it('should handle asset with null thumbhash in AssetUploadReadyV2 event', async () => {
       mocks.job.run.mockResolvedValue(JobStatus.Success);
       const id = newUuid();
       const ownerId = newUuid();
@@ -707,7 +707,7 @@ describe(JobService.name, () => {
       });
 
       expect(mocks.websocket.clientSend).toHaveBeenCalledWith(
-        'AssetUploadReadyV1',
+        'AssetUploadReadyV2',
         ownerId,
         expect.objectContaining({
           asset: expect.objectContaining({
