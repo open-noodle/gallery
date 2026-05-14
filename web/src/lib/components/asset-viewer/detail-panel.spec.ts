@@ -44,9 +44,12 @@ vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({
   assetViewerManager: {
     closeDetailPanel: vi.fn(),
     closeEditFacesPanel: vi.fn(),
+    clearHighlightedFaces: vi.fn(),
+    highlightedFaces: [],
     isEditFacesPanelOpen: false,
     isShowAssetPath: false,
     openEditFacesPanel: vi.fn(),
+    setHighlightedFaces: vi.fn(),
     toggleAssetPath: vi.fn(),
     toggleFaceEditMode: vi.fn(),
   },
