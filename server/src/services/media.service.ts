@@ -45,7 +45,6 @@ import {
   VideoStreamInfo,
 } from 'src/types';
 import { getAssetFile, getDimensions } from 'src/utils/asset.util';
-import { formatSecondsToDuration } from 'src/utils/duration';
 import { checkFaceVisibility, checkOcrVisibility } from 'src/utils/editor';
 import { BaseConfig, ThumbnailConfig } from 'src/utils/media';
 import { mimeTypes } from 'src/utils/mime-types';
@@ -309,12 +308,12 @@ export class MediaService extends BaseService {
     const probeResult = await this.mediaRepository.probe(outputPath);
     const probedDuration = probeResult.format.duration;
     if (probedDuration && probedDuration > 0) {
-      const newDuration = formatSecondsToDuration(probedDuration);
+      const newDuration = Math.round(probedDuration * 1000);
       this.logger.debug(`Trim: updating duration from probe: ${newDuration} (${probedDuration}s)`);
       await this.assetRepository.update({ id: asset.id, duration: newDuration });
     } else {
       // Probe didn't return duration — use calculated duration from trim parameters
-      const calculatedDuration = formatSecondsToDuration(params.endTime - params.startTime);
+      const calculatedDuration = Math.round((params.endTime - params.startTime) * 1000);
       this.logger.debug(`Trim: probe duration unavailable, using calculated: ${calculatedDuration}`);
       await this.assetRepository.update({ id: asset.id, duration: calculatedDuration });
     }

@@ -1353,7 +1353,7 @@ describe(MetadataService.name, () => {
       await sut.handleMetadataExtraction({ id: asset.id });
 
       expect(mocks.metadata.readTags).toHaveBeenCalledTimes(1);
-      expect(mocks.asset.update).toHaveBeenCalledWith(expect.objectContaining({ duration: '01:30:00.000' }));
+      expect(mocks.asset.update).toHaveBeenCalledWith(expect.objectContaining({ duration: 5_400_000 }));
     });
 
     it('should use Duration from exif', async () => {
