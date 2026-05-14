@@ -5,3 +5,4 @@ node_modules/
 /playwright/.cache/
 /dist
 .env
+.storage-migration-state.json
