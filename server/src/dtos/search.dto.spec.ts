@@ -14,6 +14,13 @@ describe('search DTO albumless filters', () => {
     expect(result.data?.isNotInAlbum).toBe(true);
   });
 
+  it('should accept boolean withSharedSpaces on smart search requests', () => {
+    const result = SmartSearchDto.schema.safeParse({ query: 'beach', withSharedSpaces: true });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.withSharedSpaces).toBe(true);
+  });
+
   it('should accept isNotInAlbum on smart search facet requests', () => {
     const result = SmartSearchFacetsDto.schema.safeParse({ query: 'beach', isNotInAlbum: true });
 
