@@ -1,7 +1,7 @@
 import type { Faces } from '#lib/managers/asset-viewer-manager.svelte.ts';
 import { createUrl, getAssetMediaUrl } from '#lib/utils.ts';
 import { mapNormalizedRectToContent, type Rect, type Size } from '#lib/utils/container-utils.ts';
-import { AssetTypeEnum, type AssetFaceResponseDto } from '@immich/sdk';
+import { AssetTypeEnum } from '@immich/sdk';
 
 export type BoundingBox = Rect & { id: string; labelWidth: number };
 export type SortablePerson = {
@@ -59,7 +59,7 @@ export const getBoundingBox = (faces: Faces[], imageSize: Size): BoundingBox[] =
 };
 
 export const zoomImageToBase64 = async (
-  face: AssetFaceResponseDto,
+  face: Faces,
   assetId: string,
   assetType: AssetTypeEnum,
   photoViewer: HTMLImageElement | undefined,
