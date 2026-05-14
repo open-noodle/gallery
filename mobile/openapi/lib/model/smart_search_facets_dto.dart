@@ -97,7 +97,7 @@ class SmartSearchFacetsDto {
   ///
   /// Minimum value: -1
   /// Maximum value: 5
-  num? rating;
+  int? rating;
 
   /// Shared space ID to filter by
   ///
@@ -307,9 +307,7 @@ class SmartSearchFacetsDto {
             : const [],
         query: mapValueOfType<String>(json, r'query'),
         queryAssetId: mapValueOfType<String>(json, r'queryAssetId'),
-        rating: json[r'rating'] == null
-            ? null
-            : num.parse('${json[r'rating']}'),
+        rating: mapValueOfType<int>(json, r'rating'),
         spaceId: mapValueOfType<String>(json, r'spaceId'),
         spacePersonIds: json[r'spacePersonIds'] is Iterable
             ? (json[r'spacePersonIds'] as Iterable).cast<String>().toList(growable: false)
