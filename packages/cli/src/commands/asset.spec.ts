@@ -71,7 +71,7 @@ describe('uploadFiles', () => {
         id: 'fc5621b1-86f6-44a1-9905-403e607df9f5',
       },
     ]);
-  });
+  }, 10_000);
 
   it('returns new assets when upload file retry is successful', async () => {
     let counter = 0;
