@@ -450,7 +450,7 @@
               <span>{$t('search_legacy_notice')}</span>
               <button
                 type="button"
-                class="font-medium text-primary hover:text-primary/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                class="font-medium text-primary hover:text-primary/80 focus-visible:outline-2 focus-visible:outline-primary"
                 onclick={() => globalSearchManager.open()}
               >
                 {$t('search_open_palette')}
