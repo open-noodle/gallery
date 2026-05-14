@@ -55,5 +55,12 @@
     {@render children?.()}
   </div>
 
-  <Switch {id} bind:checked {disabled} onCheckedChange={onToggle} aria-labelledby={labelId} aria-describedby={subtitleId} />
+  <Switch
+    {id}
+    bind:checked
+    {disabled}
+    onCheckedChange={onToggle}
+    aria-labelledby={labelId}
+    aria-describedby={subtitleId}
+  />
 </div>
