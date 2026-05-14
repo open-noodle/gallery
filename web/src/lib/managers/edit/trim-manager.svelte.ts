@@ -146,17 +146,11 @@ export class TrimManager implements EditToolManager {
     return `${m}:${s.toFixed(1).padStart(4, '0')}`;
   }
 
-  private parseDuration(duration: string | null | undefined): number {
+  private parseDuration(duration: number | null | undefined): number {
     if (!duration) {
       return 0;
     }
-    const match = duration.match(/^(\d+):(\d{2}):(\d{2})(?:\.(\d+))?$/);
-    if (!match) {
-      return 0;
-    }
-    const [, hours, minutes, seconds, fractional] = match;
-    const total = Number(hours) * 3600 + Number(minutes) * 60 + Number(seconds);
-    return fractional ? total + Number(`0.${fractional}`) : total;
+    return duration / 1000;
   }
 }
 
