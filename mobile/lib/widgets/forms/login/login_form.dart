@@ -15,6 +15,7 @@ import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
+import 'package:immich_mobile/models/auth/login_response.model.dart';
 import 'package:immich_mobile/providers/auth.provider.dart';
 import 'package:immich_mobile/providers/background_sync.provider.dart';
 import 'package:immich_mobile/providers/feature_message.provider.dart';
@@ -35,6 +36,8 @@ import 'package:immich_ui/immich_ui.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+
+const _demoServerUrl = 'https://demo.opennoodle.de';
 
 class LoginForm extends HookConsumerWidget {
   LoginForm({super.key});
@@ -73,6 +76,7 @@ class LoginForm extends HookConsumerWidget {
     unawaited(logoAnimationController.repeat());
     final serverInfo = ref.watch(serverInfoProvider);
     final warningMessage = useState<String?>(null);
+    final isDemoLoginLoading = useState<bool>(false);
     final loginFormKey = GlobalKey<FormState>();
     final ValueNotifier<String?> serverEndpoint = useState<String?>(null);
 
@@ -246,6 +250,22 @@ class LoginForm extends HookConsumerWidget {
 
     bool isSyncRemoteDeletionsMode() => Platform.isAndroid && Store.get(StoreKey.manageLocalMediaAndroid, false);
 
+    Future<void> completeLogin(LoginResponse result) async {
+      if (result.shouldChangePassword && !result.isAdmin) {
+        unawaited(context.pushRoute(const ChangePasswordRoute()));
+        return;
+      }
+
+      await ref.read(galleryPermissionNotifier.notifier).requestGalleryPermission();
+      if (isSyncRemoteDeletionsMode()) {
+        await getManageMediaPermission();
+      }
+      unawaited(handleSyncFlow());
+      ref.read(websocketProvider.notifier).connect();
+      unawaited(ref.read(featureMessageServiceProvider).markSeen());
+      unawaited(context.replaceRoute(const GalleryTabShellRoute()));
+    }
+
     Future<void> login() async {
       TextInput.finishAutofillContext();
 
@@ -259,27 +279,7 @@ class LoginForm extends HookConsumerWidget {
           return;
         }
 
-        if (result.shouldChangePassword && !result.isAdmin) {
-          unawaited(context.pushRoute(const ChangePasswordRoute()));
-        } else {
-          await ref.read(galleryPermissionNotifier.notifier).requestGalleryPermission();
-          if (isSyncRemoteDeletionsMode()) {
-            await getManageMediaPermission();
-          }
-          unawaited(handleSyncFlow());
-          if (!context.mounted) {
-            return;
-          }
-
-          ref.read(websocketProvider.notifier).connect();
-          unawaited(ref.read(featureMessageServiceProvider).markSeen());
-          if (!context.mounted) {
-            return;
-          }
-
-          unawaited(context.replaceRoute(const GalleryTabShellRoute()));
-          return;
-        }
+        await completeLogin(result);
       } catch (error) {
         if (!context.mounted) {
           return;
@@ -291,6 +291,38 @@ class LoginForm extends HookConsumerWidget {
           toastType: ToastType.error,
           gravity: ToastGravity.TOP,
         );
+      }
+    }
+
+    demoLogin() async {
+      if (isDemoLoginLoading.value) {
+        return;
+      }
+
+      TextInput.finishAutofillContext();
+      isDemoLoginLoading.value = true;
+
+      try {
+        serverEndpointController.text = _demoServerUrl;
+        await ref.read(authProvider.notifier).validateServerUrl(_demoServerUrl);
+
+        // Invalidate all api repository provider instance to take into account the demo endpoint and access token.
+        invalidateAllApiRepositoryProviders(ref);
+
+        await ref.read(serverInfoProvider.notifier).getServerInfo();
+        final result = await ref.read(authProvider.notifier).demoLogin();
+        await completeLogin(result);
+      } catch (error, stack) {
+        log.severe('Error logging into demo mode: $error', error, stack);
+
+        ImmichToast.show(
+          context: context,
+          msg: "login_form_failed_demo_login".tr(),
+          toastType: ToastType.error,
+          gravity: ToastGravity.TOP,
+        );
+      } finally {
+        isDemoLoginLoading.value = false;
       }
     }
 
@@ -458,6 +490,13 @@ class LoginForm extends HookConsumerWidget {
                     keyboardAction: .next,
                     onSubmit: (_) => form.submit(),
                   ),
+                ),
+                ImmichTextButton(
+                  labelText: context.t.login_form_try_demo,
+                  icon: Icons.travel_explore_rounded,
+                  variant: ImmichVariant.ghost,
+                  loading: isDemoLoginLoading.value,
+                  onPressed: demoLogin,
                 ),
                 ImmichTextButton(
                   labelText: context.t.settings,
