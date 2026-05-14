@@ -931,6 +931,36 @@ describe('rolling fork sync', () => {
     expect(output.join('\n')).toContain('Synced 2 fork commits');
   });
 
+  it('cherry-picks pending fork commits against the rolling target after upstream moved', () => {
+    const { repo, outputDir, plan } = createRepoWithPlan({
+      forkCommitsAfterStart: 1,
+    });
+    const output: string[] = [];
+    const forkHead = repo.git('rev-parse', 'main');
+    repo.git('checkout', 'upstream');
+    repo.write('upstream-moved.txt', 'new upstream');
+    repo.commit('upstream moved');
+    repo.git(
+      'checkout',
+      '-b',
+      'rebase/upstream-2026-05',
+      plan.metadata.forkHead,
+    );
+    writeRollingState(repo.path, validStateFromPlan(plan), outputDir);
+
+    const exitCode = runRollingSyncForkMainCommand({
+      repoPath: repo.path,
+      outputDir,
+      fetchFork: () => undefined,
+      runChecks: () => ({ ok: true, commands: ['pnpm check'], output: 'ok' }),
+      write: (message) => output.push(message),
+    });
+
+    expect(exitCode).toBe(0);
+    expect(repo.git('rev-parse', 'HEAD')).toBe(forkHead);
+    expect(output.join('\n')).toContain('Synced 1 fork commits');
+  });
+
   it('replays non-merge fork commits and records a merge fork head', () => {
     const { repo, outputDir, plan } = createRepoWithPlan();
     const output: string[] = [];
