@@ -19,8 +19,8 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   `.execute(db);
 
   await sql`
-    CREATE UNIQUE INDEX "person_face_suggestion_personId_assetFaceId_uq"
-    ON "person_face_suggestion" ("personId", "assetFaceId")
+    ALTER TABLE "person_face_suggestion"
+    ADD CONSTRAINT "person_face_suggestion_personId_assetFaceId_uq" UNIQUE ("personId", "assetFaceId")
   `.execute(db);
   await sql`
     CREATE INDEX "person_face_suggestion_personId_status_distance_idx"

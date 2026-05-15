@@ -7,6 +7,7 @@ import {
   Index,
   Table,
   Timestamp,
+  Unique,
   UpdateDateColumn,
 } from '@immich/sql-tools';
 import { PrimaryGeneratedUuidV7Column, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
@@ -26,11 +27,7 @@ export type PersonFaceSuggestionStatus = 'pending' | 'confirmed' | 'dismissed';
   columns: ['personId', 'status', 'distance'],
 })
 @Index({ name: 'person_face_suggestion_assetFaceId_idx', columns: ['assetFaceId'] })
-@Index({
-  name: 'person_face_suggestion_personId_assetFaceId_uq',
-  columns: ['personId', 'assetFaceId'],
-  unique: true,
-})
+@Unique({ name: 'person_face_suggestion_personId_assetFaceId_uq', columns: ['personId', 'assetFaceId'] })
 export class PersonFaceSuggestionTable {
   @PrimaryGeneratedUuidV7Column()
   id!: Generated<string>;
