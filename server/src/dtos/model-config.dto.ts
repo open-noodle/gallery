@@ -43,6 +43,12 @@ export const FacialRecognitionConfigSchema = ModelConfigSchema.extend({
     .max(2)
     .describe('Maximum distance threshold for face recognition'),
   minFaces: z.int().min(1).describe('Minimum number of faces required for recognition'),
+  suggestionMaxDistance: z
+    .number()
+    .meta({ format: 'double' })
+    .min(0)
+    .max(2)
+    .describe('Maximum distance for face suggestions; 0 disables the suggestion feature'),
 }).meta({ id: 'FacialRecognitionConfig' });
 
 export const PetDetectionConfigSchema = ModelConfigSchema.extend({
