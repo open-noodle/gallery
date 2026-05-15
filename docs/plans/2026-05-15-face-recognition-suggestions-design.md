@@ -160,7 +160,8 @@ ON CONFLICT (personId, assetFaceId) DO UPDATE
 ```
 
 New pairs insert `pending`. Still-`pending` pairs only get `distance` refreshed.
-`confirmed`/`dismissed` rows hit the conflict, fail the `WHERE`, and are left untouched.
+`confirmed`/`dismissed` rows hit the conflict, fail the `WHERE`, and are left untouched. (SQL
+illustrative; implemented via Kysely — actual column identifiers are quoted camelCase.)
 
 ### Schema (fork migration in `server/src/schema/migrations-gallery/`)
 
@@ -177,14 +178,17 @@ One table, `server/src/schema/tables/person-face-suggestion.table.ts`:
 
 Also required (mirroring `1778700000000-AddSharedSpaceFaceMatchBackfillTarget.ts`):
 
-- `@UpdatedAtTrigger('person_face_suggestion_updated_at')`; migration `up()` inserts the
+- `@UpdatedAtTrigger('person_face_suggestion_updatedAt')`; migration `up()` inserts the
   matching `migration_overrides` row, `down()` deletes it.
 - Unique `(personId, assetFaceId)` (upsert target).
 - Index `(personId, status, distance)` — banner count + ordered queue read.
 - Index `(assetFaceId)` — drives the "resolve all suggestions for this face when it is
   assigned elsewhere" `UPDATE`/`DELETE` (FK `CASCADE` already covers face _deletion_).
-- Dual registration in `server/src/schema/index.ts`: the `tables = [...]` array **and** the
-  `DB` interface map (there is no `database.ts`).
+- Registration in `server/src/schema/index.ts`: the `tables = [...]` array **and** the
+  `DB` interface map. A named domain type in `server/src/database.ts` is **optional** — add
+  `export type PersonFaceSuggestion = Selectable<PersonFaceSuggestionTable>` only if
+  service/repository code wants a named type (as `Album`/`Workflow` do); `face_identity` has
+  no `database.ts` entry, so it is not mandatory.
 - `down()` drops trigger, indexes, table, and the `migration_overrides` row.
 - Round migration timestamp `1778800000000` (free; latest existing is `1778700000000`).
 
@@ -305,15 +309,18 @@ schema validation. **Exit:** persistence + plumbing exist; no generation, no API
 - `getAssignedFaceEmbeddings`: ≤ limit rows; only that person's faces; excludes
   `isVisible=false` and `deletedAt` rows; empty when person has no faces; respects cap.
 - Conditional upsert: new → `pending`; existing `pending` → distance refreshed only; existing
-  `dismissed` → unchanged (status & — explicit regression for the headline guarantee);
-  existing `confirmed` → unchanged.
+  `dismissed` → unchanged (both status and distance preserved — explicit regression for the
+  headline guarantee); existing `confirmed` → unchanged.
 - Band read: returns only `status='pending'` with `distance ∈ (maxDistance, suggestionMaxDistance]`,
-  ordered ascending, paginated, correct `total`; excludes assigned/deleted faces.
+  ordered ascending, paginated, correct `total`; excludes assigned/deleted faces; **read
+  gate** — returns empty when the person is not currently scannable (unnamed / hidden /
+  `type='pet'`) or when the feature is disabled (`suggestionMaxDistance ≤ maxDistance`) even
+  if `pending` rows still exist.
 - Resolve-on-assign: given a now-assigned `faceId`, all its `pending` rows (every person)
   resolved.
 - Config: default `0`; rejects negative / non-number; feature-disabled gate when
   `suggestionMaxDistance ≤ maxDistance`.
-- Edge cases tested here: 3, 4, 13, 15, 17.
+- Edge cases tested here: 3, 4, 7 (read gate), 13, 17.
 
 ### Phase 2 — Generation jobs & triggers (suggestions appear automatically)
 
@@ -338,7 +345,10 @@ generated automatically end-to-end; still no API/UI.
   edits, on becoming hidden, on name-cleared, or while still unnamed.
 - Queue-placement assertion: jobs never enqueued onto `FacialRecognition`.
 - `handleRecognizeFaces` unchanged when feature disabled (no scan enqueued; behavior identical).
-- Edge cases tested here: 2, 5, 6, 7 (no new scans branch), 14, 16, 19.
+- Dismiss does **not** block auto-assign: with the feature enabled, when recognition later
+  finds a `dismissed` face within `maxDistance` of that same person, the unchanged auto-assign
+  path still assigns it (edge 1 — proves Dismiss suppresses suggestions only; zero-regression).
+- Edge cases tested here: 1, 2, 5, 6, 7 (no-new-scans branch), 14, 15, 16, 19.
 
 ### Phase 3 — HTTP API & DTOs
 
@@ -357,9 +367,12 @@ generated automatically end-to-end; still no API/UI.
   **owner-only** absence test (no state change for non-owner).
 - Dismiss: row → `dismissed`; face stays unassigned; a subsequent scan does **not** recreate
   it (regression); idempotent; owner-only absence test.
+- Merge: merging person A into B via the existing `mergePerson` path resolves `pending`
+  suggestion rows for faces moved by the merge (edge 8). GET for a no-longer-scannable person
+  (un-named / hidden) returns empty even if rows exist (edge 7, API read gate).
 - OpenAPI: generated TS SDK + Dart client build; `make sql` regenerated for decorated repo
   queries (cf. memory `feedback_openapi_dart_and_sql`, `feedback_ci_generated_files`).
-- Edge cases tested here: 1, 8, 9, 10, 11, 12, 18.
+- Edge cases tested here: 7 (API read gate), 8, 9, 10, 11, 12, 18.
 
 ### Phase 4 — Web UI (personal)
 
@@ -381,7 +394,8 @@ in a browser. **Verify in a running browser before claiming done** (golden path 
   (memory `feedback_bits_ui_body_scroll_lock_drain`).
 - E2E (Playwright, ML disabled): seed `person_face_suggestion` rows; banner shows on person
   page; confirm assigns face (verify via API); dismiss suppresses; snooze hides banner.
-- Edge cases tested here (UI side): 1 (doc copy), 9, 10, 11 (benign-advance), 13 (no banner).
+- Edge cases tested here (UI side): 1 (user-facing doc note), 7 (banner hidden), 9, 10, 11
+  (benign-advance), 13 (no banner).
 
 ### Phase 5 — Shared-space suggestions (effort-flagged; its plan may split further)
 
