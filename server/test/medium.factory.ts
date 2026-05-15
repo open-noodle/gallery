@@ -42,6 +42,7 @@ import { MetadataRepository } from 'src/repositories/metadata.repository';
 import { NotificationRepository } from 'src/repositories/notification.repository';
 import { OcrRepository } from 'src/repositories/ocr.repository';
 import { PartnerRepository } from 'src/repositories/partner.repository';
+import { PersonFaceSuggestionRepository } from 'src/repositories/person-face-suggestion.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
 import { PluginRepository } from 'src/repositories/plugin.repository';
 import { SearchRepository } from 'src/repositories/search.repository';
@@ -478,6 +479,7 @@ const newRealRepository = <T>(key: ClassConstructor<T>, db: Kysely<DB>): T => {
     case NotificationRepository:
     case OcrRepository:
     case PartnerRepository:
+    case PersonFaceSuggestionRepository:
     case PersonRepository:
     case PluginRepository:
     case SearchRepository:
@@ -549,6 +551,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case NotificationRepository:
     case OcrRepository:
     case PartnerRepository:
+    case PersonFaceSuggestionRepository:
     case PersonRepository:
     case PluginRepository:
     case SessionRepository:
