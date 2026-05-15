@@ -177,13 +177,15 @@ describe('person_face_suggestion migration', () => {
     expect(Number(c.rows[0].count)).toBeGreaterThan(0);
   });
 
-  it('rejects an invalid status via the check constraint', async () => {
-    await expect(
-      sql`
-        INSERT INTO person_face_suggestion ("personId", "assetFaceId", "distance", "status")
-        VALUES (gen_random_uuid(), gen_random_uuid(), 0.6, 'bogus')
-      `.execute(db),
-    ).rejects.toThrow();
+  it('defines the status check constraint', async () => {
+    // Assert the constraint via the catalog, NOT via an INSERT — a bare INSERT with random
+    // ids would fail the personId/assetFaceId FK first and never reach the CHECK.
+    const r = await sql<{ count: string }>`
+      SELECT COUNT(*) AS count FROM pg_constraint
+      WHERE conname = 'person_face_suggestion_status_chk'
+        AND contype = 'c'
+    `.execute(db);
+    expect(Number(r.rows[0].count)).toBe(1);
   });
 
   it('registered the updatedAt trigger override row', async () => {
@@ -532,7 +534,7 @@ git commit -m "feat(server): add PersonRepository.getAssignedFaceEmbeddings"
 **Files:**
 
 - Create: `server/src/repositories/person-face-suggestion.repository.ts`
-- Modify: `server/src/services/base.service.ts` (import ~47; `BASE_SERVICE_DEPENDENCIES` ~124; constructor param ~187; deps destructure ~218)
+- Modify: `server/src/services/base.service.ts` (import; `BASE_SERVICE_DEPENDENCIES` array ~124; constructor `protected` param ~187 — **do NOT touch the `StorageCore.create(...)` call at ~213-222**)
 - Modify: `server/test/utils.ts` (`ServiceOverrides` interface ~252; automock map ~339)
 - Modify: `server/test/medium.factory.ts` (import ~45; both `case` switches ~481 and ~552)
 - Create: `server/test/medium/specs/repositories/person-face-suggestion.repository.spec.ts`
@@ -606,7 +608,7 @@ Wire it (mirror exactly how `PersonRepository` / `FaceIdentityRepository` appear
   - import: `import { PersonFaceSuggestionRepository } from 'src/repositories/person-face-suggestion.repository';`
   - add `PersonFaceSuggestionRepository,` to the `BASE_SERVICE_DEPENDENCIES` array (next to `PersonRepository,`)
   - add constructor param `protected personFaceSuggestionRepository: PersonFaceSuggestionRepository,` (next to `protected personRepository: PersonRepository,`)
-  - if there is a deps destructure/list that includes `personRepository,` (~line 218), add `personFaceSuggestionRepository,` alongside it
+  - **Do NOT** add it to the `StorageCore.create(assetRepository, …, personRepository, …, this.logger)` call at ~lines 213-222 — that is a fixed-signature factory call with a specific repo subset, not a generic deps list. Only the three edits above (import, `BASE_SERVICE_DEPENDENCIES`, constructor param) are needed; the new repository is reached via `this.personFaceSuggestionRepository`.
 - `server/test/utils.ts`:
   - add `personFaceSuggestion: PersonFaceSuggestionRepository;` to the overrides interface (next to `person: PersonRepository;`)
   - add `personFaceSuggestion: automock(PersonFaceSuggestionRepository, { strict: false }),` (next to the `person: automock(PersonRepository, ...)` entry)
@@ -662,7 +664,13 @@ describe('upsertPending', () => {
   it('NEVER resurrects a dismissed row (headline guarantee)', async () => {
     const { sut } = setup();
     await sut.upsertPending([{ personId, assetFaceId, distance: 0.6 }]);
-    await sut.markDismissed(personId, assetFaceId); // helper added in Task 8; for now set via raw SQL in the test
+    // Phase 1 has no typed markDismissed (that is Phase 3). Set the precondition directly.
+    await defaultDatabase
+      .updateTable('person_face_suggestion')
+      .set({ status: 'dismissed' })
+      .where('personId', '=', personId)
+      .where('assetFaceId', '=', assetFaceId)
+      .execute();
     await sut.upsertPending([{ personId, assetFaceId, distance: 0.4 }]);
     const row = await getRow(personId, assetFaceId);
     expect(row.status).toBe('dismissed');
@@ -670,14 +678,31 @@ describe('upsertPending', () => {
   });
 
   it('leaves a confirmed row untouched', async () => {
-    /* same shape as dismissed: set status='confirmed' via raw SQL, upsert, assert unchanged */
+    const { sut } = setup();
+    await sut.upsertPending([{ personId, assetFaceId, distance: 0.6 }]);
+    await defaultDatabase
+      .updateTable('person_face_suggestion')
+      .set({ status: 'confirmed' })
+      .where('personId', '=', personId)
+      .where('assetFaceId', '=', assetFaceId)
+      .execute();
+    await sut.upsertPending([{ personId, assetFaceId, distance: 0.4 }]);
+    const row = await getRow(personId, assetFaceId);
+    expect(row.status).toBe('confirmed');
+    expect(row.distance).toBe(0.6);
   });
 });
 ```
 
-> `getRow` = small local helper doing `db.selectFrom('person_face_suggestion').selectAll().where(...).executeTakeFirstOrThrow()`.
-> For the dismissed/confirmed precondition use a raw `UPDATE person_face_suggestion SET status=... ` in the test (the
-> typed `markDismissed`/`markConfirmed` helpers are added in Phase 3; Phase 1 only needs the upsert + read + resolve).
+> `getRow` = small local helper doing
+> `defaultDatabase.selectFrom('person_face_suggestion').selectAll().where('personId','=',personId).where('assetFaceId','=',assetFaceId).executeTakeFirstOrThrow()`.
+> The dismissed/confirmed precondition is set with a direct `defaultDatabase.updateTable(...)`
+> (shown above) because the typed `markDismissed`/`markConfirmed` helpers do not exist until
+> Phase 3 — Phase 1 only needs upsert + read + resolve. Seed `personId` (a **named,
+> non-hidden, type='person'** person) and an unassigned `assetFaceId` in a `beforeEach` using
+> the medium factory helpers `mediumFactory.personFactory` / `assetFaceFactory` the way
+> `face-identity.repository.spec.ts` and the medium factory's `newPerson` / `newAssetFace`
+> do (one asset, one person, one `asset_face` with `personId = null` + a `face_search` row).
 
 **Step 2: Run test to verify it fails**
 
@@ -891,16 +916,25 @@ cd server && pnpm test:medium -- --run test/medium/specs/repositories/person-fac
 
 Expected: PASS (covers edge case 11 building block).
 
-Then regenerate the decorated-query SQL docs and run the gates:
+Then regenerate the decorated-query SQL docs and run the gates. **`make sql` runs
+`node ./dist/bin/sync-sql.js`, so it requires (a) a built server and (b) a reachable
+Postgres** (it connects to `DB_URL`, default `postgres://postgres:postgres@localhost:5432/immich`).
+Bring up the dev DB first if one is not already running:
 
 ```bash
-make sql
+make build-server                 # produces server/dist (sync-sql.js)
+make dev                          # or otherwise ensure Postgres is reachable at DB_URL
+make sql                          # regenerates server/src/queries/*.repository.sql
 make check-server
 cd server && pnpm test -- --run src/dtos/model-config.dto.spec.ts
 ```
 
-Expected: `make sql` updates `server/src/queries/*` for the new `@GenerateSql` methods;
-`make check-server` clean; unit test green. Do **not** run `make open-api` (no API changes).
+Expected: `make sql` creates `server/src/queries/person-face-suggestion.repository.sql` and
+updates `person.repository.sql` / `search.repository.sql` for the new/changed `@GenerateSql`
+methods; `make check-server` clean; unit test green. Do **not** run `make open-api` (no API
+changes). If no local Postgres is available in the execution environment, commit the code
+without the regenerated SQL and note that `make sql` must be run before the PR (CI enforces
+generated-file freshness — cf. memory `feedback_ci_generated_files`).
 
 **Step 5: Commit**
 
@@ -920,7 +954,9 @@ git commit -m "feat(server): resolve pending suggestions on face assignment + sy
   read enforces the band + scannable read-gate + feature-disabled gate; resolve-on-assign
   clears only pending rows.
 - `make check-server` clean; `make sql` committed; **no** API/UI/OpenAPI changes.
-- Edge cases exercised: 2, 3, 4, 7, 11 (building block), 13, 17.
+- Edge cases exercised: **3, 4, 7, 13, 17 fully**; **2 and 11 as building blocks** (the
+  conditional-upsert invariant and resolve-on-assign mechanism are tested here; full
+  concurrency / recognition-assignment interplay is Phase 2). Matches the header.
 
 **Not in this phase (Phase 2+):** the scan jobs, triggers, HTTP endpoints, web UI. The
 repository methods exist but nothing calls them yet — that is intentional and correct for
