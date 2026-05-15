@@ -10,6 +10,7 @@ import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
 import { upsertTags } from 'src/utils/tag';
 import { newMediumService } from 'test/medium.factory';
+import { newEmbedding } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
 
 let defaultDatabase: Kysely<DB>;
@@ -454,6 +455,78 @@ describe(SearchRepository.name, () => {
         },
       ]);
       expect(result.hasUnnamedPeople).toBe(false);
+    });
+  });
+
+  describe('searchFaces hasPerson tri-state', () => {
+    let ownerId: string;
+    let assignedFaceId: string;
+    let unassignedFaceId: string;
+    let faceEmbedding: string;
+
+    beforeAll(async () => {
+      const { ctx } = setup();
+      const { user } = await ctx.newUser();
+      ownerId = user.id;
+
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Ada' });
+
+      const { assetFace: assignedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      const { assetFace: unassignedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+
+      assignedFaceId = assignedFace.id;
+      unassignedFaceId = unassignedFace.id;
+
+      faceEmbedding = newEmbedding();
+      await ctx.database.insertInto('face_search').values({ faceId: assignedFaceId, embedding: faceEmbedding }).execute();
+      await ctx.database
+        .insertInto('face_search')
+        .values({ faceId: unassignedFaceId, embedding: faceEmbedding })
+        .execute();
+    });
+
+    it('hasPerson:false returns only unassigned faces', async () => {
+      const { sut } = setup();
+      const result = await sut.searchFaces({
+        userIds: [ownerId],
+        embedding: faceEmbedding,
+        numResults: 10,
+        maxDistance: 2,
+        hasPerson: false,
+      });
+      const ids = result.map((r) => r.id);
+      expect(ids).toContain(unassignedFaceId);
+      expect(ids).not.toContain(assignedFaceId);
+      expect(result.every((r) => r.personId === null)).toBe(true);
+    });
+
+    it('hasPerson:true returns only assigned faces (regression)', async () => {
+      const { sut } = setup();
+      const result = await sut.searchFaces({
+        userIds: [ownerId],
+        embedding: faceEmbedding,
+        numResults: 10,
+        maxDistance: 2,
+        hasPerson: true,
+      });
+      const ids = result.map((r) => r.id);
+      expect(ids).toContain(assignedFaceId);
+      expect(ids).not.toContain(unassignedFaceId);
+      expect(result.every((r) => r.personId !== null)).toBe(true);
+    });
+
+    it('hasPerson omitted returns both assigned and unassigned', async () => {
+      const { sut } = setup();
+      const result = await sut.searchFaces({
+        userIds: [ownerId],
+        embedding: faceEmbedding,
+        numResults: 10,
+        maxDistance: 2,
+      });
+      const ids = result.map((r) => r.id);
+      expect(ids).toContain(assignedFaceId);
+      expect(ids).toContain(unassignedFaceId);
     });
   });
 });

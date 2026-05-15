@@ -919,7 +919,8 @@ export class SearchRepository {
             .leftJoin('person', 'person.id', 'asset_face.personId')
             .where('asset.ownerId', '=', anyUuid(userIds))
             .where('asset.deletedAt', 'is', null)
-            .$if(!!hasPerson, (qb) => qb.where('asset_face.personId', 'is not', null))
+            .$if(hasPerson === true, (qb) => qb.where('asset_face.personId', 'is not', null))
+            .$if(hasPerson === false, (qb) => qb.where('asset_face.personId', 'is', null))
             .$if(!!minBirthDate, (qb) =>
               qb.where((eb) =>
                 eb.or([eb('person.birthDate', 'is', null), eb('person.birthDate', '<=', minBirthDate!)]),
