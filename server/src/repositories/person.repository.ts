@@ -530,10 +530,12 @@ export class PersonRepository {
       )
       .$if(!options?.closestFaceAssetId, (qb) =>
         qb
-          .orderBy(sql`NULLIF("owned"."name", '') is null`, 'asc')
-          .orderBy(faceCount, 'desc')
-          .orderBy(sql`NULLIF("owned"."name", '')`, (om) => om.asc().nullsLast())
-          .orderBy('owned.createdAt'),
+          .orderBy(sql`NULLIF(BTRIM(person.name), '') is null`, 'asc')
+          .orderBy(sql`NULLIF(BTRIM(person.name), '')`, (om) => om.asc().nullsLast())
+          .orderBy(sql`CASE WHEN NULLIF(BTRIM(person.name), '') IS NULL THEN COUNT("asset_face"."assetId") END`, (om) =>
+            om.desc().nullsLast(),
+          )
+          .orderBy('person.id'),
       )
       // an explicit isHidden filter takes precedence over withHidden
       .$if(!options?.withHidden && options?.isHidden === undefined, (qb) => qb.where('owned.isHidden', '=', false))
