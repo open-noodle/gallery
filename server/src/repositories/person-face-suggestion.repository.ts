@@ -27,4 +27,53 @@ export class PersonFaceSuggestionRepository {
       )
       .execute();
   }
+
+  @GenerateSql({
+    params: [DummyValue.UUID, { maxDistance: 0.5, suggestionMaxDistance: 0.8, page: 1, size: 10 }],
+  })
+  async getPendingForPerson(
+    personId: string,
+    opts: { maxDistance: number; suggestionMaxDistance: number; page: number; size: number },
+  ): Promise<{ total: number; items: Array<{ assetFaceId: string; distance: number }> }> {
+    // Read gate: feature disabled when suggestion band is empty
+    if (opts.suggestionMaxDistance <= opts.maxDistance) {
+      return { total: 0, items: [] };
+    }
+
+    // Read gate: person must be scannable (named, not hidden, type='person')
+    const scannable = await this.db
+      .selectFrom('person')
+      .select('person.id')
+      .where('person.id', '=', personId)
+      .where('person.name', '!=', '')
+      .where('person.isHidden', '=', false)
+      .where('person.type', '=', 'person')
+      .executeTakeFirst();
+    if (!scannable) {
+      return { total: 0, items: [] };
+    }
+
+    const base = this.db
+      .selectFrom('person_face_suggestion as pfs')
+      .innerJoin('asset_face as af', 'af.id', 'pfs.assetFaceId')
+      .where('pfs.personId', '=', personId)
+      .where('pfs.status', '=', 'pending')
+      .where('pfs.distance', '>', opts.maxDistance)
+      .where('pfs.distance', '<=', opts.suggestionMaxDistance)
+      .where('af.personId', 'is', null)
+      .where('af.deletedAt', 'is', null);
+
+    const totalRow = await base
+      .select((eb) => eb.fn.countAll<string>().as('total'))
+      .executeTakeFirstOrThrow();
+
+    const items = await base
+      .select(['pfs.assetFaceId as assetFaceId', 'pfs.distance as distance'])
+      .orderBy('pfs.distance', 'asc')
+      .limit(opts.size)
+      .offset((opts.page - 1) * opts.size)
+      .execute();
+
+    return { total: Number(totalRow.total), items };
+  }
 }
