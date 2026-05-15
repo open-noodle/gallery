@@ -492,6 +492,66 @@ describe(PersonRepository.name, () => {
     });
   });
 
+  describe('getAssignedFaceEmbeddings', () => {
+    let personId: string;
+    let personWithNoFacesId: string;
+    let ctx: ReturnType<typeof setup>['ctx'];
+    let sut: ReturnType<typeof setup>['sut'];
+
+    beforeAll(async () => {
+      ({ ctx, sut } = setup());
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+
+      // Person A: 3 visible+embedded faces, 1 isVisible=false face, 1 deletedAt face
+      const { person: personA } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
+      personId = personA.id;
+
+      // 3 visible faces with embeddings
+      for (let i = 0; i < 3; i++) {
+        const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: personA.id });
+        await ctx.database.insertInto('face_search').values({ faceId, embedding: newEmbedding() }).execute();
+      }
+
+      // 1 isVisible=false face with embedding (should be excluded)
+      const { result: hiddenFaceId } = await ctx.newAssetFace({
+        assetId: asset.id,
+        personId: personA.id,
+        isVisible: false,
+      });
+      await ctx.database.insertInto('face_search').values({ faceId: hiddenFaceId, embedding: newEmbedding() }).execute();
+
+      // 1 soft-deleted face with embedding (should be excluded)
+      const { result: deletedFaceId } = await ctx.newAssetFace({
+        assetId: asset.id,
+        personId: personA.id,
+        deletedAt: new Date(),
+      });
+      await ctx.database.insertInto('face_search').values({ faceId: deletedFaceId, embedding: newEmbedding() }).execute();
+
+      // Person B: zero faces
+      const { person: personB } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
+      personWithNoFacesId = personB.id;
+    });
+
+    it('returns at most `limit` embeddings for visible, non-deleted faces', async () => {
+      const rows = await sut.getAssignedFaceEmbeddings(personId, 2);
+      expect(rows).toHaveLength(2);
+      rows.forEach((r) => expect(r.embedding).toBeTruthy());
+    });
+
+    it('excludes isVisible=false and deleted faces', async () => {
+      const rows = await sut.getAssignedFaceEmbeddings(personId, 10);
+      // Person A has 3 visible non-deleted faces; isVisible=false and deletedAt faces are excluded
+      expect(rows).toHaveLength(3);
+    });
+
+    it('returns empty for a person with no assigned faces', async () => {
+      const rows = await sut.getAssignedFaceEmbeddings(personWithNoFacesId, 20);
+      expect(rows).toEqual([]);
+    });
+  });
+
   describe('representative face picker queries', () => {
     it('filters deleted, hidden, and offline representative face candidates', async () => {
       const { ctx, sut } = setup();

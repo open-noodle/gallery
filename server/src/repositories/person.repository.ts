@@ -743,6 +743,19 @@ export class PersonRepository {
       .execute();
   }
 
+  @GenerateSql({ params: [DummyValue.UUID, 20] })
+  getAssignedFaceEmbeddings(personId: string, limit: number) {
+    return this.db
+      .selectFrom('asset_face')
+      .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
+      .select('face_search.embedding')
+      .where('asset_face.personId', '=', personId)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .limit(limit)
+      .execute();
+  }
+
   @GenerateSql({ params: [DummyValue.UUID] })
   getRandomFace(personId: string) {
     return this.db
