@@ -473,6 +473,7 @@ export type JobItem =
   | { name: JobName.PersonGenerateThumbnail; data: IPersonJob }
   | { name: JobName.FacialRecognition; data: IFacialRecognitionJob }
   | { name: JobName.FaceIdentityBackfill; data: IFaceIdentityBackfillJob }
+  | { name: JobName.FaceIdentityMaintenanceAfterRecognition; data: IDelayedJob }
 
   // Smart Search
   | { name: JobName.SmartSearchQueueAll; data: IBaseJob }
