@@ -391,7 +391,7 @@ export class JobRepository {
         if (data.continuationId) {
           return { jobId: `face-identity-backfill/continuation/${data.continuationId}`, removeOnFail: true };
         }
-        return { jobId: 'face-identity-backfill/root', removeOnFail: true };
+        return { jobId: 'face-identity-backfill/root', removeOnFail: true, removeOnComplete: true };
       }
       case JobName.FaceIdentityMaintenanceAfterRecognition: {
         const data = item.data as { delay?: number };
