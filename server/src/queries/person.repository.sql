@@ -258,12 +258,14 @@ having
     )::int
   )
 order by
-  "owned"."isHidden" asc,
-  "owned"."isFavorite" desc,
-  NULLIF("owned"."name", '') is null asc,
-  count("asset"."id") desc,
-  NULLIF("owned"."name", '') asc nulls last,
-  "owned"."createdAt"
+  "person"."isHidden" asc,
+  "person"."isFavorite" desc,
+  NULLIF(BTRIM(person.name), '') is null asc,
+  NULLIF(BTRIM(person.name), '') asc nulls last,
+  CASE
+    WHEN NULLIF(BTRIM(person.name), '') IS NULL THEN COUNT("asset_face"."assetId")
+  END desc nulls last,
+  "person"."id"
 limit
   $13
 offset
