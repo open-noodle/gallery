@@ -3357,7 +3357,7 @@ describe(PersonService.name, () => {
     it('skips an unnamed / hidden / pet / missing person (edge 5, 7, 16)', async () => {
       mocks.systemMetadata.get.mockResolvedValue(enabled);
 
-      mocks.person.getById.mockResolvedValueOnce();
+      mocks.person.getById.mockResolvedValueOnce(void 0);
       await expect(sut.handlePersonSuggestionScan({ id: 'gone' })).resolves.toBe(JobStatus.Skipped);
 
       mocks.person.getById.mockResolvedValueOnce({
