@@ -273,6 +273,24 @@ describe('PersonFaceSuggestionRepository', () => {
       expect(res.total).toBe(2);
       expect(res.items.map((i) => i.assetFaceId)).not.toContain(f6Id);
     });
+
+    it('returns the asset id, bounding box and dimensions for each in-band pending item', async () => {
+      const { sut } = setup();
+      const res = await sut.getPendingForPerson(personPId, opts);
+
+      expect(res.total).toBe(2);
+      for (const item of res.items) {
+        expect(item.assetId).toEqual(expect.any(String));
+        expect(item.imageWidth).toBeGreaterThan(0);
+        expect(item.imageHeight).toBeGreaterThan(0);
+        expect(typeof item.boundingBoxX1).toBe('number');
+        expect(typeof item.boundingBoxX2).toBe('number');
+        expect(typeof item.boundingBoxY1).toBe('number');
+        expect(typeof item.boundingBoxY2).toBe('number');
+      }
+      // still ordered by distance ascending (Phase-1 contract preserved)
+      expect(res.items.map((i) => i.distance)).toEqual([0.6, 0.7]);
+    });
   });
 
   describe('markConfirmed / markDismissed (idempotent, status-guarded)', () => {

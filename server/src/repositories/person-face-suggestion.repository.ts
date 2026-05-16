@@ -67,7 +67,7 @@ export class PersonFaceSuggestionRepository {
   async getPendingForPerson(
     personId: string,
     opts: { maxDistance: number; suggestionMaxDistance: number; page: number; size: number },
-  ): Promise<{ total: number; items: Array<{ assetFaceId: string; distance: number }> }> {
+  ) {
     // Read gate: feature disabled when suggestion band is empty
     if (opts.suggestionMaxDistance <= opts.maxDistance) {
       return { total: 0, items: [] };
@@ -92,6 +92,7 @@ export class PersonFaceSuggestionRepository {
     const base = this.db
       .selectFrom('person_face_suggestion as pfs')
       .innerJoin('asset_face as af', 'af.id', 'pfs.assetFaceId')
+      .innerJoin('asset', 'asset.id', 'af.assetId')
       .where('pfs.personId', '=', personId)
       .where('pfs.status', '=', 'pending')
       .where('pfs.distance', '>', opts.maxDistance)
@@ -102,7 +103,18 @@ export class PersonFaceSuggestionRepository {
     const totalRow = await base.select((eb) => eb.fn.countAll<string>().as('total')).executeTakeFirstOrThrow();
 
     const items = await base
-      .select(['pfs.assetFaceId as assetFaceId', 'pfs.distance as distance'])
+      .select([
+        'pfs.assetFaceId as assetFaceId',
+        'pfs.distance as distance',
+        'af.assetId as assetId',
+        'af.imageWidth as imageWidth',
+        'af.imageHeight as imageHeight',
+        'af.boundingBoxX1 as boundingBoxX1',
+        'af.boundingBoxX2 as boundingBoxX2',
+        'af.boundingBoxY1 as boundingBoxY1',
+        'af.boundingBoxY2 as boundingBoxY2',
+        'asset.fileCreatedAt as fileCreatedAt',
+      ])
       .orderBy('pfs.distance', 'asc')
       .limit(opts.size)
       .offset((opts.page - 1) * opts.size)
