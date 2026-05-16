@@ -24,6 +24,8 @@ import {
   PersonCreateDto,
   PersonFacePageQueryDto,
   PersonFacePageResponseDto,
+  PersonFaceSuggestionPageQueryDto,
+  PersonFaceSuggestionPageResponseDto,
   PersonResponseDto,
   PersonSearchDto,
   PersonStatisticsResponseDto,
@@ -284,6 +286,40 @@ export class PersonService extends BaseService {
     }
 
     throw new BadRequestException(`Not found or no ${Permission.PersonRead} access`);
+  }
+
+  async getFaceSuggestions(
+    auth: AuthDto,
+    id: string,
+    dto: PersonFaceSuggestionPageQueryDto,
+  ): Promise<PersonFaceSuggestionPageResponseDto> {
+    await this.requireAccess({ auth, permission: Permission.PersonRead, ids: [id] });
+
+    const { machineLearning } = await this.getConfig({ withCache: true });
+    const { maxDistance, suggestionMaxDistance } = machineLearning.facialRecognition;
+
+    const { total, items } = await this.personFaceSuggestionRepository.getPendingForPerson(id, {
+      maxDistance,
+      suggestionMaxDistance,
+      page: dto.page,
+      size: dto.size,
+    });
+
+    return {
+      total,
+      items: items.map((item) => ({
+        assetFaceId: item.assetFaceId,
+        assetId: item.assetId,
+        distance: item.distance,
+        imageWidth: item.imageWidth,
+        imageHeight: item.imageHeight,
+        boundingBoxX1: item.boundingBoxX1,
+        boundingBoxX2: item.boundingBoxX2,
+        boundingBoxY1: item.boundingBoxY1,
+        boundingBoxY2: item.boundingBoxY2,
+        fileCreatedAt: asDateString(item.fileCreatedAt) ?? undefined,
+      })),
+    };
   }
 
   async getFacesForPicker(auth: AuthDto, id: string, dto: PersonFacePageQueryDto): Promise<PersonFacePageResponseDto> {

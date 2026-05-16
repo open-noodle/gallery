@@ -5381,4 +5381,86 @@ describe(PersonService.name, () => {
       ).toBeNull();
     });
   });
+
+  describe('getFaceSuggestions', () => {
+    const enabled = {
+      machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0.8, minFaces: 3 } },
+    };
+
+    it('denies a non-owner with no state change (edge 18 absence)', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(enabled);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set()); // not the owner
+
+      await expect(
+        sut.getFaceSuggestions(AuthFactory.create(), 'person-1', { page: 1, size: 50 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(mocks.personFaceSuggestion.getPendingForPerson).not.toHaveBeenCalled();
+    });
+
+    it('returns total + mapped items for the owner', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(enabled);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
+      mocks.personFaceSuggestion.getPendingForPerson.mockResolvedValue({
+        total: 1,
+        items: [
+          {
+            assetFaceId: 'face-1',
+            distance: 0.62,
+            assetId: 'asset-1',
+            imageWidth: 4000,
+            imageHeight: 3000,
+            boundingBoxX1: 1,
+            boundingBoxX2: 2,
+            boundingBoxY1: 3,
+            boundingBoxY2: 4,
+            fileCreatedAt: new Date('2026-01-01T00:00:00.000Z'),
+          },
+        ],
+      });
+
+      const res = await sut.getFaceSuggestions(AuthFactory.create(), 'person-1', { page: 1, size: 50 });
+
+      expect(mocks.personFaceSuggestion.getPendingForPerson).toHaveBeenCalledWith('person-1', {
+        maxDistance: 0.5,
+        suggestionMaxDistance: 0.8,
+        page: 1,
+        size: 50,
+      });
+      expect(res).toEqual({
+        total: 1,
+        items: [
+          {
+            assetFaceId: 'face-1',
+            assetId: 'asset-1',
+            distance: 0.62,
+            imageWidth: 4000,
+            imageHeight: 3000,
+            boundingBoxX1: 1,
+            boundingBoxX2: 2,
+            boundingBoxY1: 3,
+            boundingBoxY2: 4,
+            fileCreatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      });
+    });
+
+    it('passes the feature-off config through so the repository read-gate returns empty (edge 7)', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0, minFaces: 3 } },
+      });
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
+      mocks.personFaceSuggestion.getPendingForPerson.mockResolvedValue({ total: 0, items: [] });
+
+      const res = await sut.getFaceSuggestions(AuthFactory.create(), 'person-1', { page: 1, size: 50 });
+
+      expect(mocks.personFaceSuggestion.getPendingForPerson).toHaveBeenCalledWith('person-1', {
+        maxDistance: 0.5,
+        suggestionMaxDistance: 0,
+        page: 1,
+        size: 50,
+      });
+      expect(res).toEqual({ total: 0, items: [] });
+    });
+  });
 });
