@@ -252,6 +252,21 @@
 
           <SettingInputField
             inputType={SettingInputFieldType.NUMBER}
+            label={$t('admin.machine_learning_suggestion_max_distance')}
+            description={$t('admin.machine_learning_suggestion_max_distance_description')}
+            bind:value={configToEdit.machineLearning.facialRecognition.suggestionMaxDistance}
+            step="0.01"
+            min={0}
+            max={2}
+            disabled={disabled ||
+              !configToEdit.machineLearning.enabled ||
+              !configToEdit.machineLearning.facialRecognition.enabled}
+            isEdited={configToEdit.machineLearning.facialRecognition.suggestionMaxDistance !==
+              config.machineLearning.facialRecognition.suggestionMaxDistance}
+          />
+
+          <SettingInputField
+            inputType={SettingInputFieldType.NUMBER}
             label={$t('admin.machine_learning_min_recognized_faces')}
             description={$t('admin.machine_learning_min_recognized_faces_description')}
             bind:value={configToEdit.machineLearning.facialRecognition.minFaces}
