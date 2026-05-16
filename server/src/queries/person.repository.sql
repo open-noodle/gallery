@@ -528,6 +528,19 @@ where
   and "asset_face"."personId" in ($2)
   and "asset_face"."deletedAt" is null
 
+-- PersonRepository.getAssignedFaceEmbeddings
+select
+  "face_search"."embedding"
+from
+  "asset_face"
+  inner join "face_search" on "face_search"."faceId" = "asset_face"."id"
+where
+  "asset_face"."personId" = $1
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" is true
+limit
+  $2
+
 -- PersonRepository.getRandomFace
 select
   "asset_face".*

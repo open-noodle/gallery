@@ -62,6 +62,9 @@ export class PersonFaceSuggestionRepository {
       return { total: 0, items: [] };
     }
 
+    // The count and items queries below are two separate round-trips with no wrapping transaction.
+    // A concurrent resolveAssignedFace between them can make total > items.length. This is an
+    // acceptable trade-off for a background review queue where stale counts cause no harm.
     const base = this.db
       .selectFrom('person_face_suggestion as pfs')
       .innerJoin('asset_face as af', 'af.id', 'pfs.assetFaceId')

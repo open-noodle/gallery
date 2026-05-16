@@ -256,8 +256,6 @@ describe('PersonFaceSuggestionRepository', () => {
 
   describe('resolveAssignedFace', () => {
     let faceXId: string;
-    let p1Id: string;
-    let p2Id: string;
     let p3Id: string;
 
     const countRows = (assetFaceId: string, status: PersonFaceSuggestionStatus) =>
@@ -279,8 +277,8 @@ describe('PersonFaceSuggestionRepository', () => {
       const { person: p1 } = await ctx.newPerson({ ownerId: user.id, name: 'Person One', isHidden: false });
       const { person: p2 } = await ctx.newPerson({ ownerId: user.id, name: 'Person Two', isHidden: false });
       const { person: p3 } = await ctx.newPerson({ ownerId: user.id, name: 'Person Three', isHidden: false });
-      p1Id = p1.id;
-      p2Id = p2.id;
+      const p1Id = p1.id;
+      const p2Id = p2.id;
       p3Id = p3.id;
 
       const { sut } = setup();
@@ -306,7 +304,7 @@ describe('PersonFaceSuggestionRepository', () => {
       expect(await countRows(faceXId, 'pending')).toBe(0);
     });
 
-    it('preserves dismissed and confirmed rows for that face', async () => {
+    it('preserves dismissed rows for that face', async () => {
       expect(await countRows(faceXId, 'dismissed')).toBe(1);
     });
   });
