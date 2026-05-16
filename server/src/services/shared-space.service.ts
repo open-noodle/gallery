@@ -1530,6 +1530,31 @@ export class SharedSpaceService extends BaseService {
     return JobStatus.Success;
   }
 
+  @OnJob({ name: JobName.SharedSpaceFaceMatchFromBackfill, queue: QueueName.PeopleBackfill })
+  async handleSharedSpaceFaceMatchFromBackfill({
+    spaceId,
+    assetId,
+  }: JobOf<JobName.SharedSpaceFaceMatchFromBackfill>): Promise<JobStatus> {
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    if (!space || !space.faceRecognitionEnabled) {
+      return JobStatus.Skipped;
+    }
+
+    const affectedPersonIds = await this.processSpaceFaceMatch(spaceId, assetId, {
+      refreshExactMetadata: true,
+    });
+    for (const spacePersonId of affectedPersonIds) {
+      await this.queueSpaceIdentityReconciliation({ spaceId, spacePersonId });
+    }
+
+    await this.jobRepository.queue({
+      name: JobName.SharedSpacePersonDedup,
+      data: { spaceId },
+    });
+
+    return JobStatus.Success;
+  }
+
   @OnJob({ name: JobName.SharedSpaceLibraryFaceSync, queue: QueueName.FacialRecognition })
   async handleSharedSpaceLibraryFaceSync(job: JobOf<JobName.SharedSpaceLibraryFaceSync>): Promise<JobStatus> {
     const space = await this.sharedSpaceRepository.getById(job.spaceId);
