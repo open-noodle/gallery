@@ -29,6 +29,9 @@ import {
   PersonCreateDto,
   PersonFacePageQueryDto,
   PersonFacePageResponseDto,
+  PersonFaceSuggestionPageQueryDto,
+  PersonFaceSuggestionPageResponseDto,
+  PersonFaceSuggestionParamsDto,
   PersonResponseDto,
   PersonSearchDto,
   PersonStatisticsResponseDto,
@@ -289,5 +292,50 @@ export class PersonController {
     @Body() dto: MergePersonDto,
   ): Promise<BulkIdResponseDto[]> {
     return this.service.mergePerson(auth, id, dto);
+  }
+
+  @Get(':id/face-suggestions')
+  @Authenticated({ permission: Permission.PersonRead })
+  @Endpoint({
+    summary: 'Get face suggestions for a person',
+    description: 'Retrieve near-miss unassigned faces suggested for this person, best match first.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  getPersonFaceSuggestions(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Query() dto: PersonFaceSuggestionPageQueryDto,
+  ): Promise<PersonFaceSuggestionPageResponseDto> {
+    return this.service.getFaceSuggestions(auth, id, dto);
+  }
+
+  @Post(':id/face-suggestions/:assetFaceId/confirm')
+  @Authenticated({ permission: Permission.PersonReassign })
+  @HttpCode(HttpStatus.OK)
+  @Endpoint({
+    summary: 'Confirm a face suggestion',
+    description: 'Assign the suggested face to the person. Idempotent.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  confirmPersonFaceSuggestion(
+    @Auth() auth: AuthDto,
+    @Param() { id, assetFaceId }: PersonFaceSuggestionParamsDto,
+  ): Promise<void> {
+    return this.service.confirmFaceSuggestion(auth, id, assetFaceId);
+  }
+
+  @Post(':id/face-suggestions/:assetFaceId/dismiss')
+  @Authenticated({ permission: Permission.PersonUpdate })
+  @HttpCode(HttpStatus.OK)
+  @Endpoint({
+    summary: 'Dismiss a face suggestion',
+    description: 'Suppress this suggestion for the person forever. The face stays unassigned. Idempotent.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  dismissPersonFaceSuggestion(
+    @Auth() auth: AuthDto,
+    @Param() { id, assetFaceId }: PersonFaceSuggestionParamsDto,
+  ): Promise<void> {
+    return this.service.dismissFaceSuggestion(auth, id, assetFaceId);
   }
 }
