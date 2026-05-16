@@ -4963,6 +4963,26 @@ describe(PersonService.name, () => {
     });
   });
 
+  describe('reassignFaces', () => {
+    it('resolves pending suggestions for the face when bulk-reassigned (edge 11, manual branch)', async () => {
+      const face = AssetFaceFactory.create();
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create();
+
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
+      mocks.person.getFacesByIds.mockResolvedValue([getForAssetFace(face)]);
+      mocks.person.reassignFace.mockResolvedValue(1);
+
+      await sut.reassignFaces(auth, person.id, {
+        data: [{ personId: person.id, assetId: face.assetId }],
+      });
+
+      expect(mocks.personFaceSuggestion.resolveAssignedFace).toHaveBeenCalledWith(face.id);
+    });
+  });
+
   describe('reassignFacesById', () => {
     it('should trigger new feature photo for person with null faceAssetId', async () => {
       const face = AssetFaceFactory.create();
@@ -5000,6 +5020,20 @@ describe(PersonService.name, () => {
       await sut.reassignFacesById(AuthFactory.create(), newPerson.id, { id: face.id });
 
       expect(mocks.person.getRandomFace).toHaveBeenCalledWith(face.person!.id);
+    });
+
+    it('resolves pending suggestions for the face when it is reassigned by id (edge 11, manual branch)', async () => {
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
+      mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
+      mocks.person.reassignFace.mockResolvedValue(1);
+      mocks.person.getById.mockResolvedValue(person);
+
+      await sut.reassignFacesById(AuthFactory.create(), person.id, { id: face.id });
+
+      expect(mocks.personFaceSuggestion.resolveAssignedFace).toHaveBeenCalledWith(face.id);
     });
   });
 

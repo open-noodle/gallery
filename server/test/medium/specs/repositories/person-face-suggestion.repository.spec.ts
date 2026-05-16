@@ -418,4 +418,131 @@ describe('PersonFaceSuggestionRepository', () => {
       expect(await countRows(faceXId, 'confirmed')).toBe(1);
     });
   });
+
+  describe("edge 12 — confirming for one person resolves the other person's pending row", () => {
+    let p1Id: string;
+    let p2Id: string;
+    let assetFaceId: string;
+
+    beforeAll(async () => {
+      const { ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { person: person1 } = await ctx.newPerson({ ownerId: user.id, name: 'Edge12 Person1', isHidden: false });
+      const { person: person2 } = await ctx.newPerson({ ownerId: user.id, name: 'Edge12 Person2', isHidden: false });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      p1Id = person1.id;
+      p2Id = person2.id;
+      assetFaceId = assetFace.id;
+    });
+
+    beforeEach(async () => {
+      await defaultDatabase
+        .deleteFrom('person_face_suggestion')
+        .where('assetFaceId', '=', assetFaceId)
+        .execute();
+    });
+
+    afterEach(async () => {
+      await defaultDatabase
+        .deleteFrom('person_face_suggestion')
+        .where('assetFaceId', '=', assetFaceId)
+        .execute();
+    });
+
+    it('keeps the confirmed row and deletes the sibling person\'s pending row for the same face', async () => {
+      const { sut } = setup();
+      // Seed pending rows for BOTH persons pointing at the same assetFaceId
+      await sut.upsertPending([
+        { personId: p1Id, assetFaceId, distance: 0.6 },
+        { personId: p2Id, assetFaceId, distance: 0.65 },
+      ]);
+
+      // Confirm flow order: markConfirmed BEFORE resolveAssignedFace
+      expect(await sut.markConfirmed(p1Id, assetFaceId)).toBe(1);
+      await sut.resolveAssignedFace(assetFaceId); // pending-only delete across ALL persons
+
+      expect((await getRow(p1Id, assetFaceId)).status).toBe('confirmed'); // survives (non-pending)
+      const p2Rows = await defaultDatabase
+        .selectFrom('person_face_suggestion')
+        .selectAll()
+        .where('personId', '=', p2Id)
+        .where('assetFaceId', '=', assetFaceId)
+        .execute();
+      expect(p2Rows).toEqual([]); // sibling pending row deleted
+    });
+  });
+
+  describe('edge 8 — merge cannot strand a cross-person pending row', () => {
+    let p1Id: string;
+    let assetFaceId: string;
+
+    beforeAll(async () => {
+      const { ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { person: person1 } = await ctx.newPerson({ ownerId: user.id, name: 'Edge8 Person1', isHidden: false });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      p1Id = person1.id;
+      assetFaceId = assetFace.id;
+    });
+
+    afterEach(async () => {
+      // Restore face to unassigned after each test
+      await defaultDatabase
+        .updateTable('asset_face')
+        .set({ personId: null })
+        .where('id', '=', assetFaceId)
+        .execute();
+      await defaultDatabase
+        .deleteFrom('person_face_suggestion')
+        .where('assetFaceId', '=', assetFaceId)
+        .execute();
+    });
+
+    it('half 1: assigning the face makes getPendingForPerson exclude it (pending row references unassigned face only)', async () => {
+      const { sut } = setup();
+      await sut.upsertPending([{ personId: p1Id, assetFaceId, distance: 0.6 }]);
+      // Simulate: face assigned to someone (like what a merge does to its faces)
+      await defaultDatabase
+        .updateTable('asset_face')
+        .set({ personId: p1Id })
+        .where('id', '=', assetFaceId)
+        .execute();
+
+      const res = await sut.getPendingForPerson(p1Id, {
+        maxDistance: 0.5,
+        suggestionMaxDistance: 0.8,
+        page: 1,
+        size: 10,
+      });
+      expect(res.items.find((i) => i.assetFaceId === assetFaceId)).toBeUndefined();
+    });
+
+    it('half 2: removing the candidate person (what removeAllPeople does in a merge) drops its rows via FK CASCADE', async () => {
+      const { ctx } = setup();
+      // Create a fresh person specifically for this test so we can delete it
+      const { user } = await ctx.newUser();
+      const { person: tempPerson } = await ctx.newPerson({
+        ownerId: user.id,
+        name: 'Edge8 Temp Person',
+        isHidden: false,
+      });
+      const tempPersonId = tempPerson.id;
+
+      const { sut } = setup();
+      await sut.upsertPending([{ personId: tempPersonId, assetFaceId, distance: 0.6 }]);
+      expect(await getRow(tempPersonId, assetFaceId)).toBeTruthy();
+
+      // mergePerson → removeAllPeople([mergedAwayPerson]) deletes the person row
+      await defaultDatabase.deleteFrom('person').where('id', '=', tempPersonId).execute();
+
+      const remaining = await defaultDatabase
+        .selectFrom('person_face_suggestion')
+        .selectAll()
+        .where('personId', '=', tempPersonId)
+        .execute();
+      expect(remaining).toEqual([]); // Phase-1 FK ON DELETE CASCADE
+    });
+  });
 });
