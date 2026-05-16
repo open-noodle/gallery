@@ -75,9 +75,7 @@ export class PersonFaceSuggestionRepository {
       .where('af.personId', 'is', null)
       .where('af.deletedAt', 'is', null);
 
-    const totalRow = await base
-      .select((eb) => eb.fn.countAll<string>().as('total'))
-      .executeTakeFirstOrThrow();
+    const totalRow = await base.select((eb) => eb.fn.countAll<string>().as('total')).executeTakeFirstOrThrow();
 
     const items = await base
       .select(['pfs.assetFaceId as assetFaceId', 'pfs.distance as distance'])

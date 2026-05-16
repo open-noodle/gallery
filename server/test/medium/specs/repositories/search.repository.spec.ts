@@ -479,7 +479,10 @@ describe(SearchRepository.name, () => {
       unassignedFaceId = unassignedFace.id;
 
       faceEmbedding = newEmbedding();
-      await ctx.database.insertInto('face_search').values({ faceId: assignedFaceId, embedding: faceEmbedding }).execute();
+      await ctx.database
+        .insertInto('face_search')
+        .values({ faceId: assignedFaceId, embedding: faceEmbedding })
+        .execute();
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: unassignedFaceId, embedding: faceEmbedding })

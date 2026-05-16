@@ -519,7 +519,10 @@ describe(PersonRepository.name, () => {
         personId: personA.id,
         isVisible: false,
       });
-      await ctx.database.insertInto('face_search').values({ faceId: hiddenFaceId, embedding: newEmbedding() }).execute();
+      await ctx.database
+        .insertInto('face_search')
+        .values({ faceId: hiddenFaceId, embedding: newEmbedding() })
+        .execute();
 
       // 1 soft-deleted face with embedding (should be excluded)
       const { result: deletedFaceId } = await ctx.newAssetFace({
@@ -527,7 +530,10 @@ describe(PersonRepository.name, () => {
         personId: personA.id,
         deletedAt: new Date(),
       });
-      await ctx.database.insertInto('face_search').values({ faceId: deletedFaceId, embedding: newEmbedding() }).execute();
+      await ctx.database
+        .insertInto('face_search')
+        .values({ faceId: deletedFaceId, embedding: newEmbedding() })
+        .execute();
 
       // Person B: zero faces
       const { person: personB } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });

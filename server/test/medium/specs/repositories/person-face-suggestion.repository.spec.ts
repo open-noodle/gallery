@@ -226,11 +226,7 @@ describe('PersonFaceSuggestionRepository', () => {
       const { assetFace: f6 } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
       f6Id = f6.id;
       await sut.upsertPending([{ personId: personPId, assetFaceId: f6Id, distance: 0.65 }]);
-      await defaultDatabase
-        .updateTable('asset_face')
-        .set({ personId: personPId })
-        .where('id', '=', f6Id)
-        .execute();
+      await defaultDatabase.updateTable('asset_face').set({ personId: personPId }).where('id', '=', f6Id).execute();
 
       // Read-gate persons each get one in-band pending suggestion
       await sut.upsertPending([{ personId: unnamedPersonId, assetFaceId: fU.id, distance: 0.65 }]);
