@@ -187,6 +187,47 @@ export class RepresentativeFaceUpdateDto extends createZodDto(RepresentativeFace
 export class PersonFaceResponseDto extends createZodDto(PersonFaceResponseSchema) {}
 export class PersonFacePageResponseDto extends createZodDto(PersonFacePageResponseSchema) {}
 
+export const PersonFaceSuggestionPageQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1).describe('Page number'),
+    size: z.coerce.number().int().min(1).max(100).default(50).describe('Number of suggestions per page'),
+  })
+  .meta({ id: 'PersonFaceSuggestionPageQueryDto' });
+
+export const PersonFaceSuggestionParamsSchema = z
+  .object({
+    id: z.uuidv4().describe('Person ID'),
+    assetFaceId: z.uuidv4().describe('Unassigned asset face ID being reviewed'),
+  })
+  .meta({ id: 'PersonFaceSuggestionParamsDto' });
+
+export const PersonFaceSuggestionResponseSchema = z
+  .object({
+    assetFaceId: z.uuidv4().describe('Unassigned asset face ID'),
+    assetId: z.uuidv4().describe('Asset ID containing the candidate face'),
+    distance: z.number().meta({ format: 'double' }).describe('Embedding distance to the person'),
+    imageWidth: z.int().min(0).describe('Image width in pixels'),
+    imageHeight: z.int().min(0).describe('Image height in pixels'),
+    boundingBoxX1: z.int().describe('Bounding box X1 coordinate'),
+    boundingBoxX2: z.int().describe('Bounding box X2 coordinate'),
+    boundingBoxY1: z.int().describe('Bounding box Y1 coordinate'),
+    boundingBoxY2: z.int().describe('Bounding box Y2 coordinate'),
+    fileCreatedAt: z.string().meta({ format: 'date-time' }).optional().describe('Asset creation date'),
+  })
+  .meta({ id: 'PersonFaceSuggestionResponseDto' });
+
+export const PersonFaceSuggestionPageResponseSchema = z
+  .object({
+    total: z.int().min(0).describe('Total in-band pending suggestions for this person'),
+    items: z.array(PersonFaceSuggestionResponseSchema),
+  })
+  .meta({ id: 'PersonFaceSuggestionPageResponseDto' });
+
+export class PersonFaceSuggestionPageQueryDto extends createZodDto(PersonFaceSuggestionPageQuerySchema) {}
+export class PersonFaceSuggestionParamsDto extends createZodDto(PersonFaceSuggestionParamsSchema) {}
+export class PersonFaceSuggestionResponseDto extends createZodDto(PersonFaceSuggestionResponseSchema) {}
+export class PersonFaceSuggestionPageResponseDto extends createZodDto(PersonFaceSuggestionPageResponseSchema) {}
+
 export const PersonWithFacesResponseSchema = PersonResponseSchema.extend({
   faces: z.array(AssetFaceWithoutPersonResponseSchema),
   spacePersonId: z.string().optional().describe('Space person ID (when viewed through a space)'),
