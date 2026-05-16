@@ -3464,7 +3464,13 @@ describe(PersonService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue({
         machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0.8, minFaces: 3 } },
       });
-      mocks.person.getById.mockResolvedValue({ id: 'p', ownerId: 'u', name: 'A', isHidden: false, type: 'person' } as any);
+      mocks.person.getById.mockResolvedValue({
+        id: 'p',
+        ownerId: 'u',
+        name: 'A',
+        isHidden: false,
+        type: 'person',
+      } as any);
       mocks.person.getAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e' }] as any);
       mocks.search.searchFaces.mockResolvedValue([{ id: 'f-dismissed', personId: null, distance: 0.7 }] as any);
 
@@ -4459,9 +4465,7 @@ describe(PersonService.name, () => {
 
       // The recognition path must never enqueue suggestion jobs — suggestions are generated
       // only by the dedicated PersonSuggestionScan job chain, not inline in recognition.
-      expect(mocks.job.queue).not.toHaveBeenCalledWith(
-        expect.objectContaining({ name: JobName.PersonSuggestionScan }),
-      );
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.PersonSuggestionScan }));
       expect(mocks.job.queue).not.toHaveBeenCalledWith(
         expect.objectContaining({ name: JobName.PersonSuggestionScanQueueAll }),
       );

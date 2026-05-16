@@ -643,9 +643,7 @@ export class PersonService extends BaseService {
   }
 
   @OnJob({ name: JobName.PersonSuggestionScanQueueAll, queue: QueueName.PeopleBackfill })
-  async handlePersonSuggestionScanQueueAll(
-    _data: JobOf<JobName.PersonSuggestionScanQueueAll>,
-  ): Promise<JobStatus> {
+  async handlePersonSuggestionScanQueueAll(_data: JobOf<JobName.PersonSuggestionScanQueueAll>): Promise<JobStatus> {
     const { machineLearning } = await this.getConfig({ withCache: false });
     const { maxDistance, suggestionMaxDistance } = machineLearning.facialRecognition;
     if (suggestionMaxDistance <= maxDistance) {
