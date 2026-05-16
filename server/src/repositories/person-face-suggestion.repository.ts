@@ -28,6 +28,15 @@ export class PersonFaceSuggestionRepository {
       .execute();
   }
 
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async resolveAssignedFace(assetFaceId: string): Promise<void> {
+    await this.db
+      .deleteFrom('person_face_suggestion')
+      .where('assetFaceId', '=', assetFaceId)
+      .where('status', '=', 'pending')
+      .execute();
+  }
+
   @GenerateSql({
     params: [DummyValue.UUID, { maxDistance: 0.5, suggestionMaxDistance: 0.8, page: 1, size: 10 }],
   })

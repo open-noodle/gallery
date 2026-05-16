@@ -2,6 +2,7 @@ import { Kysely } from 'kysely';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { PersonFaceSuggestionRepository } from 'src/repositories/person-face-suggestion.repository';
 import { DB } from 'src/schema';
+import { PersonFaceSuggestionStatus } from 'src/schema/tables/person-face-suggestion.table';
 import { BaseService } from 'src/services/base.service';
 import { newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
@@ -250,6 +251,63 @@ describe('PersonFaceSuggestionRepository', () => {
       const { sut } = setup();
       const res = await sut.getPendingForPerson(personPId, { ...opts, suggestionMaxDistance: 0.5 });
       expect(res).toEqual({ total: 0, items: [] });
+    });
+  });
+
+  describe('resolveAssignedFace', () => {
+    let faceXId: string;
+    let p1Id: string;
+    let p2Id: string;
+    let p3Id: string;
+
+    const countRows = (assetFaceId: string, status: PersonFaceSuggestionStatus) =>
+      defaultDatabase
+        .selectFrom('person_face_suggestion')
+        .select((eb) => eb.fn.countAll<string>().as('c'))
+        .where('assetFaceId', '=', assetFaceId)
+        .where('status', '=', status)
+        .executeTakeFirstOrThrow()
+        .then((r) => Number(r.c));
+
+    beforeAll(async () => {
+      const { ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      faceXId = assetFace.id;
+
+      const { person: p1 } = await ctx.newPerson({ ownerId: user.id, name: 'Person One', isHidden: false });
+      const { person: p2 } = await ctx.newPerson({ ownerId: user.id, name: 'Person Two', isHidden: false });
+      const { person: p3 } = await ctx.newPerson({ ownerId: user.id, name: 'Person Three', isHidden: false });
+      p1Id = p1.id;
+      p2Id = p2.id;
+      p3Id = p3.id;
+
+      const { sut } = setup();
+
+      // faceX pending for P1 (distance 0.6) and P2 (distance 0.65)
+      await sut.upsertPending([{ personId: p1Id, assetFaceId: faceXId, distance: 0.6 }]);
+      await sut.upsertPending([{ personId: p2Id, assetFaceId: faceXId, distance: 0.65 }]);
+
+      // faceX dismissed for P3 — insert pending then set dismissed via raw updateTable
+      await sut.upsertPending([{ personId: p3Id, assetFaceId: faceXId, distance: 0.7 }]);
+      await defaultDatabase
+        .updateTable('person_face_suggestion')
+        .set({ status: 'dismissed' })
+        .where('personId', '=', p3Id)
+        .where('assetFaceId', '=', faceXId)
+        .execute();
+
+      // Now resolve: deletes pending rows for faceX, leaves dismissed alone
+      await sut.resolveAssignedFace(faceXId);
+    });
+
+    it('deletes all pending rows for that face across all persons', async () => {
+      expect(await countRows(faceXId, 'pending')).toBe(0);
+    });
+
+    it('preserves dismissed and confirmed rows for that face', async () => {
+      expect(await countRows(faceXId, 'dismissed')).toBe(1);
     });
   });
 });
