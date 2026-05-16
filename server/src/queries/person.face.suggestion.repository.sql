@@ -5,7 +5,7 @@ insert into
   "person_face_suggestion" ("personId", "assetFaceId", "distance")
 values
   ($1, $2, $3)
-on conflict ("personId", "assetFaceId") do update
+on conflict ("personId", "assetFaceId") where "personId" is not null do update
 set
   "distance" = "excluded"."distance",
   "updatedAt" = now()

@@ -19,6 +19,7 @@ export class PersonFaceSuggestionRepository {
       .onConflict((oc) =>
         oc
           .columns(['personId', 'assetFaceId'])
+          .where('personId', 'is not', null)
           .doUpdateSet({
             distance: (eb) => eb.ref('excluded.distance'),
             updatedAt: sql`now()`,
