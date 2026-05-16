@@ -3190,6 +3190,133 @@ describe(PersonService.name, () => {
     });
   });
 
+  describe('handlePersonSuggestionScan', () => {
+    const enabled = {
+      machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0.8, minFaces: 3 } },
+    };
+
+    it('runs on the people backfill queue, not facial recognition', () => {
+      const config = new Reflector().get(MetadataKey.JobConfig, sut.handlePersonSuggestionScan);
+      expect(config).toEqual(expect.objectContaining({ queue: 'peopleBackfill' }));
+    });
+
+    it('skips when the feature is disabled (suggestionMaxDistance <= maxDistance)', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0.5, minFaces: 3 } },
+      });
+
+      await expect(sut.handlePersonSuggestionScan({ id: 'person-1' })).resolves.toBe(JobStatus.Skipped);
+      expect(mocks.person.getById).not.toHaveBeenCalled();
+      expect(mocks.personFaceSuggestion.upsertPending).not.toHaveBeenCalled();
+    });
+
+    it('skips an unnamed / hidden / pet / missing person (edge 5, 7, 16)', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(enabled);
+
+      mocks.person.getById.mockResolvedValueOnce(undefined);
+      await expect(sut.handlePersonSuggestionScan({ id: 'gone' })).resolves.toBe(JobStatus.Skipped);
+
+      mocks.person.getById.mockResolvedValueOnce({
+        id: 'p',
+        ownerId: 'u',
+        name: '',
+        isHidden: false,
+        type: 'person',
+      } as any);
+      await expect(sut.handlePersonSuggestionScan({ id: 'p' })).resolves.toBe(JobStatus.Skipped);
+
+      mocks.person.getById.mockResolvedValueOnce({
+        id: 'p',
+        ownerId: 'u',
+        name: 'A',
+        isHidden: true,
+        type: 'person',
+      } as any);
+      await expect(sut.handlePersonSuggestionScan({ id: 'p' })).resolves.toBe(JobStatus.Skipped);
+
+      mocks.person.getById.mockResolvedValueOnce({
+        id: 'p',
+        ownerId: 'u',
+        name: 'Rex',
+        isHidden: false,
+        type: 'pet',
+      } as any);
+      await expect(sut.handlePersonSuggestionScan({ id: 'p' })).resolves.toBe(JobStatus.Skipped);
+
+      expect(mocks.personFaceSuggestion.upsertPending).not.toHaveBeenCalled();
+    });
+
+    it('no-ops when the person has zero assigned-face embeddings (edge 15)', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(enabled);
+      mocks.person.getById.mockResolvedValue({
+        id: 'p',
+        ownerId: 'u',
+        name: 'A',
+        isHidden: false,
+        type: 'person',
+      } as any);
+      mocks.person.getAssignedFaceEmbeddings.mockResolvedValue([]);
+
+      await expect(sut.handlePersonSuggestionScan({ id: 'p' })).resolves.toBe(JobStatus.Skipped);
+      expect(mocks.search.searchFaces).not.toHaveBeenCalled();
+      expect(mocks.personFaceSuggestion.upsertPending).not.toHaveBeenCalled();
+    });
+
+    it('keeps only the open band (maxDistance, suggestionMaxDistance], min distance per face, then upserts', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(enabled);
+      mocks.person.getById.mockResolvedValue({
+        id: 'p',
+        ownerId: 'u',
+        name: 'A',
+        isHidden: false,
+        type: 'person',
+      } as any);
+      mocks.person.getAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e1' }, { embedding: 'e2' }] as any);
+      mocks.search.searchFaces
+        .mockResolvedValueOnce([
+          { id: 'f-low', personId: null, distance: 0.45 }, // <= maxDistance → excluded (auto-assign band)
+          { id: 'f-band', personId: null, distance: 0.7 }, // in band
+          { id: 'f-edge', personId: null, distance: 0.8 }, // == suggestionMaxDistance → kept (closed upper)
+        ] as any)
+        .mockResolvedValueOnce([
+          { id: 'f-band', personId: null, distance: 0.6 }, // same face, smaller distance → min wins
+        ] as any);
+
+      await expect(sut.handlePersonSuggestionScan({ id: 'p' })).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.search.searchFaces).toHaveBeenCalledTimes(2);
+      expect(mocks.search.searchFaces).toHaveBeenCalledWith(
+        expect.objectContaining({ userIds: ['u'], hasPerson: false, maxDistance: 0.8 }),
+      );
+      const rows = mocks.personFaceSuggestion.upsertPending.mock.calls[0][0];
+      expect(rows).toEqual(
+        expect.arrayContaining([
+          { personId: 'p', assetFaceId: 'f-band', distance: 0.6 },
+          { personId: 'p', assetFaceId: 'f-edge', distance: 0.8 },
+        ]),
+      );
+      expect(rows).toHaveLength(2); // f-low excluded
+    });
+
+    it('caps embedding sample and candidate count (edge 14 — bounded work)', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(enabled);
+      mocks.person.getById.mockResolvedValue({
+        id: 'p',
+        ownerId: 'u',
+        name: 'A',
+        isHidden: false,
+        type: 'person',
+      } as any);
+      mocks.person.getAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e' }] as any);
+      mocks.search.searchFaces.mockResolvedValue([]);
+
+      await sut.handlePersonSuggestionScan({ id: 'p' });
+
+      expect(mocks.person.getAssignedFaceEmbeddings).toHaveBeenCalledWith('p', 20);
+      expect(mocks.search.searchFaces).toHaveBeenCalledWith(expect.objectContaining({ numResults: 100 }));
+    });
+  });
+
   describe('handleRecognizeFaces', () => {
     beforeEach(() => {
       mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([]);

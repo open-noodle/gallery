@@ -66,6 +66,8 @@ import { isFacialRecognitionEnabled } from 'src/utils/misc';
 import { Point, transformPoints } from 'src/utils/transform';
 
 const FACE_IDENTITY_BACKFILL_CHUNK_SIZE = 1000;
+const PERSON_SUGGESTION_EMBEDDING_SAMPLE = 20;
+const PERSON_SUGGESTION_NUM_RESULTS = 100;
 
 @Injectable()
 export class PersonService extends BaseService {
@@ -580,6 +582,49 @@ export class PersonService extends BaseService {
 
   private getNextFaceIdentityBackfillContinuationId(currentContinuationId?: string): string {
     return currentContinuationId === 'a' ? 'b' : 'a';
+  }
+
+  @OnJob({ name: JobName.PersonSuggestionScan, queue: QueueName.PeopleBackfill })
+  async handlePersonSuggestionScan({ id }: JobOf<JobName.PersonSuggestionScan>): Promise<JobStatus> {
+    const { machineLearning } = await this.getConfig({ withCache: true });
+    const { maxDistance, suggestionMaxDistance } = machineLearning.facialRecognition;
+    if (suggestionMaxDistance <= maxDistance) {
+      return JobStatus.Skipped;
+    }
+
+    const person = await this.personRepository.getById(id);
+    if (!person || person.name === '' || person.isHidden || person.type !== 'person') {
+      return JobStatus.Skipped;
+    }
+
+    const embeddings = await this.personRepository.getAssignedFaceEmbeddings(id, PERSON_SUGGESTION_EMBEDDING_SAMPLE);
+    if (embeddings.length === 0) {
+      return JobStatus.Skipped;
+    }
+
+    const bestByFace = new Map<string, number>();
+    for (const { embedding } of embeddings) {
+      const matches = await this.searchRepository.searchFaces({
+        userIds: [person.ownerId],
+        embedding,
+        hasPerson: false,
+        maxDistance: suggestionMaxDistance,
+        numResults: PERSON_SUGGESTION_NUM_RESULTS,
+      });
+      for (const match of matches) {
+        if (match.distance <= maxDistance) {
+          continue;
+        }
+        const prev = bestByFace.get(match.id);
+        if (prev === undefined || match.distance < prev) {
+          bestByFace.set(match.id, match.distance);
+        }
+      }
+    }
+
+    const rows = [...bestByFace].map(([assetFaceId, distance]) => ({ personId: id, assetFaceId, distance }));
+    await this.personFaceSuggestionRepository.upsertPending(rows);
+    return JobStatus.Success;
   }
 
   private getAffectedSpaceAssets(result: object): SharedSpaceFaceMatchBackfillTarget[] {
