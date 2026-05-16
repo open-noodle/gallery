@@ -50,4 +50,13 @@ describe('person_face_suggestion migration', () => {
     `.execute(db);
     expect(Number(r.rows[0].count)).toBe(1);
   });
+
+  it('created the updatedAt trigger in the database', async () => {
+    const r = await sql<{ count: string }>`
+      SELECT COUNT(*) AS count FROM pg_trigger
+      WHERE tgname = 'person_face_suggestion_updatedAt'
+        AND tgrelid = 'person_face_suggestion'::regclass
+    `.execute(db);
+    expect(Number(r.rows[0].count)).toBe(1);
+  });
 });

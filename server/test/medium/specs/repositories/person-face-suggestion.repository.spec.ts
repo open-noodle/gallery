@@ -135,8 +135,10 @@ describe('PersonFaceSuggestionRepository', () => {
     // F3 at 0.60  — in band, pending: included
     // F4 at 0.70  — in band, pending: included
     // F5 at 0.90  — above suggestionMaxDistance: excluded by band
+    // F6 at 0.65  — in band, pending, but face becomes assigned: excluded by af.personId IS NULL
     let f3Id: string;
     let f4Id: string;
+    let f6Id: string;
 
     const opts = { maxDistance: 0.5, suggestionMaxDistance: 0.8, page: 1, size: 10 };
 
@@ -216,6 +218,16 @@ describe('PersonFaceSuggestionRepository', () => {
       // F5: distance 0.90 — above suggestionMaxDistance (excluded by band upper bound)
       await sut.upsertPending([{ personId: personPId, assetFaceId: f5.id, distance: 0.9 }]);
 
+      // F6: in band (0.65) but face becomes assigned mid-review — excluded by af.personId IS NULL
+      const { assetFace: f6 } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      f6Id = f6.id;
+      await sut.upsertPending([{ personId: personPId, assetFaceId: f6Id, distance: 0.65 }]);
+      await defaultDatabase
+        .updateTable('asset_face')
+        .set({ personId: personPId })
+        .where('id', '=', f6Id)
+        .execute();
+
       // Read-gate persons each get one in-band pending suggestion
       await sut.upsertPending([{ personId: unnamedPersonId, assetFaceId: fU.id, distance: 0.65 }]);
       await sut.upsertPending([{ personId: hiddenPersonId, assetFaceId: fH.id, distance: 0.65 }]);
@@ -251,6 +263,15 @@ describe('PersonFaceSuggestionRepository', () => {
       const { sut } = setup();
       const res = await sut.getPendingForPerson(personPId, { ...opts, suggestionMaxDistance: 0.5 });
       expect(res).toEqual({ total: 0, items: [] });
+    });
+
+    it('excludes a pending suggestion whose face was assigned between scan and read (af.personId IS NULL guard)', async () => {
+      const { sut } = setup();
+      const res = await sut.getPendingForPerson(personPId, opts);
+      // F6 (0.65) has a pending suggestion but asset_face.personId was set — must be excluded.
+      // F3 (0.60) and F4 (0.70) are still unassigned: total stays 2.
+      expect(res.total).toBe(2);
+      expect(res.items.map((i) => i.assetFaceId)).not.toContain(f6Id);
     });
   });
 
@@ -296,7 +317,17 @@ describe('PersonFaceSuggestionRepository', () => {
         .where('assetFaceId', '=', faceXId)
         .execute();
 
-      // Now resolve: deletes pending rows for faceX, leaves dismissed alone
+      // faceX confirmed for P4 — insert pending then set confirmed via raw updateTable
+      const { person: p4 } = await ctx.newPerson({ ownerId: user.id, name: 'Person Four', isHidden: false });
+      await sut.upsertPending([{ personId: p4.id, assetFaceId: faceXId, distance: 0.75 }]);
+      await defaultDatabase
+        .updateTable('person_face_suggestion')
+        .set({ status: 'confirmed' })
+        .where('personId', '=', p4.id)
+        .where('assetFaceId', '=', faceXId)
+        .execute();
+
+      // Now resolve: deletes pending rows for faceX, leaves dismissed and confirmed alone
       await sut.resolveAssignedFace(faceXId);
     });
 
@@ -304,8 +335,9 @@ describe('PersonFaceSuggestionRepository', () => {
       expect(await countRows(faceXId, 'pending')).toBe(0);
     });
 
-    it('preserves dismissed rows for that face', async () => {
+    it('preserves dismissed and confirmed rows for that face', async () => {
       expect(await countRows(faceXId, 'dismissed')).toBe(1);
+      expect(await countRows(faceXId, 'confirmed')).toBe(1);
     });
   });
 });
