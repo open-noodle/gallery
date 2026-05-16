@@ -196,14 +196,17 @@ Class | Method | HTTP request | Description
 *PartnersApi* | [**getPartners**](doc//PartnersApi.md#getpartners) | **GET** /partners | Retrieve partners
 *PartnersApi* | [**removePartner**](doc//PartnersApi.md#removepartner) | **DELETE** /partners/{id} | Remove a partner
 *PartnersApi* | [**updatePartner**](doc//PartnersApi.md#updatepartner) | **PUT** /partners/{id} | Update a partner
+*PeopleApi* | [**confirmPersonFaceSuggestion**](doc//PeopleApi.md#confirmpersonfacesuggestion) | **POST** /people/{id}/face-suggestions/{assetFaceId}/confirm | Confirm a face suggestion
 *PeopleApi* | [**createPerson**](doc//PeopleApi.md#createperson) | **POST** /people | Create a person
 *PeopleApi* | [**deletePeople**](doc//PeopleApi.md#deletepeople) | **DELETE** /people | Delete people
 *PeopleApi* | [**deletePerson**](doc//PeopleApi.md#deleteperson) | **DELETE** /people/{id} | Delete person
 *PeopleApi* | [**detachScopedPerson**](doc//PeopleApi.md#detachscopedperson) | **POST** /people/detach-profile | Detach a scoped person profile
+*PeopleApi* | [**dismissPersonFaceSuggestion**](doc//PeopleApi.md#dismisspersonfacesuggestion) | **POST** /people/{id}/face-suggestions/{assetFaceId}/dismiss | Dismiss a face suggestion
 *PeopleApi* | [**getAllPeople**](doc//PeopleApi.md#getallpeople) | **GET** /people | Get all people
 *PeopleApi* | [**getPeopleFaceStatistics**](doc//PeopleApi.md#getpeoplefacestatistics) | **GET** /people/face-statistics | Get people face statistics
 *PeopleApi* | [**getPeopleStatistics**](doc//PeopleApi.md#getpeoplestatistics) | **GET** /people/statistics | Get people statistics
 *PeopleApi* | [**getPerson**](doc//PeopleApi.md#getperson) | **GET** /people/{id} | Get a person
+*PeopleApi* | [**getPersonFaceSuggestions**](doc//PeopleApi.md#getpersonfacesuggestions) | **GET** /people/{id}/face-suggestions | Get face suggestions for a person
 *PeopleApi* | [**getPersonFaceThumbnail**](doc//PeopleApi.md#getpersonfacethumbnail) | **GET** /people/{id}/faces/{faceId}/thumbnail | Get person face thumbnail
 *PeopleApi* | [**getPersonFaces**](doc//PeopleApi.md#getpersonfaces) | **GET** /people/{id}/faces | Get person faces
 *PeopleApi* | [**getPersonStatistics**](doc//PeopleApi.md#getpersonstatistics) | **GET** /people/{id}/statistics | Get person statistics
@@ -551,6 +554,8 @@ Class | Method | HTTP request | Description
  - [PersonCreateDto](doc//PersonCreateDto.md)
  - [PersonFacePageResponseDto](doc//PersonFacePageResponseDto.md)
  - [PersonFaceResponseDto](doc//PersonFaceResponseDto.md)
+ - [PersonFaceSuggestionPageResponseDto](doc//PersonFaceSuggestionPageResponseDto.md)
+ - [PersonFaceSuggestionResponseDto](doc//PersonFaceSuggestionResponseDto.md)
  - [PersonResponseDto](doc//PersonResponseDto.md)
  - [PersonStatisticsResponseDto](doc//PersonStatisticsResponseDto.md)
  - [PersonUpdateDto](doc//PersonUpdateDto.md)

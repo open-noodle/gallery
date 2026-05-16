@@ -244,6 +244,8 @@ part 'model/permission.dart';
 part 'model/person_create_dto.dart';
 part 'model/person_face_page_response_dto.dart';
 part 'model/person_face_response_dto.dart';
+part 'model/person_face_suggestion_page_response_dto.dart';
+part 'model/person_face_suggestion_response_dto.dart';
 part 'model/person_response_dto.dart';
 part 'model/person_statistics_response_dto.dart';
 part 'model/person_update_dto.dart';

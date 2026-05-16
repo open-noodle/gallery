@@ -16,6 +16,64 @@ class PeopleApi {
 
   final ApiClient apiClient;
 
+  /// Confirm a face suggestion
+  ///
+  /// Assign the suggested face to the person. Idempotent.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetFaceId (required):
+  ///   Unassigned asset face ID being reviewed
+  ///
+  /// * [String] id (required):
+  ///   Person ID
+  Future<Response> confirmPersonFaceSuggestionWithHttpInfo(String assetFaceId, String id,) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/people/{id}/face-suggestions/{assetFaceId}/confirm'
+      .replaceAll('{assetFaceId}', assetFaceId)
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'POST',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Confirm a face suggestion
+  ///
+  /// Assign the suggested face to the person. Idempotent.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetFaceId (required):
+  ///   Unassigned asset face ID being reviewed
+  ///
+  /// * [String] id (required):
+  ///   Person ID
+  Future<void> confirmPersonFaceSuggestion(String assetFaceId, String id,) async {
+    final response = await confirmPersonFaceSuggestionWithHttpInfo(assetFaceId, id,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
   /// Create a person
   ///
   /// Create a new person that can have multiple faces assigned to them.
@@ -212,6 +270,64 @@ class PeopleApi {
   /// * [DetachScopedPersonDto] detachScopedPersonDto (required):
   Future<void> detachScopedPerson(DetachScopedPersonDto detachScopedPersonDto,) async {
     final response = await detachScopedPersonWithHttpInfo(detachScopedPersonDto,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
+  /// Dismiss a face suggestion
+  ///
+  /// Suppress this suggestion for the person forever. The face stays unassigned. Idempotent.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetFaceId (required):
+  ///   Unassigned asset face ID being reviewed
+  ///
+  /// * [String] id (required):
+  ///   Person ID
+  Future<Response> dismissPersonFaceSuggestionWithHttpInfo(String assetFaceId, String id,) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/people/{id}/face-suggestions/{assetFaceId}/dismiss'
+      .replaceAll('{assetFaceId}', assetFaceId)
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'POST',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Dismiss a face suggestion
+  ///
+  /// Suppress this suggestion for the person forever. The face stays unassigned. Idempotent.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetFaceId (required):
+  ///   Unassigned asset face ID being reviewed
+  ///
+  /// * [String] id (required):
+  ///   Person ID
+  Future<void> dismissPersonFaceSuggestion(String assetFaceId, String id,) async {
+    final response = await dismissPersonFaceSuggestionWithHttpInfo(assetFaceId, id,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -590,6 +706,82 @@ class PeopleApi {
     // FormatException when trying to decode an empty string.
     if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
       return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'PersonResponseDto',) as PersonResponseDto;
+    
+    }
+    return null;
+  }
+
+  /// Get face suggestions for a person
+  ///
+  /// Retrieve near-miss unassigned faces suggested for this person, best match first.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [int] page:
+  ///   Page number
+  ///
+  /// * [int] size:
+  ///   Number of suggestions per page
+  Future<Response> getPersonFaceSuggestionsWithHttpInfo(String id, { int? page, int? size, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/people/{id}/face-suggestions'
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    if (page != null) {
+      queryParams.addAll(_queryParams('', 'page', page));
+    }
+    if (size != null) {
+      queryParams.addAll(_queryParams('', 'size', size));
+    }
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'GET',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Get face suggestions for a person
+  ///
+  /// Retrieve near-miss unassigned faces suggested for this person, best match first.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [int] page:
+  ///   Page number
+  ///
+  /// * [int] size:
+  ///   Number of suggestions per page
+  Future<PersonFaceSuggestionPageResponseDto?> getPersonFaceSuggestions(String id, { int? page, int? size, }) async {
+    final response = await getPersonFaceSuggestionsWithHttpInfo(id,  page: page, size: size, );
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'PersonFaceSuggestionPageResponseDto',) as PersonFaceSuggestionPageResponseDto;
     
     }
     return null;

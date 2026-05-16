@@ -524,6 +524,10 @@ class ApiClient {
           return PersonFacePageResponseDto.fromJson(value);
         case 'PersonFaceResponseDto':
           return PersonFaceResponseDto.fromJson(value);
+        case 'PersonFaceSuggestionPageResponseDto':
+          return PersonFaceSuggestionPageResponseDto.fromJson(value);
+        case 'PersonFaceSuggestionResponseDto':
+          return PersonFaceSuggestionResponseDto.fromJson(value);
         case 'PersonResponseDto':
           return PersonResponseDto.fromJson(value);
         case 'PersonStatisticsResponseDto':

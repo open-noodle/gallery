@@ -18,6 +18,24 @@ where
   "assetFaceId" = $1
   and "status" = $2
 
+-- PersonFaceSuggestionRepository.markConfirmed
+update "person_face_suggestion"
+set
+  "status" = $1
+where
+  "personId" = $2
+  and "assetFaceId" = $3
+  and "status" = $4
+
+-- PersonFaceSuggestionRepository.markDismissed
+update "person_face_suggestion"
+set
+  "status" = $1
+where
+  "personId" = $2
+  and "assetFaceId" = $3
+  and "status" = $4
+
 -- PersonFaceSuggestionRepository.getPendingForPerson
 select
   "person"."id"

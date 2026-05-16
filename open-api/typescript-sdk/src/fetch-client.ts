@@ -1593,6 +1593,33 @@ export type PersonUpdateDto = {
     /** Person name */
     name?: string;
 };
+export type PersonFaceSuggestionResponseDto = {
+    /** Unassigned asset face ID */
+    assetFaceId: string;
+    /** Asset ID containing the candidate face */
+    assetId: string;
+    /** Bounding box X1 coordinate */
+    boundingBoxX1: number;
+    /** Bounding box X2 coordinate */
+    boundingBoxX2: number;
+    /** Bounding box Y1 coordinate */
+    boundingBoxY1: number;
+    /** Bounding box Y2 coordinate */
+    boundingBoxY2: number;
+    /** Embedding distance to the person */
+    distance: number;
+    /** Asset creation date */
+    fileCreatedAt?: string;
+    /** Image height in pixels */
+    imageHeight: number;
+    /** Image width in pixels */
+    imageWidth: number;
+};
+export type PersonFaceSuggestionPageResponseDto = {
+    items: PersonFaceSuggestionResponseDto[];
+    /** Total in-band pending suggestions for this person */
+    total: number;
+};
 export type PersonFaceResponseDto = {
     /** Asset ID containing the face */
     assetId: string;
@@ -6004,6 +6031,48 @@ export function updatePerson({ id, personUpdateDto }: {
         method: "PUT",
         body: personUpdateDto
     })));
+}
+/**
+ * Get face suggestions for a person
+ */
+export function getPersonFaceSuggestions({ id, page, size }: {
+    id: string;
+    page?: number;
+    size?: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PersonFaceSuggestionPageResponseDto;
+    }>(`/people/${encodeURIComponent(id)}/face-suggestions${QS.query(QS.explode({
+        page,
+        size
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Confirm a face suggestion
+ */
+export function confirmPersonFaceSuggestion({ assetFaceId, id }: {
+    assetFaceId: string;
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/people/${encodeURIComponent(id)}/face-suggestions/${encodeURIComponent(assetFaceId)}/confirm`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
+ * Dismiss a face suggestion
+ */
+export function dismissPersonFaceSuggestion({ assetFaceId, id }: {
+    assetFaceId: string;
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/people/${encodeURIComponent(id)}/face-suggestions/${encodeURIComponent(assetFaceId)}/dismiss`, {
+        ...opts,
+        method: "POST"
+    }));
 }
 /**
  * Get person faces
