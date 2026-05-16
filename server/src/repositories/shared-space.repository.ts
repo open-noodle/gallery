@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Insertable, Kysely, NotNull, sql, Updateable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { ChunkedArray, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators';
-import { AssetType, AssetVisibility, SharedSpaceRole, VectorIndex } from 'src/enum';
+import { AssetType, AssetVisibility, SharedSpaceRole, SourceType, VectorIndex } from 'src/enum';
 import { probes } from 'src/repositories/database.repository';
 import type { PeopleFaceStatistics } from 'src/repositories/person.repository';
 import type { AssetSearchBuilderOptions } from 'src/repositories/search.repository';
@@ -1956,6 +1956,79 @@ export class SharedSpaceRepository {
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
       .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, 20] })
+  getSpacePersonAssignedFaceEmbeddings(spacePersonId: string, limit: number) {
+    return this.db
+      .selectFrom('shared_space_person_face')
+      .innerJoin('face_search', 'face_search.faceId', 'shared_space_person_face.assetFaceId')
+      .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+      .select('face_search.embedding')
+      .where('shared_space_person_face.personId', '=', spacePersonId)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .limit(limit)
+      .execute();
+  }
+
+  getScannableSpacePeopleWithUnassignedFaces() {
+    return this.db
+      .selectFrom('shared_space_person')
+      .innerJoin('shared_space', 'shared_space.id', 'shared_space_person.spaceId')
+      .select(['shared_space_person.id', 'shared_space_person.spaceId'])
+      .where(sql`BTRIM("shared_space_person"."name")`, '<>', '')
+      .where('shared_space_person.isHidden', 'is', false)
+      .where('shared_space_person.type', '=', 'person')
+      .where('shared_space.faceRecognitionEnabled', 'is', true)
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('asset_face')
+            .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+            .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
+            .select('asset_face.id')
+            .where('asset.deletedAt', 'is', null)
+            .where('asset_face.personId', 'is', null)
+            .where('asset_face.deletedAt', 'is', null)
+            .where('asset_face.isVisible', 'is', true)
+            .where('asset_face.sourceType', '=', SourceType.MachineLearning)
+            .where((eb) =>
+              eb.not(
+                eb.exists(
+                  eb
+                    .selectFrom('shared_space_person_face')
+                    .innerJoin('shared_space_person as assigned_person', (join) =>
+                      join
+                        .onRef('assigned_person.id', '=', 'shared_space_person_face.personId')
+                        .onRef('assigned_person.spaceId', '=', 'shared_space_person.spaceId'),
+                    )
+                    .select('shared_space_person_face.assetFaceId')
+                    .whereRef('shared_space_person_face.assetFaceId', '=', 'asset_face.id'),
+                ),
+              ),
+            )
+            .where((eb) =>
+              eb.or([
+                eb.exists(
+                  eb
+                    .selectFrom('shared_space_asset')
+                    .select('shared_space_asset.assetId')
+                    .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                    .whereRef('shared_space_asset.spaceId', '=', 'shared_space_person.spaceId'),
+                ),
+                eb.exists(
+                  eb
+                    .selectFrom('shared_space_library')
+                    .select('shared_space_library.libraryId')
+                    .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                    .whereRef('shared_space_library.spaceId', '=', 'shared_space_person.spaceId'),
+                ),
+              ]),
+            ),
+        ),
+      )
+      .stream();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })

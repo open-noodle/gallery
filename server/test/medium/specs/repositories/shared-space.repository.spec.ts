@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import { AssetVisibility, SharedSpaceRole } from 'src/enum';
+import { AssetVisibility, SharedSpaceRole, SourceType } from 'src/enum';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { DB } from 'src/schema';
@@ -3181,6 +3181,212 @@ describe(SharedSpaceRepository.name, () => {
         representativeFaceId: null,
         representativeFaceSource: 'auto',
       });
+    });
+  });
+
+  describe('space face suggestion scan helpers', () => {
+    it('gets assigned face embeddings for a shared-space person', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+      const { assetFace: linkedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: unlinkedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const hiddenFace = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      await ctx.database
+        .updateTable('asset_face')
+        .set({ isVisible: false })
+        .where('id', '=', hiddenFace.assetFace.id)
+        .execute();
+      const spacePerson = await sut.createPerson({
+        spaceId: space.id,
+        name: 'Alice',
+        representativeFaceId: linkedFace.id,
+      });
+      await sut.addPersonFaces([
+        { personId: spacePerson.id, assetFaceId: linkedFace.id },
+        { personId: spacePerson.id, assetFaceId: hiddenFace.assetFace.id },
+      ]);
+      await ctx.database
+        .insertInto('face_search')
+        .values([
+          { faceId: linkedFace.id, embedding: newEmbedding() },
+          { faceId: unlinkedFace.id, embedding: newEmbedding() },
+          { faceId: hiddenFace.assetFace.id, embedding: newEmbedding() },
+        ])
+        .execute();
+
+      const rows = await sut.getSpacePersonAssignedFaceEmbeddings(spacePerson.id, 20);
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0].embedding).toEqual(expect.any(String));
+    });
+
+    it('streams only eligible named people in face-recognition-enabled spaces with direct unassigned ML faces', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+      const { space: disabledSpace } = await ctx.newSharedSpace({
+        createdById: user.id,
+        faceRecognitionEnabled: false,
+      });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: newEmbedding() }).execute();
+
+      const included = await sut.createPerson({ spaceId: space.id, name: '  Alice  ', type: 'person', isHidden: false });
+      const whitespace = await sut.createPerson({ spaceId: space.id, name: '   ', type: 'person', isHidden: false });
+      const hidden = await sut.createPerson({ spaceId: space.id, name: 'Hidden', type: 'person', isHidden: true });
+      const pet = await sut.createPerson({ spaceId: space.id, name: 'Pet', type: 'pet', isHidden: false });
+      const disabled = await sut.createPerson({
+        spaceId: disabledSpace.id,
+        name: 'Disabled',
+        type: 'person',
+        isHidden: false,
+      });
+
+      const ids: string[] = [];
+      for await (const row of sut.getScannableSpacePeopleWithUnassignedFaces()) {
+        ids.push(row.id);
+      }
+
+      expect(ids).toContain(included.id);
+      expect(ids).not.toContain(whitespace.id);
+      expect(ids).not.toContain(hidden.id);
+      expect(ids).not.toContain(pet.id);
+      expect(ids).not.toContain(disabled.id);
+    });
+
+    it('treats linked-library unassigned ML faces as scannable space scope', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+      const { library } = await ctx.newLibrary({ ownerId: user.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: newEmbedding() }).execute();
+      const linkedLibraryPerson = await sut.createPerson({
+        spaceId: space.id,
+        name: 'Library Alice',
+        type: 'person',
+        isHidden: false,
+      });
+
+      const ids: string[] = [];
+      for await (const row of sut.getScannableSpacePeopleWithUnassignedFaces()) {
+        ids.push(row.id);
+      }
+
+      expect(ids).toContain(linkedLibraryPerson.id);
+    });
+
+    it('does not scan spaces that only have assigned, manual, invisible, deleted, deleted-asset, or non-searchable faces', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+      const { asset: assignedAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: manualAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: invisibleFaceAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: deletedFaceAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: deletedAsset } = await ctx.newAsset({ ownerId: user.id, deletedAt: new Date() });
+      const { asset: personallyAssignedAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: nonSearchableAsset } = await ctx.newAsset({ ownerId: user.id });
+      for (const asset of [
+        assignedAsset,
+        manualAsset,
+        invisibleFaceAsset,
+        deletedFaceAsset,
+        deletedAsset,
+        personallyAssignedAsset,
+        nonSearchableAsset,
+      ]) {
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+      }
+
+      const assignedFace = await ctx.newAssetFace({ assetId: assignedAsset.id, personId: null });
+      await ctx.database
+        .insertInto('face_search')
+        .values({ faceId: assignedFace.assetFace.id, embedding: newEmbedding() })
+        .execute();
+      const manualFace = await ctx.newAssetFace({ assetId: manualAsset.id, personId: null, sourceType: SourceType.Exif });
+      await ctx.database
+        .insertInto('face_search')
+        .values({ faceId: manualFace.assetFace.id, embedding: newEmbedding() })
+        .execute();
+      const invisibleFace = await ctx.newAssetFace({ assetId: invisibleFaceAsset.id, personId: null });
+      await ctx.database
+        .insertInto('face_search')
+        .values({ faceId: invisibleFace.assetFace.id, embedding: newEmbedding() })
+        .execute();
+      await ctx.database
+        .updateTable('asset_face')
+        .set({ isVisible: false })
+        .where('id', '=', invisibleFace.assetFace.id)
+        .execute();
+      const deletedFace = await ctx.newAssetFace({ assetId: deletedFaceAsset.id, personId: null });
+      await ctx.database
+        .insertInto('face_search')
+        .values({ faceId: deletedFace.assetFace.id, embedding: newEmbedding() })
+        .execute();
+      await ctx.database
+        .updateTable('asset_face')
+        .set({ deletedAt: new Date() })
+        .where('id', '=', deletedFace.assetFace.id)
+        .execute();
+      const deletedAssetFace = await ctx.newAssetFace({ assetId: deletedAsset.id, personId: null });
+      await ctx.database
+        .insertInto('face_search')
+        .values({ faceId: deletedAssetFace.assetFace.id, embedding: newEmbedding() })
+        .execute();
+      const personalPerson = await ctx.newPerson({ ownerId: user.id });
+      const personallyAssignedFace = await ctx.newAssetFace({
+        assetId: personallyAssignedAsset.id,
+        personId: personalPerson.result.id,
+      });
+      await ctx.database
+        .insertInto('face_search')
+        .values({ faceId: personallyAssignedFace.assetFace.id, embedding: newEmbedding() })
+        .execute();
+      await ctx.newAssetFace({ assetId: nonSearchableAsset.id, personId: null });
+      const person = await sut.createPerson({ spaceId: space.id, name: 'No Candidates', type: 'person', isHidden: false });
+      await sut.addPersonFaces([{ personId: person.id, assetFaceId: assignedFace.assetFace.id }]);
+
+      const ids: string[] = [];
+      for await (const row of sut.getScannableSpacePeopleWithUnassignedFaces()) {
+        ids.push(row.id);
+      }
+
+      expect(ids).not.toContain(person.id);
+    });
+
+    it('treats another space assignment as unassigned in the current space', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+      const { space: otherSpace } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+      await ctx.newSharedSpaceAsset({ spaceId: otherSpace.id, assetId: asset.id, addedById: user.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: newEmbedding() }).execute();
+      const included = await sut.createPerson({ spaceId: space.id, name: 'Current', type: 'person', isHidden: false });
+      const otherPerson = await sut.createPerson({
+        spaceId: otherSpace.id,
+        name: 'Other',
+        type: 'person',
+        isHidden: false,
+      });
+      await sut.addPersonFaces([{ personId: otherPerson.id, assetFaceId: assetFace.id }]);
+
+      const ids: string[] = [];
+      for await (const row of sut.getScannableSpacePeopleWithUnassignedFaces()) {
+        ids.push(row.id);
+      }
+
+      expect(ids).toContain(included.id);
     });
   });
 

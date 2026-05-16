@@ -1413,6 +1413,20 @@ where
   and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" = $2
 
+-- SharedSpaceRepository.getSpacePersonAssignedFaceEmbeddings
+select
+  "face_search"."embedding"
+from
+  "shared_space_person_face"
+  inner join "face_search" on "face_search"."faceId" = "shared_space_person_face"."assetFaceId"
+  inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
+where
+  "shared_space_person_face"."personId" = $1
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" is true
+limit
+  $2
+
 -- SharedSpaceRepository.getAssetFacesForMatching
 select
   "asset_face"."id",
