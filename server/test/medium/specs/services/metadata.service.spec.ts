@@ -531,8 +531,8 @@ describe(MetadataService.name, () => {
       expect(backfillCtx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository).queueAll).toHaveBeenCalledWith(
         expect.arrayContaining([
           {
-            name: JobName.SharedSpaceFaceMatch,
-            data: { spaceId: space.id, assetId: asset.id, source: 'identity-backfill' },
+            name: JobName.SharedSpaceFaceMatchFromBackfill,
+            data: { spaceId: space.id, assetId: asset.id },
           },
         ]),
       );
