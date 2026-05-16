@@ -420,6 +420,7 @@ export class PersonService extends BaseService {
 
   async update(auth: AuthDto, id: string, dto: PersonUpdateDto): Promise<PersonResponseDto> {
     await this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [id] });
+    const prior = await this.personRepository.getById(id);
 
     const { name, birthDate, isHidden, featureFaceAssetId: assetId, isFavorite, color } = dto;
     // TODO: set by faceId directly
@@ -453,6 +454,14 @@ export class PersonService extends BaseService {
         name: JobName.SharedSpacePersonMetadataBackfill,
         data: { identityId: person.identityId },
       });
+    }
+
+    const { machineLearning } = await this.getConfig({ withCache: true });
+    const { maxDistance, suggestionMaxDistance } = machineLearning.facialRecognition;
+    const featureEnabled = suggestionMaxDistance > maxDistance;
+    const nowScannable = person.name !== '' && !person.isHidden && person.type === 'person';
+    if (featureEnabled && nowScannable && prior && prior.name !== person.name) {
+      await this.jobRepository.queue({ name: JobName.PersonSuggestionScan, data: { id } });
     }
 
     return mapPerson(person);

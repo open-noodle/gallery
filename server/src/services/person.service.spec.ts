@@ -916,6 +916,104 @@ describe(PersonService.name, () => {
       expect(mocks.person.update).not.toHaveBeenCalled();
       expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.id]));
     });
+
+    describe('suggestion on-name trigger', () => {
+      const enabled = {
+        machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0.8, minFaces: 3 } },
+      };
+
+      it('enqueues a scan when an unnamed cluster is named (edge 5)', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(enabled);
+        const auth = AuthFactory.create();
+        const prior = PersonFactory.create({ name: '', isHidden: false });
+        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.id]));
+        mocks.person.getById.mockResolvedValue(prior);
+        mocks.person.update.mockResolvedValue({ ...prior, name: 'Alice' });
+
+        await sut.update(auth, prior.id, { name: 'Alice' });
+
+        expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PersonSuggestionScan, data: { id: prior.id } });
+      });
+
+      it('enqueues a scan on rename of an already-named person (edge 6)', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(enabled);
+        const auth = AuthFactory.create();
+        const prior = PersonFactory.create({ name: 'Alice', isHidden: false });
+        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.id]));
+        mocks.person.getById.mockResolvedValue(prior);
+        mocks.person.update.mockResolvedValue({ ...prior, name: 'Bob' });
+
+        await sut.update(auth, prior.id, { name: 'Bob' });
+
+        expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PersonSuggestionScan, data: { id: prior.id } });
+      });
+
+      it('does NOT enqueue on a color/favorite/birthDate edit (name unchanged) (edge 7)', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(enabled);
+        const auth = AuthFactory.create();
+        const prior = PersonFactory.create({ name: 'Alice', isHidden: false });
+        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.id]));
+        mocks.person.getById.mockResolvedValue(prior);
+        mocks.person.update.mockResolvedValue({ ...prior }); // name unchanged
+
+        await sut.update(auth, prior.id, { isFavorite: true });
+
+        expect(mocks.job.queue).not.toHaveBeenCalledWith({
+          name: JobName.PersonSuggestionScan,
+          data: { id: prior.id },
+        });
+      });
+
+      it('does NOT enqueue when name is cleared (edge 7)', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(enabled);
+        const auth = AuthFactory.create();
+        const prior = PersonFactory.create({ name: 'Alice', isHidden: false });
+        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.id]));
+        mocks.person.getById.mockResolvedValue(prior);
+        mocks.person.update.mockResolvedValue({ ...prior, name: '' });
+
+        await sut.update(auth, prior.id, { name: '' });
+
+        expect(mocks.job.queue).not.toHaveBeenCalledWith({
+          name: JobName.PersonSuggestionScan,
+          data: { id: prior.id },
+        });
+      });
+
+      it('does NOT enqueue when a person becomes hidden (edge 7)', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(enabled);
+        const auth = AuthFactory.create();
+        const prior = PersonFactory.create({ name: 'Alice', isHidden: false });
+        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.id]));
+        mocks.person.getById.mockResolvedValue(prior);
+        mocks.person.update.mockResolvedValue({ ...prior, isHidden: true }); // name unchanged
+
+        await sut.update(auth, prior.id, { isHidden: true });
+
+        expect(mocks.job.queue).not.toHaveBeenCalledWith({
+          name: JobName.PersonSuggestionScan,
+          data: { id: prior.id },
+        });
+      });
+
+      it('does NOT enqueue when the feature is disabled', async () => {
+        mocks.systemMetadata.get.mockResolvedValue({
+          machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0, minFaces: 3 } },
+        });
+        const auth = AuthFactory.create();
+        const prior = PersonFactory.create({ name: '', isHidden: false });
+        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.id]));
+        mocks.person.getById.mockResolvedValue(prior);
+        mocks.person.update.mockResolvedValue({ ...prior, name: 'Alice' });
+
+        await sut.update(auth, prior.id, { name: 'Alice' });
+
+        expect(mocks.job.queue).not.toHaveBeenCalledWith({
+          name: JobName.PersonSuggestionScan,
+          data: { id: prior.id },
+        });
+      });
+    });
   });
 
   describe('updateAll', () => {
