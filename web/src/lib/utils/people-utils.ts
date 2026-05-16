@@ -79,6 +79,41 @@ export const getBoundingBox = (faces: Faces[], imageSize: Size): BoundingBox[] =
   return boxes;
 };
 
+export type FaceBox = {
+  imageWidth: number;
+  imageHeight: number;
+  boundingBoxX1: number;
+  boundingBoxX2: number;
+  boundingBoxY1: number;
+  boundingBoxY2: number;
+};
+
+export type FaceCropTransform = { backgroundSize: string; backgroundPosition: string };
+
+/**
+ * CSS background size/position that reveals exactly the face sub-rectangle of an image
+ * inside a square container. Non-uniform scale is intentional for compact preview crops;
+ * the review modal shows the undistorted full photo separately.
+ */
+export const getFaceCropTransform = (face: FaceBox): FaceCropTransform => {
+  const bw = (face.boundingBoxX2 - face.boundingBoxX1) / face.imageWidth;
+  const bh = (face.boundingBoxY2 - face.boundingBoxY1) / face.imageHeight;
+
+  if (!(bw > 0) || !(bh > 0) || bw >= 1 || bh >= 1) {
+    return { backgroundSize: 'cover', backgroundPosition: 'center' };
+  }
+
+  const nx1 = face.boundingBoxX1 / face.imageWidth;
+  const ny1 = face.boundingBoxY1 / face.imageHeight;
+  const posX = (nx1 / (1 - bw)) * 100;
+  const posY = (ny1 / (1 - bh)) * 100;
+
+  return {
+    backgroundSize: `${100 / bw}% ${100 / bh}%`,
+    backgroundPosition: `${posX}% ${posY}%`,
+  };
+};
+
 export const zoomImageToBase64 = async (
   face: Faces,
   assetId: string,
