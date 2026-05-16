@@ -604,8 +604,8 @@ export class PersonService extends BaseService {
     let jobs: JobItem[] = [];
     for (const { spaceId, assetId } of uniqueTargets) {
       jobs.push({
-        name: JobName.SharedSpaceFaceMatch as const,
-        data: { spaceId, assetId, source: 'identity-backfill' },
+        name: JobName.SharedSpaceFaceMatchFromBackfill as const,
+        data: { spaceId, assetId },
       });
 
       if (jobs.length >= JOBS_ASSET_PAGINATION_SIZE) {

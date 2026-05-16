@@ -1059,7 +1059,7 @@ export class MetadataService extends BaseService {
       if (spaceIds.length > 0) {
         await this.jobRepository.queueAll(
           spaceIds.map(({ spaceId }) => ({
-            name: JobName.SharedSpaceFaceMatch as const,
+            name: JobName.SharedSpaceFaceMatchFromBackfill as const,
             data: { spaceId, assetId: asset.id },
           })),
         );

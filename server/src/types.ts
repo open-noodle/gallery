@@ -525,6 +525,7 @@ export type JobItem =
   | { name: JobName.SharedSpaceFaceMatch; data: ISharedSpaceFaceMatchJob }
   | { name: JobName.SharedSpaceFaceMatchAll; data: ISharedSpaceFaceMatchAllJob }
   | { name: JobName.SharedSpaceFaceMatchPage; data: ISharedSpaceFaceMatchPageJob }
+  | { name: JobName.SharedSpaceFaceMatchFromBackfill; data: ISharedSpaceFaceMatchJob }
   | { name: JobName.SharedSpaceLibraryFaceSync; data: ISharedSpaceLibraryFaceSyncJob }
   | { name: JobName.SharedSpaceIdentityReconciliation; data: ISharedSpaceIdentityReconciliationJob }
   | { name: JobName.SharedSpacePersonDedup; data: ISharedSpacePersonDedupJob }
