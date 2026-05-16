@@ -19,7 +19,8 @@ transitions into a scannable, named state. Everything is gated on
 `suggestionMaxDistance > maxDistance` (feature off by default).
 
 **Tech Stack:** NestJS, BullMQ jobs (`@OnJob`), Kysely, Vitest unit tests (`newTestService`
-auto-mock factory) + Vitest medium tests (testcontainers Postgres), `@GenerateSql` SQL-doc sync.
+auto-mock factory) + Vitest medium tests (testcontainers Postgres). No `@GenerateSql` /
+OpenAPI changes (the one new repo method is an undecorated `.stream()` enumeration).
 
 **Design reference:** `docs/plans/2026-05-15-face-recognition-suggestions-design.md`
 (Architecture → "Why a scan job", "Triggers", "End-to-end automatic chain"; Edge cases).
@@ -41,8 +42,10 @@ commands run in `server/`.
 - Type check: `make check-server`
 
 There are **no** controller/DTO/OpenAPI changes in Phase 2, so do **not** run `make open-api`.
-There **is** one new `@GenerateSql`-decorated repository method (Task 2), so `make sql` runs
-once at the end (Task 7).
+The one new repository method (Task 2) is an **undecorated streamed enumeration** (matching the
+existing `getAll` / `getAllFaces` in the same file, which carry no `@GenerateSql`), so there is
+**no new `@GenerateSql` method and `make sql` is not needed** — consistent with "no API
+changes". Task 7 only runs `make check-server` + the full regression.
 
 ---
 
@@ -64,14 +67,21 @@ returning at most 100 candidates.
 
 ### Task 1: `JobName` enum + job payload types
 
+> **TDD note (deliberate exception):** This is the one non-test-first task. An enum member /
+> payload-type declaration has no runtime behavior to red-test in isolation — the failing
+> test that drives it is **Task 3's** `handlePersonSuggestionScan` spec, which cannot compile
+> or run until these symbols exist. Task 1 is the minimal scaffolding that makes Task 3's red
+> test _expressible_; it adds no production logic. Keep it tiny (enum + type only); all
+> behavior is TDD'd in Tasks 2–6.
+
 **Files:**
 
 - Modify: `server/src/enum.ts` (`JobName` enum, after line 728
   `FaceIdentityMaintenanceAfterRecognition`)
 - Modify: `server/src/types.ts` (job payload interface near `IFaceIdentityBackfillJob:241`;
   `JobItem` union near line 424)
-- Test: `server/test/medium/specs/<none>` — this is a type/compile task; the proof is
-  `make check-server` plus the assertions added in later tasks.
+- Test: none — type/compile task; proof is `make check-server` and the Task 3–6 specs that
+  consume these symbols.
 
 **Step 1: Add the enum members**
 
@@ -197,8 +207,13 @@ Expected: FAIL — `sut.getScannablePeopleWithUnassignedFaces is not a function`
 In `server/src/repositories/person.repository.ts`, after `getAssignedFaceEmbeddings`
 (~line 757):
 
+**No `@GenerateSql` decorator** — the sibling streamed enumerations `getAll`
+(`person.repository.ts:161`) and `getAllFaces:148` are undecorated; match them exactly.
+(`@GenerateSql` is for `.execute()`/`.executeTakeFirst()` query methods; `.stream()`
+enumerations in this file are intentionally undecorated, so `make sql` has nothing to
+regenerate.)
+
 ```ts
-  @GenerateSql({ stream: true })
   getScannablePeopleWithUnassignedFaces() {
     return this.db
       .selectFrom('person')
@@ -224,13 +239,9 @@ In `server/src/repositories/person.repository.ts`, after `getAssignedFaceEmbeddi
   }
 ```
 
-Confirm `SourceType` is already imported in this file (it is used elsewhere in the repo —
-check the import block; add `SourceType` to the `src/enum` import if missing). Match the
-existing `@GenerateSql` stream style used by other streamed methods in this file (if no other
-method uses `{ stream: true }`, use a plain `@GenerateSql()` — the goal is only that
-`make sql` can introspect it; copy whatever the nearest streamed `@GenerateSql` method uses,
-else omit the decorator and add a `// not @GenerateSql: streamed enumeration` note like other
-stream methods if they are undecorated).
+`SourceType` is **already imported** in this file
+(`person.repository.ts:7 — import { AssetFileType, AssetVisibility, SourceType } from 'src/enum'`);
+no import change needed.
 
 **Step 4: Run it — expect pass**
 
@@ -692,33 +703,40 @@ if (queuedTargets.length === 0) {
 return JobStatus.Success;
 ```
 
-Change it to also chain the suggestion fan-out at the same terminal point, feature-gated:
+Chain the suggestion fan-out at **exactly the same terminal point** that enqueues
+`SharedSpacePersonMetadataBackfill` — _inside_ the `if (queuedTargets.length === 0)` block,
+immediately after `queueSpacePersonMetadataBackfill()`, feature-gated:
 
 ```ts
 const queuedTargets = await this.queueSharedSpaceFaceMatchTargets([...pendingTargets, ...affectedSpaceAssets]);
 await this.faceIdentityRepository.deletePendingSharedSpaceFaceMatchBackfillTargets(pendingTargets);
 if (queuedTargets.length === 0) {
   await this.queueSpacePersonMetadataBackfill();
-}
 
-const { machineLearning } = await this.getConfig({ withCache: true });
-const { maxDistance, suggestionMaxDistance } = machineLearning.facialRecognition;
-if (suggestionMaxDistance > maxDistance) {
-  await this.jobRepository.queue({ name: JobName.PersonSuggestionScanQueueAll, data: {} });
+  const { machineLearning } = await this.getConfig({ withCache: true });
+  const { maxDistance, suggestionMaxDistance } = machineLearning.facialRecognition;
+  if (suggestionMaxDistance > maxDistance) {
+    await this.jobRepository.queue({ name: JobName.PersonSuggestionScanQueueAll, data: {} });
+  }
 }
 
 return JobStatus.Success;
 ```
 
-> Placement rationale: this code path is reached only after every cursor page
-> (`result.nextCursor` early-returns above), every bounded continuation
-> (`getBackfillWork` early-returns above), and projection fan-out are exhausted — i.e.
-> strictly after `FaceIdentityBackfill` is done (edge 19). It fires even when
-> `queuedTargets.length > 0` (face-match targets still queued) because the suggestion scan
-> reads post-assignment state via the DB at scan time, and `PersonSuggestionScanQueueAll`
-> sits on the `PeopleBackfill` queue behind this job; ordering on that queue preserves
-> "after backfill". Keeping it outside the `queuedTargets.length === 0` guard means a single
-> enqueue per terminal invocation regardless of the shared-space branch.
+> **Placement rationale (corrected).** `queuedTargets.length === 0` is this codebase's
+> canonical "face-identity backfill fully drained, nothing more queued" signal — it is the
+> exact gate the existing `SharedSpacePersonMetadataBackfill` uses. Reaching it requires
+> every cursor page (`result.nextCursor` early-returns above), every bounded continuation
+> (`getBackfillWork` early-returns above), and the shared-space projection fan-out to be
+> exhausted, so the enqueue is **strictly after `FaceIdentityBackfill` completes** (edge 19)
+> and fires **exactly once** per full drain. Putting it _outside_ the guard would enqueue on
+> partial-drain passes where shared-space targets are still queued — inconsistent with the
+> established terminal signal and the plan's own intro ("the same point that queues
+> `SharedSpacePersonMetadataBackfill`"). The theoretical "never fires if `queuedTargets` is
+> perpetually > 0" is the **identical, already-accepted tradeoff** of
+> `SharedSpacePersonMetadataBackfill`; in practice `deletePendingSharedSpaceFaceMatchBackfillTargets`
+> drains pending targets so a later cycle reaches `=== 0`. This keeps Phase 2 consistent
+> with the existing terminal, not novel.
 
 **Step 4: Run it — expect pass + full describe regression**
 
@@ -770,7 +788,11 @@ Walk-through:
 
 **Step 1: Write the failing unit tests**
 
-Add inside `describe('update')`:
+Add inside `describe('update')`. **Fixture API is pinned to the real conventions in this
+spec** (`person.service.spec.ts:687-736`): `AuthFactory.create()` (imported spec:24),
+`PersonFactory.create({...})` (imported spec:25), `mocks.access.person.checkOwnerAccess`,
+`mocks.person.update`, `mocks.person.getById` (used spec:692). Build the prior/updated pair
+from one factory person via spread so `id`/`ownerId` stay consistent:
 
 ```ts
 describe('suggestion on-name trigger', () => {
@@ -780,134 +802,102 @@ describe('suggestion on-name trigger', () => {
 
   it('enqueues a scan when an unnamed cluster is named (edge 5)', async () => {
     mocks.systemMetadata.get.mockResolvedValue(enabled);
-    const auth = factory.auth();
-    mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['p']));
-    mocks.person.getById.mockResolvedValue({
-      id: 'p',
-      ownerId: auth.user.id,
-      name: '',
-      isHidden: false,
-      type: 'person',
-    } as any);
-    mocks.person.update.mockResolvedValue({
-      id: 'p',
-      ownerId: auth.user.id,
-      name: 'Alice',
-      isHidden: false,
-      type: 'person',
-    } as any);
+    const auth = AuthFactory.create();
+    const prior = PersonFactory.create({ name: '', isHidden: false });
+    mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.id]));
+    mocks.person.getById.mockResolvedValue(prior);
+    mocks.person.update.mockResolvedValue({ ...prior, name: 'Alice' });
 
-    await sut.update(auth, 'p', { name: 'Alice' });
+    await sut.update(auth, prior.id, { name: 'Alice' });
 
-    expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PersonSuggestionScan, data: { id: 'p' } });
+    expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PersonSuggestionScan, data: { id: prior.id } });
   });
 
   it('enqueues a scan on rename of an already-named person (edge 6)', async () => {
     mocks.systemMetadata.get.mockResolvedValue(enabled);
-    const auth = factory.auth();
-    mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['p']));
-    mocks.person.getById.mockResolvedValue({
-      id: 'p',
-      ownerId: auth.user.id,
-      name: 'Alice',
-      isHidden: false,
-      type: 'person',
-    } as any);
-    mocks.person.update.mockResolvedValue({
-      id: 'p',
-      ownerId: auth.user.id,
-      name: 'Bob',
-      isHidden: false,
-      type: 'person',
-    } as any);
+    const auth = AuthFactory.create();
+    const prior = PersonFactory.create({ name: 'Alice', isHidden: false });
+    mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.id]));
+    mocks.person.getById.mockResolvedValue(prior);
+    mocks.person.update.mockResolvedValue({ ...prior, name: 'Bob' });
 
-    await sut.update(auth, 'p', { name: 'Bob' });
+    await sut.update(auth, prior.id, { name: 'Bob' });
 
-    expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PersonSuggestionScan, data: { id: 'p' } });
+    expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PersonSuggestionScan, data: { id: prior.id } });
   });
 
   it('does NOT enqueue on a color/favorite/birthDate edit (name unchanged) (edge 7)', async () => {
     mocks.systemMetadata.get.mockResolvedValue(enabled);
-    const auth = factory.auth();
-    mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['p']));
-    mocks.person.getById.mockResolvedValue({
-      id: 'p',
-      ownerId: auth.user.id,
-      name: 'Alice',
-      isHidden: false,
-      type: 'person',
-    } as any);
-    mocks.person.update.mockResolvedValue({
-      id: 'p',
-      ownerId: auth.user.id,
-      name: 'Alice',
-      isHidden: false,
-      type: 'person',
-    } as any);
+    const auth = AuthFactory.create();
+    const prior = PersonFactory.create({ name: 'Alice', isHidden: false });
+    mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.id]));
+    mocks.person.getById.mockResolvedValue(prior);
+    mocks.person.update.mockResolvedValue({ ...prior }); // name unchanged
 
-    await sut.update(auth, 'p', { isFavorite: true });
+    await sut.update(auth, prior.id, { isFavorite: true });
 
-    expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.PersonSuggestionScan, data: { id: 'p' } });
+    expect(mocks.job.queue).not.toHaveBeenCalledWith({
+      name: JobName.PersonSuggestionScan,
+      data: { id: prior.id },
+    });
   });
 
-  it('does NOT enqueue when name is cleared or person becomes hidden (edge 7)', async () => {
+  it('does NOT enqueue when name is cleared (edge 7)', async () => {
     mocks.systemMetadata.get.mockResolvedValue(enabled);
-    const auth = factory.auth();
-    mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['p']));
-    mocks.person.getById.mockResolvedValue({
-      id: 'p',
-      ownerId: auth.user.id,
-      name: 'Alice',
-      isHidden: false,
-      type: 'person',
-    } as any);
-    mocks.person.update.mockResolvedValue({
-      id: 'p',
-      ownerId: auth.user.id,
-      name: '',
-      isHidden: false,
-      type: 'person',
-    } as any);
+    const auth = AuthFactory.create();
+    const prior = PersonFactory.create({ name: 'Alice', isHidden: false });
+    mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.id]));
+    mocks.person.getById.mockResolvedValue(prior);
+    mocks.person.update.mockResolvedValue({ ...prior, name: '' });
 
-    await sut.update(auth, 'p', { name: '' });
+    await sut.update(auth, prior.id, { name: '' });
 
-    expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.PersonSuggestionScan, data: { id: 'p' } });
+    expect(mocks.job.queue).not.toHaveBeenCalledWith({
+      name: JobName.PersonSuggestionScan,
+      data: { id: prior.id },
+    });
+  });
+
+  it('does NOT enqueue when a person becomes hidden (edge 7)', async () => {
+    mocks.systemMetadata.get.mockResolvedValue(enabled);
+    const auth = AuthFactory.create();
+    const prior = PersonFactory.create({ name: 'Alice', isHidden: false });
+    mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.id]));
+    mocks.person.getById.mockResolvedValue(prior);
+    mocks.person.update.mockResolvedValue({ ...prior, isHidden: true }); // name unchanged
+
+    await sut.update(auth, prior.id, { isHidden: true });
+
+    expect(mocks.job.queue).not.toHaveBeenCalledWith({
+      name: JobName.PersonSuggestionScan,
+      data: { id: prior.id },
+    });
   });
 
   it('does NOT enqueue when the feature is disabled', async () => {
     mocks.systemMetadata.get.mockResolvedValue({
       machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0, minFaces: 3 } },
     });
-    const auth = factory.auth();
-    mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['p']));
-    mocks.person.getById.mockResolvedValue({
-      id: 'p',
-      ownerId: auth.user.id,
-      name: '',
-      isHidden: false,
-      type: 'person',
-    } as any);
-    mocks.person.update.mockResolvedValue({
-      id: 'p',
-      ownerId: auth.user.id,
-      name: 'Alice',
-      isHidden: false,
-      type: 'person',
-    } as any);
+    const auth = AuthFactory.create();
+    const prior = PersonFactory.create({ name: '', isHidden: false });
+    mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.id]));
+    mocks.person.getById.mockResolvedValue(prior);
+    mocks.person.update.mockResolvedValue({ ...prior, name: 'Alice' });
 
-    await sut.update(auth, 'p', { name: 'Alice' });
+    await sut.update(auth, prior.id, { name: 'Alice' });
 
-    expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.PersonSuggestionScan, data: { id: 'p' } });
+    expect(mocks.job.queue).not.toHaveBeenCalledWith({
+      name: JobName.PersonSuggestionScan,
+      data: { id: prior.id },
+    });
   });
 });
 ```
 
-> Match the exact auth/access mock helpers the **existing** `describe('update')` tests use
-> (look at spec:687-836 — they may use `authStub`/`personStub` and a specific
-> `mocks.access.person.checkOwnerAccess` or `mocks.person.update` shape). Mirror those
-> verbatim; the snippets above are the intent, not necessarily the exact fixture API in this
-> file. The behavioral assertions (`mocks.job.queue` called / not called with
-> `PersonSuggestionScan`) are the contract.
+> If `PersonFactory.create` does not accept `name`/`isHidden` overrides, set them on the
+> returned object before mocking (`const prior = PersonFactory.create(); prior.name = '';
+prior.isHidden = false;`). The behavioral assertions (`mocks.job.queue` called / not called
+> with `PersonSuggestionScan`) are the contract; the factory mechanics are flexible.
 
 **Step 2: Run it — expect failure**
 
@@ -954,11 +944,20 @@ Do **not** remove or reorder the existing `assetId`/`identityId` logic — only 
 cd server && pnpm test -- --run src/services/person.service.spec.ts -t "update"
 ```
 
-Expected: all new on-name cases PASS and every pre-existing `update` test still green
-(the added `getById` call must not break existing expectations — if a pre-existing test
-asserts an exact `mocks.person.*` call list, add a `mocks.person.getById.mockResolvedValue`
-default in that test's setup or the describe `beforeEach`, mirroring how other reads are
-defaulted in this spec).
+Expected: all new on-name cases PASS and every pre-existing `update` test still green.
+
+> **Why pre-existing `update` tests stay green (verified):** `update` did not previously call
+> `getConfig`; the existing `describe('update')` tests therefore do **not** mock
+> `systemMetadata.get`. With it unmocked, `getConfig` falls back to `defaults`
+> (`config.ts` → `facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0 }`), so
+> `suggestionMaxDistance (0) > maxDistance (0.5)` is **false** → feature off → no
+> `PersonSuggestionScan` is queued → existing assertions are unaffected. **Do not add config
+> mocks to existing tests.** Likewise the new `prior = getById(id)` read: existing tests
+> don't set `mocks.person.getById`, so it resolves to the automock default (`undefined`) →
+> `prior` falsy → trigger short-circuits. Only if a pre-existing test asserts an _exact_
+> `mocks.person.*` call list (none currently do in 687-836) add a
+> `mocks.person.getById.mockResolvedValue(...)` default there. Run the full
+> `describe('update')` in Step 4 to confirm.
 
 **Step 5: Commit**
 
@@ -969,12 +968,13 @@ git commit -m "feat(server): enqueue PersonSuggestionScan on person naming/renam
 
 ---
 
-### Task 7: Edge-1 regression, queue-placement guard, `make sql`, final gates
+### Task 7: Edge-1 regression, queue-placement guard, final gates
 
 **Files:**
 
 - Test: `server/src/services/person.service.spec.ts` (two guard tests)
-- Generated: `server/src/queries/person.repository.sql` (from `make sql`)
+- No generated files: Phase 2 adds **no** `@GenerateSql` method and **no** API — `make sql`
+  and `make open-api` are not run.
 
 **Step 1: Edge-1 + queue-placement guard tests**
 
@@ -1024,23 +1024,14 @@ it('does not enqueue any PersonSuggestionScan from the recognition path (zero-re
 Run: `cd server && pnpm test -- --run src/services/person.service.spec.ts`
 Expected: PASS (entire file).
 
-**Step 3: Regenerate SQL docs for the new decorated repo method**
+**Step 3: No `make sql` / `make open-api`**
 
-`make sql` runs `node ./dist/bin/sync-sql.js`, so it needs (a) a built server and (b) a
-reachable Postgres (`DB_URL`, default `postgres://postgres:postgres@localhost:5432/immich`).
-
-```bash
-make build-server
-make dev            # or otherwise ensure Postgres reachable at DB_URL
-make sql
-make check-server
-```
-
-Expected: `make sql` updates `server/src/queries/person.repository.sql` with the
-`getScannablePeopleWithUnassignedFaces` query; `make check-server` clean. Do **not** run
-`make open-api` (no API changes). If no local Postgres is available in the execution
-environment, commit the code and note that `make sql` must be run before the PR (CI enforces
-generated-file freshness — memory `feedback_ci_generated_files`).
+Phase 2 adds **no** `@GenerateSql`-decorated method (the only new repo method,
+`getScannablePeopleWithUnassignedFaces`, is an undecorated `.stream()` enumeration like
+`getAll`/`getAllFaces`) and **no** API. So `make sql` would produce an empty diff and is not
+run; `make open-api` is not run. This keeps Phase 2 free of generated-file churn (consistent
+with the "no API changes" scope; memory `feedback_ci_generated_files` does not apply — no
+decorated query was added or changed).
 
 **Step 4: Full Phase-2 regression**
 
@@ -1050,13 +1041,14 @@ cd server && pnpm test:medium -- --run test/medium/specs/repositories/person.rep
 make check-server
 ```
 
-Expected: all green.
+Expected: all green; `make check-server` clean; `git status` shows **no** changes under
+`server/src/queries/` or `open-api/`.
 
 **Step 5: Commit**
 
 ```bash
-git add server/src/services/person.service.spec.ts server/src/queries
-git commit -m "test(server): edge-1 + recognition zero-regression guards; sync SQL docs"
+git add server/src/services/person.service.spec.ts
+git commit -m "test(server): edge-1 + recognition zero-regression guards"
 ```
 
 ---
@@ -1078,7 +1070,8 @@ git commit -m "test(server): edge-1 + recognition zero-regression guards; sync S
   named state (edges 5, 6); silent on color/favorite/birthDate/visibility/name-clear/hidden
   edits and while unnamed (edge 7); feature-gated.
 - Recognition path proven untouched (edge 1 zero-regression guard).
-- `make check-server` clean; `make sql` committed; **no** API/UI/OpenAPI changes.
+- `make check-server` clean; **no** generated-file changes (`make sql` / `make open-api` not
+  run — no `@GenerateSql` method or API added); **no** API/UI/OpenAPI changes.
 
 **Not in this phase (Phase 3+):** `GET/POST /people/:id/face-suggestions`, DTOs, the
 Confirm/Dismiss resolve-in-reassign hook, web UI. The repository `resolveAssignedFace` and
