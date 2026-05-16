@@ -1,4 +1,5 @@
 import { Kysely } from 'kysely';
+import { AssetVisibility } from 'src/enum';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { PersonFaceSuggestionRepository } from 'src/repositories/person-face-suggestion.repository';
 import { DB } from 'src/schema';
@@ -543,6 +544,228 @@ describe('PersonFaceSuggestionRepository', () => {
         .where('personId', '=', tempPersonId)
         .execute();
       expect(remaining).toEqual([]); // Phase-1 FK ON DELETE CASCADE
+    });
+  });
+
+  describe('space-person suggestion methods', () => {
+    it('upserts pending rows by spacePersonId and never resurrects dismissed rows', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const spacePerson = await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: space.id, name: 'Alice' })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+
+      await sut.upsertPendingForSpacePerson([
+        { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.7 },
+      ]);
+      expect(await sut.markDismissedForSpacePerson(spacePerson.id, assetFace.id)).toBe(1);
+      await sut.upsertPendingForSpacePerson([
+        { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.6 },
+      ]);
+
+      const row = await defaultDatabase
+        .selectFrom('person_face_suggestion')
+        .selectAll()
+        .where('spacePersonId', '=', spacePerson.id)
+        .where('assetFaceId', '=', assetFace.id)
+        .executeTakeFirstOrThrow();
+      expect(row.status).toBe('dismissed');
+      expect(row.distance).toBe(0.7);
+    });
+
+    it('markConfirmedForSpacePerson is idempotent and status-guarded', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const spacePerson = await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: space.id, name: 'Alice' })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+
+      await sut.upsertPendingForSpacePerson([
+        { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.7 },
+      ]);
+
+      expect(await sut.markConfirmedForSpacePerson(spacePerson.id, assetFace.id)).toBe(1);
+      expect(await sut.markConfirmedForSpacePerson(spacePerson.id, assetFace.id)).toBe(0);
+      expect(await sut.markDismissedForSpacePerson(spacePerson.id, assetFace.id)).toBe(0);
+
+      const row = await defaultDatabase
+        .selectFrom('person_face_suggestion')
+        .selectAll()
+        .where('spacePersonId', '=', spacePerson.id)
+        .where('assetFaceId', '=', assetFace.id)
+        .executeTakeFirstOrThrow();
+      expect(row.status).toBe('confirmed');
+    });
+
+    it('getPendingForSpacePerson filters unshared stale rows at read time', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+      const { asset: keptAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: unsharedAsset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: keptAsset.id, addedById: user.id });
+      const { assetFace: keptFace } = await ctx.newAssetFace({ assetId: keptAsset.id, personId: null });
+      const { assetFace: staleFace } = await ctx.newAssetFace({ assetId: unsharedAsset.id, personId: null });
+      const spacePerson = await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: space.id, name: 'Alice', type: 'person', isHidden: false })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      await sut.upsertPendingForSpacePerson([
+        { spacePersonId: spacePerson.id, assetFaceId: keptFace.id, distance: 0.6 },
+        { spacePersonId: spacePerson.id, assetFaceId: staleFace.id, distance: 0.7 },
+      ]);
+
+      const result = await sut.getPendingForSpacePerson(space.id, spacePerson.id, {
+        maxDistance: 0.5,
+        suggestionMaxDistance: 0.8,
+        page: 1,
+        size: 10,
+      });
+
+      expect(result.total).toBe(1);
+      expect(result.items.map((item) => item.assetFaceId)).toEqual([keptFace.id]);
+    });
+
+    it('getPendingForSpacePerson includes linked-library rows and excludes ineligible asset and face rows', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+      const { library } = await ctx.newLibrary({ ownerId: user.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
+      const { asset: hiddenAsset } = await ctx.newAsset({
+        ownerId: user.id,
+        libraryId: library.id,
+        visibility: AssetVisibility.Hidden,
+      });
+      const { asset: lockedAsset } = await ctx.newAsset({
+        ownerId: user.id,
+        libraryId: library.id,
+        visibility: AssetVisibility.Locked,
+      });
+      const { asset: offlineAsset } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id, isOffline: true });
+      const { assetFace: includedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: assignedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: deletedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: invisibleFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: outOfBandFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: hiddenAssetFace } = await ctx.newAssetFace({ assetId: hiddenAsset.id, personId: null });
+      const { assetFace: lockedAssetFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personId: null });
+      const { assetFace: offlineAssetFace } = await ctx.newAssetFace({ assetId: offlineAsset.id, personId: null });
+      const { person } = await ctx.newPerson({ ownerId: user.id });
+      await ctx.database.updateTable('asset_face').set({ personId: person.id }).where('id', '=', assignedFace.id).execute();
+      await ctx.database.updateTable('asset_face').set({ deletedAt: new Date() }).where('id', '=', deletedFace.id).execute();
+      await ctx.database.updateTable('asset_face').set({ isVisible: false }).where('id', '=', invisibleFace.id).execute();
+      const spacePerson = await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: space.id, name: 'Alice', type: 'person', isHidden: false })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      await sut.upsertPendingForSpacePerson([
+        { spacePersonId: spacePerson.id, assetFaceId: includedFace.id, distance: 0.6 },
+        { spacePersonId: spacePerson.id, assetFaceId: assignedFace.id, distance: 0.61 },
+        { spacePersonId: spacePerson.id, assetFaceId: deletedFace.id, distance: 0.62 },
+        { spacePersonId: spacePerson.id, assetFaceId: invisibleFace.id, distance: 0.63 },
+        { spacePersonId: spacePerson.id, assetFaceId: outOfBandFace.id, distance: 0.9 },
+        { spacePersonId: spacePerson.id, assetFaceId: hiddenAssetFace.id, distance: 0.64 },
+        { spacePersonId: spacePerson.id, assetFaceId: lockedAssetFace.id, distance: 0.65 },
+        { spacePersonId: spacePerson.id, assetFaceId: offlineAssetFace.id, distance: 0.66 },
+      ]);
+
+      const result = await sut.getPendingForSpacePerson(space.id, spacePerson.id, {
+        maxDistance: 0.5,
+        suggestionMaxDistance: 0.8,
+        page: 1,
+        size: 10,
+      });
+
+      expect(result.total).toBe(1);
+      expect(result.items.map((item) => item.assetFaceId)).toEqual([includedFace.id]);
+    });
+
+    it('getPendingForSpacePerson returns empty for whitespace name, hidden person, pet person, disabled space, and disabled band', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+      const { space: disabledSpace } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: false });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const rows = await ctx.database
+        .insertInto('shared_space_person')
+        .values([
+          { spaceId: space.id, name: 'Valid', type: 'person', isHidden: false },
+          { spaceId: space.id, name: '   ', type: 'person', isHidden: false },
+          { spaceId: space.id, name: 'Hidden', type: 'person', isHidden: true },
+          { spaceId: space.id, name: 'Pet', type: 'pet', isHidden: false },
+          { spaceId: disabledSpace.id, name: 'Disabled', type: 'person', isHidden: false },
+        ])
+        .returningAll()
+        .execute();
+
+      for (const person of rows.slice(1)) {
+        await sut.upsertPendingForSpacePerson([{ spacePersonId: person.id, assetFaceId: assetFace.id, distance: 0.6 }]);
+        await expect(
+          sut.getPendingForSpacePerson(person.spaceId, person.id, {
+            maxDistance: 0.5,
+            suggestionMaxDistance: 0.8,
+            page: 1,
+            size: 10,
+          }),
+        ).resolves.toEqual({ total: 0, items: [] });
+      }
+
+      await sut.upsertPendingForSpacePerson([{ spacePersonId: rows[0].id, assetFaceId: assetFace.id, distance: 0.6 }]);
+      await expect(
+        sut.getPendingForSpacePerson(space.id, rows[0].id, {
+          maxDistance: 0.5,
+          suggestionMaxDistance: 0.5,
+          page: 1,
+          size: 10,
+        }),
+      ).resolves.toEqual({ total: 0, items: [] });
+    });
+
+    it('resolveAssignedFace deletes pending personal and space-person rows for the same face', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Personal' });
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const spacePerson = await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: space.id, name: 'Space' })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+
+      await sut.upsertPending([{ personId: person.id, assetFaceId: assetFace.id, distance: 0.65 }]);
+      await sut.upsertPendingForSpacePerson([
+        { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.7 },
+      ]);
+      await sut.resolveAssignedFace(assetFace.id);
+
+      const pending = await defaultDatabase
+        .selectFrom('person_face_suggestion')
+        .selectAll()
+        .where('assetFaceId', '=', assetFace.id)
+        .where('status', '=', 'pending')
+        .execute();
+      expect(pending).toEqual([]);
     });
   });
 });

@@ -20,6 +20,20 @@ where
   "assetFaceId" = $1
   and "status" = $2
 
+-- PersonFaceSuggestionRepository.upsertPendingForSpacePerson
+insert into
+  "person_face_suggestion" ("spacePersonId", "assetFaceId", "distance")
+values
+  ($1, $2, $3)
+on conflict ("spacePersonId", "assetFaceId")
+where
+  "spacePersonId" is not null do update
+set
+  "distance" = "excluded"."distance",
+  "updatedAt" = now()
+where
+  "person_face_suggestion"."status" = $4
+
 -- PersonFaceSuggestionRepository.markConfirmed
 update "person_face_suggestion"
 set
@@ -38,6 +52,24 @@ where
   and "assetFaceId" = $3
   and "status" = $4
 
+-- PersonFaceSuggestionRepository.markConfirmedForSpacePerson
+update "person_face_suggestion"
+set
+  "status" = $1
+where
+  "spacePersonId" = $2
+  and "assetFaceId" = $3
+  and "status" = $4
+
+-- PersonFaceSuggestionRepository.markDismissedForSpacePerson
+update "person_face_suggestion"
+set
+  "status" = $1
+where
+  "spacePersonId" = $2
+  and "assetFaceId" = $3
+  and "status" = $4
+
 -- PersonFaceSuggestionRepository.getPendingForPerson
 select
   "person"."id"
@@ -48,3 +80,17 @@ where
   and "person"."name" != $2
   and "person"."isHidden" = $3
   and "person"."type" = $4
+
+-- PersonFaceSuggestionRepository.getPendingForSpacePerson
+select
+  "shared_space_person"."id"
+from
+  "shared_space_person"
+  inner join "shared_space" on "shared_space"."id" = "shared_space_person"."spaceId"
+where
+  "shared_space_person"."id" = $1
+  and "shared_space_person"."spaceId" = $2
+  and BTRIM("shared_space_person"."name") <> $3
+  and "shared_space_person"."isHidden" is false
+  and "shared_space_person"."type" = $4
+  and "shared_space"."faceRecognitionEnabled" is true
