@@ -3459,6 +3459,24 @@ describe(PersonService.name, () => {
       expect(mocks.person.getAssignedFaceEmbeddings).toHaveBeenCalledWith('p', 20);
       expect(mocks.search.searchFaces).toHaveBeenCalledWith(expect.objectContaining({ numResults: 100 }));
     });
+
+    it('never resurrects a resolved decision — delegates the guarantee to upsertPending (edge 1, 2)', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0.8, minFaces: 3 } },
+      });
+      mocks.person.getById.mockResolvedValue({ id: 'p', ownerId: 'u', name: 'A', isHidden: false, type: 'person' } as any);
+      mocks.person.getAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e' }] as any);
+      mocks.search.searchFaces.mockResolvedValue([{ id: 'f-dismissed', personId: null, distance: 0.7 }] as any);
+
+      await sut.handlePersonSuggestionScan({ id: 'p' });
+
+      // The scan unconditionally calls the conditional upsert; the WHERE status='pending'
+      // guard in the repository is the single source of the never-resurrect guarantee.
+      // The job must not pre-filter resolved rows — it delegates to upsertPending.
+      expect(mocks.personFaceSuggestion.upsertPending).toHaveBeenCalledWith([
+        { personId: 'p', assetFaceId: 'f-dismissed', distance: 0.7 },
+      ]);
+    });
   });
 
   describe('handlePersonSuggestionScanQueueAll', () => {
@@ -4416,6 +4434,37 @@ describe(PersonService.name, () => {
 
       expect(mocks.sharedSpace.getSpaceIdsForAsset).toHaveBeenCalledWith(noPerson1.assetId);
       expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpaceFaceMatch }));
+    });
+
+    it('does not enqueue any PersonSuggestionScan from the recognition path (zero-regression)', async () => {
+      const asset = AssetFactory.create();
+      const person = PersonFactory.create();
+      const [noPerson1, primaryFace] = [
+        AssetFaceFactory.create({ assetId: asset.id }),
+        AssetFaceFactory.from().person().build(),
+      ];
+
+      const faces = [
+        { ...noPerson1, distance: 0 },
+        { ...primaryFace, distance: 0.2 },
+      ] as FaceSearchResult[];
+
+      mocks.systemMetadata.get.mockResolvedValue({ machineLearning: { facialRecognition: { minFaces: 1 } } });
+      mocks.search.searchFaces.mockResolvedValue(faces);
+      mocks.person.getFaceForFacialRecognitionJob.mockResolvedValue(getForFacialRecognitionJob(noPerson1, asset));
+      mocks.person.create.mockResolvedValue(person);
+      mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([]);
+
+      await sut.handleRecognizeFaces({ id: noPerson1.id });
+
+      // The recognition path must never enqueue suggestion jobs — suggestions are generated
+      // only by the dedicated PersonSuggestionScan job chain, not inline in recognition.
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.PersonSuggestionScan }),
+      );
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.PersonSuggestionScanQueueAll }),
+      );
     });
   });
 
