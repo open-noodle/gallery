@@ -5497,4 +5497,84 @@ describe(PersonService.name, () => {
       expect(res).toEqual({ total: 0, items: [] });
     });
   });
+
+  describe('confirmFaceSuggestion', () => {
+    it('denies a non-owner with NO state change (edge 18 absence)', async () => {
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set()); // not owner
+
+      await expect(
+        sut.confirmFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(mocks.personFaceSuggestion.markConfirmed).not.toHaveBeenCalled();
+      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+    });
+
+    it('flips the row to confirmed then delegates to reassignFacesById (assign + manual identity + feature photo)', async () => {
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+      person.faceAssetId = null; // no feature photo yet — triggers createNewFeaturePhoto
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
+      mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
+      mocks.person.reassignFace.mockResolvedValue(1);
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.person.getRandomFace.mockResolvedValue(face); // drives createNewFeaturePhoto
+      mocks.personFaceSuggestion.markConfirmed.mockResolvedValue(1); // a pending row existed
+
+      await sut.confirmFaceSuggestion(AuthFactory.create(), person.id, face.id);
+
+      expect(mocks.personFaceSuggestion.markConfirmed).toHaveBeenCalledWith(person.id, face.id);
+      expect(mocks.person.reassignFace).toHaveBeenCalledWith(face.id, person.id);
+      expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledWith({
+        assetFaceId: face.id,
+        identityId: 'identity-1',
+        source: 'manual',
+      });
+      expect(mocks.person.update).toHaveBeenCalledWith(
+        expect.objectContaining({ id: person.id, faceAssetId: face.id }),
+      );
+      expect(mocks.personFaceSuggestion.resolveAssignedFace).toHaveBeenCalledWith(face.id);
+    });
+
+    it('is idempotent when the row is already resolved but person+face still exist → 200, no reassign', async () => {
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
+      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set(['face-1']));
+      mocks.personFaceSuggestion.markConfirmed.mockResolvedValue(0); // already confirmed/dismissed
+
+      await expect(sut.confirmFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).resolves.toBeUndefined();
+      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+    });
+
+    it('a CASCADE-deleted person or face → 400 (owner-only precedence, edges 9, 10)', async () => {
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set()); // person row gone
+
+      await expect(sut.confirmFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(mocks.personFaceSuggestion.markConfirmed).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('dismissFaceSuggestion', () => {
+    it('denies a non-owner with NO state change (edge 18 absence)', async () => {
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+
+      await expect(
+        sut.dismissFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(mocks.personFaceSuggestion.markDismissed).not.toHaveBeenCalled();
+    });
+
+    it('flips the row to dismissed and never assigns the face (idempotent 200)', async () => {
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
+      mocks.personFaceSuggestion.markDismissed.mockResolvedValue(1);
+
+      await expect(sut.dismissFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).resolves.toBeUndefined();
+      expect(mocks.personFaceSuggestion.markDismissed).toHaveBeenCalledWith('person-1', 'face-1');
+      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+
+      mocks.personFaceSuggestion.markDismissed.mockResolvedValue(0); // re-dismiss → still 200
+      await expect(sut.dismissFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).resolves.toBeUndefined();
+    });
+  });
 });

@@ -324,6 +324,38 @@ export class PersonService extends BaseService {
     };
   }
 
+  async confirmFaceSuggestion(auth: AuthDto, personId: string, assetFaceId: string): Promise<void> {
+    await this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [personId] });
+    await this.requireAccess({ auth, permission: Permission.PersonCreate, ids: [assetFaceId] });
+
+    const confirmed = await this.personFaceSuggestionRepository.markConfirmed(personId, assetFaceId);
+    if (confirmed === 0) {
+      // Idempotent: the row was already confirmed/dismissed (double-submit, or a concurrent
+      // scan/auto-assign resolved it) while person+face still exist. A CASCADE-deleted
+      // person/face never reaches here — the requireAccess checks above already threw 400
+      // (owner-only precedence; edges 9/10 — the client treats that 400 as benign-advance).
+      return;
+    }
+
+    // Delegates assign + replaceFaceIdentity('manual') + createNewFeaturePhoto, and (Task 5)
+    // its embedded resolveAssignedFace deletes every OTHER person's still-pending row for
+    // this now-assigned face (edge 12). This person's row is already 'confirmed' above, so
+    // the pending-only delete leaves it intact.
+    await this.reassignFacesById(auth, personId, { id: assetFaceId });
+  }
+
+  async dismissFaceSuggestion(auth: AuthDto, personId: string, assetFaceId: string): Promise<void> {
+    // Owner-only on the PERSON only — intentionally asymmetric with confirm. Dismiss never
+    // touches the face (it only suppresses a (personId, assetFaceId) suggestion row), so
+    // person ownership is sufficient; confirm additionally checks face ownership because it
+    // assigns the face. Consequence: dismiss on a CASCADE-deleted face (person still exists)
+    // → markDismissed affects 0 rows → benign 200; that asymmetry is by-design, not a gap.
+    await this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [personId] });
+    await this.personFaceSuggestionRepository.markDismissed(personId, assetFaceId);
+    // Face stays unassigned; the Phase-1 conditional upsertPending never resurrects a
+    // 'dismissed' row, so a later scan will not re-suggest it for this person.
+  }
+
   async getFacesForPicker(auth: AuthDto, id: string, dto: PersonFacePageQueryDto): Promise<PersonFacePageResponseDto> {
     await this.requireAccess({ auth, permission: Permission.PersonRead, ids: [id] });
     const person = await this.findOrFail(id);
