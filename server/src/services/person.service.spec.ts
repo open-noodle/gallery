@@ -2457,7 +2457,7 @@ describe(PersonService.name, () => {
       });
       expect((mocks.faceIdentity as any).getSharedSpaceFaceMatchBackfillTargets).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
-        expect.arrayContaining([expect.objectContaining({ name: JobName.SharedSpaceFaceMatch })]),
+        expect.arrayContaining([expect.objectContaining({ name: JobName.SharedSpaceFaceMatchFromBackfill })]),
       );
       expect(mocks.job.queue).not.toHaveBeenCalledWith({
         name: JobName.SharedSpacePersonMetadataBackfill,
@@ -2554,12 +2554,12 @@ describe(PersonService.name, () => {
       expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
-          name: JobName.SharedSpaceFaceMatch,
-          data: { spaceId: 'space-1', assetId: 'asset-1', source: 'identity-backfill' },
+          name: JobName.SharedSpaceFaceMatchFromBackfill,
+          data: { spaceId: 'space-1', assetId: 'asset-1' },
         },
         {
-          name: JobName.SharedSpaceFaceMatch,
-          data: { spaceId: 'space-2', assetId: 'asset-2', source: 'identity-backfill' },
+          name: JobName.SharedSpaceFaceMatchFromBackfill,
+          data: { spaceId: 'space-2', assetId: 'asset-2' },
         },
       ]);
       expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
@@ -2598,12 +2598,12 @@ describe(PersonService.name, () => {
 
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
-          name: JobName.SharedSpaceFaceMatch,
-          data: { spaceId: 'space-1', assetId: 'asset-1', source: 'identity-backfill' },
+          name: JobName.SharedSpaceFaceMatchFromBackfill,
+          data: { spaceId: 'space-1', assetId: 'asset-1' },
         },
         {
-          name: JobName.SharedSpaceFaceMatch,
-          data: { spaceId: 'space-1', assetId: 'asset-2', source: 'identity-backfill' },
+          name: JobName.SharedSpaceFaceMatchFromBackfill,
+          data: { spaceId: 'space-1', assetId: 'asset-2' },
         },
       ]);
     });
@@ -2636,8 +2636,8 @@ describe(PersonService.name, () => {
 
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
-          name: JobName.SharedSpaceFaceMatch,
-          data: { spaceId: pendingTarget.spaceId, assetId: pendingTarget.assetId, source: 'identity-backfill' },
+          name: JobName.SharedSpaceFaceMatchFromBackfill,
+          data: { spaceId: pendingTarget.spaceId, assetId: pendingTarget.assetId },
         },
       ]);
       expect((mocks.faceIdentity as any).deletePendingSharedSpaceFaceMatchBackfillTargets).toHaveBeenCalledWith([
@@ -2740,8 +2740,8 @@ describe(PersonService.name, () => {
 
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
-          name: JobName.SharedSpaceFaceMatch,
-          data: { ...target, source: 'identity-backfill' },
+          name: JobName.SharedSpaceFaceMatchFromBackfill,
+          data: target,
         },
       ]);
     });
@@ -2770,8 +2770,8 @@ describe(PersonService.name, () => {
 
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
-          name: JobName.SharedSpaceFaceMatch,
-          data: { ...remainingTarget, source: 'identity-backfill' },
+          name: JobName.SharedSpaceFaceMatchFromBackfill,
+          data: remainingTarget,
         },
       ]);
     });
@@ -2792,8 +2792,8 @@ describe(PersonService.name, () => {
 
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
-          name: JobName.SharedSpaceFaceMatch,
-          data: { spaceId: 'space-1', assetId: 'asset-1', source: 'identity-backfill' },
+          name: JobName.SharedSpaceFaceMatchFromBackfill,
+          data: { spaceId: 'space-1', assetId: 'asset-1' },
         },
       ]);
       expect(mocks.job.queue).not.toHaveBeenCalledWith({
