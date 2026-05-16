@@ -842,5 +842,20 @@ describe(PersonRepository.name, () => {
       }
       expect(ids).not.toContain(person.id);
     });
+
+    it('excludes a named person whose owner has only non-ML (manual) unassigned faces', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Dave', isHidden: false });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      // Create an unassigned face with non-ML sourceType
+      await ctx.newAssetFace({ assetId: asset.id, personId: null, sourceType: SourceType.Manual });
+
+      const ids: string[] = [];
+      for await (const p of sut.getScannablePeopleWithUnassignedFaces()) {
+        ids.push(p.id);
+      }
+      expect(ids).not.toContain(person.id);
+    });
   });
 });
