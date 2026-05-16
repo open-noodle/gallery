@@ -1101,6 +1101,30 @@ describe(MetadataService.name, () => {
       });
     });
 
+    it('should skip motion photo extraction when corrupted metadata yields a negative read position', async () => {
+      const asset = AssetFactory.create();
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+      mocks.storage.stat.mockResolvedValue({
+        size: 100,
+        mtime: asset.fileModifiedAt,
+        mtimeMs: asset.fileModifiedAt.valueOf(),
+        birthtimeMs: asset.fileCreatedAt.valueOf(),
+      } as Stats);
+      mockReadTags({
+        Directory: 'foo/bar/',
+        MotionPhoto: 1,
+        MicroVideo: 1,
+        // Larger than the file size, so position = size - length - padding is negative.
+        MicroVideoOffset: 723_621,
+      });
+
+      await sut.handleMetadataExtraction({ id: asset.id });
+
+      expect(mocks.storage.readFile).not.toHaveBeenCalled();
+      expect(mocks.asset.create).not.toHaveBeenCalled();
+      expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('negative read position'));
+    });
+
     it('should delete old motion photo video assets if they do not match what is extracted', async () => {
       const motionAsset = AssetFactory.create({ type: AssetType.Video, visibility: AssetVisibility.Hidden });
       const asset = AssetFactory.create({ livePhotoVideoId: motionAsset.id });
