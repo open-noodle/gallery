@@ -7,6 +7,7 @@ dotenv.config({ quiet: true, path: resolve(import.meta.dirname, '.env') });
 
 export const playwrightHost = process.env.PLAYWRIGHT_HOST ?? '127.0.0.1';
 export const playwrightDbHost = process.env.PLAYWRIGHT_DB_HOST ?? '127.0.0.1';
+export const playwrightDbPort = process.env.PLAYWRIGHT_DB_PORT ?? '5435';
 export const playwriteBaseUrl = process.env.PLAYWRIGHT_BASE_URL ?? `http://${playwrightHost}:2285`;
 export const playwriteSlowMo = Number.parseInt(process.env.PLAYWRIGHT_SLOW_MO ?? '0');
 export const playwrightDisableWebserver = process.env.PLAYWRIGHT_DISABLE_WEBSERVER;
