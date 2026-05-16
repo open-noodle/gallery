@@ -19,9 +19,9 @@ describe('person_face_suggestion migration', () => {
       SELECT column_name FROM information_schema.columns
       WHERE table_name = 'person_face_suggestion'
     `.execute(db);
-    const cols = rows.rows.map((r) => r.column_name).sort();
+    const cols = rows.rows.map((r) => r.column_name).toSorted();
     expect(cols).toEqual(
-      ['assetFaceId', 'createdAt', 'distance', 'id', 'personId', 'status', 'updateId', 'updatedAt'].sort(),
+      ['assetFaceId', 'createdAt', 'distance', 'id', 'personId', 'status', 'updateId', 'updatedAt'].toSorted(),
     );
   });
 

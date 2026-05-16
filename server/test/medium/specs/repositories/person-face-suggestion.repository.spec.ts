@@ -10,6 +10,23 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 let defaultDatabase: Kysely<DB>;
 
+const getRow = (pId: string, afId: string) =>
+  defaultDatabase
+    .selectFrom('person_face_suggestion')
+    .selectAll()
+    .where('personId', '=', pId)
+    .where('assetFaceId', '=', afId)
+    .executeTakeFirstOrThrow();
+
+const countRows = (assetFaceId: string, status: PersonFaceSuggestionStatus) =>
+  defaultDatabase
+    .selectFrom('person_face_suggestion')
+    .select((eb) => eb.fn.countAll<string>().as('c'))
+    .where('assetFaceId', '=', assetFaceId)
+    .where('status', '=', status)
+    .executeTakeFirstOrThrow()
+    .then((r) => Number(r.c));
+
 const setup = (db?: Kysely<DB>) => {
   const { ctx } = newMediumService(BaseService, {
     database: db || defaultDatabase,
@@ -36,14 +53,6 @@ describe('PersonFaceSuggestionRepository', () => {
   describe('upsertPending', () => {
     let personId: string;
     let assetFaceId: string;
-
-    const getRow = (pId: string, afId: string) =>
-      defaultDatabase
-        .selectFrom('person_face_suggestion')
-        .selectAll()
-        .where('personId', '=', pId)
-        .where('assetFaceId', '=', afId)
-        .executeTakeFirstOrThrow();
 
     beforeAll(async () => {
       const { ctx } = setup();
@@ -136,8 +145,6 @@ describe('PersonFaceSuggestionRepository', () => {
     // F4 at 0.70  — in band, pending: included
     // F5 at 0.90  — above suggestionMaxDistance: excluded by band
     // F6 at 0.65  — in band, pending, but face becomes assigned: excluded by af.personId IS NULL
-    let f3Id: string;
-    let f4Id: string;
     let f6Id: string;
 
     const opts = { maxDistance: 0.5, suggestionMaxDistance: 0.8, page: 1, size: 10 };
@@ -187,9 +194,6 @@ describe('PersonFaceSuggestionRepository', () => {
       const { assetFace: f3 } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
       const { assetFace: f4 } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
       const { assetFace: f5 } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      f3Id = f3.id;
-      f4Id = f4.id;
-
       // Asset faces for gate-excluded persons
       const { assetFace: fU } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
       const { assetFace: fH } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
@@ -278,15 +282,6 @@ describe('PersonFaceSuggestionRepository', () => {
   describe('resolveAssignedFace', () => {
     let faceXId: string;
     let p3Id: string;
-
-    const countRows = (assetFaceId: string, status: PersonFaceSuggestionStatus) =>
-      defaultDatabase
-        .selectFrom('person_face_suggestion')
-        .select((eb) => eb.fn.countAll<string>().as('c'))
-        .where('assetFaceId', '=', assetFaceId)
-        .where('status', '=', status)
-        .executeTakeFirstOrThrow()
-        .then((r) => Number(r.c));
 
     beforeAll(async () => {
       const { ctx } = setup();

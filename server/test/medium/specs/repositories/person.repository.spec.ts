@@ -537,7 +537,9 @@ describe(PersonRepository.name, () => {
     it('returns at most `limit` embeddings for visible, non-deleted faces', async () => {
       const rows = await sut.getAssignedFaceEmbeddings(personId, 2);
       expect(rows).toHaveLength(2);
-      rows.forEach((r) => expect(r.embedding).toBeTruthy());
+      for (const r of rows) {
+        expect(r.embedding).toBeTruthy();
+      }
     });
 
     it('excludes isVisible=false and deleted faces', async () => {
