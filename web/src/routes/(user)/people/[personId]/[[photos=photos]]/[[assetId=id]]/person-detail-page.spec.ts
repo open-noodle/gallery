@@ -133,6 +133,11 @@ vi.mock('$lib/modals/RepresentativeFacePickerModal.svelte', async () => {
   return { default: MockComponent };
 });
 
+vi.mock('$lib/modals/PersonSuggestionReviewModal.svelte', async () => {
+  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+  return { default: MockComponent };
+});
+
 function makePerson(overrides: Partial<PersonResponseDto> = {}): PersonResponseDto {
   return {
     id: 'person-1',
@@ -181,6 +186,7 @@ describe('Person detail page', () => {
     mockAssetMultiSelectManager.selectionActive = false;
     mockAssetMultiSelectManager.assets = [];
     sdkMock.getPerson.mockResolvedValue(makePerson());
+    sdkMock.getPersonFaceSuggestions.mockResolvedValue({ total: 0, items: [] });
     featureFlagsMock.value.peopleStatistics = true;
   });
 
@@ -359,5 +365,57 @@ describe('Person detail page', () => {
       detachScopedPersonDto: { profile: { type: 'person', id: 'person-1' } },
     });
     expect(invalidateAllMock).toHaveBeenCalled();
+  });
+});
+
+describe('face suggestions', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    gotoMock.mockResolvedValue(undefined);
+    invalidateAllMock.mockResolvedValue(undefined);
+    mockAssetMultiSelectManager.selectionActive = false;
+    mockAssetMultiSelectManager.assets = [];
+    sdkMock.getPerson.mockResolvedValue(makePerson());
+    sdkMock.getPersonFaceSuggestions.mockResolvedValue({ total: 0, items: [] });
+  });
+
+  it('renders the banner when the API returns suggestions for a named owned person', async () => {
+    sdkMock.getPersonFaceSuggestions.mockResolvedValue({
+      total: 4,
+      items: [
+        {
+          assetFaceId: 'f1',
+          assetId: 'a1',
+          distance: 0.6,
+          imageWidth: 100,
+          imageHeight: 100,
+          boundingBoxX1: 10,
+          boundingBoxX2: 40,
+          boundingBoxY1: 10,
+          boundingBoxY2: 40,
+        },
+      ],
+    });
+    renderPage({ person: makePerson({ name: 'Alice' }) });
+    await screen.findByTestId('person-suggestion-banner');
+    expect(sdkMock.getPersonFaceSuggestions).toHaveBeenCalledWith({ id: 'person-1', page: 1, size: 5 });
+  });
+
+  it('renders no banner when the API returns total 0 (server read-gate: edges 7/13)', async () => {
+    sdkMock.getPersonFaceSuggestions.mockResolvedValue({ total: 0, items: [] });
+    renderPage({ person: makePerson({ name: 'Alice' }) });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument();
+  });
+
+  it('does not query suggestions for a space-scoped person (Phase 5 scope)', async () => {
+    renderPage({
+      person: makePerson({
+        name: 'Alice',
+        primaryProfile: { type: 'space-person', id: 'sp1', spaceId: 'space-1' },
+      } as never),
+    });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(sdkMock.getPersonFaceSuggestions).not.toHaveBeenCalled();
   });
 });

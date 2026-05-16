@@ -32,6 +32,8 @@
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
   import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
   import PersonMergeSuggestionModal from '$lib/modals/PersonMergeSuggestionModal.svelte';
+  import PersonSuggestionBanner from '$lib/components/faces-page/person-suggestion-banner.svelte';
+  import PersonSuggestionReviewModal from '$lib/modals/PersonSuggestionReviewModal.svelte';
   import RepresentativeFacePickerModal from '$lib/modals/RepresentativeFacePickerModal.svelte';
   import { Route } from '$lib/route';
   import { getAssetBulkActions } from '$lib/services/asset.service';
@@ -45,9 +47,12 @@
   import { isSpaceScopedPerson, toScopedPersonRef } from '$lib/utils/scoped-person-ref';
   import {
     AssetVisibility,
+    confirmPersonFaceSuggestion,
     detachScopedPerson,
+    dismissPersonFaceSuggestion,
     getAllPeople,
     getPersonFaces,
+    getPersonFaceSuggestions,
     getPerson,
     mergePerson,
     mergeScopedPeople,
@@ -56,6 +61,7 @@
     updateRepresentativeFace,
     updatePerson,
     type PersonFaceResponseDto,
+    type PersonFaceSuggestionResponseDto,
     type PersonResponseDto,
   } from '@immich/sdk';
   import {
@@ -127,6 +133,8 @@
     if (action == 'merge') {
       viewMode = PersonPageViewMode.MERGE_PEOPLE;
     }
+
+    void loadSuggestionSummary();
 
     return websocketEvents.on('on_person_thumbnail', (personId: string) => {
       if (person.id === personId) {
@@ -345,6 +353,41 @@
 
   let thumbnailData = $derived(getScopedThumbnailUrl(person));
 
+  let suggestionTotal = $state(0);
+  let suggestionPreviews = $state<PersonFaceSuggestionResponseDto[]>([]);
+
+  const loadSuggestionSummary = async () => {
+    if (isSpaceScopedPerson(person)) {
+      suggestionTotal = 0;
+      suggestionPreviews = [];
+      return;
+    }
+    try {
+      const res = await getPersonFaceSuggestions({ id: person.id, page: 1, size: 5 });
+      suggestionTotal = res.total;
+      suggestionPreviews = res.items;
+    } catch {
+      suggestionTotal = 0;
+      suggestionPreviews = [];
+    }
+  };
+
+  const openSuggestionReview = async () => {
+    const result = await modalManager.show(PersonSuggestionReviewModal, {
+      person,
+      referenceThumbnailUrl: getPeopleThumbnailUrl(person),
+      loadPage: ({ page, size }: { page: number; size: number }) =>
+        getPersonFaceSuggestions({ id: person.id, page, size }),
+      confirm: (assetFaceId: string) => confirmPersonFaceSuggestion({ id: person.id, assetFaceId }),
+      dismiss: (assetFaceId: string) => dismissPersonFaceSuggestion({ id: person.id, assetFaceId }),
+    });
+    await loadSuggestionSummary();
+    if (result && result.confirmed > 0) {
+      await invalidateAll();
+      thumbnailData = getScopedThumbnailUrl(person, Date.now().toString());
+    }
+  };
+
   const handleSetVisibility = (assetIds: string[]) => {
     timelineManager.removeAssets(assetIds);
     assetMultiSelectManager.clear();
@@ -555,6 +598,13 @@
             </div>
           {/if}
         </div>
+        <PersonSuggestionBanner
+          {person}
+          total={suggestionTotal}
+          previews={suggestionPreviews}
+          referenceThumbnailUrl={getPeopleThumbnailUrl(person)}
+          onReview={openSuggestionReview}
+        />
       {/if}
     </Timeline>
   {/key}
