@@ -575,6 +575,12 @@ export class PersonService extends BaseService {
     await this.faceIdentityRepository.deletePendingSharedSpaceFaceMatchBackfillTargets(pendingTargets);
     if (queuedTargets.length === 0) {
       await this.queueSpacePersonMetadataBackfill();
+
+      const { machineLearning } = await this.getConfig({ withCache: true });
+      const { maxDistance, suggestionMaxDistance } = machineLearning.facialRecognition;
+      if (suggestionMaxDistance > maxDistance) {
+        await this.jobRepository.queue({ name: JobName.PersonSuggestionScanQueueAll, data: {} });
+      }
     }
 
     return JobStatus.Success;
