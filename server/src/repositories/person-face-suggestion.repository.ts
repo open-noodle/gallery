@@ -37,6 +37,30 @@ export class PersonFaceSuggestionRepository {
       .execute();
   }
 
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async markConfirmed(personId: string, assetFaceId: string): Promise<number> {
+    const result = await this.db
+      .updateTable('person_face_suggestion')
+      .set({ status: 'confirmed' })
+      .where('personId', '=', personId)
+      .where('assetFaceId', '=', assetFaceId)
+      .where('status', '=', 'pending')
+      .executeTakeFirst();
+    return Number(result.numUpdatedRows ?? 0n);
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async markDismissed(personId: string, assetFaceId: string): Promise<number> {
+    const result = await this.db
+      .updateTable('person_face_suggestion')
+      .set({ status: 'dismissed' })
+      .where('personId', '=', personId)
+      .where('assetFaceId', '=', assetFaceId)
+      .where('status', '=', 'pending')
+      .executeTakeFirst();
+    return Number(result.numUpdatedRows ?? 0n);
+  }
+
   @GenerateSql({
     params: [DummyValue.UUID, { maxDistance: 0.5, suggestionMaxDistance: 0.8, page: 1, size: 10 }],
   })

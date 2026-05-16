@@ -275,6 +275,75 @@ describe('PersonFaceSuggestionRepository', () => {
     });
   });
 
+  describe('markConfirmed / markDismissed (idempotent, status-guarded)', () => {
+    let personId: string;
+    let assetFaceId: string;
+
+    beforeAll(async () => {
+      const { ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Suggestion Person', isHidden: false });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      personId = person.id;
+      assetFaceId = assetFace.id;
+    });
+
+    beforeEach(async () => {
+      await defaultDatabase
+        .deleteFrom('person_face_suggestion')
+        .where('personId', '=', personId)
+        .where('assetFaceId', '=', assetFaceId)
+        .execute();
+    });
+
+    afterEach(async () => {
+      await defaultDatabase
+        .deleteFrom('person_face_suggestion')
+        .where('personId', '=', personId)
+        .where('assetFaceId', '=', assetFaceId)
+        .execute();
+    });
+
+    it('markConfirmed flips a pending row to confirmed and returns 1; re-running returns 0', async () => {
+      const { sut } = setup();
+      await sut.upsertPending([{ personId, assetFaceId, distance: 0.6 }]);
+
+      expect(await sut.markConfirmed(personId, assetFaceId)).toBe(1);
+      expect((await getRow(personId, assetFaceId)).status).toBe('confirmed');
+
+      // idempotent: already confirmed → no pending row → 0 affected, status unchanged
+      expect(await sut.markConfirmed(personId, assetFaceId)).toBe(0);
+      expect((await getRow(personId, assetFaceId)).status).toBe('confirmed');
+    });
+
+    it('markDismissed flips a pending row to dismissed and returns 1; re-running returns 0', async () => {
+      const { sut } = setup();
+      await sut.upsertPending([{ personId, assetFaceId, distance: 0.6 }]);
+
+      expect(await sut.markDismissed(personId, assetFaceId)).toBe(1);
+      expect((await getRow(personId, assetFaceId)).status).toBe('dismissed');
+
+      expect(await sut.markDismissed(personId, assetFaceId)).toBe(0);
+      expect((await getRow(personId, assetFaceId)).status).toBe('dismissed');
+    });
+
+    it('markConfirmed does not override a dismissed row and vice-versa (status guard)', async () => {
+      const { sut } = setup();
+      await sut.upsertPending([{ personId, assetFaceId, distance: 0.6 }]);
+      await sut.markDismissed(personId, assetFaceId);
+
+      expect(await sut.markConfirmed(personId, assetFaceId)).toBe(0);
+      expect((await getRow(personId, assetFaceId)).status).toBe('dismissed');
+    });
+
+    it('returns 0 for a (personId, assetFaceId) pair that has no row (benign idempotent)', async () => {
+      const { sut } = setup();
+      expect(await sut.markConfirmed(personId, assetFaceId)).toBe(0);
+      expect(await sut.markDismissed(personId, assetFaceId)).toBe(0);
+    });
+  });
+
   describe('resolveAssignedFace', () => {
     let faceXId: string;
     let p3Id: string;
