@@ -65,6 +65,19 @@ The setting is a UI toggle only — it controls whether the counts and the info 
 If you find the totals distracting (for example on a casual family library where the exact face count isn't useful), you can leave the variable unset. The People pages will fall back to just showing the people count.
 :::
 
+## Face Suggestions
+
+When a named person has near-miss faces (similar but below the auto-assign threshold),
+Gallery surfaces them as **suggestions** on that person's page. Review them one at a time:
+
+- **Same person** assigns the face to the person (and improves future matching).
+- **Different person** dismisses the suggestion — it will never be suggested for this
+  person again. The face itself stays unassigned.
+
+> Dismissing only hides the _suggestion_. If a future, more confident match puts that same
+> face within the automatic-recognition threshold, it can still be auto-assigned — by design,
+> so dismissing a suggestion never blocks normal recognition.
+
 ## How Face Detection Works
 
 Face detection sends the generated preview image to the machine learning service for processing. The service checks if it has the relevant model downloaded and downloads it if not. The image is decoded, pre-processed and passed to the face detection model (with hardware acceleration if configured). The bounding boxes and scores outputted from this model are used to crop and preprocess the image once again to be passed to a facial recognition model (also accelerated if configured). The embeddings from the recognition model, together with the bounding boxes and scores from the face detection model, are then sent back to the server to be added to the database. The embeddings in particular are indexed so they can be searched quickly during facial recognition clustering.
