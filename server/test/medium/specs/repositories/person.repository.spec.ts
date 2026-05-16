@@ -795,4 +795,52 @@ describe(PersonRepository.name, () => {
       );
     });
   });
+
+  describe('getScannablePeopleWithUnassignedFaces', () => {
+    it('streams only named, non-hidden, type=person people whose owner has an unassigned ML face', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { user: otherUser } = await ctx.newUser();
+
+      const { person: named } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', isHidden: false });
+      const { person: unnamed } = await ctx.newPerson({ ownerId: user.id, name: '', isHidden: false });
+      const { person: hidden } = await ctx.newPerson({ ownerId: user.id, name: 'Hidden', isHidden: true });
+      const { person: pet } = await ctx.newPerson({ ownerId: user.id, name: 'Rex', isHidden: false, type: 'pet' });
+      const { person: otherOwner } = await ctx.newPerson({ ownerId: otherUser.id, name: 'Bob', isHidden: false });
+
+      // user owns an unassigned ML face → `named` is eligible
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      // otherUser has NO unassigned face → `otherOwner` excluded
+      const { asset: a2 } = await ctx.newAsset({ ownerId: otherUser.id });
+      await ctx.newAssetFace({ assetId: a2.id, personId: otherOwner.id });
+
+      const ids: string[] = [];
+      for await (const p of sut.getScannablePeopleWithUnassignedFaces()) {
+        ids.push(p.id);
+      }
+
+      expect(ids).toContain(named.id);
+      expect(ids).not.toContain(unnamed.id);
+      expect(ids).not.toContain(hidden.id);
+      expect(ids).not.toContain(pet.id);
+      expect(ids).not.toContain(otherOwner.id);
+    });
+
+    it('excludes a named person whose owner has only assigned/deleted/invisible faces', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Carol', isHidden: false });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newAssetFace({ assetId: asset.id, personId: person.id }); // assigned
+      await ctx.newAssetFace({ assetId: asset.id, personId: null, deletedAt: new Date() }); // deleted
+      await ctx.newAssetFace({ assetId: asset.id, personId: null, isVisible: false }); // invisible
+
+      const ids: string[] = [];
+      for await (const p of sut.getScannablePeopleWithUnassignedFaces()) {
+        ids.push(p.id);
+      }
+      expect(ids).not.toContain(person.id);
+    });
+  });
 });

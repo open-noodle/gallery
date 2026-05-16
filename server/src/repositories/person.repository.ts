@@ -756,6 +756,30 @@ export class PersonRepository {
       .execute();
   }
 
+  getScannablePeopleWithUnassignedFaces() {
+    return this.db
+      .selectFrom('person')
+      .select(['person.id', 'person.ownerId'])
+      .where('person.name', '!=', '')
+      .where('person.isHidden', '=', false)
+      .where('person.type', '=', 'person')
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('asset_face')
+            .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+            .select('asset_face.id')
+            .whereRef('asset.ownerId', '=', 'person.ownerId')
+            .where('asset.deletedAt', 'is', null)
+            .where('asset_face.personId', 'is', null)
+            .where('asset_face.deletedAt', 'is', null)
+            .where('asset_face.isVisible', 'is', true)
+            .where('asset_face.sourceType', '=', SourceType.MachineLearning),
+        ),
+      )
+      .stream();
+  }
+
   @GenerateSql({ params: [DummyValue.UUID] })
   getRandomFace(personId: string) {
     return this.db
