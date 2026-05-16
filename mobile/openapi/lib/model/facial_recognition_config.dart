@@ -18,6 +18,7 @@ class FacialRecognitionConfig {
     required this.minFaces,
     required this.minScore,
     required this.modelName,
+    required this.suggestionMaxDistance,
   });
 
   /// Whether the task is enabled
@@ -44,13 +45,20 @@ class FacialRecognitionConfig {
   /// Name of the model to use
   String modelName;
 
+  /// Maximum distance for face suggestions; 0 disables the suggestion feature
+  ///
+  /// Minimum value: 0
+  /// Maximum value: 2
+  double suggestionMaxDistance;
+
   @override
   bool operator ==(Object other) => identical(this, other) || other is FacialRecognitionConfig &&
     other.enabled == enabled &&
     other.maxDistance == maxDistance &&
     other.minFaces == minFaces &&
     other.minScore == minScore &&
-    other.modelName == modelName;
+    other.modelName == modelName &&
+    other.suggestionMaxDistance == suggestionMaxDistance;
 
   @override
   int get hashCode =>
@@ -59,10 +67,11 @@ class FacialRecognitionConfig {
     (maxDistance.hashCode) +
     (minFaces.hashCode) +
     (minScore.hashCode) +
-    (modelName.hashCode);
+    (modelName.hashCode) +
+    (suggestionMaxDistance.hashCode);
 
   @override
-  String toString() => 'FacialRecognitionConfig[enabled=$enabled, maxDistance=$maxDistance, minFaces=$minFaces, minScore=$minScore, modelName=$modelName]';
+  String toString() => 'FacialRecognitionConfig[enabled=$enabled, maxDistance=$maxDistance, minFaces=$minFaces, minScore=$minScore, modelName=$modelName, suggestionMaxDistance=$suggestionMaxDistance]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -71,6 +80,7 @@ class FacialRecognitionConfig {
       json[r'minFaces'] = this.minFaces;
       json[r'minScore'] = this.minScore;
       json[r'modelName'] = this.modelName;
+      json[r'suggestionMaxDistance'] = this.suggestionMaxDistance;
     return json;
   }
 
@@ -88,6 +98,7 @@ class FacialRecognitionConfig {
         minFaces: mapValueOfType<int>(json, r'minFaces')!,
         minScore: (mapValueOfType<num>(json, r'minScore')!).toDouble(),
         modelName: mapValueOfType<String>(json, r'modelName')!,
+        suggestionMaxDistance: (mapValueOfType<num>(json, r'suggestionMaxDistance')!).toDouble(),
       );
     }
     return null;
@@ -140,6 +151,7 @@ class FacialRecognitionConfig {
     'minFaces',
     'minScore',
     'modelName',
+    'suggestionMaxDistance',
   };
 }
 
