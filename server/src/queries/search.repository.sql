@@ -775,7 +775,7 @@ order by
   "type"
 commit
 
--- SearchRepository.searchFaces
+-- SearchRepository.searchFaces (owner)
 begin
 set
   local vchordrq.probes = 1
@@ -804,6 +804,55 @@ from
   "cte"
 where
   "cte"."distance" <= $4
+commit
+
+-- SearchRepository.searchFaces (space)
+begin
+set
+  local vchordrq.probes = 1
+with
+  "cte" as (
+    select
+      "asset_face"."id",
+      "asset_face"."personId",
+      face_search.embedding <=> $1 as "distance"
+    from
+      "asset_face"
+      inner join "asset" on "asset"."id" = "asset_face"."assetId"
+      inner join "face_search" on "face_search"."faceId" = "asset_face"."id"
+      left join "person" on "person"."id" = "asset_face"."personId"
+    where
+      (
+        exists (
+          select
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = $2::uuid
+        )
+        or exists (
+          select
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = $3::uuid
+        )
+      )
+      and "asset"."deletedAt" is null
+      and "asset_face"."personId" is null
+    order by
+      "distance"
+    limit
+      $4
+  )
+select
+  *
+from
+  "cte"
+where
+  "cte"."distance" <= $5
 commit
 
 -- SearchRepository.searchPlaces

@@ -189,7 +189,9 @@ export type OcrSearchOptions = SearchDateOptions & SearchOcrOptions;
 
 export type LargeAssetSearchOptions = AssetSearchOptions & { minFileSize?: number };
 
-export interface FaceEmbeddingSearch extends SearchEmbeddingOptions {
+export interface FaceEmbeddingSearch extends Omit<SearchEmbeddingOptions, 'userIds' | 'maxDistance'> {
+  userIds?: string[];
+  spaceId?: string;
   hasPerson?: boolean;
   numResults: number;
   maxDistance: number;
@@ -888,22 +890,45 @@ export class SearchRepository {
     return rows.map((row) => row.type);
   }
 
-  @GenerateSql({
-    params: [
-      {
-        userIds: [DummyValue.UUID],
-        embedding: DummyValue.VECTOR,
-        numResults: 10,
-        maxDistance: 0.6,
-      },
-    ],
-  })
-  searchFaces({ userIds, embedding, numResults, maxDistance, hasPerson, minBirthDate }: FaceEmbeddingSearch) {
+  @GenerateSql(
+    {
+      name: 'owner',
+      params: [
+        {
+          userIds: [DummyValue.UUID],
+          embedding: DummyValue.VECTOR,
+          numResults: 10,
+          maxDistance: 0.6,
+        },
+      ],
+    },
+    {
+      name: 'space',
+      params: [
+        {
+          spaceId: DummyValue.UUID,
+          embedding: DummyValue.VECTOR,
+          numResults: 10,
+          maxDistance: 0.6,
+          hasPerson: false,
+        },
+      ],
+    },
+  )
+  async searchFaces({ userIds, spaceId, embedding, numResults, maxDistance, hasPerson, minBirthDate }: FaceEmbeddingSearch) {
     if (!isValidInteger(numResults, { min: 1, max: 1000 })) {
       throw new Error(`Invalid value for 'numResults': ${numResults}`);
     }
 
-    return this.db.transaction().execute(async (trx) => {
+    if (spaceId && userIds?.length) {
+      throw new Error('Cannot mix spaceId and userIds');
+    }
+
+    if (!spaceId && !userIds?.length) {
+      throw new Error('searchFaces requires userIds for owner-scoped scans');
+    }
+
+    return await this.db.transaction().execute(async (trx) => {
       await sql`set local vchordrq.probes = ${sql.lit(probes[VectorIndex.Face])}`.execute(trx);
       return await trx
         .with('cte', (qb) =>
@@ -917,7 +942,25 @@ export class SearchRepository {
             .innerJoin('asset', 'asset.id', 'asset_face.assetId')
             .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
             .leftJoin('person', 'person.id', 'asset_face.personId')
-            .where('asset.ownerId', '=', anyUuid(userIds))
+            .$if(!spaceId, (qb) => qb.where('asset.ownerId', '=', anyUuid(userIds!)))
+            .$if(!!spaceId, (qb) =>
+              qb.where((eb) =>
+                eb.or([
+                  eb.exists(
+                    eb
+                      .selectFrom('shared_space_asset')
+                      .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                      .where('shared_space_asset.spaceId', '=', asUuid(spaceId!)),
+                  ),
+                  eb.exists(
+                    eb
+                      .selectFrom('shared_space_library')
+                      .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                      .where('shared_space_library.spaceId', '=', asUuid(spaceId!)),
+                  ),
+                ]),
+              ),
+            )
             .where('asset.deletedAt', 'is', null)
             .$if(hasPerson === true, (qb) => qb.where('asset_face.personId', 'is not', null))
             .$if(hasPerson === false, (qb) => qb.where('asset_face.personId', 'is', null))

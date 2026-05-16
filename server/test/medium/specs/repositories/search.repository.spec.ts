@@ -531,5 +531,96 @@ describe(SearchRepository.name, () => {
       expect(ids).toContain(assignedFaceId);
       expect(ids).toContain(unassignedFaceId);
     });
+
+    it('spaceId returns unassigned faces from direct shared assets and linked libraries without owner filtering', async () => {
+      const { ctx, sut } = setup();
+      const { user: spaceOwner } = await ctx.newUser();
+      const { user: directOwner } = await ctx.newUser();
+      const { user: libraryOwner } = await ctx.newUser();
+      const { user: outsideOwner } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: spaceOwner.id });
+      const { library } = await ctx.newLibrary({ ownerId: libraryOwner.id });
+
+      const { asset: directAsset } = await ctx.newAsset({ ownerId: directOwner.id });
+      const { asset: libraryAsset } = await ctx.newAsset({ ownerId: libraryOwner.id, libraryId: library.id });
+      const { asset: outsideAsset } = await ctx.newAsset({ ownerId: outsideOwner.id });
+
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: directAsset.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+
+      const { assetFace: directFace } = await ctx.newAssetFace({ assetId: directAsset.id, personId: null });
+      const { assetFace: libraryFace } = await ctx.newAssetFace({ assetId: libraryAsset.id, personId: null });
+      const { assetFace: outsideFace } = await ctx.newAssetFace({ assetId: outsideAsset.id, personId: null });
+
+      const embedding = newEmbedding();
+      await ctx.database
+        .insertInto('face_search')
+        .values([
+          { faceId: directFace.id, embedding },
+          { faceId: libraryFace.id, embedding },
+          { faceId: outsideFace.id, embedding },
+        ])
+        .execute();
+
+      const result = await sut.searchFaces({
+        spaceId: space.id,
+        embedding,
+        numResults: 10,
+        maxDistance: 2,
+        hasPerson: false,
+      });
+
+      const ids = result.map((face) => face.id);
+      expect(ids).toEqual(expect.arrayContaining([directFace.id, libraryFace.id]));
+      expect(ids).not.toContain(outsideFace.id);
+    });
+
+    it('spaceId still respects hasPerson:false by excluding assigned faces', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Grace' });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+      const { assetFace: assignedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      const { assetFace: unassignedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+
+      const embedding = newEmbedding();
+      await ctx.database
+        .insertInto('face_search')
+        .values([
+          { faceId: assignedFace.id, embedding },
+          { faceId: unassignedFace.id, embedding },
+        ])
+        .execute();
+
+      const result = await sut.searchFaces({
+        spaceId: space.id,
+        embedding,
+        numResults: 10,
+        maxDistance: 2,
+        hasPerson: false,
+      });
+
+      const ids = result.map((face) => face.id);
+      expect(ids).toContain(unassignedFace.id);
+      expect(ids).not.toContain(assignedFace.id);
+      expect(result.every((face) => face.personId === null)).toBe(true);
+    });
+
+    it('rejects mixed spaceId and userIds scopes', async () => {
+      const { sut } = setup();
+
+      await expect(
+        sut.searchFaces({
+          spaceId: ownerId,
+          userIds: [ownerId],
+          embedding: faceEmbedding,
+          numResults: 10,
+          maxDistance: 2,
+        }),
+      ).rejects.toThrow('Cannot mix spaceId and userIds');
+    });
   });
 });
