@@ -36,7 +36,7 @@ export class TagRepository {
   async upsertValue({ userId, value, parentId: _parentId }: { userId: string; value: string; parentId?: string }) {
     const parentId = _parentId ?? null;
     return this.db.transaction().execute(async (tx) => {
-      const tag = await this.db
+      const tag = await tx
         .insertInto('tag')
         .values({ userId, value, parentId })
         .onConflict((oc) => oc.columns(['userId', 'value']).doUpdateSet({ parentId }))
@@ -55,7 +55,7 @@ export class TagRepository {
           .insertInto('tag_closure')
           .columns(['id_ancestor', 'id_descendant'])
           .expression(
-            this.db
+            tx
               .selectFrom('tag_closure')
               .select(['id_ancestor', sql.raw<string>(`'${tag.id}'`).as('id_descendant')])
               .where('id_descendant', '=', parentId),
