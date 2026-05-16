@@ -3317,6 +3317,52 @@ describe(PersonService.name, () => {
     });
   });
 
+  describe('handlePersonSuggestionScanQueueAll', () => {
+    const enabled = {
+      machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0.8, minFaces: 3 } },
+    };
+
+    it('runs on the people backfill queue', () => {
+      const config = new Reflector().get(MetadataKey.JobConfig, sut.handlePersonSuggestionScanQueueAll);
+      expect(config).toEqual(expect.objectContaining({ queue: 'peopleBackfill' }));
+    });
+
+    it('skips and enumerates nothing when the feature is disabled', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0, minFaces: 3 } },
+      });
+
+      await expect(sut.handlePersonSuggestionScanQueueAll({})).resolves.toBe(JobStatus.Skipped);
+      expect((mocks.person as any).getScannablePeopleWithUnassignedFaces).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+    });
+
+    it('queues one PersonSuggestionScan per scannable person', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(enabled);
+      (mocks.person as any).getScannablePeopleWithUnassignedFaces.mockReturnValue(
+        makeStream([
+          { id: 'p1', ownerId: 'u' },
+          { id: 'p2', ownerId: 'u' },
+        ]),
+      );
+
+      await expect(sut.handlePersonSuggestionScanQueueAll({})).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.PersonSuggestionScan, data: { id: 'p1' } },
+        { name: JobName.PersonSuggestionScan, data: { id: 'p2' } },
+      ]);
+    });
+
+    it('empty library → success, no scan jobs queued except empty flush', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(enabled);
+      (mocks.person as any).getScannablePeopleWithUnassignedFaces.mockReturnValue(makeStream([]));
+
+      await expect(sut.handlePersonSuggestionScanQueueAll({})).resolves.toBe(JobStatus.Success);
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([]);
+    });
+  });
+
   describe('handleRecognizeFaces', () => {
     beforeEach(() => {
       mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([]);

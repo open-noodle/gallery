@@ -627,6 +627,28 @@ export class PersonService extends BaseService {
     return JobStatus.Success;
   }
 
+  @OnJob({ name: JobName.PersonSuggestionScanQueueAll, queue: QueueName.PeopleBackfill })
+  async handlePersonSuggestionScanQueueAll(
+    _data: JobOf<JobName.PersonSuggestionScanQueueAll>,
+  ): Promise<JobStatus> {
+    const { machineLearning } = await this.getConfig({ withCache: false });
+    const { maxDistance, suggestionMaxDistance } = machineLearning.facialRecognition;
+    if (suggestionMaxDistance <= maxDistance) {
+      return JobStatus.Skipped;
+    }
+
+    let jobs: { name: JobName.PersonSuggestionScan; data: { id: string } }[] = [];
+    for await (const person of this.personRepository.getScannablePeopleWithUnassignedFaces()) {
+      jobs.push({ name: JobName.PersonSuggestionScan, data: { id: person.id } });
+      if (jobs.length === JOBS_ASSET_PAGINATION_SIZE) {
+        await this.jobRepository.queueAll(jobs);
+        jobs = [];
+      }
+    }
+    await this.jobRepository.queueAll(jobs);
+    return JobStatus.Success;
+  }
+
   private getAffectedSpaceAssets(result: object): SharedSpaceFaceMatchBackfillTarget[] {
     return (result as { affectedSpaceAssets?: SharedSpaceFaceMatchBackfillTarget[] }).affectedSpaceAssets ?? [];
   }
