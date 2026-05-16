@@ -419,6 +419,12 @@ export class JobRepository {
           removeOnComplete: true,
         };
       }
+      case JobName.SharedSpaceFaceMatchFromBackfill: {
+        return {
+          jobId: `shared-space-face-match/from-backfill/${item.data.spaceId}/${item.data.assetId}`,
+          removeOnComplete: true,
+        };
+      }
       case JobName.SharedSpaceFaceMatchAll: {
         return {
           jobId: `shared-space-face-match-all/${item.data.spaceId}`,
@@ -485,7 +491,8 @@ export class JobRepository {
     return (
       name === JobName.SharedSpaceFaceMatch ||
       name === JobName.SharedSpaceFaceMatchAll ||
-      name === JobName.SharedSpaceFaceMatchPage
+      name === JobName.SharedSpaceFaceMatchPage ||
+      name === JobName.SharedSpaceFaceMatchFromBackfill
     );
   }
 
