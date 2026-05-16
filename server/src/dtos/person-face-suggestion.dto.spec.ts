@@ -1,24 +1,24 @@
 import {
-  PersonFaceSuggestionPageQuerySchema,
-  PersonFaceSuggestionPageResponseSchema,
-  PersonFaceSuggestionParamsSchema,
+  PersonFaceSuggestionPageQueryDto,
+  PersonFaceSuggestionPageResponseDto,
+  PersonFaceSuggestionParamsDto,
 } from 'src/dtos/person.dto';
 import { describe, expect, it } from 'vitest';
 
 describe('PersonFaceSuggestion DTOs', () => {
   it('query schema coerces and defaults page/size', () => {
-    expect(PersonFaceSuggestionPageQuerySchema.parse({})).toEqual({ page: 1, size: 50 });
-    expect(PersonFaceSuggestionPageQuerySchema.parse({ page: '2', size: '10' })).toEqual({ page: 2, size: 10 });
+    expect(PersonFaceSuggestionPageQueryDto.schema.parse({})).toEqual({ page: 1, size: 50 });
+    expect(PersonFaceSuggestionPageQueryDto.schema.parse({ page: '2', size: '10' })).toEqual({ page: 2, size: 10 });
   });
 
   it('query schema rejects size > 100 and page < 1', () => {
-    expect(() => PersonFaceSuggestionPageQuerySchema.parse({ size: 101 })).toThrow();
-    expect(() => PersonFaceSuggestionPageQuerySchema.parse({ page: 0 })).toThrow();
+    expect(() => PersonFaceSuggestionPageQueryDto.schema.parse({ size: 101 })).toThrow();
+    expect(() => PersonFaceSuggestionPageQueryDto.schema.parse({ page: 0 })).toThrow();
   });
 
   it('params schema requires two uuids', () => {
-    expect(() => PersonFaceSuggestionParamsSchema.parse({ id: 'not-a-uuid', assetFaceId: 'x' })).toThrow();
-    const ok = PersonFaceSuggestionParamsSchema.parse({
+    expect(() => PersonFaceSuggestionParamsDto.schema.parse({ id: 'not-a-uuid', assetFaceId: 'x' })).toThrow();
+    const ok = PersonFaceSuggestionParamsDto.schema.parse({
       id: '00000000-0000-4000-8000-000000000001',
       assetFaceId: '00000000-0000-4000-8000-000000000002',
     });
@@ -26,7 +26,7 @@ describe('PersonFaceSuggestion DTOs', () => {
   });
 
   it('page response schema accepts a fully-populated item', () => {
-    const parsed = PersonFaceSuggestionPageResponseSchema.parse({
+    const parsed = PersonFaceSuggestionPageResponseDto.schema.parse({
       total: 1,
       items: [
         {
