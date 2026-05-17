@@ -1,5 +1,5 @@
-import { updateConfig } from '@immich/sdk';
 import type { LoginResponseDto } from '@immich/sdk';
+import { updateConfig } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
 import { asBearerAuth, utils } from 'src/utils';
 
