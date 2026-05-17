@@ -95,7 +95,7 @@ vi.mock('$lib/components/assets/thumbnail/image-thumbnail.svelte', async () => {
 });
 
 vi.mock('$lib/components/people/people-merge-selector.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/people-merge-selector.stub.svelte');
+  const { default: MockComponent } = await import('@test-data/mocks/space-people-merge-selector.stub.svelte');
   return { default: MockComponent };
 });
 

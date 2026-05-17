@@ -1,21 +1,12 @@
 <script lang="ts">
-  type Candidate = { id: string; [key: string]: unknown };
-
   interface Props {
     person: { id: string };
-    mergePeople?: (person: { id: string }, selectedPeople: Candidate[]) => Promise<Candidate | void> | Candidate | void;
-    onMerge?: (person: Candidate) => void;
-    onSwapPerson?: (person: Candidate) => void;
+    mergePeople?: (person: { id: string }, selectedPeople: Array<{ id: string; [key: string]: unknown }>) => void;
+    onSwapPerson?: (person: { id: string; [key: string]: unknown }) => void;
     searchPeople?: (name: string) => void;
   }
 
-  let {
-    person,
-    mergePeople = () => {},
-    onMerge = () => {},
-    onSwapPerson = () => {},
-    searchPeople = () => {},
-  }: Props = $props();
+  let { person, mergePeople = () => {}, onSwapPerson = () => {}, searchPeople = () => {} }: Props = $props();
 
   const personalCandidate = {
     id: 'person-candidate',
@@ -28,26 +19,20 @@
     name: 'Space Candidate',
     primaryProfile: { type: 'space-person', id: 'space-person-candidate', spaceId: 'space-2' },
   };
-
-  // Mirror the real selector: after merging, hand the surviving person to onMerge.
-  const runMerge = async (target: Candidate, sources: Candidate[]) => {
-    const merged = await mergePeople(target, sources);
-    onMerge(merged ?? target);
-  };
 </script>
 
 <div data-testid="people-merge-selector" data-person-id={person.id}>
   choose_matching_people_to_merge
-  <button type="button" data-testid="merge-personal-candidate" onclick={() => void runMerge(person, [personalCandidate])}>
+  <button type="button" data-testid="merge-personal-candidate" onclick={() => mergePeople(person, [personalCandidate])}>
     merge personal candidate
   </button>
-  <button type="button" data-testid="merge-space-candidate" onclick={() => void runMerge(person, [spaceCandidate])}>
+  <button type="button" data-testid="merge-space-candidate" onclick={() => mergePeople(person, [spaceCandidate])}>
     merge space candidate
   </button>
   <button
     type="button"
     data-testid="merge-swapped-space-candidate"
-    onclick={() => void runMerge(spaceCandidate, [person])}
+    onclick={() => mergePeople(spaceCandidate, [person])}
   >
     merge swapped space candidate
   </button>
