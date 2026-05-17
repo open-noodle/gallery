@@ -850,7 +850,9 @@ describe(LibraryService.name, () => {
         expect(mocks.job.queue).not.toHaveBeenCalledWith(
           expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
         );
-        expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.FaceIdentityBackfill }));
+        expect(mocks.job.queue).not.toHaveBeenCalledWith(
+          expect.objectContaining({ name: JobName.FaceIdentityBackfill }),
+        );
         expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
           expect.arrayContaining([expect.objectContaining({ name: JobName.SidecarCheck })]),
         );
