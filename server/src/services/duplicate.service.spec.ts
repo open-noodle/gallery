@@ -462,6 +462,18 @@ describe(DuplicateService.name, () => {
             { name: JobName.SharedSpaceFaceMatch, data: { spaceId: spaceX, assetId: asset1.id } },
           ]),
         );
+
+        const queuedJobs = mocks.job.queueAll.mock.calls.flatMap(([jobs]) => jobs);
+        expect(queuedJobs).toEqual([
+          { name: JobName.SharedSpaceFaceMatch, data: { spaceId: spaceX, assetId: asset1.id } },
+        ]);
+        expect(queuedJobs).not.toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }),
+            expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
+            expect.objectContaining({ name: JobName.FaceIdentityBackfill }),
+          ]),
+        );
       });
 
       it('does not call addAssets when the user has no editable spaces containing the group', async () => {
@@ -481,6 +493,16 @@ describe(DuplicateService.name, () => {
           .flat()
           .filter((j: any) => j?.name === JobName.SharedSpaceFaceMatch);
         expect(faceMatchCalls).toHaveLength(0);
+        expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
+          expect.arrayContaining([expect.objectContaining({ name: JobName.SharedSpaceFaceMatch })]),
+        );
+        expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
+          expect.arrayContaining([
+            expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }),
+            expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
+            expect.objectContaining({ name: JobName.FaceIdentityBackfill }),
+          ]),
+        );
       });
 
       it('adds keeper to multiple editable spaces', async () => {
@@ -528,6 +550,62 @@ describe(DuplicateService.name, () => {
         expect(result[0].success).toBe(true);
         expect(mocks.sharedSpace.getEditableByAssetIds).not.toHaveBeenCalled();
         expect(mocks.sharedSpace.addAssets).not.toHaveBeenCalled();
+        expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
+          expect.arrayContaining([expect.objectContaining({ name: JobName.SharedSpaceFaceMatch })]),
+        );
+        expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
+          expect.arrayContaining([
+            expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }),
+            expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
+            expect.objectContaining({ name: JobName.FaceIdentityBackfill }),
+          ]),
+        );
+      });
+
+      it('reports queue failure after keeper insertion so retry can queue face matches idempotently', async () => {
+        const asset1 = AssetFactory.create();
+        const asset2 = AssetFactory.create();
+        setupBaseDuplicate(asset1, asset2);
+        mocks.sharedSpace.getEditableByAssetIds.mockResolvedValue(new Set([spaceX]));
+        mocks.sharedSpace.addAssets.mockResolvedValue([]);
+        mocks.job.queueAll.mockRejectedValueOnce(new Error('queue unavailable')).mockResolvedValue(undefined as any);
+
+        const first = await sut.resolve(authStub.admin, {
+          groups: [{ duplicateId: 'group-1', keepAssetIds: [asset1.id], trashAssetIds: [asset2.id] }],
+        });
+
+        expect(first[0].success).toBe(false);
+        expect(first[0].error).toBe(BulkIdErrorReason.UNKNOWN);
+        expect(mocks.sharedSpace.addAssets).toHaveBeenCalledWith([
+          { spaceId: spaceX, assetId: asset1.id, addedById: authStub.admin.user.id },
+        ]);
+
+        const second = await sut.resolve(authStub.admin, {
+          groups: [{ duplicateId: 'group-1', keepAssetIds: [asset1.id], trashAssetIds: [asset2.id] }],
+        });
+
+        expect(second[0].success).toBe(true);
+        expect(mocks.sharedSpace.addAssets).toHaveBeenCalledTimes(2);
+        expect(mocks.job.queueAll).toHaveBeenCalledWith(
+          expect.arrayContaining([
+            { name: JobName.SharedSpaceFaceMatch, data: { spaceId: spaceX, assetId: asset1.id } },
+          ]),
+        );
+
+        const faceMatchCalls = mocks.job.queueAll.mock.calls
+          .flatMap(([jobs]) => jobs)
+          .filter((job) => job.name === JobName.SharedSpaceFaceMatch);
+        expect(faceMatchCalls).toEqual([
+          { name: JobName.SharedSpaceFaceMatch, data: { spaceId: spaceX, assetId: asset1.id } },
+          { name: JobName.SharedSpaceFaceMatch, data: { spaceId: spaceX, assetId: asset1.id } },
+        ]);
+        expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
+          expect.arrayContaining([
+            expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }),
+            expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
+            expect.objectContaining({ name: JobName.FaceIdentityBackfill }),
+          ]),
+        );
       });
 
       it('reports failure cleanly if addAssets throws, and NO downstream mutation runs', async () => {
