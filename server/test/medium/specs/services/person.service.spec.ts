@@ -97,10 +97,7 @@ const getIdentityLinks = (ctx: ReturnType<typeof setupFaceDetection>['ctx'], fac
     .orderBy('assetFaceId')
     .execute();
 
-const createAssetReadyForFaceDetection = async (
-  ctx: ReturnType<typeof setupFaceDetection>['ctx'],
-  ownerId: string,
-) => {
+const createAssetReadyForFaceDetection = async (ctx: ReturnType<typeof setupFaceDetection>['ctx'], ownerId: string) => {
   const { asset } = await ctx.newAsset({ ownerId, visibility: AssetVisibility.Timeline, width: 200, height: 200 });
   await ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: `/preview/${asset.id}.webp` });
   await ctx.newExif({ assetId: asset.id, exifImageHeight: 200, exifImageWidth: 200 });
@@ -231,9 +228,9 @@ describe(PersonService.name, () => {
           }),
         ]),
       );
-      await expect(getIdentityLinks(ctx, [ml.assetFace.id, manual.assetFace.id, exif.assetFace.id])).resolves.toHaveLength(
-        2,
-      );
+      await expect(
+        getIdentityLinks(ctx, [ml.assetFace.id, manual.assetFace.id, exif.assetFace.id]),
+      ).resolves.toHaveLength(2);
       await expect(getIdentityLinks(ctx, [ml.assetFace.id, manual.assetFace.id, exif.assetFace.id])).resolves.toEqual(
         expect.arrayContaining([
           { assetFaceId: exif.assetFace.id, identityId: exif.identity.id, source: 'import' },
@@ -411,11 +408,7 @@ describe(PersonService.name, () => {
       await expect(sut.handleDetectFaces({ id: asset.id })).resolves.toBe(JobStatus.Success);
 
       await expect(
-        ctx.database
-          .selectFrom('asset_face')
-          .select('id')
-          .where('id', '=', ml.assetFace.id)
-          .execute(),
+        ctx.database.selectFrom('asset_face').select('id').where('id', '=', ml.assetFace.id).execute(),
       ).resolves.toEqual([]);
       await expect(
         ctx.database
