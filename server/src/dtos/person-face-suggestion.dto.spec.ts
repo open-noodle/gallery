@@ -3,6 +3,7 @@ import {
   PersonFaceSuggestionPageResponseDto,
   PersonFaceSuggestionParamsDto,
 } from 'src/dtos/person.dto';
+import { SpacePersonFaceSuggestionParamsDto, SpacePersonParamsDto } from 'src/dtos/shared-space-person.dto';
 import { describe, expect, it } from 'vitest';
 
 describe('PersonFaceSuggestion DTOs', () => {
@@ -45,5 +46,33 @@ describe('PersonFaceSuggestion DTOs', () => {
     });
     expect(parsed.total).toBe(1);
     expect(parsed.items[0].distance).toBe(0.62);
+  });
+
+  it('space person params schema requires space and person uuids', () => {
+    expect(() => SpacePersonParamsDto.schema.parse({ id: 'not-a-uuid', personId: 'x' })).toThrow();
+    const ok = SpacePersonParamsDto.schema.parse({
+      id: '00000000-0000-4000-8000-000000000005',
+      personId: '00000000-0000-4000-8000-000000000006',
+    });
+    expect(ok).toEqual({
+      id: '00000000-0000-4000-8000-000000000005',
+      personId: '00000000-0000-4000-8000-000000000006',
+    });
+  });
+
+  it('space person face suggestion params schema requires space, person, and face uuids', () => {
+    expect(() =>
+      SpacePersonFaceSuggestionParamsDto.schema.parse({
+        id: 'not-a-uuid',
+        personId: '00000000-0000-4000-8000-000000000007',
+        assetFaceId: 'x',
+      }),
+    ).toThrow();
+    const ok = SpacePersonFaceSuggestionParamsDto.schema.parse({
+      id: '00000000-0000-4000-8000-000000000007',
+      personId: '00000000-0000-4000-8000-000000000008',
+      assetFaceId: '00000000-0000-4000-8000-000000000009',
+    });
+    expect(ok.assetFaceId).toBe('00000000-0000-4000-8000-000000000009');
   });
 });
