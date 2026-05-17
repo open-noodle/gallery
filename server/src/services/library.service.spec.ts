@@ -838,9 +838,34 @@ describe(LibraryService.name, () => {
 
         await sut.handleSyncFiles({ libraryId, paths: ['/photos/test.jpg'], progressCounter: 1, totalAssets: 1 });
 
-        expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
-        expect(mocks.job.queueAll).toHaveBeenCalledWith([]);
-        expect(mocks.job.queue).not.toHaveBeenCalled();
+        expect(mocks.job.queue).not.toHaveBeenCalledWith(
+          expect.objectContaining({ name: JobName.SharedSpaceFaceMatch }),
+        );
+        expect(mocks.job.queue).not.toHaveBeenCalledWith(
+          expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }),
+        );
+        expect(mocks.job.queue).not.toHaveBeenCalledWith(
+          expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }),
+        );
+        expect(mocks.job.queue).not.toHaveBeenCalledWith(
+          expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
+        );
+        expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.FaceIdentityBackfill }));
+        expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
+          expect.arrayContaining([expect.objectContaining({ name: JobName.SidecarCheck })]),
+        );
+        expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
+          expect.arrayContaining([expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll })]),
+        );
+        expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
+          expect.arrayContaining([expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll })]),
+        );
+        expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
+          expect.arrayContaining([expect.objectContaining({ name: JobName.FacialRecognitionQueueAll })]),
+        );
+        expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
+          expect.arrayContaining([expect.objectContaining({ name: JobName.FaceIdentityBackfill })]),
+        );
       });
     });
   });
