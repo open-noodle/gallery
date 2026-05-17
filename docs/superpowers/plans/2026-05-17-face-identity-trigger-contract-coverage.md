@@ -171,14 +171,17 @@ it.each([
   [QueueName.FacialRecognition, false, { name: JobName.FacialRecognitionQueueAll, data: { force: false } }],
   [QueueName.FacialRecognition, true, { name: JobName.FacialRecognitionQueueAll, data: { force: true } }],
   [QueueName.PeopleBackfill, false, { name: JobName.FaceIdentityBackfill, data: {} }],
-] as const)('should queue %s start with force=%s as the expected face identity root', async (queueName, force, expected) => {
-  mocks.job.isActive.mockResolvedValue(false);
-  mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
+] as const)(
+  'should queue %s start with force=%s as the expected face identity root',
+  async (queueName, force, expected) => {
+    mocks.job.isActive.mockResolvedValue(false);
+    mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
 
-  await sut.runCommandLegacy(queueName, { command: QueueCommand.Start, force });
+    await sut.runCommandLegacy(queueName, { command: QueueCommand.Start, force });
 
-  expect(mocks.job.queue).toHaveBeenCalledWith(expected);
-});
+    expect(mocks.job.queue).toHaveBeenCalledWith(expected);
+  },
+);
 ```
 
 - [ ] **Step 4: Add explicit nightly cleanup trigger coverage**
@@ -223,7 +226,9 @@ it.each([
   await sut.runCommandLegacy(queueName, { command: QueueCommand.Start, force: false });
 
   expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }));
-  expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }));
+  expect(mocks.job.queue).not.toHaveBeenCalledWith(
+    expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
+  );
   expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.FaceIdentityBackfill }));
 });
 ```
@@ -682,9 +687,7 @@ expect(mocks.job.queue).toHaveBeenCalledWith({
 For the true-to-false and already-true tests, use:
 
 ```ts
-expect(mocks.job.queue).not.toHaveBeenCalledWith(
-  expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }),
-);
+expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }));
 ```
 
 - [ ] **Step 6: Strengthen delete-space and remove-member metadata backfill assertions**
@@ -734,9 +737,7 @@ expect(mocks.job.queue).toHaveBeenCalledWith({
 In `describe('handleSharedSpaceBulkAddAssets')`, extend the count-zero and disabled tests with:
 
 ```ts
-expect(mocks.job.queue).not.toHaveBeenCalledWith(
-  expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }),
-);
+expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }));
 ```
 
 For the enabled test, keep the exact positive assertion:
@@ -762,9 +763,7 @@ expect(mocks.job.queue).toHaveBeenCalledWith({
 For disabled and duplicate-link tests, use:
 
 ```ts
-expect(mocks.job.queue).not.toHaveBeenCalledWith(
-  expect.objectContaining({ name: JobName.SharedSpaceLibraryFaceSync }),
-);
+expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpaceLibraryFaceSync }));
 ```
 
 - [ ] **Step 9: Run SharedSpaceService tests**
