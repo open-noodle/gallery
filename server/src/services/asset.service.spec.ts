@@ -1464,7 +1464,8 @@ describe(AssetService.name, () => {
 
       await sut.run(authStub.admin, { assetIds: [assetId], name: AssetJobName.REFRESH_FACES });
 
-      expect(mocks.job.queueAll).toHaveBeenCalledWith([{ name: JobName.AssetDetectFaces, data: { id: assetId } }]);
+      expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queueAll.mock.calls[0][0]).toEqual([{ name: JobName.AssetDetectFaces, data: { id: assetId } }]);
       const queuedJobNames = mocks.job.queueAll.mock.calls.flatMap(([jobs]) => jobs.map((job) => job.name));
       expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(queuedJobNames).not.toContain(JobName.AssetDetectFacesQueueAll);

@@ -6,11 +6,9 @@ import {
   JobName,
   JobStatus,
   ManualJobName,
-  QueueCommand,
   QueueName,
 } from 'src/enum';
 import { JobService } from 'src/services/job.service';
-import { QueueService } from 'src/services/queue.service';
 import { JobItem } from 'src/types';
 import { AssetFactory } from 'test/factories/asset.factory';
 import { factory, newUuid } from 'test/small.factory';
@@ -70,7 +68,7 @@ describe(JobService.name, () => {
     });
 
     it('should queue a FaceIdentityBackfill job', async () => {
-      await sut.create({ name: 'face-identity-backfill' as ManualJobName });
+      await sut.create({ name: ManualJobName.FaceIdentityBackfill });
 
       expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.FaceIdentityBackfill, data: {} });
       expect(mocks.job.queue).toHaveBeenCalledTimes(1);
@@ -78,7 +76,7 @@ describe(JobService.name, () => {
     });
 
     it('should queue a SharedSpacePersonMetadataBackfill job', async () => {
-      await sut.create({ name: 'shared-space-person-metadata-backfill' as ManualJobName });
+      await sut.create({ name: ManualJobName.SharedSpacePersonMetadataBackfill });
 
       expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.SharedSpacePersonMetadataBackfill, data: {} });
       expect(mocks.job.queue).toHaveBeenCalledTimes(1);
@@ -90,77 +88,6 @@ describe(JobService.name, () => {
 
       expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('manual face identity queue routes', () => {
-    let queueSut: QueueService;
-
-    beforeEach(() => {
-      ({ sut: queueSut, mocks } = newTestService(QueueService));
-
-      mocks.config.getWorker.mockReturnValue(ImmichWorker.Microservices);
-      mocks.job.isActive.mockResolvedValue(false);
-      mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
-      mocks.job.isPaused.mockResolvedValue(false);
-    });
-
-    it.each([
-      {
-        queue: QueueName.FaceDetection,
-        force: false,
-        expected: { name: JobName.AssetDetectFacesQueueAll, data: { force: false } },
-      },
-      {
-        queue: QueueName.FaceDetection,
-        force: true,
-        expected: { name: JobName.AssetDetectFacesQueueAll, data: { force: true } },
-      },
-      {
-        queue: QueueName.FacialRecognition,
-        force: false,
-        expected: { name: JobName.FacialRecognitionQueueAll, data: { force: false } },
-      },
-      {
-        queue: QueueName.FacialRecognition,
-        force: true,
-        expected: { name: JobName.FacialRecognitionQueueAll, data: { force: true } },
-      },
-      {
-        queue: QueueName.PeopleBackfill,
-        force: false,
-        expected: { name: JobName.FaceIdentityBackfill, data: {} },
-      },
-    ])('queues $expected.name for manual $queue start with force=$force', async ({ queue, force, expected }) => {
-      await queueSut.runCommandLegacy(queue, { command: QueueCommand.Start, force });
-
-      expect(mocks.job.queue).toHaveBeenCalledWith(expected);
-      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
-      expect(mocks.job.queueAll).not.toHaveBeenCalled();
-    });
-
-    it.each([
-      {
-        queue: QueueName.FaceDetection,
-        force: true,
-        unrelated: [JobName.FacialRecognitionQueueAll, JobName.FaceIdentityBackfill],
-      },
-      {
-        queue: QueueName.FacialRecognition,
-        force: true,
-        unrelated: [JobName.AssetDetectFacesQueueAll, JobName.FaceIdentityBackfill],
-      },
-      {
-        queue: QueueName.PeopleBackfill,
-        force: false,
-        unrelated: [JobName.AssetDetectFacesQueueAll, JobName.FacialRecognitionQueueAll],
-      },
-    ])('does not enqueue unrelated face identity roots for manual $queue starts', async ({ queue, force, unrelated }) => {
-      await queueSut.runCommandLegacy(queue, { command: QueueCommand.Start, force });
-
-      for (const name of unrelated) {
-        expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name }));
-      }
     });
   });
 
