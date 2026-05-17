@@ -220,6 +220,7 @@ DELETE FROM "migration_overrides"
    'trigger_face_identity_updatedAt',
    'trigger_library_after_insert',
    'trigger_library_user_delete_after_audit',
+   'trigger_person_face_suggestion_updatedAt',
    'trigger_shared_space_face_match_backfill_target_updatedAt',
    'trigger_shared_space_asset_delete_audit',
    'trigger_shared_space_asset_updatedAt',
@@ -350,6 +351,7 @@ DELETE FROM "kysely_migrations"
    '1778700000000-AddSharedSpaceFaceMatchBackfillTarget',
    '1778800000000-TrimSpacePersonNameIndex',
    '1778900000000-AddPersonFaceSuggestion',
+   '1779000000000-AddSpacePersonFaceSuggestion',
 
    -- Post-v2.7.5 upstream migrations pulled in by rebase. Paired with the
    -- schema rollbacks in step 7 above.
