@@ -417,5 +417,6 @@ describe('face suggestions', () => {
     });
     await new Promise((r) => setTimeout(r, 0));
     expect(sdkMock.getPersonFaceSuggestions).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument();
   });
 });
