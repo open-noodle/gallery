@@ -672,7 +672,7 @@ describe(PersonRepository.name, () => {
       ).resolves.toEqual({ faceId: newFaceId, dimensions: 512 });
       const embeddingDistance = await ctx.database
         .selectFrom('face_search')
-        .select(sql<number>`face_search.embedding <=> ${embedding}`.as('distance'))
+        .select(sql<number>`face_search.embedding <-> ${embedding}`.as('distance'))
         .where('faceId', '=', newFaceId)
         .executeTakeFirstOrThrow();
       expect(embeddingDistance.distance).toBeCloseTo(0);
