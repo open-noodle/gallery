@@ -271,10 +271,12 @@ Class | Method | HTTP request | Description
 *SharedSpacesApi* | [**addAssets**](doc//SharedSpacesApi.md#addassets) | **POST** /shared-spaces/{id}/assets | Add assets to a shared space
 *SharedSpacesApi* | [**addMember**](doc//SharedSpacesApi.md#addmember) | **POST** /shared-spaces/{id}/members | Add a member to a shared space
 *SharedSpacesApi* | [**bulkAddAssets**](doc//SharedSpacesApi.md#bulkaddassets) | **POST** /shared-spaces/{id}/assets/bulk-add | Add all user assets to a shared space
+*SharedSpacesApi* | [**confirmSpacePersonFaceSuggestion**](doc//SharedSpacesApi.md#confirmspacepersonfacesuggestion) | **POST** /shared-spaces/{id}/people/{personId}/face-suggestions/{assetFaceId}/confirm | Confirm a face suggestion for a person in a shared space
 *SharedSpacesApi* | [**createSpace**](doc//SharedSpacesApi.md#createspace) | **POST** /shared-spaces | Create a shared space
 *SharedSpacesApi* | [**deduplicateSpacePeople**](doc//SharedSpacesApi.md#deduplicatespacepeople) | **POST** /shared-spaces/{id}/people/deduplicate | Deduplicate people in a shared space
 *SharedSpacesApi* | [**deleteSpacePerson**](doc//SharedSpacesApi.md#deletespaceperson) | **DELETE** /shared-spaces/{id}/people/{personId} | Delete a person from a shared space
 *SharedSpacesApi* | [**deleteSpacePersonAlias**](doc//SharedSpacesApi.md#deletespacepersonalias) | **DELETE** /shared-spaces/{id}/people/{personId}/alias | Delete a person alias in a shared space
+*SharedSpacesApi* | [**dismissSpacePersonFaceSuggestion**](doc//SharedSpacesApi.md#dismissspacepersonfacesuggestion) | **POST** /shared-spaces/{id}/people/{personId}/face-suggestions/{assetFaceId}/dismiss | Dismiss a face suggestion for a person in a shared space
 *SharedSpacesApi* | [**getAllSpaces**](doc//SharedSpacesApi.md#getallspaces) | **GET** /shared-spaces | Get all shared spaces
 *SharedSpacesApi* | [**getMembers**](doc//SharedSpacesApi.md#getmembers) | **GET** /shared-spaces/{id}/members | Get members of a shared space
 *SharedSpacesApi* | [**getSpace**](doc//SharedSpacesApi.md#getspace) | **GET** /shared-spaces/{id} | Get a shared space
@@ -285,6 +287,7 @@ Class | Method | HTTP request | Description
 *SharedSpacesApi* | [**getSpacePeopleStatistics**](doc//SharedSpacesApi.md#getspacepeoplestatistics) | **GET** /shared-spaces/{id}/people/statistics | Get people statistics in a shared space
 *SharedSpacesApi* | [**getSpacePerson**](doc//SharedSpacesApi.md#getspaceperson) | **GET** /shared-spaces/{id}/people/{personId} | Get a person in a shared space
 *SharedSpacesApi* | [**getSpacePersonAssets**](doc//SharedSpacesApi.md#getspacepersonassets) | **GET** /shared-spaces/{id}/people/{personId}/assets | Get assets for a person in a shared space
+*SharedSpacesApi* | [**getSpacePersonFaceSuggestions**](doc//SharedSpacesApi.md#getspacepersonfacesuggestions) | **GET** /shared-spaces/{id}/people/{personId}/face-suggestions | Get face suggestions for a person in a shared space
 *SharedSpacesApi* | [**getSpacePersonFaceThumbnail**](doc//SharedSpacesApi.md#getspacepersonfacethumbnail) | **GET** /shared-spaces/{id}/people/{personId}/faces/{faceId}/thumbnail | Get space person face thumbnail
 *SharedSpacesApi* | [**getSpacePersonFaces**](doc//SharedSpacesApi.md#getspacepersonfaces) | **GET** /shared-spaces/{id}/people/{personId}/faces | Get space person faces
 *SharedSpacesApi* | [**getSpacePersonStatistics**](doc//SharedSpacesApi.md#getspacepersonstatistics) | **GET** /shared-spaces/{id}/people/{personId}/statistics | Get space person statistics

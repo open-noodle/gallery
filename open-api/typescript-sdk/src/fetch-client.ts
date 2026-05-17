@@ -7431,6 +7431,51 @@ export function getSpacePersonAssets({ id, personId }: {
     }));
 }
 /**
+ * Get face suggestions for a person in a shared space
+ */
+export function getSpacePersonFaceSuggestions({ id, page, personId, size }: {
+    id: string;
+    page?: number;
+    personId: string;
+    size?: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PersonFaceSuggestionPageResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/face-suggestions${QS.query(QS.explode({
+        page,
+        size
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Confirm a face suggestion for a person in a shared space
+ */
+export function confirmSpacePersonFaceSuggestion({ assetFaceId, id, personId }: {
+    assetFaceId: string;
+    id: string;
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/face-suggestions/${encodeURIComponent(assetFaceId)}/confirm`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
+ * Dismiss a face suggestion for a person in a shared space
+ */
+export function dismissSpacePersonFaceSuggestion({ assetFaceId, id, personId }: {
+    assetFaceId: string;
+    id: string;
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/face-suggestions/${encodeURIComponent(assetFaceId)}/dismiss`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
  * Get space person faces
  */
 export function getSpacePersonFaces({ id, page, personId, size }: {
@@ -8879,6 +8924,8 @@ export enum JobName {
     FaceIdentityMaintenanceAfterRecognition = "FaceIdentityMaintenanceAfterRecognition",
     PersonSuggestionScanQueueAll = "PersonSuggestionScanQueueAll",
     PersonSuggestionScan = "PersonSuggestionScan",
+    SpacePersonSuggestionScanQueueAll = "SpacePersonSuggestionScanQueueAll",
+    SpacePersonSuggestionScan = "SpacePersonSuggestionScan",
     FileDelete = "FileDelete",
     FileMigrationQueueAll = "FileMigrationQueueAll",
     LibraryDeleteCheck = "LibraryDeleteCheck",

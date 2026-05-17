@@ -179,6 +179,71 @@ class SharedSpacesApi {
     }
   }
 
+  /// Confirm a face suggestion for a person in a shared space
+  ///
+  /// Assign the suggested face to the space person. Idempotent.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetFaceId (required):
+  ///   Unassigned asset face ID being reviewed
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  ///
+  /// * [String] personId (required):
+  ///   Space person ID
+  Future<Response> confirmSpacePersonFaceSuggestionWithHttpInfo(String assetFaceId, String id, String personId,) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/people/{personId}/face-suggestions/{assetFaceId}/confirm'
+      .replaceAll('{assetFaceId}', assetFaceId)
+      .replaceAll('{id}', id)
+      .replaceAll('{personId}', personId);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'POST',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Confirm a face suggestion for a person in a shared space
+  ///
+  /// Assign the suggested face to the space person. Idempotent.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetFaceId (required):
+  ///   Unassigned asset face ID being reviewed
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  ///
+  /// * [String] personId (required):
+  ///   Space person ID
+  Future<void> confirmSpacePersonFaceSuggestion(String assetFaceId, String id, String personId,) async {
+    final response = await confirmSpacePersonFaceSuggestionWithHttpInfo(assetFaceId, id, personId,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
   /// Create a shared space
   ///
   /// Create a new shared space for collaborative asset management.
@@ -387,6 +452,71 @@ class SharedSpacesApi {
   /// * [String] personId (required):
   Future<void> deleteSpacePersonAlias(String id, String personId,) async {
     final response = await deleteSpacePersonAliasWithHttpInfo(id, personId,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
+  /// Dismiss a face suggestion for a person in a shared space
+  ///
+  /// Suppress this suggestion for the space person forever. The face stays unassigned. Idempotent.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetFaceId (required):
+  ///   Unassigned asset face ID being reviewed
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  ///
+  /// * [String] personId (required):
+  ///   Space person ID
+  Future<Response> dismissSpacePersonFaceSuggestionWithHttpInfo(String assetFaceId, String id, String personId,) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/people/{personId}/face-suggestions/{assetFaceId}/dismiss'
+      .replaceAll('{assetFaceId}', assetFaceId)
+      .replaceAll('{id}', id)
+      .replaceAll('{personId}', personId);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'POST',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Dismiss a face suggestion for a person in a shared space
+  ///
+  /// Suppress this suggestion for the space person forever. The face stays unassigned. Idempotent.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetFaceId (required):
+  ///   Unassigned asset face ID being reviewed
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  ///
+  /// * [String] personId (required):
+  ///   Space person ID
+  Future<void> dismissSpacePersonFaceSuggestion(String assetFaceId, String id, String personId,) async {
+    final response = await dismissSpacePersonFaceSuggestionWithHttpInfo(assetFaceId, id, personId,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1160,6 +1290,91 @@ class SharedSpacesApi {
         .cast<String>()
         .toList(growable: false);
 
+    }
+    return null;
+  }
+
+  /// Get face suggestions for a person in a shared space
+  ///
+  /// Retrieve near-miss unassigned faces suggested for this space person, best match first.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  ///
+  /// * [String] personId (required):
+  ///   Space person ID
+  ///
+  /// * [int] page:
+  ///   Page number
+  ///
+  /// * [int] size:
+  ///   Number of suggestions per page
+  Future<Response> getSpacePersonFaceSuggestionsWithHttpInfo(String id, String personId, { int? page, int? size, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/people/{personId}/face-suggestions'
+      .replaceAll('{id}', id)
+      .replaceAll('{personId}', personId);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    if (page != null) {
+      queryParams.addAll(_queryParams('', 'page', page));
+    }
+    if (size != null) {
+      queryParams.addAll(_queryParams('', 'size', size));
+    }
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'GET',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Get face suggestions for a person in a shared space
+  ///
+  /// Retrieve near-miss unassigned faces suggested for this space person, best match first.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  ///
+  /// * [String] personId (required):
+  ///   Space person ID
+  ///
+  /// * [int] page:
+  ///   Page number
+  ///
+  /// * [int] size:
+  ///   Number of suggestions per page
+  Future<PersonFaceSuggestionPageResponseDto?> getSpacePersonFaceSuggestions(String id, String personId, { int? page, int? size, }) async {
+    final response = await getSpacePersonFaceSuggestionsWithHttpInfo(id, personId,  page: page, size: size, );
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'PersonFaceSuggestionPageResponseDto',) as PersonFaceSuggestionPageResponseDto;
+    
     }
     return null;
   }
