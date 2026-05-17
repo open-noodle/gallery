@@ -388,6 +388,9 @@ describe(PetDetectionService.name, () => {
 
         expect(mocks.person.create).not.toHaveBeenCalled();
         expect(mocks.person.createAssetFace).not.toHaveBeenCalled();
+        expect(mocks.job.queueAll).not.toHaveBeenCalled();
+        expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+        expect(mocks.event.emit).not.toHaveBeenCalled();
       });
 
       it('should handle out of memory errors during inference', async () => {
@@ -398,6 +401,9 @@ describe(PetDetectionService.name, () => {
         expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Failed);
 
         expect(mocks.person.create).not.toHaveBeenCalled();
+        expect(mocks.job.queueAll).not.toHaveBeenCalled();
+        expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+        expect(mocks.event.emit).not.toHaveBeenCalled();
       });
 
       it('should handle model loading timeout errors', async () => {
@@ -406,6 +412,10 @@ describe(PetDetectionService.name, () => {
         mocks.machineLearning.detectPets.mockRejectedValue(new Error('model load timeout'));
 
         expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Failed);
+
+        expect(mocks.job.queueAll).not.toHaveBeenCalled();
+        expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+        expect(mocks.event.emit).not.toHaveBeenCalled();
       });
     });
   });
