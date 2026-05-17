@@ -28,6 +28,10 @@
   - Owns duplicate-resolution keeper propagation and retryable queue-failure trigger contracts.
 - Modify: `server/src/services/pet-detection.service.spec.ts`
   - Owns pet detection queue-root and per-asset trigger contracts.
+- Audit/Modify: `server/src/services/person.service.spec.ts`
+  - Owns app bootstrap identity backfill trigger contracts from the trigger matrix.
+- Audit: `server/src/repositories/job.repository.spec.ts`
+  - Owns stable job id behavior for duplicate root backfill jobs and retrigger dedupe; do not edit unless the audit finds missing coverage.
 
 ## Execution Preflight
 
@@ -55,10 +59,58 @@ codex/face-queues-test-plan
 Run:
 
 ```bash
-pnpm --filter immich test -- --run src/services/job.service.spec.ts src/services/queue.service.spec.ts src/services/asset.service.spec.ts src/services/library.service.spec.ts src/services/metadata.service.spec.ts src/services/duplicate.service.spec.ts src/services/shared-space.service.spec.ts src/services/pet-detection.service.spec.ts
+pnpm --filter immich test -- --run src/services/job.service.spec.ts src/services/queue.service.spec.ts src/services/asset.service.spec.ts src/services/library.service.spec.ts src/services/metadata.service.spec.ts src/services/duplicate.service.spec.ts src/services/shared-space.service.spec.ts src/services/pet-detection.service.spec.ts src/services/person.service.spec.ts
 ```
 
 Expected: all targeted specs pass before new tests are added. If a pre-existing failure appears, stop and investigate before adding coverage.
+
+- [ ] **Step 3: Audit existing stable-job dedupe coverage**
+
+Run:
+
+```bash
+rg -n "FaceIdentityBackfill|SharedSpacePersonMetadataBackfill|stable|jobId" server/src/repositories/job.repository.spec.ts
+```
+
+Expected: output includes root, cursor, continuation, and metadata-backfill stable job id coverage. If those cases are missing, add `server/src/repositories/job.repository.spec.ts` to this plan before implementation and cover manual retrigger dedupe there.
+
+## TDD Protocol For This Coverage Slice
+
+This is primarily a test-coverage slice. Most behavior may already be implemented. Use this protocol for every task:
+
+- [ ] **Step 1: Write tests before production code**
+
+Add the new service-spec assertions first. Do not edit service implementation before the new test exists.
+
+- [ ] **Step 2: Run the smallest targeted test selection**
+
+Use either the full spec command in the task or a focused `-t` selector for the new test name. Expected result:
+
+- FAIL if the current implementation does not satisfy the contract.
+- PASS if the contract was already implemented and this is coverage-only.
+
+- [ ] **Step 3: If a test fails, make the minimal production fix**
+
+Only change production code for a failing contract test. Do not combine unrelated queue behavior changes in this slice.
+
+- [ ] **Step 4: Prove the assertion can fail**
+
+For at least one new assertion per touched spec file, temporarily change one expected `JobName` or `force` value to an intentionally wrong value, run the focused test and confirm it fails, then restore the correct expectation before committing. This prevents adding a vacuous test that cannot catch regressions.
+
+## Spec Coverage Map
+
+- Upload and thumbnail completion: Task 2 covers upload, non-upload, hidden upload, missing asset, image, and video job contracts.
+- Manual asset jobs: Task 2 covers multi-asset refresh faces and access failure no-op.
+- Admin queue starts: Task 1 covers face detection, facial recognition, people backfill, active recognition start behavior, and unrelated queues.
+- Nightly jobs: Task 1 covers `PersonCleanup`, missing thumbnails, non-force `clusterNewFaces`, disabled switches, and issue #597 scheduled-trigger boundaries. Stuck recognition queue mutation behavior belongs to Slice 3 and full overnight composition belongs to Slice 8.
+- Manual job endpoint: Task 2 covers identity backfill, shared-space metadata backfill, person cleanup, invalid jobs, and root-only side effects. Stable backfill job id dedupe remains in `job.repository.spec.ts`; audit that file before execution and only add a job repository test if coverage is missing.
+- App bootstrap: Task 7 covers root backfill queueing, no-work no-op, active/waiting/delayed/paused dedupe query, and no direct projection fan-out.
+- Metadata face import: Task 4 covers disabled import, no-space import, multi-space targeted backfill, identity linking, and thumbnail queueing.
+- Library sync and link: Task 3 covers scheduled scan roots and linked-library asset import; Task 5 covers link, duplicate link, unlink cleanup, and disabled face-recognition link behavior.
+- Shared-space membership and asset changes: Task 5 covers face-recognition toggle, add/remove members, add/remove assets, delete space, queue bulk add, and bulk-add handler behavior.
+- Duplicate resolution: Task 6 covers keeper propagation, no editable spaces, no keepers, add failure, queue failure retry, and downstream disabled-space skip behavior.
+- Pet detection: Task 6 covers disabled queue root, force fan-out, missing asset or preview, hidden asset, new species, existing species, first thumbnail, and no-pet no-op.
+- Manual people and face operations: intentionally deferred to Slice 7; they are destructive user operations rather than Slice 1 queue-trigger roots.
 
 ## Task 1: QueueService Scheduled And Admin Triggers
 
@@ -129,7 +181,54 @@ it.each([
 });
 ```
 
-- [ ] **Step 4: Run QueueService tests**
+- [ ] **Step 4: Add explicit nightly cleanup trigger coverage**
+
+In `describe('handleNightlyJobs')`, add:
+
+```ts
+it('should queue PersonCleanup only when nightly database cleanup is enabled', async () => {
+  await sut.handleNightlyJobs();
+  expect(mocks.job.queueAll.mock.calls[0][0]).toContainEqual({ name: JobName.PersonCleanup });
+
+  mocks.job.queueAll.mockClear();
+  mocks.systemMetadata.get.mockResolvedValue({
+    nightlyTasks: {
+      ...defaults.nightlyTasks,
+      databaseCleanup: false,
+    },
+  });
+
+  await sut.handleNightlyJobs();
+
+  expect(mocks.job.queueAll.mock.calls[0][0]).not.toContainEqual({ name: JobName.PersonCleanup });
+});
+```
+
+- [ ] **Step 5: Add unrelated queue start no-face coverage**
+
+In `describe('handleCommand')`, add:
+
+```ts
+it.each([
+  QueueName.VideoConversion,
+  QueueName.SmartSearch,
+  QueueName.MetadataExtraction,
+  QueueName.Sidecar,
+  QueueName.ThumbnailGeneration,
+  QueueName.Library,
+] as const)('should not enqueue face identity roots when starting unrelated queue %s', async (queueName) => {
+  mocks.job.isActive.mockResolvedValue(false);
+  mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
+
+  await sut.runCommandLegacy(queueName, { command: QueueCommand.Start, force: false });
+
+  expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }));
+  expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }));
+  expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.FaceIdentityBackfill }));
+});
+```
+
+- [ ] **Step 6: Run QueueService tests**
 
 Run:
 
@@ -139,7 +238,7 @@ pnpm --filter immich test -- --run src/services/queue.service.spec.ts
 
 Expected: PASS. If a new test fails, fix only the trigger contract that failed.
 
-- [ ] **Step 5: Commit Task 1**
+- [ ] **Step 7: Commit Task 1**
 
 Run:
 
@@ -193,7 +292,46 @@ it.each([
 });
 ```
 
-- [ ] **Step 3: Strengthen manual refresh-faces multi-asset coverage**
+- [ ] **Step 3: Add invalid manual job no-queue coverage**
+
+In `server/src/services/job.service.spec.ts`, extend the invalid manual job test with explicit queue assertions:
+
+```ts
+it('should not queue anything for an invalid manual job name', async () => {
+  await expect(sut.create({ name: 'invalid-job' as ManualJobName })).rejects.toThrow(BadRequestException);
+
+  expect(mocks.job.queue).not.toHaveBeenCalled();
+  expect(mocks.job.queueAll).not.toHaveBeenCalled();
+});
+```
+
+- [ ] **Step 4: Add hidden upload queue-decision coverage**
+
+In `server/src/services/job.service.spec.ts`, inside `describe('onDone - AssetGenerateThumbnails')`, add:
+
+```ts
+it('should still queue upload follow-up jobs for hidden assets while suppressing upload notifications', async () => {
+  mocks.job.run.mockResolvedValue(JobStatus.Success);
+  const id = newUuid();
+  const asset = AssetFactory.create({ id, visibility: AssetVisibility.Hidden });
+  mocks.asset.getByIdsWithAllRelationsButStacks.mockResolvedValue([asset] as any);
+
+  await sut.onJobRun(QueueName.ThumbnailGeneration, {
+    name: JobName.AssetGenerateThumbnails,
+    data: { id, source: 'upload' },
+  });
+
+  expect(mocks.job.queueAll).toHaveBeenCalledWith([
+    { name: JobName.SmartSearch, data: { id, source: 'upload' } },
+    { name: JobName.AssetDetectFaces, data: { id, source: 'upload' } },
+    { name: JobName.Ocr, data: { id, source: 'upload' } },
+    { name: JobName.PetDetection, data: { id, source: 'upload' } },
+  ]);
+  expect(mocks.websocket.clientSend).not.toHaveBeenCalled();
+});
+```
+
+- [ ] **Step 5: Strengthen manual refresh-faces multi-asset coverage**
 
 In `server/src/services/asset.service.spec.ts`, inside `describe('run')`, add:
 
@@ -212,7 +350,16 @@ it('should queue only per-asset face detection jobs for manual refresh faces', a
 });
 ```
 
-- [ ] **Step 4: Run JobService and AssetService tests**
+- [ ] **Step 6: Add manual refresh-faces access failure no-queue assertion**
+
+In `server/src/services/asset.service.spec.ts`, extend the existing access failure test with:
+
+```ts
+expect(mocks.job.queue).not.toHaveBeenCalled();
+expect(mocks.job.queueAll).not.toHaveBeenCalled();
+```
+
+- [ ] **Step 7: Run JobService and AssetService tests**
 
 Run:
 
@@ -222,7 +369,7 @@ pnpm --filter immich test -- --run src/services/job.service.spec.ts src/services
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 2**
+- [ ] **Step 8: Commit Task 2**
 
 Run:
 
@@ -244,6 +391,7 @@ In `describe('onConfigInit')`, add:
 ```ts
 it('should schedule library scan cron to queue only the library scan root', async () => {
   mocks.cron.create.mockResolvedValue();
+  mocks.job.queue.mockResolvedValue(undefined as any);
 
   await sut.onConfigInit({ newConfig: defaults });
 
@@ -332,7 +480,19 @@ it('should queue sidecar refresh and targeted space face match for imported link
 });
 ```
 
-- [ ] **Step 4: Run LibraryService tests**
+- [ ] **Step 4: Strengthen linked-library disabled and no-space coverage**
+
+In `describe('handleSyncFiles')`, inside `describe('space face matching')`, extend the existing no-space and disabled-space tests with exact queue assertions:
+
+```ts
+expect(mocks.job.queueAll).toHaveBeenCalledWith([
+  { name: JobName.SidecarCheck, data: { id: expect.any(String), source: 'upload' } },
+]);
+expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpaceFaceMatch }));
+expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }));
+```
+
+- [ ] **Step 5: Run LibraryService tests**
 
 Run:
 
@@ -342,7 +502,7 @@ pnpm --filter immich test -- --run src/services/library.service.spec.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 3**
+- [ ] **Step 6: Commit Task 3**
 
 Run:
 
@@ -508,7 +668,106 @@ expect(mocks.job.queue).toHaveBeenCalledWith({
 });
 ```
 
-- [ ] **Step 5: Run SharedSpaceService tests**
+- [ ] **Step 5: Strengthen face-recognition toggle assertions**
+
+In `describe('update')`, extend the false-to-true, true-to-false, and already-true face-recognition tests with exact queue count assertions:
+
+```ts
+expect(mocks.job.queue).toHaveBeenCalledWith({
+  name: JobName.SharedSpaceFaceMatchAll,
+  data: { spaceId: space.id },
+});
+```
+
+For the true-to-false and already-true tests, use:
+
+```ts
+expect(mocks.job.queue).not.toHaveBeenCalledWith(
+  expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }),
+);
+```
+
+- [ ] **Step 6: Strengthen delete-space and remove-member metadata backfill assertions**
+
+In `describe('remove')`, extend the delete-space metadata test with:
+
+```ts
+expect(mocks.job.queue).toHaveBeenCalledTimes(1);
+expect(mocks.job.queue).toHaveBeenCalledWith({
+  name: JobName.SharedSpacePersonMetadataBackfill,
+  data: {},
+});
+```
+
+In `describe('removeMember')`, extend both member-removal metadata tests with:
+
+```ts
+expect(mocks.job.queue).toHaveBeenCalledWith({
+  name: JobName.SharedSpacePersonMetadataBackfill,
+  data: {},
+});
+expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }));
+```
+
+- [ ] **Step 7: Strengthen remove-assets and bulk-add trigger assertions**
+
+In `describe('removeAssets')`, extend the metadata backfill test with:
+
+```ts
+expect(mocks.sharedSpace.removePersonFacesByAssetIds).toHaveBeenCalledWith(spaceId, [assetId]);
+expect(mocks.sharedSpace.deleteOrphanedPersons).toHaveBeenCalledWith(spaceId);
+expect(mocks.job.queue).toHaveBeenCalledWith({
+  name: JobName.SharedSpacePersonMetadataBackfill,
+  data: {},
+});
+```
+
+In `describe('queueBulkAdd')`, extend the editor and owner tests with:
+
+```ts
+expect(mocks.job.queue).toHaveBeenCalledWith({
+  name: JobName.SharedSpaceBulkAddAssets,
+  data: { spaceId, userId: auth.user.id },
+});
+```
+
+In `describe('handleSharedSpaceBulkAddAssets')`, extend the count-zero and disabled tests with:
+
+```ts
+expect(mocks.job.queue).not.toHaveBeenCalledWith(
+  expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }),
+);
+```
+
+For the enabled test, keep the exact positive assertion:
+
+```ts
+expect(mocks.job.queue).toHaveBeenCalledWith({
+  name: JobName.SharedSpaceFaceMatchAll,
+  data: { spaceId },
+});
+```
+
+- [ ] **Step 8: Strengthen link-library trigger assertions**
+
+In `describe('linkLibrary')`, extend the enabled test with:
+
+```ts
+expect(mocks.job.queue).toHaveBeenCalledWith({
+  name: JobName.SharedSpaceLibraryFaceSync,
+  data: { spaceId: space.id, libraryId: library.id },
+});
+```
+
+For disabled and duplicate-link tests, use:
+
+```ts
+expect(mocks.job.queue).not.toHaveBeenCalledWith(
+  expect.objectContaining({ name: JobName.SharedSpaceLibraryFaceSync }),
+);
+```
+
+- [ ] **Step 9: Run SharedSpaceService tests**
 
 Run:
 
@@ -518,7 +777,7 @@ pnpm --filter immich test -- --run src/services/shared-space.service.spec.ts
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 5**
+- [ ] **Step 10: Commit Task 5**
 
 Run:
 
@@ -630,7 +889,86 @@ git add server/src/services/duplicate.service.spec.ts server/src/services/pet-de
 git commit -m "test: cover duplicate and pet face trigger contracts"
 ```
 
-## Task 7: Final Slice Verification
+## Task 7: PersonService App Bootstrap Trigger Audit
+
+**Files:**
+
+- Modify: `server/src/services/person.service.spec.ts`
+
+- [ ] **Step 1: Strengthen bootstrap backfill trigger status coverage**
+
+In `server/src/services/person.service.spec.ts`, update the import from `src/enum` to include `QueueJobStatus`:
+
+```ts
+import {
+  AssetFileType,
+  AssetVisibility,
+  CacheControl,
+  JobName,
+  JobStatus,
+  MetadataKey,
+  QueueJobStatus,
+  QueueName,
+  SourceType,
+  SystemMetadataKey,
+} from 'src/enum';
+```
+
+Then add this test inside `describe('onBootstrap')`:
+
+```ts
+it('should not queue a duplicate identity backfill root while any backfill job is active, waiting, delayed, or paused', async () => {
+  (mocks.faceIdentity as any).hasBackfillWork.mockResolvedValue(true);
+  mocks.job.searchJobs.mockResolvedValue([
+    {
+      id: 'face-identity-backfill/root',
+      name: JobName.FaceIdentityBackfill,
+      timestamp: Date.now(),
+      data: {},
+    },
+  ]);
+
+  await sut.onBootstrap();
+
+  expect(mocks.job.searchJobs).toHaveBeenCalledWith(QueueName.PeopleBackfill, {
+    status: [QueueJobStatus.Active, QueueJobStatus.Delayed, QueueJobStatus.Paused, QueueJobStatus.Waiting],
+  });
+  expect(mocks.job.queue).not.toHaveBeenCalled();
+});
+```
+
+- [ ] **Step 2: Assert bootstrap does not start projection fan-out directly**
+
+Extend the existing positive bootstrap test with:
+
+```ts
+expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }));
+expect(mocks.job.queue).not.toHaveBeenCalledWith(
+  expect.objectContaining({ name: JobName.SharedSpaceFaceMatchFromBackfill }),
+);
+expect(mocks.job.queueAll).not.toHaveBeenCalled();
+```
+
+- [ ] **Step 3: Run PersonService bootstrap tests**
+
+Run:
+
+```bash
+pnpm --filter immich test -- --run src/services/person.service.spec.ts -t "onBootstrap"
+```
+
+Expected: PASS.
+
+- [ ] **Step 4: Commit Task 7**
+
+Run:
+
+```bash
+git add server/src/services/person.service.spec.ts
+git commit -m "test: cover bootstrap identity trigger contract"
+```
+
+## Task 8: Final Slice Verification
 
 **Files:**
 
@@ -641,7 +979,7 @@ git commit -m "test: cover duplicate and pet face trigger contracts"
 Run:
 
 ```bash
-pnpm --filter immich test -- --run src/services/job.service.spec.ts src/services/queue.service.spec.ts src/services/asset.service.spec.ts src/services/library.service.spec.ts src/services/metadata.service.spec.ts src/services/duplicate.service.spec.ts src/services/shared-space.service.spec.ts src/services/pet-detection.service.spec.ts
+pnpm --filter immich test -- --run src/services/job.service.spec.ts src/services/queue.service.spec.ts src/services/asset.service.spec.ts src/services/library.service.spec.ts src/services/metadata.service.spec.ts src/services/duplicate.service.spec.ts src/services/shared-space.service.spec.ts src/services/pet-detection.service.spec.ts src/services/person.service.spec.ts
 ```
 
 Expected: PASS.
@@ -669,10 +1007,10 @@ Expected: `git diff --check` emits no output. `git status --short` lists only in
 
 - [ ] **Step 4: Commit any remaining verification-only adjustments**
 
-If Task 7 changed files, commit them:
+If final verification changed files, commit them:
 
 ```bash
-git add server/src/services/job.service.spec.ts server/src/services/queue.service.spec.ts server/src/services/asset.service.spec.ts server/src/services/library.service.spec.ts server/src/services/metadata.service.spec.ts server/src/services/duplicate.service.spec.ts server/src/services/shared-space.service.spec.ts server/src/services/pet-detection.service.spec.ts
+git add server/src/services/job.service.spec.ts server/src/services/queue.service.spec.ts server/src/services/asset.service.spec.ts server/src/services/library.service.spec.ts server/src/services/metadata.service.spec.ts server/src/services/duplicate.service.spec.ts server/src/services/shared-space.service.spec.ts server/src/services/pet-detection.service.spec.ts server/src/services/person.service.spec.ts
 git commit -m "test: complete face trigger contract coverage"
 ```
 
@@ -685,8 +1023,9 @@ Expected: clean worktree after the final commit.
 - [ ] External library scan cron is asserted to queue only the library scan root directly.
 - [ ] Manual face refresh queues one `AssetDetectFaces` per requested asset with no coordinator shortcut.
 - [ ] Manual identity/backfill job endpoint queues only the requested root job.
+- [ ] App bootstrap identity backfill queues one root job only when work exists and no backfill job is active, waiting, delayed, or paused.
 - [ ] EXIF face import queues thumbnails, identity links, and targeted shared-space backfill only when applicable.
-- [ ] Shared-space add/remove/member/link/unlink/bulk triggers have explicit enabled and disabled assertions.
+- [ ] Shared-space toggle/member/add/remove/delete/link/unlink/bulk triggers have explicit enabled and disabled assertions.
 - [ ] Duplicate keeper propagation covers no spaces, no keepers, add failure, and queue failure retry.
 - [ ] Pet queue root covers disabled, force, and per-asset fan-out.
 - [ ] No test in this slice requires real ML, Redis workers, filesystem scanning, or medium DB fixtures.
