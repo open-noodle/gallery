@@ -254,13 +254,13 @@ describe(PersonService.name, () => {
       await expect(
         ctx.database
           .selectFrom('shared_space_person')
-          .select(['id', 'name'])
+          .select(['id', 'identityId', 'name'])
           .where('id', 'in', [mlSpacePerson.id, manualSpacePerson.id, exifSpacePerson.id])
           .orderBy('name')
           .execute(),
       ).resolves.toEqual([
-        { id: exifSpacePerson.id, name: 'Exif Space' },
-        { id: manualSpacePerson.id, name: 'Manual Space' },
+        { id: exifSpacePerson.id, identityId: exif.identity.id, name: 'Exif Space' },
+        { id: manualSpacePerson.id, identityId: manual.identity.id, name: 'Manual Space' },
       ]);
       await expect(
         ctx.database
@@ -420,14 +420,14 @@ describe(PersonService.name, () => {
       await expect(
         ctx.database
           .selectFrom('shared_space_person')
-          .select(['id', 'name'])
+          .select(['id', 'identityId', 'name'])
           .where('id', 'in', [mlSpacePerson.id, manualSpacePerson.id, exifSpacePerson.id])
           .orderBy('name')
           .execute(),
       ).resolves.toEqual([
-        { id: exifSpacePerson.id, name: 'Exif Space' },
-        { id: mlSpacePerson.id, name: 'Machine Space' },
-        { id: manualSpacePerson.id, name: 'Manual Space' },
+        { id: exifSpacePerson.id, identityId: exif.identity.id, name: 'Exif Space' },
+        { id: mlSpacePerson.id, identityId: ml.identity.id, name: 'Machine Space' },
+        { id: manualSpacePerson.id, identityId: manual.identity.id, name: 'Manual Space' },
       ]);
       await expect(
         ctx.database
