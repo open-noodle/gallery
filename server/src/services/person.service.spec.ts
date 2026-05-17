@@ -96,9 +96,15 @@ describe(PersonService.name, () => {
         data: {},
       });
       expect(mocks.job.searchJobs).toHaveBeenCalledWith(QueueName.PeopleBackfill, expect.any(Object));
-      expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }));
-      expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }));
-      expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }));
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }),
+      );
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
+      );
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }),
+      );
       expect(mocks.job.queue).not.toHaveBeenCalledWith(
         expect.objectContaining({ name: JobName.SharedSpaceFaceMatchFromBackfill }),
       );
