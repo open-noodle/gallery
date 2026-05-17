@@ -50,6 +50,8 @@ describe('PersonFaceSuggestion DTOs', () => {
 
   it('space person params schema requires space and person uuids', () => {
     expect(() => SpacePersonParamsDto.schema.parse({ id: 'not-a-uuid', personId: 'x' })).toThrow();
+    expect(SpacePersonParamsDto.schema.shape.id.description).toBe('Shared space ID');
+    expect(SpacePersonParamsDto.schema.shape.personId.description).toBe('Space person ID');
     const ok = SpacePersonParamsDto.schema.parse({
       id: '00000000-0000-4000-8000-000000000005',
       personId: '00000000-0000-4000-8000-000000000006',
@@ -61,13 +63,16 @@ describe('PersonFaceSuggestion DTOs', () => {
   });
 
   it('space person face suggestion params schema requires space, person, and face uuids', () => {
-    expect(() =>
-      SpacePersonFaceSuggestionParamsDto.schema.parse({
-        id: 'not-a-uuid',
-        personId: '00000000-0000-4000-8000-000000000007',
-        assetFaceId: 'x',
-      }),
-    ).toThrow();
+    expect(SpacePersonFaceSuggestionParamsDto.schema.shape.assetFaceId.description).toBe(
+      'Unassigned asset face ID being reviewed',
+    );
+    const invalidFace = SpacePersonFaceSuggestionParamsDto.schema.safeParse({
+      id: '00000000-0000-4000-8000-000000000007',
+      personId: '00000000-0000-4000-8000-000000000008',
+      assetFaceId: 'x',
+    });
+    expect(invalidFace.success).toBe(false);
+    expect(invalidFace.error?.issues.map((issue) => issue.path)).toContainEqual(['assetFaceId']);
     const ok = SpacePersonFaceSuggestionParamsDto.schema.parse({
       id: '00000000-0000-4000-8000-000000000007',
       personId: '00000000-0000-4000-8000-000000000008',

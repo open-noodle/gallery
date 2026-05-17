@@ -52,13 +52,13 @@ const SharedSpacePersonMergeSchema = z
 
 const SpacePersonParamsSchema = z
   .object({
-    id: z.uuidv4(),
-    personId: z.uuidv4(),
+    id: z.uuidv4().describe('Shared space ID'),
+    personId: z.uuidv4().describe('Space person ID'),
   })
   .meta({ id: 'SpacePersonParamsDto' });
 
 const SpacePersonFaceSuggestionParamsSchema = SpacePersonParamsSchema.extend({
-  assetFaceId: z.uuidv4(),
+  assetFaceId: z.uuidv4().describe('Unassigned asset face ID being reviewed'),
 }).meta({ id: 'SpacePersonFaceSuggestionParamsDto' });
 
 const SharedSpacePersonResponseSchema = z
