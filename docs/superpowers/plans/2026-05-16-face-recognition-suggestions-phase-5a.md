@@ -26,6 +26,7 @@
 ### Task 1: Add space-person targeting to the suggestion schema
 
 **Files:**
+
 - Modify: `server/src/schema/tables/person-face-suggestion.table.ts`
 - Create: `server/src/schema/migrations-gallery/1779000000000-AddSpacePersonFaceSuggestion.ts`
 - Modify: `server/test/medium/specs/migrations/person-face-suggestion.migration.spec.ts`
@@ -87,10 +88,12 @@ it('uses partial unique indexes for personal and space-person suggestions', asyn
     'person_face_suggestion_spacePersonId_assetFaceId_uq',
     'person_face_suggestion_spacePersonId_status_distance_idx',
   ]);
-  expect(indexes.rows.find((row) => row.indexname === 'person_face_suggestion_personId_assetFaceId_uq')?.indexdef)
-    .toContain('WHERE ("personId" IS NOT NULL)');
-  expect(indexes.rows.find((row) => row.indexname === 'person_face_suggestion_spacePersonId_assetFaceId_uq')?.indexdef)
-    .toContain('WHERE ("spacePersonId" IS NOT NULL)');
+  expect(
+    indexes.rows.find((row) => row.indexname === 'person_face_suggestion_personId_assetFaceId_uq')?.indexdef,
+  ).toContain('WHERE ("personId" IS NOT NULL)');
+  expect(
+    indexes.rows.find((row) => row.indexname === 'person_face_suggestion_spacePersonId_assetFaceId_uq')?.indexdef,
+  ).toContain('WHERE ("spacePersonId" IS NOT NULL)');
 });
 
 it('keeps the updatedAt trigger migration override row intact', async () => {
@@ -278,6 +281,7 @@ git commit -m "feat(server): support space-person face suggestion rows"
 ### Task 2: Add space-scoped `searchFaces`
 
 **Files:**
+
 - Modify: `server/src/repositories/search.repository.ts`
 - Modify: `server/test/medium/specs/repositories/search.repository.spec.ts`
 
@@ -305,11 +309,14 @@ it('spaceId scope returns unassigned faces from direct shared assets and linked 
   const { asset: outsideAsset } = await ctx.newAsset({ ownerId: other.id });
   const { assetFace: outsideFace } = await ctx.newAssetFace({ assetId: outsideAsset.id, personId: null });
 
-  await ctx.database.insertInto('face_search').values([
-    { faceId: directFace.id, embedding },
-    { faceId: libraryFace.id, embedding },
-    { faceId: outsideFace.id, embedding },
-  ]).execute();
+  await ctx.database
+    .insertInto('face_search')
+    .values([
+      { faceId: directFace.id, embedding },
+      { faceId: libraryFace.id, embedding },
+      { faceId: outsideFace.id, embedding },
+    ])
+    .execute();
 
   const result = await sut.searchFaces({
     spaceId: space.id,
@@ -335,10 +342,13 @@ it('spaceId scope still respects hasPerson:false', async () => {
   const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Ada' });
   const { assetFace: assigned } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
   const { assetFace: unassigned } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-  await ctx.database.insertInto('face_search').values([
-    { faceId: assigned.id, embedding },
-    { faceId: unassigned.id, embedding },
-  ]).execute();
+  await ctx.database
+    .insertInto('face_search')
+    .values([
+      { faceId: assigned.id, embedding },
+      { faceId: unassigned.id, embedding },
+    ])
+    .execute();
 
   const result = await sut.searchFaces({
     spaceId: space.id,
@@ -453,6 +463,7 @@ git commit -m "feat(server): add space-scoped face embedding search"
 ### Task 3: Add shared-space scan repository methods
 
 **Files:**
+
 - Modify: `server/src/repositories/shared-space.repository.ts`
 - Modify: `server/test/medium/specs/repositories/shared-space.repository.spec.ts`
 
@@ -470,12 +481,19 @@ describe('space face suggestion scan helpers', () => {
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
     const { assetFace: linkedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
     const { assetFace: unlinkedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-    const spacePerson = await sut.createPerson({ spaceId: space.id, name: 'Alice', representativeFaceId: linkedFace.id });
+    const spacePerson = await sut.createPerson({
+      spaceId: space.id,
+      name: 'Alice',
+      representativeFaceId: linkedFace.id,
+    });
     await sut.addPersonFaces([{ personId: spacePerson.id, assetFaceId: linkedFace.id }]);
-    await ctx.database.insertInto('face_search').values([
-      { faceId: linkedFace.id, embedding: newEmbedding() },
-      { faceId: unlinkedFace.id, embedding: newEmbedding() },
-    ]).execute();
+    await ctx.database
+      .insertInto('face_search')
+      .values([
+        { faceId: linkedFace.id, embedding: newEmbedding() },
+        { faceId: unlinkedFace.id, embedding: newEmbedding() },
+      ])
+      .execute();
 
     const rows = await sut.getSpacePersonAssignedFaceEmbeddings(spacePerson.id, 20);
 
@@ -497,7 +515,12 @@ describe('space face suggestion scan helpers', () => {
     const whitespace = await sut.createPerson({ spaceId: space.id, name: '   ', type: 'person', isHidden: false });
     const hidden = await sut.createPerson({ spaceId: space.id, name: 'Hidden', type: 'person', isHidden: true });
     const pet = await sut.createPerson({ spaceId: space.id, name: 'Pet', type: 'pet', isHidden: false });
-    const disabled = await sut.createPerson({ spaceId: disabledSpace.id, name: 'Disabled', type: 'person', isHidden: false });
+    const disabled = await sut.createPerson({
+      spaceId: disabledSpace.id,
+      name: 'Disabled',
+      type: 'person',
+      isHidden: false,
+    });
 
     const ids: string[] = [];
     for await (const row of sut.getScannableSpacePeopleWithUnassignedFaces()) {
@@ -632,6 +655,7 @@ git commit -m "feat(server): add space-person suggestion scan queries"
 ### Task 4: Add space-keyed suggestion repository methods and read filtering
 
 **Files:**
+
 - Modify: `server/src/repositories/person-face-suggestion.repository.ts`
 - Modify: `server/test/medium/specs/repositories/person-face-suggestion.repository.spec.ts`
 
@@ -654,9 +678,13 @@ describe('space-person suggestion methods', () => {
       .returningAll()
       .executeTakeFirstOrThrow();
 
-    await sut.upsertPendingForSpacePerson([{ spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.7 }]);
+    await sut.upsertPendingForSpacePerson([
+      { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.7 },
+    ]);
     expect(await sut.markDismissedForSpacePerson(spacePerson.id, assetFace.id)).toBe(1);
-    await sut.upsertPendingForSpacePerson([{ spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.6 }]);
+    await sut.upsertPendingForSpacePerson([
+      { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.6 },
+    ]);
 
     const row = await defaultDatabase
       .selectFrom('person_face_suggestion')
@@ -681,7 +709,9 @@ describe('space-person suggestion methods', () => {
       .returningAll()
       .executeTakeFirstOrThrow();
 
-    await sut.upsertPendingForSpacePerson([{ spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.7 }]);
+    await sut.upsertPendingForSpacePerson([
+      { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.7 },
+    ]);
 
     expect(await sut.markConfirmedForSpacePerson(spacePerson.id, assetFace.id)).toBe(1);
     expect(await sut.markConfirmedForSpacePerson(spacePerson.id, assetFace.id)).toBe(0);
@@ -784,7 +814,9 @@ describe('space-person suggestion methods', () => {
       .executeTakeFirstOrThrow();
 
     await sut.upsertPending([{ personId: person.id, assetFaceId: assetFace.id, distance: 0.65 }]);
-    await sut.upsertPendingForSpacePerson([{ spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.7 }]);
+    await sut.upsertPendingForSpacePerson([
+      { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.7 },
+    ]);
     await sut.resolveAssignedFace(assetFace.id);
 
     const pending = await defaultDatabase
@@ -931,6 +963,7 @@ git commit -m "feat(server): add space-person suggestion repository methods"
 ### Task 5: Add space-person suggestion job names and scan handlers
 
 **Files:**
+
 - Modify: `server/src/enum.ts`
 - Modify: `server/src/types.ts`
 - Modify: `server/src/services/person.service.ts`
@@ -999,16 +1032,28 @@ describe('handleSpacePersonSuggestionScan', () => {
       { id: 'p', spaceId: 's', name: 'Alice', isHidden: false, type: 'person', faceRecognitionEnabled: false },
     ]) {
       (mocks.sharedSpace as any).getPersonById.mockResolvedValueOnce(person);
-      (mocks.sharedSpace as any).getById.mockResolvedValueOnce({ id: 's', faceRecognitionEnabled: person.faceRecognitionEnabled });
+      (mocks.sharedSpace as any).getById.mockResolvedValueOnce({
+        id: 's',
+        faceRecognitionEnabled: person.faceRecognitionEnabled,
+      });
       await expect(sut.handleSpacePersonSuggestionScan({ id: 'p' })).resolves.toBe(JobStatus.Skipped);
     }
   });
 
   it('keeps only the open band, takes min distance per candidate, and upserts by spacePersonId', async () => {
     mocks.systemMetadata.get.mockResolvedValue(enabled);
-    (mocks.sharedSpace as any).getPersonById.mockResolvedValue({ id: 'sp', spaceId: 'space-1', name: 'Alice', isHidden: false, type: 'person' });
+    (mocks.sharedSpace as any).getPersonById.mockResolvedValue({
+      id: 'sp',
+      spaceId: 'space-1',
+      name: 'Alice',
+      isHidden: false,
+      type: 'person',
+    });
     (mocks.sharedSpace as any).getById.mockResolvedValue({ id: 'space-1', faceRecognitionEnabled: true });
-    (mocks.sharedSpace as any).getSpacePersonAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e1' }, { embedding: 'e2' }]);
+    (mocks.sharedSpace as any).getSpacePersonAssignedFaceEmbeddings.mockResolvedValue([
+      { embedding: 'e1' },
+      { embedding: 'e2' },
+    ]);
     mocks.search.searchFaces
       .mockResolvedValueOnce([
         { id: 'too-close', personId: null, distance: 0.5 },
@@ -1018,12 +1063,14 @@ describe('handleSpacePersonSuggestionScan', () => {
 
     await expect(sut.handleSpacePersonSuggestionScan({ id: 'sp' })).resolves.toBe(JobStatus.Success);
 
-    expect(mocks.search.searchFaces).toHaveBeenCalledWith(expect.objectContaining({
-      spaceId: 'space-1',
-      hasPerson: false,
-      maxDistance: 0.8,
-      numResults: 100,
-    }));
+    expect(mocks.search.searchFaces).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spaceId: 'space-1',
+        hasPerson: false,
+        maxDistance: 0.8,
+        numResults: 100,
+      }),
+    );
     expect(mocks.personFaceSuggestion.upsertPendingForSpacePerson).toHaveBeenCalledWith([
       { spacePersonId: 'sp', assetFaceId: 'candidate', distance: 0.6 },
     ]);
@@ -1073,10 +1120,12 @@ describe('handleSpacePersonSuggestionScanQueueAll', () => {
 
   it('queues one SpacePersonSuggestionScan per scannable space person', async () => {
     mocks.systemMetadata.get.mockResolvedValue(enabled);
-    (mocks.sharedSpace as any).getScannableSpacePeopleWithUnassignedFaces.mockReturnValue(makeStream([
-      { id: 'sp1', spaceId: 's1' },
-      { id: 'sp2', spaceId: 's1' },
-    ]));
+    (mocks.sharedSpace as any).getScannableSpacePeopleWithUnassignedFaces.mockReturnValue(
+      makeStream([
+        { id: 'sp1', spaceId: 's1' },
+        { id: 'sp2', spaceId: 's1' },
+      ]),
+    );
 
     await expect(sut.handleSpacePersonSuggestionScanQueueAll({})).resolves.toBe(JobStatus.Success);
 
@@ -1198,6 +1247,7 @@ git commit -m "feat(server): add space-person suggestion scan jobs"
 ### Task 6: Chain space scans at identity-maintenance terminal
 
 **Files:**
+
 - Modify: `server/src/services/person.service.ts`
 - Modify: `server/src/services/person.service.spec.ts`
 
@@ -1294,6 +1344,7 @@ git commit -m "feat(server): chain space face-suggestion scans after identity ma
 ### Task 7: Resolve moved space-person faces during merges and dedup
 
 **Files:**
+
 - Modify: `server/src/services/shared-space.service.ts`
 - Modify: `server/test/medium/specs/services/shared-space-face-identity-repair.spec.ts` or `server/test/medium/specs/services/shared-space-person-metadata-rbac.spec.ts`
 - Modify: `server/src/repositories/shared-space.repository.ts` if `getFaceIdsForPerson` is added
@@ -1314,17 +1365,31 @@ it('resolves pending suggestions for faces moved by mergeSpacePeople', async () 
   await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
   const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
   const { assetFace: sourceFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-  const target = await ctx.database.insertInto('shared_space_person').values({ spaceId: space.id, name: 'Target', representativeFaceId: targetFace.id }).returningAll().executeTakeFirstOrThrow();
-  const source = await ctx.database.insertInto('shared_space_person').values({ spaceId: space.id, name: 'Source', representativeFaceId: sourceFace.id }).returningAll().executeTakeFirstOrThrow();
-  await ctx.database.insertInto('shared_space_person_face').values([
-    { personId: target.id, assetFaceId: targetFace.id },
-    { personId: source.id, assetFaceId: sourceFace.id },
-  ]).execute();
-  await ctx.database.insertInto('person_face_suggestion').values({
-    spacePersonId: target.id,
-    assetFaceId: sourceFace.id,
-    distance: 0.7,
-  }).execute();
+  const target = await ctx.database
+    .insertInto('shared_space_person')
+    .values({ spaceId: space.id, name: 'Target', representativeFaceId: targetFace.id })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+  const source = await ctx.database
+    .insertInto('shared_space_person')
+    .values({ spaceId: space.id, name: 'Source', representativeFaceId: sourceFace.id })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+  await ctx.database
+    .insertInto('shared_space_person_face')
+    .values([
+      { personId: target.id, assetFaceId: targetFace.id },
+      { personId: source.id, assetFaceId: sourceFace.id },
+    ])
+    .execute();
+  await ctx.database
+    .insertInto('person_face_suggestion')
+    .values({
+      spacePersonId: target.id,
+      assetFaceId: sourceFace.id,
+      distance: 0.7,
+    })
+    .execute();
 
   await sut.mergeSpacePeople(auth, space.id, target.id, { ids: [source.id] });
 
@@ -1421,6 +1486,7 @@ git commit -m "feat(server): resolve space suggestions when space people merge"
 ### Task 8: Regenerate SQL docs and run Phase 5a regression
 
 **Files:**
+
 - Generated: `server/src/queries/*.sql`
 
 - [ ] **Step 1: Regenerate SQL docs**
@@ -1452,15 +1518,15 @@ Expected: PASS.
 
 Verify each Phase 5a edge is covered before final commit:
 
-| Edge | Covered By |
-| --- | --- |
-| 21 asset unshared after scan | `getPendingForSpacePerson filters unshared stale rows at read time` |
-| 27 pet space person | shared-space scannable repository test and scan-handler skip test |
-| 29 `suggestionMaxDistance <= maxDistance` | queue-all and per-person scan skip tests |
-| 30 zero linked faces / embeddings | scan-handler zero embeddings test, mirroring personal scan test |
-| 28 shared/personal pending cleanup | `resolveAssignedFace deletes pending personal and space-person rows` |
-| inherited or whitespace names | `BTRIM(name) <> ''` scannable repository test and `person.name.trim()` scan-handler skip |
-| `faceRecognitionEnabled = false` | scannable repository test and scan-handler skip |
+| Edge                                      | Covered By                                                                               |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------- |
+| 21 asset unshared after scan              | `getPendingForSpacePerson filters unshared stale rows at read time`                      |
+| 27 pet space person                       | shared-space scannable repository test and scan-handler skip test                        |
+| 29 `suggestionMaxDistance <= maxDistance` | queue-all and per-person scan skip tests                                                 |
+| 30 zero linked faces / embeddings         | scan-handler zero embeddings test, mirroring personal scan test                          |
+| 28 shared/personal pending cleanup        | `resolveAssignedFace deletes pending personal and space-person rows`                     |
+| inherited or whitespace names             | `BTRIM(name) <> ''` scannable repository test and `person.name.trim()` scan-handler skip |
+| `faceRecognitionEnabled = false`          | scannable repository test and scan-handler skip                                          |
 
 - [ ] **Step 4: Commit generated SQL and final verification**
 

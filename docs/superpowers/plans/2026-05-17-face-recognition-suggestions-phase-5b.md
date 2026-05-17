@@ -30,6 +30,7 @@
 ### Task 1: Add shared-space face-suggestion route DTOs
 
 **Files:**
+
 - Modify: `server/src/dtos/shared-space-person.dto.ts`
 - Modify: `server/src/dtos/person-face-suggestion.dto.spec.ts`
 
@@ -38,10 +39,7 @@
 Append these tests to `server/src/dtos/person-face-suggestion.dto.spec.ts` and update the import to include the two shared-space DTOs:
 
 ```ts
-import {
-  SpacePersonFaceSuggestionParamsDto,
-  SpacePersonParamsDto,
-} from 'src/dtos/shared-space-person.dto';
+import { SpacePersonFaceSuggestionParamsDto, SpacePersonParamsDto } from 'src/dtos/shared-space-person.dto';
 
 it('space person params schema requires shared space and person UUIDs', () => {
   expect(() => SpacePersonParamsDto.schema.parse({ id: 'bad', personId: 'x' })).toThrow();
@@ -130,6 +128,7 @@ git commit -m "feat(server): add shared-space face suggestion DTOs"
 ### Task 2: Add a read-gated candidate guard for direct POSTs
 
 **Files:**
+
 - Modify: `server/src/repositories/person-face-suggestion.repository.ts`
 - Modify: `server/test/medium/specs/repositories/person-face-suggestion.repository.spec.ts`
 
@@ -379,6 +378,7 @@ git commit -m "feat(server): guard space face suggestion actions"
 ### Task 3: Add shared-space service read API with viewer-empty behavior
 
 **Files:**
+
 - Modify: `server/src/services/shared-space.service.ts`
 - Modify: `server/src/services/shared-space.service.spec.ts`
 
@@ -571,6 +571,7 @@ git commit -m "feat(server): read space face suggestions"
 ### Task 4: Add confirm/dismiss service methods with identity linking
 
 **Files:**
+
 - Modify: `server/src/services/shared-space.service.ts`
 - Modify: `server/src/services/shared-space.service.spec.ts`
 
@@ -586,7 +587,9 @@ describe('confirmSpacePersonFaceSuggestion', () => {
 
   beforeEach(() => {
     mocks.systemMetadata.get.mockResolvedValue(enabled);
-    mocks.sharedSpace.getPersonById.mockResolvedValue(factory.sharedSpacePerson({ id: 'space-person-1', spaceId: 'space-1' }));
+    mocks.sharedSpace.getPersonById.mockResolvedValue(
+      factory.sharedSpacePerson({ id: 'space-person-1', spaceId: 'space-1' }),
+    );
     mocks.personFaceSuggestion.hasPendingForSpacePerson.mockResolvedValue(true);
     mocks.faceIdentity.ensureSpacePersonIdentity.mockResolvedValue({ id: 'space-identity-1' } as any);
   });
@@ -616,7 +619,9 @@ describe('confirmSpacePersonFaceSuggestion', () => {
 
   it('rejects a person from another space before identity creation', async () => {
     mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
-    mocks.sharedSpace.getPersonById.mockResolvedValue(factory.sharedSpacePerson({ id: 'space-person-1', spaceId: 'other-space' }));
+    mocks.sharedSpace.getPersonById.mockResolvedValue(
+      factory.sharedSpacePerson({ id: 'space-person-1', spaceId: 'other-space' }),
+    );
 
     await expect(
       sut.confirmSpacePersonFaceSuggestion(factory.auth(), 'space-1', 'space-person-1', 'face-1'),
@@ -642,10 +647,15 @@ describe('confirmSpacePersonFaceSuggestion', () => {
 
     await sut.confirmSpacePersonFaceSuggestion(factory.auth(), 'space-1', 'space-person-1', 'face-1');
 
-    expect(mocks.personFaceSuggestion.hasPendingForSpacePerson).toHaveBeenCalledWith('space-1', 'space-person-1', 'face-1', {
-      maxDistance: 0.5,
-      suggestionMaxDistance: 0.8,
-    });
+    expect(mocks.personFaceSuggestion.hasPendingForSpacePerson).toHaveBeenCalledWith(
+      'space-1',
+      'space-person-1',
+      'face-1',
+      {
+        maxDistance: 0.5,
+        suggestionMaxDistance: 0.8,
+      },
+    );
     expect(mocks.faceIdentity.ensureSpacePersonIdentity).toHaveBeenCalledWith('space-person-1');
     expect(mocks.personFaceSuggestion.markConfirmedForSpacePerson).toHaveBeenCalledWith('space-person-1', 'face-1');
     expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledWith({
@@ -683,7 +693,9 @@ describe('dismissSpacePersonFaceSuggestion', () => {
 
   beforeEach(() => {
     mocks.systemMetadata.get.mockResolvedValue(enabled);
-    mocks.sharedSpace.getPersonById.mockResolvedValue(factory.sharedSpacePerson({ id: 'space-person-1', spaceId: 'space-1' }));
+    mocks.sharedSpace.getPersonById.mockResolvedValue(
+      factory.sharedSpacePerson({ id: 'space-person-1', spaceId: 'space-1' }),
+    );
     mocks.personFaceSuggestion.hasPendingForSpacePerson.mockResolvedValue(true);
   });
 
@@ -854,6 +866,7 @@ If `server/test/utils.ts` was not changed, omit it from `git add`.
 ### Task 5: Add shared-space controller routes
 
 **Files:**
+
 - Modify: `server/src/controllers/shared-space.controller.ts`
 - Modify: `server/src/controllers/shared-space.controller.spec.ts`
 
@@ -1064,6 +1077,7 @@ git commit -m "feat(server): add space face suggestion routes"
 **TDD ordering:** write and run this task's medium tests immediately after Task 2, before implementing Task 4. The tests should be RED because the service methods do not exist yet. Keep the task here in the document because it is the integration coverage checkpoint, but do not defer writing these tests until after the service implementation when executing strictly.
 
 **Files:**
+
 - Create: `server/test/medium/specs/services/shared-space-face-suggestions.service.spec.ts`
 
 - [ ] **Step 1: Create the failing medium test file**
@@ -1263,9 +1277,7 @@ describe('SharedSpaceService space face suggestions', () => {
       .select(['personId', 'spacePersonId', 'status'])
       .where('assetFaceId', '=', fx.assetFace.id)
       .execute();
-    expect(rows).toEqual([
-      expect.objectContaining({ spacePersonId: fx.spacePerson.id, status: 'confirmed' }),
-    ]);
+    expect(rows).toEqual([expect.objectContaining({ spacePersonId: fx.spacePerson.id, status: 'confirmed' })]);
   });
 
   it('confirm overwrites an existing face identity link (edge 32)', async () => {
@@ -1407,6 +1419,7 @@ If only the new test file changed in this task, commit only that file.
 ### Task 7: Regenerate OpenAPI, SDKs, SQL, and run final verification
 
 **Files:**
+
 - Generated: `open-api/immich-openapi-specs.json`
 - Generated: `open-api/typescript-sdk/**`
 - Generated: `mobile/openapi/**`
