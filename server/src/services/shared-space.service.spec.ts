@@ -2246,7 +2246,10 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId1, assetId2]));
-      mocks.sharedSpace.addAssets.mockResolvedValue([]);
+      mocks.sharedSpace.addAssets.mockResolvedValue([
+        { spaceId, assetId: assetId1, addedById: auth.user.id },
+        { spaceId, assetId: assetId2, addedById: auth.user.id },
+      ] as any);
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.update.mockResolvedValue(space);
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
