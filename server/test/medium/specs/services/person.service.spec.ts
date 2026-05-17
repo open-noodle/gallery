@@ -2,23 +2,36 @@ import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
 import { AssetEditAction, MirrorAxis } from 'src/dtos/editing.dto';
 import { AssetFaceCreateDto } from 'src/dtos/person.dto';
-import { AssetVisibility, JobName, JobStatus } from 'src/enum';
+import {
+  AssetFileType,
+  AssetVisibility,
+  JobName,
+  JobStatus,
+  SharedSpaceRole,
+  SourceType,
+  SystemMetadataKey,
+} from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository';
+import { AssetJobRepository } from 'src/repositories/asset-job.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { ConfigRepository } from 'src/repositories/config.repository';
 import { DatabaseRepository } from 'src/repositories/database.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
+import { MachineLearningRepository } from 'src/repositories/machine-learning.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { StorageRepository } from 'src/repositories/storage.repository';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
 import { DB } from 'src/schema';
 import { PersonService } from 'src/services/person.service';
+import { clearConfigCache } from 'src/utils/config';
 import { newMediumService } from 'test/medium.factory';
 import { factory } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
+import { Mocked } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 
@@ -39,11 +52,410 @@ const setup = (db?: Kysely<DB>) => {
   });
 };
 
+const setupFaceDetection = (db?: Kysely<DB>) => {
+  clearConfigCache();
+
+  const { sut, ctx } = newMediumService(PersonService, {
+    database: db || defaultDatabase,
+    real: [
+      AccessRepository,
+      AssetRepository,
+      AssetJobRepository,
+      ConfigRepository,
+      DatabaseRepository,
+      FaceIdentityRepository,
+      PersonRepository,
+      SharedSpaceRepository,
+    ],
+    mock: [JobRepository, LoggingRepository, MachineLearningRepository, StorageRepository, SystemMetadataRepository],
+  });
+
+  ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository).queue.mockResolvedValue();
+  ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository).queueAll.mockResolvedValue();
+  ctx
+    .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
+    .get.mockImplementation((key) => {
+      if (key === SystemMetadataKey.SystemConfig) {
+        return { machineLearning: { facialRecognition: { enabled: true, minFaces: 1 } } } as any;
+      }
+      return undefined as any;
+    });
+
+  return { sut, ctx };
+};
+
+const getAssetFaces = (ctx: ReturnType<typeof setupFaceDetection>['ctx'], assetId: string) =>
+  ctx.database
+    .selectFrom('asset_face')
+    .select(['id', 'assetId', 'personId', 'sourceType'])
+    .where('assetId', '=', assetId)
+    .orderBy('id')
+    .execute();
+
+const getIdentityLinks = (ctx: ReturnType<typeof setupFaceDetection>['ctx'], faceIds: string[]) =>
+  ctx.database
+    .selectFrom('face_identity_face')
+    .select(['assetFaceId', 'identityId', 'source'])
+    .where('assetFaceId', 'in', faceIds)
+    .orderBy('assetFaceId')
+    .execute();
+
+const createAssetReadyForFaceDetection = async (ctx: ReturnType<typeof setupFaceDetection>['ctx'], ownerId: string) => {
+  const { asset } = await ctx.newAsset({ ownerId, visibility: AssetVisibility.Timeline, width: 200, height: 200 });
+  await ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: `/preview/${asset.id}.webp` });
+  await ctx.newExif({ assetId: asset.id, exifImageHeight: 200, exifImageWidth: 200 });
+  return asset;
+};
+
+const createPersonFaceIdentity = async (
+  ctx: ReturnType<typeof setupFaceDetection>['ctx'],
+  input: {
+    ownerId: string;
+    assetId: string;
+    name: string;
+    sourceType: SourceType;
+    linkSource: 'ml' | 'manual' | 'import';
+  },
+) => {
+  const faceIdentityRepository = ctx.get(FaceIdentityRepository);
+  const { result: person } = await ctx.newPerson({ ownerId: input.ownerId, name: input.name });
+  const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+  const { assetFace } = await ctx.newAssetFace({
+    assetId: input.assetId,
+    personId: person.id,
+    sourceType: input.sourceType,
+  });
+  await faceIdentityRepository.replaceFaceIdentity({
+    assetFaceId: assetFace.id,
+    identityId: identity.id,
+    source: input.linkSource,
+  });
+
+  return { person, identity, assetFace };
+};
+
+const createSpacePersonFace = async (
+  ctx: ReturnType<typeof setupFaceDetection>['ctx'],
+  input: { spaceId: string; identityId: string; assetFaceId: string; name: string },
+) => {
+  const spacePerson = await ctx.database
+    .insertInto('shared_space_person')
+    .values({
+      spaceId: input.spaceId,
+      identityId: input.identityId,
+      name: input.name,
+      type: 'person',
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+
+  await ctx.database
+    .insertInto('shared_space_person_face')
+    .values({ personId: spacePerson.id, assetFaceId: input.assetFaceId })
+    .execute();
+
+  return spacePerson;
+};
+
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
 
 describe(PersonService.name, () => {
+  describe('handleQueueDetectFaces safety', () => {
+    it('preserves manual and EXIF roots while force face detection removes stale machine-learning state', async () => {
+      const { sut, ctx } = setupFaceDetection();
+      const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+      const { user } = await ctx.newUser();
+      const asset = await createAssetReadyForFaceDetection(ctx, user.id);
+      await ctx.newJobStatus({ assetId: asset.id });
+
+      const ml = await createPersonFaceIdentity(ctx, {
+        ownerId: user.id,
+        assetId: asset.id,
+        name: 'Machine',
+        sourceType: SourceType.MachineLearning,
+        linkSource: 'ml',
+      });
+      const manual = await createPersonFaceIdentity(ctx, {
+        ownerId: user.id,
+        assetId: asset.id,
+        name: 'Manual',
+        sourceType: SourceType.Manual,
+        linkSource: 'manual',
+      });
+      const exif = await createPersonFaceIdentity(ctx, {
+        ownerId: user.id,
+        assetId: asset.id,
+        name: 'Exif',
+        sourceType: SourceType.Exif,
+        linkSource: 'import',
+      });
+
+      const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+      const mlSpacePerson = await createSpacePersonFace(ctx, {
+        spaceId: space.id,
+        identityId: ml.identity.id,
+        assetFaceId: ml.assetFace.id,
+        name: 'Machine Space',
+      });
+      const manualSpacePerson = await createSpacePersonFace(ctx, {
+        spaceId: space.id,
+        identityId: manual.identity.id,
+        assetFaceId: manual.assetFace.id,
+        name: 'Manual Space',
+      });
+      const exifSpacePerson = await createSpacePersonFace(ctx, {
+        spaceId: space.id,
+        identityId: exif.identity.id,
+        assetFaceId: exif.assetFace.id,
+        name: 'Exif Space',
+      });
+
+      await expect(sut.handleQueueDetectFaces({ force: true })).resolves.toBe(JobStatus.Success);
+
+      await expect(getAssetFaces(ctx, asset.id)).resolves.toHaveLength(2);
+      await expect(getAssetFaces(ctx, asset.id)).resolves.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: exif.assetFace.id,
+            personId: exif.person.id,
+            sourceType: SourceType.Exif,
+          }),
+          expect.objectContaining({
+            id: manual.assetFace.id,
+            personId: manual.person.id,
+            sourceType: SourceType.Manual,
+          }),
+        ]),
+      );
+      await expect(
+        getIdentityLinks(ctx, [ml.assetFace.id, manual.assetFace.id, exif.assetFace.id]),
+      ).resolves.toHaveLength(2);
+      await expect(getIdentityLinks(ctx, [ml.assetFace.id, manual.assetFace.id, exif.assetFace.id])).resolves.toEqual(
+        expect.arrayContaining([
+          { assetFaceId: exif.assetFace.id, identityId: exif.identity.id, source: 'import' },
+          { assetFaceId: manual.assetFace.id, identityId: manual.identity.id, source: 'manual' },
+        ]),
+      );
+      await expect(
+        ctx.database
+          .selectFrom('person')
+          .select(['id', 'name'])
+          .where('id', 'in', [ml.person.id, manual.person.id, exif.person.id])
+          .orderBy('name')
+          .execute(),
+      ).resolves.toEqual([
+        { id: exif.person.id, name: 'Exif' },
+        { id: manual.person.id, name: 'Manual' },
+      ]);
+      await expect(
+        ctx.database
+          .selectFrom('shared_space_person')
+          .select(['id', 'identityId', 'name'])
+          .where('id', 'in', [mlSpacePerson.id, manualSpacePerson.id, exifSpacePerson.id])
+          .orderBy('name')
+          .execute(),
+      ).resolves.toEqual([
+        { id: exifSpacePerson.id, identityId: exif.identity.id, name: 'Exif Space' },
+        { id: manualSpacePerson.id, identityId: manual.identity.id, name: 'Manual Space' },
+      ]);
+      await expect(
+        ctx.database
+          .selectFrom('shared_space_person_face')
+          .select(['personId', 'assetFaceId'])
+          .where('personId', 'in', [mlSpacePerson.id, manualSpacePerson.id, exifSpacePerson.id])
+          .orderBy('personId')
+          .execute(),
+      ).resolves.toHaveLength(2);
+      await expect(
+        ctx.database
+          .selectFrom('shared_space_person_face')
+          .select(['personId', 'assetFaceId'])
+          .where('personId', 'in', [mlSpacePerson.id, manualSpacePerson.id, exifSpacePerson.id])
+          .orderBy('personId')
+          .execute(),
+      ).resolves.toEqual(
+        expect.arrayContaining([
+          { personId: manualSpacePerson.id, assetFaceId: manual.assetFace.id },
+          { personId: exifSpacePerson.id, assetFaceId: exif.assetFace.id },
+        ]),
+      );
+      await expect(
+        ctx.database
+          .selectFrom('shared_space_person_face')
+          .select(['personId', 'assetFaceId'])
+          .where('personId', '=', mlSpacePerson.id)
+          .execute(),
+      ).resolves.toEqual([]);
+      expect(jobMock.queueAll).toHaveBeenCalledWith([
+        { name: JobName.AssetDetectFaces, data: { id: asset.id, force: true } },
+      ]);
+    });
+  });
+
+  describe('handleDetectFaces face detection safety', () => {
+    it('removes stale machine-learning faces without deleting people on non-force no-detected-faces runs', async () => {
+      const { sut, ctx } = setupFaceDetection();
+      const machineLearningMock = ctx.getMock<MachineLearningRepository, Mocked<MachineLearningRepository>>(
+        MachineLearningRepository,
+      );
+      const { user } = await ctx.newUser();
+      const asset = await createAssetReadyForFaceDetection(ctx, user.id);
+      const ml = await createPersonFaceIdentity(ctx, {
+        ownerId: user.id,
+        assetId: asset.id,
+        name: 'Machine',
+        sourceType: SourceType.MachineLearning,
+        linkSource: 'ml',
+      });
+      const manual = await createPersonFaceIdentity(ctx, {
+        ownerId: user.id,
+        assetId: asset.id,
+        name: 'Manual',
+        sourceType: SourceType.Manual,
+        linkSource: 'manual',
+      });
+      const exif = await createPersonFaceIdentity(ctx, {
+        ownerId: user.id,
+        assetId: asset.id,
+        name: 'Exif',
+        sourceType: SourceType.Exif,
+        linkSource: 'import',
+      });
+      machineLearningMock.detectFaces.mockResolvedValue({ imageWidth: 200, imageHeight: 200, faces: [] });
+
+      await expect(sut.handleDetectFaces({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+      await expect(getAssetFaces(ctx, asset.id)).resolves.toHaveLength(2);
+      await expect(getAssetFaces(ctx, asset.id)).resolves.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: exif.assetFace.id, sourceType: SourceType.Exif }),
+          expect.objectContaining({ id: manual.assetFace.id, sourceType: SourceType.Manual }),
+        ]),
+      );
+      await expect(
+        ctx.database
+          .selectFrom('person')
+          .select(['id', 'name'])
+          .where('id', 'in', [ml.person.id, manual.person.id, exif.person.id])
+          .orderBy('name')
+          .execute(),
+      ).resolves.toEqual([
+        { id: exif.person.id, name: 'Exif' },
+        { id: ml.person.id, name: 'Machine' },
+        { id: manual.person.id, name: 'Manual' },
+      ]);
+      await expect(
+        ctx.database
+          .selectFrom('asset_job_status')
+          .select('facesRecognizedAt')
+          .where('assetId', '=', asset.id)
+          .executeTakeFirstOrThrow(),
+      ).resolves.toEqual({ facesRecognizedAt: expect.any(Date) });
+    });
+
+    it('preserves manual and EXIF shared-space projections while removing stale machine-learning face links', async () => {
+      const { sut, ctx } = setupFaceDetection();
+      const machineLearningMock = ctx.getMock<MachineLearningRepository, Mocked<MachineLearningRepository>>(
+        MachineLearningRepository,
+      );
+      const { user } = await ctx.newUser();
+      const asset = await createAssetReadyForFaceDetection(ctx, user.id);
+      const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+      const ml = await createPersonFaceIdentity(ctx, {
+        ownerId: user.id,
+        assetId: asset.id,
+        name: 'Machine',
+        sourceType: SourceType.MachineLearning,
+        linkSource: 'ml',
+      });
+      const manual = await createPersonFaceIdentity(ctx, {
+        ownerId: user.id,
+        assetId: asset.id,
+        name: 'Manual',
+        sourceType: SourceType.Manual,
+        linkSource: 'manual',
+      });
+      const exif = await createPersonFaceIdentity(ctx, {
+        ownerId: user.id,
+        assetId: asset.id,
+        name: 'Exif',
+        sourceType: SourceType.Exif,
+        linkSource: 'import',
+      });
+      const mlSpacePerson = await createSpacePersonFace(ctx, {
+        spaceId: space.id,
+        identityId: ml.identity.id,
+        assetFaceId: ml.assetFace.id,
+        name: 'Machine Space',
+      });
+      const manualSpacePerson = await createSpacePersonFace(ctx, {
+        spaceId: space.id,
+        identityId: manual.identity.id,
+        assetFaceId: manual.assetFace.id,
+        name: 'Manual Space',
+      });
+      const exifSpacePerson = await createSpacePersonFace(ctx, {
+        spaceId: space.id,
+        identityId: exif.identity.id,
+        assetFaceId: exif.assetFace.id,
+        name: 'Exif Space',
+      });
+      machineLearningMock.detectFaces.mockResolvedValue({ imageWidth: 200, imageHeight: 200, faces: [] });
+
+      await expect(sut.handleDetectFaces({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+      await expect(
+        ctx.database.selectFrom('asset_face').select('id').where('id', '=', ml.assetFace.id).execute(),
+      ).resolves.toEqual([]);
+      await expect(
+        ctx.database
+          .selectFrom('shared_space_person')
+          .select(['id', 'identityId', 'name'])
+          .where('id', 'in', [mlSpacePerson.id, manualSpacePerson.id, exifSpacePerson.id])
+          .orderBy('name')
+          .execute(),
+      ).resolves.toEqual([
+        { id: exifSpacePerson.id, identityId: exif.identity.id, name: 'Exif Space' },
+        { id: mlSpacePerson.id, identityId: ml.identity.id, name: 'Machine Space' },
+        { id: manualSpacePerson.id, identityId: manual.identity.id, name: 'Manual Space' },
+      ]);
+      await expect(
+        ctx.database
+          .selectFrom('shared_space_person_face')
+          .select(['personId', 'assetFaceId'])
+          .where('personId', 'in', [mlSpacePerson.id, manualSpacePerson.id, exifSpacePerson.id])
+          .orderBy('personId')
+          .execute(),
+      ).resolves.toHaveLength(2);
+      await expect(
+        ctx.database
+          .selectFrom('shared_space_person_face')
+          .select(['personId', 'assetFaceId'])
+          .where('personId', 'in', [mlSpacePerson.id, manualSpacePerson.id, exifSpacePerson.id])
+          .orderBy('personId')
+          .execute(),
+      ).resolves.toEqual(
+        expect.arrayContaining([
+          { personId: manualSpacePerson.id, assetFaceId: manual.assetFace.id },
+          { personId: exifSpacePerson.id, assetFaceId: exif.assetFace.id },
+        ]),
+      );
+      await expect(
+        ctx.database
+          .selectFrom('shared_space_person_face')
+          .select(['personId', 'assetFaceId'])
+          .where('personId', '=', mlSpacePerson.id)
+          .execute(),
+      ).resolves.toEqual([]);
+    });
+  });
+
   describe('mergePerson', () => {
     it('links reassigned faces to the target identity for identity-filtered timelines', async () => {
       const { sut, ctx } = setup();
