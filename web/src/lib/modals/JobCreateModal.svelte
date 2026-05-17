@@ -17,6 +17,7 @@
     { title: $t('admin.memory_generate_job'), value: ManualJobName.MemoryCreate },
     { title: $t('admin.backup_database'), value: ManualJobName.BackupDatabase },
     { title: $t('admin.face_identity_backfill_job'), value: ManualJobName.FaceIdentityBackfill },
+    { title: $t('admin.face_suggestion_maintenance_job'), value: ManualJobName.FaceSuggestionMaintenance },
     {
       title: $t('admin.space_person_metadata_backfill_job'),
       value: ManualJobName.SharedSpacePersonMetadataBackfill,

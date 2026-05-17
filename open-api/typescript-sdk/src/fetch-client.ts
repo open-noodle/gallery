@@ -8832,6 +8832,7 @@ export enum ManualJobName {
     MemoryCreate = "memory-create",
     BackupDatabase = "backup-database",
     FaceIdentityBackfill = "face-identity-backfill",
+    FaceSuggestionMaintenance = "face-suggestion-maintenance",
     SharedSpacePersonMetadataBackfill = "shared-space-person-metadata-backfill"
 }
 export enum QueueName {
@@ -8922,6 +8923,7 @@ export enum JobName {
     FacialRecognition = "FacialRecognition",
     FaceIdentityBackfill = "FaceIdentityBackfill",
     FaceIdentityMaintenanceAfterRecognition = "FaceIdentityMaintenanceAfterRecognition",
+    FaceSuggestionMaintenance = "FaceSuggestionMaintenance",
     PersonSuggestionScanQueueAll = "PersonSuggestionScanQueueAll",
     PersonSuggestionScan = "PersonSuggestionScan",
     SpacePersonSuggestionScanQueueAll = "SpacePersonSuggestionScanQueueAll",

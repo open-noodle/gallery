@@ -23171,6 +23171,7 @@
           "FacialRecognition",
           "FaceIdentityBackfill",
           "FaceIdentityMaintenanceAfterRecognition",
+          "FaceSuggestionMaintenance",
           "PersonSuggestionScanQueueAll",
           "PersonSuggestionScan",
           "SpacePersonSuggestionScanQueueAll",
@@ -23593,6 +23594,7 @@
           "memory-create",
           "backup-database",
           "face-identity-backfill",
+          "face-suggestion-maintenance",
           "shared-space-person-metadata-backfill"
         ],
         "type": "string"

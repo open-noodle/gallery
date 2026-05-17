@@ -1,5 +1,15 @@
 import { BadRequestException } from '@nestjs/common';
-import { AssetType, AssetVisibility, ImmichWorker, JobName, JobStatus, ManualJobName, QueueName } from 'src/enum';
+import { Reflector } from '@nestjs/core';
+import {
+  AssetType,
+  AssetVisibility,
+  ImmichWorker,
+  JobName,
+  JobStatus,
+  ManualJobName,
+  MetadataKey,
+  QueueName,
+} from 'src/enum';
 import { JobService } from 'src/services/job.service';
 import { JobItem } from 'src/types';
 import { AssetFactory } from 'test/factories/asset.factory';
@@ -75,10 +85,47 @@ describe(JobService.name, () => {
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
+    it('should queue a FaceSuggestionMaintenance job', async () => {
+      await sut.create({ name: ManualJobName.FaceSuggestionMaintenance });
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.FaceSuggestionMaintenance, data: {} });
+    });
+
     it('should throw BadRequestException for an invalid job name', async () => {
       await expect(sut.create({ name: 'invalid-job' as ManualJobName })).rejects.toThrow(BadRequestException);
 
       expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleFaceSuggestionMaintenance', () => {
+    it('should run on the people backfill queue', () => {
+      const config = new Reflector().get(MetadataKey.JobConfig, sut.handleFaceSuggestionMaintenance);
+
+      expect(config).toEqual(expect.objectContaining({ queue: QueueName.PeopleBackfill }));
+    });
+
+    it('should queue personal and shared-space suggestion fanout jobs when suggestions are enabled', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0.8, minFaces: 3 } },
+      });
+
+      await expect(sut.handleFaceSuggestionMaintenance()).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.PersonSuggestionScanQueueAll, data: {} },
+        { name: JobName.SpacePersonSuggestionScanQueueAll, data: {} },
+      ]);
+    });
+
+    it('should skip without queueing child fanout jobs when suggestions are disabled', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0.5, minFaces: 3 } },
+      });
+
+      await expect(sut.handleFaceSuggestionMaintenance()).resolves.toBe(JobStatus.Skipped);
+
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
   });

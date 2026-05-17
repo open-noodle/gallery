@@ -338,6 +338,53 @@ describe(JobRepository.name, () => {
     );
   });
 
+  it('uses stable job ids for global face suggestion maintenance and queue-all fanout jobs', async () => {
+    const { sut, queue } = setup();
+    setHandlers(sut, [
+      JobName.FaceSuggestionMaintenance,
+      JobName.PersonSuggestionScanQueueAll,
+      JobName.SpacePersonSuggestionScanQueueAll,
+    ]);
+
+    await sut.queueAll([
+      { name: JobName.FaceSuggestionMaintenance, data: {} },
+      { name: JobName.FaceSuggestionMaintenance, data: {} },
+      { name: JobName.PersonSuggestionScanQueueAll, data: {} },
+      { name: JobName.PersonSuggestionScanQueueAll, data: {} },
+      { name: JobName.SpacePersonSuggestionScanQueueAll, data: {} },
+      { name: JobName.SpacePersonSuggestionScanQueueAll, data: {} },
+    ]);
+
+    expect(queue.addBulk).not.toHaveBeenCalled();
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.FaceSuggestionMaintenance,
+      {},
+      {
+        jobId: 'face-suggestion-maintenance',
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+    );
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.PersonSuggestionScanQueueAll,
+      {},
+      {
+        jobId: 'person-suggestion-scan/all',
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+    );
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SpacePersonSuggestionScanQueueAll,
+      {},
+      {
+        jobId: 'space-person-suggestion-scan/all',
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+    );
+  });
+
   it('removes a failed stable facial-recognition coordinator before requeueing it', async () => {
     const { sut, queue } = setup();
     const failedJob = {

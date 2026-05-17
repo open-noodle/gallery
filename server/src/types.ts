@@ -430,6 +430,7 @@ export type JobItem =
   | { name: JobName.FacialRecognition; data: IFacialRecognitionJob }
   | { name: JobName.FaceIdentityBackfill; data: IFaceIdentityBackfillJob }
   | { name: JobName.FaceIdentityMaintenanceAfterRecognition; data: IDelayedJob }
+  | { name: JobName.FaceSuggestionMaintenance; data: IBaseJob }
   | { name: JobName.PersonSuggestionScanQueueAll; data: IBaseJob }
   | { name: JobName.PersonSuggestionScan; data: IPersonSuggestionScanJob }
   | { name: JobName.SpacePersonSuggestionScanQueueAll; data: IBaseJob }

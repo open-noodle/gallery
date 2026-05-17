@@ -1,8 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { OnEvent } from 'src/decorators';
+import { OnEvent, OnJob } from 'src/decorators';
 import { mapAsset } from 'src/dtos/asset-response.dto';
 import { JobCreateDto } from 'src/dtos/job.dto';
-import { AssetType, AssetVisibility, JobName, JobStatus, ManualJobName } from 'src/enum';
+import { AssetType, AssetVisibility, JobName, JobStatus, ManualJobName, QueueName } from 'src/enum';
 import { ArgsOf } from 'src/repositories/event.repository';
 import { BaseService } from 'src/services/base.service';
 import { JobItem } from 'src/types';
@@ -38,6 +38,10 @@ const asJobItem = (dto: JobCreateDto): JobItem => {
       return { name: JobName.FaceIdentityBackfill, data: {} };
     }
 
+    case ManualJobName.FaceSuggestionMaintenance: {
+      return { name: JobName.FaceSuggestionMaintenance, data: {} };
+    }
+
     case ManualJobName.SharedSpacePersonMetadataBackfill: {
       return { name: JobName.SharedSpacePersonMetadataBackfill, data: {} };
     }
@@ -52,6 +56,21 @@ const asJobItem = (dto: JobCreateDto): JobItem => {
 export class JobService extends BaseService {
   async create(dto: JobCreateDto): Promise<void> {
     await this.jobRepository.queue(asJobItem(dto));
+  }
+
+  @OnJob({ name: JobName.FaceSuggestionMaintenance, queue: QueueName.PeopleBackfill })
+  async handleFaceSuggestionMaintenance(): Promise<JobStatus> {
+    const { machineLearning } = await this.getConfig({ withCache: false });
+    const { maxDistance, suggestionMaxDistance } = machineLearning.facialRecognition;
+    if (suggestionMaxDistance <= maxDistance) {
+      return JobStatus.Skipped;
+    }
+
+    await this.jobRepository.queueAll([
+      { name: JobName.PersonSuggestionScanQueueAll, data: {} },
+      { name: JobName.SpacePersonSuggestionScanQueueAll, data: {} },
+    ]);
+    return JobStatus.Success;
   }
 
   @OnEvent({ name: 'JobRun' })
