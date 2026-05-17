@@ -30,6 +30,7 @@ const sharedSpaceFaceIdentityJobNames = new Set<JobName>([
   JobName.AssetDetectFacesQueueAll,
   JobName.FaceIdentityBackfill,
   JobName.FacialRecognitionQueueAll,
+  JobName.PersonCleanup,
   JobName.SharedSpaceFaceMatchAll,
   JobName.SharedSpaceIdentityReconciliation,
   JobName.SharedSpacePersonMetadataBackfill,
@@ -2273,7 +2274,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      mocks.sharedSpace.addAssets.mockResolvedValue([]);
+      mocks.sharedSpace.addAssets.mockResolvedValue([{ spaceId, assetId, addedById: auth.user.id }] as any);
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.update.mockResolvedValue(space);
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
@@ -2284,6 +2285,7 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
         expect.arrayContaining([expect.objectContaining({ name: JobName.SharedSpaceFaceMatch })]),
       );
+      expectNoSharedSpaceFaceIdentityRootJobs(mocks);
     });
   });
 
