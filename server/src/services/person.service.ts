@@ -694,16 +694,19 @@ export class PersonService extends BaseService {
       }
     }
 
-    const heightScale = imageHeight / (asset.faces[0]?.imageHeight || 1);
-    const widthScale = imageWidth / (asset.faces[0]?.imageWidth || 1);
     for (const { boundingBox, embedding } of faces) {
-      const scaledBox = {
-        x1: boundingBox.x1 * widthScale,
-        y1: boundingBox.y1 * heightScale,
-        x2: boundingBox.x2 * widthScale,
-        y2: boundingBox.y2 * heightScale,
-      };
-      const match = asset.faces.find((face) => this.iou(face, scaledBox) > 0.5);
+      const match = asset.faces.find((face) => {
+        const heightScale = face.imageHeight / imageHeight;
+        const widthScale = face.imageWidth / imageWidth;
+        const scaledBox = {
+          x1: boundingBox.x1 * widthScale,
+          y1: boundingBox.y1 * heightScale,
+          x2: boundingBox.x2 * widthScale,
+          y2: boundingBox.y2 * heightScale,
+        };
+
+        return this.iou(face, scaledBox) > 0.5;
+      });
 
       if (match && !mlFaceIds.delete(match.id)) {
         embeddings.push({ faceId: match.id, embedding });
