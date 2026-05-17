@@ -1,11 +1,12 @@
-import { Kysely } from 'kysely';
-import { AssetFileType, AssetVisibility } from 'src/enum';
+import { Kysely, sql } from 'kysely';
+import { AssetFileType, AssetVisibility, SourceType } from 'src/enum';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
 import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
 import { newMediumService } from 'test/medium.factory';
+import { newEmbedding } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
 
 let defaultDatabase: Kysely<DB>;
@@ -717,6 +718,176 @@ describe(PersonRepository.name, () => {
       await expect(
         sut.getRepresentativeFaceForUpdate({ personId: targetPerson.id, assetFaceId: faceId }),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('refreshFaces', () => {
+    it('deletes only requested ML faces, cascades only those identity links, and preserves manual and EXIF evidence', async () => {
+      const { ctx, sut } = setup();
+      const faceIdentityRepository = ctx.get(FaceIdentityRepository);
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { person: mlPerson } = await ctx.newPerson({ ownerId: user.id, name: 'ML' });
+      const { person: retainedMlPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Retained ML' });
+      const { person: manualPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Manual' });
+      const { person: exifPerson } = await ctx.newPerson({ ownerId: user.id, name: 'EXIF' });
+      const { result: mlFaceId } = await ctx.newAssetFace({
+        assetId: asset.id,
+        personId: mlPerson.id,
+        sourceType: SourceType.MachineLearning,
+      });
+      const { result: retainedMlFaceId } = await ctx.newAssetFace({
+        assetId: asset.id,
+        personId: retainedMlPerson.id,
+        sourceType: SourceType.MachineLearning,
+      });
+      const { result: manualFaceId } = await ctx.newAssetFace({
+        assetId: asset.id,
+        personId: manualPerson.id,
+        sourceType: SourceType.Manual,
+      });
+      const { result: exifFaceId } = await ctx.newAssetFace({
+        assetId: asset.id,
+        personId: exifPerson.id,
+        sourceType: SourceType.Exif,
+      });
+      const mlIdentity = await faceIdentityRepository.ensurePersonIdentity(mlPerson.id);
+      const retainedMlIdentity = await faceIdentityRepository.ensurePersonIdentity(retainedMlPerson.id);
+      const manualIdentity = await faceIdentityRepository.ensurePersonIdentity(manualPerson.id);
+      const exifIdentity = await faceIdentityRepository.ensurePersonIdentity(exifPerson.id);
+      await faceIdentityRepository.replaceFaceIdentity({
+        assetFaceId: mlFaceId,
+        identityId: mlIdentity.id,
+        source: 'ml',
+      });
+      await faceIdentityRepository.replaceFaceIdentity({
+        assetFaceId: retainedMlFaceId,
+        identityId: retainedMlIdentity.id,
+        source: 'ml',
+      });
+      await faceIdentityRepository.replaceFaceIdentity({
+        assetFaceId: manualFaceId,
+        identityId: manualIdentity.id,
+        source: 'manual',
+      });
+      await faceIdentityRepository.replaceFaceIdentity({
+        assetFaceId: exifFaceId,
+        identityId: exifIdentity.id,
+        source: 'import',
+      });
+      const newFaceId = '11111111-1111-4111-8111-111111111111';
+      const embedding = newEmbedding();
+
+      await sut.refreshFaces(
+        [
+          {
+            id: newFaceId,
+            assetId: asset.id,
+            imageWidth: 200,
+            imageHeight: 200,
+            boundingBoxX1: 10,
+            boundingBoxY1: 10,
+            boundingBoxX2: 60,
+            boundingBoxY2: 60,
+          },
+        ],
+        [mlFaceId],
+        [{ faceId: newFaceId, embedding }],
+      );
+
+      const faceRows = await ctx.database
+        .selectFrom('asset_face')
+        .select(['id', 'sourceType'])
+        .where('assetId', '=', asset.id)
+        .execute();
+      expect(faceRows).toEqual(
+        expect.arrayContaining([
+          { id: retainedMlFaceId, sourceType: SourceType.MachineLearning },
+          { id: manualFaceId, sourceType: SourceType.Manual },
+          { id: exifFaceId, sourceType: SourceType.Exif },
+          { id: newFaceId, sourceType: SourceType.MachineLearning },
+        ]),
+      );
+      expect(faceRows).toHaveLength(4);
+      expect(faceRows.map((face) => face.id)).not.toContain(mlFaceId);
+
+      const links = await ctx.database
+        .selectFrom('face_identity_face')
+        .select(['assetFaceId', 'identityId', 'source'])
+        .where('assetFaceId', 'in', [mlFaceId, retainedMlFaceId, manualFaceId, exifFaceId])
+        .execute();
+      expect(links).toEqual(
+        expect.arrayContaining([
+          { assetFaceId: retainedMlFaceId, identityId: retainedMlIdentity.id, source: 'ml' },
+          { assetFaceId: manualFaceId, identityId: manualIdentity.id, source: 'manual' },
+          { assetFaceId: exifFaceId, identityId: exifIdentity.id, source: 'import' },
+        ]),
+      );
+      expect(links).toHaveLength(3);
+      expect(links.map((link) => link.assetFaceId)).not.toContain(mlFaceId);
+
+      await expect(
+        ctx.database
+          .selectFrom('face_search')
+          .select(['faceId', sql<number>`vector_dims(embedding)`.as('dimensions')])
+          .where('faceId', '=', newFaceId)
+          .executeTakeFirst(),
+      ).resolves.toEqual({ faceId: newFaceId, dimensions: 512 });
+      const embeddingDistance = await ctx.database
+        .selectFrom('face_search')
+        .select(sql<number>`face_search.embedding <-> ${embedding}`.as('distance'))
+        .where('faceId', '=', newFaceId)
+        .executeTakeFirstOrThrow();
+      expect(embeddingDistance.distance).toBeCloseTo(0);
+    });
+
+    it('does not mutate face rows when refreshFaces receives no inserts, removals, or embeddings', async () => {
+      const { ctx, sut } = setup();
+      const faceIdentityRepository = ctx.get(FaceIdentityRepository);
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { person } = await ctx.newPerson({ ownerId: user.id });
+      const { result: manualFaceId } = await ctx.newAssetFace({
+        assetId: asset.id,
+        personId: person.id,
+        sourceType: SourceType.Manual,
+      });
+      const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+      await faceIdentityRepository.replaceFaceIdentity({
+        assetFaceId: manualFaceId,
+        identityId: identity.id,
+        source: 'manual',
+      });
+
+      const before = {
+        faces: await ctx.database
+          .selectFrom('asset_face')
+          .select(['id', 'sourceType'])
+          .where('assetId', '=', asset.id)
+          .execute(),
+        links: await ctx.database
+          .selectFrom('face_identity_face')
+          .select(['assetFaceId', 'identityId', 'source'])
+          .where('assetFaceId', '=', manualFaceId)
+          .execute(),
+        embeddings: await ctx.database.selectFrom('face_search').select(['faceId']).execute(),
+      };
+
+      await sut.refreshFaces([], [], []);
+
+      await expect(
+        ctx.database.selectFrom('asset_face').select(['id', 'sourceType']).where('assetId', '=', asset.id).execute(),
+      ).resolves.toEqual(before.faces);
+      await expect(
+        ctx.database
+          .selectFrom('face_identity_face')
+          .select(['assetFaceId', 'identityId', 'source'])
+          .where('assetFaceId', '=', manualFaceId)
+          .execute(),
+      ).resolves.toEqual(before.links);
+      await expect(ctx.database.selectFrom('face_search').select(['faceId']).execute()).resolves.toEqual(
+        before.embeddings,
+      );
     });
   });
 });
