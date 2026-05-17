@@ -338,8 +338,13 @@ describe(QueueService.name, () => {
         name: JobName.FacialRecognitionQueueAll,
         data: { force: false, nightly: true },
       });
-      expect(jobs).not.toContainEqual({ name: JobName.FacialRecognitionQueueAll, data: { force: true } });
-      expect(jobs).not.toContainEqual({ name: JobName.AssetDetectFacesQueueAll, data: expect.anything() });
+      expect(jobs).not.toContainEqual(
+        expect.objectContaining({
+          name: JobName.FacialRecognitionQueueAll,
+          data: expect.objectContaining({ force: true }),
+        }),
+      );
+      expect(jobs).not.toContainEqual(expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }));
     });
 
     it('should keep missing thumbnails from directly queueing face detection or recognition roots', async () => {
@@ -360,8 +365,8 @@ describe(QueueService.name, () => {
         { name: JobName.AssetGenerateThumbnailsQueueAll, data: { force: false } },
       ]);
       const jobs = mocks.job.queueAll.mock.calls[0][0];
-      expect(jobs).not.toContainEqual({ name: JobName.AssetDetectFacesQueueAll, data: expect.anything() });
-      expect(jobs).not.toContainEqual({ name: JobName.FacialRecognitionQueueAll, data: expect.anything() });
+      expect(jobs).not.toContainEqual(expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }));
+      expect(jobs).not.toContainEqual(expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }));
     });
 
     it.each([
@@ -682,14 +687,13 @@ describe(QueueService.name, () => {
       await runStartCommand(queue, false);
 
       expect(mocks.job.queue).toHaveBeenCalledTimes(1);
-      expect(mocks.job.queue).not.toHaveBeenCalledWith({
-        name: JobName.AssetDetectFacesQueueAll,
-        data: expect.anything(),
-      });
-      expect(mocks.job.queue).not.toHaveBeenCalledWith({
-        name: JobName.FacialRecognitionQueueAll,
-        data: expect.anything(),
-      });
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }),
+      );
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
+      );
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.FaceIdentityBackfill }));
     });
 
     it('should handle a start video conversion command', async () => {
