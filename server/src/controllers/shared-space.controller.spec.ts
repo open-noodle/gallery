@@ -1,4 +1,5 @@
 import { SharedSpaceController } from 'src/controllers/shared-space.controller';
+import { Permission } from 'src/enum';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { SharedSpaceService } from 'src/services/shared-space.service';
 import request from 'supertest';
@@ -158,6 +159,114 @@ describe(SharedSpaceController.name, () => {
       expect(status).toBe(200);
       expect(service.getSpacePersonStatistics).toHaveBeenCalledWith(undefined, spaceId, personId);
       expect(body).toEqual({ assets: 5, faces: 8 });
+    });
+  });
+
+  describe('face suggestion routes', () => {
+    const spaceId = '00000000-0000-4000-8000-000000000001';
+    const personId = '00000000-0000-4000-8000-000000000002';
+    const assetFaceId = '00000000-0000-4000-8000-000000000003';
+
+    it('GET /shared-spaces/:id/people/:personId/face-suggestions should require shared-space read permission', async () => {
+      await request(ctx.getHttpServer()).get(`/shared-spaces/${spaceId}/people/${personId}/face-suggestions`);
+
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ permission: Permission.SharedSpaceRead }),
+        }),
+      );
+    });
+
+    it('GET /shared-spaces/:id/people/:personId/face-suggestions should coerce query and return suggestions', async () => {
+      service.getSpacePersonFaceSuggestions.mockResolvedValue({
+        total: 1,
+        items: [
+          {
+            assetFaceId,
+            assetId: '00000000-0000-4000-8000-000000000004',
+            distance: 0.42,
+            imageHeight: 3000,
+            imageWidth: 4000,
+            boundingBoxX1: 10,
+            boundingBoxX2: 110,
+            boundingBoxY1: 20,
+            boundingBoxY2: 120,
+            fileCreatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      });
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .get(`/shared-spaces/${spaceId}/people/${personId}/face-suggestions`)
+        .query({ page: '2', size: '25' })
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(service.getSpacePersonFaceSuggestions).toHaveBeenCalledWith(undefined, spaceId, personId, {
+        page: 2,
+        size: 25,
+      });
+      expect(body.total).toBe(1);
+      expect(body.items[0].assetFaceId).toBe(assetFaceId);
+    });
+
+    it('GET /shared-spaces/:id/people/:personId/face-suggestions should validate query', async () => {
+      const { status, body } = await request(ctx.getHttpServer())
+        .get(`/shared-spaces/${spaceId}/people/${personId}/face-suggestions`)
+        .query({ size: 101 })
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.badRequest(['[size] Too big: expected number to be <=100']));
+      expect(service.getSpacePersonFaceSuggestions).not.toHaveBeenCalled();
+    });
+
+    it('GET /shared-spaces/:id/people/:personId/face-suggestions should validate UUID params', async () => {
+      const { status, body } = await request(ctx.getHttpServer())
+        .get(`/shared-spaces/not-a-uuid/people/${personId}/face-suggestions`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.badRequest(['[id] Invalid UUID']));
+      expect(service.getSpacePersonFaceSuggestions).not.toHaveBeenCalled();
+    });
+
+    it('POST confirm should require shared-space update permission and respond with 200', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .post(`/shared-spaces/${spaceId}/people/${personId}/face-suggestions/${assetFaceId}/confirm`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ permission: Permission.SharedSpaceUpdate }),
+        }),
+      );
+      expect(service.confirmSpacePersonFaceSuggestion).toHaveBeenCalledWith(undefined, spaceId, personId, assetFaceId);
+    });
+
+    it('POST dismiss should require shared-space update permission and respond with 200', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .post(`/shared-spaces/${spaceId}/people/${personId}/face-suggestions/${assetFaceId}/dismiss`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ permission: Permission.SharedSpaceUpdate }),
+        }),
+      );
+      expect(service.dismissSpacePersonFaceSuggestion).toHaveBeenCalledWith(undefined, spaceId, personId, assetFaceId);
+    });
+
+    it('POST confirm should validate assetFaceId independently', async () => {
+      const { status, body } = await request(ctx.getHttpServer())
+        .post(`/shared-spaces/${spaceId}/people/${personId}/face-suggestions/not-a-uuid/confirm`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.badRequest(['[assetFaceId] Invalid UUID']));
+      expect(service.confirmSpacePersonFaceSuggestion).not.toHaveBeenCalled();
     });
   });
 });

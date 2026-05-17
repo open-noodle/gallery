@@ -22,6 +22,8 @@ import {
   PeopleFaceStatisticsResponseDto,
   PersonFacePageQueryDto,
   PersonFacePageResponseDto,
+  PersonFaceSuggestionPageQueryDto,
+  PersonFaceSuggestionPageResponseDto,
   PersonStatisticsResponseDto,
 } from 'src/dtos/person.dto';
 import {
@@ -31,6 +33,8 @@ import {
   SharedSpacePersonResponseDto,
   SharedSpacePersonUpdateDto,
   SpacePeopleQueryDto,
+  SpacePersonFaceSuggestionParamsDto,
+  SpacePersonParamsDto,
   SpaceRepresentativeFaceUpdateDto,
 } from 'src/dtos/shared-space-person.dto';
 import {
@@ -425,6 +429,51 @@ export class SharedSpaceController {
     @Body() dto: SpaceRepresentativeFaceUpdateDto,
   ): Promise<SharedSpacePersonResponseDto> {
     return this.service.updateSpacePersonRepresentativeFace(auth, id, personId, dto);
+  }
+
+  @Get(':id/people/:personId/face-suggestions')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({
+    summary: 'Get face suggestions for a person in a shared space',
+    description: 'Retrieve near-miss unassigned faces suggested for this space person, best match first.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  getSpacePersonFaceSuggestions(
+    @Auth() auth: AuthDto,
+    @Param() { id, personId }: SpacePersonParamsDto,
+    @Query() dto: PersonFaceSuggestionPageQueryDto,
+  ): Promise<PersonFaceSuggestionPageResponseDto> {
+    return this.service.getSpacePersonFaceSuggestions(auth, id, personId, dto);
+  }
+
+  @Post(':id/people/:personId/face-suggestions/:assetFaceId/confirm')
+  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  @HttpCode(HttpStatus.OK)
+  @Endpoint({
+    summary: 'Confirm a face suggestion for a person in a shared space',
+    description: 'Assign the suggested face to the space person. Idempotent.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  confirmSpacePersonFaceSuggestion(
+    @Auth() auth: AuthDto,
+    @Param() { id, personId, assetFaceId }: SpacePersonFaceSuggestionParamsDto,
+  ): Promise<void> {
+    return this.service.confirmSpacePersonFaceSuggestion(auth, id, personId, assetFaceId);
+  }
+
+  @Post(':id/people/:personId/face-suggestions/:assetFaceId/dismiss')
+  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  @HttpCode(HttpStatus.OK)
+  @Endpoint({
+    summary: 'Dismiss a face suggestion for a person in a shared space',
+    description: 'Suppress this suggestion for the space person forever. The face stays unassigned. Idempotent.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  dismissSpacePersonFaceSuggestion(
+    @Auth() auth: AuthDto,
+    @Param() { id, personId, assetFaceId }: SpacePersonFaceSuggestionParamsDto,
+  ): Promise<void> {
+    return this.service.dismissSpacePersonFaceSuggestion(auth, id, personId, assetFaceId);
   }
 
   @Get(':id/people/:personId')
