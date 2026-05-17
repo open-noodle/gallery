@@ -23,6 +23,23 @@ const makePerson = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const petFaceIsolationJobNames = [
+  JobName.AssetDetectFacesQueueAll,
+  JobName.FacialRecognitionQueueAll,
+  JobName.FaceIdentityBackfill,
+  JobName.SharedSpaceFaceMatch,
+];
+
+const getQueuedJobNames = (mocks: ServiceMocks) =>
+  mocks.job.queueAll.mock.calls.flatMap(([jobs]) => jobs).map((job) => job.name);
+
+const expectNoQueuedJobNames = (mocks: ServiceMocks, names: JobName[]) => {
+  const queuedJobNames = getQueuedJobNames(mocks);
+  for (const name of names) {
+    expect(queuedJobNames).not.toContain(name);
+  }
+};
+
 describe(PetDetectionService.name, () => {
   let sut: PetDetectionService;
   let mocks: ServiceMocks;
@@ -71,14 +88,7 @@ describe(PetDetectionService.name, () => {
 
       expect(mocks.job.queueAll).toHaveBeenCalledWith([{ name: JobName.PetDetection, data: { id: asset.id } }]);
       expect(mocks.assetJob.streamForPetDetectionJob).toHaveBeenCalledWith(false);
-      expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }),
-          expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
-          expect.objectContaining({ name: JobName.FaceIdentityBackfill }),
-          expect.objectContaining({ name: JobName.SharedSpaceFaceMatch }),
-        ]),
-      );
+      expectNoQueuedJobNames(mocks, petFaceIsolationJobNames);
     });
 
     it('should pass force flag when queuing assets', async () => {
@@ -105,14 +115,7 @@ describe(PetDetectionService.name, () => {
       expect(mocks.assetJob.streamForPetDetectionJob).toHaveBeenCalledWith(true);
       expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
       expect(mocks.job.queueAll).toHaveBeenCalledWith([{ name: JobName.PetDetection, data: { id: asset.id } }]);
-      expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }),
-          expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
-          expect.objectContaining({ name: JobName.FaceIdentityBackfill }),
-          expect.objectContaining({ name: JobName.SharedSpaceFaceMatch }),
-        ]),
-      );
+      expectNoQueuedJobNames(mocks, petFaceIsolationJobNames);
     });
   });
 
@@ -220,14 +223,7 @@ describe(PetDetectionService.name, () => {
         { name: JobName.PersonGenerateThumbnail, data: { id: 'person-id' } },
       ]);
       expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
-      expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }),
-          expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
-          expect.objectContaining({ name: JobName.FaceIdentityBackfill }),
-          expect.objectContaining({ name: JobName.SharedSpaceFaceMatch }),
-        ]),
-      );
+      expectNoQueuedJobNames(mocks, petFaceIsolationJobNames);
     });
 
     it('should reuse existing pet person for same species', async () => {
@@ -273,14 +269,7 @@ describe(PetDetectionService.name, () => {
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         { name: JobName.PersonGenerateThumbnail, data: { id: 'existing-cat' } },
       ]);
-      expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }),
-          expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
-          expect.objectContaining({ name: JobName.FaceIdentityBackfill }),
-          expect.objectContaining({ name: JobName.SharedSpaceFaceMatch }),
-        ]),
-      );
+      expectNoQueuedJobNames(mocks, petFaceIsolationJobNames);
     });
 
     it('should reuse same person for multiple detections of same species in one photo', async () => {
