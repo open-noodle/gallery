@@ -924,16 +924,11 @@ export class SharedSpaceService extends BaseService {
       return { total: 0, items: [] };
     }
 
-    const person = await this.sharedSpaceRepository.getPersonById(personId);
-    if (!person || person.spaceId !== spaceId) {
-      throw new BadRequestException('Person not found');
-    }
+    await this.requireSpacePersonInSpace(spaceId, personId);
 
-    const { machineLearning } = await this.getConfig({ withCache: false });
-    const { maxDistance, suggestionMaxDistance } = machineLearning.facialRecognition;
+    const distanceConfig = await this.getFaceSuggestionDistanceConfig();
     const result = await this.personFaceSuggestionRepository.getPendingForSpacePerson(spaceId, personId, {
-      maxDistance,
-      suggestionMaxDistance,
+      ...distanceConfig,
       page: dto.page,
       size: dto.size,
     });
@@ -953,6 +948,57 @@ export class SharedSpaceService extends BaseService {
         fileCreatedAt: item.fileCreatedAt?.toISOString(),
       })),
     };
+  }
+
+  async confirmSpacePersonFaceSuggestion(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    assetFaceId: string,
+  ): Promise<void> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+    const person = await this.requireSpacePersonInSpace(spaceId, personId);
+    const distanceConfig = await this.getFaceSuggestionDistanceConfig();
+    const isPending = await this.personFaceSuggestionRepository.hasPendingForSpacePerson(
+      spaceId,
+      person.id,
+      assetFaceId,
+      distanceConfig,
+    );
+    if (!isPending) {
+      return;
+    }
+
+    const identity = await this.faceIdentityRepository.ensureSpacePersonIdentity(person.id);
+    const updated = await this.personFaceSuggestionRepository.markConfirmedForSpacePerson(person.id, assetFaceId);
+    if (updated === 0) {
+      return;
+    }
+
+    await this.faceIdentityRepository.replaceFaceIdentity({ assetFaceId, identityId: identity.id, source: 'manual' });
+    await this.personFaceSuggestionRepository.resolveAssignedFace(assetFaceId);
+  }
+
+  async dismissSpacePersonFaceSuggestion(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    assetFaceId: string,
+  ): Promise<void> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+    const person = await this.requireSpacePersonInSpace(spaceId, personId);
+    const distanceConfig = await this.getFaceSuggestionDistanceConfig();
+    const isPending = await this.personFaceSuggestionRepository.hasPendingForSpacePerson(
+      spaceId,
+      person.id,
+      assetFaceId,
+      distanceConfig,
+    );
+    if (!isPending) {
+      return;
+    }
+
+    await this.personFaceSuggestionRepository.markDismissedForSpacePerson(person.id, assetFaceId);
   }
 
   async updateSpacePersonRepresentativeFace(
@@ -2513,6 +2559,22 @@ export class SharedSpaceService extends BaseService {
       throw new ForbiddenException('Insufficient role');
     }
     return member;
+  }
+
+  private async requireSpacePersonInSpace(spaceId: string, personId: string): Promise<SharedSpacePerson> {
+    const person = await this.sharedSpaceRepository.getPersonById(personId);
+    if (!person || person.spaceId !== spaceId) {
+      throw new BadRequestException('Person not found');
+    }
+    return person;
+  }
+
+  private async getFaceSuggestionDistanceConfig() {
+    const { machineLearning } = await this.getConfig({ withCache: false });
+    return {
+      maxDistance: machineLearning.facialRecognition.maxDistance,
+      suggestionMaxDistance: machineLearning.facialRecognition.suggestionMaxDistance,
+    };
   }
 
   private mapMember(member: {
