@@ -772,30 +772,28 @@ describe(LibraryService.name, () => {
       it('should not queue face match jobs when library is not linked to any space', async () => {
         const libraryId = newUuid();
         const library = factory.library({ id: libraryId });
+        const assetId = newUuid();
 
         mocks.library.get.mockResolvedValue(library);
-        mocks.asset.createAll.mockResolvedValue([newUuid()]);
+        mocks.asset.createAll.mockResolvedValue([assetId]);
         mocks.sharedSpace.getSpacesLinkedToLibrary.mockResolvedValue([]);
 
         await sut.handleSyncFiles({ libraryId, paths: ['/photos/test.jpg'], progressCounter: 1, totalAssets: 1 });
 
+        expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
         expect(mocks.job.queueAll).toHaveBeenCalledWith([
-          { name: JobName.SidecarCheck, data: { id: expect.any(String), source: 'upload' } },
+          { name: JobName.SidecarCheck, data: { id: assetId, source: 'upload' } },
         ]);
-        expect(mocks.job.queue).not.toHaveBeenCalledWith(
-          expect.objectContaining({ name: JobName.SharedSpaceFaceMatch }),
-        );
-        expect(mocks.job.queue).not.toHaveBeenCalledWith(
-          expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }),
-        );
+        expect(mocks.job.queue).not.toHaveBeenCalled();
       });
 
       it('should not queue face match jobs when linked space has face recognition disabled', async () => {
         const libraryId = newUuid();
         const library = factory.library({ id: libraryId });
+        const assetId = newUuid();
 
         mocks.library.get.mockResolvedValue(library);
-        mocks.asset.createAll.mockResolvedValue([newUuid()]);
+        mocks.asset.createAll.mockResolvedValue([assetId]);
         mocks.sharedSpace.getSpacesLinkedToLibrary.mockResolvedValue([
           {
             spaceId: newUuid(),
@@ -811,15 +809,38 @@ describe(LibraryService.name, () => {
 
         await sut.handleSyncFiles({ libraryId, paths: ['/photos/test.jpg'], progressCounter: 1, totalAssets: 1 });
 
+        expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
         expect(mocks.job.queueAll).toHaveBeenCalledWith([
-          { name: JobName.SidecarCheck, data: { id: expect.any(String), source: 'upload' } },
+          { name: JobName.SidecarCheck, data: { id: assetId, source: 'upload' } },
         ]);
-        expect(mocks.job.queue).not.toHaveBeenCalledWith(
-          expect.objectContaining({ name: JobName.SharedSpaceFaceMatch }),
-        );
-        expect(mocks.job.queue).not.toHaveBeenCalledWith(
-          expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }),
-        );
+        expect(mocks.job.queue).not.toHaveBeenCalled();
+      });
+
+      it('should not queue face match jobs when linked library import has no new assets', async () => {
+        const libraryId = newUuid();
+        const spaceId = newUuid();
+        const library = factory.library({ id: libraryId });
+
+        mocks.library.get.mockResolvedValue(library);
+        mocks.asset.createAll.mockResolvedValue([]);
+        mocks.sharedSpace.getSpacesLinkedToLibrary.mockResolvedValue([
+          {
+            spaceId,
+            libraryId,
+            addedById: null,
+            createdAt: newDate(),
+            updatedAt: newDate(),
+            createId: newUuid(),
+            updateId: newUuid(),
+            faceRecognitionEnabled: true,
+          },
+        ]);
+
+        await sut.handleSyncFiles({ libraryId, paths: ['/photos/test.jpg'], progressCounter: 1, totalAssets: 1 });
+
+        expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
+        expect(mocks.job.queueAll).toHaveBeenCalledWith([]);
+        expect(mocks.job.queue).not.toHaveBeenCalled();
       });
     });
   });
@@ -1423,6 +1444,7 @@ describe(LibraryService.name, () => {
         name: JobName.LibrarySyncAssetsQueueAll,
         data: { id: library.id },
       });
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
   });
 
