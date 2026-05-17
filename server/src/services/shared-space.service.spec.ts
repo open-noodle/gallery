@@ -57,6 +57,20 @@ const makeMemberResult = (overrides: any = {}) => ({
   ...overrides,
 });
 
+const getQueuedSpacePersonSuggestionScans = (mocks: ServiceMocks) =>
+  mocks.job.queue.mock.calls.map(([job]) => job).filter((job) => job.name === JobName.SpacePersonSuggestionScan);
+
+const makeSpacePersonMetadataBackfillScanCandidate = (id: string, spaceId: string) =>
+  factory.sharedSpacePerson({
+    id,
+    spaceId,
+    identityId: newUuid(),
+    name: '',
+    nameSource: 'none',
+    isHidden: false,
+    type: 'person',
+  });
+
 const setupStrictReconciliationFixture = (
   mocks: ServiceMocks,
   overrides: {
@@ -6404,6 +6418,10 @@ describe(SharedSpaceService.name, () => {
   });
 
   describe('updateSpacePerson', () => {
+    const suggestionsEnabled = {
+      machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0.8, minFaces: 3 } },
+    };
+
     it('should require editor role', async () => {
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
 
@@ -6614,6 +6632,153 @@ describe(SharedSpaceService.name, () => {
       expect(result.name).toBe('');
       expect(result.thumbnailPath).toBe('');
     });
+
+    it('should queue one suggestion scan when an unnamed space person is named', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const personId = newUuid();
+      const person = factory.sharedSpacePerson({ id: personId, spaceId, name: '', isHidden: false, type: 'person' });
+      const updatedPerson = { ...person, name: 'Alice' };
+
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.systemMetadata.get.mockResolvedValue(suggestionsEnabled);
+      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(person).mockResolvedValueOnce(updatedPerson);
+      mocks.sharedSpace.updatePerson.mockResolvedValue(updatedPerson);
+      mocks.sharedSpace.getAlias.mockResolvedValue(void 0);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.updateSpacePerson(auth, spaceId, personId, { name: 'Alice' });
+
+      expect(getQueuedSpacePersonSuggestionScans(mocks)).toEqual([
+        { name: JobName.SpacePersonSuggestionScan, data: { id: personId } },
+      ]);
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.SpacePersonSuggestionScanQueueAll, data: {} });
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+    });
+
+    it('should queue one suggestion scan when a named space person is renamed', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const personId = newUuid();
+      const person = factory.sharedSpacePerson({
+        id: personId,
+        spaceId,
+        name: 'Alice',
+        isHidden: false,
+        type: 'person',
+      });
+      const updatedPerson = { ...person, name: 'Bob' };
+
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.systemMetadata.get.mockResolvedValue(suggestionsEnabled);
+      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(person).mockResolvedValueOnce(updatedPerson);
+      mocks.sharedSpace.updatePerson.mockResolvedValue(updatedPerson);
+      mocks.sharedSpace.getAlias.mockResolvedValue(void 0);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.updateSpacePerson(auth, spaceId, personId, { name: 'Bob' });
+
+      expect(getQueuedSpacePersonSuggestionScans(mocks)).toEqual([
+        { name: JobName.SpacePersonSuggestionScan, data: { id: personId } },
+      ]);
+    });
+
+    it('should not queue suggestion scans for non-name edits, cleared names, hidden people, pets, disabled spaces, or disabled suggestion bands', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const cases: Array<{
+        name: string;
+        prior: Partial<ReturnType<typeof factory.sharedSpacePerson>>;
+        dto: Parameters<typeof sut.updateSpacePerson>[3];
+        spaceFaceRecognitionEnabled?: boolean;
+        suggestionMaxDistance?: number;
+      }> = [
+        {
+          name: 'birth date only',
+          prior: { name: 'Alice', isHidden: false, type: 'person' },
+          dto: { birthDate: '1980-01-01' },
+        },
+        {
+          name: 'representative face only',
+          prior: { name: 'Alice', isHidden: false, type: 'person' },
+          dto: { representativeFaceId: newUuid() },
+        },
+        {
+          name: 'cleared name',
+          prior: { name: 'Alice', isHidden: false, type: 'person' },
+          dto: { name: '' },
+        },
+        {
+          name: 'hidden person',
+          prior: { name: 'Alice', isHidden: false, type: 'person' },
+          dto: { name: 'Bob', isHidden: true },
+        },
+        {
+          name: 'pet',
+          prior: { name: '', isHidden: false, type: 'pet' },
+          dto: { name: 'Mochi' },
+        },
+        {
+          name: 'disabled space',
+          prior: { name: '', isHidden: false, type: 'person' },
+          dto: { name: 'Alice' },
+          spaceFaceRecognitionEnabled: false,
+        },
+        {
+          name: 'disabled suggestion band',
+          prior: { name: '', isHidden: false, type: 'person' },
+          dto: { name: 'Alice' },
+          suggestionMaxDistance: 0.5,
+        },
+      ];
+
+      for (const testCase of cases) {
+        vi.clearAllMocks();
+        const personId = newUuid();
+        const person = factory.sharedSpacePerson({ id: personId, spaceId, ...testCase.prior });
+        const updatedPerson = factory.sharedSpacePerson({
+          ...person,
+          ...(testCase.dto.name === undefined ? {} : { name: testCase.dto.name }),
+          ...(testCase.dto.isHidden === undefined ? {} : { isHidden: testCase.dto.isHidden }),
+          ...(testCase.dto.representativeFaceId === undefined
+            ? {}
+            : { representativeFaceId: testCase.dto.representativeFaceId }),
+          ...(testCase.dto.birthDate === undefined ? {} : { birthDate: testCase.dto.birthDate }),
+        });
+
+        mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+        mocks.sharedSpace.getById.mockResolvedValue(
+          factory.sharedSpace({
+            id: spaceId,
+            faceRecognitionEnabled: testCase.spaceFaceRecognitionEnabled ?? true,
+          }),
+        );
+        mocks.systemMetadata.get.mockResolvedValue({
+          machineLearning: {
+            facialRecognition: {
+              maxDistance: 0.5,
+              suggestionMaxDistance: testCase.suggestionMaxDistance ?? 0.8,
+              minFaces: 3,
+            },
+          },
+        });
+        mocks.sharedSpace.getPersonById.mockResolvedValueOnce(person).mockResolvedValueOnce(updatedPerson);
+        mocks.sharedSpace.updatePerson.mockResolvedValue(updatedPerson);
+        mocks.sharedSpace.getAlias.mockResolvedValue(void 0);
+        mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+        await sut.updateSpacePerson(auth, spaceId, personId, testCase.dto);
+
+        expect(getQueuedSpacePersonSuggestionScans(mocks), testCase.name).toEqual([]);
+        expect(mocks.job.queue, testCase.name).not.toHaveBeenCalledWith({
+          name: JobName.SpacePersonSuggestionScanQueueAll,
+          data: {},
+        });
+        expect(mocks.job.queueAll, testCase.name).not.toHaveBeenCalled();
+      }
+    });
   });
 
   describe('deleteSpacePerson', () => {
@@ -6683,6 +6848,10 @@ describe(SharedSpaceService.name, () => {
   });
 
   describe('backfillSpacePersonMetadata', () => {
+    const suggestionsEnabled = {
+      machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0.8, minFaces: 3 } },
+    };
+
     it('should run metadata backfill on the people backfill queue', () => {
       const config = new Reflector().get(MetadataKey.JobConfig, sut.handleSharedSpacePersonMetadataBackfill);
 
@@ -7116,6 +7285,194 @@ describe(SharedSpaceService.name, () => {
         name: JobName.SharedSpacePersonMetadataBackfill,
         data: { cursor: person.id, limit: 1, identityId },
       });
+    });
+
+    it('should batch suggestion scans only for inherited name changes in the current page', async () => {
+      const spaceId = newUuid();
+      const scanPersonId = newUuid();
+      const birthDateOnlyPersonId = newUuid();
+      const hiddenPersonId = newUuid();
+      const scanPerson = factory.sharedSpacePerson({
+        id: scanPersonId,
+        spaceId,
+        identityId: 'identity-scan',
+        name: '',
+        nameSource: 'none',
+        birthDateSource: 'none',
+        isHidden: false,
+        type: 'person',
+      });
+      const birthDateOnlyPerson = factory.sharedSpacePerson({
+        id: birthDateOnlyPersonId,
+        spaceId,
+        identityId: 'identity-birth',
+        name: 'Manual Name',
+        nameSource: 'manual',
+        birthDateSource: 'none',
+        isHidden: false,
+        type: 'person',
+      });
+      const hiddenPerson = factory.sharedSpacePerson({
+        id: hiddenPersonId,
+        spaceId,
+        identityId: 'identity-hidden',
+        name: '',
+        nameSource: 'none',
+        isHidden: true,
+        type: 'person',
+      });
+
+      mocks.sharedSpace.getSpacePersonMetadataBackfillPage.mockResolvedValue([
+        scanPerson,
+        birthDateOnlyPerson,
+        hiddenPerson,
+      ]);
+      mocks.sharedSpace.getPersonById.mockImplementation((id: string) => {
+        return {
+          [scanPersonId]: scanPerson,
+          [birthDateOnlyPersonId]: birthDateOnlyPerson,
+          [hiddenPersonId]: hiddenPerson,
+        }[id] as any;
+      });
+      mocks.sharedSpace.getMetadataInheritanceCandidates
+        .mockResolvedValueOnce([
+          {
+            personId: newUuid(),
+            userId: newUuid(),
+            role: SharedSpaceRole.Owner,
+            name: 'Alice',
+            birthDate: null,
+            type: 'person',
+            species: null,
+            updatedAt: newDate(),
+            supportingFaceCount: 2,
+            isAssetAdder: false,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            personId: newUuid(),
+            userId: newUuid(),
+            role: SharedSpaceRole.Owner,
+            name: '',
+            birthDate: new Date('1990-01-01'),
+            type: 'person',
+            species: null,
+            updatedAt: newDate(),
+            supportingFaceCount: 2,
+            isAssetAdder: false,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            personId: newUuid(),
+            userId: newUuid(),
+            role: SharedSpaceRole.Owner,
+            name: 'Hidden Alice',
+            birthDate: null,
+            type: 'person',
+            species: null,
+            updatedAt: newDate(),
+            supportingFaceCount: 2,
+            isAssetAdder: false,
+          },
+        ]);
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.systemMetadata.get.mockResolvedValue(suggestionsEnabled);
+      mocks.sharedSpace.updatePerson.mockResolvedValue(scanPerson);
+
+      const result = await sut.backfillSpacePersonMetadata({ limit: 50 });
+
+      expect(result).toEqual({ processed: 3, inherited: 3, skipped: 0 });
+      expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.SpacePersonSuggestionScan, data: { id: scanPersonId } },
+      ]);
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.SpacePersonSuggestionScanQueueAll, data: {} });
+    });
+
+    it('should not queue repeated scans when inherited names are unchanged', async () => {
+      const spaceId = newUuid();
+      const personId = newUuid();
+      const sourcePersonId = newUuid();
+      const person = factory.sharedSpacePerson({
+        id: personId,
+        spaceId,
+        identityId: 'identity-unchanged',
+        name: 'Alice',
+        nameSource: 'inherited',
+        isHidden: false,
+        type: 'person',
+      });
+
+      mocks.sharedSpace.getSpacePersonMetadataBackfillPage.mockResolvedValue([person]);
+      mocks.sharedSpace.getPersonById.mockResolvedValue(person);
+      mocks.sharedSpace.getMetadataInheritanceCandidates.mockResolvedValue([
+        {
+          personId: sourcePersonId,
+          userId: newUuid(),
+          role: SharedSpaceRole.Owner,
+          name: 'Alice',
+          birthDate: null,
+          type: 'person',
+          species: null,
+          updatedAt: newDate(),
+          supportingFaceCount: 3,
+          isAssetAdder: false,
+        },
+      ]);
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.systemMetadata.get.mockResolvedValue(suggestionsEnabled);
+      mocks.sharedSpace.updatePerson.mockResolvedValue(person);
+
+      await sut.backfillSpacePersonMetadata({ limit: 50 });
+
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.SpacePersonSuggestionScanQueueAll, data: {} });
+    });
+
+    it('should not queue scans for inherited name changes when the suggestion band or space face recognition is disabled', async () => {
+      for (const testCase of [
+        { name: 'disabled suggestion band', faceRecognitionEnabled: true, suggestionMaxDistance: 0.5 },
+        { name: 'disabled space', faceRecognitionEnabled: false, suggestionMaxDistance: 0.8 },
+      ]) {
+        vi.clearAllMocks();
+        const spaceId = newUuid();
+        const person = makeSpacePersonMetadataBackfillScanCandidate(newUuid(), spaceId);
+        mocks.sharedSpace.getSpacePersonMetadataBackfillPage.mockResolvedValue([person]);
+        mocks.sharedSpace.getPersonById.mockResolvedValue(person);
+        mocks.sharedSpace.getMetadataInheritanceCandidates.mockResolvedValue([
+          {
+            personId: newUuid(),
+            userId: newUuid(),
+            role: SharedSpaceRole.Owner,
+            name: 'Alice',
+            birthDate: null,
+            type: 'person',
+            species: null,
+            updatedAt: newDate(),
+            supportingFaceCount: 3,
+            isAssetAdder: false,
+          },
+        ]);
+        mocks.sharedSpace.getById.mockResolvedValue(
+          factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: testCase.faceRecognitionEnabled }),
+        );
+        mocks.systemMetadata.get.mockResolvedValue({
+          machineLearning: {
+            facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: testCase.suggestionMaxDistance, minFaces: 3 },
+          },
+        });
+        mocks.sharedSpace.updatePerson.mockResolvedValue(person);
+
+        await sut.backfillSpacePersonMetadata({ limit: 50 });
+
+        expect(mocks.job.queueAll, testCase.name).not.toHaveBeenCalled();
+        expect(mocks.job.queue, testCase.name).not.toHaveBeenCalledWith({
+          name: JobName.SpacePersonSuggestionScanQueueAll,
+          data: {},
+        });
+      }
     });
   });
 

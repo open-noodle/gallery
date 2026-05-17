@@ -87,6 +87,13 @@ type SharedSpaceIdentityReconciliationClaim = ReconciliationClaim & {
   sourceIdentityId: string;
 };
 
+type SpacePersonSuggestionScanCandidate = Pick<SharedSpacePerson, 'id' | 'spaceId' | 'name' | 'isHidden' | 'type'>;
+
+type SpacePersonMetadataInheritanceResult = {
+  didInherit: boolean;
+  suggestionScanCandidate?: SpacePersonSuggestionScanCandidate;
+};
+
 @Injectable()
 export class SharedSpaceService extends BaseService {
   private sharedSpaceFaceMatchBatchSize = 1000;
@@ -1236,6 +1243,22 @@ export class SharedSpaceService extends BaseService {
       await this.queueSpacePersonMetadataBackfill(person.identityId);
     }
 
+    if (dto.name !== undefined) {
+      const candidate = {
+        id: personId,
+        spaceId,
+        name: dto.name,
+        isHidden: dto.isHidden ?? person.isHidden,
+        type: person.type,
+      };
+      if (this.isNamedVisibleSpacePerson(candidate) && dto.name.trim() !== person.name.trim()) {
+        const suggestionsEnabled = await this.areSpacePersonSuggestionsEnabled({ withCache: false });
+        if (suggestionsEnabled && (await this.isSpaceFaceRecognitionEnabled(spaceId))) {
+          await this.jobRepository.queue({ name: JobName.SpacePersonSuggestionScan, data: { id: personId } });
+        }
+      }
+    }
+
     const alias = await this.sharedSpaceRepository.getAlias(personId, auth.user.id);
 
     await this.sharedSpaceRepository.logActivity({
@@ -1297,24 +1320,30 @@ export class SharedSpaceService extends BaseService {
 
     let inherited = 0;
     let skipped = 0;
+    const suggestionScanCandidates: SpacePersonSuggestionScanCandidate[] = [];
     for (const person of people) {
       if (!person.identityId) {
         skipped++;
         continue;
       }
       const assetAdderIds = await this.sharedSpaceRepository.getSpacePersonAssetAdderIds(person.spaceId, person.id);
-      const didInherit = await this.inheritSpacePersonMetadata(
+      const inheritance = await this.inheritSpacePersonMetadata(
         person.spaceId,
         person.id,
         person.identityId,
         assetAdderIds,
       );
-      if (didInherit) {
+      if (inheritance.didInherit) {
         inherited++;
+        if (inheritance.suggestionScanCandidate) {
+          suggestionScanCandidates.push(inheritance.suggestionScanCandidate);
+        }
       } else {
         skipped++;
       }
     }
+
+    await this.queueSpacePersonSuggestionScans(suggestionScanCandidates);
 
     return {
       processed: people.length,
@@ -2440,10 +2469,10 @@ export class SharedSpaceService extends BaseService {
     spacePersonId: string,
     identityId: string,
     assetAdderIdOrIds?: string | string[] | null,
-  ): Promise<boolean> {
+  ): Promise<SpacePersonMetadataInheritanceResult> {
     const person = await this.sharedSpaceRepository.getPersonById(spacePersonId);
     if (!person || person.spaceId !== spaceId) {
-      return false;
+      return { didInherit: false };
     }
     const assetAdderIds = Array.isArray(assetAdderIdOrIds)
       ? assetAdderIdOrIds
@@ -2498,9 +2527,69 @@ export class SharedSpaceService extends BaseService {
 
     if (Object.keys(updates).length > 0) {
       await this.sharedSpaceRepository.updatePerson(spacePersonId, updates);
-      return true;
+      const nextName = updates.name ?? person.name;
+      const nameChanged = typeof updates.name === 'string' && updates.name.trim() !== person.name.trim();
+      return {
+        didInherit: true,
+        ...(nameChanged && this.isNamedVisibleSpacePerson({ ...person, name: nextName })
+          ? { suggestionScanCandidate: { ...person, name: nextName } }
+          : {}),
+      };
     }
-    return false;
+    return { didInherit: false };
+  }
+
+  private isNamedVisibleSpacePerson(person: Pick<SharedSpacePerson, 'name' | 'isHidden' | 'type'>): boolean {
+    return person.name.trim().length > 0 && !person.isHidden && person.type === 'person';
+  }
+
+  private async areSpacePersonSuggestionsEnabled({ withCache }: { withCache: boolean }): Promise<boolean> {
+    const { machineLearning } = await this.getConfig({ withCache });
+    const { maxDistance, suggestionMaxDistance } = machineLearning.facialRecognition;
+    return suggestionMaxDistance > maxDistance;
+  }
+
+  private async isSpaceFaceRecognitionEnabled(spaceId: string, cache = new Map<string, boolean>()): Promise<boolean> {
+    const cached = cache.get(spaceId);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    const enabled = !!space?.faceRecognitionEnabled;
+    cache.set(spaceId, enabled);
+    return enabled;
+  }
+
+  private async queueSpacePersonSuggestionScans(candidates: SpacePersonSuggestionScanCandidate[]): Promise<void> {
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const suggestionsEnabled = await this.areSpacePersonSuggestionsEnabled({ withCache: false });
+    if (!suggestionsEnabled) {
+      return;
+    }
+
+    const queuedIds = new Set<string>();
+    const spaceEnabledCache = new Map<string, boolean>();
+    const jobs: Array<{ name: JobName.SpacePersonSuggestionScan; data: { id: string } }> = [];
+    for (const candidate of candidates) {
+      if (queuedIds.has(candidate.id) || !this.isNamedVisibleSpacePerson(candidate)) {
+        continue;
+      }
+
+      if (!(await this.isSpaceFaceRecognitionEnabled(candidate.spaceId, spaceEnabledCache))) {
+        continue;
+      }
+
+      queuedIds.add(candidate.id);
+      jobs.push({ name: JobName.SpacePersonSuggestionScan, data: { id: candidate.id } });
+    }
+
+    if (jobs.length > 0) {
+      await this.jobRepository.queueAll(jobs);
+    }
   }
 
   private selectMetadataCandidate<
