@@ -3223,6 +3223,41 @@ describe(SharedSpaceRepository.name, () => {
       expect(rows[0].embedding).toEqual(expect.any(String));
     });
 
+    it('samples assigned face embeddings in deterministic face id order', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+      const spacePerson = await sut.createPerson({ spaceId: space.id, name: 'Alice', representativeFaceId: null });
+      const faces: Array<{ id: string; embedding: string }> = [];
+
+      for (let i = 0; i < 4; i++) {
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const embedding = newEmbedding();
+        faces.push({ id: assetFace.id, embedding });
+        await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding }).execute();
+        await sut.addPersonFaces([{ personId: spacePerson.id, assetFaceId: assetFace.id }]);
+      }
+
+      const rows = await sut.getSpacePersonAssignedFaceEmbeddings(spacePerson.id, 2);
+      const expected = await ctx.database
+        .selectFrom('face_search')
+        .select('embedding')
+        .where(
+          'faceId',
+          'in',
+          faces
+            .toSorted((a, b) => a.id.localeCompare(b.id))
+            .slice(0, 2)
+            .map((face) => face.id),
+        )
+        .orderBy('faceId', 'asc')
+        .execute();
+
+      expect(rows.map((row) => row.embedding)).toEqual(expected.map((row) => row.embedding));
+    });
+
     it('gets assigned face ids scoped to the requested shared space', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();

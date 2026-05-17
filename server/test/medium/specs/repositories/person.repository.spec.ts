@@ -548,6 +548,37 @@ describe(PersonRepository.name, () => {
       }
     });
 
+    it('samples assigned face embeddings in deterministic face id order', async () => {
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Carol' });
+      const faces: Array<{ id: string; embedding: string }> = [];
+
+      for (let i = 0; i < 4; i++) {
+        const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+        const embedding = newEmbedding();
+        faces.push({ id: faceId, embedding });
+        await ctx.database.insertInto('face_search').values({ faceId, embedding }).execute();
+      }
+
+      const rows = await sut.getAssignedFaceEmbeddings(person.id, 2);
+      const expected = await ctx.database
+        .selectFrom('face_search')
+        .select('embedding')
+        .where(
+          'faceId',
+          'in',
+          faces
+            .toSorted((a, b) => a.id.localeCompare(b.id))
+            .slice(0, 2)
+            .map((face) => face.id),
+        )
+        .orderBy('faceId', 'asc')
+        .execute();
+
+      expect(rows.map((row) => row.embedding)).toEqual(expected.map((row) => row.embedding));
+    });
+
     it('excludes isVisible=false and deleted faces', async () => {
       const rows = await sut.getAssignedFaceEmbeddings(personId, 10);
       // Person A has 3 visible non-deleted faces; isVisible=false and deletedAt faces are excluded

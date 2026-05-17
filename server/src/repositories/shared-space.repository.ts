@@ -1977,6 +1977,7 @@ export class SharedSpaceRepository {
       .where('shared_space_person_face.personId', '=', spacePersonId)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', 'is', true)
+      .orderBy('shared_space_person_face.assetFaceId', 'asc')
       .limit(limit)
       .execute();
   }

@@ -752,6 +752,7 @@ export class PersonRepository {
       .where('asset_face.personId', '=', personId)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', 'is', true)
+      .orderBy('asset_face.id', 'asc')
       .limit(limit)
       .execute();
   }
