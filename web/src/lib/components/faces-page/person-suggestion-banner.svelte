@@ -17,7 +17,10 @@
   let { person, total, previews, referenceThumbnailUrl, onReview }: Props = $props();
 
   let snoozeTick = $state(0);
-  const visible = $derived((snoozeTick, total > 0 && !isSuggestionSnoozed(person.id, total)));
+  const visible = $derived.by(() => {
+    snoozeTick;
+    return total > 0 && !isSuggestionSnoozed(person.id, total);
+  });
   const shownPreviews = $derived(previews.slice(0, 5));
 
   const title = $derived(
@@ -70,13 +73,7 @@
       >
         {$t('face_suggestion_review')}
       </Button>
-      <Button
-        size="small"
-        shape="round"
-        color="secondary"
-        data-testid="suggestion-snooze-btn"
-        onclick={snooze}
-      >
+      <Button size="small" shape="round" color="secondary" data-testid="suggestion-snooze-btn" onclick={snooze}>
         {$t('face_suggestion_not_now')}
       </Button>
     </div>

@@ -12,12 +12,7 @@
     type PersonResponseDto,
   } from '@immich/sdk';
   import { Button, IconButton, Modal, ModalBody, ModalFooter } from '@immich/ui';
-  import {
-    mdiAccountCheckOutline,
-    mdiAccountRemoveOutline,
-    mdiChevronLeft,
-    mdiChevronRight,
-  } from '@mdi/js';
+  import { mdiAccountCheckOutline, mdiAccountRemoveOutline, mdiChevronLeft, mdiChevronRight } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
 
@@ -140,7 +135,9 @@
   const canNext = $derived(index < items.length - 1);
 
   function step(delta: number) {
-    if (busy) return;
+    if (busy) {
+      return;
+    }
     const next = index + delta;
     if (next >= 0 && next < items.length) {
       index = next;
@@ -153,7 +150,9 @@
   });
 
   function onKeydown(event: KeyboardEvent) {
-    if (loading) return;
+    if (loading) {
+      return;
+    }
     switch (event.key) {
       case 'ArrowRight': {
         event.preventDefault();

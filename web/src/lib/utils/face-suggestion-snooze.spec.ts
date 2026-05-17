@@ -1,8 +1,4 @@
-import {
-  SUGGESTION_SNOOZE_MS,
-  isSuggestionSnoozed,
-  snoozeSuggestions,
-} from '$lib/utils/face-suggestion-snooze';
+import { SUGGESTION_SNOOZE_MS, isSuggestionSnoozed, snoozeSuggestions } from '$lib/utils/face-suggestion-snooze';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('face-suggestion-snooze', () => {

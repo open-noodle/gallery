@@ -1,6 +1,11 @@
 import type { Faces } from '$lib/stores/people.store';
 import type { Size } from '$lib/utils/container-utils';
-import { getBoundingBox, getFaceCropTransform, sortPeopleForManagement, zoomImageToBase64 } from '$lib/utils/people-utils';
+import {
+  getBoundingBox,
+  getFaceCropTransform,
+  sortPeopleForManagement,
+  zoomImageToBase64,
+} from '$lib/utils/people-utils';
 import { AssetTypeEnum } from '@immich/sdk';
 
 const makeFace = (overrides: Partial<Faces> = {}): Faces => ({

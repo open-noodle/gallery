@@ -95,9 +95,9 @@ describe('PersonSuggestionReviewModal', () => {
     expect(screen.getByTestId('suggestion-prev-btn')).toBeDisabled();
 
     await userEvent.click(screen.getByTestId('suggestion-next-btn'));
-    expect(screen.getByTestId('suggestion-progress').getAttribute('data-current')).toBe('2'); // moved to 2 of 2
+    expect(screen.getByTestId('suggestion-progress').dataset.current).toBe('2'); // moved to 2 of 2
     await userEvent.click(screen.getByTestId('suggestion-prev-btn'));
-    expect(screen.getByTestId('suggestion-progress').getAttribute('data-current')).toBe('1');
+    expect(screen.getByTestId('suggestion-progress').dataset.current).toBe('1');
 
     expect(confirm).not.toHaveBeenCalled();
     expect(dismiss).not.toHaveBeenCalled();
