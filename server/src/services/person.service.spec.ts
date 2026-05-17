@@ -77,6 +77,15 @@ describe(PersonService.name, () => {
     mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue([]);
   });
 
+  const expectNoFaceDetectionMutation = () => {
+    expect(mocks.machineLearning.detectFaces).not.toHaveBeenCalled();
+    expect(mocks.person.refreshFaces).not.toHaveBeenCalled();
+    expect(mocks.faceIdentity.unlinkFaces).not.toHaveBeenCalled();
+    expect(mocks.job.queue).not.toHaveBeenCalled();
+    expect(mocks.job.queueAll).not.toHaveBeenCalled();
+    expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+  };
+
   it('should be defined', () => {
     expect(sut).toBeDefined();
   });
@@ -1869,6 +1878,44 @@ describe(PersonService.name, () => {
       await expect(sut.handleDetectFaces({ id: 'foo' })).resolves.toBe(JobStatus.Skipped);
       expect(mocks.asset.getByIds).not.toHaveBeenCalled();
       expect(mocks.systemMetadata.get).toHaveBeenCalled();
+      expect(mocks.assetJob.getForDetectFacesJob).not.toHaveBeenCalled();
+      expectNoFaceDetectionMutation();
+    });
+
+    it.each([
+      {
+        label: 'missing asset',
+        asset: undefined,
+        expected: JobStatus.Failed,
+      },
+      {
+        label: 'asset without preview file',
+        asset: AssetFactory.from().exif().build(),
+        expected: JobStatus.Failed,
+      },
+      {
+        label: 'asset with multiple preview files',
+        asset: AssetFactory.from()
+          .file({ type: AssetFileType.Preview, path: '/preview-1.jpg' })
+          .file({ type: AssetFileType.Preview, path: '/preview-2.jpg' })
+          .exif()
+          .build(),
+        expected: JobStatus.Failed,
+      },
+      {
+        label: 'hidden asset with preview file',
+        asset: AssetFactory.from({ visibility: AssetVisibility.Hidden })
+          .file({ type: AssetFileType.Preview, path: '/hidden-preview.jpg' })
+          .exif()
+          .build(),
+        expected: JobStatus.Skipped,
+      },
+    ] as const)('should not mutate faces or status for $label', async ({ asset, expected }) => {
+      mocks.assetJob.getForDetectFacesJob.mockResolvedValue(asset ? getForDetectedFaces(asset) : undefined);
+
+      await expect(sut.handleDetectFaces({ id: asset?.id ?? 'missing-asset' })).resolves.toBe(expected);
+
+      expectNoFaceDetectionMutation();
     });
 
     it('should skip when no resize path', async () => {
@@ -1891,6 +1938,8 @@ describe(PersonService.name, () => {
       );
       expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
+      expect(mocks.person.refreshFaces).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.unlinkFaces).not.toHaveBeenCalled();
 
       expect(mocks.asset.upsertJobStatus).toHaveBeenCalledWith({
         assetId: asset.id,
@@ -1898,6 +1947,20 @@ describe(PersonService.name, () => {
       });
       const facesRecognizedAt = mocks.asset.upsertJobStatus.mock.calls[0][0].facesRecognizedAt as Date;
       expect(facesRecognizedAt.getTime()).toBeGreaterThan(start);
+    });
+
+    it('should not write facesRecognizedAt or queue recognition when ML face detection throws', async () => {
+      const asset = AssetFactory.from().file({ type: AssetFileType.Preview, path: '/preview.jpg' }).exif().build();
+      mocks.assetJob.getForDetectFacesJob.mockResolvedValue(getForDetectedFaces(asset));
+      mocks.machineLearning.detectFaces.mockRejectedValue(new Error('ml unavailable'));
+
+      await expect(sut.handleDetectFaces({ id: asset.id })).rejects.toThrow('ml unavailable');
+
+      expect(mocks.person.refreshFaces).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.unlinkFaces).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+      expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
     });
 
     it('should create a face with no person and queue recognition job', async () => {
