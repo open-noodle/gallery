@@ -647,6 +647,21 @@ describe(QueueService.name, () => {
     });
 
     it.each([
+      { queue: QueueName.FaceDetection, force: true },
+      { queue: QueueName.PeopleBackfill, force: false },
+    ])('still rejects active destructive face-root starts for $queue with force=$force', async ({ queue, force }) => {
+      mocks.job.isActive.mockResolvedValue(true);
+
+      await expect(sut.runCommandLegacy(queue, { command: QueueCommand.Start, force })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(mocks.job.empty).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+    });
+
+    it.each([
       {
         queue: QueueName.FaceDetection,
         force: false,
