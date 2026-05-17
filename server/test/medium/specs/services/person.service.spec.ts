@@ -412,6 +412,13 @@ describe(PersonService.name, () => {
 
       await expect(
         ctx.database
+          .selectFrom('asset_face')
+          .select('id')
+          .where('id', '=', ml.assetFace.id)
+          .execute(),
+      ).resolves.toEqual([]);
+      await expect(
+        ctx.database
           .selectFrom('shared_space_person')
           .select(['id', 'name'])
           .where('id', 'in', [mlSpacePerson.id, manualSpacePerson.id, exifSpacePerson.id])
