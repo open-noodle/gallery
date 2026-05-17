@@ -94,11 +94,21 @@ describe(MetadataService.name, () => {
   });
 
   const expectNoGlobalFaceIdentityRootJobs = () => {
-    const queuedJobs = mocks.job.queueAll.mock.calls.flatMap(([jobs]) => jobs ?? []);
+    const globalFaceIdentityRoots = [
+      JobName.AssetDetectFacesQueueAll,
+      JobName.FacialRecognitionQueueAll,
+      JobName.FaceIdentityBackfill,
+      JobName.SharedSpaceFaceMatchAll,
+      JobName.SharedSpacePersonMetadataBackfill,
+    ];
+    const queuedJobs = [
+      ...mocks.job.queueAll.mock.calls.flatMap(([jobs]) => jobs ?? []),
+      ...mocks.job.queue.mock.calls.map(([job]) => job),
+    ];
 
-    expect(queuedJobs).not.toContainEqual(expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }));
-    expect(queuedJobs).not.toContainEqual(expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }));
-    expect(queuedJobs).not.toContainEqual(expect.objectContaining({ name: JobName.FaceIdentityBackfill }));
+    for (const name of globalFaceIdentityRoots) {
+      expect(queuedJobs).not.toContainEqual(expect.objectContaining({ name }));
+    }
   };
 
   afterEach(async () => {
@@ -206,6 +216,9 @@ describe(MetadataService.name, () => {
       expect(mocks.asset.upsertExif).not.toHaveBeenCalled();
       expect(mocks.asset.update).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.ensurePersonIdentity).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.getSpaceIdsForAsset).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
@@ -1543,7 +1556,9 @@ describe(MetadataService.name, () => {
       await sut.handleMetadataExtraction({ id: asset.id });
       expect(mocks.person.getDistinctNames).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.ensurePersonIdentity).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
       expect(mocks.sharedSpace.getSpaceIdsForAsset).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
@@ -1555,7 +1570,9 @@ describe(MetadataService.name, () => {
       await sut.handleMetadataExtraction({ id: asset.id });
       expect(mocks.person.getDistinctNames).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.ensurePersonIdentity).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
       expect(mocks.sharedSpace.getSpaceIdsForAsset).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
@@ -1571,7 +1588,9 @@ describe(MetadataService.name, () => {
       expect(mocks.person.refreshFaces).not.toHaveBeenCalled();
       expect(mocks.person.updateAll).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.ensurePersonIdentity).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
       expect(mocks.sharedSpace.getSpaceIdsForAsset).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
@@ -1587,7 +1606,9 @@ describe(MetadataService.name, () => {
       expect(mocks.person.refreshFaces).not.toHaveBeenCalled();
       expect(mocks.person.updateAll).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.ensurePersonIdentity).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
       expect(mocks.sharedSpace.getSpaceIdsForAsset).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
@@ -1738,7 +1759,10 @@ describe(MetadataService.name, () => {
     });
 
     it('should remove existing exif faces before adding new ones', async () => {
-      const asset = AssetFactory.from().face({ id: 'face-1', sourceType: SourceType.Exif }).build();
+      const asset = AssetFactory.from()
+        .face({ id: 'face-1', sourceType: SourceType.Exif })
+        .face({ id: 'face-2', sourceType: SourceType.MachineLearning })
+        .build();
       const person = PersonFactory.create();
 
       mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
@@ -1750,6 +1774,7 @@ describe(MetadataService.name, () => {
       await sut.handleMetadataExtraction({ id: asset.id });
 
       expect(mocks.person.refreshFaces).toHaveBeenCalledWith(expect.any(Array), ['face-1']);
+      expect(mocks.person.refreshFaces).not.toHaveBeenCalledWith(expect.any(Array), expect.arrayContaining(['face-2']));
       expectNoGlobalFaceIdentityRootJobs();
     });
 
