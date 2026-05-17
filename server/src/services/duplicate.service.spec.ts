@@ -514,7 +514,23 @@ describe(DuplicateService.name, () => {
           .flat()
           .flat()
           .filter((j: any) => j?.name === JobName.SharedSpaceFaceMatch);
-        expect(queuedFaceJobs).toHaveLength(2);
+        expect(queuedFaceJobs).toEqual([
+          { name: JobName.SharedSpaceFaceMatch, data: { spaceId: spaceX, assetId: asset1.id } },
+          { name: JobName.SharedSpaceFaceMatch, data: { spaceId: spaceY, assetId: asset1.id } },
+        ]);
+        expect(mocks.job.queueAll).toHaveBeenCalledWith([
+          { name: JobName.SharedSpaceFaceMatch, data: { spaceId: spaceX, assetId: asset1.id } },
+          { name: JobName.SharedSpaceFaceMatch, data: { spaceId: spaceY, assetId: asset1.id } },
+        ]);
+        expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
+          expect.arrayContaining([
+            expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }),
+            expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
+            expect.objectContaining({ name: JobName.FaceIdentityBackfill }),
+            expect.objectContaining({ name: JobName.AssetDetectFaces }),
+            expect.objectContaining({ name: JobName.FacialRecognition }),
+          ]),
+        );
       });
 
       it('skips the space sync branch entirely when there are no keepers', async () => {
@@ -609,6 +625,8 @@ describe(DuplicateService.name, () => {
         expect(mocks.album.addAssetIdsToAlbums).not.toHaveBeenCalled();
         expect(mocks.tag.replaceAssetTags).not.toHaveBeenCalled();
         expect(mocks.asset.updateAllExif).not.toHaveBeenCalled();
+        expect(mocks.job.queueAll).not.toHaveBeenCalled();
+        expect(mocks.event.emit).not.toHaveBeenCalled();
 
         // The trash step must NOT have run.
         const trashCalls = mocks.asset.updateAll.mock.calls.filter(
