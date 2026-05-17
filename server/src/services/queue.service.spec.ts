@@ -346,6 +346,7 @@ describe(QueueService.name, () => {
           data: expect.objectContaining({ force: true }),
         }),
       );
+      expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
       expect(jobs).not.toContainEqual(expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }));
     });
 
@@ -366,6 +367,7 @@ describe(QueueService.name, () => {
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         { name: JobName.AssetGenerateThumbnailsQueueAll, data: { force: false } },
       ]);
+      expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
       const jobs = mocks.job.queueAll.mock.calls[0][0];
       expect(jobs).not.toContainEqual(expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }));
       expect(jobs).not.toContainEqual(expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }));
@@ -692,6 +694,7 @@ describe(QueueService.name, () => {
       await runStartCommand(queue, force);
 
       expect(mocks.job.queue).toHaveBeenCalledWith(expected);
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
     });
 
     it.each([
