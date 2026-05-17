@@ -1452,10 +1452,21 @@ describe(AssetService.name, () => {
 
       await sut.run(authStub.admin, { assetIds: ['asset-1', 'asset-2'], name: AssetJobName.REFRESH_FACES });
 
-      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+      expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queueAll.mock.calls[0][0]).toEqual([
         { name: JobName.AssetDetectFaces, data: { id: 'asset-1' } },
         { name: JobName.AssetDetectFaces, data: { id: 'asset-2' } },
       ]);
+      const queuedJobNames = mocks.job.queueAll.mock.calls.flatMap(([jobs]) => jobs.map((job) => job.name));
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(queuedJobNames).not.toContain(JobName.AssetDetectFacesQueueAll);
+      expect(queuedJobNames).not.toContain(JobName.FacialRecognitionQueueAll);
+      expect(queuedJobNames).not.toContain(JobName.FaceIdentityBackfill);
+      expect(queuedJobNames).not.toContain(JobName.PersonCleanup);
+      expect(mocks.person.deleteFaces).not.toHaveBeenCalled();
+      expect(mocks.person.delete).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.deleteAllPersonFaces).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.deleteAllPersons).not.toHaveBeenCalled();
     });
 
     it('should only enqueue the requested asset face detection job for manual face refresh', async () => {
