@@ -508,4 +508,38 @@ describe('Spaces person detail page', () => {
     });
     expect(invalidateAllMock).toHaveBeenCalled();
   });
+
+  it('navigates to the surviving person after an autosuggest merge without reloading the deleted route', async () => {
+    const person = makePerson({ id: 'person-1', name: '' });
+    const existingPerson = makePerson({ id: 'person-2', name: 'Alice Existing' });
+    sdkMock.getSpacePeople.mockResolvedValue([existingPerson]);
+    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    renderPage({ person });
+
+    await userEvent.click(screen.getByText('add_a_name'));
+    await userEvent.type(screen.getByPlaceholderText('add_a_name'), 'Ali');
+    await userEvent.click(await screen.findByRole('button', { name: 'Alice Existing' }));
+
+    await waitFor(() => {
+      expect(sdkMock.mergeSpacePeople).toHaveBeenCalledWith({
+        id: 'space-1',
+        personId: 'person-2',
+        sharedSpacePersonMergeDto: { ids: ['person-1'] },
+      });
+    });
+    expect(gotoMock).toHaveBeenCalledWith('/spaces/space-1/people/person-2', { replaceState: true });
+    expect(invalidateAllMock).not.toHaveBeenCalled();
+  });
+
+  it('navigates to the surviving target after a swapped merge instead of reloading the deleted route person', async () => {
+    renderPage({ action: 'merge' });
+
+    await userEvent.click(screen.getByTestId('merge-swapped-space-candidate'));
+
+    await waitFor(() => {
+      expect(sdkMock.mergeScopedPeople).toHaveBeenCalled();
+    });
+    expect(gotoMock).toHaveBeenCalledWith('/spaces/space-2/people/space-person-candidate', { replaceState: true });
+    expect(invalidateAllMock).not.toHaveBeenCalled();
+  });
 });
