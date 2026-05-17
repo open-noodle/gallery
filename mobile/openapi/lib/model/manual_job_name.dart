@@ -30,6 +30,7 @@ class ManualJobName {
   static const memoryCreate = ManualJobName._(r'memory-create');
   static const backupDatabase = ManualJobName._(r'backup-database');
   static const faceIdentityBackfill = ManualJobName._(r'face-identity-backfill');
+  static const faceSuggestionMaintenance = ManualJobName._(r'face-suggestion-maintenance');
   static const sharedSpacePersonMetadataBackfill = ManualJobName._(r'shared-space-person-metadata-backfill');
 
   /// List of all possible values in this [enum][ManualJobName].
@@ -41,6 +42,7 @@ class ManualJobName {
     memoryCreate,
     backupDatabase,
     faceIdentityBackfill,
+    faceSuggestionMaintenance,
     sharedSpacePersonMetadataBackfill,
   ];
 
@@ -87,6 +89,7 @@ class ManualJobNameTypeTransformer {
         case r'memory-create': return ManualJobName.memoryCreate;
         case r'backup-database': return ManualJobName.backupDatabase;
         case r'face-identity-backfill': return ManualJobName.faceIdentityBackfill;
+        case r'face-suggestion-maintenance': return ManualJobName.faceSuggestionMaintenance;
         case r'shared-space-person-metadata-backfill': return ManualJobName.sharedSpacePersonMetadataBackfill;
         default:
           if (!allowNull) {

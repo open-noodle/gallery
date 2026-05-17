@@ -44,6 +44,7 @@ class JobName {
   static const facialRecognition = JobName._(r'FacialRecognition');
   static const faceIdentityBackfill = JobName._(r'FaceIdentityBackfill');
   static const faceIdentityMaintenanceAfterRecognition = JobName._(r'FaceIdentityMaintenanceAfterRecognition');
+  static const faceSuggestionMaintenance = JobName._(r'FaceSuggestionMaintenance');
   static const personSuggestionScanQueueAll = JobName._(r'PersonSuggestionScanQueueAll');
   static const personSuggestionScan = JobName._(r'PersonSuggestionScan');
   static const spacePersonSuggestionScanQueueAll = JobName._(r'SpacePersonSuggestionScanQueueAll');
@@ -123,6 +124,7 @@ class JobName {
     facialRecognition,
     faceIdentityBackfill,
     faceIdentityMaintenanceAfterRecognition,
+    faceSuggestionMaintenance,
     personSuggestionScanQueueAll,
     personSuggestionScan,
     spacePersonSuggestionScanQueueAll,
@@ -237,6 +239,7 @@ class JobNameTypeTransformer {
         case r'FacialRecognition': return JobName.facialRecognition;
         case r'FaceIdentityBackfill': return JobName.faceIdentityBackfill;
         case r'FaceIdentityMaintenanceAfterRecognition': return JobName.faceIdentityMaintenanceAfterRecognition;
+        case r'FaceSuggestionMaintenance': return JobName.faceSuggestionMaintenance;
         case r'PersonSuggestionScanQueueAll': return JobName.personSuggestionScanQueueAll;
         case r'PersonSuggestionScan': return JobName.personSuggestionScan;
         case r'SpacePersonSuggestionScanQueueAll': return JobName.spacePersonSuggestionScanQueueAll;
