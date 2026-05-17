@@ -16,6 +16,25 @@ The face pipeline is not one queue. It spans:
 
 The triggering surface is broad. Upload thumbnail completion, manual asset refresh, admin queue starts, nightly jobs, metadata face imports, linked-library sync, shared-space membership changes, duplicate resolution, pet detection, manual face edits, people merge/delete/reassign operations, and identity backfill can all touch the same people and face identity state.
 
+## Production Regression Focus
+
+Issue #597 reports an overnight state transition where Facial Recognition was stuck with about 87,000 waiting jobs, then by morning had about 274,000 waiting jobs and all Shared Space persons were empty while 359,274 faces still existed. The reported setup had EXIF face import enabled, ML facial recognition enabled, and no user interaction between the evening and morning observations.
+
+This plan treats that as a first-class regression scenario. The relevant scheduled entry points are:
+
+- nightly tasks at `nightlyTasks.startTime`, default `00:00`
+- external library scan cron, default every day at midnight
+
+The destructive shared-space wipe is not itself a scheduled branch. In the current code it is only in forced `FacialRecognitionQueueAll` handling. The scheduled nightly recognition job is `force=false` and `nightly=true`, so the tests must prove it never reaches the forced wipe path when a large or stuck Facial Recognition queue already exists.
+
+Regression coverage must prove:
+
+- scheduled `clusterNewFaces` queues only non-force `FacialRecognitionQueueAll`
+- a non-force nightly coordinator with waiting, delayed, paused, or active recognition work skips before `unassignFaces`, `unlinkFacesBySourceType`, `deleteAllPersonFaces`, or `deleteAllPersons`
+- recovered or retried non-force queue coordinators do not expand the queue with duplicate full-recognition fan-out while old work is still waiting
+- an already-pending force-recognition follow-up is the only path allowed to clear `shared_space_person` state, and it must queue the full shared-space rebuild before maintenance/backfill
+- library scans and EXIF face imports running on the same overnight window may add or repair projection work, but must not empty existing shared-space people without the forced recognition path
+
 ## Goals
 
 - Build an extremely thorough test plan before implementation.
@@ -160,9 +179,11 @@ Source: `QueueService.handleNightlyJobs`.
 Coverage:
 
 - database cleanup queues `PersonCleanup`
-- missing thumbnails queues `AssetGenerateThumbnailsQueueAll`, which may later trigger face detection through thumbnail completion
+- missing thumbnails queues `AssetGenerateThumbnailsQueueAll`; those generated thumbnail jobs are not upload/notify jobs and must not trigger face detection through thumbnail completion
 - cluster new faces queues `FacialRecognitionQueueAll` with `nightly=true` and `force=false`
 - nightly recognition skip with no new faces does not queue maintenance, backfill, or destructive reset work
+- nightly recognition with existing waiting, delayed, paused, or active recognition work skips before any destructive reset or shared-space wipe
+- nightly recognition recovered after a stuck queue does not enqueue duplicate full-recognition fan-out while old work is still waiting
 - disabled nightly switches do not enqueue corresponding face jobs
 
 ### Manual Job Endpoint
@@ -210,6 +231,8 @@ Sources: `LibraryService.handleSyncFiles`, `SharedSpaceService.linkLibrary`, `Sh
 Coverage:
 
 - importing new library assets queues normal post-sync jobs and shared-space face matches for enabled linked spaces
+- scheduled library scan queues only library sync roots directly; any face identity effects must come from later sidecar, metadata, thumbnail, EXIF import, or shared-space projection handlers
+- overnight library scan plus EXIF face import with pre-existing shared-space people does not empty shared-space people and queues only targeted projection/metadata repair work
 - no linked spaces queues no shared-space face work
 - disabled linked space queues no shared-space face work from library sync
 - linking a library to an enabled space queues `SharedSpaceLibraryFaceSync`
@@ -361,6 +384,8 @@ Add tests for:
 
 - waits for thumbnail and face detection queues before queueing recognition work
 - nightly skip happens before queue drain and before destructive reset
+- non-force nightly run with a large existing waiting queue skips before personal unassign, identity unlink, shared-space person-face delete, shared-space person delete, maintenance marker, and backfill
+- recovered or retried non-force coordinator with stale waiting recognition work remains idempotent and does not multiply full-queue fan-out
 - non-force run skips if recognition jobs are waiting
 - force run drains pending recognition work before deleting assignments
 - force run unassigns ML faces, unlinks ML identity links, cleans orphaned people, vacuums without vector reindex, clears shared-space person state, deletes unreferenced identities, queues per-face jobs with `skipSharedSpaceMatch`, queues `SharedSpaceFaceMatchAll`, queues maintenance marker, and writes last-run state
@@ -525,6 +550,9 @@ Add tests for:
 
 - upload-like chain: thumbnail completion, face detection, recognition, shared-space projection, dedup, metadata backfill
 - force detection followed by force recognition on a populated user and enabled shared space
+- issue #597 chain: overnight `clusterNewFaces` fires while a large non-force Facial Recognition queue is stuck or waiting; the coordinator skips without clearing shared-space people, does not multiply recognition jobs, and leaves EXIF-backed space people visible
+- issue #597 force-follow-up chain: if a force recognition follow-up was already pending before the overnight window, it is the only allowed wipe path; it clears shared-space people, queues full-space rematch after personal recognition jobs, and the final state has rebuilt space people rather than remaining empty after the queue drains
+- overnight library-scan chain: scheduled library scan, sidecar/metadata refresh, EXIF face import, targeted shared-space backfill, dedup, and metadata backfill preserve pre-existing shared-space people and do not convert all faces to unassigned
 - metadata EXIF import followed by targeted shared-space backfill projection
 - library link followed by library face sync, identity reconciliation, dedup, and global people visibility
 - duplicate keeper propagation followed by shared-space face match and stats repair
