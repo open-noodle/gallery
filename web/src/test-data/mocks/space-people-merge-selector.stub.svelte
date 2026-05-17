@@ -41,7 +41,11 @@
 
 <div data-testid="people-merge-selector" data-person-id={person.id}>
   choose_matching_people_to_merge
-  <button type="button" data-testid="merge-personal-candidate" onclick={() => void runMerge(person, [personalCandidate])}>
+  <button
+    type="button"
+    data-testid="merge-personal-candidate"
+    onclick={() => void runMerge(person, [personalCandidate])}
+  >
     merge personal candidate
   </button>
   <button type="button" data-testid="merge-space-candidate" onclick={() => void runMerge(person, [spaceCandidate])}>
