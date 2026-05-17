@@ -131,25 +131,6 @@ describe(PersonService.name, () => {
       expect(mocks.job.queue).not.toHaveBeenCalled();
     });
 
-    it('should not queue a duplicate identity backfill root while any backfill job is active, waiting, delayed, or paused', async () => {
-      (mocks.faceIdentity as any).hasBackfillWork.mockResolvedValue(true);
-      mocks.job.searchJobs.mockResolvedValue([
-        {
-          id: 'face-identity-backfill/root',
-          name: JobName.FaceIdentityBackfill,
-          timestamp: Date.now(),
-          data: {},
-        },
-      ]);
-
-      await sut.onBootstrap();
-
-      expect(mocks.job.searchJobs).toHaveBeenCalledWith(QueueName.PeopleBackfill, {
-        status: [QueueJobStatus.Active, QueueJobStatus.Delayed, QueueJobStatus.Paused, QueueJobStatus.Waiting],
-      });
-      expect(mocks.job.queue).not.toHaveBeenCalled();
-    });
-
     it('should not queue a new identity backfill root while the root backfill is active', async () => {
       (mocks.faceIdentity as any).hasBackfillWork.mockResolvedValue(true);
       mocks.job.searchJobs.mockResolvedValue([
@@ -163,6 +144,15 @@ describe(PersonService.name, () => {
 
       await sut.onBootstrap();
 
+      expect(mocks.job.searchJobs).toHaveBeenCalledWith(QueueName.PeopleBackfill, {
+        status: expect.arrayContaining([
+          QueueJobStatus.Active,
+          QueueJobStatus.Delayed,
+          QueueJobStatus.Paused,
+          QueueJobStatus.Waiting,
+        ]),
+      });
+      expect(mocks.job.searchJobs.mock.calls[0][1]?.status).toHaveLength(4);
       expect(mocks.job.queue).not.toHaveBeenCalled();
     });
   });
