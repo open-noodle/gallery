@@ -739,6 +739,148 @@ describe('PersonFaceSuggestionRepository', () => {
       ).resolves.toEqual({ total: 0, items: [] });
     });
 
+    describe('hasPendingForSpacePerson', () => {
+      const opts = { maxDistance: 0.5, suggestionMaxDistance: 0.8 };
+
+      it('returns true for an in-band pending suggestion on a directly shared asset', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const spacePerson = await ctx.database
+          .insertInto('shared_space_person')
+          .values({ spaceId: space.id, name: 'Alice', type: 'person', isHidden: false })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        await sut.upsertPendingForSpacePerson([
+          { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.6 },
+        ]);
+
+        await expect(sut.hasPendingForSpacePerson(space.id, spacePerson.id, assetFace.id, opts)).resolves.toBe(true);
+      });
+
+      it('returns false when the suggestion band is disabled', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const spacePerson = await ctx.database
+          .insertInto('shared_space_person')
+          .values({ spaceId: space.id, name: 'Alice', type: 'person', isHidden: false })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        await sut.upsertPendingForSpacePerson([
+          { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.6 },
+        ]);
+
+        await expect(
+          sut.hasPendingForSpacePerson(space.id, spacePerson.id, assetFace.id, {
+            maxDistance: 0.5,
+            suggestionMaxDistance: 0.5,
+          }),
+        ).resolves.toBe(false);
+      });
+
+      it('returns false for a pending suggestion on an asset no longer shared with the space', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const spacePerson = await ctx.database
+          .insertInto('shared_space_person')
+          .values({ spaceId: space.id, name: 'Alice', type: 'person', isHidden: false })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        await sut.upsertPendingForSpacePerson([
+          { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.6 },
+        ]);
+
+        await expect(sut.hasPendingForSpacePerson(space.id, spacePerson.id, assetFace.id, opts)).resolves.toBe(false);
+      });
+
+      it('returns false when the candidate face has already been assigned', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Personal' });
+        const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const spacePerson = await ctx.database
+          .insertInto('shared_space_person')
+          .values({ spaceId: space.id, name: 'Alice', type: 'person', isHidden: false })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        await sut.upsertPendingForSpacePerson([
+          { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.6 },
+        ]);
+        await ctx.database.updateTable('asset_face').set({ personId: person.id }).where('id', '=', assetFace.id).execute();
+
+        await expect(sut.hasPendingForSpacePerson(space.id, spacePerson.id, assetFace.id, opts)).resolves.toBe(false);
+      });
+
+      it('returns false for whitespace, hidden, pet, and disabled-space people', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+        const { space: disabledSpace } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: false });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: disabledSpace.id, assetId: asset.id, addedById: user.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const rows = await ctx.database
+          .insertInto('shared_space_person')
+          .values([
+            { spaceId: space.id, name: '   ', type: 'person', isHidden: false },
+            { spaceId: space.id, name: 'Hidden', type: 'person', isHidden: true },
+            { spaceId: space.id, name: 'Pet', type: 'pet', isHidden: false },
+            { spaceId: disabledSpace.id, name: 'Disabled', type: 'person', isHidden: false },
+          ])
+          .returningAll()
+          .execute();
+
+        for (const person of rows) {
+          await sut.upsertPendingForSpacePerson([
+            { spacePersonId: person.id, assetFaceId: assetFace.id, distance: 0.6 },
+          ]);
+          await expect(sut.hasPendingForSpacePerson(person.spaceId, person.id, assetFace.id, opts)).resolves.toBe(false);
+        }
+      });
+
+      it('returns false after a linked library is unlinked from the space', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+        const { library } = await ctx.newLibrary({ ownerId: user.id });
+        await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const spacePerson = await ctx.database
+          .insertInto('shared_space_person')
+          .values({ spaceId: space.id, name: 'Alice', type: 'person', isHidden: false })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        await sut.upsertPendingForSpacePerson([
+          { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.6 },
+        ]);
+
+        await expect(sut.hasPendingForSpacePerson(space.id, spacePerson.id, assetFace.id, opts)).resolves.toBe(true);
+
+        await ctx.database
+          .deleteFrom('shared_space_library')
+          .where('spaceId', '=', space.id)
+          .where('libraryId', '=', library.id)
+          .execute();
+
+        await expect(sut.hasPendingForSpacePerson(space.id, spacePerson.id, assetFace.id, opts)).resolves.toBe(false);
+      });
+    });
+
     it('resolveAssignedFace deletes pending personal and space-person rows for the same face', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();

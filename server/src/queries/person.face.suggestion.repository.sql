@@ -94,3 +94,50 @@ where
   and "shared_space_person"."isHidden" is false
   and "shared_space_person"."type" = $4
   and "shared_space"."faceRecognitionEnabled" is true
+
+-- PersonFaceSuggestionRepository.hasPendingForSpacePerson
+select
+  "pfs"."assetFaceId"
+from
+  "person_face_suggestion" as "pfs"
+  inner join "shared_space_person" on "shared_space_person"."id" = "pfs"."spacePersonId"
+  inner join "shared_space" on "shared_space"."id" = "shared_space_person"."spaceId"
+  inner join "asset_face" as "af" on "af"."id" = "pfs"."assetFaceId"
+  inner join "asset" on "asset"."id" = "af"."assetId"
+where
+  "pfs"."spacePersonId" = $1
+  and "pfs"."assetFaceId" = $2
+  and "pfs"."status" = $3
+  and "pfs"."distance" > $4
+  and "pfs"."distance" <= $5
+  and "shared_space_person"."spaceId" = $6
+  and BTRIM("shared_space_person"."name") <> $7
+  and "shared_space_person"."isHidden" is false
+  and "shared_space_person"."type" = $8
+  and "shared_space"."faceRecognitionEnabled" is true
+  and "af"."personId" is null
+  and "af"."deletedAt" is null
+  and "af"."isVisible" is true
+  and "asset"."deletedAt" is null
+  and "asset"."isOffline" is false
+  and "asset"."visibility" in ($9, $10)
+  and (
+    exists (
+      select
+        "shared_space_asset"."assetId"
+      from
+        "shared_space_asset"
+      where
+        "shared_space_asset"."assetId" = "asset"."id"
+        and "shared_space_asset"."spaceId" = $11
+    )
+    or exists (
+      select
+        "shared_space_library"."libraryId"
+      from
+        "shared_space_library"
+      where
+        "shared_space_library"."libraryId" = "asset"."libraryId"
+        and "shared_space_library"."spaceId" = $12
+    )
+  )

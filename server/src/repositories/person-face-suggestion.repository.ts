@@ -254,4 +254,63 @@ export class PersonFaceSuggestionRepository {
 
     return { total: Number(totalRow.total), items };
   }
+
+  @GenerateSql({
+    params: [DummyValue.UUID, DummyValue.UUID, DummyValue.UUID, { maxDistance: 0.5, suggestionMaxDistance: 0.8 }],
+  })
+  async hasPendingForSpacePerson(
+    spaceId: string,
+    spacePersonId: string,
+    assetFaceId: string,
+    opts: { maxDistance: number; suggestionMaxDistance: number },
+  ): Promise<boolean> {
+    if (opts.suggestionMaxDistance <= opts.maxDistance) {
+      return false;
+    }
+
+    const row = await this.db
+      .selectFrom('person_face_suggestion as pfs')
+      .innerJoin('shared_space_person', 'shared_space_person.id', 'pfs.spacePersonId')
+      .innerJoin('shared_space', 'shared_space.id', 'shared_space_person.spaceId')
+      .innerJoin('asset_face as af', 'af.id', 'pfs.assetFaceId')
+      .innerJoin('asset', 'asset.id', 'af.assetId')
+      .select('pfs.assetFaceId')
+      .where('pfs.spacePersonId', '=', spacePersonId)
+      .where('pfs.assetFaceId', '=', assetFaceId)
+      .where('pfs.status', '=', 'pending')
+      .where('pfs.distance', '>', opts.maxDistance)
+      .where('pfs.distance', '<=', opts.suggestionMaxDistance)
+      .where('shared_space_person.spaceId', '=', spaceId)
+      .where(sql`BTRIM("shared_space_person"."name")`, '<>', '')
+      .where('shared_space_person.isHidden', 'is', false)
+      .where('shared_space_person.type', '=', 'person')
+      .where('shared_space.faceRecognitionEnabled', 'is', true)
+      .where('af.personId', 'is', null)
+      .where('af.deletedAt', 'is', null)
+      .where('af.isVisible', 'is', true)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', 'is', false)
+      .where('asset.visibility', 'in', [AssetVisibility.Archive, AssetVisibility.Timeline])
+      .where((eb) =>
+        eb.or([
+          eb.exists(
+            eb
+              .selectFrom('shared_space_asset')
+              .select('shared_space_asset.assetId')
+              .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+              .where('shared_space_asset.spaceId', '=', spaceId),
+          ),
+          eb.exists(
+            eb
+              .selectFrom('shared_space_library')
+              .select('shared_space_library.libraryId')
+              .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+              .where('shared_space_library.spaceId', '=', spaceId),
+          ),
+        ]),
+      )
+      .executeTakeFirst();
+
+    return !!row;
+  }
 }
