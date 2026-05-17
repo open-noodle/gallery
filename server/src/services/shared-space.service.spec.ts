@@ -6099,8 +6099,22 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.personFaceSuggestion.getPendingForSpacePerson).not.toHaveBeenCalled();
     });
 
+    it('throws for missing or cross-space people before querying suggestions', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(void 0).mockResolvedValueOnce({ spaceId: 'other-space' } as any);
+
+      await expect(
+        sut.getSpacePersonFaceSuggestions(factory.auth(), 'space-1', 'missing-person', { page: 1, size: 50 }),
+      ).rejects.toThrow(new BadRequestException('Person not found'));
+      await expect(
+        sut.getSpacePersonFaceSuggestions(factory.auth(), 'space-1', 'other-person', { page: 1, size: 50 }),
+      ).rejects.toThrow(new BadRequestException('Person not found'));
+      expect(mocks.personFaceSuggestion.getPendingForSpacePerson).not.toHaveBeenCalled();
+    });
+
     it('returns mapped pending suggestions for editors', async () => {
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValue({ spaceId: 'space-1' } as any);
       mocks.systemMetadata.get.mockResolvedValue(enabled);
       mocks.personFaceSuggestion.getPendingForSpacePerson.mockResolvedValue({
         total: 1,
@@ -6152,6 +6166,7 @@ describe(SharedSpaceService.name, () => {
 
     it('passes disabled suggestion bands through so the repository read-gate returns empty', async () => {
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Owner }));
+      mocks.sharedSpace.getPersonById.mockResolvedValue({ spaceId: 'space-1' } as any);
       mocks.systemMetadata.get.mockResolvedValue({
         machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0.5, minFaces: 3 } },
       });

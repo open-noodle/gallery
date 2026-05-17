@@ -924,6 +924,11 @@ export class SharedSpaceService extends BaseService {
       return { total: 0, items: [] };
     }
 
+    const person = await this.sharedSpaceRepository.getPersonById(personId);
+    if (!person || person.spaceId !== spaceId) {
+      throw new BadRequestException('Person not found');
+    }
+
     const { machineLearning } = await this.getConfig({ withCache: false });
     const { maxDistance, suggestionMaxDistance } = machineLearning.facialRecognition;
     const result = await this.personFaceSuggestionRepository.getPendingForSpacePerson(spaceId, personId, {
