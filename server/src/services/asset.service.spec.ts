@@ -1456,6 +1456,26 @@ describe(AssetService.name, () => {
         { name: JobName.AssetDetectFaces, data: { id: 'asset-2' } },
       ]);
     });
+
+    it('should only enqueue asset face detection for manual face refresh on populated assets', async () => {
+      const existingAsset = AssetFactory.from().face().build({ id: 'asset-1' });
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([existingAsset.id]));
+
+      await sut.run(authStub.admin, { assetIds: [existingAsset.id], name: AssetJobName.REFRESH_FACES });
+
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.AssetDetectFaces, data: { id: existingAsset.id } },
+      ]);
+      const queuedJobNames = mocks.job.queueAll.mock.calls.flatMap(([jobs]) => jobs.map((job) => job.name));
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(queuedJobNames).not.toContain(JobName.AssetDetectFacesQueueAll);
+      expect(queuedJobNames).not.toContain(JobName.FacialRecognitionQueueAll);
+      expect(queuedJobNames).not.toContain(JobName.FaceIdentityBackfill);
+      expect(mocks.person.deleteFaces).not.toHaveBeenCalled();
+      expect(mocks.person.delete).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.deleteAllPersonFaces).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.deleteAllPersons).not.toHaveBeenCalled();
+    });
   });
 
   describe('upsertMetadata', () => {
