@@ -331,6 +331,64 @@ describe(QueueService.name, () => {
       ]);
     });
 
+    it('should queue nightly facial recognition without forcing recognition or face detection', async () => {
+      await sut.handleNightlyJobs();
+
+      const jobs = mocks.job.queueAll.mock.calls[0][0];
+      expect(jobs).toContainEqual({
+        name: JobName.FacialRecognitionQueueAll,
+        data: { force: false, nightly: true },
+      });
+      expect(jobs).not.toContainEqual({ name: JobName.FacialRecognitionQueueAll, data: { force: true } });
+      expect(jobs).not.toContainEqual({ name: JobName.AssetDetectFacesQueueAll, data: expect.anything() });
+    });
+
+    it('should keep missing thumbnails from directly queueing face detection or recognition roots', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        nightlyTasks: {
+          startTime: '00:00',
+          databaseCleanup: false,
+          generateMemories: false,
+          syncQuotaUsage: false,
+          missingThumbnails: true,
+          clusterNewFaces: false,
+        },
+      });
+
+      await sut.handleNightlyJobs();
+
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.AssetGenerateThumbnailsQueueAll, data: { force: false } },
+      ]);
+      const jobs = mocks.job.queueAll.mock.calls[0][0];
+      expect(jobs).not.toContainEqual({ name: JobName.AssetDetectFacesQueueAll, data: expect.anything() });
+      expect(jobs).not.toContainEqual({ name: JobName.FacialRecognitionQueueAll, data: expect.anything() });
+    });
+
+    it.each([
+      { databaseCleanup: true, expected: 'queues' },
+      { databaseCleanup: false, expected: 'skips' },
+    ])(
+      'should explicitly $expected nightly person cleanup when database cleanup is $databaseCleanup',
+      async ({ databaseCleanup }) => {
+        mocks.systemMetadata.get.mockResolvedValue({
+          nightlyTasks: {
+            ...defaults.nightlyTasks,
+            databaseCleanup,
+          },
+        });
+
+        await sut.handleNightlyJobs();
+
+        const jobs = mocks.job.queueAll.mock.calls[0][0];
+        if (databaseCleanup) {
+          expect(jobs).toContainEqual({ name: JobName.PersonCleanup });
+        } else {
+          expect(jobs).not.toContainEqual({ name: JobName.PersonCleanup });
+        }
+      },
+    );
+
     it('should skip database cleanup when disabled', async () => {
       mocks.systemMetadata.get.mockResolvedValue({
         nightlyTasks: {
@@ -484,6 +542,13 @@ describe(QueueService.name, () => {
   });
 
   describe('handleCommand', () => {
+    const runStartCommand = async (name: QueueName, force = false) => {
+      mocks.job.isActive.mockResolvedValue(false);
+      mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
+
+      await sut.runCommandLegacy(name, { command: QueueCommand.Start, force });
+    };
+
     it('should handle a pause command', async () => {
       mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
 
@@ -574,6 +639,59 @@ describe(QueueService.name, () => {
 
       expect(mocks.job.empty).not.toHaveBeenCalled();
       expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      {
+        queue: QueueName.FaceDetection,
+        force: false,
+        expected: { name: JobName.AssetDetectFacesQueueAll, data: { force: false } },
+      },
+      {
+        queue: QueueName.FaceDetection,
+        force: true,
+        expected: { name: JobName.AssetDetectFacesQueueAll, data: { force: true } },
+      },
+      {
+        queue: QueueName.FacialRecognition,
+        force: false,
+        expected: { name: JobName.FacialRecognitionQueueAll, data: { force: false } },
+      },
+      {
+        queue: QueueName.FacialRecognition,
+        force: true,
+        expected: { name: JobName.FacialRecognitionQueueAll, data: { force: true } },
+      },
+      {
+        queue: QueueName.PeopleBackfill,
+        force: false,
+        expected: { name: JobName.FaceIdentityBackfill, data: {} },
+      },
+    ])('should queue face identity root for $queue with force=$force', async ({ queue, force, expected }) => {
+      await runStartCommand(queue, force);
+
+      expect(mocks.job.queue).toHaveBeenCalledWith(expected);
+    });
+
+    it.each([
+      QueueName.VideoConversion,
+      QueueName.SmartSearch,
+      QueueName.MetadataExtraction,
+      QueueName.Sidecar,
+      QueueName.ThumbnailGeneration,
+      QueueName.Library,
+    ])('should not enqueue face roots when starting %s', async (queue) => {
+      await runStartCommand(queue, false);
+
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({
+        name: JobName.AssetDetectFacesQueueAll,
+        data: expect.anything(),
+      });
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({
+        name: JobName.FacialRecognitionQueueAll,
+        data: expect.anything(),
+      });
     });
 
     it('should handle a start video conversion command', async () => {
@@ -706,7 +824,7 @@ describe(QueueService.name, () => {
       mocks.job.isActive.mockResolvedValue(false);
       mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
 
-      await sut.runCommandLegacy('peopleBackfill' as QueueName, { command: QueueCommand.Start, force: false });
+      await sut.runCommandLegacy(QueueName.PeopleBackfill, { command: QueueCommand.Start, force: false });
 
       expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.FaceIdentityBackfill, data: {} });
     });
