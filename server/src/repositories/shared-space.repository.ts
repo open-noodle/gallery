@@ -1518,6 +1518,15 @@ export class SharedSpaceRepository {
       .execute();
   }
 
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getFaceIdsForPerson(personId: string): Promise<Array<{ assetFaceId: string }>> {
+    return this.db
+      .selectFrom('shared_space_person_face')
+      .select('assetFaceId')
+      .where('personId', '=', personId)
+      .execute();
+  }
+
   async reassignPersonFaces(fromPersonId: string, toPersonId: string) {
     await this.db
       .updateTable('shared_space_person_face')

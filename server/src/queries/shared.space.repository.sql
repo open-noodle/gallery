@@ -1036,6 +1036,14 @@ from
 where
   "shared_space_person_face"."personId" = $1
 
+-- SharedSpaceRepository.getFaceIdsForPerson
+select
+  "assetFaceId"
+from
+  "shared_space_person_face"
+where
+  "personId" = $1
+
 -- SharedSpaceRepository.reassignPersonFacesSafe
 delete from "shared_space_person_face"
 where

@@ -3248,6 +3248,24 @@ describe(SharedSpaceRepository.name, () => {
       expect(rows).toEqual([{ assetFaceId: assignedFace.id }]);
     });
 
+    it('gets face ids linked to a shared-space person', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: first } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: second } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const person = await sut.createPerson({ spaceId: space.id, name: 'Alice', representativeFaceId: first.id });
+      await sut.addPersonFaces([
+        { personId: person.id, assetFaceId: first.id },
+        { personId: person.id, assetFaceId: second.id },
+      ]);
+
+      await expect(sut.getFaceIdsForPerson(person.id)).resolves.toEqual(
+        expect.arrayContaining([{ assetFaceId: first.id }, { assetFaceId: second.id }]),
+      );
+    });
+
     it('streams only eligible named people in face-recognition-enabled spaces with direct unassigned ML faces', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();

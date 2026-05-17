@@ -5,6 +5,7 @@ import { ConfigRepository } from 'src/repositories/config.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
+import { PersonFaceSuggestionRepository } from 'src/repositories/person-face-suggestion.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
 import { SearchRepository } from 'src/repositories/search.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
@@ -29,6 +30,7 @@ const setup = (db?: Kysely<DB>) => {
       ConfigRepository,
       SystemMetadataRepository,
       SearchRepository,
+      PersonFaceSuggestionRepository,
     ],
     mock: [LoggingRepository, JobRepository],
   });
@@ -184,6 +186,49 @@ const createLegacyPetFace = async (
 };
 
 describe('SharedSpaceService linked-library face identity repair', () => {
+  it('resolves pending suggestions for faces moved by mergeSpacePeople', async () => {
+    const { ctx, sut } = setup();
+    const { user } = await ctx.newUser();
+    const auth = factory.auth({ user });
+    const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+    const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+    const { assetFace: sourceFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+    const target = await ctx.database
+      .insertInto('shared_space_person')
+      .values({ spaceId: space.id, name: 'Target', representativeFaceId: targetFace.id })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    const source = await ctx.database
+      .insertInto('shared_space_person')
+      .values({ spaceId: space.id, name: 'Source', representativeFaceId: sourceFace.id })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    await ctx.database
+      .insertInto('shared_space_person_face')
+      .values([
+        { personId: target.id, assetFaceId: targetFace.id },
+        { personId: source.id, assetFaceId: sourceFace.id },
+      ])
+      .execute();
+    await ctx.database
+      .insertInto('person_face_suggestion')
+      .values({ spacePersonId: target.id, assetFaceId: sourceFace.id, distance: 0.7 })
+      .execute();
+
+    await sut.mergeSpacePeople(auth, space.id, target.id, { ids: [source.id] });
+
+    const rows = await ctx.database
+      .selectFrom('person_face_suggestion')
+      .selectAll()
+      .where('assetFaceId', '=', sourceFace.id)
+      .where('status', '=', 'pending')
+      .execute();
+    expect(rows).toEqual([]);
+  });
+
   it('full-space rematch assigns every EXIF identity face in linked libraries without embeddings', async () => {
     const { ctx, sut, faceIdentityRepository, sharedSpaceRepository, jobs } = setup();
     const { user } = await ctx.newUser();

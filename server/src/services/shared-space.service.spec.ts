@@ -211,6 +211,7 @@ describe(SharedSpaceService.name, () => {
     mocks.sharedSpace.getSpacePersonAssetAdderIds.mockResolvedValue([]);
     mocks.sharedSpace.getSpacePersonMetadataBackfillPage.mockResolvedValue([]);
     mocks.sharedSpace.getIdentityEvidenceForSpacePerson.mockResolvedValue([]);
+    mocks.sharedSpace.getFaceIdsForPerson.mockResolvedValue([]);
     (mocks.sharedSpace as any).getPeopleFaceStatisticsBySpaceId ??= vi.fn();
     mocks.faceIdentity.mergeIdentities.mockResolvedValue({
       personalProfileConflictCount: 0,
@@ -7978,6 +7979,7 @@ describe(SharedSpaceService.name, () => {
       (mocks.sharedSpace as any).repairInvalidRepresentativeFaces = vi.fn().mockResolvedValue(void 0 as any);
       mocks.sharedSpace.repairOrphanedRepresentativeFaces.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.getFirstFaceIdForPerson.mockResolvedValue(null);
+      mocks.sharedSpace.getFaceIdsForPerson.mockResolvedValue([]);
     });
 
     it('should skip when space does not exist', async () => {
@@ -8055,10 +8057,12 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.updatePerson.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.getFaceIdsForPerson.mockResolvedValue([{ assetFaceId: 'moved-face' }]);
 
       const result = await sut.handleSharedSpacePersonDedup({ spaceId });
       expect(result).toBe(JobStatus.Success);
       expect(mocks.sharedSpace.reassignPersonFacesSafe).toHaveBeenCalledWith(personB, personA);
+      expect(mocks.personFaceSuggestion.resolveAssignedFace).toHaveBeenCalledWith('moved-face');
       expect(mocks.sharedSpace.deletePerson).toHaveBeenCalledWith(personB);
       expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledWith([personA]);
       expect(mocks.sharedSpace.deleteOrphanedPersons).toHaveBeenCalledWith(spaceId);

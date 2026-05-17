@@ -1252,6 +1252,12 @@ export class SharedSpaceService extends BaseService {
     });
   }
 
+  private async resolveMovedSpacePersonFaces(faceIds: Array<{ assetFaceId: string }>): Promise<void> {
+    for (const { assetFaceId } of faceIds) {
+      await this.personFaceSuggestionRepository.resolveAssignedFace(assetFaceId);
+    }
+  }
+
   async mergeSpacePeople(
     auth: AuthDto,
     spaceId: string,
@@ -1282,7 +1288,9 @@ export class SharedSpaceService extends BaseService {
     }
 
     for (const source of sources) {
+      const movedFaceIds = await this.sharedSpaceRepository.getFaceIdsForPerson(source.id);
       await this.sharedSpaceRepository.reassignPersonFaces(source.id, targetPersonId);
+      await this.resolveMovedSpacePersonFaces(movedFaceIds);
       await this.sharedSpaceRepository.deletePerson(source.id);
     }
 
@@ -1796,7 +1804,9 @@ export class SharedSpaceService extends BaseService {
         );
 
         // Reassign faces and migrate aliases
+        const movedFaceIds = await this.sharedSpaceRepository.getFaceIdsForPerson(source.id);
         await this.sharedSpaceRepository.reassignPersonFacesSafe(source.id, target.id);
+        await this.resolveMovedSpacePersonFaces(movedFaceIds);
         await this.sharedSpaceRepository.migrateAliases(source.id, target.id);
 
         const candidateIdentityIds = [target.identityId, source.identityId].filter(
