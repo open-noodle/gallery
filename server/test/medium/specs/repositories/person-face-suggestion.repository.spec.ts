@@ -790,6 +790,7 @@ describe('PersonFaceSuggestionRepository', () => {
         const { user } = await ctx.newUser();
         const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
         const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
         const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
         const spacePerson = await ctx.database
           .insertInto('shared_space_person')
@@ -799,6 +800,14 @@ describe('PersonFaceSuggestionRepository', () => {
         await sut.upsertPendingForSpacePerson([
           { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.6 },
         ]);
+
+        await expect(sut.hasPendingForSpacePerson(space.id, spacePerson.id, assetFace.id, opts)).resolves.toBe(true);
+
+        await ctx.database
+          .deleteFrom('shared_space_asset')
+          .where('spaceId', '=', space.id)
+          .where('assetId', '=', asset.id)
+          .execute();
 
         await expect(sut.hasPendingForSpacePerson(space.id, spacePerson.id, assetFace.id, opts)).resolves.toBe(false);
       });
