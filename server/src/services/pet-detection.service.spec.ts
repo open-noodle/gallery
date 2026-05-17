@@ -130,12 +130,16 @@ describe(PetDetectionService.name, () => {
       expect(await sut.handlePetDetection({ id: '123' })).toEqual(JobStatus.Skipped);
 
       expect(mocks.machineLearning.detectPets).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+      expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
     });
 
     it('should skip if pet detection is disabled (default)', async () => {
       expect(await sut.handlePetDetection({ id: '123' })).toEqual(JobStatus.Skipped);
 
       expect(mocks.machineLearning.detectPets).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+      expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
     });
 
     it('should fail if asset not found', async () => {
@@ -145,6 +149,8 @@ describe(PetDetectionService.name, () => {
       expect(await sut.handlePetDetection({ id: 'non-existent' })).toEqual(JobStatus.Failed);
 
       expect(mocks.machineLearning.detectPets).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+      expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
     });
 
     it('should fail if asset has no preview file', async () => {
@@ -158,6 +164,8 @@ describe(PetDetectionService.name, () => {
       expect(await sut.handlePetDetection({ id: '123' })).toEqual(JobStatus.Failed);
 
       expect(mocks.machineLearning.detectPets).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+      expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
     });
 
     it('should skip hidden assets', async () => {
@@ -171,6 +179,8 @@ describe(PetDetectionService.name, () => {
       expect(await sut.handlePetDetection({ id: '123' })).toEqual(JobStatus.Skipped);
 
       expect(mocks.machineLearning.detectPets).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+      expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
     });
 
     it('should create new pet person when none exists for species', async () => {
@@ -239,6 +249,38 @@ describe(PetDetectionService.name, () => {
       expect(mocks.person.update).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).toHaveBeenCalledWith([]);
       expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('should generate the first thumbnail for an existing pet species without a face asset', async () => {
+      const asset = AssetFactory.create();
+      mocks.systemMetadata.get.mockResolvedValue(enabledConfig);
+      mocks.machineLearning.detectPets.mockResolvedValue({
+        imageHeight: 100,
+        imageWidth: 200,
+        pets: [{ boundingBox: { x1: 10, y1: 20, x2: 30, y2: 40 }, score: 0.9, label: 'cat' }],
+      });
+      mocks.person.getByOwnerAndSpecies.mockResolvedValue(makePerson({ id: 'existing-cat', faceAssetId: null }));
+      mocks.person.createAssetFace.mockResolvedValue('new-face-id');
+      mocks.person.getById.mockResolvedValue(makePerson({ id: 'existing-cat', faceAssetId: null }));
+      mocks.person.update.mockResolvedValue({} as any);
+
+      expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Success);
+
+      expect(mocks.person.create).not.toHaveBeenCalled();
+      expect(mocks.person.createAssetFace).toHaveBeenCalledWith(expect.objectContaining({ personId: 'existing-cat' }));
+      expect(mocks.person.update).toHaveBeenCalledWith({ id: 'existing-cat', faceAssetId: 'new-face-id' });
+      expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.PersonGenerateThumbnail, data: { id: 'existing-cat' } },
+      ]);
+      expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }),
+          expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
+          expect.objectContaining({ name: JobName.FaceIdentityBackfill }),
+          expect.objectContaining({ name: JobName.SharedSpaceFaceMatch }),
+        ]),
+      );
     });
 
     it('should reuse same person for multiple detections of same species in one photo', async () => {
