@@ -692,6 +692,7 @@ describe(QueueService.name, () => {
 
       expect(mocks.job.queue).toHaveBeenCalledWith(expected);
       expect(mocks.job.queue).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
     it.each([
