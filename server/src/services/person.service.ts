@@ -659,6 +659,7 @@ export class PersonService extends BaseService {
       const { maxDistance, suggestionMaxDistance } = machineLearning.facialRecognition;
       if (suggestionMaxDistance > maxDistance) {
         await this.jobRepository.queue({ name: JobName.PersonSuggestionScanQueueAll, data: {} });
+        await this.jobRepository.queue({ name: JobName.SpacePersonSuggestionScanQueueAll, data: {} });
       }
     }
 
