@@ -26,6 +26,13 @@ import { ImmichFileResponse, ImmichStreamResponse } from 'src/utils/file';
 import { factory, newDate, newUuid } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
 
+const sharedSpaceFaceIdentityJobNames = new Set<JobName>([
+  JobName.FaceIdentityBackfill,
+  JobName.SharedSpaceFaceMatchAll,
+  JobName.SharedSpaceIdentityReconciliation,
+  JobName.SharedSpacePersonMetadataBackfill,
+]);
+
 /** Helper to build a joined member result (member + user fields from the repo join). */
 const makeMemberResult = (overrides: any = {}) => ({
   ...factory.sharedSpaceMember(),
@@ -1274,6 +1281,7 @@ describe(SharedSpaceService.name, () => {
 
       await sut.update(auth, space.id, { faceRecognitionEnabled: true });
 
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.SharedSpaceFaceMatchAll,
         data: { spaceId: space.id },
@@ -1292,6 +1300,7 @@ describe(SharedSpaceService.name, () => {
 
       await sut.update(auth, space.id, { faceRecognitionEnabled: false });
 
+      expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.job.queue).not.toHaveBeenCalledWith(
         expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }),
       );
@@ -1309,6 +1318,7 @@ describe(SharedSpaceService.name, () => {
 
       await sut.update(auth, space.id, { faceRecognitionEnabled: true });
 
+      expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.job.queue).not.toHaveBeenCalledWith(
         expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }),
       );
@@ -1367,6 +1377,7 @@ describe(SharedSpaceService.name, () => {
 
       await sut.remove(auth, spaceId);
 
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.SharedSpacePersonMetadataBackfill,
         data: {},
@@ -1598,6 +1609,28 @@ describe(SharedSpaceService.name, () => {
         name: JobName.SharedSpaceFaceMatchAll,
         data: { spaceId },
       });
+      expect(queuedJobs).toContainEqual({
+        name: JobName.SharedSpacePersonMetadataBackfill,
+        data: {},
+      });
+      expect(queuedJobs).toContainEqual({
+        name: JobName.SharedSpaceIdentityReconciliation,
+        data: { spaceId, userId },
+      });
+      expect(queuedJobs.filter((job) => sharedSpaceFaceIdentityJobNames.has(job.name))).toEqual([
+        {
+          name: JobName.SharedSpacePersonMetadataBackfill,
+          data: {},
+        },
+        {
+          name: JobName.SharedSpaceFaceMatchAll,
+          data: { spaceId },
+        },
+        {
+          name: JobName.SharedSpaceIdentityReconciliation,
+          data: { spaceId, userId },
+        },
+      ]);
     });
 
     it('should not queue space face materialization when face recognition is disabled', async () => {
@@ -1617,9 +1650,23 @@ describe(SharedSpaceService.name, () => {
       const queuedJobs = mocks.job.queue.mock.calls.map(([job]) => job);
       expect(queuedJobs.some((job) => job.name === JobName.SharedSpaceFaceMatchAll)).toBe(false);
       expect(queuedJobs).toContainEqual({
+        name: JobName.SharedSpacePersonMetadataBackfill,
+        data: {},
+      });
+      expect(queuedJobs).toContainEqual({
         name: JobName.SharedSpaceIdentityReconciliation,
         data: { spaceId, userId },
       });
+      expect(queuedJobs.filter((job) => sharedSpaceFaceIdentityJobNames.has(job.name))).toEqual([
+        {
+          name: JobName.SharedSpacePersonMetadataBackfill,
+          data: {},
+        },
+        {
+          name: JobName.SharedSpaceIdentityReconciliation,
+          data: { spaceId, userId },
+        },
+      ]);
     });
   });
 
@@ -2003,10 +2050,14 @@ describe(SharedSpaceService.name, () => {
 
       await sut.removeMember(auth, 'space-1', 'user-1');
 
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.SharedSpacePersonMetadataBackfill,
         data: {},
       });
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }),
+      );
     });
 
     it('should queue metadata backfill when an owner removes a member', async () => {
@@ -2019,10 +2070,14 @@ describe(SharedSpaceService.name, () => {
 
       await sut.removeMember(auth, 'space-1', 'other-user');
 
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.SharedSpacePersonMetadataBackfill,
         data: {},
       });
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }),
+      );
     });
   });
 
@@ -2208,6 +2263,9 @@ describe(SharedSpaceService.name, () => {
       await sut.addAssets(auth, spaceId, { assetIds: [assetId] });
 
       expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpaceFaceMatch }));
+      expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ name: JobName.SharedSpaceFaceMatch })]),
+      );
     });
   });
 
@@ -2461,6 +2519,8 @@ describe(SharedSpaceService.name, () => {
 
       await sut.removeAssets(auth, spaceId, { assetIds: [assetId] });
 
+      expect(mocks.sharedSpace.removePersonFacesByAssetIds).toHaveBeenCalledWith(spaceId, [assetId]);
+      expect(mocks.sharedSpace.deleteOrphanedPersons).toHaveBeenCalledWith(spaceId);
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.SharedSpacePersonMetadataBackfill,
         data: {},
@@ -6922,6 +6982,7 @@ describe(SharedSpaceService.name, () => {
 
       await expect(sut.linkLibrary(auth, space.id, { libraryId: library.id })).resolves.not.toThrow();
 
+      expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.job.queue).not.toHaveBeenCalledWith(
         expect.objectContaining({ name: JobName.SharedSpaceLibraryFaceSync }),
       );
@@ -6997,6 +7058,7 @@ describe(SharedSpaceService.name, () => {
 
       await sut.linkLibrary(auth, space.id, { libraryId: library.id });
 
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.SharedSpaceLibraryFaceSync,
         data: { spaceId: space.id, libraryId: library.id },
@@ -7022,6 +7084,7 @@ describe(SharedSpaceService.name, () => {
 
       await sut.linkLibrary(auth, space.id, { libraryId: library.id });
 
+      expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.job.queue).not.toHaveBeenCalledWith(
         expect.objectContaining({ name: JobName.SharedSpaceLibraryFaceSync }),
       );
@@ -7162,6 +7225,7 @@ describe(SharedSpaceService.name, () => {
         expect(mocks.sharedSpace.removeLibrary).toHaveBeenCalledWith(spaceId, libraryId);
         expect(mocks.sharedSpace.removePersonFacesByLibrary).toHaveBeenCalledWith(spaceId, libraryId);
         expect(mocks.sharedSpace.deleteOrphanedPersons).toHaveBeenCalledWith(spaceId);
+        expect(mocks.job.queue).toHaveBeenCalledTimes(1);
         expect(mocks.job.queue).toHaveBeenCalledWith({
           name: JobName.SharedSpacePersonMetadataBackfill,
           data: {},
@@ -8450,6 +8514,9 @@ describe(SharedSpaceService.name, () => {
 
       expect(mocks.sharedSpace.logActivity).not.toHaveBeenCalled();
       expect(mocks.sharedSpace.update).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }),
+      );
     });
 
     it('should NOT send notification when count is 0', async () => {
@@ -8492,6 +8559,7 @@ describe(SharedSpaceService.name, () => {
 
       await sut.handleSharedSpaceBulkAddAssets({ spaceId, userId });
 
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.SharedSpaceFaceMatchAll,
         data: { spaceId },
