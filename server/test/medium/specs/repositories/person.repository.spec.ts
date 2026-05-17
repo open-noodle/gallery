@@ -670,6 +670,12 @@ describe(PersonRepository.name, () => {
           .where('faceId', '=', newFaceId)
           .executeTakeFirst(),
       ).resolves.toEqual({ faceId: newFaceId, dimensions: 512 });
+      const embeddingDistance = await ctx.database
+        .selectFrom('face_search')
+        .select(sql<number>`face_search.embedding <=> ${embedding}`.as('distance'))
+        .where('faceId', '=', newFaceId)
+        .executeTakeFirstOrThrow();
+      expect(embeddingDistance.distance).toBeCloseTo(0);
     });
 
     it('does not mutate face rows when refreshFaces receives no inserts, removals, or embeddings', async () => {
