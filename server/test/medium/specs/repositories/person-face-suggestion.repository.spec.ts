@@ -329,11 +329,13 @@ describe('PersonFaceSuggestionRepository', () => {
       await sut.upsertPending([{ personId, assetFaceId, distance: 0.6 }]);
 
       expect(await sut.markConfirmed(personId, assetFaceId)).toBe(1);
-      expect((await getRow(personId, assetFaceId)).status).toBe('confirmed');
+      let row = await getRow(personId, assetFaceId);
+      expect(row.status).toBe('confirmed');
 
       // idempotent: already confirmed → no pending row → 0 affected, status unchanged
       expect(await sut.markConfirmed(personId, assetFaceId)).toBe(0);
-      expect((await getRow(personId, assetFaceId)).status).toBe('confirmed');
+      row = await getRow(personId, assetFaceId);
+      expect(row.status).toBe('confirmed');
     });
 
     it('markDismissed flips a pending row to dismissed and returns 1; re-running returns 0', async () => {
@@ -341,10 +343,12 @@ describe('PersonFaceSuggestionRepository', () => {
       await sut.upsertPending([{ personId, assetFaceId, distance: 0.6 }]);
 
       expect(await sut.markDismissed(personId, assetFaceId)).toBe(1);
-      expect((await getRow(personId, assetFaceId)).status).toBe('dismissed');
+      let row = await getRow(personId, assetFaceId);
+      expect(row.status).toBe('dismissed');
 
       expect(await sut.markDismissed(personId, assetFaceId)).toBe(0);
-      expect((await getRow(personId, assetFaceId)).status).toBe('dismissed');
+      row = await getRow(personId, assetFaceId);
+      expect(row.status).toBe('dismissed');
     });
 
     it('markConfirmed does not override a dismissed row and vice-versa (status guard)', async () => {
@@ -353,7 +357,8 @@ describe('PersonFaceSuggestionRepository', () => {
       await sut.markDismissed(personId, assetFaceId);
 
       expect(await sut.markConfirmed(personId, assetFaceId)).toBe(0);
-      expect((await getRow(personId, assetFaceId)).status).toBe('dismissed');
+      const row = await getRow(personId, assetFaceId);
+      expect(row.status).toBe('dismissed');
     });
 
     it('returns 0 for a (personId, assetFaceId) pair that has no row (benign idempotent)', async () => {
@@ -438,20 +443,14 @@ describe('PersonFaceSuggestionRepository', () => {
     });
 
     beforeEach(async () => {
-      await defaultDatabase
-        .deleteFrom('person_face_suggestion')
-        .where('assetFaceId', '=', assetFaceId)
-        .execute();
+      await defaultDatabase.deleteFrom('person_face_suggestion').where('assetFaceId', '=', assetFaceId).execute();
     });
 
     afterEach(async () => {
-      await defaultDatabase
-        .deleteFrom('person_face_suggestion')
-        .where('assetFaceId', '=', assetFaceId)
-        .execute();
+      await defaultDatabase.deleteFrom('person_face_suggestion').where('assetFaceId', '=', assetFaceId).execute();
     });
 
-    it('keeps the confirmed row and deletes the sibling person\'s pending row for the same face', async () => {
+    it("keeps the confirmed row and deletes the sibling person's pending row for the same face", async () => {
       const { sut } = setup();
       // Seed pending rows for BOTH persons pointing at the same assetFaceId
       await sut.upsertPending([
@@ -463,7 +462,8 @@ describe('PersonFaceSuggestionRepository', () => {
       expect(await sut.markConfirmed(p1Id, assetFaceId)).toBe(1);
       await sut.resolveAssignedFace(assetFaceId); // pending-only delete across ALL persons
 
-      expect((await getRow(p1Id, assetFaceId)).status).toBe('confirmed'); // survives (non-pending)
+      const row = await getRow(p1Id, assetFaceId);
+      expect(row.status).toBe('confirmed'); // survives (non-pending)
       const p2Rows = await defaultDatabase
         .selectFrom('person_face_suggestion')
         .selectAll()
@@ -490,26 +490,15 @@ describe('PersonFaceSuggestionRepository', () => {
 
     afterEach(async () => {
       // Restore face to unassigned after each test
-      await defaultDatabase
-        .updateTable('asset_face')
-        .set({ personId: null })
-        .where('id', '=', assetFaceId)
-        .execute();
-      await defaultDatabase
-        .deleteFrom('person_face_suggestion')
-        .where('assetFaceId', '=', assetFaceId)
-        .execute();
+      await defaultDatabase.updateTable('asset_face').set({ personId: null }).where('id', '=', assetFaceId).execute();
+      await defaultDatabase.deleteFrom('person_face_suggestion').where('assetFaceId', '=', assetFaceId).execute();
     });
 
     it('half 1: assigning the face makes getPendingForPerson exclude it (pending row references unassigned face only)', async () => {
       const { sut } = setup();
       await sut.upsertPending([{ personId: p1Id, assetFaceId, distance: 0.6 }]);
       // Simulate: face assigned to someone (like what a merge does to its faces)
-      await defaultDatabase
-        .updateTable('asset_face')
-        .set({ personId: p1Id })
-        .where('id', '=', assetFaceId)
-        .execute();
+      await defaultDatabase.updateTable('asset_face').set({ personId: p1Id }).where('id', '=', assetFaceId).execute();
 
       const res = await sut.getPendingForPerson(p1Id, {
         maxDistance: 0.5,
@@ -666,9 +655,21 @@ describe('PersonFaceSuggestionRepository', () => {
       const { assetFace: lockedAssetFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personId: null });
       const { assetFace: offlineAssetFace } = await ctx.newAssetFace({ assetId: offlineAsset.id, personId: null });
       const { person } = await ctx.newPerson({ ownerId: user.id });
-      await ctx.database.updateTable('asset_face').set({ personId: person.id }).where('id', '=', assignedFace.id).execute();
-      await ctx.database.updateTable('asset_face').set({ deletedAt: new Date() }).where('id', '=', deletedFace.id).execute();
-      await ctx.database.updateTable('asset_face').set({ isVisible: false }).where('id', '=', invisibleFace.id).execute();
+      await ctx.database
+        .updateTable('asset_face')
+        .set({ personId: person.id })
+        .where('id', '=', assignedFace.id)
+        .execute();
+      await ctx.database
+        .updateTable('asset_face')
+        .set({ deletedAt: new Date() })
+        .where('id', '=', deletedFace.id)
+        .execute();
+      await ctx.database
+        .updateTable('asset_face')
+        .set({ isVisible: false })
+        .where('id', '=', invisibleFace.id)
+        .execute();
       const spacePerson = await ctx.database
         .insertInto('shared_space_person')
         .values({ spaceId: space.id, name: 'Alice', type: 'person', isHidden: false })
@@ -700,7 +701,10 @@ describe('PersonFaceSuggestionRepository', () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
       const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
-      const { space: disabledSpace } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: false });
+      const { space: disabledSpace } = await ctx.newSharedSpace({
+        createdById: user.id,
+        faceRecognitionEnabled: false,
+      });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
       const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
@@ -828,7 +832,11 @@ describe('PersonFaceSuggestionRepository', () => {
         await sut.upsertPendingForSpacePerson([
           { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.6 },
         ]);
-        await ctx.database.updateTable('asset_face').set({ personId: person.id }).where('id', '=', assetFace.id).execute();
+        await ctx.database
+          .updateTable('asset_face')
+          .set({ personId: person.id })
+          .where('id', '=', assetFace.id)
+          .execute();
 
         await expect(sut.hasPendingForSpacePerson(space.id, spacePerson.id, assetFace.id, opts)).resolves.toBe(false);
       });
@@ -837,7 +845,10 @@ describe('PersonFaceSuggestionRepository', () => {
         const { ctx, sut } = setup();
         const { user } = await ctx.newUser();
         const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
-        const { space: disabledSpace } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: false });
+        const { space: disabledSpace } = await ctx.newSharedSpace({
+          createdById: user.id,
+          faceRecognitionEnabled: false,
+        });
         const { asset } = await ctx.newAsset({ ownerId: user.id });
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
         await ctx.newSharedSpaceAsset({ spaceId: disabledSpace.id, assetId: asset.id, addedById: user.id });
@@ -857,7 +868,9 @@ describe('PersonFaceSuggestionRepository', () => {
           await sut.upsertPendingForSpacePerson([
             { spacePersonId: person.id, assetFaceId: assetFace.id, distance: 0.6 },
           ]);
-          await expect(sut.hasPendingForSpacePerson(person.spaceId, person.id, assetFace.id, opts)).resolves.toBe(false);
+          await expect(sut.hasPendingForSpacePerson(person.spaceId, person.id, assetFace.id, opts)).resolves.toBe(
+            false,
+          );
         }
       });
 

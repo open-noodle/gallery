@@ -3277,9 +3277,17 @@ describe(SharedSpaceRepository.name, () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
       const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: newEmbedding() }).execute();
+      await ctx.database
+        .insertInto('face_search')
+        .values({ faceId: assetFace.id, embedding: newEmbedding() })
+        .execute();
 
-      const included = await sut.createPerson({ spaceId: space.id, name: '  Alice  ', type: 'person', isHidden: false });
+      const included = await sut.createPerson({
+        spaceId: space.id,
+        name: '  Alice  ',
+        type: 'person',
+        isHidden: false,
+      });
       const whitespace = await sut.createPerson({ spaceId: space.id, name: '   ', type: 'person', isHidden: false });
       const hidden = await sut.createPerson({ spaceId: space.id, name: 'Hidden', type: 'person', isHidden: true });
       const pet = await sut.createPerson({ spaceId: space.id, name: 'Pet', type: 'pet', isHidden: false });
@@ -3310,7 +3318,10 @@ describe(SharedSpaceRepository.name, () => {
       await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
       const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: newEmbedding() }).execute();
+      await ctx.database
+        .insertInto('face_search')
+        .values({ faceId: assetFace.id, embedding: newEmbedding() })
+        .execute();
       const linkedLibraryPerson = await sut.createPerson({
         spaceId: space.id,
         name: 'Library Alice',
@@ -3354,7 +3365,11 @@ describe(SharedSpaceRepository.name, () => {
         .insertInto('face_search')
         .values({ faceId: assignedFace.assetFace.id, embedding: newEmbedding() })
         .execute();
-      const manualFace = await ctx.newAssetFace({ assetId: manualAsset.id, personId: null, sourceType: SourceType.Exif });
+      const manualFace = await ctx.newAssetFace({
+        assetId: manualAsset.id,
+        personId: null,
+        sourceType: SourceType.Exif,
+      });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: manualFace.assetFace.id, embedding: newEmbedding() })
@@ -3394,7 +3409,12 @@ describe(SharedSpaceRepository.name, () => {
         .values({ faceId: personallyAssignedFace.assetFace.id, embedding: newEmbedding() })
         .execute();
       await ctx.newAssetFace({ assetId: nonSearchableAsset.id, personId: null });
-      const person = await sut.createPerson({ spaceId: space.id, name: 'No Candidates', type: 'person', isHidden: false });
+      const person = await sut.createPerson({
+        spaceId: space.id,
+        name: 'No Candidates',
+        type: 'person',
+        isHidden: false,
+      });
       await sut.addPersonFaces([{ personId: person.id, assetFaceId: assignedFace.assetFace.id }]);
 
       const ids: string[] = [];
@@ -3414,7 +3434,10 @@ describe(SharedSpaceRepository.name, () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
       await ctx.newSharedSpaceAsset({ spaceId: otherSpace.id, assetId: asset.id, addedById: user.id });
       const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: newEmbedding() }).execute();
+      await ctx.database
+        .insertInto('face_search')
+        .values({ faceId: assetFace.id, embedding: newEmbedding() })
+        .execute();
       const included = await sut.createPerson({ spaceId: space.id, name: 'Current', type: 'person', isHidden: false });
       const otherPerson = await sut.createPerson({
         spaceId: otherSpace.id,

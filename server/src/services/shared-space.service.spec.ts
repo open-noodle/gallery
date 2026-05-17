@@ -6101,7 +6101,9 @@ describe(SharedSpaceService.name, () => {
 
     it('throws for missing or cross-space people before querying suggestions', async () => {
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
-      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(void 0).mockResolvedValueOnce({ spaceId: 'other-space' } as any);
+      mocks.sharedSpace.getPersonById
+        .mockResolvedValueOnce(void 0)
+        .mockResolvedValueOnce({ spaceId: 'other-space' } as any);
 
       await expect(
         sut.getSpacePersonFaceSuggestions(factory.auth(), 'space-1', 'missing-person', { page: 1, size: 50 }),

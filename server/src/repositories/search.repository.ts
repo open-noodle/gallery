@@ -915,7 +915,15 @@ export class SearchRepository {
       ],
     },
   )
-  async searchFaces({ userIds, spaceId, embedding, numResults, maxDistance, hasPerson, minBirthDate }: FaceEmbeddingSearch) {
+  async searchFaces({
+    userIds,
+    spaceId,
+    embedding,
+    numResults,
+    maxDistance,
+    hasPerson,
+    minBirthDate,
+  }: FaceEmbeddingSearch) {
     if (!isValidInteger(numResults, { min: 1, max: 1000 })) {
       throw new Error(`Invalid value for 'numResults': ${numResults}`);
     }

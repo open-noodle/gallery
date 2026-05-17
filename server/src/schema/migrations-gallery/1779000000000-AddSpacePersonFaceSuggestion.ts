@@ -1,11 +1,5 @@
 import { Kysely, sql } from 'kysely';
 
-const updatedAtTriggerOverride = {
-  type: 'trigger',
-  name: 'person_face_suggestion_updatedAt',
-  sql: 'CREATE OR REPLACE TRIGGER "person_face_suggestion_updatedAt"\n  BEFORE UPDATE ON "person_face_suggestion"\n  FOR EACH ROW\n  EXECUTE FUNCTION updated_at();',
-};
-
 export async function up(db: Kysely<unknown>): Promise<void> {
   await sql`
     ALTER TABLE "person_face_suggestion"
@@ -66,7 +60,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
   await sql`
     INSERT INTO "migration_overrides" ("name", "value")
-    VALUES ('trigger_person_face_suggestion_updatedAt', ${JSON.stringify(updatedAtTriggerOverride)}::jsonb)
+    VALUES ('trigger_person_face_suggestion_updatedAt', '{"type":"trigger","name":"person_face_suggestion_updatedAt","sql":"CREATE OR REPLACE TRIGGER \\"person_face_suggestion_updatedAt\\"\\n  BEFORE UPDATE ON \\"person_face_suggestion\\"\\n  FOR EACH ROW\\n  EXECUTE FUNCTION updated_at();"}'::jsonb)
     ON CONFLICT ("name") DO UPDATE SET "value" = EXCLUDED."value"
   `.execute(db);
 }
@@ -125,7 +119,7 @@ export async function down(db: Kysely<unknown>): Promise<void> {
 
   await sql`
     INSERT INTO "migration_overrides" ("name", "value")
-    VALUES ('trigger_person_face_suggestion_updatedAt', ${JSON.stringify(updatedAtTriggerOverride)}::jsonb)
+    VALUES ('trigger_person_face_suggestion_updatedAt', '{"type":"trigger","name":"person_face_suggestion_updatedAt","sql":"CREATE OR REPLACE TRIGGER \\"person_face_suggestion_updatedAt\\"\\n  BEFORE UPDATE ON \\"person_face_suggestion\\"\\n  FOR EACH ROW\\n  EXECUTE FUNCTION updated_at();"}'::jsonb)
     ON CONFLICT ("name") DO UPDATE SET "value" = EXCLUDED."value"
   `.execute(db);
 }

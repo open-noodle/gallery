@@ -5691,9 +5691,9 @@ describe(PersonService.name, () => {
     it('denies a non-owner with NO state change (edge 18 absence)', async () => {
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set()); // not owner
 
-      await expect(
-        sut.confirmFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1'),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(sut.confirmFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
       expect(mocks.personFaceSuggestion.markConfirmed).not.toHaveBeenCalled();
       expect(mocks.person.reassignFace).not.toHaveBeenCalled();
     });
@@ -5748,9 +5748,9 @@ describe(PersonService.name, () => {
     it('denies a non-owner with NO state change (edge 18 absence)', async () => {
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
 
-      await expect(
-        sut.dismissFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1'),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(sut.dismissFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
       expect(mocks.personFaceSuggestion.markDismissed).not.toHaveBeenCalled();
     });
 

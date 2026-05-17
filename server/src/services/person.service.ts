@@ -779,7 +779,9 @@ export class PersonService extends BaseService {
       }
     }
 
-    const assigned = await this.sharedSpaceRepository.getAssignedFaceIdsForSpace(person.spaceId, [...bestByFace.keys()]);
+    const assigned = await this.sharedSpaceRepository.getAssignedFaceIdsForSpace(person.spaceId, [
+      ...bestByFace.keys(),
+    ]);
     for (const { assetFaceId } of assigned) {
       bestByFace.delete(assetFaceId);
     }
