@@ -1974,6 +1974,36 @@ describe(PersonService.name, () => {
       expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
     });
 
+    it('should not write facesRecognizedAt when recognition fan-out queueing fails', async () => {
+      const asset = AssetFactory.from().file({ type: AssetFileType.Preview, path: '/preview.jpg' }).exif().build();
+      const face = AssetFaceFactory.create({ assetId: asset.id });
+      mocks.crypto.randomUUID.mockReturnValue(face.id);
+      mocks.machineLearning.detectFaces.mockResolvedValue(getAsDetectedFace(face));
+      mocks.assetJob.getForDetectFacesJob.mockResolvedValue(getForDetectedFaces(asset));
+      mocks.person.refreshFaces.mockResolvedValue();
+      mocks.job.queueAll.mockRejectedValue(new Error('redis unavailable'));
+
+      await expect(sut.handleDetectFaces({ id: asset.id })).rejects.toThrow('redis unavailable');
+
+      expect(mocks.person.refreshFaces).toHaveBeenCalled();
+      expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+    });
+
+    it('should not queue recognition or write facesRecognizedAt when refreshFaces fails', async () => {
+      const asset = AssetFactory.from().file({ type: AssetFileType.Preview, path: '/preview.jpg' }).exif().build();
+      const face = AssetFaceFactory.create({ assetId: asset.id });
+      mocks.crypto.randomUUID.mockReturnValue(face.id);
+      mocks.machineLearning.detectFaces.mockResolvedValue(getAsDetectedFace(face));
+      mocks.assetJob.getForDetectFacesJob.mockResolvedValue(getForDetectedFaces(asset));
+      mocks.person.refreshFaces.mockRejectedValue(new Error('refresh failed'));
+
+      await expect(sut.handleDetectFaces({ id: asset.id })).rejects.toThrow('refresh failed');
+
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+      expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+    });
+
     it('should create a face with no person and queue recognition job', async () => {
       const asset = AssetFactory.from().file({ type: AssetFileType.Preview }).exif().build();
       const face = AssetFaceFactory.create({ assetId: asset.id });
@@ -1990,10 +2020,16 @@ describe(PersonService.name, () => {
         [],
         [{ faceId: face.id, embedding: '[1, 2, 3, 4]' }],
       );
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         { name: JobName.FacialRecognitionQueueAll, data: { force: false } },
         { name: JobName.FacialRecognition, data: { id: face.id } },
       ]);
+      expect(mocks.asset.upsertJobStatus).toHaveBeenCalledWith({
+        assetId: asset.id,
+        facesRecognizedAt: expect.any(Date),
+      });
       expect(mocks.person.reassignFace).not.toHaveBeenCalled();
       expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
     });
@@ -2019,6 +2055,10 @@ describe(PersonService.name, () => {
       });
       expect(mocks.job.queue).toHaveBeenCalledTimes(1);
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
+      expect(mocks.asset.upsertJobStatus).toHaveBeenCalledWith({
+        assetId: asset.id,
+        facesRecognizedAt: expect.any(Date),
+      });
     });
 
     it('non-force detection keeps immediate incremental recognition for new faces', async () => {
@@ -2031,10 +2071,16 @@ describe(PersonService.name, () => {
 
       await sut.handleDetectFaces({ id: asset.id, force: false });
 
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         { name: JobName.FacialRecognitionQueueAll, data: { force: false } },
         { name: JobName.FacialRecognition, data: { id: face.id } },
       ]);
+      expect(mocks.asset.upsertJobStatus).toHaveBeenCalledWith({
+        assetId: asset.id,
+        facesRecognizedAt: expect.any(Date),
+      });
     });
 
     it('keeps old pre-deploy asset-detection jobs without force on the incremental path', async () => {
@@ -2047,10 +2093,16 @@ describe(PersonService.name, () => {
 
       await sut.handleDetectFaces({ id: asset.id });
 
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         { name: JobName.FacialRecognitionQueueAll, data: { force: false } },
         { name: JobName.FacialRecognition, data: { id: face.id } },
       ]);
+      expect(mocks.asset.upsertJobStatus).toHaveBeenCalledWith({
+        assetId: asset.id,
+        facesRecognizedAt: expect.any(Date),
+      });
     });
 
     it('should delete an existing face not among the new detected faces', async () => {
