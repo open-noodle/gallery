@@ -1,14 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import type { JobItem } from 'src/types.js';
-import {
-  AssetType,
-  AssetVisibility,
-  ImmichWorker,
-  JobName,
-  JobStatus,
-  ManualJobName,
-  QueueName,
-} from 'src/enum.js';
+import { AssetType, AssetVisibility, ImmichWorker, JobName, JobStatus, ManualJobName, QueueName } from 'src/enum.js';
 import { JobService } from 'src/services/job.service.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
 import { factory, newUuid } from 'test/small.factory.js';
