@@ -80,186 +80,186 @@ function makeSuggestion(overrides: Partial<PersonFaceSuggestionResponseDto> = {}
 Append this describe block before the final `});` of the top-level `describe('Spaces person detail page', ...)`:
 
 ```ts
-  describe('face suggestions', () => {
-    beforeEach(() => {
-      localStorage.clear();
-      sdkMock.getSpacePersonFaceSuggestions.mockResolvedValue({ total: 0, items: [] });
-      sdkMock.confirmSpacePersonFaceSuggestion.mockResolvedValue(undefined as never);
-      sdkMock.dismissSpacePersonFaceSuggestion.mockResolvedValue(undefined as never);
+describe('face suggestions', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    sdkMock.getSpacePersonFaceSuggestions.mockResolvedValue({ total: 0, items: [] });
+    sdkMock.confirmSpacePersonFaceSuggestion.mockResolvedValue(undefined as never);
+    sdkMock.dismissSpacePersonFaceSuggestion.mockResolvedValue(undefined as never);
+  });
+
+  it('renders the reused banner for editors and uses the space-person thumbnail URL', async () => {
+    sdkMock.getSpacePersonFaceSuggestions.mockResolvedValue({
+      total: 2,
+      items: [makeSuggestion()],
     });
 
-    it('renders the reused banner for editors and uses the space-person thumbnail URL', async () => {
-      sdkMock.getSpacePersonFaceSuggestions.mockResolvedValue({
-        total: 2,
-        items: [makeSuggestion()],
-      });
+    renderPage();
 
-      renderPage();
+    await screen.findByTestId('person-suggestion-banner');
+    expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenCalledWith({
+      id: 'space-1',
+      personId: 'person-1',
+      page: 1,
+      size: 5,
+    });
+    const src = screen.getByTestId('suggestion-banner-reference').getAttribute('src') ?? '';
+    expect(src).toContain('/shared-spaces/space-1/people/person-1/thumbnail');
+    expect(src).not.toContain('/people/person-1/thumbnail');
+  });
 
-      await screen.findByTestId('person-suggestion-banner');
+  it('relies on the server read-gate for viewers and hides when the API returns zero', async () => {
+    sdkMock.getSpacePersonFaceSuggestions.mockResolvedValue({ total: 0, items: [] });
+
+    renderPage({ members: [makeMember({ role: SharedSpaceRole.Viewer })] });
+
+    await waitFor(() => {
       expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenCalledWith({
         id: 'space-1',
         personId: 'person-1',
         page: 1,
         size: 5,
       });
-      const src = screen.getByTestId('suggestion-banner-reference').getAttribute('src') ?? '';
-      expect(src).toContain('/shared-spaces/space-1/people/person-1/thumbnail');
-      expect(src).not.toContain('/people/person-1/thumbnail');
     });
+    expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('suggestion-review-btn')).not.toBeInTheDocument();
+  });
 
-    it('relies on the server read-gate for viewers and hides when the API returns zero', async () => {
-      sdkMock.getSpacePersonFaceSuggestions.mockResolvedValue({ total: 0, items: [] });
+  it('hides the banner if the shared-space suggestion summary request fails', async () => {
+    sdkMock.getSpacePersonFaceSuggestions.mockRejectedValue(new Error('not a member'));
 
-      renderPage({ members: [makeMember({ role: SharedSpaceRole.Viewer })] });
+    renderPage();
 
-      await waitFor(() => {
-        expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenCalledWith({
-          id: 'space-1',
-          personId: 'person-1',
-          page: 1,
-          size: 5,
-        });
+    await waitFor(() => {
+      expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenCalledWith({
+        id: 'space-1',
+        personId: 'person-1',
+        page: 1,
+        size: 5,
       });
-      expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('suggestion-review-btn')).not.toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument();
+  });
+
+  it('opens the review modal with shared-space SDK actions and refreshes after a confirm', async () => {
+    const firstSuggestion = makeSuggestion({ assetFaceId: 'face-1' });
+    let closeModal!: (value: { confirmed: number }) => void;
+    sdkMock.getSpacePersonFaceSuggestions
+      .mockResolvedValueOnce({ total: 1, items: [firstSuggestion] })
+      .mockResolvedValueOnce({ total: 1, items: [firstSuggestion] })
+      .mockResolvedValueOnce({ total: 0, items: [] });
+    vi.mocked(modalManager.show).mockReturnValue(
+      new Promise((resolve) => {
+        closeModal = resolve;
+      }) as never,
+    );
+
+    renderPage();
+
+    await userEvent.click(await screen.findByTestId('suggestion-review-btn'));
+
+    const modalProps = vi.mocked(modalManager.show).mock.calls[0][1] as unknown as {
+      referenceThumbnailUrl: string;
+      loadPage: (request: { page: number; size: number }) => Promise<PersonFaceSuggestionPageResponseDto>;
+      confirm: (assetFaceId: string) => Promise<void>;
+      dismiss: (assetFaceId: string) => Promise<void>;
+    };
+
+    expect(modalProps.referenceThumbnailUrl).toContain('/shared-spaces/space-1/people/person-1/thumbnail');
+
+    await modalProps.loadPage({ page: 2, size: 50 });
+    expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenLastCalledWith({
+      id: 'space-1',
+      personId: 'person-1',
+      page: 2,
+      size: 50,
     });
 
-    it('hides the banner if the shared-space suggestion summary request fails', async () => {
-      sdkMock.getSpacePersonFaceSuggestions.mockRejectedValue(new Error('not a member'));
-
-      renderPage();
-
-      await waitFor(() => {
-        expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenCalledWith({
-          id: 'space-1',
-          personId: 'person-1',
-          page: 1,
-          size: 5,
-        });
-      });
-      expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument();
+    await modalProps.confirm('face-1');
+    expect(sdkMock.confirmSpacePersonFaceSuggestion).toHaveBeenCalledWith({
+      id: 'space-1',
+      personId: 'person-1',
+      assetFaceId: 'face-1',
     });
 
-    it('opens the review modal with shared-space SDK actions and refreshes after a confirm', async () => {
-      const firstSuggestion = makeSuggestion({ assetFaceId: 'face-1' });
-      let closeModal!: (value: { confirmed: number }) => void;
-      sdkMock.getSpacePersonFaceSuggestions
-        .mockResolvedValueOnce({ total: 1, items: [firstSuggestion] })
-        .mockResolvedValueOnce({ total: 1, items: [firstSuggestion] })
-        .mockResolvedValueOnce({ total: 0, items: [] });
-      vi.mocked(modalManager.show).mockReturnValue(
-        new Promise((resolve) => {
-          closeModal = resolve;
-        }) as never,
-      );
+    await modalProps.dismiss('face-2');
+    expect(sdkMock.dismissSpacePersonFaceSuggestion).toHaveBeenCalledWith({
+      id: 'space-1',
+      personId: 'person-1',
+      assetFaceId: 'face-2',
+    });
 
-      renderPage();
+    closeModal({ confirmed: 1 });
 
-      await userEvent.click(await screen.findByTestId('suggestion-review-btn'));
-
-      const modalProps = vi.mocked(modalManager.show).mock.calls[0][1] as unknown as {
-        referenceThumbnailUrl: string;
-        loadPage: (request: { page: number; size: number }) => Promise<PersonFaceSuggestionPageResponseDto>;
-        confirm: (assetFaceId: string) => Promise<void>;
-        dismiss: (assetFaceId: string) => Promise<void>;
-      };
-
-      expect(modalProps.referenceThumbnailUrl).toContain('/shared-spaces/space-1/people/person-1/thumbnail');
-
-      await modalProps.loadPage({ page: 2, size: 50 });
+    await waitFor(() => expect(invalidateAllMock).toHaveBeenCalled());
+    await waitFor(() => {
       expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenLastCalledWith({
         id: 'space-1',
         personId: 'person-1',
-        page: 2,
-        size: 50,
+        page: 1,
+        size: 5,
       });
-
-      await modalProps.confirm('face-1');
-      expect(sdkMock.confirmSpacePersonFaceSuggestion).toHaveBeenCalledWith({
-        id: 'space-1',
-        personId: 'person-1',
-        assetFaceId: 'face-1',
-      });
-
-      await modalProps.dismiss('face-2');
-      expect(sdkMock.dismissSpacePersonFaceSuggestion).toHaveBeenCalledWith({
-        id: 'space-1',
-        personId: 'person-1',
-        assetFaceId: 'face-2',
-      });
-
-      closeModal({ confirmed: 1 });
-
-      await waitFor(() => expect(invalidateAllMock).toHaveBeenCalled());
-      await waitFor(() => {
-        expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenLastCalledWith({
-          id: 'space-1',
-          personId: 'person-1',
-          page: 1,
-          size: 5,
-        });
-      });
-    });
-
-    it('keys Not now snooze by the space person id', async () => {
-      sdkMock.getSpacePersonFaceSuggestions.mockResolvedValue({
-        total: 2,
-        items: [makeSuggestion()],
-      });
-
-      const firstRender = renderPage({ person: makePerson({ id: 'person-1', name: 'Alice' }) });
-      await screen.findByTestId('person-suggestion-banner');
-      await userEvent.click(screen.getByTestId('suggestion-snooze-btn'));
-      expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument();
-      firstRender.unmount();
-
-      renderPage({ person: makePerson({ id: 'person-2', name: 'Alice in another space cluster' }) });
-
-      await screen.findByTestId('person-suggestion-banner');
-    });
-
-    it('reloads suggestions when navigating to another space person in the same route component', async () => {
-      sdkMock.getSpacePersonFaceSuggestions
-        .mockResolvedValueOnce({ total: 2, items: [makeSuggestion({ assetFaceId: 'face-1' })] })
-        .mockResolvedValueOnce({ total: 0, items: [] });
-      const firstPerson = makePerson({ id: 'person-1', name: 'Alice' });
-      const secondPerson = makePerson({
-        id: 'person-2',
-        name: 'Bob',
-        updatedAt: '2026-01-03T00:00:00.000Z',
-      });
-
-      const view = renderPage({ person: firstPerson });
-
-      await screen.findByTestId('person-suggestion-banner');
-
-      await view.rerender({
-        component: SpacePersonDetailPage,
-        componentProps: {
-          data: {
-            space: makeSpace(),
-            members: [makeMember()],
-            person: secondPerson,
-            statistics: { assets: secondPerson.assetCount, faces: secondPerson.faceCount },
-            action: null,
-            previousRoute: null,
-            meta: { title: 'Bob - Test Space' },
-          },
-        },
-      });
-
-      await waitFor(() => {
-        expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenLastCalledWith({
-          id: 'space-1',
-          personId: 'person-2',
-          page: 1,
-          size: 5,
-        });
-      });
-      await waitFor(() => expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument());
     });
   });
+
+  it('keys Not now snooze by the space person id', async () => {
+    sdkMock.getSpacePersonFaceSuggestions.mockResolvedValue({
+      total: 2,
+      items: [makeSuggestion()],
+    });
+
+    const firstRender = renderPage({ person: makePerson({ id: 'person-1', name: 'Alice' }) });
+    await screen.findByTestId('person-suggestion-banner');
+    await userEvent.click(screen.getByTestId('suggestion-snooze-btn'));
+    expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument();
+    firstRender.unmount();
+
+    renderPage({ person: makePerson({ id: 'person-2', name: 'Alice in another space cluster' }) });
+
+    await screen.findByTestId('person-suggestion-banner');
+  });
+
+  it('reloads suggestions when navigating to another space person in the same route component', async () => {
+    sdkMock.getSpacePersonFaceSuggestions
+      .mockResolvedValueOnce({ total: 2, items: [makeSuggestion({ assetFaceId: 'face-1' })] })
+      .mockResolvedValueOnce({ total: 0, items: [] });
+    const firstPerson = makePerson({ id: 'person-1', name: 'Alice' });
+    const secondPerson = makePerson({
+      id: 'person-2',
+      name: 'Bob',
+      updatedAt: '2026-01-03T00:00:00.000Z',
+    });
+
+    const view = renderPage({ person: firstPerson });
+
+    await screen.findByTestId('person-suggestion-banner');
+
+    await view.rerender({
+      component: SpacePersonDetailPage,
+      componentProps: {
+        data: {
+          space: makeSpace(),
+          members: [makeMember()],
+          person: secondPerson,
+          statistics: { assets: secondPerson.assetCount, faces: secondPerson.faceCount },
+          action: null,
+          previousRoute: null,
+          meta: { title: 'Bob - Test Space' },
+        },
+      },
+    });
+
+    await waitFor(() => {
+      expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenLastCalledWith({
+        id: 'space-1',
+        personId: 'person-2',
+        page: 1,
+        size: 5,
+      });
+    });
+    await waitFor(() => expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument());
+  });
+});
 ```
 
 - [ ] **Step 2: Run and verify RED**
@@ -326,35 +326,35 @@ Update the imports in `+page.svelte`:
 Update the SDK import list:
 
 ```ts
-  import {
-    confirmSpacePersonFaceSuggestion,
-    detachScopedPerson,
-    dismissSpacePersonFaceSuggestion,
-    getSpacePersonFaces,
-    getSpacePersonFaceSuggestions,
-    getSpacePeople,
-    mergeSpacePeople,
-    mergeScopedPeople,
-    RepresentativeFaceSource,
-    searchPerson,
-    SharedSpaceRole,
-    Type2 as ScopedPersonProfileType,
-    updateSpacePersonRepresentativeFace,
-    updateSpacePerson,
-    type PersonFaceResponseDto,
-    type PersonFaceSuggestionResponseDto,
-    type PersonResponseDto,
-    type PersonStatisticsResponseDto,
-    type ScopedPersonProfileRefDto,
-    type SharedSpaceMemberResponseDto,
-    type SharedSpacePersonResponseDto,
-  } from '@immich/sdk';
+import {
+  confirmSpacePersonFaceSuggestion,
+  detachScopedPerson,
+  dismissSpacePersonFaceSuggestion,
+  getSpacePersonFaces,
+  getSpacePersonFaceSuggestions,
+  getSpacePeople,
+  mergeSpacePeople,
+  mergeScopedPeople,
+  RepresentativeFaceSource,
+  searchPerson,
+  SharedSpaceRole,
+  Type2 as ScopedPersonProfileType,
+  updateSpacePersonRepresentativeFace,
+  updateSpacePerson,
+  type PersonFaceResponseDto,
+  type PersonFaceSuggestionResponseDto,
+  type PersonResponseDto,
+  type PersonStatisticsResponseDto,
+  type ScopedPersonProfileRefDto,
+  type SharedSpaceMemberResponseDto,
+  type SharedSpacePersonResponseDto,
+} from '@immich/sdk';
 ```
 
 Keep the existing Svelte import unchanged:
 
 ```ts
-  import { tick } from 'svelte';
+import { tick } from 'svelte';
 ```
 
 - [ ] **Step 2: Add shared-space suggestion state and actions**
@@ -362,76 +362,76 @@ Keep the existing Svelte import unchanged:
 Replace the current `thumbnailUrl` declaration:
 
 ```ts
-  const thumbnailUrl = $derived(
-    createUrl(`/shared-spaces/${space.id}/people/${person.id}/thumbnail`, { updatedAt: person.updatedAt }),
-  );
+const thumbnailUrl = $derived(
+  createUrl(`/shared-spaces/${space.id}/people/${person.id}/thumbnail`, { updatedAt: person.updatedAt }),
+);
 ```
 
 with this block:
 
 ```ts
-  let thumbnailRefresh = $state<string | null>(null);
-  const thumbnailUrl = $derived(
-    createUrl(`/shared-spaces/${space.id}/people/${person.id}/thumbnail`, {
-      updatedAt: thumbnailRefresh ?? person.updatedAt,
-    }),
-  );
-  const suggestionPerson = $derived({ id: person.id, name: person.name } as PersonResponseDto);
-  let suggestionTotal = $state(0);
-  let suggestionPreviews = $state<PersonFaceSuggestionResponseDto[]>([]);
+let thumbnailRefresh = $state<string | null>(null);
+const thumbnailUrl = $derived(
+  createUrl(`/shared-spaces/${space.id}/people/${person.id}/thumbnail`, {
+    updatedAt: thumbnailRefresh ?? person.updatedAt,
+  }),
+);
+const suggestionPerson = $derived({ id: person.id, name: person.name } as PersonResponseDto);
+let suggestionTotal = $state(0);
+let suggestionPreviews = $state<PersonFaceSuggestionResponseDto[]>([]);
 ```
 
 Add these functions after `openRepresentativeFacePicker`:
 
 ```ts
-  async function loadSuggestionSummary(spaceId = space.id, personId = person.id) {
-    try {
-      const response = await getSpacePersonFaceSuggestions({ id: spaceId, personId, page: 1, size: 5 });
-      if (spaceId !== space.id || personId !== person.id) {
-        return;
-      }
-      suggestionTotal = response.total;
-      suggestionPreviews = response.items;
-    } catch {
-      if (spaceId !== space.id || personId !== person.id) {
-        return;
-      }
-      suggestionTotal = 0;
-      suggestionPreviews = [];
+async function loadSuggestionSummary(spaceId = space.id, personId = person.id) {
+  try {
+    const response = await getSpacePersonFaceSuggestions({ id: spaceId, personId, page: 1, size: 5 });
+    if (spaceId !== space.id || personId !== person.id) {
+      return;
     }
-  }
-
-  async function openSuggestionReview() {
-    const result = await modalManager.show(PersonSuggestionReviewModal, {
-      person: suggestionPerson,
-      referenceThumbnailUrl: thumbnailUrl,
-      loadPage: ({ page, size }: { page: number; size: number }) =>
-        getSpacePersonFaceSuggestions({ id: space.id, personId: person.id, page, size }),
-      confirm: (assetFaceId: string) =>
-        confirmSpacePersonFaceSuggestion({ id: space.id, personId: person.id, assetFaceId }),
-      dismiss: (assetFaceId: string) =>
-        dismissSpacePersonFaceSuggestion({ id: space.id, personId: person.id, assetFaceId }),
-    });
-
-    await loadSuggestionSummary(space.id, person.id);
-    if (result && result.confirmed > 0) {
-      thumbnailRefresh = Date.now().toString();
-      await invalidateAll();
+    suggestionTotal = response.total;
+    suggestionPreviews = response.items;
+  } catch {
+    if (spaceId !== space.id || personId !== person.id) {
+      return;
     }
+    suggestionTotal = 0;
+    suggestionPreviews = [];
   }
+}
+
+async function openSuggestionReview() {
+  const result = await modalManager.show(PersonSuggestionReviewModal, {
+    person: suggestionPerson,
+    referenceThumbnailUrl: thumbnailUrl,
+    loadPage: ({ page, size }: { page: number; size: number }) =>
+      getSpacePersonFaceSuggestions({ id: space.id, personId: person.id, page, size }),
+    confirm: (assetFaceId: string) =>
+      confirmSpacePersonFaceSuggestion({ id: space.id, personId: person.id, assetFaceId }),
+    dismiss: (assetFaceId: string) =>
+      dismissSpacePersonFaceSuggestion({ id: space.id, personId: person.id, assetFaceId }),
+  });
+
+  await loadSuggestionSummary(space.id, person.id);
+  if (result && result.confirmed > 0) {
+    thumbnailRefresh = Date.now().toString();
+    await invalidateAll();
+  }
+}
 ```
 
 Add this route-keyed effect before the closing `</script>`:
 
 ```ts
-  $effect(() => {
-    const currentSpaceId = space.id;
-    const currentPersonId = person.id;
-    thumbnailRefresh = null;
-    suggestionTotal = 0;
-    suggestionPreviews = [];
-    void loadSuggestionSummary(currentSpaceId, currentPersonId);
-  });
+$effect(() => {
+  const currentSpaceId = space.id;
+  const currentPersonId = person.id;
+  thumbnailRefresh = null;
+  suggestionTotal = 0;
+  suggestionPreviews = [];
+  void loadSuggestionSummary(currentSpaceId, currentPersonId);
+});
 ```
 
 This deliberately does not check `isEditor` in the client. Viewers call the shared-space API and receive `{ total: 0, items: [] }` from the server read-gate.
@@ -481,17 +481,17 @@ git commit -m "feat(web): mount face suggestions on space person detail"
 Find the existing test named `does not query suggestions for a space-scoped person (Phase 5 scope)` and add the final assertion shown here:
 
 ```ts
-  it('does not query suggestions for a space-scoped person (Phase 5 scope)', async () => {
-    renderPage({
-      person: makePerson({
-        name: 'Alice',
-        primaryProfile: { type: 'space-person', id: 'sp1', spaceId: 'space-1' },
-      } as never),
-    });
-    await new Promise((r) => setTimeout(r, 0));
-    expect(sdkMock.getPersonFaceSuggestions).not.toHaveBeenCalled();
-    expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument();
+it('does not query suggestions for a space-scoped person (Phase 5 scope)', async () => {
+  renderPage({
+    person: makePerson({
+      name: 'Alice',
+      primaryProfile: { type: 'space-person', id: 'sp1', spaceId: 'space-1' },
+    } as never),
   });
+  await new Promise((r) => setTimeout(r, 0));
+  expect(sdkMock.getPersonFaceSuggestions).not.toHaveBeenCalled();
+  expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument();
+});
 ```
 
 - [ ] **Step 2: Run the personal guard test**
@@ -606,10 +606,9 @@ test.describe('Space person face suggestions (web)', () => {
 
     const candidateFaceIds: string[] = [];
     for (const distance of [0.55, 0.6, 0.65]) {
-      const face = await db.query<{ id: string }>(
-        `INSERT INTO asset_face ("assetId") VALUES ($1) RETURNING id`,
-        [candidateAsset.id],
-      );
+      const face = await db.query<{ id: string }>(`INSERT INTO asset_face ("assetId") VALUES ($1) RETURNING id`, [
+        candidateAsset.id,
+      ]);
       const faceId = face.rows[0].id;
       candidateFaceIds.push(faceId);
       await db.query(
