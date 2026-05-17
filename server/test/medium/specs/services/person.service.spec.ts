@@ -71,7 +71,7 @@ const setupFaceDetection = (db?: Kysely<DB>) => {
   ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository).queueAll.mockResolvedValue();
   ctx
     .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
-    .get.mockImplementation(async (key) => {
+    .get.mockImplementation((key) => {
       if (key === SystemMetadataKey.SystemConfig) {
         return { machineLearning: { facialRecognition: { enabled: true, minFaces: 1 } } } as any;
       }

@@ -86,6 +86,17 @@ describe(PersonService.name, () => {
     expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
   };
 
+  const queuedBatchJobs = () => mocks.job.queueAll.mock.calls.flatMap(([jobs]) => jobs);
+  const queuedBatchJobNames = () => queuedBatchJobs().map((job) => job.name);
+
+  const expectNoRecognitionFanout = () => {
+    expect(mocks.job.queue).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
+    );
+    expect(queuedBatchJobNames()).not.toContain(JobName.FacialRecognitionQueueAll);
+    expect(queuedBatchJobNames()).not.toContain(JobName.FacialRecognition);
+  };
+
   it('should be defined', () => {
     expect(sut).toBeDefined();
   });
@@ -1187,17 +1198,6 @@ describe(PersonService.name, () => {
   });
 
   describe('handleQueueDetectFaces', () => {
-    const queuedBatchJobs = () => mocks.job.queueAll.mock.calls.flatMap(([jobs]) => jobs);
-    const queuedBatchJobNames = () => queuedBatchJobs().map((job) => job.name);
-
-    const expectNoRecognitionFanout = () => {
-      expect(mocks.job.queue).not.toHaveBeenCalledWith(
-        expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
-      );
-      expect(queuedBatchJobNames()).not.toContain(JobName.FacialRecognitionQueueAll);
-      expect(queuedBatchJobNames()).not.toContain(JobName.FacialRecognition);
-    };
-
     it('should skip if machine learning is disabled', async () => {
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.machineLearningDisabled);
 
@@ -1872,17 +1872,6 @@ describe(PersonService.name, () => {
   });
 
   describe('handleDetectFaces', () => {
-    const queuedBatchJobs = () => mocks.job.queueAll.mock.calls.flatMap(([jobs]) => jobs);
-    const queuedBatchJobNames = () => queuedBatchJobs().map((job) => job.name);
-
-    const expectNoRecognitionFanout = () => {
-      expect(mocks.job.queue).not.toHaveBeenCalledWith(
-        expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
-      );
-      expect(queuedBatchJobNames()).not.toContain(JobName.FacialRecognitionQueueAll);
-      expect(queuedBatchJobNames()).not.toContain(JobName.FacialRecognition);
-    };
-
     it('should skip if machine learning is disabled', async () => {
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.machineLearningDisabled);
 
