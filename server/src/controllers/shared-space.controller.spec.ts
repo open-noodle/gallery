@@ -231,6 +231,16 @@ describe(SharedSpaceController.name, () => {
       expect(service.getSpacePersonFaceSuggestions).not.toHaveBeenCalled();
     });
 
+    it('GET /shared-spaces/:id/people/:personId/face-suggestions should validate personId', async () => {
+      const { status, body } = await request(ctx.getHttpServer())
+        .get(`/shared-spaces/${spaceId}/people/not-a-uuid/face-suggestions`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.badRequest(['[personId] Invalid UUID']));
+      expect(service.getSpacePersonFaceSuggestions).not.toHaveBeenCalled();
+    });
+
     it('POST confirm should require shared-space update permission and respond with 200', async () => {
       const { status } = await request(ctx.getHttpServer())
         .post(`/shared-spaces/${spaceId}/people/${personId}/face-suggestions/${assetFaceId}/confirm`)
