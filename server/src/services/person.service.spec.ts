@@ -87,6 +87,7 @@ describe(PersonService.name, () => {
     (mocks.faceIdentity as any).getAccessiblePersonByProfileId.mockResolvedValue(void 0);
     (mocks.faceIdentity as any).getAccessibleProfileIdentityId.mockResolvedValue(void 0);
     mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue([]);
+    mocks.sharedSpace.getAssignedFaceIdsForSpace.mockResolvedValue([]);
   });
 
   const expectNoFaceDetectionMutation = () => {
@@ -3528,6 +3529,172 @@ describe(PersonService.name, () => {
 
       await expect(sut.handlePersonSuggestionScanQueueAll({})).resolves.toBe(JobStatus.Success);
       expect(mocks.job.queueAll).toHaveBeenCalledWith([]);
+    });
+  });
+
+  describe('handleSpacePersonSuggestionScan', () => {
+    const enabled = {
+      machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0.8, minFaces: 3 } },
+    };
+
+    it('runs on the people backfill queue', () => {
+      const config = new Reflector().get(MetadataKey.JobConfig, sut.handleSpacePersonSuggestionScan);
+      expect(config).toEqual(expect.objectContaining({ queue: QueueName.PeopleBackfill }));
+    });
+
+    it('skips when feature is disabled', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0.5, minFaces: 3 } },
+      });
+
+      await expect(sut.handleSpacePersonSuggestionScan({ id: 'space-person-1' })).resolves.toBe(JobStatus.Skipped);
+      expect(mocks.sharedSpace.getSpacePersonAssignedFaceEmbeddings).not.toHaveBeenCalled();
+      expect(mocks.personFaceSuggestion.upsertPendingForSpacePerson).not.toHaveBeenCalled();
+    });
+
+    it('skips missing, unnamed, whitespace, hidden, pet, or disabled-space people', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(enabled);
+      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(void 0);
+      await expect(sut.handleSpacePersonSuggestionScan({ id: 'gone' })).resolves.toBe(JobStatus.Skipped);
+
+      for (const person of [
+        { id: 'p', spaceId: 's', name: '', isHidden: false, type: 'person', faceRecognitionEnabled: true },
+        { id: 'p', spaceId: 's', name: '   ', isHidden: false, type: 'person', faceRecognitionEnabled: true },
+        { id: 'p', spaceId: 's', name: 'Alice', isHidden: true, type: 'person', faceRecognitionEnabled: true },
+        { id: 'p', spaceId: 's', name: 'Rex', isHidden: false, type: 'pet', faceRecognitionEnabled: true },
+        { id: 'p', spaceId: 's', name: 'Alice', isHidden: false, type: 'person', faceRecognitionEnabled: false },
+      ]) {
+        mocks.sharedSpace.getPersonById.mockResolvedValueOnce(person as any);
+        if (person.name.trim() !== '' && !person.isHidden && person.type === 'person') {
+          mocks.sharedSpace.getById.mockResolvedValueOnce({
+            id: 's',
+            faceRecognitionEnabled: person.faceRecognitionEnabled,
+          } as any);
+        }
+        await expect(sut.handleSpacePersonSuggestionScan({ id: 'p' })).resolves.toBe(JobStatus.Skipped);
+      }
+
+      expect(mocks.sharedSpace.getSpacePersonAssignedFaceEmbeddings).not.toHaveBeenCalled();
+      expect(mocks.personFaceSuggestion.upsertPendingForSpacePerson).not.toHaveBeenCalled();
+    });
+
+    it('skips when the space person has zero linked face embeddings', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(enabled);
+      mocks.sharedSpace.getPersonById.mockResolvedValue({
+        id: 'sp',
+        spaceId: 'space-1',
+        name: 'Alice',
+        isHidden: false,
+        type: 'person',
+      } as any);
+      mocks.sharedSpace.getById.mockResolvedValue({ id: 'space-1', faceRecognitionEnabled: true } as any);
+      mocks.sharedSpace.getSpacePersonAssignedFaceEmbeddings.mockResolvedValue([]);
+
+      await expect(sut.handleSpacePersonSuggestionScan({ id: 'sp' })).resolves.toBe(JobStatus.Skipped);
+      expect(mocks.search.searchFaces).not.toHaveBeenCalled();
+      expect(mocks.personFaceSuggestion.upsertPendingForSpacePerson).not.toHaveBeenCalled();
+    });
+
+    it('keeps only the open band, takes min distance per candidate, and upserts by spacePersonId', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(enabled);
+      mocks.sharedSpace.getPersonById.mockResolvedValue({
+        id: 'sp',
+        spaceId: 'space-1',
+        name: 'Alice',
+        isHidden: false,
+        type: 'person',
+      } as any);
+      mocks.sharedSpace.getById.mockResolvedValue({ id: 'space-1', faceRecognitionEnabled: true } as any);
+      mocks.sharedSpace.getSpacePersonAssignedFaceEmbeddings.mockResolvedValue([
+        { embedding: 'e1' },
+        { embedding: 'e2' },
+      ] as any);
+      mocks.search.searchFaces
+        .mockResolvedValueOnce([
+          { id: 'too-close', personId: null, distance: 0.5 },
+          { id: 'candidate', personId: null, distance: 0.7 },
+        ] as FaceSearchResult[])
+        .mockResolvedValueOnce([{ id: 'candidate', personId: null, distance: 0.6 }] as FaceSearchResult[]);
+
+      await expect(sut.handleSpacePersonSuggestionScan({ id: 'sp' })).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.search.searchFaces).toHaveBeenCalledWith(
+        expect.objectContaining({
+          spaceId: 'space-1',
+          hasPerson: false,
+          maxDistance: 0.8,
+          numResults: 100,
+        }),
+      );
+      expect(mocks.personFaceSuggestion.upsertPendingForSpacePerson).toHaveBeenCalledWith([
+        { spacePersonId: 'sp', assetFaceId: 'candidate', distance: 0.6 },
+      ]);
+    });
+
+    it('does not upsert matches already assigned to a shared-space person in the same space', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(enabled);
+      mocks.sharedSpace.getPersonById.mockResolvedValue({
+        id: 'sp',
+        spaceId: 'space-1',
+        name: 'Alice',
+        isHidden: false,
+        type: 'person',
+      } as any);
+      mocks.sharedSpace.getById.mockResolvedValue({ id: 'space-1', faceRecognitionEnabled: true } as any);
+      mocks.sharedSpace.getSpacePersonAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e1' }] as any);
+      mocks.search.searchFaces.mockResolvedValue([
+        { id: 'assigned-face', personId: null, distance: 0.6 },
+        { id: 'candidate', personId: null, distance: 0.7 },
+      ] as FaceSearchResult[]);
+      mocks.sharedSpace.getAssignedFaceIdsForSpace.mockResolvedValue([{ assetFaceId: 'assigned-face' }]);
+
+      await expect(sut.handleSpacePersonSuggestionScan({ id: 'sp' })).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.sharedSpace.getAssignedFaceIdsForSpace).toHaveBeenCalledWith('space-1', [
+        'assigned-face',
+        'candidate',
+      ]);
+      expect(mocks.personFaceSuggestion.upsertPendingForSpacePerson).toHaveBeenCalledWith([
+        { spacePersonId: 'sp', assetFaceId: 'candidate', distance: 0.7 },
+      ]);
+    });
+  });
+
+  describe('handleSpacePersonSuggestionScanQueueAll', () => {
+    const enabled = {
+      machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0.8, minFaces: 3 } },
+    };
+
+    it('runs on the people backfill queue', () => {
+      const config = new Reflector().get(MetadataKey.JobConfig, sut.handleSpacePersonSuggestionScanQueueAll);
+      expect(config).toEqual(expect.objectContaining({ queue: QueueName.PeopleBackfill }));
+    });
+
+    it('skips enumeration when feature is disabled', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0, minFaces: 3 } },
+      });
+
+      await expect(sut.handleSpacePersonSuggestionScanQueueAll({})).resolves.toBe(JobStatus.Skipped);
+      expect(mocks.sharedSpace.getScannableSpacePeopleWithUnassignedFaces).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+    });
+
+    it('queues one SpacePersonSuggestionScan per scannable space person', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(enabled);
+      mocks.sharedSpace.getScannableSpacePeopleWithUnassignedFaces.mockReturnValue(
+        makeStream([
+          { id: 'sp1', spaceId: 's1' },
+          { id: 'sp2', spaceId: 's1' },
+        ]) as any,
+      );
+
+      await expect(sut.handleSpacePersonSuggestionScanQueueAll({})).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.SpacePersonSuggestionScan, data: { id: 'sp1' } },
+        { name: JobName.SpacePersonSuggestionScan, data: { id: 'sp2' } },
+      ]);
     });
   });
 

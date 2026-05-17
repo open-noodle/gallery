@@ -1427,6 +1427,16 @@ where
 limit
   $2
 
+-- SharedSpaceRepository.getAssignedFaceIdsForSpace
+select
+  "shared_space_person_face"."assetFaceId"
+from
+  "shared_space_person_face"
+  inner join "shared_space_person" on "shared_space_person"."id" = "shared_space_person_face"."personId"
+where
+  "shared_space_person"."spaceId" = $1
+  and "shared_space_person_face"."assetFaceId" = any ($2::uuid[])
+
 -- SharedSpaceRepository.getAssetFacesForMatching
 select
   "asset_face"."id",

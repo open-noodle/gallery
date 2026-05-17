@@ -3223,6 +3223,31 @@ describe(SharedSpaceRepository.name, () => {
       expect(rows[0].embedding).toEqual(expect.any(String));
     });
 
+    it('gets assigned face ids scoped to the requested shared space', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { space: otherSpace } = await ctx.newSharedSpace({ createdById: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: assignedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: otherSpaceFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: unassignedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const person = await sut.createPerson({ spaceId: space.id, name: 'Alice', representativeFaceId: null });
+      const otherPerson = await sut.createPerson({ spaceId: otherSpace.id, name: 'Bob', representativeFaceId: null });
+      await sut.addPersonFaces([
+        { personId: person.id, assetFaceId: assignedFace.id },
+        { personId: otherPerson.id, assetFaceId: otherSpaceFace.id },
+      ]);
+
+      const rows = await sut.getAssignedFaceIdsForSpace(space.id, [
+        assignedFace.id,
+        otherSpaceFace.id,
+        unassignedFace.id,
+      ]);
+
+      expect(rows).toEqual([{ assetFaceId: assignedFace.id }]);
+    });
+
     it('streams only eligible named people in face-recognition-enabled spaces with direct unassigned ML faces', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();

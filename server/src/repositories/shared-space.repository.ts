@@ -1972,6 +1972,17 @@ export class SharedSpaceRepository {
       .execute();
   }
 
+  @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
+  getAssignedFaceIdsForSpace(spaceId: string, assetFaceIds: string[]) {
+    return this.db
+      .selectFrom('shared_space_person_face')
+      .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_face.personId')
+      .select('shared_space_person_face.assetFaceId')
+      .where('shared_space_person.spaceId', '=', spaceId)
+      .where('shared_space_person_face.assetFaceId', '=', anyUuid(assetFaceIds))
+      .execute();
+  }
+
   getScannableSpacePeopleWithUnassignedFaces() {
     return this.db
       .selectFrom('shared_space_person')

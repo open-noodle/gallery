@@ -732,6 +732,88 @@ export class PersonService extends BaseService {
     return JobStatus.Success;
   }
 
+  @OnJob({ name: JobName.SpacePersonSuggestionScan, queue: QueueName.PeopleBackfill })
+  async handleSpacePersonSuggestionScan({ id }: JobOf<JobName.SpacePersonSuggestionScan>): Promise<JobStatus> {
+    const { machineLearning } = await this.getConfig({ withCache: true });
+    const { maxDistance, suggestionMaxDistance } = machineLearning.facialRecognition;
+    if (suggestionMaxDistance <= maxDistance) {
+      return JobStatus.Skipped;
+    }
+
+    const person = await this.sharedSpaceRepository.getPersonById(id);
+    if (!person || person.name.trim() === '' || person.isHidden || person.type !== 'person') {
+      return JobStatus.Skipped;
+    }
+
+    const space = await this.sharedSpaceRepository.getById(person.spaceId);
+    if (!space?.faceRecognitionEnabled) {
+      return JobStatus.Skipped;
+    }
+
+    const embeddings = await this.sharedSpaceRepository.getSpacePersonAssignedFaceEmbeddings(
+      id,
+      PERSON_SUGGESTION_EMBEDDING_SAMPLE,
+    );
+    if (embeddings.length === 0) {
+      return JobStatus.Skipped;
+    }
+
+    const bestByFace = new Map<string, number>();
+    for (const { embedding } of embeddings) {
+      const matches = await this.searchRepository.searchFaces({
+        spaceId: person.spaceId,
+        embedding,
+        hasPerson: false,
+        maxDistance: suggestionMaxDistance,
+        numResults: PERSON_SUGGESTION_NUM_RESULTS,
+      });
+      for (const match of matches) {
+        if (match.distance <= maxDistance) {
+          continue;
+        }
+        const prev = bestByFace.get(match.id);
+        if (prev === undefined || match.distance < prev) {
+          bestByFace.set(match.id, match.distance);
+        }
+      }
+    }
+
+    const assigned = await this.sharedSpaceRepository.getAssignedFaceIdsForSpace(person.spaceId, [...bestByFace.keys()]);
+    for (const { assetFaceId } of assigned) {
+      bestByFace.delete(assetFaceId);
+    }
+
+    const rows = [...bestByFace].map(([assetFaceId, distance]) => ({
+      spacePersonId: id,
+      assetFaceId,
+      distance,
+    }));
+    await this.personFaceSuggestionRepository.upsertPendingForSpacePerson(rows);
+    return JobStatus.Success;
+  }
+
+  @OnJob({ name: JobName.SpacePersonSuggestionScanQueueAll, queue: QueueName.PeopleBackfill })
+  async handleSpacePersonSuggestionScanQueueAll(
+    _data: JobOf<JobName.SpacePersonSuggestionScanQueueAll>,
+  ): Promise<JobStatus> {
+    const { machineLearning } = await this.getConfig({ withCache: false });
+    const { maxDistance, suggestionMaxDistance } = machineLearning.facialRecognition;
+    if (suggestionMaxDistance <= maxDistance) {
+      return JobStatus.Skipped;
+    }
+
+    let jobs: { name: JobName.SpacePersonSuggestionScan; data: { id: string } }[] = [];
+    for await (const person of this.sharedSpaceRepository.getScannableSpacePeopleWithUnassignedFaces()) {
+      jobs.push({ name: JobName.SpacePersonSuggestionScan, data: { id: person.id } });
+      if (jobs.length === JOBS_ASSET_PAGINATION_SIZE) {
+        await this.jobRepository.queueAll(jobs);
+        jobs = [];
+      }
+    }
+    await this.jobRepository.queueAll(jobs);
+    return JobStatus.Success;
+  }
+
   private getAffectedSpaceAssets(result: object): SharedSpaceFaceMatchBackfillTarget[] {
     return (result as { affectedSpaceAssets?: SharedSpaceFaceMatchBackfillTarget[] }).affectedSpaceAssets ?? [];
   }

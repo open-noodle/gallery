@@ -248,6 +248,10 @@ export interface IPersonSuggestionScanJob extends IBaseJob {
   id: string;
 }
 
+export interface ISpacePersonSuggestionScanJob extends IBaseJob {
+  id: string;
+}
+
 export interface ISharedSpaceFaceMatchJob extends IBaseJob {
   spaceId: string;
   assetId: string;
@@ -428,6 +432,8 @@ export type JobItem =
   | { name: JobName.FaceIdentityMaintenanceAfterRecognition; data: IDelayedJob }
   | { name: JobName.PersonSuggestionScanQueueAll; data: IBaseJob }
   | { name: JobName.PersonSuggestionScan; data: IPersonSuggestionScanJob }
+  | { name: JobName.SpacePersonSuggestionScanQueueAll; data: IBaseJob }
+  | { name: JobName.SpacePersonSuggestionScan; data: ISpacePersonSuggestionScanJob }
   | { name: JobName.PersonGenerateThumbnail; data: IEntityJob }
 
   // Smart Search
