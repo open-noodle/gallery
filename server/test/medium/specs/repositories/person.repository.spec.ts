@@ -565,11 +565,17 @@ describe(PersonRepository.name, () => {
       const { user } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       const { person: mlPerson } = await ctx.newPerson({ ownerId: user.id, name: 'ML' });
+      const { person: retainedMlPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Retained ML' });
       const { person: manualPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Manual' });
       const { person: exifPerson } = await ctx.newPerson({ ownerId: user.id, name: 'EXIF' });
       const { result: mlFaceId } = await ctx.newAssetFace({
         assetId: asset.id,
         personId: mlPerson.id,
+        sourceType: SourceType.MachineLearning,
+      });
+      const { result: retainedMlFaceId } = await ctx.newAssetFace({
+        assetId: asset.id,
+        personId: retainedMlPerson.id,
         sourceType: SourceType.MachineLearning,
       });
       const { result: manualFaceId } = await ctx.newAssetFace({
@@ -583,11 +589,17 @@ describe(PersonRepository.name, () => {
         sourceType: SourceType.Exif,
       });
       const mlIdentity = await faceIdentityRepository.ensurePersonIdentity(mlPerson.id);
+      const retainedMlIdentity = await faceIdentityRepository.ensurePersonIdentity(retainedMlPerson.id);
       const manualIdentity = await faceIdentityRepository.ensurePersonIdentity(manualPerson.id);
       const exifIdentity = await faceIdentityRepository.ensurePersonIdentity(exifPerson.id);
       await faceIdentityRepository.replaceFaceIdentity({
         assetFaceId: mlFaceId,
         identityId: mlIdentity.id,
+        source: 'ml',
+      });
+      await faceIdentityRepository.replaceFaceIdentity({
+        assetFaceId: retainedMlFaceId,
+        identityId: retainedMlIdentity.id,
         source: 'ml',
       });
       await faceIdentityRepository.replaceFaceIdentity({
@@ -627,26 +639,28 @@ describe(PersonRepository.name, () => {
         .execute();
       expect(faceRows).toEqual(
         expect.arrayContaining([
+          { id: retainedMlFaceId, sourceType: SourceType.MachineLearning },
           { id: manualFaceId, sourceType: SourceType.Manual },
           { id: exifFaceId, sourceType: SourceType.Exif },
           { id: newFaceId, sourceType: SourceType.MachineLearning },
         ]),
       );
-      expect(faceRows).toHaveLength(3);
+      expect(faceRows).toHaveLength(4);
       expect(faceRows.map((face) => face.id)).not.toContain(mlFaceId);
 
       const links = await ctx.database
         .selectFrom('face_identity_face')
         .select(['assetFaceId', 'identityId', 'source'])
-        .where('assetFaceId', 'in', [mlFaceId, manualFaceId, exifFaceId])
+        .where('assetFaceId', 'in', [mlFaceId, retainedMlFaceId, manualFaceId, exifFaceId])
         .execute();
       expect(links).toEqual(
         expect.arrayContaining([
+          { assetFaceId: retainedMlFaceId, identityId: retainedMlIdentity.id, source: 'ml' },
           { assetFaceId: manualFaceId, identityId: manualIdentity.id, source: 'manual' },
           { assetFaceId: exifFaceId, identityId: exifIdentity.id, source: 'import' },
         ]),
       );
-      expect(links).toHaveLength(2);
+      expect(links).toHaveLength(3);
       expect(links.map((link) => link.assetFaceId)).not.toContain(mlFaceId);
 
       await expect(
