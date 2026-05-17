@@ -389,7 +389,93 @@ it('should remove only stale machine-learning faces and unlink only those identi
 });
 ```
 
-- [ ] **Step 2: Add manual-face matching coverage**
+- [ ] **Step 2: Add populated forced per-asset detection coverage**
+
+Add:
+
+```ts
+it('forced per-asset detection removes stale ML faces while preserving manual and EXIF evidence', async () => {
+  const assetId = newUuid();
+  const staleMlFace = AssetFaceFactory.create({
+    assetId,
+    id: 'stale-ml-face',
+    sourceType: SourceType.MachineLearning,
+    boundingBoxX1: 700,
+    boundingBoxY1: 500,
+    boundingBoxX2: 900,
+    boundingBoxY2: 700,
+  });
+  const exifFace = AssetFaceFactory.create({
+    assetId,
+    id: 'force-exif-face',
+    sourceType: SourceType.Exif,
+    boundingBoxX1: 10,
+    boundingBoxY1: 10,
+    boundingBoxX2: 40,
+    boundingBoxY2: 40,
+  });
+  const manualFace = AssetFaceFactory.create({
+    assetId,
+    id: 'force-manual-face',
+    sourceType: SourceType.Manual,
+    boundingBoxX1: 300,
+    boundingBoxY1: 300,
+    boundingBoxX2: 350,
+    boundingBoxY2: 350,
+  });
+  const asset = AssetFactory.from({ id: assetId })
+    .face(staleMlFace)
+    .face(exifFace)
+    .face(manualFace)
+    .file({ type: AssetFileType.Preview, path: '/preview.jpg' })
+    .exif()
+    .build();
+  mocks.assetJob.getForDetectFacesJob.mockResolvedValue(getForDetectedFaces(asset));
+  mocks.crypto.randomUUID.mockReturnValue('force-new-ml-face');
+  mocks.machineLearning.detectFaces.mockResolvedValue({
+    imageHeight: 500,
+    imageWidth: 400,
+    faces: [
+      {
+        boundingBox: { x1: 100, y1: 80, x2: 250, y2: 200 },
+        embedding: '[1, 2, 3, 4]',
+        score: 0.99,
+      },
+    ],
+  });
+
+  await expect(sut.handleDetectFaces({ id: asset.id, force: true })).resolves.toBe(JobStatus.Success);
+
+  expect(mocks.person.refreshFaces).toHaveBeenCalledWith(
+    [
+      expect.objectContaining({
+        id: 'force-new-ml-face',
+        assetId: asset.id,
+        boundingBoxX1: 100,
+        boundingBoxY1: 80,
+        boundingBoxX2: 250,
+        boundingBoxY2: 200,
+      }),
+    ],
+    [staleMlFace.id],
+    [{ faceId: 'force-new-ml-face', embedding: '[1, 2, 3, 4]' }],
+  );
+  expect(mocks.faceIdentity.unlinkFaces).toHaveBeenCalledWith([staleMlFace.id]);
+  expect(mocks.faceIdentity.unlinkFaces).not.toHaveBeenCalledWith(expect.arrayContaining([exifFace.id]));
+  expect(mocks.faceIdentity.unlinkFaces).not.toHaveBeenCalledWith(expect.arrayContaining([manualFace.id]));
+  expect(mocks.job.queue).toHaveBeenCalledWith({
+    name: JobName.FacialRecognitionQueueAll,
+    data: { force: true },
+  });
+  expect(mocks.job.queueAll).not.toHaveBeenCalled();
+  expect(mocks.asset.upsertJobStatus).toHaveBeenCalledWith({
+    assetId: asset.id,
+    facesRecognizedAt: expect.any(Date),
+  });
+});
+```
+
+- [ ] **Step 3: Add manual-face matching coverage**
 
 Existing tests cover EXIF matching. Add the manual equivalent:
 
@@ -417,7 +503,35 @@ it('should add an embedding to a matching manual face instead of creating a dupl
 });
 ```
 
-- [ ] **Step 3: Add changed-image-dimensions IOU preservation coverage**
+- [ ] **Step 4: Add matching existing ML face coverage**
+
+Add:
+
+```ts
+it('should keep a matching existing ML face without adding a duplicate or unlinking identities', async () => {
+  const mlFace = AssetFaceFactory.create({ sourceType: SourceType.MachineLearning });
+  const asset = AssetFactory.from({ id: mlFace.assetId })
+    .face(mlFace)
+    .file({ type: AssetFileType.Preview, path: '/preview.jpg' })
+    .exif()
+    .build();
+  mocks.assetJob.getForDetectFacesJob.mockResolvedValue(getForDetectedFaces(asset));
+  mocks.machineLearning.detectFaces.mockResolvedValue(getAsDetectedFace(mlFace));
+
+  await expect(sut.handleDetectFaces({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+  expect(mocks.person.refreshFaces).not.toHaveBeenCalled();
+  expect(mocks.crypto.randomUUID).not.toHaveBeenCalled();
+  expect(mocks.faceIdentity.unlinkFaces).not.toHaveBeenCalled();
+  expectNoRecognitionFanout();
+  expect(mocks.asset.upsertJobStatus).toHaveBeenCalledWith({
+    assetId: asset.id,
+    facesRecognizedAt: expect.any(Date),
+  });
+});
+```
+
+- [ ] **Step 5: Add changed-image-dimensions IOU preservation coverage**
 
 Add:
 
@@ -464,7 +578,7 @@ it('should preserve an existing metadata face when scaled detection boxes still 
 
 The detected box is in a half-size preview coordinate space, while the existing EXIF face is in the full-size original coordinate space. These boxes represent the same face and should overlap after scaling. If this test fails, make the minimal production fix in `handleDetectFaces()` so IOU comparison scales detection boxes from ML image dimensions into existing face dimensions.
 
-- [ ] **Step 4: Add changed-dimensions non-overlap coverage**
+- [ ] **Step 6: Add changed-dimensions non-overlap coverage**
 
 Add:
 
@@ -525,17 +639,17 @@ it('should create a new ML face when scaled detection boxes do not overlap exist
 });
 ```
 
-- [ ] **Step 5: Run focused matching tests**
+- [ ] **Step 7: Run focused matching tests**
 
 Run:
 
 ```bash
-pnpm --config.verify-deps-before-run=false --filter immich exec vitest --config test/vitest.config.mjs run src/services/person.service.spec.ts -t "matching manual face|scaled detection|stale machine-learning"
+pnpm --config.verify-deps-before-run=false --filter immich exec vitest --config test/vitest.config.mjs run src/services/person.service.spec.ts -t "matching manual face|matching existing ML face|scaled detection|stale machine-learning|forced per-asset detection"
 ```
 
 Expected: the focused tests pass or expose one minimal production fix.
 
-- [ ] **Step 6: Commit Task 3**
+- [ ] **Step 8: Commit Task 3**
 
 Run:
 
@@ -678,6 +792,7 @@ import { MachineLearningRepository } from 'src/repositories/machine-learning.rep
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
 import { clearConfigCache } from 'src/utils/config';
+import { Mocked } from 'vitest';
 ```
 
 Add this setup helper near the existing `setup()`:
@@ -752,6 +867,7 @@ describe('handleQueueDetectFaces safety', () => {
     const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
     await ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: 'preview.jpg' });
     await ctx.newExif({ assetId: asset.id, exifImageWidth: 200, exifImageHeight: 200 });
+    await ctx.newJobStatus({ assetId: asset.id });
     const { person: mlPerson } = await ctx.newPerson({ ownerId: user.id, name: 'ML' });
     const { person: manualPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Manual' });
     const { person: exifPerson } = await ctx.newPerson({ ownerId: user.id, name: 'EXIF' });
@@ -908,6 +1024,9 @@ it('non-force detection removes stale ML faces without deleting manual or EXIF p
   await expect(ctx.get(PersonRepository).getById(exifPerson.id)).resolves.toEqual(
     expect.objectContaining({ id: exifPerson.id }),
   );
+  await expect(ctx.get(PersonRepository).getById(mlPerson.id)).resolves.toEqual(
+    expect.objectContaining({ id: mlPerson.id }),
+  );
   await expect(
     ctx.database
       .selectFrom('asset_job_status')
@@ -923,7 +1042,7 @@ it('non-force detection removes stale ML faces without deleting manual or EXIF p
 Add:
 
 ```ts
-it('non-force detection preserves existing shared-space people for manual and EXIF identities', async () => {
+it('non-force detection preserves existing shared-space people for manual, EXIF, and stale ML identities', async () => {
   const { sut, ctx } = setupFaceDetection();
   const machineLearningMock = ctx.getMock<MachineLearningRepository, Mocked<MachineLearningRepository>>(
     MachineLearningRepository,
@@ -936,8 +1055,14 @@ it('non-force detection preserves existing shared-space people for manual and EX
   await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
   await ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: 'preview.jpg' });
   await ctx.newExif({ assetId: asset.id, exifImageWidth: 200, exifImageHeight: 200 });
+  const { person: mlPerson } = await ctx.newPerson({ ownerId: user.id, name: 'ML' });
   const { person: manualPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Manual' });
   const { person: exifPerson } = await ctx.newPerson({ ownerId: user.id, name: 'EXIF' });
+  const { result: mlFaceId } = await ctx.newAssetFace({
+    assetId: asset.id,
+    personId: mlPerson.id,
+    sourceType: SourceType.MachineLearning,
+  });
   const { result: manualFaceId } = await ctx.newAssetFace({
     assetId: asset.id,
     personId: manualPerson.id,
@@ -948,8 +1073,14 @@ it('non-force detection preserves existing shared-space people for manual and EX
     personId: exifPerson.id,
     sourceType: SourceType.Exif,
   });
+  const mlIdentity = await faceIdentityRepo.ensurePersonIdentity(mlPerson.id);
   const manualIdentity = await faceIdentityRepo.ensurePersonIdentity(manualPerson.id);
   const exifIdentity = await faceIdentityRepo.ensurePersonIdentity(exifPerson.id);
+  await faceIdentityRepo.replaceFaceIdentity({
+    assetFaceId: mlFaceId,
+    identityId: mlIdentity.id,
+    source: 'ml',
+  });
   await faceIdentityRepo.replaceFaceIdentity({
     assetFaceId: manualFaceId,
     identityId: manualIdentity.id,
@@ -960,11 +1091,13 @@ it('non-force detection preserves existing shared-space people for manual and EX
     identityId: exifIdentity.id,
     source: 'import',
   });
+  const mlSpacePersonId = factory.uuid();
   const manualSpacePersonId = factory.uuid();
   const exifSpacePersonId = factory.uuid();
   await ctx.database
     .insertInto('shared_space_person')
     .values([
+      { id: mlSpacePersonId, spaceId: space.id, identityId: mlIdentity.id, name: 'ML', type: 'person' },
       { id: manualSpacePersonId, spaceId: space.id, identityId: manualIdentity.id, name: 'Manual', type: 'person' },
       { id: exifSpacePersonId, spaceId: space.id, identityId: exifIdentity.id, name: 'EXIF', type: 'person' },
     ])
@@ -972,6 +1105,7 @@ it('non-force detection preserves existing shared-space people for manual and EX
   await ctx.database
     .insertInto('shared_space_person_face')
     .values([
+      { personId: mlSpacePersonId, assetFaceId: mlFaceId },
       { personId: manualSpacePersonId, assetFaceId: manualFaceId },
       { personId: exifSpacePersonId, assetFaceId: exifFaceId },
     ])
@@ -984,21 +1118,27 @@ it('non-force detection preserves existing shared-space people for manual and EX
     ctx.database
       .selectFrom('shared_space_person')
       .select(['id', 'identityId', 'name'])
-      .where('id', 'in', [manualSpacePersonId, exifSpacePersonId])
+      .where('id', 'in', [mlSpacePersonId, manualSpacePersonId, exifSpacePersonId])
       .orderBy('name')
       .execute(),
   ).resolves.toEqual([
     { id: exifSpacePersonId, identityId: exifIdentity.id, name: 'EXIF' },
+    { id: mlSpacePersonId, identityId: mlIdentity.id, name: 'ML' },
     { id: manualSpacePersonId, identityId: manualIdentity.id, name: 'Manual' },
   ]);
-  await expect(
-    ctx.database
-      .selectFrom('shared_space_person_face')
-      .select(['personId', 'assetFaceId'])
-      .where('personId', 'in', [manualSpacePersonId, exifSpacePersonId])
-      .orderBy('personId')
-      .execute(),
-  ).resolves.toHaveLength(2);
+  const remainingSpaceFaceLinks = await ctx.database
+    .selectFrom('shared_space_person_face')
+    .select(['personId', 'assetFaceId'])
+    .where('personId', 'in', [mlSpacePersonId, manualSpacePersonId, exifSpacePersonId])
+    .execute();
+  expect(remainingSpaceFaceLinks).toEqual(
+    expect.arrayContaining([
+      { personId: manualSpacePersonId, assetFaceId: manualFaceId },
+      { personId: exifSpacePersonId, assetFaceId: exifFaceId },
+    ]),
+  );
+  expect(remainingSpaceFaceLinks.map((link) => link.personId)).not.toContain(mlSpacePersonId);
+  expect(remainingSpaceFaceLinks.map((link) => link.assetFaceId)).not.toContain(mlFaceId);
 });
 ```
 
@@ -1241,10 +1381,12 @@ Verify the final diff covers each Slice 2 invariant:
 - removed ML faces lose identity links
 - manual and EXIF `asset_face` rows survive force and non-force paths
 - manual and EXIF `face_identity_face` rows survive
-- non-force detection does not delete people or shared-space people globally
+- non-force stale-face detection does not delete personal people or shared-space people globally, including ML-backed people whose stale face rows were removed
+- populated per-asset `force=true` detection removes only stale ML face ids, preserves manual/EXIF evidence, and queues only the forced recognition coordinator
 - missing asset, no preview, multiple preview files, hidden asset, ML-disabled, ML-error, refresh-error, and queue-error paths do not write `facesRecognizedAt`
 - no detected faces removes stale ML faces but not manual/EXIF faces
 - matching detection adds embeddings to existing EXIF/manual faces instead of creating duplicates
+- matching detection keeps existing ML faces without deleting, recreating, or duplicating them
 - changed dimensions with high IOU preserve existing metadata faces
 - changed dimensions with low IOU create new ML faces
 - successful non-force new faces queue `FacialRecognitionQueueAll(force:false)` and per-face `FacialRecognition`
