@@ -41,6 +41,8 @@ describe(JobService.name, () => {
       await sut.create({ name: ManualJobName.PersonCleanup });
 
       expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PersonCleanup });
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
     it('should queue a UserDeleteCheck job', async () => {
@@ -71,16 +73,23 @@ describe(JobService.name, () => {
       await sut.create({ name: 'face-identity-backfill' as ManualJobName });
 
       expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.FaceIdentityBackfill, data: {} });
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
     it('should queue a SharedSpacePersonMetadataBackfill job', async () => {
       await sut.create({ name: 'shared-space-person-metadata-backfill' as ManualJobName });
 
       expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.SharedSpacePersonMetadataBackfill, data: {} });
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException for an invalid job name', async () => {
       await expect(sut.create({ name: 'invalid-job' as ManualJobName })).rejects.toThrow(BadRequestException);
+
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
   });
 
@@ -545,6 +554,20 @@ describe(JobService.name, () => {
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
+    it('should not queue jobs for generated thumbnails without upload or notify markers', async () => {
+      mocks.job.run.mockResolvedValue(JobStatus.Success);
+      const id = newUuid();
+
+      await sut.onJobRun(QueueName.ThumbnailGeneration, {
+        name: JobName.AssetGenerateThumbnails,
+        data: { id },
+      });
+
+      expect(mocks.asset.getByIdsWithAllRelationsButStacks).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+    });
+
     it('should proceed when notify is true even without source upload', async () => {
       mocks.job.run.mockResolvedValue(JobStatus.Success);
       const id = newUuid();
@@ -650,7 +673,7 @@ describe(JobService.name, () => {
       expect(mocks.websocket.clientSend).toHaveBeenCalledWith('on_upload_success', ownerId, expect.anything());
     });
 
-    it('should not send websocket events for Hidden visibility assets', async () => {
+    it('should queue upload follow-up jobs for hidden assets while suppressing notifications', async () => {
       mocks.job.run.mockResolvedValue(JobStatus.Success);
       const id = newUuid();
       const ownerId = newUuid();
@@ -662,6 +685,13 @@ describe(JobService.name, () => {
         data: { id, source: 'upload' },
       });
 
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.SmartSearch, data: { id, source: 'upload' } },
+        { name: JobName.AssetDetectFaces, data: { id, source: 'upload' } },
+        { name: JobName.Ocr, data: { id, source: 'upload' } },
+        { name: JobName.PetDetection, data: { id, source: 'upload' } },
+      ]);
+      expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.websocket.clientSend).not.toHaveBeenCalled();
     });
 
