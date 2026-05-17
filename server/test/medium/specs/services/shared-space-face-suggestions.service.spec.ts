@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Kysely } from 'kysely';
-import { AssetVisibility, SharedSpaceRole } from 'src/enum';
+import { AssetVisibility, SharedSpaceRole, SystemMetadataKey } from 'src/enum';
 import { ConfigRepository } from 'src/repositories/config.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
 import { JobRepository } from 'src/repositories/job.repository';
@@ -36,10 +36,18 @@ const setup = (db?: Kysely<DB>) =>
 const authFor = (user: { id: string; name: string; email: string; isAdmin?: boolean }) =>
   factory.auth({ user: { id: user.id, name: user.name, email: user.email, isAdmin: user.isAdmin } });
 
+const enableSuggestionBand = async (ctx: ReturnType<typeof setup>['ctx']) => {
+  await ctx.get(SystemMetadataRepository).set(SystemMetadataKey.SystemConfig, {
+    machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0.8 } },
+  } as any);
+};
+
 const createSuggestionFixture = async (
   ctx: ReturnType<typeof setup>['ctx'],
   input: { reviewerRole?: SharedSpaceRole; faceRecognitionEnabled?: boolean } = {},
 ) => {
+  await enableSuggestionBand(ctx);
+
   const { user: owner } = await ctx.newUser();
   const { user: reviewer } = await ctx.newUser();
   const { user: assetOwner } = await ctx.newUser();
@@ -118,6 +126,7 @@ describe('SharedSpaceService space face suggestions', () => {
     const { ctx, sut } = setup();
     const fx = await createSuggestionFixture(ctx);
     const { space: otherSpace } = await ctx.newSharedSpace({ createdById: fx.owner.id, faceRecognitionEnabled: true });
+    await ctx.newSharedSpaceMember({ spaceId: otherSpace.id, userId: fx.reviewer.id, role: SharedSpaceRole.Editor });
 
     await expect(
       sut.confirmSpacePersonFaceSuggestion(authFor(fx.reviewer), otherSpace.id, fx.spacePerson.id, fx.assetFace.id),
