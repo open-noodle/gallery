@@ -6072,6 +6072,103 @@ describe(SharedSpaceService.name, () => {
     });
   });
 
+  describe('getSpacePersonFaceSuggestions', () => {
+    const enabled = {
+      machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0.8, minFaces: 3 } },
+    };
+
+    it('returns an empty page for viewers and does not query suggestions', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+      mocks.systemMetadata.get.mockResolvedValue(enabled);
+
+      const result = await sut.getSpacePersonFaceSuggestions(factory.auth(), 'space-1', 'space-person-1', {
+        page: 1,
+        size: 50,
+      });
+
+      expect(result).toEqual({ total: 0, items: [] });
+      expect(mocks.personFaceSuggestion.getPendingForSpacePerson).not.toHaveBeenCalled();
+    });
+
+    it('throws for removed members before querying suggestions', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(void 0);
+
+      await expect(
+        sut.getSpacePersonFaceSuggestions(factory.auth(), 'space-1', 'space-person-1', { page: 1, size: 50 }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(mocks.personFaceSuggestion.getPendingForSpacePerson).not.toHaveBeenCalled();
+    });
+
+    it('returns mapped pending suggestions for editors', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.systemMetadata.get.mockResolvedValue(enabled);
+      mocks.personFaceSuggestion.getPendingForSpacePerson.mockResolvedValue({
+        total: 1,
+        items: [
+          {
+            assetFaceId: 'face-1',
+            distance: 0.62,
+            assetId: 'asset-1',
+            imageWidth: 4000,
+            imageHeight: 3000,
+            boundingBoxX1: 10,
+            boundingBoxX2: 110,
+            boundingBoxY1: 20,
+            boundingBoxY2: 140,
+            fileCreatedAt: new Date('2026-01-01T00:00:00.000Z'),
+          },
+        ],
+      });
+
+      const result = await sut.getSpacePersonFaceSuggestions(factory.auth(), 'space-1', 'space-person-1', {
+        page: 2,
+        size: 10,
+      });
+
+      expect(mocks.personFaceSuggestion.getPendingForSpacePerson).toHaveBeenCalledWith('space-1', 'space-person-1', {
+        maxDistance: 0.5,
+        suggestionMaxDistance: 0.8,
+        page: 2,
+        size: 10,
+      });
+      expect(result).toEqual({
+        total: 1,
+        items: [
+          {
+            assetFaceId: 'face-1',
+            assetId: 'asset-1',
+            distance: 0.62,
+            imageWidth: 4000,
+            imageHeight: 3000,
+            boundingBoxX1: 10,
+            boundingBoxX2: 110,
+            boundingBoxY1: 20,
+            boundingBoxY2: 140,
+            fileCreatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      });
+    });
+
+    it('passes disabled suggestion bands through so the repository read-gate returns empty', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Owner }));
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { facialRecognition: { maxDistance: 0.5, suggestionMaxDistance: 0.5, minFaces: 3 } },
+      });
+      mocks.personFaceSuggestion.getPendingForSpacePerson.mockResolvedValue({ total: 0, items: [] });
+
+      await expect(
+        sut.getSpacePersonFaceSuggestions(factory.auth(), 'space-1', 'space-person-1', { page: 1, size: 50 }),
+      ).resolves.toEqual({ total: 0, items: [] });
+      expect(mocks.personFaceSuggestion.getPendingForSpacePerson).toHaveBeenCalledWith('space-1', 'space-person-1', {
+        maxDistance: 0.5,
+        suggestionMaxDistance: 0.5,
+        page: 1,
+        size: 50,
+      });
+    });
+  });
+
   describe('updateSpacePerson', () => {
     it('should require editor role', async () => {
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));

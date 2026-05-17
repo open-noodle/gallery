@@ -9,6 +9,8 @@ import {
   PeopleFaceStatisticsResponseDto,
   PersonFacePageQueryDto,
   PersonFacePageResponseDto,
+  PersonFaceSuggestionPageQueryDto,
+  PersonFaceSuggestionPageResponseDto,
   PersonStatisticsResponseDto,
 } from 'src/dtos/person.dto';
 import {
@@ -908,6 +910,43 @@ export class SharedSpaceService extends BaseService {
         isRepresentative: face.id === person.representativeFaceId,
       })),
       hasNextPage: rows.length > take,
+    };
+  }
+
+  async getSpacePersonFaceSuggestions(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    dto: PersonFaceSuggestionPageQueryDto,
+  ): Promise<PersonFaceSuggestionPageResponseDto> {
+    const member = await this.requireMembership(auth, spaceId);
+    if (ROLE_HIERARCHY[member.role as SharedSpaceRole] < ROLE_HIERARCHY[SharedSpaceRole.Editor]) {
+      return { total: 0, items: [] };
+    }
+
+    const { machineLearning } = await this.getConfig({ withCache: false });
+    const { maxDistance, suggestionMaxDistance } = machineLearning.facialRecognition;
+    const result = await this.personFaceSuggestionRepository.getPendingForSpacePerson(spaceId, personId, {
+      maxDistance,
+      suggestionMaxDistance,
+      page: dto.page,
+      size: dto.size,
+    });
+
+    return {
+      total: result.total,
+      items: result.items.map((item) => ({
+        assetFaceId: item.assetFaceId,
+        assetId: item.assetId,
+        distance: item.distance,
+        imageWidth: item.imageWidth,
+        imageHeight: item.imageHeight,
+        boundingBoxX1: item.boundingBoxX1,
+        boundingBoxX2: item.boundingBoxX2,
+        boundingBoxY1: item.boundingBoxY1,
+        boundingBoxY2: item.boundingBoxY2,
+        fileCreatedAt: item.fileCreatedAt?.toISOString(),
+      })),
     };
   }
 
