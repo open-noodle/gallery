@@ -18,7 +18,9 @@
 
   let snoozeTick = $state(0);
   const visible = $derived.by(() => {
-    snoozeTick;
+    if (snoozeTick < 0) {
+      return false;
+    }
     return total > 0 && !isSuggestionSnoozed(person.id, total);
   });
   const shownPreviews = $derived(previews.slice(0, 5));
