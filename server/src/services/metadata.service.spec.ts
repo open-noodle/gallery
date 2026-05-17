@@ -100,6 +100,14 @@ describe(MetadataService.name, () => {
     delete process.env.TZ;
   });
 
+  const expectNoGlobalFaceIdentityRootJobs = () => {
+    const queuedJobs = mocks.job.queueAll.mock.calls.flatMap(([jobs]) => jobs ?? []);
+
+    expect(queuedJobs).not.toContainEqual(expect.objectContaining({ name: JobName.AssetDetectFacesQueueAll }));
+    expect(queuedJobs).not.toContainEqual(expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }));
+    expect(queuedJobs).not.toContainEqual(expect.objectContaining({ name: JobName.FaceIdentityBackfill }));
+  };
+
   afterEach(async () => {
     await sut.onShutdown();
   });
@@ -204,6 +212,8 @@ describe(MetadataService.name, () => {
       expect(mocks.assetJob.getForMetadataExtraction).toHaveBeenCalledWith('non-existent');
       expect(mocks.asset.upsertExif).not.toHaveBeenCalled();
       expect(mocks.asset.update).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.ensurePersonIdentity).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
     it.each(['CreationDate', 'DateTimeOriginal'] as const)('should prefer %s from a sidecar file', async (tag) => {
@@ -1624,6 +1634,9 @@ describe(MetadataService.name, () => {
       mockReadTags(makeFaceTags({ Name: 'Person 1' }));
       await sut.handleMetadataExtraction({ id: asset.id });
       expect(mocks.person.getDistinctNames).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.ensurePersonIdentity).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.getSpaceIdsForAsset).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
     it('should skip importing metadata face for assets without tags.RegionInfo', async () => {
@@ -1633,6 +1646,9 @@ describe(MetadataService.name, () => {
       mockReadTags();
       await sut.handleMetadataExtraction({ id: asset.id });
       expect(mocks.person.getDistinctNames).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.ensurePersonIdentity).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.getSpaceIdsForAsset).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
     it('should skip importing faces without name', async () => {
@@ -1646,6 +1662,9 @@ describe(MetadataService.name, () => {
       expect(mocks.person.createAll).not.toHaveBeenCalled();
       expect(mocks.person.refreshFaces).not.toHaveBeenCalled();
       expect(mocks.person.updateAll).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.ensurePersonIdentity).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.getSpaceIdsForAsset).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
     it('should skip importing faces with empty name', async () => {
@@ -1659,6 +1678,9 @@ describe(MetadataService.name, () => {
       expect(mocks.person.createAll).not.toHaveBeenCalled();
       expect(mocks.person.refreshFaces).not.toHaveBeenCalled();
       expect(mocks.person.updateAll).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.ensurePersonIdentity).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.getSpaceIdsForAsset).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
     it('should handle string coordinates in face region bounding box calculation by limiting to 16 decimal places', async () => {
@@ -1732,6 +1754,8 @@ describe(MetadataService.name, () => {
           data: { ownerId: asset.ownerId, personGroupId: 'random-uuid' },
         },
       ]);
+      expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
+      expectNoGlobalFaceIdentityRootJobs();
     });
 
     it('should link imported metadata faces to identity-backed people', async () => {
@@ -1753,6 +1777,7 @@ describe(MetadataService.name, () => {
         identityId: 'identity-1',
         source: 'import',
       });
+      expectNoGlobalFaceIdentityRootJobs();
     });
 
     it('should queue shared-space matching for imported metadata faces', async () => {
@@ -1776,6 +1801,63 @@ describe(MetadataService.name, () => {
           data: { spaceId: 'space-1', assetId: asset.id },
         },
       ]);
+      expect(mocks.job.queueAll).toHaveBeenCalledTimes(2);
+      expectNoGlobalFaceIdentityRootJobs();
+    });
+
+    it('should not queue shared-space matching for imported metadata faces when the asset is in no spaces', async () => {
+      const asset = AssetFactory.create();
+      const person = PersonFactory.create();
+
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+      mocks.systemMetadata.get.mockResolvedValue({ metadata: { faces: { import: true } } });
+      mockReadTags(makeFaceTags({ Name: person.name }));
+      mocks.person.getDistinctNames.mockResolvedValue([]);
+      mocks.person.createAll.mockResolvedValue([person.id]);
+      mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identity-1' } as any);
+      mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([]);
+
+      await sut.handleMetadataExtraction({ id: asset.id });
+
+      expect(mocks.sharedSpace.getSpaceIdsForAsset).toHaveBeenCalledWith(asset.id);
+      expect(mocks.job.queueAll).toHaveBeenCalledExactlyOnceWith([
+        {
+          name: JobName.PersonGenerateThumbnail,
+          data: { id: person.id },
+        },
+      ]);
+      expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ name: JobName.SharedSpaceFaceMatchFromBackfill })]),
+      );
+      expectNoGlobalFaceIdentityRootJobs();
+    });
+
+    it('should queue one backfill face match per space for imported metadata faces', async () => {
+      const asset = AssetFactory.create();
+      const person = PersonFactory.create();
+
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+      mocks.systemMetadata.get.mockResolvedValue({ metadata: { faces: { import: true } } });
+      mockReadTags(makeFaceTags({ Name: person.name }));
+      mocks.person.getDistinctNames.mockResolvedValue([]);
+      mocks.person.createAll.mockResolvedValue([person.id]);
+      mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identity-1' } as any);
+      mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([{ spaceId: 'space-1' }, { spaceId: 'space-2' }]);
+
+      await sut.handleMetadataExtraction({ id: asset.id });
+
+      expect(mocks.job.queueAll).toHaveBeenNthCalledWith(1, [
+        {
+          name: JobName.PersonGenerateThumbnail,
+          data: { id: person.id },
+        },
+      ]);
+      expect(mocks.job.queueAll).toHaveBeenNthCalledWith(2, [
+        { name: JobName.SharedSpaceFaceMatchFromBackfill, data: { spaceId: 'space-1', assetId: asset.id } },
+        { name: JobName.SharedSpaceFaceMatchFromBackfill, data: { spaceId: 'space-2', assetId: asset.id } },
+      ]);
+      expect(mocks.job.queueAll).toHaveBeenCalledTimes(2);
+      expectNoGlobalFaceIdentityRootJobs();
     });
 
     it('should remove existing exif faces before adding new ones', async () => {
@@ -1791,6 +1873,7 @@ describe(MetadataService.name, () => {
       await sut.handleMetadataExtraction({ id: asset.id });
 
       expect(mocks.person.refreshFaces).toHaveBeenCalledWith(expect.any(Array), ['face-1']);
+      expectNoGlobalFaceIdentityRootJobs();
     });
 
     it('should assign metadata face tags to existing persons', async () => {
@@ -1826,7 +1909,14 @@ describe(MetadataService.name, () => {
         [],
       );
       expect(mocks.person.updateAll).not.toHaveBeenCalled();
-      expect(mocks.job.queueAll).not.toHaveBeenCalledWith();
+      expect(mocks.faceIdentity.ensurePersonIdentity).toHaveBeenCalledWith(person.id);
+      expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledWith({
+        assetFaceId: 'random-uuid',
+        identityId: 'identity-1',
+        source: 'import',
+      });
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+      expectNoGlobalFaceIdentityRootJobs();
     });
 
     describe('handleFaceTagOrientation', () => {
