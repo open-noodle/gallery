@@ -1443,6 +1443,7 @@ describe(AssetService.name, () => {
         sut.run(authStub.admin, { assetIds: ['asset-1'], name: AssetJobName.REFRESH_FACES }),
       ).rejects.toBeInstanceOf(BadRequestException);
 
+      expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
@@ -1457,15 +1458,13 @@ describe(AssetService.name, () => {
       ]);
     });
 
-    it('should only enqueue asset face detection for manual face refresh on populated assets', async () => {
-      const existingAsset = AssetFactory.from().face().build({ id: 'asset-1' });
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([existingAsset.id]));
+    it('should only enqueue the requested asset face detection job for manual face refresh', async () => {
+      const assetId = 'asset-1';
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
 
-      await sut.run(authStub.admin, { assetIds: [existingAsset.id], name: AssetJobName.REFRESH_FACES });
+      await sut.run(authStub.admin, { assetIds: [assetId], name: AssetJobName.REFRESH_FACES });
 
-      expect(mocks.job.queueAll).toHaveBeenCalledWith([
-        { name: JobName.AssetDetectFaces, data: { id: existingAsset.id } },
-      ]);
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([{ name: JobName.AssetDetectFaces, data: { id: assetId } }]);
       const queuedJobNames = mocks.job.queueAll.mock.calls.flatMap(([jobs]) => jobs.map((job) => job.name));
       expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(queuedJobNames).not.toContain(JobName.AssetDetectFacesQueueAll);
