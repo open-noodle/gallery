@@ -1245,6 +1245,7 @@ describe(PersonService.name, () => {
       expect(mocks.person.delete).toHaveBeenCalledWith([orphan.id]);
       expect(mocks.sharedSpace.deleteAllOrphanedPersons).toHaveBeenCalledTimes(1);
       expect(mocks.person.vacuum).toHaveBeenCalledWith({ reindexVectors: true });
+      expect(mocks.assetJob.streamForDetectFacesJob).toHaveBeenCalledWith(true);
       expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         { name: JobName.AssetDetectFaces, data: { id: asset1.id, force: true } },
