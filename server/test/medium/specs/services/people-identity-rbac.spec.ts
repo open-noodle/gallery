@@ -662,6 +662,7 @@ describe('People identity RBAC projection', () => {
       .select(['person.id', 'person.identityId'])
       .where('asset_face.id', '=', uploadedFaceId)
       .executeTakeFirstOrThrow();
+    const targetIdentity = await fx.faceIdentityRepository.ensurePersonIdentity(fx.face.person.id);
     const withSpace = await fx.personService.getAll(authFor(fx.member), {
       withHidden: false,
       withSharedSpaces: true,
@@ -669,6 +670,7 @@ describe('People identity RBAC projection', () => {
       size: 50,
     } as any);
 
+    expect(uploadedPerson.identityId).toBe(targetIdentity.id);
     expect(withSpace.people).toEqual([
       expect.objectContaining({
         primaryProfile: { type: 'user-person', id: uploadedPerson.id },
@@ -696,6 +698,123 @@ describe('People identity RBAC projection', () => {
       }),
     ]);
     expect(JSON.stringify(afterLeave)).not.toContain(fx.spacePerson.id);
+  });
+
+  it('does not merge a post-join private upload when strict personal conflict guards fail', async () => {
+    const fx = await createLinkedLibraryIdentityFixture({ personName: 'Library Source' });
+    const embeddingRow = await fx.ctx.database
+      .selectFrom('face_search')
+      .select('embedding')
+      .where('faceId', '=', fx.face.faceId)
+      .executeTakeFirstOrThrow();
+    const targetIdentity = await fx.faceIdentityRepository.ensurePersonIdentity(fx.face.person.id);
+
+    const { result: memberConflictPerson } = await fx.ctx.newPerson({
+      ownerId: fx.member.id,
+      name: 'Member Existing Profile',
+    });
+    const memberConflictIdentity = await fx.faceIdentityRepository.ensurePersonIdentity(memberConflictPerson.id);
+    await fx.faceIdentityRepository.mergeIdentities({
+      targetIdentityId: targetIdentity.id,
+      sourceIdentityIds: [memberConflictIdentity.id],
+      source: 'manual',
+    });
+
+    const { asset } = await fx.ctx.newAsset({ ownerId: fx.member.id, visibility: AssetVisibility.Timeline });
+    const { result: uploadedFaceId } = await fx.ctx.newAssetFace({ assetId: asset.id });
+    await fx.ctx.database
+      .insertInto('face_search')
+      .values({ faceId: uploadedFaceId, embedding: embeddingRow.embedding })
+      .execute();
+
+    await fx.personService.handleRecognizeFaces({ id: uploadedFaceId });
+
+    const uploadedPerson = await fx.ctx.database
+      .selectFrom('asset_face')
+      .innerJoin('person', 'person.id', 'asset_face.personId')
+      .select(['person.id', 'person.identityId'])
+      .where('asset_face.id', '=', uploadedFaceId)
+      .executeTakeFirstOrThrow();
+    const uploadedLinks = await fx.ctx.database
+      .selectFrom('face_identity_face')
+      .select(['assetFaceId', 'identityId', 'source'])
+      .where('assetFaceId', '=', uploadedFaceId)
+      .execute();
+    const targetProfiles = await fx.ctx.database
+      .selectFrom('person')
+      .select(['id', 'ownerId', 'identityId'])
+      .where('identityId', '=', targetIdentity.id)
+      .orderBy('id')
+      .execute();
+
+    expect(uploadedPerson.id).not.toBe(memberConflictPerson.id);
+    expect(uploadedPerson.identityId).not.toBe(targetIdentity.id);
+    expect(uploadedLinks).toEqual([
+      { assetFaceId: uploadedFaceId, identityId: uploadedPerson.identityId, source: 'owner-person' },
+    ]);
+    expect(targetProfiles).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: memberConflictPerson.id, ownerId: fx.member.id, identityId: targetIdentity.id }),
+      ]),
+    );
+    expect(targetProfiles.map((profile) => profile.id)).not.toContain(uploadedPerson.id);
+  });
+
+  it('repeated recognition of an already assigned face preserves one person and one identity link', async () => {
+    const fx = await createLinkedLibraryIdentityFixture({ personName: 'Library Source' });
+    const embeddingRow = await fx.ctx.database
+      .selectFrom('face_search')
+      .select('embedding')
+      .where('faceId', '=', fx.face.faceId)
+      .executeTakeFirstOrThrow();
+
+    const { asset } = await fx.ctx.newAsset({ ownerId: fx.member.id, visibility: AssetVisibility.Timeline });
+    const { result: uploadedFaceId } = await fx.ctx.newAssetFace({ assetId: asset.id });
+    await fx.ctx.database
+      .insertInto('face_search')
+      .values({ faceId: uploadedFaceId, embedding: embeddingRow.embedding })
+      .execute();
+
+    const readState = async () => {
+      const assignedPerson = await fx.ctx.database
+        .selectFrom('asset_face')
+        .innerJoin('person', 'person.id', 'asset_face.personId')
+        .select(['person.id as personId', 'person.identityId as identityId'])
+        .where('asset_face.id', '=', uploadedFaceId)
+        .executeTakeFirstOrThrow();
+      const memberPeople = await fx.ctx.database
+        .selectFrom('person')
+        .select(['id', 'identityId'])
+        .where('ownerId', '=', fx.member.id)
+        .orderBy('id')
+        .execute();
+      const faceLinks = await fx.ctx.database
+        .selectFrom('face_identity_face')
+        .select(['assetFaceId', 'identityId', 'source'])
+        .where('assetFaceId', '=', uploadedFaceId)
+        .orderBy('assetFaceId')
+        .execute();
+
+      return { assignedPerson, memberPeople, faceLinks };
+    };
+
+    await fx.personService.handleRecognizeFaces({ id: uploadedFaceId });
+
+    await fx.personService.handleRecognizeFaces({ id: uploadedFaceId });
+    const assignedState = await readState();
+
+    await fx.personService.handleRecognizeFaces({ id: uploadedFaceId });
+    const repeatedState = await readState();
+
+    expect(repeatedState).toEqual(assignedState);
+    expect(repeatedState.memberPeople).toHaveLength(1);
+    expect(repeatedState.faceLinks).toEqual([
+      {
+        assetFaceId: uploadedFaceId,
+        identityId: repeatedState.assignedPerson.identityId,
+        source: 'owner-person',
+      },
+    ]);
   });
 
   it('reconciles a late member local person against linked-library space evidence', async () => {
