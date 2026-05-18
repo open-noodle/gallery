@@ -1,5 +1,11 @@
 # Split mobile and server release cycles — design
 
+> **Superseded (2026-05-18).** The draft-release handoff and phase-2 model
+> described here were removed. Mobile and server now release independently
+> with manually supplied versions and no draft coupling. See
+> [2026-05-18-decoupled-release-design.md](./2026-05-18-decoupled-release-design.md).
+> Kept for historical context.
+
 Date: 2026-04-17
 
 ## Problem
