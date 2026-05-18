@@ -127,8 +127,16 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      # Release runs (inputs.version set) must NOT restore the shared,
+      # static-key main Gradle cache. A poisoned sqlite3_flutter_libs native
+      # build cached under this key silently omits libsqlite3.so from both
+      # the AAB and APK (drift/sqlite3 FFI then crashes at DB init), and the
+      # poison persists across every main run until the cache is evicted.
+      # Release builds run cache-free + flutter clean so the .so is always
+      # regenerated; CI/smoke runs keep the cache for speed.
       - name: Restore Gradle Cache
         id: cache-gradle-restore
+        if: inputs.version == ''
         uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: |
@@ -150,6 +158,14 @@ jobs:
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
         with:
           packages: ''
+
+      # Release runs skip the Gradle cache restore above, so the runner is
+      # already pristine — flutter clean guarantees no pre-build state can
+      # survive into the release build's native library packaging.
+      - name: Clean build (release runs)
+        if: inputs.version != ''
+        working-directory: ./mobile
+        run: flutter clean
 
       - name: Get Packages
         working-directory: ./mobile
@@ -192,6 +208,27 @@ jobs:
             --build-name="$VERSION_NAME" \
             --build-number="$VERSION_CODE"
 
+      # Guard: a poisoned native build silently drops libsqlite3.so from the
+      # AAB, which then crashes every install at DB init. Fail here BEFORE
+      # the Play Store upload so a broken bundle can never reach users.
+      - name: Verify App Bundle bundles libsqlite3.so
+        working-directory: ./mobile
+        run: |
+          aab="build/app/outputs/bundle/release/app-release.aab"
+          missing=0
+          for abi in arm64-v8a armeabi-v7a; do
+            if unzip -Z1 "$aab" | grep -qx "base/lib/$abi/libsqlite3.so"; then
+              echo "OK: base/lib/$abi/libsqlite3.so present in AAB"
+            else
+              echo "::error::libsqlite3.so missing from AAB for ABI $abi"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::App Bundle is missing the sqlite3 native library (sqlite3_flutter_libs) — refusing to ship a broken build to Play Store."
+            exit 1
+          fi
+
       - name: Publish Android App Bundle artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
@@ -214,6 +251,28 @@ jobs:
             --build-number="$VERSION_CODE"
           mv build/app/outputs/flutter-apk/app-release.apk \
              "build/app/outputs/flutter-apk/gallery-${VERSION}.apk"
+
+      # Same guard for the sideloadable APK attached to the GitHub release.
+      - name: Verify APK bundles libsqlite3.so
+        if: inputs.version != ''
+        working-directory: ./mobile
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          apk="build/app/outputs/flutter-apk/gallery-${VERSION}.apk"
+          missing=0
+          for abi in arm64-v8a armeabi-v7a; do
+            if unzip -Z1 "$apk" | grep -qx "lib/$abi/libsqlite3.so"; then
+              echo "OK: lib/$abi/libsqlite3.so present in APK"
+            else
+              echo "::error::libsqlite3.so missing from APK for ABI $abi"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::APK is missing the sqlite3 native library (sqlite3_flutter_libs) — refusing to ship a broken build."
+            exit 1
+          fi
 
       - name: Publish Android APK artifact
         if: inputs.version != ''
@@ -248,10 +307,13 @@ jobs:
         working-directory: ./mobile/android/gallery-release
         run: rm -f fastlane/play-store-key.json
 
+      # Never save from a release run: it would overwrite the shared CI
+      # cache with release-build state (and the restore step is skipped on
+      # release runs, so its cache-primary-key output is empty anyway).
       - name: Save Gradle Cache
         id: cache-gradle-save
         uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && inputs.version == ''
         with:
           path: |
             ~/.gradle/caches
@@ -259,7 +321,7 @@ jobs:
             ~/.android/sdk
             mobile/android/.gradle
             mobile/.dart_tool
-          key: ${{ steps.cache-gradle-restore.outputs.cache-primary-key }}
+          key: build-mobile-gradle-${{ runner.os }}-main
 
   build-sign-ios:
     name: Build and sign iOS
