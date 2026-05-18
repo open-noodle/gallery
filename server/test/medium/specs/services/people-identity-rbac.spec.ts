@@ -1,10 +1,11 @@
 import { BadRequestException } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { SearchSuggestionType } from 'src/dtos/search.dto';
-import { AssetVisibility, JobName, SharedSpaceRole } from 'src/enum';
+import { AssetVisibility, JobName, SharedSpaceRole, SourceType } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { ConfigRepository } from 'src/repositories/config.repository';
+import { DatabaseRepository } from 'src/repositories/database.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
@@ -30,6 +31,7 @@ const setup = (db?: Kysely<DB>) => {
     real: [
       AccessRepository,
       ConfigRepository,
+      DatabaseRepository,
       FaceIdentityRepository,
       PersonRepository,
       SearchRepository,
@@ -86,6 +88,19 @@ const drainSharedSpaceFaceJobs = async (sharedSpaceService: SharedSpaceService, 
       if (job.name === JobName.SharedSpaceIdentityReconciliation) {
         await sharedSpaceService.handleSharedSpaceIdentityReconciliation(job.data);
       }
+    }
+  }
+};
+
+const drainSharedSpaceFaceMatchFromBackfillJobs = async (
+  sharedSpaceService: SharedSpaceService,
+  jobs: Mocked<JobRepository>,
+) => {
+  const queued = jobs.queueAll.mock.calls.flatMap(([items]) => items);
+
+  for (const job of queued) {
+    if (job.name === JobName.SharedSpaceFaceMatchFromBackfill) {
+      await sharedSpaceService.handleSharedSpaceFaceMatchFromBackfill(job.data);
     }
   }
 };
@@ -2106,6 +2121,544 @@ describe('People identity RBAC projection', () => {
     expect(JSON.stringify({ hiddenPeople, hiddenFilters, hiddenAssets })).not.toContain('Legacy Library Person');
   });
 
+  it('identity backfill queues targeted projection jobs and materializes selected-space faces', async () => {
+    const { ctx, sut, faceIdentityRepository } = setup();
+    const { sut: sharedSpaceService } = setupSharedSpace();
+    const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const { user: owner } = await ctx.newUser();
+    const { user: member } = await ctx.newUser();
+    try {
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: true });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+      const { person } = await ctx.newPerson({ ownerId: owner.id, identityId: null, name: 'Legacy Alice' });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+
+      await expect(faceIdentityRepository.hasBackfillWork()).resolves.toBe(true);
+
+      await sut.handleFaceIdentityBackfill({ stage: 'person' });
+
+      const queuedTargetJobs = jobs.queueAll.mock.calls.flatMap(([items]) => items);
+      expect(queuedTargetJobs).toEqual([
+        { name: JobName.SharedSpaceFaceMatchFromBackfill, data: { spaceId: space.id, assetId: asset.id } },
+      ]);
+      expect(jobs.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }));
+      await expect(faceIdentityRepository.getPendingSharedSpaceFaceMatchBackfillTargets()).resolves.toEqual([]);
+
+      await drainSharedSpaceFaceMatchFromBackfillJobs(sharedSpaceService, jobs);
+
+      const selectedFaces = await ctx.database
+        .selectFrom('shared_space_person_face')
+        .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_face.personId')
+        .select([
+          'shared_space_person.spaceId',
+          'shared_space_person.identityId',
+          'shared_space_person_face.assetFaceId',
+        ])
+        .where('shared_space_person.spaceId', '=', space.id)
+        .execute();
+      const updatedPerson = await ctx.database
+        .selectFrom('person')
+        .select('identityId')
+        .where('id', '=', person.id)
+        .executeTakeFirstOrThrow();
+
+      expect(selectedFaces).toEqual([
+        {
+          spaceId: space.id,
+          identityId: updatedPerson.identityId,
+          assetFaceId: assetFace.id,
+        },
+      ]);
+      await expect(faceIdentityRepository.hasBackfillWork()).resolves.toBe(false);
+    } finally {
+      await ctx.database.deleteFrom('user').where('id', 'in', [owner.id, member.id]).execute();
+    }
+  });
+
+  it('identity backfill materializes one selected-space assignment per enabled space for the same photo', async () => {
+    const { ctx, sut, faceIdentityRepository } = setup();
+    const { sut: sharedSpaceService } = setupSharedSpace();
+    const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const { user: owner } = await ctx.newUser();
+    try {
+      const { person } = await ctx.newPerson({ ownerId: owner.id, identityId: null, name: 'Shared Alice' });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      const enabledSpaces = [];
+      for (let index = 0; index < 10; index++) {
+        const { space } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: true });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+        enabledSpaces.push(space);
+      }
+      const { space: disabledSpace } = await ctx.newSharedSpace({
+        createdById: owner.id,
+        faceRecognitionEnabled: false,
+      });
+      await ctx.newSharedSpaceMember({ spaceId: disabledSpace.id, userId: owner.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceAsset({ spaceId: disabledSpace.id, assetId: asset.id, addedById: owner.id });
+
+      await sut.handleFaceIdentityBackfill({ stage: 'person' });
+
+      const queuedTargetJobs = jobs.queueAll.mock.calls.flatMap(([items]) => items);
+      const expectedJobs = enabledSpaces
+        .map((space) => ({
+          name: JobName.SharedSpaceFaceMatchFromBackfill,
+          data: { spaceId: space.id, assetId: asset.id },
+        }))
+        .toSorted((a, b) => a.data.spaceId.localeCompare(b.data.spaceId));
+      expect(queuedTargetJobs).toEqual(expectedJobs);
+
+      await drainSharedSpaceFaceMatchFromBackfillJobs(sharedSpaceService, jobs);
+
+      const selectedFaces = await ctx.database
+        .selectFrom('shared_space_person_face')
+        .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_face.personId')
+        .select(['shared_space_person.spaceId', 'shared_space_person_face.assetFaceId'])
+        .where('shared_space_person_face.assetFaceId', '=', assetFace.id)
+        .orderBy('shared_space_person.spaceId')
+        .execute();
+
+      expect(selectedFaces).toEqual(
+        enabledSpaces
+          .map((space) => ({ spaceId: space.id, assetFaceId: assetFace.id }))
+          .toSorted((a, b) => a.spaceId.localeCompare(b.spaceId)),
+      );
+      expect(selectedFaces.map((row) => row.spaceId)).not.toContain(disabledSpace.id);
+      await expect(faceIdentityRepository.hasBackfillWork()).resolves.toBe(false);
+    } finally {
+      await ctx.database.deleteFrom('user').where('id', '=', owner.id).execute();
+    }
+  });
+
+  it('delays page-one projection fanout until the final identity backfill page', async () => {
+    const { ctx, sut, faceIdentityRepository } = setup();
+    const { sut: sharedSpaceService } = setupSharedSpace();
+    const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    await ctx.database.deleteFrom('user').execute();
+    const { user: owner } = await ctx.newUser();
+    try {
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: true });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+      const first = await ctx.newPerson({ ownerId: owner.id, identityId: null, name: 'Page One Alice' });
+      const second = await ctx.newPerson({ ownerId: owner.id, identityId: null, name: 'Page Two Alice' });
+      const { asset: firstAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      const { asset: secondAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      const { assetFace: firstFace } = await ctx.newAssetFace({ assetId: firstAsset.id, personId: first.person.id });
+      const { assetFace: secondFace } = await ctx.newAssetFace({
+        assetId: secondAsset.id,
+        personId: second.person.id,
+      });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: firstAsset.id, addedById: owner.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: secondAsset.id, addedById: owner.id });
+
+      const firstPage = await faceIdentityRepository.backfillPersonalIdentities({ limit: 1 });
+      expect(firstPage).toEqual({
+        processed: 1,
+        nextCursor: expect.any(String),
+        affectedSpaceAssets: expect.any(Array),
+      });
+      const firstPageAffectedAssets = firstPage.affectedSpaceAssets ?? [];
+      expect(firstPageAffectedAssets).toHaveLength(1);
+      expect([firstAsset.id, secondAsset.id]).toContain(firstPageAffectedAssets[0].assetId);
+      expect(firstPageAffectedAssets[0].spaceId).toBe(space.id);
+      expect(jobs.queueAll).not.toHaveBeenCalled();
+      await expect(faceIdentityRepository.getPendingSharedSpaceFaceMatchBackfillTargets()).resolves.toMatchObject(
+        firstPageAffectedAssets,
+      );
+
+      await sut.handleFaceIdentityBackfill({ stage: 'person', cursor: firstPage.nextCursor });
+
+      const queuedTargetJobs = jobs.queueAll.mock.calls.flatMap(([items]) => items);
+      expect(queuedTargetJobs).toEqual(
+        [firstAsset.id, secondAsset.id]
+          .map((assetId) => ({
+            name: JobName.SharedSpaceFaceMatchFromBackfill,
+            data: { spaceId: space.id, assetId },
+          }))
+          .toSorted((a, b) => a.data.assetId.localeCompare(b.data.assetId)),
+      );
+      await expect(faceIdentityRepository.getPendingSharedSpaceFaceMatchBackfillTargets()).resolves.toEqual([]);
+
+      await drainSharedSpaceFaceMatchFromBackfillJobs(sharedSpaceService, jobs);
+
+      const selectedFaces = await ctx.database
+        .selectFrom('shared_space_person_face')
+        .select('assetFaceId')
+        .where('assetFaceId', 'in', [firstFace.id, secondFace.id])
+        .orderBy('assetFaceId')
+        .execute();
+      expect(selectedFaces.map((row) => row.assetFaceId)).toEqual([firstFace.id, secondFace.id].toSorted());
+      await expect(faceIdentityRepository.hasBackfillWork()).resolves.toBe(false);
+    } finally {
+      await ctx.database.deleteFrom('user').where('id', '=', owner.id).execute();
+    }
+  });
+
+  it('identity backfill materializes once when an asset is both directly added and linked by library', async () => {
+    const { ctx, sut, faceIdentityRepository } = setup();
+    const { sut: sharedSpaceService } = setupSharedSpace();
+    const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const { user: owner } = await ctx.newUser();
+    try {
+      const { library } = await ctx.newLibrary({ ownerId: owner.id });
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: true });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+      const { person } = await ctx.newPerson({ ownerId: owner.id, identityId: null, name: 'Library Alice' });
+      const { asset } = await ctx.newAsset({
+        ownerId: owner.id,
+        libraryId: library.id,
+        visibility: AssetVisibility.Timeline,
+      });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: owner.id });
+
+      await sut.handleFaceIdentityBackfill({ stage: 'person' });
+
+      const queuedTargetJobs = jobs.queueAll.mock.calls.flatMap(([items]) => items);
+      expect(queuedTargetJobs).toEqual([
+        { name: JobName.SharedSpaceFaceMatchFromBackfill, data: { spaceId: space.id, assetId: asset.id } },
+      ]);
+
+      await drainSharedSpaceFaceMatchFromBackfillJobs(sharedSpaceService, jobs);
+
+      const selectedFaces = await ctx.database
+        .selectFrom('shared_space_person_face')
+        .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_face.personId')
+        .select(['shared_space_person.spaceId', 'shared_space_person_face.assetFaceId'])
+        .where('shared_space_person.spaceId', '=', space.id)
+        .where('shared_space_person_face.assetFaceId', '=', assetFace.id)
+        .execute();
+      expect(selectedFaces).toEqual([{ spaceId: space.id, assetFaceId: assetFace.id }]);
+      await expect(faceIdentityRepository.hasBackfillWork()).resolves.toBe(false);
+    } finally {
+      await ctx.database.deleteFrom('user').where('id', '=', owner.id).execute();
+    }
+  });
+
+  it('targeted identity backfill repairs wrong-identity selected-space assignments', async () => {
+    const { ctx, faceIdentityRepository } = setup();
+    const { sut: sharedSpaceService } = setupSharedSpace();
+    const { user: owner } = await ctx.newUser();
+    try {
+      const correct = await createIdentityBackedFace(ctx, faceIdentityRepository, {
+        ownerId: owner.id,
+        personName: 'Correct Alice',
+      });
+      const wrong = await createIdentityBackedFace(ctx, faceIdentityRepository, {
+        ownerId: owner.id,
+        personName: 'Wrong Bob',
+      });
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: true });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: correct.asset.id, addedById: owner.id });
+      const wrongSpacePerson = await ctx.database
+        .insertInto('shared_space_person')
+        .values({
+          spaceId: space.id,
+          identityId: wrong.identity.id,
+          representativeFaceId: correct.faceId,
+          type: 'person',
+          faceCount: 1,
+        })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      await ctx.database
+        .insertInto('shared_space_person_face')
+        .values({ personId: wrongSpacePerson.id, assetFaceId: correct.faceId })
+        .execute();
+
+      await sharedSpaceService.handleSharedSpaceFaceMatchFromBackfill({ spaceId: space.id, assetId: correct.asset.id });
+
+      const selectedFaces = await ctx.database
+        .selectFrom('shared_space_person_face')
+        .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_face.personId')
+        .select(['shared_space_person.id', 'shared_space_person.identityId', 'shared_space_person_face.assetFaceId'])
+        .where('shared_space_person.spaceId', '=', space.id)
+        .orderBy('shared_space_person.identityId')
+        .execute();
+      const wrongPerson = await ctx.database
+        .selectFrom('shared_space_person')
+        .select(['id', 'faceCount'])
+        .where('id', '=', wrongSpacePerson.id)
+        .executeTakeFirst();
+
+      expect(selectedFaces).toEqual([
+        {
+          id: expect.any(String),
+          identityId: correct.identity.id,
+          assetFaceId: correct.faceId,
+        },
+      ]);
+      expect(wrongPerson).toBeUndefined();
+    } finally {
+      await ctx.database.deleteFrom('user').where('id', '=', owner.id).execute();
+    }
+  });
+
+  it('identity backfill uses targeted projection for EXIF-imported face evidence', async () => {
+    const { ctx, sut, faceIdentityRepository } = setup();
+    const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const { user: owner } = await ctx.newUser();
+    try {
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: true });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+      const { person } = await ctx.newPerson({ ownerId: owner.id, identityId: null, name: 'Imported Alice' });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+      await ctx.newAssetFace({ assetId: asset.id, personId: person.id, sourceType: SourceType.Exif });
+
+      await sut.handleFaceIdentityBackfill({ stage: 'person' });
+
+      const queuedTargetJobs = jobs.queueAll.mock.calls.flatMap(([items]) => items);
+      expect(queuedTargetJobs).toEqual([
+        { name: JobName.SharedSpaceFaceMatchFromBackfill, data: { spaceId: space.id, assetId: asset.id } },
+      ]);
+      expect(jobs.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }));
+      await expect(faceIdentityRepository.hasBackfillWork()).resolves.toBe(true);
+    } finally {
+      await ctx.database.deleteFrom('user').where('id', '=', owner.id).execute();
+    }
+  });
+
+  it('force recognition still rebuilds shared-space projections through full-space jobs', async () => {
+    const { ctx, sut, faceIdentityRepository } = setup();
+    const { sut: sharedSpaceService, jobs: sharedJobs } = setupSharedSpace();
+    const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    jobs.waitForQueueCompletion.mockResolvedValue();
+    jobs.empty.mockResolvedValue();
+    jobs.getJobCounts.mockResolvedValue({ active: 0, waiting: 0, delayed: 0, paused: 0, failed: 0, completed: 0 });
+    ctx
+      .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
+      .set.mockResolvedValue();
+    await ctx.database.deleteFrom('user').execute();
+    const { user: owner } = await ctx.newUser();
+    try {
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: true });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+      const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'EXIF Alice' });
+      const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      const { assetFace } = await ctx.newAssetFace({
+        assetId: asset.id,
+        personId: person.id,
+        sourceType: SourceType.Exif,
+      });
+      await faceIdentityRepository.linkFace({
+        assetFaceId: assetFace.id,
+        identityId: identity.id,
+        source: 'owner-person',
+      });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+      const staleSpacePerson = await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: space.id, identityId: identity.id, representativeFaceId: assetFace.id, type: 'person' })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      await ctx.database
+        .insertInto('shared_space_person_face')
+        .values({ personId: staleSpacePerson.id, assetFaceId: assetFace.id })
+        .execute();
+
+      await sut.handleQueueRecognizeFaces({ force: true });
+
+      const fullRebuildJobs = jobs.queueAll.mock.calls
+        .flatMap(([items]) => items)
+        .filter((job) => job.name === JobName.SharedSpaceFaceMatchAll);
+      expect(fullRebuildJobs).toEqual([{ name: JobName.SharedSpaceFaceMatchAll, data: { spaceId: space.id } }]);
+      expect(jobs.queueAll.mock.calls.flatMap(([items]) => items)).not.toContainEqual(
+        expect.objectContaining({ name: JobName.SharedSpaceFaceMatchFromBackfill }),
+      );
+
+      for (const job of fullRebuildJobs) {
+        await sharedSpaceService.handleSharedSpaceFaceMatchAll(job.data);
+      }
+      await drainSharedSpaceFaceJobs(sharedSpaceService, sharedJobs);
+
+      const selectedFaces = await ctx.database
+        .selectFrom('shared_space_person_face')
+        .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_face.personId')
+        .select([
+          'shared_space_person.spaceId',
+          'shared_space_person.identityId',
+          'shared_space_person_face.assetFaceId',
+        ])
+        .where('shared_space_person.spaceId', '=', space.id)
+        .execute();
+      expect(selectedFaces).toEqual([{ spaceId: space.id, identityId: identity.id, assetFaceId: assetFace.id }]);
+    } finally {
+      await ctx.database.deleteFrom('user').where('id', '=', owner.id).execute();
+    }
+  });
+
+  it('clears stale inherited metadata after membership removal before global discovery', async () => {
+    const { ctx, sut, faceIdentityRepository } = setup();
+    const { sut: sharedSpaceService } = setupSharedSpace();
+    const { user: owner } = await ctx.newUser();
+    const { user: member } = await ctx.newUser();
+    const { user: source } = await ctx.newUser();
+    const { user: admin } = await ctx.newUser({ isAdmin: true });
+    try {
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: true });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: source.id, role: SharedSpaceRole.Editor });
+      await ctx.database
+        .updateTable('shared_space_member')
+        .set({ sharePersonMetadata: true })
+        .where('spaceId', '=', space.id)
+        .where('userId', '=', source.id)
+        .execute();
+      const { person: sourcePerson } = await ctx.newPerson({ ownerId: source.id, name: 'Source Alice' });
+      const identity = await faceIdentityRepository.ensurePersonIdentity(sourcePerson.id);
+      const { asset } = await ctx.newAsset({ ownerId: source.id, visibility: AssetVisibility.Timeline });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: sourcePerson.id });
+      await faceIdentityRepository.linkFace({
+        assetFaceId: assetFace.id,
+        identityId: identity.id,
+        source: 'owner-person',
+      });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: source.id });
+      const spacePerson = await ctx.database
+        .insertInto('shared_space_person')
+        .values({
+          spaceId: space.id,
+          identityId: identity.id,
+          name: 'Source Alice',
+          nameSource: 'inherited',
+          nameSourceProfileType: 'user-person',
+          nameSourceProfileId: sourcePerson.id,
+          representativeFaceId: assetFace.id,
+          type: 'person',
+        })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      await ctx.database
+        .insertInto('shared_space_person_face')
+        .values({ personId: spacePerson.id, assetFaceId: assetFace.id })
+        .execute();
+
+      await ctx.database
+        .deleteFrom('shared_space_member')
+        .where('spaceId', '=', space.id)
+        .where('userId', '=', source.id)
+        .execute();
+      await sharedSpaceService.handleSharedSpacePersonMetadataBackfill({ identityId: identity.id, limit: 1000 });
+
+      const refreshed = await ctx.database
+        .selectFrom('shared_space_person')
+        .select(['name', 'nameSource', 'nameSourceProfileId'])
+        .where('id', '=', spacePerson.id)
+        .executeTakeFirstOrThrow();
+      const people = await sut.getAll(factory.auth({ user: member }), {
+        withHidden: true,
+        withSharedSpaces: true,
+        page: 1,
+        size: 50,
+      } as any);
+      const adminPeople = await sut.getAll(factory.auth({ user: admin }), {
+        withHidden: true,
+        withSharedSpaces: true,
+        page: 1,
+        size: 50,
+      } as any);
+
+      expect(refreshed).toEqual({ name: '', nameSource: 'none', nameSourceProfileId: null });
+      expect(JSON.stringify(people)).not.toContain('Source Alice');
+      expect(JSON.stringify(adminPeople)).not.toContain('Source Alice');
+    } finally {
+      await ctx.database.deleteFrom('user').where('id', 'in', [owner.id, member.id, source.id, admin.id]).execute();
+    }
+  });
+
+  it('excludes timeline-disabled space profile metadata from later metadata backfills', async () => {
+    const { ctx, sut, faceIdentityRepository } = setup();
+    const { sut: sharedSpaceService } = setupSharedSpace();
+    const { user: owner } = await ctx.newUser();
+    const { user: viewer } = await ctx.newUser();
+    try {
+      const { person: personalPerson } = await ctx.newPerson({ ownerId: owner.id, name: 'Owner Alice' });
+      const identity = await faceIdentityRepository.ensurePersonIdentity(personalPerson.id);
+      const { space: sourceSpace } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: true });
+      const { space: targetSpace } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: true });
+      await ctx.newSharedSpaceMember({ spaceId: sourceSpace.id, userId: owner.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceMember({ spaceId: targetSpace.id, userId: owner.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceMember({ spaceId: sourceSpace.id, userId: viewer.id, role: SharedSpaceRole.Viewer });
+      await ctx.newSharedSpaceMember({ spaceId: targetSpace.id, userId: viewer.id, role: SharedSpaceRole.Viewer });
+      await ctx.database
+        .updateTable('shared_space_member')
+        .set({ showInTimeline: false })
+        .where('spaceId', '=', sourceSpace.id)
+        .where('userId', '=', viewer.id)
+        .execute();
+      const { asset: targetAsset } = await ctx.newAsset({
+        ownerId: owner.id,
+        visibility: AssetVisibility.Timeline,
+      });
+      const { assetFace: targetFace } = await ctx.newAssetFace({
+        assetId: targetAsset.id,
+        personId: personalPerson.id,
+      });
+      await faceIdentityRepository.linkFace({
+        assetFaceId: targetFace.id,
+        identityId: identity.id,
+        source: 'owner-person',
+      });
+      await ctx.newSharedSpaceAsset({ spaceId: targetSpace.id, assetId: targetAsset.id, addedById: viewer.id });
+      const sourceSpacePerson = await ctx.database
+        .insertInto('shared_space_person')
+        .values({
+          spaceId: sourceSpace.id,
+          identityId: identity.id,
+          name: 'Hidden Timeline Alias',
+          type: 'person',
+        })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      const targetSpacePerson = await ctx.database
+        .insertInto('shared_space_person')
+        .values({
+          spaceId: targetSpace.id,
+          identityId: identity.id,
+          name: 'Hidden Timeline Alias',
+          nameSource: 'inherited',
+          nameSourceProfileType: 'space-person',
+          nameSourceProfileId: sourceSpacePerson.id,
+          representativeFaceId: targetFace.id,
+          type: 'person',
+        })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      await ctx.database
+        .insertInto('shared_space_person_face')
+        .values({ personId: targetSpacePerson.id, assetFaceId: targetFace.id })
+        .execute();
+
+      await sharedSpaceService.handleSharedSpacePersonMetadataBackfill({ identityId: identity.id, limit: 1000 });
+
+      const refreshed = await ctx.database
+        .selectFrom('shared_space_person')
+        .select(['name', 'nameSource', 'nameSourceProfileType', 'nameSourceProfileId'])
+        .where('id', '=', targetSpacePerson.id)
+        .executeTakeFirstOrThrow();
+      const people = await sut.getAll(factory.auth({ user: viewer }), {
+        withHidden: true,
+        withSharedSpaces: true,
+        page: 1,
+        size: 50,
+      } as any);
+
+      expect(refreshed.name).not.toBe('Hidden Timeline Alias');
+      expect(JSON.stringify(people)).not.toContain('Hidden Timeline Alias');
+    } finally {
+      await ctx.database.deleteFrom('user').where('id', 'in', [owner.id, viewer.id]).execute();
+    }
+  });
+
   it('timeline opt-in: album scope excludes direct space people and assets while the space is hidden from timeline', async () => {
     const { ctx, sut } = setupSearch();
     const faceIdentityRepository = ctx.get(FaceIdentityRepository);
@@ -2503,6 +3056,142 @@ describe('People identity RBAC projection', () => {
         expect(updatedSpacePerson.identityId).toBe(fx.targetIdentity.id);
       },
     );
+
+    it('scoped merge keeps inherited metadata limited to accessible profiles', async () => {
+      const fx = await setupRepairFixture(SharedSpaceRole.Editor);
+      await fx.ctx.database
+        .updateTable('person')
+        .set({ name: 'Actor Alice', birthDate: '1990-01-01' })
+        .where('id', '=', fx.actorPerson.id)
+        .execute();
+      await fx.ctx.database
+        .updateTable('shared_space_person')
+        .set({
+          name: 'Stale Space Alice',
+          nameSource: 'inherited',
+          nameSourceProfileType: 'space-person',
+          nameSourceProfileId: fx.spacePerson.id,
+          birthDate: '1980-01-01',
+          birthDateSource: 'inherited',
+          birthDateSourceProfileType: 'space-person',
+          birthDateSourceProfileId: fx.spacePerson.id,
+        })
+        .where('id', '=', fx.spacePerson.id)
+        .execute();
+
+      await fx.sut.mergeScopedPeople(factory.auth({ user: fx.actor }), {
+        target: { type: 'person', id: fx.actorPerson.id },
+        sources: [{ type: 'space-person', id: fx.spacePerson.id, spaceId: fx.space.id }],
+      });
+
+      const { sut: sharedSpaceService } = setupSharedSpace();
+      await sharedSpaceService.handleSharedSpacePersonMetadataBackfill({
+        identityId: fx.targetIdentity.id,
+        limit: 1000,
+      });
+
+      const updatedSpacePerson = await fx.ctx.database
+        .selectFrom('shared_space_person')
+        .select([
+          'identityId',
+          'name',
+          'nameSource',
+          'nameSourceProfileType',
+          'nameSourceProfileId',
+          'birthDate',
+          'birthDateSource',
+          'birthDateSourceProfileType',
+          'birthDateSourceProfileId',
+        ])
+        .where('id', '=', fx.spacePerson.id)
+        .executeTakeFirstOrThrow();
+      const nonMemberPeople = await fx.sut.getAll(factory.auth({ user: fx.otherUser }), {
+        withHidden: true,
+        withSharedSpaces: true,
+        page: 1,
+        size: 50,
+      } as any);
+
+      expect(updatedSpacePerson.identityId).toBe(fx.targetIdentity.id);
+      expect(updatedSpacePerson).toEqual(
+        expect.objectContaining({
+          name: 'Actor Alice',
+          nameSource: 'inherited',
+          nameSourceProfileType: 'user-person',
+          nameSourceProfileId: fx.actorPerson.id,
+          birthDateSource: 'inherited',
+          birthDateSourceProfileType: 'user-person',
+          birthDateSourceProfileId: fx.actorPerson.id,
+        }),
+      );
+      expect(updatedSpacePerson.nameSourceProfileId).not.toBe(fx.spacePerson.id);
+      expect(updatedSpacePerson.birthDateSourceProfileId).not.toBe(fx.spacePerson.id);
+      expect(JSON.stringify(nonMemberPeople)).not.toContain(fx.spacePerson.id);
+      expect(JSON.stringify(nonMemberPeople)).not.toContain('Stale Space Alice');
+    });
+
+    it('detach keeps old identity metadata from leaking through the detached profile', async () => {
+      const fx = await setupRepairFixture(SharedSpaceRole.Editor);
+      await fx.ctx.database
+        .updateTable('person')
+        .set({ name: 'Actor Alice', birthDate: '1990-01-01' })
+        .where('id', '=', fx.actorPerson.id)
+        .execute();
+      await fx.ctx.database
+        .updateTable('shared_space_person')
+        .set({
+          name: 'Old Actor Alice',
+          nameSource: 'inherited',
+          nameSourceProfileType: 'user-person',
+          nameSourceProfileId: fx.actorPerson.id,
+          birthDate: '1990-01-01',
+          birthDateSource: 'inherited',
+          birthDateSourceProfileType: 'user-person',
+          birthDateSourceProfileId: fx.actorPerson.id,
+        })
+        .where('id', '=', fx.spacePerson.id)
+        .execute();
+      const newIdentityId = await fx.faceIdentityRepository.detachScopedProfile({
+        type: 'space-person',
+        id: fx.spacePerson.id,
+        spaceId: fx.space.id,
+      });
+      const { sut: sharedSpaceService } = setupSharedSpace();
+
+      await sharedSpaceService.handleSharedSpacePersonMetadataBackfill({ identityId: newIdentityId, limit: 1000 });
+
+      const detached = await fx.ctx.database
+        .selectFrom('shared_space_person')
+        .select([
+          'identityId',
+          'name',
+          'nameSource',
+          'nameSourceProfileId',
+          'birthDate',
+          'birthDateSource',
+          'birthDateSourceProfileId',
+        ])
+        .where('id', '=', fx.spacePerson.id)
+        .executeTakeFirstOrThrow();
+      const targetPerson = await fx.ctx.database
+        .selectFrom('person')
+        .select('identityId')
+        .where('id', '=', fx.actorPerson.id)
+        .executeTakeFirstOrThrow();
+
+      expect(detached.identityId).toBe(newIdentityId);
+      expect(detached.identityId).not.toBe(targetPerson.identityId);
+      expect(detached).toEqual(
+        expect.objectContaining({
+          name: '',
+          nameSource: 'none',
+          nameSourceProfileId: null,
+          birthDate: null,
+          birthDateSource: 'none',
+          birthDateSourceProfileId: null,
+        }),
+      );
+    });
 
     it('user cannot repair a personal profile they do not own', async () => {
       const fx = await setupRepairFixture(SharedSpaceRole.Editor);
