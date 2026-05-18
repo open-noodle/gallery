@@ -1,5 +1,11 @@
 # Split Mobile and Server Release Cycles — Implementation Plan
 
+> **Superseded (2026-05-18).** This plan was implemented but the resulting
+> draft-handoff / phase-2 model has since been replaced by the decoupled
+> release flow. See
+> [2026-05-18-decoupled-release-design.md](./2026-05-18-decoupled-release-design.md).
+> Kept for historical context.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Split the single release workflow into a mobile phase that submits to Play / TestFlight and a separate server phase the maintainer triggers manually after stores approve, so server users only see the new version once mobile is already live.
