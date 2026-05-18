@@ -67,6 +67,20 @@ const drainSharedSpaceFaceJobs = async (sharedSpaceService: SharedSpaceService, 
   }
 };
 
+const getSelectedSpaceFaceRows = async (ctx: ReturnType<typeof setup>['ctx'], spaceId: string) =>
+  ctx.database
+    .selectFrom('shared_space_person_face as face')
+    .innerJoin('shared_space_person as person', 'person.id', 'face.personId')
+    .select([
+      'face.assetFaceId as assetFaceId',
+      'face.personId as personId',
+      'person.identityId as identityId',
+      'person.type as type',
+    ])
+    .where('person.spaceId', '=', spaceId)
+    .orderBy('face.assetFaceId')
+    .execute();
+
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
@@ -273,6 +287,247 @@ describe('SharedSpaceService linked-library face identity repair', () => {
     expect(jobs.queue).toHaveBeenCalledWith({
       name: JobName.SharedSpaceIdentityReconciliation,
       data: { spaceId: space.id },
+    });
+  });
+
+  it('full-space rematch repairs missing stale and wrong-identity selected-space assignments without inflating counts', async () => {
+    const { ctx, sut, faceIdentityRepository, sharedSpaceRepository, jobs } = setup();
+    const { user } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+    const { library } = await ctx.newLibrary({ ownerId: user.id });
+    await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: user.id });
+
+    const target = await createIdentityFace(ctx, faceIdentityRepository, {
+      ownerId: user.id,
+      libraryId: library.id,
+      name: 'Alice',
+    });
+    const missing = await createIdentityFace(ctx, faceIdentityRepository, {
+      ownerId: user.id,
+      libraryId: library.id,
+      personId: target.person.id,
+      identityId: target.identity.id,
+    });
+    const wrong = await createIdentityFace(ctx, faceIdentityRepository, {
+      ownerId: user.id,
+      libraryId: library.id,
+      personId: target.person.id,
+      identityId: target.identity.id,
+    });
+    const stale = await createIdentityFace(ctx, faceIdentityRepository, {
+      ownerId: user.id,
+      libraryId: library.id,
+      personId: target.person.id,
+      identityId: target.identity.id,
+    });
+
+    const correctPerson = await sharedSpaceRepository.createPerson({
+      spaceId: space.id,
+      identityId: target.identity.id,
+      name: '',
+      representativeFaceId: target.assetFace.id,
+      type: 'person',
+    });
+    await sharedSpaceRepository.addPersonFaces([{ personId: correctPerson.id, assetFaceId: target.assetFace.id }], {
+      skipRecount: true,
+    });
+
+    const { result: wrongOwnerPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Wrong Alice' });
+    const wrongIdentity = await faceIdentityRepository.ensurePersonIdentity(wrongOwnerPerson.id);
+    const wrongSpacePerson = await sharedSpaceRepository.createPerson({
+      spaceId: space.id,
+      identityId: wrongIdentity.id,
+      name: '',
+      representativeFaceId: wrong.assetFace.id,
+      type: 'person',
+    });
+    await sharedSpaceRepository.addPersonFaces([{ personId: wrongSpacePerson.id, assetFaceId: wrong.assetFace.id }], {
+      skipRecount: true,
+    });
+
+    const staleSpacePerson = await sharedSpaceRepository.createPerson({
+      spaceId: space.id,
+      name: '',
+      representativeFaceId: stale.assetFace.id,
+      type: 'person',
+    });
+    await sharedSpaceRepository.addPersonFaces([{ personId: staleSpacePerson.id, assetFaceId: stale.assetFace.id }], {
+      skipRecount: true,
+    });
+
+    await expect(sut.handleSharedSpaceFaceMatchAll({ spaceId: space.id })).resolves.toBe(JobStatus.Success);
+    await drainSharedSpaceFaceJobs(sut, jobs);
+
+    const repairedPerson = await ctx.database
+      .selectFrom('shared_space_person')
+      .selectAll()
+      .where('spaceId', '=', space.id)
+      .where('identityId', '=', target.identity.id)
+      .executeTakeFirstOrThrow();
+    expect(repairedPerson.id).toBe(correctPerson.id);
+
+    const repairedRows = await getSelectedSpaceFaceRows(ctx, space.id);
+    expect(repairedRows).toHaveLength(4);
+    expect(repairedRows).toEqual(
+      expect.arrayContaining([
+        {
+          assetFaceId: missing.assetFace.id,
+          personId: repairedPerson.id,
+          identityId: target.identity.id,
+          type: 'person',
+        },
+        {
+          assetFaceId: stale.assetFace.id,
+          personId: repairedPerson.id,
+          identityId: target.identity.id,
+          type: 'person',
+        },
+        {
+          assetFaceId: target.assetFace.id,
+          personId: repairedPerson.id,
+          identityId: target.identity.id,
+          type: 'person',
+        },
+        {
+          assetFaceId: wrong.assetFace.id,
+          personId: repairedPerson.id,
+          identityId: target.identity.id,
+          type: 'person',
+        },
+      ]),
+    );
+    await expect(sharedSpaceRepository.getPersonById(wrongSpacePerson.id)).resolves.toBeUndefined();
+    await expect(sharedSpaceRepository.getPersonById(staleSpacePerson.id)).resolves.toBeUndefined();
+    await expect(
+      sharedSpaceRepository.getPeopleFaceStatisticsBySpaceId(space.id, { minimumFaceCount: 1 }),
+    ).resolves.toMatchObject({
+      detectedFaceCount: 4,
+      assignedVisibleFaceCount: 4,
+      assignedHiddenFaceCount: 0,
+      unassignedFaceCount: 0,
+    });
+  });
+
+  it('removing direct assets removes selected-space face rows and deletes orphaned space people', async () => {
+    const { ctx, sut, faceIdentityRepository, sharedSpaceRepository } = setup();
+    const { user } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+    const { library } = await ctx.newLibrary({ ownerId: user.id });
+    const face = await createIdentityFace(ctx, faceIdentityRepository, {
+      ownerId: user.id,
+      libraryId: library.id,
+      name: 'Alice',
+    });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: face.asset.id, addedById: user.id });
+
+    await expect(sut.handleSharedSpaceFaceMatch({ spaceId: space.id, assetId: face.asset.id })).resolves.toBe(
+      JobStatus.Success,
+    );
+    const projectedPerson = await ctx.database
+      .selectFrom('shared_space_person')
+      .selectAll()
+      .where('spaceId', '=', space.id)
+      .where('identityId', '=', face.identity.id)
+      .executeTakeFirstOrThrow();
+    await expect(getSelectedSpaceFaceRows(ctx, space.id)).resolves.toHaveLength(1);
+
+    await sut.removeAssets(factory.auth({ user: { id: user.id } }), space.id, { assetIds: [face.asset.id] });
+
+    await expect(getSelectedSpaceFaceRows(ctx, space.id)).resolves.toEqual([]);
+    await expect(sharedSpaceRepository.getPersonById(projectedPerson.id)).resolves.toBeUndefined();
+    await expect(
+      sharedSpaceRepository.getPeopleFaceStatisticsBySpaceId(space.id, { minimumFaceCount: 1 }),
+    ).resolves.toMatchObject({
+      detectedFaceCount: 0,
+      assignedVisibleFaceCount: 0,
+      assignedHiddenFaceCount: 0,
+      unassignedFaceCount: 0,
+    });
+  });
+
+  it('unlinking a library removes selected-space face rows and deletes orphaned space people', async () => {
+    const { ctx, sut, faceIdentityRepository, sharedSpaceRepository } = setup();
+    const { user } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+    const { library } = await ctx.newLibrary({ ownerId: user.id });
+    await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: user.id });
+    const face = await createIdentityFace(ctx, faceIdentityRepository, {
+      ownerId: user.id,
+      libraryId: library.id,
+      name: 'Alice',
+    });
+
+    await expect(sut.handleSharedSpaceLibraryFaceSync({ spaceId: space.id, libraryId: library.id })).resolves.toBe(
+      JobStatus.Success,
+    );
+    const projectedPerson = await ctx.database
+      .selectFrom('shared_space_person')
+      .selectAll()
+      .where('spaceId', '=', space.id)
+      .where('identityId', '=', face.identity.id)
+      .executeTakeFirstOrThrow();
+    await expect(getSelectedSpaceFaceRows(ctx, space.id)).resolves.toHaveLength(1);
+
+    await sut.unlinkLibrary(factory.auth({ user: { id: user.id, isAdmin: true } }), space.id, library.id);
+
+    await expect(getSelectedSpaceFaceRows(ctx, space.id)).resolves.toEqual([]);
+    await expect(sharedSpaceRepository.getPersonById(projectedPerson.id)).resolves.toBeUndefined();
+    await expect(
+      sharedSpaceRepository.getPeopleFaceStatisticsBySpaceId(space.id, { minimumFaceCount: 1 }),
+    ).resolves.toMatchObject({
+      detectedFaceCount: 0,
+      assignedVisibleFaceCount: 0,
+      assignedHiddenFaceCount: 0,
+      unassignedFaceCount: 0,
+    });
+  });
+
+  it('same asset direct plus linked-library path materializes only one selected-space face assignment', async () => {
+    const { ctx, sut, faceIdentityRepository, sharedSpaceRepository } = setup();
+    const { user } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+    const { library } = await ctx.newLibrary({ ownerId: user.id });
+    await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: user.id });
+    const face = await createIdentityFace(ctx, faceIdentityRepository, {
+      ownerId: user.id,
+      libraryId: library.id,
+      name: 'Alice',
+    });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: face.asset.id, addedById: user.id });
+
+    await expect(sut.handleSharedSpaceFaceMatch({ spaceId: space.id, assetId: face.asset.id })).resolves.toBe(
+      JobStatus.Success,
+    );
+    await expect(sut.handleSharedSpaceLibraryFaceSync({ spaceId: space.id, libraryId: library.id })).resolves.toBe(
+      JobStatus.Success,
+    );
+
+    const people = await ctx.database
+      .selectFrom('shared_space_person')
+      .selectAll()
+      .where('spaceId', '=', space.id)
+      .where('identityId', '=', face.identity.id)
+      .execute();
+    expect(people).toHaveLength(1);
+    await expect(getSelectedSpaceFaceRows(ctx, space.id)).resolves.toEqual([
+      {
+        assetFaceId: face.assetFace.id,
+        personId: people[0].id,
+        identityId: face.identity.id,
+        type: 'person',
+      },
+    ]);
+    await expect(
+      sharedSpaceRepository.getPeopleFaceStatisticsBySpaceId(space.id, { minimumFaceCount: 1 }),
+    ).resolves.toMatchObject({
+      detectedFaceCount: 1,
+      assignedVisibleFaceCount: 1,
+      assignedHiddenFaceCount: 0,
+      unassignedFaceCount: 0,
     });
   });
 
