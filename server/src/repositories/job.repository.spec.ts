@@ -650,7 +650,34 @@ describe(JobRepository.name, () => {
     );
   });
 
+  it('uses stable job ids for shared-space face matches queued from identity backfill', async () => {
+    const { sut, queue } = setup();
+    setHandlers(sut, [JobName.SharedSpaceFaceMatch, JobName.SharedSpaceFaceMatchFromBackfill]);
+
+    await sut.queueAll([
+      { name: JobName.SharedSpaceFaceMatch, data: { spaceId: 'space-1', assetId: 'asset-1' } },
+      { name: JobName.SharedSpaceFaceMatchFromBackfill, data: { spaceId: 'space-1', assetId: 'asset-1' } },
+    ]);
+
+    expect(queue.addBulk).not.toHaveBeenCalled();
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SharedSpaceFaceMatch,
+      { spaceId: 'space-1', assetId: 'asset-1' },
+      { jobId: 'shared-space-face-match/space-1/asset-1', removeOnComplete: true },
+    );
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SharedSpaceFaceMatchFromBackfill,
+      { spaceId: 'space-1', assetId: 'asset-1' },
+      { jobId: 'shared-space-face-match/from-backfill/space-1/asset-1', removeOnComplete: true },
+    );
+  });
+
   it.each([
+    [
+      JobName.SharedSpaceFaceMatchFromBackfill,
+      { spaceId: 'space-1', assetId: 'asset-1' },
+      'shared-space-face-match/from-backfill/space-1/asset-1',
+    ],
     [
       JobName.SharedSpaceFaceMatch,
       { spaceId: 'space-1', assetId: 'asset-1', source: 'identity-backfill' },
