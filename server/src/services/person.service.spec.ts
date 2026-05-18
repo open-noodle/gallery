@@ -2558,6 +2558,33 @@ describe(PersonService.name, () => {
       });
     });
 
+    it('queues only the next space-person page when resuming a space-person cursor', async () => {
+      mocks.faceIdentity.backfillSpacePersonIdentities.mockResolvedValue({
+        processed: 1000,
+        conflictCount: 0,
+        nextCursor: 'space-person-cursor-2',
+        affectedSpaceAssets: [{ spaceId: 'space-1', assetId: 'asset-1' }],
+      });
+
+      await expect(
+        sut.handleFaceIdentityBackfill({ stage: 'space-person', cursor: 'space-person-cursor-1' }),
+      ).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.faceIdentity.backfillPersonalIdentities).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.backfillSpacePersonIdentities).toHaveBeenCalledWith({
+        cursor: 'space-person-cursor-1',
+        limit: 1000,
+      });
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.FaceIdentityBackfill,
+        data: { stage: 'space-person', cursor: 'space-person-cursor-2' },
+      });
+      expect((mocks.faceIdentity as any).getBackfillWork).not.toHaveBeenCalled();
+      expect((mocks.faceIdentity as any).getSharedSpaceFaceMatchBackfillTargets).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+    });
+
     it('requeues identity backfill without projection fan-out when identity work remains after final pages', async () => {
       mocks.faceIdentity.backfillPersonalIdentities.mockResolvedValue({ processed: 0 });
       mocks.faceIdentity.backfillSpacePersonIdentities.mockResolvedValue({ processed: 0, conflictCount: 0 });
@@ -2581,6 +2608,36 @@ describe(PersonService.name, () => {
         name: JobName.SharedSpacePersonMetadataBackfill,
         data: {},
       });
+    });
+
+    it('requeues root without fan-out when new identity work appears after a cursor page finishes', async () => {
+      mocks.faceIdentity.backfillPersonalIdentities.mockResolvedValue({ processed: 0 });
+      mocks.faceIdentity.backfillSpacePersonIdentities.mockResolvedValue({ processed: 0, conflictCount: 0 });
+      (mocks.faceIdentity as any).getBackfillWork.mockResolvedValue({
+        hasPersonalIdentityWork: false,
+        hasSpacePersonIdentityWork: true,
+        hasSharedSpaceProjectionWork: true,
+      });
+
+      await expect(
+        sut.handleFaceIdentityBackfill({ stage: 'person', cursor: 'person-cursor-after-new-lower-id' }),
+      ).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.FaceIdentityBackfill,
+        data: { continuationId: expect.any(String) },
+      });
+      expect((mocks.faceIdentity as any).getSharedSpaceFaceMatchBackfillTargets).not.toHaveBeenCalled();
+      expect((mocks.faceIdentity as any).getPendingSharedSpaceFaceMatchBackfillTargets).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({
+        name: JobName.SharedSpacePersonMetadataBackfill,
+        data: {},
+      });
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }),
+      );
     });
 
     it('alternates bounded continuation ids when identity work remains', async () => {
@@ -2683,6 +2740,62 @@ describe(PersonService.name, () => {
       expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
         expect.arrayContaining([expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll })]),
       );
+    });
+
+    it('dedupes pending repair and projection targets together before deleting pending rows', async () => {
+      const pendingTargets = [
+        {
+          spaceId: 'space-1',
+          assetId: 'asset-1',
+          updateId: 'pending-1',
+          updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+        },
+        {
+          spaceId: 'space-3',
+          assetId: 'asset-3',
+          updateId: 'pending-3',
+          updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+        },
+      ];
+      mocks.faceIdentity.backfillPersonalIdentities.mockResolvedValue({
+        processed: 1,
+        affectedSpaceAssets: [
+          { spaceId: 'space-1', assetId: 'asset-1' },
+          { spaceId: 'space-2', assetId: 'asset-2' },
+        ],
+      });
+      mocks.faceIdentity.backfillSpacePersonIdentities.mockResolvedValue({
+        processed: 1,
+        conflictCount: 0,
+        affectedSpaceAssets: [{ spaceId: 'space-2', assetId: 'asset-2' }],
+      });
+      (mocks.faceIdentity as any).getBackfillWork.mockResolvedValue({
+        hasPersonalIdentityWork: false,
+        hasSpacePersonIdentityWork: false,
+        hasSharedSpaceProjectionWork: true,
+      });
+      (mocks.faceIdentity as any).getPendingSharedSpaceFaceMatchBackfillTargets.mockResolvedValue(pendingTargets);
+      (mocks.faceIdentity as any).getSharedSpaceFaceMatchBackfillTargets.mockResolvedValue([
+        { spaceId: 'space-2', assetId: 'asset-2' },
+        { spaceId: 'space-4', assetId: 'asset-4' },
+      ]);
+
+      await expect(sut.handleFaceIdentityBackfill({ stage: 'person' })).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.SharedSpaceFaceMatchFromBackfill, data: { spaceId: 'space-1', assetId: 'asset-1' } },
+        { name: JobName.SharedSpaceFaceMatchFromBackfill, data: { spaceId: 'space-2', assetId: 'asset-2' } },
+        { name: JobName.SharedSpaceFaceMatchFromBackfill, data: { spaceId: 'space-3', assetId: 'asset-3' } },
+        { name: JobName.SharedSpaceFaceMatchFromBackfill, data: { spaceId: 'space-4', assetId: 'asset-4' } },
+      ]);
+      expect((mocks.faceIdentity as any).deletePendingSharedSpaceFaceMatchBackfillTargets).toHaveBeenCalledWith(
+        pendingTargets,
+      );
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({
+        name: JobName.SharedSpacePersonMetadataBackfill,
+        data: {},
+      });
     });
 
     it('rediscovers earlier-page targets after paginated identity backfill completes', async () => {
