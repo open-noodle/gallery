@@ -1,10 +1,10 @@
 name: Gallery Build Mobile
 
 # For production releases, trigger via gallery-release-mobile.yml.
-# Manual workflow_dispatch with a non-empty version input here will
-# upload to stores WITHOUT creating a release draft, which breaks the
-# phase-1 → phase-2 handoff. Use build_target=android only for a
-# Play-only dry run; otherwise leave version empty for smoke builds.
+# A non-empty version input here stamps that version and uploads the
+# Android AAB to Play internal / iOS IPA to TestFlight. Leave version
+# empty for an upload-free smoke build; use build_target=android for a
+# Play-only dry run.
 
 on:
   workflow_dispatch:
