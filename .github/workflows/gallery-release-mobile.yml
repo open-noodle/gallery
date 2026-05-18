@@ -1,19 +1,23 @@
-name: Release Mobile P1
+name: Release Mobile
 
-# Phase 1 of the split release cycle. Builds mobile, uploads Android AAB to
-# Play Store internal, uploads iOS IPA to TestFlight, and keeps the AAB as a
-# workflow artifact. Creates a draft GitHub Release that pins the version (tag
-# name), commit SHA (target_commitish), and APK (asset). The maintainer
-# promotes the Play internal build to production, submits App Store for review,
-# then triggers gallery-release.yml once both stores are live. See
-# docs/plans/2026-04-17-split-mobile-server-release-design.md.
+# Independent mobile release. Builds + signs the Android AAB/APK and the
+# iOS IPA at the commit that dispatched this run, uploads the AAB to the
+# Play Store internal track and the IPA to TestFlight, and keeps the APK
+# as a workflow artifact.
+#
+# It does NOT create a GitHub Release or a git tag. The version is supplied
+# manually and the commit SHA it built from is written to the run summary
+# so a maintainer can — optionally — ship a matching server build by
+# running "Release Gallery Server" with the same version and that SHA.
+#
+# See docs/plans/2026-05-18-decoupled-release-design.md.
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g. v3.0.5) — overrides auto-version'
-        required: false
+        description: 'Version tag to stamp (e.g. v4.56.6)'
+        required: true
         type: string
 
 concurrency:
@@ -23,14 +27,11 @@ concurrency:
 permissions: {}
 
 jobs:
-  guard:
-    name: Guard against existing draft
+  validate:
+    name: Validate
     runs-on: ubuntu-latest
-    # contents: write is REQUIRED so the token can see draft releases.
-    # GitHub returns drafts only to tokens with write permission; contents:
-    # read would silently return no drafts and bypass the dupe check.
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Require main branch
         env:
@@ -41,160 +42,25 @@ jobs:
             exit 1
           fi
 
-      - name: Fail if a release draft with an APK asset is pending
+      - name: Validate version input
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
         run: |
-          set -euo pipefail
-          # Composite filter: drafts whose tag matches v*.*.* AND have at least
-          # one .apk asset. This is the same predicate phase 2 uses for
-          # discovery — what passes the guard is what phase 2 will find.
-          pending=$(gh release list --repo "$REPO" --limit 1000 \
-            --json tagName,isDraft \
-            --jq '[.[] | select(.isDraft == true and (.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")))] | .[].tagName')
-          matches=""
-          for tag in $pending; do
-            count=$(gh release view "$tag" --repo "$REPO" --json assets \
-              --jq '[.assets[] | select(.name | endswith(".apk"))] | length')
-            if [[ "$count" -gt 0 ]]; then
-              matches="$matches $tag"
-            fi
-          done
-          matches=$(echo "$matches" | xargs || true)
-          if [[ -n "$matches" ]]; then
-            echo "::error::Pending mobile release draft(s) found: $matches"
-            echo "::error::Discard or publish before starting a new mobile release."
-            echo "::error::To discard: gh release delete <tag> --cleanup-tag --yes"
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid version: '$VERSION' (expected v<major>.<minor>.<patch>, e.g. v4.56.6)"
             exit 1
           fi
-          echo "No pending draft. Proceeding."
-
-  version:
-    name: Compute Version
-    needs: guard
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      # github.sha is locked at workflow-dispatch time and visible from every
-      # job. Emitting it as an output is purely for downstream-job convenience.
-      sha: ${{ github.sha }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Compute next version
-        id: version
-        env:
-          GH_TOKEN: ${{ github.token }}
-          INPUT_VERSION: ${{ inputs.version }}
-        run: |
-          set -euo pipefail
-
-          # Manual override always wins. Enforce the same v-prefixed semver
-          # phase 2's discover step requires — a bare "4.53.0" draft is
-          # invisible to phase 2 and silently fails the release.
-          if [[ -n "$INPUT_VERSION" ]]; then
-            if [[ ! "$INPUT_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "::error::Invalid version override: '$INPUT_VERSION' (expected v<major>.<minor>.<patch>, e.g. v4.53.0)"
-              exit 1
-            fi
-            echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
-            echo "Version: $INPUT_VERSION — manual override"
-            exit 0
-          fi
-
-          prev_tag=$(git tag --list 'v*.*.*' --sort=-version:refname | head -n1)
-          if [[ -z "$prev_tag" ]]; then
-            echo "::error::No existing version tags found. Run a manual release first."
-            exit 1
-          fi
-
-          rank_of() {
-            case "$1" in
-              major) echo 3 ;;
-              minor) echo 2 ;;
-              patch) echo 1 ;;
-              *) echo 0 ;;
-            esac
-          }
-
-          bump=""
-          has_non_skip_commit=false
-          skipped_count=0
-          total_count=0
-
-          while IFS=$'\t' read -r sha subject; do
-            [[ -z "$sha" ]] && continue
-            total_count=$((total_count + 1))
-
-            pr_num=$(echo "$subject" | grep -oP '#\K[0-9]+' | tail -1 || true)
-            labels=""
-            if [[ -n "$pr_num" ]]; then
-              labels=$(gh pr view "$pr_num" --json labels --jq '.labels[].name' 2>/dev/null || true)
-            fi
-
-            if echo "$labels" | grep -q '^changelog:skip$'; then
-              skipped_count=$((skipped_count + 1))
-              echo "  · ${sha:0:7} ${subject}  [skip]"
-              continue
-            fi
-
-            has_non_skip_commit=true
-            commit_bump="patch"
-
-            if echo "$labels" | grep -q '^changelog:feat$'; then
-              commit_bump="minor"
-            fi
-
-            if echo "$subject" | grep -qP '^[a-z]+(\([^)]+\))?!:'; then
-              commit_bump="major"
-            elif echo "$subject" | grep -qP '^feat(\([^)]+\))?:'; then
-              [[ "$commit_bump" == "patch" ]] && commit_bump="minor"
-            fi
-
-            if [[ -z "$bump" ]] || (( $(rank_of "$commit_bump") > $(rank_of "$bump") )); then
-              bump="$commit_bump"
-            fi
-            echo "  · ${sha:0:7} ${subject}  [${commit_bump}]"
-          done < <(git log --format='%H%x09%s' "${prev_tag}..HEAD")
-
-          echo "Scanned $total_count commits since $prev_tag ($skipped_count skipped)."
-
-          if [[ "$has_non_skip_commit" == "false" ]]; then
-            echo "::error::No releasable commits since $prev_tag — nothing to release."
-            exit 1
-          fi
-
-          bump="${bump:-patch}"
-          major=$(echo "$prev_tag" | sed 's/^v//' | cut -d. -f1)
-          minor=$(echo "$prev_tag" | sed 's/^v//' | cut -d. -f2)
-          patch=$(echo "$prev_tag" | sed 's/^v//' | cut -d. -f3)
-
-          case "$bump" in
-            major) version="v$((major + 1)).0.0" ;;
-            minor) version="v${major}.$((minor + 1)).0" ;;
-            patch) version="v${major}.${minor}.$((patch + 1))" ;;
-          esac
-
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Version: $version — ${bump} bump from $prev_tag"
+          echo "Version: $VERSION"
 
   build-mobile:
     name: Build Mobile
-    needs: version
+    needs: validate
     permissions:
       contents: read
     uses: ./.github/workflows/gallery-build-mobile.yml
     with:
       environment: production
-      version: ${{ needs.version.outputs.version }}
+      version: ${{ inputs.version }}
     secrets:
       KEY_JKS: ${{ secrets.KEY_JKS }}
       ALIAS: ${{ secrets.ALIAS }}
@@ -208,73 +74,32 @@ jobs:
       IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
       FASTLANE_TEAM_ID: ${{ secrets.FASTLANE_TEAM_ID }}
 
-  draft-release:
-    name: Create Draft GitHub Release
-    needs: [version, build-mobile]
+  record:
+    name: Record built commit
+    needs: build-mobile
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Download APK artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: gallery-apk
-          path: ${{ runner.temp }}/apk
-
-      - name: Create draft release
+      - name: Write version and commit SHA to run summary
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          VERSION: ${{ needs.version.outputs.version }}
-          SHA: ${{ needs.version.outputs.sha }}
+          VERSION: ${{ inputs.version }}
+          SHA: ${{ github.sha }}
         run: |
-          set -euo pipefail
-
-          upstream_version=$(jq -r '.upstream.version' branding/config.json)
-          prev_tag=$(git tag --list 'v*.*.*' --sort=-version:refname | head -n1)
-
-          notes="Based on [Immich v${upstream_version}](https://github.com/immich-app/immich/releases/tag/v${upstream_version})"
-
-          if [[ -n "$prev_tag" ]]; then
-            all_commits=$(git log --pretty=format:'%s' "${prev_tag}..${SHA}" 2>/dev/null)
-
-            gallery_commits=$(echo "$all_commits" | while IFS= read -r line; do
-              [[ -z "$line" ]] && continue
-              pr_num=$(echo "$line" | grep -oP '\(#\K[0-9]+(?=\))' | head -1)
-              if [[ -z "$pr_num" || "$pr_num" -lt 1000 ]]; then
-                echo "- $line"
-              fi
-            done)
-
-            upstream_commits=$(echo "$all_commits" | while IFS= read -r line; do
-              [[ -z "$line" ]] && continue
-              pr_num=$(echo "$line" | grep -oP '\(#\K[0-9]+(?=\))' | head -1)
-              if [[ -n "$pr_num" && "$pr_num" -ge 1000 ]]; then
-                echo "- $line"
-              fi
-            done)
-
-            if [[ -n "$upstream_commits" ]]; then
-              printf -v notes '%s\n\n<details>\n<summary>Upstream commits</summary>\n\n%s\n\n</details>' "$notes" "$upstream_commits"
-            elif [[ -n "$gallery_commits" ]]; then
-              printf -v notes '%s\n\n## Changes\n\n%s' "$notes" "$gallery_commits"
-            fi
-          fi
-
-          gh release create "$VERSION" "$RUNNER_TEMP/apk/gallery-${VERSION}.apk" \
-            --repo "$REPO" \
-            --draft \
-            --target "$SHA" \
-            --title "$VERSION" \
-            --notes "$notes"
-
-          echo "Draft created: $VERSION pinned at $SHA"
-          echo "iOS IPA submitted to TestFlight. Android AAB available as workflow artifact."
-          echo "Next: upload AAB to Play internal, promote Play → production, submit App Store, then run gallery-release.yml."
+          {
+            echo "## Mobile release ${VERSION}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Version | \`${VERSION}\` |"
+            echo "| Commit | \`${SHA}\` |"
+            echo ""
+            echo "Android AAB uploaded to Play Store **internal**; iOS IPA submitted to **TestFlight**."
+            echo "The signed APK is attached to this run as the \`gallery-apk\` artifact."
+            echo ""
+            echo "To ship a matching server build, run **Release Gallery Server** with:"
+            echo ""
+            echo "- **version:** \`${VERSION}\`"
+            echo "- **commit:** \`${SHA}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Mobile ${VERSION} built from ${SHA}"
