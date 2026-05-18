@@ -1,29 +1,29 @@
-name: Release Gallery Server-only
+name: Release Gallery Server
 
-# Server-only release. Skips mobile entirely. Use when shipping changes
-# that don't affect the mobile app (server bug fixes, web UI tweaks, docs)
-# and you don't want to wait for mobile app store review.
+# The server release. Builds + pushes the server and ML Docker images,
+# moves the floating git tags, creates the GitHub Release, and flips the
+# version endpoint that self-hosted instances poll.
 #
-# Mobile users remain on the previous version. Do NOT use this for major
-# version bumps or changes that break the mobile app's API contract — ship
-# those via the normal phase-1 → phase-2 flow so mobile catches up.
+# Mobile is released independently via "Release Mobile" — the two no
+# longer hand off through a draft release. To ship a server build that
+# matches a mobile release, pass the same `version` and the `commit` SHA
+# that the mobile run recorded in its summary.
 #
-# Blocks if a pending phase-1 mobile draft exists — running server-only
-# while a mobile draft is pending would collide on version numbers.
-#
-# See docs/plans/2026-04-17-split-mobile-server-release-design.md.
+# See docs/plans/2026-05-18-decoupled-release-design.md.
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g. v4.50.1) — overrides auto-version'
+        description: 'Version tag to release (e.g. v4.56.6)'
+        required: true
+        type: string
+      commit:
+        description: 'Commit SHA to release up to (default: HEAD of the triggering branch). Pass the SHA the mobile run recorded to ship a matching server build.'
         required: false
         type: string
 
 concurrency:
-  # Same group as phase 2 so the two never race on docker / tag / version
-  # endpoint state. They serialize.
   group: gallery-release-server
   cancel-in-progress: false
 
@@ -31,69 +31,23 @@ permissions: {}
 
 jobs:
   guard:
-    name: Guard against pending mobile draft
+    name: Validate branch
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Require main or release branch
         env:
           REF: ${{ github.ref_name }}
-          VERSION: ${{ inputs.version }}
         run: |
-          set -euo pipefail
-
-          if [[ "$REF" == "main" ]]; then
-            exit 0
-          fi
-
-          if [[ "$REF" == release/* ]]; then
-            if [[ -z "$VERSION" ]]; then
-              echo "::error::Server-only releases from release/* branches require an explicit version input."
-              exit 1
-            fi
-
-            if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "::error::Version must be a full semver tag like v4.55.2 (got: $VERSION)"
-              exit 1
-            fi
-
-            echo "Release branch $REF with explicit version $VERSION. Proceeding."
-            exit 0
-          fi
-
-          echo "::error::Releases must be triggered from main or release/* (got: $REF)"
-          exit 1
-
-      - name: Fail if a mobile release draft is pending
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          pending=$(gh release list --repo "$REPO" --limit 1000 \
-            --json tagName,isDraft \
-            --jq '[.[] | select(.isDraft == true and (.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")))] | .[].tagName')
-          matches=""
-          for tag in $pending; do
-            count=$(gh release view "$tag" --repo "$REPO" --json assets \
-              --jq '[.assets[] | select(.name | endswith(".apk"))] | length')
-            if [[ "$count" -gt 0 ]]; then
-              matches="$matches $tag"
-            fi
-          done
-          matches=$(echo "$matches" | xargs || true)
-          if [[ -n "$matches" ]]; then
-            echo "::error::Pending mobile release draft(s) found: $matches"
-            echo "::error::A server-only release while a mobile draft is pending would collide on version numbers."
-            echo "::error::Either finish the mobile release (run gallery-release.yml once mobile is live), or discard the draft:"
-            echo "::error::  gh release delete <tag> --cleanup-tag --yes"
+          if [[ "$REF" != "main" && "$REF" != release/* ]]; then
+            echo "::error::Releases must be triggered from main or release/* (got: $REF)"
             exit 1
           fi
-          echo "No pending mobile draft. Proceeding."
+          echo "Branch $REF OK."
 
   version:
-    name: Compute Version
+    name: Resolve version & commit
     needs: guard
     runs-on: ubuntu-latest
     permissions:
@@ -101,7 +55,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       major: ${{ steps.version.outputs.major }}
-      sha: ${{ github.sha }}
+      sha: ${{ steps.version.outputs.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -110,99 +64,41 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Compute next version
+      - name: Resolve
         id: version
         env:
-          GH_TOKEN: ${{ github.token }}
           INPUT_VERSION: ${{ inputs.version }}
+          INPUT_COMMIT: ${{ inputs.commit }}
+          DEFAULT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
-          if [[ -n "$INPUT_VERSION" ]]; then
-            major=$(echo "$INPUT_VERSION" | sed 's/^v//' | cut -d. -f1)
-            echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
-            echo "major=v${major}" >> "$GITHUB_OUTPUT"
-            echo "Version: $INPUT_VERSION — manual override"
-            exit 0
-          fi
-
-          prev_tag=$(git tag --list 'v*.*.*' --sort=-version:refname | head -n1)
-          if [[ -z "$prev_tag" ]]; then
-            echo "::error::No existing version tags found. Run a manual release first."
+          if [[ ! "$INPUT_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid version: '$INPUT_VERSION' (expected v<major>.<minor>.<patch>, e.g. v4.56.6)"
             exit 1
           fi
 
-          rank_of() {
-            case "$1" in
-              major) echo 3 ;;
-              minor) echo 2 ;;
-              patch) echo 1 ;;
-              *) echo 0 ;;
-            esac
-          }
-
-          bump=""
-          has_non_skip_commit=false
-          skipped_count=0
-          total_count=0
-
-          while IFS=$'\t' read -r sha subject; do
-            [[ -z "$sha" ]] && continue
-            total_count=$((total_count + 1))
-
-            pr_num=$(echo "$subject" | grep -oP '#\K[0-9]+' | tail -1 || true)
-            labels=""
-            if [[ -n "$pr_num" ]]; then
-              labels=$(gh pr view "$pr_num" --json labels --jq '.labels[].name' 2>/dev/null || true)
+          sha="$DEFAULT_SHA"
+          if [[ -n "$INPUT_COMMIT" ]]; then
+            # Resolve to a full commit SHA and require it to be an ancestor
+            # of the triggering ref, so we only ever release a commit that
+            # is already merged onto this branch — never an arbitrary or
+            # unmerged commit. This is the "release up to <commit>" pin.
+            if ! sha=$(git rev-parse --verify --quiet "${INPUT_COMMIT}^{commit}"); then
+              echo "::error::commit '$INPUT_COMMIT' not found in history"
+              exit 1
             fi
-
-            if echo "$labels" | grep -q '^changelog:skip$'; then
-              skipped_count=$((skipped_count + 1))
-              echo "  · ${sha:0:7} ${subject}  [skip]"
-              continue
+            if ! git merge-base --is-ancestor "$sha" "$DEFAULT_SHA"; then
+              echo "::error::commit '$sha' is not an ancestor of ${DEFAULT_SHA} — refusing to release a commit not merged on this branch"
+              exit 1
             fi
-
-            has_non_skip_commit=true
-            commit_bump="patch"
-
-            if echo "$labels" | grep -q '^changelog:feat$'; then
-              commit_bump="minor"
-            fi
-
-            if echo "$subject" | grep -qP '^[a-z]+(\([^)]+\))?!:'; then
-              commit_bump="major"
-            elif echo "$subject" | grep -qP '^feat(\([^)]+\))?:'; then
-              [[ "$commit_bump" == "patch" ]] && commit_bump="minor"
-            fi
-
-            if [[ -z "$bump" ]] || (( $(rank_of "$commit_bump") > $(rank_of "$bump") )); then
-              bump="$commit_bump"
-            fi
-            echo "  · ${sha:0:7} ${subject}  [${commit_bump}]"
-          done < <(git log --format='%H%x09%s' "${prev_tag}..HEAD")
-
-          echo "Scanned $total_count commits since $prev_tag ($skipped_count skipped)."
-
-          if [[ "$has_non_skip_commit" == "false" ]]; then
-            echo "::error::No releasable commits since $prev_tag — nothing to release."
-            exit 1
           fi
 
-          bump="${bump:-patch}"
-          prev_major=$(echo "$prev_tag" | sed 's/^v//' | cut -d. -f1)
-          prev_minor=$(echo "$prev_tag" | sed 's/^v//' | cut -d. -f2)
-          prev_patch=$(echo "$prev_tag" | sed 's/^v//' | cut -d. -f3)
-
-          case "$bump" in
-            major) version="v$((prev_major + 1)).0.0" ;;
-            minor) version="v${prev_major}.$((prev_minor + 1)).0" ;;
-            patch) version="v${prev_major}.${prev_minor}.$((prev_patch + 1))" ;;
-          esac
-
-          new_major=$(echo "$version" | sed 's/^v//' | cut -d. -f1)
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "major=v${new_major}" >> "$GITHUB_OUTPUT"
-          echo "Version: $version — ${bump} bump from $prev_tag"
+          major=$(echo "$INPUT_VERSION" | sed 's/^v//' | cut -d. -f1)
+          echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "major=v${major}" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Releasing $INPUT_VERSION from $sha"
 
   build-server:
     name: Build Server (${{ matrix.platform }})
@@ -485,8 +381,6 @@ jobs:
           notes="Based on [Immich v${upstream_version}](https://github.com/immich-app/immich/releases/tag/v${upstream_version})"
 
           if [[ -n "$prev_tag" ]]; then
-            notes+=$'\n\n> **Server-only release.** No mobile changes. For the Android APK, see ['"$prev_tag"'](https://github.com/'"$REPO"'/releases/tag/'"$prev_tag"').'
-
             all_commits=$(git log --pretty=format:'%s' "${prev_tag}..${SHA}" 2>/dev/null)
 
             gallery_commits=$(echo "$all_commits" | while IFS= read -r line; do
@@ -521,7 +415,7 @@ jobs:
             docker/docker-compose.yml \
             docker/example.env
 
-          echo "Released $VERSION (server-only)"
+          echo "Released $VERSION from $SHA"
 
   publish-version-endpoint:
     name: Publish Version Endpoint
