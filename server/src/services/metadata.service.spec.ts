@@ -334,6 +334,78 @@ describe(MetadataService.name, () => {
       );
     });
 
+    // Issue #607: Android cameras omit OffsetTimeOriginal, so the EXIF wall-clock
+    // time has no timezone. Recover the offset from the upload-supplied
+    // fileCreatedAt instant instead of assuming UTC.
+    it('should recover a positive timezone offset from the uploaded fileCreatedAt instant', async () => {
+      // Photo taken at 16:51 local time in UTC+2 -> true instant 14:51Z
+      const asset = AssetFactory.create({ fileCreatedAt: new Date('2026-05-18T14:51:00.000Z') });
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+      mockReadTags({ DateTimeOriginal: '2026:05:18 16:51:00' });
+
+      await sut.handleMetadataExtraction({ id: asset.id });
+
+      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dateTimeOriginal: new Date('2026-05-18T14:51:00.000Z'),
+          timeZone: 'UTC+2',
+        }),
+        { lockedPropertiesBehavior: 'skip' },
+      );
+      expect(mocks.asset.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fileCreatedAt: new Date('2026-05-18T14:51:00.000Z'),
+          localDateTime: new Date('2026-05-18T16:51:00.000Z'),
+        }),
+      );
+    });
+
+    it('should recover a negative timezone offset from the uploaded fileCreatedAt instant', async () => {
+      // Photo taken at 12:00 local time in UTC-4 -> true instant 16:00Z
+      const asset = AssetFactory.create({ fileCreatedAt: new Date('2026-05-18T16:00:00.000Z') });
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+      mockReadTags({ DateTimeOriginal: '2026:05:18 12:00:00' });
+
+      await sut.handleMetadataExtraction({ id: asset.id });
+
+      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dateTimeOriginal: new Date('2026-05-18T16:00:00.000Z'),
+          timeZone: 'UTC-4',
+        }),
+        { lockedPropertiesBehavior: 'skip' },
+      );
+      expect(mocks.asset.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fileCreatedAt: new Date('2026-05-18T16:00:00.000Z'),
+          localDateTime: new Date('2026-05-18T12:00:00.000Z'),
+        }),
+      );
+    });
+
+    it('should not invent a timezone when the uploaded instant matches the EXIF wall clock', async () => {
+      // Clients (web/immich-go) that derive fileCreatedAt from the same zone-less
+      // EXIF must keep the existing UTC behaviour, not gain a fake offset.
+      const asset = AssetFactory.create({ fileCreatedAt: new Date('2026-05-18T16:51:00.000Z') });
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+      mockReadTags({ DateTimeOriginal: '2026:05:18 16:51:00' });
+
+      await sut.handleMetadataExtraction({ id: asset.id });
+
+      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dateTimeOriginal: new Date('2026-05-18T16:51:00.000Z'),
+          timeZone: null,
+        }),
+        { lockedPropertiesBehavior: 'skip' },
+      );
+      expect(mocks.asset.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          localDateTime: new Date('2026-05-18T16:51:00.000Z'),
+        }),
+      );
+    });
+
     it('should handle lists of numbers', async () => {
       const asset = AssetFactory.create();
       mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));

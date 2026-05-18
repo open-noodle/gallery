@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ContainerDirectoryItem, ExifDateTime, Tags } from 'exiftool-vendored';
 import { Insertable } from 'kysely';
 import _ from 'lodash';
-import { DateTime, Duration } from 'luxon';
+import { DateTime, Duration, FixedOffsetZone } from 'luxon';
 import { Stats } from 'node:fs';
 import { constants } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -86,6 +86,33 @@ export function firstDateTime(tags: ImmichTags) {
     }
   }
 }
+
+/**
+ * Recover a UTC offset for a zone-less EXIF capture time (issue #607).
+ *
+ * Android cameras commonly omit `OffsetTimeOriginal`, so the EXIF wall-clock
+ * time has no timezone and would otherwise be assumed to be UTC. Clients upload
+ * `fileCreatedAt` derived from the true capture instant, so the gap between the
+ * wall clock (read as UTC) and that instant is the original offset.
+ *
+ * Returns a Luxon fixed-offset zone string (e.g. `UTC+2`, `UTC-4`) or null when
+ * the gap is zero or does not resolve to a real-world offset — in which case
+ * the caller keeps the existing UTC behaviour.
+ */
+const deriveTimeZoneFromUploadedInstant = (exifLocalAsUtc: DateTime, fileCreatedAt: Date): string | null => {
+  if (!exifLocalAsUtc.isValid || Number.isNaN(fileCreatedAt.getTime())) {
+    return null;
+  }
+
+  const offsetMinutes = (exifLocalAsUtc.toMillis() - fileCreatedAt.getTime()) / 60_000;
+  // Real-world UTC offsets are whole multiples of 15 minutes within ±14:00.
+  const snapped = Math.round(offsetMinutes / 15) * 15;
+  if (snapped === 0 || Math.abs(snapped) > 14 * 60 || Math.abs(offsetMinutes - snapped) > 2) {
+    return null;
+  }
+
+  return FixedOffsetZone.instance(snapped).name;
+};
 
 const validate = <T>(value: T): NonNullable<T> | null => {
   // handle lists of numbers
@@ -1113,6 +1140,21 @@ export class MetadataService extends BaseService {
     // do not let JavaScript use local timezone
     if (dateTimeOriginal && !dateTime?.hasZone) {
       dateTimeOriginal = dateTimeOriginal.setZone('UTC', { keepLocalTime: true });
+
+      // EXIF has a wall-clock capture time but no offset (Android cameras omit
+      // OffsetTimeOriginal, unlike iOS). Recover the original offset from the
+      // upload-supplied fileCreatedAt instant so the timestamp is not shifted
+      // into UTC on sync. Issue #607.
+      if (timeZone == null) {
+        const derived = deriveTimeZoneFromUploadedInstant(dateTimeOriginal, asset.fileCreatedAt);
+        if (derived) {
+          timeZone = derived;
+          dateTimeOriginal = dateTimeOriginal.setZone(derived, { keepLocalTime: true });
+          this.logger.verbose(
+            `Derived timezone ${timeZone} from fileCreatedAt for asset ${asset.id}: ${asset.originalPath}`,
+          );
+        }
+      }
     }
 
     // align with whatever timeZone we chose
