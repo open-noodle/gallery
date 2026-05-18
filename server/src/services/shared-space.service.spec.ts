@@ -3636,6 +3636,66 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.sharedSpace.deleteOrphanedPersonsByIds).toHaveBeenCalledWith(spaceId, [petSpacePersonId]);
     });
 
+    it('does not attach an identity-backed pet face to an existing human space person for the same identity', async () => {
+      const spaceId = newUuid();
+      const assetId = newUuid();
+      const petFaceId = newUuid();
+      const petPersonId = newUuid();
+      const identityId = newUuid();
+      const humanSpacePersonId = newUuid();
+      const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([]);
+      mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([
+        { id: petFaceId, assetId, personId: petPersonId, identityId, type: 'pet' },
+      ]);
+      mocks.sharedSpace.getPersonFaceAssignmentsForSpace.mockResolvedValue([]);
+      mocks.sharedSpace.getSpacePersonByIdentity.mockResolvedValue(
+        factory.sharedSpacePerson({ id: humanSpacePersonId, spaceId, identityId, type: 'person' }),
+      );
+
+      const result = await sut.handleSharedSpaceFaceMatch({ spaceId, assetId });
+
+      expect(result).toBe(JobStatus.Success);
+      expect(mocks.sharedSpace.addPersonFaces).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.createPerson).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.recountPersons).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.deleteOrphanedPersonsByIds).not.toHaveBeenCalled();
+    });
+
+    it('removes a stale human selected-space assignment for an identity-backed pet face without cross-type reassignment', async () => {
+      const spaceId = newUuid();
+      const assetId = newUuid();
+      const petFaceId = newUuid();
+      const petPersonId = newUuid();
+      const identityId = newUuid();
+      const humanSpacePersonId = newUuid();
+      const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([]);
+      mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([
+        { id: petFaceId, assetId, personId: petPersonId, identityId, type: 'pet' },
+      ]);
+      mocks.sharedSpace.getPersonFaceAssignmentsForSpace.mockResolvedValue([
+        { personId: humanSpacePersonId, identityId, type: 'person' },
+      ]);
+      mocks.sharedSpace.getSpacePersonByIdentity.mockResolvedValue(
+        factory.sharedSpacePerson({ id: humanSpacePersonId, spaceId, identityId, type: 'person' }),
+      );
+      mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace.mockResolvedValue([humanSpacePersonId]);
+
+      const result = await sut.handleSharedSpaceFaceMatch({ spaceId, assetId });
+
+      expect(result).toBe(JobStatus.Success);
+      expect(mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace).toHaveBeenCalledWith(spaceId, petFaceId);
+      expect(mocks.sharedSpace.addPersonFaces).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.createPerson).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledWith([humanSpacePersonId]);
+      expect(mocks.sharedSpace.deleteOrphanedPersonsByIds).toHaveBeenCalledWith(spaceId, [humanSpacePersonId]);
+    });
+
     it('should not auto-repair or attach pre-existing stale rows for a face without source personId', async () => {
       const spaceId = newUuid();
       const assetId = newUuid();
@@ -4007,6 +4067,13 @@ describe(SharedSpaceService.name, () => {
       const result = await sut.handleSharedSpaceFaceMatchFromBackfill({ spaceId: 'space-1', assetId: 'asset-1' });
 
       expect(result).toBe(JobStatus.Skipped);
+      expect(mocks.sharedSpace.isAssetInSpace).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.getAssetFacesForMatching).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.getPetFacesForAsset).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.createPerson).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.addPersonFaces).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
     });
 
     it('should skip when face recognition is disabled on the space', async () => {
@@ -4016,6 +4083,34 @@ describe(SharedSpaceService.name, () => {
       const result = await sut.handleSharedSpaceFaceMatchFromBackfill({ spaceId: space.id, assetId: 'asset-1' });
 
       expect(result).toBe(JobStatus.Skipped);
+      expect(mocks.sharedSpace.isAssetInSpace).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.getAssetFacesForMatching).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.getPetFacesForAsset).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.createPerson).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.addPersonFaces).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it('skips safely when a from-backfill asset is no longer in the space before execution', async () => {
+      const spaceId = newUuid();
+      const assetId = newUuid();
+
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.sharedSpace.isAssetInSpace.mockResolvedValue(false);
+
+      const result = await sut.handleSharedSpaceFaceMatchFromBackfill({ spaceId, assetId });
+
+      expect(result).toBe(JobStatus.Success);
+      expect(mocks.sharedSpace.getAssetFacesForMatching).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.getPetFacesForAsset).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.createPerson).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.updatePerson).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.addPersonFaces).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.recountPersons).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.deleteOrphanedPersonsByIds).not.toHaveBeenCalled();
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.SharedSpacePersonDedup, data: { spaceId } });
     });
 
     it('should queue dedup pass after successful face match', async () => {
@@ -7575,6 +7670,32 @@ describe(SharedSpaceService.name, () => {
       });
     });
 
+    it('does not queue identity reconciliation when library sync finds assets but changes no space people', async () => {
+      const spaceId = newUuid();
+      const libraryId = newUuid();
+      const assetId = newUuid();
+
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
+      mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+      mocks.sharedSpace.isAssetInSpace.mockResolvedValue(true);
+      mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([]);
+      mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
+
+      const result = await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
+
+      expect(result).toBe(JobStatus.Success);
+      expect(mocks.sharedSpace.getAssetFacesForMatching).toHaveBeenCalledWith(assetId);
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpacePersonDedup,
+        data: { spaceId },
+      });
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.SharedSpaceIdentityReconciliation }),
+      );
+    });
+
     it('should skip when space does not exist', async () => {
       mocks.sharedSpace.getById.mockResolvedValue(void 0);
       const result = await sut.handleSharedSpaceLibraryFaceSync({ spaceId: newUuid(), libraryId: newUuid() });
@@ -7604,10 +7725,14 @@ describe(SharedSpaceService.name, () => {
       mocks.asset.getByLibraryIdWithFaces.mockResolvedValue([]);
       const result = await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
       expect(result).toBe(JobStatus.Success);
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.SharedSpacePersonDedup,
         data: { spaceId },
       });
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.SharedSpaceIdentityReconciliation }),
+      );
     });
 
     it('should stop syncing when library is unlinked during iteration', async () => {
