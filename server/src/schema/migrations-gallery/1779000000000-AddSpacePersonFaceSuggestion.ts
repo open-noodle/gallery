@@ -36,6 +36,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   await sql`
     INSERT INTO "migration_overrides" ("name", "value")
     VALUES ('index_person_face_suggestion_personId_assetFaceId_uq', '{"type":"index","name":"person_face_suggestion_personId_assetFaceId_uq","sql":"CREATE UNIQUE INDEX \\"person_face_suggestion_personId_assetFaceId_uq\\" ON \\"person_face_suggestion\\" (\\"personId\\", \\"assetFaceId\\") WHERE \\"personId\\" IS NOT NULL;"}'::jsonb)
+    ON CONFLICT ("name") DO UPDATE SET "value" = EXCLUDED."value"
   `.execute(db);
 
   await sql`
@@ -46,6 +47,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   await sql`
     INSERT INTO "migration_overrides" ("name", "value")
     VALUES ('index_person_face_suggestion_spacePersonId_assetFaceId_uq', '{"type":"index","name":"person_face_suggestion_spacePersonId_assetFaceId_uq","sql":"CREATE UNIQUE INDEX \\"person_face_suggestion_spacePersonId_assetFaceId_uq\\" ON \\"person_face_suggestion\\" (\\"spacePersonId\\", \\"assetFaceId\\") WHERE \\"spacePersonId\\" IS NOT NULL;"}'::jsonb)
+    ON CONFLICT ("name") DO UPDATE SET "value" = EXCLUDED."value"
   `.execute(db);
 
   await sql`
@@ -56,6 +58,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   await sql`
     INSERT INTO "migration_overrides" ("name", "value")
     VALUES ('index_person_face_suggestion_spacePersonId_status_distance_idx', '{"type":"index","name":"person_face_suggestion_spacePersonId_status_distance_idx","sql":"CREATE INDEX \\"person_face_suggestion_spacePersonId_status_distance_idx\\" ON \\"person_face_suggestion\\" (\\"spacePersonId\\", \\"status\\", \\"distance\\") WHERE \\"spacePersonId\\" IS NOT NULL;"}'::jsonb)
+    ON CONFLICT ("name") DO UPDATE SET "value" = EXCLUDED."value"
   `.execute(db);
 
   await sql`
