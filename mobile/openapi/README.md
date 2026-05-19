@@ -90,6 +90,7 @@ Class | Method | HTTP request | Description
 *AlbumsApi* | [**deleteAlbum**](doc//AlbumsApi.md#deletealbum) | **DELETE** /albums/{id} | Delete an album
 *AlbumsApi* | [**getAlbumInfo**](doc//AlbumsApi.md#getalbuminfo) | **GET** /albums/{id} | Retrieve an album
 *AlbumsApi* | [**getAlbumMapMarkers**](doc//AlbumsApi.md#getalbummapmarkers) | **GET** /albums/{id}/map-markers | Retrieve album map markers
+*AlbumsApi* | [**getAlbumNames**](doc//AlbumsApi.md#getalbumnames) | **GET** /albums/names | Retrieve album names
 *AlbumsApi* | [**getAlbumStatistics**](doc//AlbumsApi.md#getalbumstatistics) | **GET** /albums/statistics | Retrieve album statistics
 *AlbumsApi* | [**getAllAlbums**](doc//AlbumsApi.md#getallalbums) | **GET** /albums | List all albums
 *AlbumsApi* | [**removeAssetFromAlbum**](doc//AlbumsApi.md#removeassetfromalbum) | **DELETE** /albums/{id}/assets | Remove assets from an album
@@ -136,6 +137,7 @@ Class | Method | HTTP request | Description
 *AuthenticationApi* | [**unlockAuthSession**](doc//AuthenticationApi.md#unlockauthsession) | **POST** /auth/session/unlock | Unlock auth session
 *AuthenticationApi* | [**validateAccessToken**](doc//AuthenticationApi.md#validateaccesstoken) | **POST** /auth/validateToken | Validate access token
 *AuthenticationAdminApi* | [**unlinkAllOAuthAccountsAdmin**](doc//AuthenticationAdminApi.md#unlinkalloauthaccountsadmin) | **POST** /admin/auth/unlink-all | Unlink all OAuth accounts
+*ClassificationApi* | [**scanClassification**](doc//ClassificationApi.md#scanclassification) | **POST** /classification/scan | Scan all libraries for classification
 *DatabaseBackupsAdminApi* | [**deleteDatabaseBackup**](doc//DatabaseBackupsAdminApi.md#deletedatabasebackup) | **DELETE** /admin/database-backups | Delete database backup
 *DatabaseBackupsAdminApi* | [**downloadDatabaseBackup**](doc//DatabaseBackupsAdminApi.md#downloaddatabasebackup) | **GET** /admin/database-backups/{filename} | Download database backup
 *DatabaseBackupsAdminApi* | [**listDatabaseBackups**](doc//DatabaseBackupsAdminApi.md#listdatabasebackups) | **GET** /admin/database-backups | List database backups
@@ -154,6 +156,7 @@ Class | Method | HTTP request | Description
 *FacesApi* | [**deleteFace**](doc//FacesApi.md#deleteface) | **DELETE** /faces/{id} | Delete a face
 *FacesApi* | [**getFaces**](doc//FacesApi.md#getfaces) | **GET** /faces | Retrieve faces for asset
 *FacesApi* | [**reassignFacesById**](doc//FacesApi.md#reassignfacesbyid) | **PUT** /faces/{id} | Re-assign a face to another person
+*GalleryMapApi* | [**getFilteredMapMarkers**](doc//GalleryMapApi.md#getfilteredmapmarkers) | **GET** /gallery/map/markers | Get filtered map markers
 *JobsApi* | [**createJob**](doc//JobsApi.md#createjob) | **POST** /jobs | Create a manual job
 *JobsApi* | [**getQueuesLegacy**](doc//JobsApi.md#getqueueslegacy) | **GET** /jobs | Retrieve queue counts and status
 *JobsApi* | [**runQueueCommandLegacy**](doc//JobsApi.md#runqueuecommandlegacy) | **PUT** /jobs/{name} | Run jobs
@@ -196,14 +199,21 @@ Class | Method | HTTP request | Description
 *PeopleApi* | [**createPerson**](doc//PeopleApi.md#createperson) | **POST** /people | Create a person
 *PeopleApi* | [**deletePeople**](doc//PeopleApi.md#deletepeople) | **DELETE** /people | Delete people
 *PeopleApi* | [**deletePerson**](doc//PeopleApi.md#deleteperson) | **DELETE** /people/{id} | Delete person
+*PeopleApi* | [**detachScopedPerson**](doc//PeopleApi.md#detachscopedperson) | **POST** /people/detach-profile | Detach a scoped person profile
 *PeopleApi* | [**getAllPeople**](doc//PeopleApi.md#getallpeople) | **GET** /people | Get all people
+*PeopleApi* | [**getPeopleFaceStatistics**](doc//PeopleApi.md#getpeoplefacestatistics) | **GET** /people/face-statistics | Get people face statistics
+*PeopleApi* | [**getPeopleStatistics**](doc//PeopleApi.md#getpeoplestatistics) | **GET** /people/statistics | Get people statistics
 *PeopleApi* | [**getPerson**](doc//PeopleApi.md#getperson) | **GET** /people/{id} | Get a person
+*PeopleApi* | [**getPersonFaceThumbnail**](doc//PeopleApi.md#getpersonfacethumbnail) | **GET** /people/{id}/faces/{faceId}/thumbnail | Get person face thumbnail
+*PeopleApi* | [**getPersonFaces**](doc//PeopleApi.md#getpersonfaces) | **GET** /people/{id}/faces | Get person faces
 *PeopleApi* | [**getPersonStatistics**](doc//PeopleApi.md#getpersonstatistics) | **GET** /people/{id}/statistics | Get person statistics
 *PeopleApi* | [**getPersonThumbnail**](doc//PeopleApi.md#getpersonthumbnail) | **GET** /people/{id}/thumbnail | Get person thumbnail
 *PeopleApi* | [**mergePerson**](doc//PeopleApi.md#mergeperson) | **POST** /people/{id}/merge | Merge people
+*PeopleApi* | [**mergeScopedPeople**](doc//PeopleApi.md#mergescopedpeople) | **POST** /people/same-person | Merge scoped people by identity
 *PeopleApi* | [**reassignFaces**](doc//PeopleApi.md#reassignfaces) | **PUT** /people/{id}/reassign | Reassign faces
 *PeopleApi* | [**updatePeople**](doc//PeopleApi.md#updatepeople) | **PUT** /people | Update people
 *PeopleApi* | [**updatePerson**](doc//PeopleApi.md#updateperson) | **PUT** /people/{id} | Update person
+*PeopleApi* | [**updateRepresentativeFace**](doc//PeopleApi.md#updaterepresentativeface) | **PUT** /people/{id}/representative-face | Update representative face
 *PluginsApi* | [**getPlugin**](doc//PluginsApi.md#getplugin) | **GET** /plugins/{id} | Retrieve a plugin
 *PluginsApi* | [**getPluginTriggers**](doc//PluginsApi.md#getplugintriggers) | **GET** /plugins/triggers | List all plugin triggers
 *PluginsApi* | [**getPlugins**](doc//PluginsApi.md#getplugins) | **GET** /plugins | List all plugins
@@ -214,7 +224,9 @@ Class | Method | HTTP request | Description
 *QueuesApi* | [**updateQueue**](doc//QueuesApi.md#updatequeue) | **PUT** /queues/{name} | Update a queue
 *SearchApi* | [**getAssetsByCity**](doc//SearchApi.md#getassetsbycity) | **GET** /search/cities | Retrieve assets by city
 *SearchApi* | [**getExploreData**](doc//SearchApi.md#getexploredata) | **GET** /search/explore | Retrieve explore data
+*SearchApi* | [**getFilterSuggestions**](doc//SearchApi.md#getfiltersuggestions) | **GET** /search/suggestions/filters | Retrieve dynamic filter suggestions
 *SearchApi* | [**getSearchSuggestions**](doc//SearchApi.md#getsearchsuggestions) | **GET** /search/suggestions | Retrieve search suggestions
+*SearchApi* | [**getTagSuggestions**](doc//SearchApi.md#gettagsuggestions) | **GET** /search/suggestions/tags | Retrieve tag suggestions
 *SearchApi* | [**searchAssetStatistics**](doc//SearchApi.md#searchassetstatistics) | **POST** /search/statistics | Search asset statistics
 *SearchApi* | [**searchAssets**](doc//SearchApi.md#searchassets) | **POST** /search/metadata | Search assets by metadata
 *SearchApi* | [**searchLargeAssets**](doc//SearchApi.md#searchlargeassets) | **POST** /search/large-assets | Search large assets
@@ -222,9 +234,11 @@ Class | Method | HTTP request | Description
 *SearchApi* | [**searchPlaces**](doc//SearchApi.md#searchplaces) | **GET** /search/places | Search places
 *SearchApi* | [**searchRandom**](doc//SearchApi.md#searchrandom) | **POST** /search/random | Search random assets
 *SearchApi* | [**searchSmart**](doc//SearchApi.md#searchsmart) | **POST** /search/smart | Smart asset search
+*SearchApi* | [**searchSmartFacets**](doc//SearchApi.md#searchsmartfacets) | **POST** /search/smart/facets | Smart asset search facets
 *ServerApi* | [**deleteServerLicense**](doc//ServerApi.md#deleteserverlicense) | **DELETE** /server/license | Delete server product key
 *ServerApi* | [**getAboutInfo**](doc//ServerApi.md#getaboutinfo) | **GET** /server/about | Get server information
 *ServerApi* | [**getApkLinks**](doc//ServerApi.md#getapklinks) | **GET** /server/apk-links | Get APK links
+*ServerApi* | [**getMlHealth**](doc//ServerApi.md#getmlhealth) | **GET** /server/ml-health | Smart search health
 *ServerApi* | [**getServerConfig**](doc//ServerApi.md#getserverconfig) | **GET** /server/config | Get config
 *ServerApi* | [**getServerFeatures**](doc//ServerApi.md#getserverfeatures) | **GET** /server/features | Get features
 *ServerApi* | [**getServerLicense**](doc//ServerApi.md#getserverlicense) | **GET** /server/license | Get product key
@@ -251,6 +265,42 @@ Class | Method | HTTP request | Description
 *SharedLinksApi* | [**removeSharedLinkAssets**](doc//SharedLinksApi.md#removesharedlinkassets) | **DELETE** /shared-links/{id}/assets | Remove assets from a shared link
 *SharedLinksApi* | [**sharedLinkLogin**](doc//SharedLinksApi.md#sharedlinklogin) | **POST** /shared-links/login | Shared link login
 *SharedLinksApi* | [**updateSharedLink**](doc//SharedLinksApi.md#updatesharedlink) | **PATCH** /shared-links/{id} | Update a shared link
+*SharedSpacesApi* | [**addAssets**](doc//SharedSpacesApi.md#addassets) | **POST** /shared-spaces/{id}/assets | Add assets to a shared space
+*SharedSpacesApi* | [**addMember**](doc//SharedSpacesApi.md#addmember) | **POST** /shared-spaces/{id}/members | Add a member to a shared space
+*SharedSpacesApi* | [**bulkAddAssets**](doc//SharedSpacesApi.md#bulkaddassets) | **POST** /shared-spaces/{id}/assets/bulk-add | Add all user assets to a shared space
+*SharedSpacesApi* | [**createSpace**](doc//SharedSpacesApi.md#createspace) | **POST** /shared-spaces | Create a shared space
+*SharedSpacesApi* | [**deduplicateSpacePeople**](doc//SharedSpacesApi.md#deduplicatespacepeople) | **POST** /shared-spaces/{id}/people/deduplicate | Deduplicate people in a shared space
+*SharedSpacesApi* | [**deleteSpacePerson**](doc//SharedSpacesApi.md#deletespaceperson) | **DELETE** /shared-spaces/{id}/people/{personId} | Delete a person from a shared space
+*SharedSpacesApi* | [**deleteSpacePersonAlias**](doc//SharedSpacesApi.md#deletespacepersonalias) | **DELETE** /shared-spaces/{id}/people/{personId}/alias | Delete a person alias in a shared space
+*SharedSpacesApi* | [**getAllSpaces**](doc//SharedSpacesApi.md#getallspaces) | **GET** /shared-spaces | Get all shared spaces
+*SharedSpacesApi* | [**getMembers**](doc//SharedSpacesApi.md#getmembers) | **GET** /shared-spaces/{id}/members | Get members of a shared space
+*SharedSpacesApi* | [**getSpace**](doc//SharedSpacesApi.md#getspace) | **GET** /shared-spaces/{id} | Get a shared space
+*SharedSpacesApi* | [**getSpaceActivities**](doc//SharedSpacesApi.md#getspaceactivities) | **GET** /shared-spaces/{id}/activities | Get space activity feed
+*SharedSpacesApi* | [**getSpaceMapMarkers**](doc//SharedSpacesApi.md#getspacemapmarkers) | **GET** /shared-spaces/{id}/map-markers | Get map markers for a shared space
+*SharedSpacesApi* | [**getSpacePeople**](doc//SharedSpacesApi.md#getspacepeople) | **GET** /shared-spaces/{id}/people | Get people in a shared space
+*SharedSpacesApi* | [**getSpacePeopleFaceStatistics**](doc//SharedSpacesApi.md#getspacepeoplefacestatistics) | **GET** /shared-spaces/{id}/people/face-statistics | Get people face statistics in a shared space
+*SharedSpacesApi* | [**getSpacePeopleStatistics**](doc//SharedSpacesApi.md#getspacepeoplestatistics) | **GET** /shared-spaces/{id}/people/statistics | Get people statistics in a shared space
+*SharedSpacesApi* | [**getSpacePerson**](doc//SharedSpacesApi.md#getspaceperson) | **GET** /shared-spaces/{id}/people/{personId} | Get a person in a shared space
+*SharedSpacesApi* | [**getSpacePersonAssets**](doc//SharedSpacesApi.md#getspacepersonassets) | **GET** /shared-spaces/{id}/people/{personId}/assets | Get assets for a person in a shared space
+*SharedSpacesApi* | [**getSpacePersonFaceThumbnail**](doc//SharedSpacesApi.md#getspacepersonfacethumbnail) | **GET** /shared-spaces/{id}/people/{personId}/faces/{faceId}/thumbnail | Get space person face thumbnail
+*SharedSpacesApi* | [**getSpacePersonFaces**](doc//SharedSpacesApi.md#getspacepersonfaces) | **GET** /shared-spaces/{id}/people/{personId}/faces | Get space person faces
+*SharedSpacesApi* | [**getSpacePersonStatistics**](doc//SharedSpacesApi.md#getspacepersonstatistics) | **GET** /shared-spaces/{id}/people/{personId}/statistics | Get space person statistics
+*SharedSpacesApi* | [**getSpacePersonThumbnail**](doc//SharedSpacesApi.md#getspacepersonthumbnail) | **GET** /shared-spaces/{id}/people/{personId}/thumbnail | Get a space person thumbnail
+*SharedSpacesApi* | [**linkLibrary**](doc//SharedSpacesApi.md#linklibrary) | **PUT** /shared-spaces/{id}/libraries | Link a library to a shared space
+*SharedSpacesApi* | [**markSpaceViewed**](doc//SharedSpacesApi.md#markspaceviewed) | **PATCH** /shared-spaces/{id}/view | Mark space as viewed
+*SharedSpacesApi* | [**mergeSpacePeople**](doc//SharedSpacesApi.md#mergespacepeople) | **POST** /shared-spaces/{id}/people/{personId}/merge | Merge people in a shared space
+*SharedSpacesApi* | [**removeAssets**](doc//SharedSpacesApi.md#removeassets) | **DELETE** /shared-spaces/{id}/assets | Remove assets from a shared space
+*SharedSpacesApi* | [**removeMember**](doc//SharedSpacesApi.md#removemember) | **DELETE** /shared-spaces/{id}/members/{userId} | Remove a member from a shared space
+*SharedSpacesApi* | [**removeSpace**](doc//SharedSpacesApi.md#removespace) | **DELETE** /shared-spaces/{id} | Delete a shared space
+*SharedSpacesApi* | [**setSpacePersonAlias**](doc//SharedSpacesApi.md#setspacepersonalias) | **PUT** /shared-spaces/{id}/people/{personId}/alias | Set a person alias in a shared space
+*SharedSpacesApi* | [**unlinkLibrary**](doc//SharedSpacesApi.md#unlinklibrary) | **DELETE** /shared-spaces/{id}/libraries/{libraryId} | Unlink a library from a shared space
+*SharedSpacesApi* | [**updateMember**](doc//SharedSpacesApi.md#updatemember) | **PATCH** /shared-spaces/{id}/members/{userId} | Update a member in a shared space
+*SharedSpacesApi* | [**updateMemberMetadataContribution**](doc//SharedSpacesApi.md#updatemembermetadatacontribution) | **PATCH** /shared-spaces/{id}/members/{userId}/metadata-contribution | Disable member person metadata contribution
+*SharedSpacesApi* | [**updateMemberPreferences**](doc//SharedSpacesApi.md#updatememberpreferences) | **PATCH** /shared-spaces/{id}/members/me/preferences | Update current member preferences
+*SharedSpacesApi* | [**updateMemberTimeline**](doc//SharedSpacesApi.md#updatemembertimeline) | **PATCH** /shared-spaces/{id}/members/me/timeline | Update timeline visibility for current member
+*SharedSpacesApi* | [**updateSpace**](doc//SharedSpacesApi.md#updatespace) | **PATCH** /shared-spaces/{id} | Update a shared space
+*SharedSpacesApi* | [**updateSpacePerson**](doc//SharedSpacesApi.md#updatespaceperson) | **PUT** /shared-spaces/{id}/people/{personId} | Update a person in a shared space
+*SharedSpacesApi* | [**updateSpacePersonRepresentativeFace**](doc//SharedSpacesApi.md#updatespacepersonrepresentativeface) | **PUT** /shared-spaces/{id}/people/{personId}/representative-face | Update space person representative face
 *StacksApi* | [**createStack**](doc//StacksApi.md#createstack) | **POST** /stacks | Create a stack
 *StacksApi* | [**deleteStack**](doc//StacksApi.md#deletestack) | **DELETE** /stacks/{id} | Delete a stack
 *StacksApi* | [**deleteStacks**](doc//StacksApi.md#deletestacks) | **DELETE** /stacks | Delete stacks
@@ -258,6 +308,10 @@ Class | Method | HTTP request | Description
 *StacksApi* | [**removeAssetFromStack**](doc//StacksApi.md#removeassetfromstack) | **DELETE** /stacks/{id}/assets/{assetId} | Remove an asset from a stack
 *StacksApi* | [**searchStacks**](doc//StacksApi.md#searchstacks) | **GET** /stacks | Retrieve stacks
 *StacksApi* | [**updateStack**](doc//StacksApi.md#updatestack) | **PUT** /stacks/{id} | Update a stack
+*StorageMigrationAdminApi* | [**getEstimate**](doc//StorageMigrationAdminApi.md#getestimate) | **GET** /storage-migration/estimate | Get storage migration estimate
+*StorageMigrationAdminApi* | [**getStatus**](doc//StorageMigrationAdminApi.md#getstatus) | **GET** /storage-migration/status | Get storage migration status
+*StorageMigrationAdminApi* | [**rollback**](doc//StorageMigrationAdminApi.md#rollback) | **POST** /storage-migration/rollback/{batchId} | Rollback a storage migration batch
+*StorageMigrationAdminApi* | [**start**](doc//StorageMigrationAdminApi.md#start) | **POST** /storage-migration/start | Start storage migration
 *SyncApi* | [**deleteSyncAck**](doc//SyncApi.md#deletesyncack) | **DELETE** /sync/ack | Delete acknowledgements
 *SyncApi* | [**getSyncAck**](doc//SyncApi.md#getsyncack) | **GET** /sync/ack | Retrieve acknowledgements
 *SyncApi* | [**getSyncStream**](doc//SyncApi.md#getsyncstream) | **POST** /sync/stream | Stream sync changes
@@ -284,6 +338,12 @@ Class | Method | HTTP request | Description
 *TrashApi* | [**emptyTrash**](doc//TrashApi.md#emptytrash) | **POST** /trash/empty | Empty trash
 *TrashApi* | [**restoreAssets**](doc//TrashApi.md#restoreassets) | **POST** /trash/restore/assets | Restore assets
 *TrashApi* | [**restoreTrash**](doc//TrashApi.md#restoretrash) | **POST** /trash/restore | Restore trash
+*UserGroupsApi* | [**createGroup**](doc//UserGroupsApi.md#creategroup) | **POST** /user-groups | Create a user group
+*UserGroupsApi* | [**getAllGroups**](doc//UserGroupsApi.md#getallgroups) | **GET** /user-groups | Get all user groups
+*UserGroupsApi* | [**getGroup**](doc//UserGroupsApi.md#getgroup) | **GET** /user-groups/{id} | Get a user group
+*UserGroupsApi* | [**removeGroup**](doc//UserGroupsApi.md#removegroup) | **DELETE** /user-groups/{id} | Delete a user group
+*UserGroupsApi* | [**setMembers**](doc//UserGroupsApi.md#setmembers) | **PUT** /user-groups/{id}/members | Set group members
+*UserGroupsApi* | [**updateGroup**](doc//UserGroupsApi.md#updategroup) | **PATCH** /user-groups/{id} | Update a user group
 *UsersApi* | [**createProfileImage**](doc//UsersApi.md#createprofileimage) | **POST** /users/profile-image | Create user profile image
 *UsersApi* | [**deleteProfileImage**](doc//UsersApi.md#deleteprofileimage) | **DELETE** /users/profile-image | Delete user profile image
 *UsersApi* | [**deleteUserLicense**](doc//UsersApi.md#deleteuserlicense) | **DELETE** /users/me/license | Delete user product key
@@ -325,6 +385,7 @@ Class | Method | HTTP request | Description
  - [ActivityStatisticsResponseDto](doc//ActivityStatisticsResponseDto.md)
  - [AddUsersDto](doc//AddUsersDto.md)
  - [AdminOnboardingUpdateDto](doc//AdminOnboardingUpdateDto.md)
+ - [AlbumNameDto](doc//AlbumNameDto.md)
  - [AlbumResponseDto](doc//AlbumResponseDto.md)
  - [AlbumStatisticsResponseDto](doc//AlbumStatisticsResponseDto.md)
  - [AlbumUserAddDto](doc//AlbumUserAddDto.md)
@@ -357,6 +418,7 @@ Class | Method | HTTP request | Description
  - [AssetFaceResponseDto](doc//AssetFaceResponseDto.md)
  - [AssetFaceUpdateDto](doc//AssetFaceUpdateDto.md)
  - [AssetFaceUpdateItem](doc//AssetFaceUpdateItem.md)
+ - [AssetFaceWithoutPersonResponseDto](doc//AssetFaceWithoutPersonResponseDto.md)
  - [AssetIdErrorReason](doc//AssetIdErrorReason.md)
  - [AssetIdsDto](doc//AssetIdsDto.md)
  - [AssetIdsResponseDto](doc//AssetIdsResponseDto.md)
@@ -375,7 +437,6 @@ Class | Method | HTTP request | Description
  - [AssetMetadataUpsertItemDto](doc//AssetMetadataUpsertItemDto.md)
  - [AssetOcrResponseDto](doc//AssetOcrResponseDto.md)
  - [AssetOrder](doc//AssetOrder.md)
- - [AssetOrderBy](doc//AssetOrderBy.md)
  - [AssetRejectReason](doc//AssetRejectReason.md)
  - [AssetResponseDto](doc//AssetResponseDto.md)
  - [AssetStackResponseDto](doc//AssetStackResponseDto.md)
@@ -394,6 +455,7 @@ Class | Method | HTTP request | Description
  - [CastResponse](doc//CastResponse.md)
  - [CastUpdate](doc//CastUpdate.md)
  - [ChangePasswordDto](doc//ChangePasswordDto.md)
+ - [ClassificationFaceExclusion](doc//ClassificationFaceExclusion.md)
  - [Colorspace](doc//Colorspace.md)
  - [ContributorCountResponseDto](doc//ContributorCountResponseDto.md)
  - [CreateAlbumDto](doc//CreateAlbumDto.md)
@@ -404,6 +466,7 @@ Class | Method | HTTP request | Description
  - [DatabaseBackupDeleteDto](doc//DatabaseBackupDeleteDto.md)
  - [DatabaseBackupDto](doc//DatabaseBackupDto.md)
  - [DatabaseBackupListResponseDto](doc//DatabaseBackupListResponseDto.md)
+ - [DetachScopedPersonDto](doc//DetachScopedPersonDto.md)
  - [DownloadArchiveDto](doc//DownloadArchiveDto.md)
  - [DownloadArchiveInfo](doc//DownloadArchiveInfo.md)
  - [DownloadInfoDto](doc//DownloadInfoDto.md)
@@ -419,6 +482,9 @@ Class | Method | HTTP request | Description
  - [ExifResponseDto](doc//ExifResponseDto.md)
  - [FaceDto](doc//FaceDto.md)
  - [FacialRecognitionConfig](doc//FacialRecognitionConfig.md)
+ - [FilterSuggestionsPersonDto](doc//FilterSuggestionsPersonDto.md)
+ - [FilterSuggestionsResponseDto](doc//FilterSuggestionsResponseDto.md)
+ - [FilterSuggestionsTagDto](doc//FilterSuggestionsTagDto.md)
  - [FoldersResponse](doc//FoldersResponse.md)
  - [FoldersUpdate](doc//FoldersUpdate.md)
  - [ImageFormat](doc//ImageFormat.md)
@@ -441,6 +507,7 @@ Class | Method | HTTP request | Description
  - [MaintenanceStatusResponseDto](doc//MaintenanceStatusResponseDto.md)
  - [ManualJobName](doc//ManualJobName.md)
  - [MapMarkerResponseDto](doc//MapMarkerResponseDto.md)
+ - [MapMediaType](doc//MapMediaType.md)
  - [MapReverseGeocodeResponseDto](doc//MapReverseGeocodeResponseDto.md)
  - [MemoriesResponse](doc//MemoriesResponse.md)
  - [MemoriesUpdate](doc//MemoriesUpdate.md)
@@ -451,6 +518,7 @@ Class | Method | HTTP request | Description
  - [MemoryType](doc//MemoryType.md)
  - [MemoryUpdateDto](doc//MemoryUpdateDto.md)
  - [MergePersonDto](doc//MergePersonDto.md)
+ - [MergeScopedPeopleDto](doc//MergeScopedPeopleDto.md)
  - [MetadataSearchDto](doc//MetadataSearchDto.md)
  - [MirrorAxis](doc//MirrorAxis.md)
  - [MirrorParameters](doc//MirrorParameters.md)
@@ -466,23 +534,28 @@ Class | Method | HTTP request | Description
  - [OAuthConfigDto](doc//OAuthConfigDto.md)
  - [OAuthTokenEndpointAuthMethod](doc//OAuthTokenEndpointAuthMethod.md)
  - [OcrConfig](doc//OcrConfig.md)
- - [OnThisDayDto](doc//OnThisDayDto.md)
  - [OnboardingDto](doc//OnboardingDto.md)
  - [OnboardingResponseDto](doc//OnboardingResponseDto.md)
  - [PartnerCreateDto](doc//PartnerCreateDto.md)
  - [PartnerDirection](doc//PartnerDirection.md)
  - [PartnerResponseDto](doc//PartnerResponseDto.md)
  - [PartnerUpdateDto](doc//PartnerUpdateDto.md)
+ - [PeopleFaceStatisticsResponseDto](doc//PeopleFaceStatisticsResponseDto.md)
  - [PeopleResponse](doc//PeopleResponse.md)
  - [PeopleResponseDto](doc//PeopleResponseDto.md)
+ - [PeopleStatisticsResponseDto](doc//PeopleStatisticsResponseDto.md)
  - [PeopleUpdate](doc//PeopleUpdate.md)
  - [PeopleUpdateDto](doc//PeopleUpdateDto.md)
  - [PeopleUpdateItem](doc//PeopleUpdateItem.md)
  - [Permission](doc//Permission.md)
  - [PersonCreateDto](doc//PersonCreateDto.md)
+ - [PersonFacePageResponseDto](doc//PersonFacePageResponseDto.md)
+ - [PersonFaceResponseDto](doc//PersonFaceResponseDto.md)
  - [PersonResponseDto](doc//PersonResponseDto.md)
  - [PersonStatisticsResponseDto](doc//PersonStatisticsResponseDto.md)
  - [PersonUpdateDto](doc//PersonUpdateDto.md)
+ - [PersonWithFacesResponseDto](doc//PersonWithFacesResponseDto.md)
+ - [PetDetectionConfig](doc//PetDetectionConfig.md)
  - [PinCodeChangeDto](doc//PinCodeChangeDto.md)
  - [PinCodeResetDto](doc//PinCodeResetDto.md)
  - [PinCodeSetupDto](doc//PinCodeSetupDto.md)
@@ -504,6 +577,7 @@ Class | Method | HTTP request | Description
  - [QueueDeleteDto](doc//QueueDeleteDto.md)
  - [QueueJobResponseDto](doc//QueueJobResponseDto.md)
  - [QueueJobStatus](doc//QueueJobStatus.md)
+ - [QueueJobTypeCountsDto](doc//QueueJobTypeCountsDto.md)
  - [QueueName](doc//QueueName.md)
  - [QueueResponseDto](doc//QueueResponseDto.md)
  - [QueueResponseLegacyDto](doc//QueueResponseLegacyDto.md)
@@ -516,8 +590,11 @@ Class | Method | HTTP request | Description
  - [RatingsUpdate](doc//RatingsUpdate.md)
  - [ReactionLevel](doc//ReactionLevel.md)
  - [ReactionType](doc//ReactionType.md)
+ - [RepresentativeFaceUpdateDto](doc//RepresentativeFaceUpdateDto.md)
  - [ReverseGeocodingStateResponseDto](doc//ReverseGeocodingStateResponseDto.md)
  - [RotateParameters](doc//RotateParameters.md)
+ - [ScopedPersonProfileRefDto](doc//ScopedPersonProfileRefDto.md)
+ - [ScopedPrimaryProfile](doc//ScopedPrimaryProfile.md)
  - [SearchAlbumResponseDto](doc//SearchAlbumResponseDto.md)
  - [SearchAssetResponseDto](doc//SearchAssetResponseDto.md)
  - [SearchExploreItem](doc//SearchExploreItem.md)
@@ -532,6 +609,7 @@ Class | Method | HTTP request | Description
  - [ServerConfigDto](doc//ServerConfigDto.md)
  - [ServerFeaturesDto](doc//ServerFeaturesDto.md)
  - [ServerMediaTypesResponseDto](doc//ServerMediaTypesResponseDto.md)
+ - [ServerMlHealthResponseDto](doc//ServerMlHealthResponseDto.md)
  - [ServerPingResponse](doc//ServerPingResponse.md)
  - [ServerStatsResponseDto](doc//ServerStatsResponseDto.md)
  - [ServerStorageResponseDto](doc//ServerStorageResponseDto.md)
@@ -550,14 +628,41 @@ Class | Method | HTTP request | Description
  - [SharedLinkType](doc//SharedLinkType.md)
  - [SharedLinksResponse](doc//SharedLinksResponse.md)
  - [SharedLinksUpdate](doc//SharedLinksUpdate.md)
+ - [SharedSpaceActivityResponseDto](doc//SharedSpaceActivityResponseDto.md)
+ - [SharedSpaceAssetAddDto](doc//SharedSpaceAssetAddDto.md)
+ - [SharedSpaceAssetRemoveDto](doc//SharedSpaceAssetRemoveDto.md)
+ - [SharedSpaceCreateDto](doc//SharedSpaceCreateDto.md)
+ - [SharedSpaceLibraryLinkDto](doc//SharedSpaceLibraryLinkDto.md)
+ - [SharedSpaceLinkedLibraryDto](doc//SharedSpaceLinkedLibraryDto.md)
+ - [SharedSpaceMemberCreateDto](doc//SharedSpaceMemberCreateDto.md)
+ - [SharedSpaceMemberMetadataContributionDto](doc//SharedSpaceMemberMetadataContributionDto.md)
+ - [SharedSpaceMemberPreferencesDto](doc//SharedSpaceMemberPreferencesDto.md)
+ - [SharedSpaceMemberResponseDto](doc//SharedSpaceMemberResponseDto.md)
+ - [SharedSpaceMemberTimelineDto](doc//SharedSpaceMemberTimelineDto.md)
+ - [SharedSpaceMemberUpdateDto](doc//SharedSpaceMemberUpdateDto.md)
+ - [SharedSpacePeopleStatisticsResponseDto](doc//SharedSpacePeopleStatisticsResponseDto.md)
+ - [SharedSpacePersonAliasDto](doc//SharedSpacePersonAliasDto.md)
+ - [SharedSpacePersonMergeDto](doc//SharedSpacePersonMergeDto.md)
+ - [SharedSpacePersonResponseDto](doc//SharedSpacePersonResponseDto.md)
+ - [SharedSpacePersonUpdateDto](doc//SharedSpacePersonUpdateDto.md)
+ - [SharedSpaceResponseDto](doc//SharedSpaceResponseDto.md)
+ - [SharedSpaceResponseDtoLastContributor](doc//SharedSpaceResponseDtoLastContributor.md)
+ - [SharedSpaceRole](doc//SharedSpaceRole.md)
+ - [SharedSpaceUpdateDto](doc//SharedSpaceUpdateDto.md)
  - [SignUpDto](doc//SignUpDto.md)
  - [SmartSearchDto](doc//SmartSearchDto.md)
+ - [SmartSearchFacetsDto](doc//SmartSearchFacetsDto.md)
+ - [SmartSearchFacetsResponseDto](doc//SmartSearchFacetsResponseDto.md)
  - [SourceType](doc//SourceType.md)
+ - [SpaceRepresentativeFaceUpdateDto](doc//SpaceRepresentativeFaceUpdateDto.md)
  - [StackCreateDto](doc//StackCreateDto.md)
  - [StackResponseDto](doc//StackResponseDto.md)
  - [StackUpdateDto](doc//StackUpdateDto.md)
  - [StatisticsSearchDto](doc//StatisticsSearchDto.md)
  - [StorageFolder](doc//StorageFolder.md)
+ - [StorageMigrationDirection](doc//StorageMigrationDirection.md)
+ - [StorageMigrationFileTypesDto](doc//StorageMigrationFileTypesDto.md)
+ - [StorageMigrationStartDto](doc//StorageMigrationStartDto.md)
  - [SyncAckDeleteDto](doc//SyncAckDeleteDto.md)
  - [SyncAckDto](doc//SyncAckDto.md)
  - [SyncAckSetDto](doc//SyncAckSetDto.md)
@@ -581,6 +686,9 @@ Class | Method | HTTP request | Description
  - [SyncAssetV2](doc//SyncAssetV2.md)
  - [SyncAuthUserV1](doc//SyncAuthUserV1.md)
  - [SyncEntityType](doc//SyncEntityType.md)
+ - [SyncLibraryAssetDeleteV1](doc//SyncLibraryAssetDeleteV1.md)
+ - [SyncLibraryDeleteV1](doc//SyncLibraryDeleteV1.md)
+ - [SyncLibraryV1](doc//SyncLibraryV1.md)
  - [SyncMemoryAssetDeleteV1](doc//SyncMemoryAssetDeleteV1.md)
  - [SyncMemoryAssetV1](doc//SyncMemoryAssetV1.md)
  - [SyncMemoryDeleteV1](doc//SyncMemoryDeleteV1.md)
@@ -590,6 +698,14 @@ Class | Method | HTTP request | Description
  - [SyncPersonDeleteV1](doc//SyncPersonDeleteV1.md)
  - [SyncPersonV1](doc//SyncPersonV1.md)
  - [SyncRequestType](doc//SyncRequestType.md)
+ - [SyncSharedSpaceDeleteV1](doc//SyncSharedSpaceDeleteV1.md)
+ - [SyncSharedSpaceLibraryDeleteV1](doc//SyncSharedSpaceLibraryDeleteV1.md)
+ - [SyncSharedSpaceLibraryV1](doc//SyncSharedSpaceLibraryV1.md)
+ - [SyncSharedSpaceMemberDeleteV1](doc//SyncSharedSpaceMemberDeleteV1.md)
+ - [SyncSharedSpaceMemberV1](doc//SyncSharedSpaceMemberV1.md)
+ - [SyncSharedSpaceToAssetDeleteV1](doc//SyncSharedSpaceToAssetDeleteV1.md)
+ - [SyncSharedSpaceToAssetV1](doc//SyncSharedSpaceToAssetV1.md)
+ - [SyncSharedSpaceV1](doc//SyncSharedSpaceV1.md)
  - [SyncStackDeleteV1](doc//SyncStackDeleteV1.md)
  - [SyncStackV1](doc//SyncStackV1.md)
  - [SyncStreamDto](doc//SyncStreamDto.md)
@@ -598,6 +714,8 @@ Class | Method | HTTP request | Description
  - [SyncUserMetadataV1](doc//SyncUserMetadataV1.md)
  - [SyncUserV1](doc//SyncUserV1.md)
  - [SystemConfigBackupsDto](doc//SystemConfigBackupsDto.md)
+ - [SystemConfigClassificationCategoryDto](doc//SystemConfigClassificationCategoryDto.md)
+ - [SystemConfigClassificationDto](doc//SystemConfigClassificationDto.md)
  - [SystemConfigDto](doc//SystemConfigDto.md)
  - [SystemConfigFFmpegDto](doc//SystemConfigFFmpegDto.md)
  - [SystemConfigFacesDto](doc//SystemConfigFacesDto.md)
@@ -611,6 +729,7 @@ Class | Method | HTTP request | Description
  - [SystemConfigLoggingDto](doc//SystemConfigLoggingDto.md)
  - [SystemConfigMachineLearningDto](doc//SystemConfigMachineLearningDto.md)
  - [SystemConfigMapDto](doc//SystemConfigMapDto.md)
+ - [SystemConfigMemoriesDto](doc//SystemConfigMemoriesDto.md)
  - [SystemConfigMetadataDto](doc//SystemConfigMetadataDto.md)
  - [SystemConfigNewVersionCheckDto](doc//SystemConfigNewVersionCheckDto.md)
  - [SystemConfigNightlyTasksDto](doc//SystemConfigNightlyTasksDto.md)
@@ -632,6 +751,7 @@ Class | Method | HTTP request | Description
  - [TagBulkAssetsResponseDto](doc//TagBulkAssetsResponseDto.md)
  - [TagCreateDto](doc//TagCreateDto.md)
  - [TagResponseDto](doc//TagResponseDto.md)
+ - [TagSuggestionResponseDto](doc//TagSuggestionResponseDto.md)
  - [TagUpdateDto](doc//TagUpdateDto.md)
  - [TagUpsertDto](doc//TagUpsertDto.md)
  - [TagsResponse](doc//TagsResponse.md)
@@ -645,6 +765,7 @@ Class | Method | HTTP request | Description
  - [TranscodeHWAccel](doc//TranscodeHWAccel.md)
  - [TranscodePolicy](doc//TranscodePolicy.md)
  - [TrashResponseDto](doc//TrashResponseDto.md)
+ - [TrimParameters](doc//TrimParameters.md)
  - [UpdateAlbumDto](doc//UpdateAlbumDto.md)
  - [UpdateAlbumUserDto](doc//UpdateAlbumUserDto.md)
  - [UpdateAssetDto](doc//UpdateAssetDto.md)
@@ -655,6 +776,11 @@ Class | Method | HTTP request | Description
  - [UserAdminResponseDto](doc//UserAdminResponseDto.md)
  - [UserAdminUpdateDto](doc//UserAdminUpdateDto.md)
  - [UserAvatarColor](doc//UserAvatarColor.md)
+ - [UserGroupCreateDto](doc//UserGroupCreateDto.md)
+ - [UserGroupMemberResponseDto](doc//UserGroupMemberResponseDto.md)
+ - [UserGroupMemberSetDto](doc//UserGroupMemberSetDto.md)
+ - [UserGroupResponseDto](doc//UserGroupResponseDto.md)
+ - [UserGroupUpdateDto](doc//UserGroupUpdateDto.md)
  - [UserLicense](doc//UserLicense.md)
  - [UserMetadataKey](doc//UserMetadataKey.md)
  - [UserPreferencesResponseDto](doc//UserPreferencesResponseDto.md)
