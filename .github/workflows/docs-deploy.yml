@@ -199,14 +199,3 @@ jobs:
           TF_STATE_POSTGRES_CONN_STR: ${{ secrets.TF_STATE_POSTGRES_CONN_STR }}
         working-directory: 'deployment/modules/cloudflare/docs-release'
         run: 'mise run //deployment:tf apply'
-
-      - name: Comment
-        uses: actions-cool/maintain-one-comment@909842216bc8e8658364c572ec52100f4c2cc50a # v3.3.0
-        if: ${{ steps.parameters.outputs.event == 'pr' }}
-        with:
-          token: ${{ github.token }}
-          number: ${{ fromJson(needs.checks.outputs.parameters).pr_number }}
-          body: |
-            📖 Documentation deployed to [${{ steps.docs-output.outputs.subdomain }}](https://${{ steps.docs-output.outputs.subdomain }})
-          emojis: 'rocket'
-          body-include: '<!-- Docs PR URL -->'
