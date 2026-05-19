@@ -195,7 +195,16 @@ export class JobService extends BaseService {
         }
 
         await this.jobRepository.queueAll(jobs);
-        if (asset.visibility === AssetVisibility.Timeline || asset.visibility === AssetVisibility.Archive) {
+        // External library scans queue these jobs per asset with source
+        // 'upload', which would emit an on_upload_success / AssetUploadReadyV2
+        // websocket message for every scanned file. On a large library that
+        // floods web and mobile clients and thrashes the timeline. Library
+        // assets surface on the next bucket refresh, so suppress the per-asset
+        // push for external assets while keeping it for genuine uploads.
+        if (
+          !asset.isExternal &&
+          (asset.visibility === AssetVisibility.Timeline || asset.visibility === AssetVisibility.Archive)
+        ) {
           this.websocketRepository.clientSend('on_upload_success', asset.ownerId, mapAsset(asset));
           if (asset.exifInfo) {
             const exif = asset.exifInfo;
