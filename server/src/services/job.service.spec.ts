@@ -651,6 +651,49 @@ describe(JobService.name, () => {
 
       expect(mocks.websocket.clientSend).toHaveBeenCalledWith('on_upload_success', ownerId, expect.anything());
       expect(mocks.websocket.clientSend).not.toHaveBeenCalledWith(
+        'AssetUploadReadyV1',
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it('should not send per-asset websocket notifications for external library assets but still queue processing', async () => {
+      mocks.job.run.mockResolvedValue(JobStatus.Success);
+      const id = newUuid();
+      const ownerId = newUuid();
+      // External library scans queue thumbnail jobs with source 'upload' too, so
+      // visibility/exif/source alone would trigger the per-asset flood. The
+      // external marker must suppress the websocket pushes (web + mobile) while
+      // leaving ML follow-up jobs intact.
+      const asset = AssetFactory.from({
+        id,
+        ownerId,
+        visibility: AssetVisibility.Timeline,
+        isExternal: true,
+      })
+        .exif()
+        .build();
+      mocks.asset.getByIdsWithAllRelationsButStacks.mockResolvedValue([asset] as any);
+
+      await sut.onJobRun(QueueName.ThumbnailGeneration, {
+        name: JobName.AssetGenerateThumbnails,
+        data: { id, source: 'upload' },
+      });
+
+      expect(mocks.job.queueAll).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          { name: JobName.SmartSearch, data: { id, source: 'upload' } },
+          { name: JobName.AssetDetectFaces, data: { id, source: 'upload' } },
+          { name: JobName.Ocr, data: { id, source: 'upload' } },
+          { name: JobName.PetDetection, data: { id, source: 'upload' } },
+        ]),
+      );
+      expect(mocks.websocket.clientSend).not.toHaveBeenCalledWith(
+        'on_upload_success',
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(mocks.websocket.clientSend).not.toHaveBeenCalledWith(
         'AssetUploadReadyV2',
         expect.anything(),
         expect.anything(),
