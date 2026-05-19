@@ -75,7 +75,7 @@ describe(SharedSpaceController.name, () => {
         .set('Authorization', `Bearer token`);
 
       expect(status).toBe(400);
-      expect(body).toEqual(errorDto.badRequest(['[assetFaceId] Invalid UUID']));
+      expect(body).toEqual(errorDto.validationError([{ path: ['assetFaceId'], message: 'Invalid UUID' }]));
     });
   });
 
