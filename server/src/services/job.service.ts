@@ -196,7 +196,7 @@ export class JobService extends BaseService {
 
         await this.jobRepository.queueAll(jobs);
         // External library scans queue these jobs per asset with source
-        // 'upload', which would emit an on_upload_success / AssetUploadReadyV1
+        // 'upload', which would emit an on_upload_success / AssetUploadReadyV2
         // websocket message for every scanned file. On a large library that
         // floods web and mobile clients and thrashes the timeline. Library
         // assets surface on the next bucket refresh, so suppress the per-asset
