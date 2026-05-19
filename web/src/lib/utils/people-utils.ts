@@ -104,26 +104,39 @@ export const zoomImageToBase64 = async (
   if (!image) {
     return null;
   }
-  const { boundingBoxX1: x1, boundingBoxX2: x2, boundingBoxY1: y1, boundingBoxY2: y2, imageWidth, imageHeight } = face;
-
-  const coordinates = {
-    x1: (image.naturalWidth / imageWidth) * x1,
-    x2: (image.naturalWidth / imageWidth) * x2,
-    y1: (image.naturalHeight / imageHeight) * y1,
-    y2: (image.naturalHeight / imageHeight) * y2,
-  };
-
-  const faceWidth = coordinates.x2 - coordinates.x1;
-  const faceHeight = coordinates.y2 - coordinates.y1;
 
   const faceImage = new Image();
   faceImage.crossOrigin = 'anonymous';
   faceImage.src = image.src;
 
-  await new Promise((resolve) => {
-    faceImage.addEventListener('load', resolve);
-    faceImage.addEventListener('error', () => resolve(null));
+  const loaded = await new Promise<boolean>((resolve) => {
+    faceImage.addEventListener('load', () => resolve(true));
+    faceImage.addEventListener('error', () => resolve(false));
   });
+
+  // The displayed <img> is frequently still decoding when the detail panel
+  // renders (its naturalWidth/Height are then 0). Derive the crop from the
+  // freshly loaded clone instead, and bail out — so callers fall back to the
+  // person thumbnail — rather than emit a broken 0×0 "data:," image.
+  if (!loaded || faceImage.naturalWidth === 0 || faceImage.naturalHeight === 0) {
+    return null;
+  }
+
+  const { boundingBoxX1: x1, boundingBoxX2: x2, boundingBoxY1: y1, boundingBoxY2: y2, imageWidth, imageHeight } = face;
+  const widthScale = faceImage.naturalWidth / imageWidth;
+  const heightScale = faceImage.naturalHeight / imageHeight;
+  const coordinates = {
+    x1: widthScale * x1,
+    x2: widthScale * x2,
+    y1: heightScale * y1,
+    y2: heightScale * y2,
+  };
+
+  const faceWidth = coordinates.x2 - coordinates.x1;
+  const faceHeight = coordinates.y2 - coordinates.y1;
+  if (faceWidth <= 0 || faceHeight <= 0) {
+    return null;
+  }
 
   const canvas = document.createElement('canvas');
   canvas.width = faceWidth;
