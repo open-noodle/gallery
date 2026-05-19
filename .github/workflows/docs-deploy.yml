@@ -207,13 +207,3 @@ jobs:
           TF_STATE_POSTGRES_CONN_STR: ${{ secrets.TF_STATE_POSTGRES_CONN_STR }}
         working-directory: 'deployment/modules/cloudflare/docs-release'
         run: 'mise run //deployment:tf apply'
-
-      - name: Comment
-        uses: immich-app/devtools/actions/sticky-comment@0135acd12ad9f3369b94a2aa3c0ae8c835a4e926 # sticky-comment-action-v1.0.0
-        if: ${{ steps.parameters.outputs.event == 'pr' }}
-        with:
-          id: docs-pr-url
-          token: ${{ github.token }}
-          number: ${{ fromJson(needs.checks.outputs.parameters).pr_number }}
-          body: |
-            📖 Documentation deployed to [${{ steps.docs-output.outputs.subdomain }}](https://${{ steps.docs-output.outputs.subdomain }})
