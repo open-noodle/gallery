@@ -25,7 +25,7 @@ import { AudioStreamInfo, JobCounts, RawImageInfo, VideoFormat, VideoStreamInfo 
 import { AssetFaceFactory } from 'test/factories/asset-face.factory';
 import { AssetFactory } from 'test/factories/asset.factory';
 import { PersonFactory } from 'test/factories/person.factory';
-import { probeStub } from 'test/fixtures/media.stub';
+import { probeStub, videoInfoStub } from 'test/fixtures/media.stub';
 import { personThumbnailStub } from 'test/fixtures/person.stub';
 import { systemConfigStub } from 'test/fixtures/system-config.stub';
 import { getForGenerateThumbnail } from 'test/mappers';
@@ -1595,8 +1595,8 @@ describe(MediaService.name, () => {
         .build();
       mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
       mocks.media.probe.mockResolvedValue({
-        ...probeStub.noAudioStreams,
-        format: { ...probeStub.noAudioStreams.format, duration: 20 },
+        ...videoInfoStub.noAudioStreams,
+        format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
       });
       mocks.media.decodeImage.mockResolvedValue({ data: rawBuffer, info: rawInfo as OutputInfo });
       mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
@@ -1613,8 +1613,8 @@ describe(MediaService.name, () => {
         .build();
       mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
       mocks.media.probe.mockResolvedValue({
-        ...probeStub.noAudioStreams,
-        format: { ...probeStub.noAudioStreams.format, duration: 19.5 },
+        ...videoInfoStub.noAudioStreams,
+        format: { ...videoInfoStub.noAudioStreams.format, duration: 19.5 },
       });
       mocks.media.decodeImage.mockResolvedValue({ data: rawBuffer, info: rawInfo as OutputInfo });
       mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
@@ -1631,8 +1631,8 @@ describe(MediaService.name, () => {
         .build();
       mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
       mocks.media.probe.mockResolvedValue({
-        ...probeStub.noAudioStreams,
-        format: { ...probeStub.noAudioStreams.format, duration: 10 },
+        ...videoInfoStub.noAudioStreams,
+        format: { ...videoInfoStub.noAudioStreams.format, duration: 10 },
       });
       mocks.media.decodeImage.mockResolvedValue({ data: rawBuffer, info: rawInfo as OutputInfo });
       mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
@@ -4675,17 +4675,27 @@ describe(MediaService.name, () => {
   });
 
   describe('handleVideoConversion - remux required', () => {
+    const movMetadata = {
+      ...probeStub.matroskaContainer,
+      format: {
+        formatName: 'mov,mp4,m4a,3gp,3g2,mj2',
+        formatLongName: 'QuickTime / MOV',
+        duration: 0,
+        bitrate: 0,
+      },
+    };
+
     beforeEach(() => {
-      const asset = AssetFactory.create({ id: 'video-id', type: AssetType.Video, originalPath: '/original/path.ext' });
-      mocks.assetJob.getForVideoConversion.mockResolvedValue(asset);
+      const asset = AssetFactory.create({
+        id: 'video-id',
+        type: AssetType.Video,
+        originalPath: '/original/path.ext',
+      });
+      mocks.assetJob.getForVideoConversion.mockResolvedValue({ ...asset, ...movMetadata });
       sut.videoInterfaces = { dri: ['renderD128'], mali: true };
     });
 
     it('should remux MOV files that do not need transcoding', async () => {
-      mocks.media.probe.mockResolvedValue({
-        ...probeStub.matroskaContainer,
-        format: { formatName: 'mov,mp4,m4a,3gp,3g2,mj2', formatLongName: 'QuickTime / MOV', duration: 0, bitrate: 0 },
-      });
       mocks.systemMetadata.get.mockResolvedValue({
         ffmpeg: { transcode: TranscodePolicy.Optimal, acceptedContainers: [] },
       });
@@ -4696,10 +4706,6 @@ describe(MediaService.name, () => {
     });
 
     it('should not remux when transcode is disabled', async () => {
-      mocks.media.probe.mockResolvedValue({
-        ...probeStub.matroskaContainer,
-        format: { formatName: 'mov,mp4,m4a,3gp,3g2,mj2', formatLongName: 'QuickTime / MOV', duration: 0, bitrate: 0 },
-      });
       mocks.systemMetadata.get.mockResolvedValue({
         ffmpeg: { transcode: TranscodePolicy.Disabled, acceptedContainers: [] },
       });
@@ -4712,13 +4718,16 @@ describe(MediaService.name, () => {
 
   describe('handleVideoConversion - hardware acceleration fallback', () => {
     beforeEach(() => {
-      const asset = AssetFactory.create({ id: 'video-id', type: AssetType.Video, originalPath: '/original/path.ext' });
-      mocks.assetJob.getForVideoConversion.mockResolvedValue(asset);
+      const asset = AssetFactory.create({
+        id: 'video-id',
+        type: AssetType.Video,
+        originalPath: '/original/path.ext',
+      });
+      mocks.assetJob.getForVideoConversion.mockResolvedValue({ ...asset, ...probeStub.multipleVideoStreams });
       sut.videoInterfaces = { dri: ['renderD128'], mali: true };
     });
 
     it('should fall back to software decoding when hw decode fails', async () => {
-      mocks.media.probe.mockResolvedValue(probeStub.multipleVideoStreams);
       mocks.systemMetadata.get.mockResolvedValue({
         ffmpeg: {
           transcode: TranscodePolicy.All,
@@ -4734,7 +4743,6 @@ describe(MediaService.name, () => {
     });
 
     it('should fall back to full software when partial fallback also fails', async () => {
-      mocks.media.probe.mockResolvedValue(probeStub.multipleVideoStreams);
       mocks.systemMetadata.get.mockResolvedValue({
         ffmpeg: {
           transcode: TranscodePolicy.All,
@@ -4753,7 +4761,6 @@ describe(MediaService.name, () => {
     });
 
     it('should fall back to software when hw accel fails without accelDecode', async () => {
-      mocks.media.probe.mockResolvedValue(probeStub.multipleVideoStreams);
       mocks.systemMetadata.get.mockResolvedValue({
         ffmpeg: {
           transcode: TranscodePolicy.All,
@@ -4771,17 +4778,20 @@ describe(MediaService.name, () => {
   });
 
   describe('handleVideoConversion - debug frame counting', () => {
-    it('should enable frame counting when debug logging is enabled', async () => {
-      const asset = AssetFactory.create({ id: 'video-id', type: AssetType.Video, originalPath: '/original/path.ext' });
-      mocks.assetJob.getForVideoConversion.mockResolvedValue(asset);
+    it('should use stored metadata without probing during conversion', async () => {
+      const asset = AssetFactory.create({
+        id: 'video-id',
+        type: AssetType.Video,
+        originalPath: '/original/path.ext',
+      });
+      mocks.assetJob.getForVideoConversion.mockResolvedValue({ ...asset, ...probeStub.multipleVideoStreams });
       sut.videoInterfaces = { dri: ['renderD128'], mali: true };
 
       mocks.logger.isLevelEnabled.mockReturnValue(true);
-      mocks.media.probe.mockResolvedValue(probeStub.multipleVideoStreams);
 
       await sut.handleVideoConversion({ id: 'video-id' });
 
-      expect(mocks.media.probe).toHaveBeenCalledWith('/original/path.ext', { countFrames: true });
+      expect(mocks.media.probe).not.toHaveBeenCalled();
     });
   });
 
