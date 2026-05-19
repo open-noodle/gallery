@@ -101,6 +101,7 @@ describe(DuplicateService.name, () => {
   describe('delete', () => {
     it('should delete a specific duplicate group', async () => {
       const duplicateId = newUuid();
+      mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set([duplicateId]));
 
       await sut.delete(authStub.admin, duplicateId);
 
@@ -111,6 +112,7 @@ describe(DuplicateService.name, () => {
   describe('deleteAll', () => {
     it('should delete multiple duplicate groups', async () => {
       const ids = [newUuid(), newUuid()];
+      mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(ids));
 
       await sut.deleteAll(authStub.admin, { ids });
 
