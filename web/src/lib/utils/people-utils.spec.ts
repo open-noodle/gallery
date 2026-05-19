@@ -206,4 +206,73 @@ describe(zoomImageToBase64.name, () => {
       expect(operations[crossOriginIndex].value).toBe('anonymous');
     }
   });
+
+  it('crops from the loaded image even when the displayed photo has not decoded yet', async () => {
+    class TestImage extends EventTarget {
+      naturalWidth = 4000;
+      naturalHeight = 3000;
+      crossOrigin: string | null = null;
+      private source = '';
+
+      set src(value: string) {
+        this.source = value;
+      }
+
+      get src() {
+        return this.source;
+      }
+
+      override addEventListener(...args: Parameters<EventTarget['addEventListener']>) {
+        super.addEventListener(...args);
+        if (args[0] === 'load') {
+          queueMicrotask(() => this.dispatchEvent(new Event('load')));
+        }
+      }
+    }
+
+    const drawImage = vi.fn();
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: () => ({ drawImage }),
+      toDataURL: () => 'data:image/png;base64,face',
+    };
+    const originalCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation(((tagName: string) =>
+      tagName === 'canvas' ? canvas : originalCreateElement(tagName)) as typeof document.createElement);
+    vi.stubGlobal('Image', TestImage);
+
+    // The displayed <img> is bound but still decoding: naturalWidth/Height are 0.
+    const photoViewer = { naturalWidth: 0, naturalHeight: 0, src: 'http://localhost/preview.jpg' } as HTMLImageElement;
+
+    const result = await zoomImageToBase64(makeFace(), 'asset-1', AssetTypeEnum.Image, photoViewer);
+
+    // Must not emit a broken 0×0 "data:," thumbnail.
+    expect(result).toBe('data:image/png;base64,face');
+    expect(canvas.width).toBeGreaterThan(0);
+    expect(canvas.height).toBeGreaterThan(0);
+    // Crop rectangle must be scaled from the loaded clone (4000×3000), not the 0-sized element.
+    expect(drawImage).toHaveBeenCalledWith(expect.anything(), 1000, 750, 1000, 750, 0, 0, 1000, 750);
+  });
+
+  it('returns null (so callers fall back) when the source image fails to load', async () => {
+    class BrokenImage extends EventTarget {
+      naturalWidth = 0;
+      naturalHeight = 0;
+      crossOrigin: string | null = null;
+      src = '';
+
+      override addEventListener(...args: Parameters<EventTarget['addEventListener']>) {
+        super.addEventListener(...args);
+        if (args[0] === 'error') {
+          queueMicrotask(() => this.dispatchEvent(new Event('error')));
+        }
+      }
+    }
+
+    vi.stubGlobal('Image', BrokenImage);
+    const photoViewer = { naturalWidth: 0, naturalHeight: 0, src: 'http://localhost/preview.jpg' } as HTMLImageElement;
+
+    await expect(zoomImageToBase64(makeFace(), 'asset-1', AssetTypeEnum.Image, photoViewer)).resolves.toBeNull();
+  });
 });
