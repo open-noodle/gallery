@@ -650,7 +650,7 @@ describe(JobService.name, () => {
 
       expect(mocks.websocket.clientSend).toHaveBeenCalledWith('on_upload_success', ownerId, expect.anything());
       expect(mocks.websocket.clientSend).not.toHaveBeenCalledWith(
-        'AssetUploadReadyV1',
+        'AssetUploadReadyV2',
         expect.anything(),
         expect.anything(),
       );
