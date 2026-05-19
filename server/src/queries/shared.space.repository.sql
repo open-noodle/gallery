@@ -1432,6 +1432,8 @@ where
   "shared_space_person_face"."personId" = $1
   and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" is true
+order by
+  "shared_space_person_face"."assetFaceId" asc
 limit
   $2
 

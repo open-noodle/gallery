@@ -538,6 +538,8 @@ where
   "asset_face"."personId" = $1
   and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" is true
+order by
+  "asset_face"."id" asc
 limit
   $2
 
