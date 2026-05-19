@@ -351,10 +351,12 @@ describe(MetadataService.name, () => {
 
       expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
         expect.objectContaining({
-          dateTimeOriginal: new Date('2026-05-18T14:51:00.000Z'),
-          timeZone: 'UTC+2',
+          exif: expect.objectContaining({
+            dateTimeOriginal: new Date('2026-05-18T14:51:00.000Z'),
+            timeZone: 'UTC+2',
+          }),
+          lockedPropertiesBehavior: 'skip',
         }),
-        { lockedPropertiesBehavior: 'skip' },
       );
       expect(mocks.asset.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -374,10 +376,12 @@ describe(MetadataService.name, () => {
 
       expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
         expect.objectContaining({
-          dateTimeOriginal: new Date('2026-05-18T16:00:00.000Z'),
-          timeZone: 'UTC-4',
+          exif: expect.objectContaining({
+            dateTimeOriginal: new Date('2026-05-18T16:00:00.000Z'),
+            timeZone: 'UTC-4',
+          }),
+          lockedPropertiesBehavior: 'skip',
         }),
-        { lockedPropertiesBehavior: 'skip' },
       );
       expect(mocks.asset.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -398,10 +402,12 @@ describe(MetadataService.name, () => {
 
       expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
         expect.objectContaining({
-          dateTimeOriginal: new Date('2026-05-18T16:51:00.000Z'),
-          timeZone: null,
+          exif: expect.objectContaining({
+            dateTimeOriginal: new Date('2026-05-18T16:51:00.000Z'),
+            timeZone: null,
+          }),
+          lockedPropertiesBehavior: 'skip',
         }),
-        { lockedPropertiesBehavior: 'skip' },
       );
       expect(mocks.asset.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -721,9 +727,12 @@ describe(MetadataService.name, () => {
 
       await sut.handleMetadataExtraction({ id: asset.id });
 
-      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(expect.objectContaining({ tags: ['Archive', 'Flat'] }), {
-        lockedPropertiesBehavior: 'skip',
-      });
+      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+        expect.objectContaining({
+          exif: expect.objectContaining({ tags: ['Archive', 'Flat'] }),
+          lockedPropertiesBehavior: 'skip',
+        }),
+      );
     });
 
     it('should deduplicate merged Keywords and HierarchicalSubject', async () => {
@@ -733,9 +742,12 @@ describe(MetadataService.name, () => {
 
       await sut.handleMetadataExtraction({ id: asset.id });
 
-      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(expect.objectContaining({ tags: ['Archive', 'Flat'] }), {
-        lockedPropertiesBehavior: 'skip',
-      });
+      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+        expect.objectContaining({
+          exif: expect.objectContaining({ tags: ['Archive', 'Flat'] }),
+          lockedPropertiesBehavior: 'skip',
+        }),
+      );
     });
 
     it('should use only Keywords when HierarchicalSubject is absent', async () => {
@@ -746,8 +758,10 @@ describe(MetadataService.name, () => {
       await sut.handleMetadataExtraction({ id: asset.id });
 
       expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
-        expect.objectContaining({ tags: ['Trip2026', 'Landscape'] }),
-        { lockedPropertiesBehavior: 'skip' },
+        expect.objectContaining({
+          exif: expect.objectContaining({ tags: ['Trip2026', 'Landscape'] }),
+          lockedPropertiesBehavior: 'skip',
+        }),
       );
     });
 
@@ -759,8 +773,10 @@ describe(MetadataService.name, () => {
       await sut.handleMetadataExtraction({ id: asset.id });
 
       expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
-        expect.objectContaining({ tags: ['Parent/Child', 'Vacation'] }),
-        { lockedPropertiesBehavior: 'skip' },
+        expect.objectContaining({
+          exif: expect.objectContaining({ tags: ['Parent/Child', 'Vacation'] }),
+          lockedPropertiesBehavior: 'skip',
+        }),
       );
     });
 
@@ -948,16 +964,18 @@ describe(MetadataService.name, () => {
       const asset = AssetFactory.create({ type: AssetType.Video });
       mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mocks.media.probe.mockResolvedValue({
-        ...probeStub.videoStreamH264,
-        videoStreams: [{ ...probeStub.videoStreamH264.videoStreams[0], rotation: -90 }],
+        ...videoInfoStub.videoStreamH264,
+        videoStreams: [{ ...videoInfoStub.videoStreamH264.videoStreams[0], rotation: -90 }],
       });
       mockReadTags({});
 
       await sut.handleMetadataExtraction({ id: asset.id });
 
       expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
-        expect.objectContaining({ orientation: ExifOrientation.Rotate90CW.toString() }),
-        { lockedPropertiesBehavior: 'skip' },
+        expect.objectContaining({
+          exif: expect.objectContaining({ orientation: ExifOrientation.Rotate90CW.toString() }),
+          lockedPropertiesBehavior: 'skip',
+        }),
       );
     });
 
@@ -965,16 +983,18 @@ describe(MetadataService.name, () => {
       const asset = AssetFactory.create({ type: AssetType.Video });
       mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mocks.media.probe.mockResolvedValue({
-        ...probeStub.videoStreamH264,
-        videoStreams: [{ ...probeStub.videoStreamH264.videoStreams[0], rotation: 0 }],
+        ...videoInfoStub.videoStreamH264,
+        videoStreams: [{ ...videoInfoStub.videoStreamH264.videoStreams[0], rotation: 0 }],
       });
       mockReadTags({});
 
       await sut.handleMetadataExtraction({ id: asset.id });
 
       expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
-        expect.objectContaining({ orientation: ExifOrientation.Horizontal.toString() }),
-        { lockedPropertiesBehavior: 'skip' },
+        expect.objectContaining({
+          exif: expect.objectContaining({ orientation: ExifOrientation.Horizontal.toString() }),
+          lockedPropertiesBehavior: 'skip',
+        }),
       );
     });
 
@@ -982,16 +1002,18 @@ describe(MetadataService.name, () => {
       const asset = AssetFactory.create({ type: AssetType.Video });
       mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mocks.media.probe.mockResolvedValue({
-        ...probeStub.videoStreamH264,
-        videoStreams: [{ ...probeStub.videoStreamH264.videoStreams[0], rotation: 180 }],
+        ...videoInfoStub.videoStreamH264,
+        videoStreams: [{ ...videoInfoStub.videoStreamH264.videoStreams[0], rotation: 180 }],
       });
       mockReadTags({});
 
       await sut.handleMetadataExtraction({ id: asset.id });
 
       expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
-        expect.objectContaining({ orientation: ExifOrientation.Rotate180.toString() }),
-        { lockedPropertiesBehavior: 'skip' },
+        expect.objectContaining({
+          exif: expect.objectContaining({ orientation: ExifOrientation.Rotate180.toString() }),
+          lockedPropertiesBehavior: 'skip',
+        }),
       );
     });
 
@@ -999,46 +1021,54 @@ describe(MetadataService.name, () => {
       const asset = AssetFactory.create({ type: AssetType.Video });
       mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mocks.media.probe.mockResolvedValue({
-        ...probeStub.videoStreamH264,
-        videoStreams: [{ ...probeStub.videoStreamH264.videoStreams[0], rotation: 45 }],
-      });
-      mockReadTags({});
-
-      await sut.handleMetadataExtraction({ id: asset.id });
-
-      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(expect.objectContaining({ orientation: null }), {
-        lockedPropertiesBehavior: 'skip',
-      });
-    });
-
-    it('should extract video dimensions from probe', async () => {
-      const asset = AssetFactory.create({ type: AssetType.Video });
-      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
-      mocks.media.probe.mockResolvedValue({
-        ...probeStub.videoStreamH264,
-        videoStreams: [{ ...probeStub.videoStreamH264.videoStreams[0], width: 3840, height: 2160 }],
+        ...videoInfoStub.videoStreamH264,
+        videoStreams: [{ ...videoInfoStub.videoStreamH264.videoStreams[0], rotation: 45 }],
       });
       mockReadTags({});
 
       await sut.handleMetadataExtraction({ id: asset.id });
 
       expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
-        expect.objectContaining({ exifImageWidth: 3840, exifImageHeight: 2160 }),
-        { lockedPropertiesBehavior: 'skip' },
+        expect.objectContaining({
+          exif: expect.objectContaining({ orientation: null }),
+          lockedPropertiesBehavior: 'skip',
+        }),
+      );
+    });
+
+    it('should extract video dimensions from probe', async () => {
+      const asset = AssetFactory.create({ type: AssetType.Video });
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
+      mocks.media.probe.mockResolvedValue({
+        ...videoInfoStub.videoStreamH264,
+        videoStreams: [{ ...videoInfoStub.videoStreamH264.videoStreams[0], width: 3840, height: 2160 }],
+      });
+      mockReadTags({});
+
+      await sut.handleMetadataExtraction({ id: asset.id });
+
+      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+        expect.objectContaining({
+          exif: expect.objectContaining({ exifImageWidth: 3840, exifImageHeight: 2160 }),
+          lockedPropertiesBehavior: 'skip',
+        }),
       );
     });
 
     it('should handle video with no video streams', async () => {
       const asset = AssetFactory.create({ type: AssetType.Video });
       mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
-      mocks.media.probe.mockResolvedValue(probeStub.noVideoStreams);
+      mocks.media.probe.mockResolvedValue(videoInfoStub.noVideoStreams);
       mockReadTags({});
 
       await sut.handleMetadataExtraction({ id: asset.id });
 
-      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(expect.objectContaining({ orientation: null }), {
-        lockedPropertiesBehavior: 'skip',
-      });
+      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+        expect.objectContaining({
+          exif: expect.objectContaining({ orientation: null }),
+          lockedPropertiesBehavior: 'skip',
+        }),
+      );
     });
 
     it('should extract the MotionPhotoVideo tag from Samsung HEIC motion photos', async () => {
@@ -2033,9 +2063,12 @@ describe(MetadataService.name, () => {
       mockReadTags({ BitsPerSample: 24 });
 
       await sut.handleMetadataExtraction({ id: asset.id });
-      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(expect.objectContaining({ bitsPerSample: 8 }), {
-        lockedPropertiesBehavior: 'skip',
-      });
+      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+        expect.objectContaining({
+          exif: expect.objectContaining({ bitsPerSample: 8 }),
+          lockedPropertiesBehavior: 'skip',
+        }),
+      );
     });
 
     it('should parse BitsPerSample from string tag', async () => {
@@ -2045,9 +2078,12 @@ describe(MetadataService.name, () => {
 
       await sut.handleMetadataExtraction({ id: asset.id });
       // Number.parseInt('12 12 12') returns 12, which is not >= 24, so no division
-      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(expect.objectContaining({ bitsPerSample: 12 }), {
-        lockedPropertiesBehavior: 'skip',
-      });
+      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+        expect.objectContaining({
+          exif: expect.objectContaining({ bitsPerSample: 12 }),
+          lockedPropertiesBehavior: 'skip',
+        }),
+      );
     });
 
     it('should use ComponentBitDepth when BitsPerSample is not available', async () => {
@@ -2056,9 +2092,12 @@ describe(MetadataService.name, () => {
       mockReadTags({ ComponentBitDepth: 10 });
 
       await sut.handleMetadataExtraction({ id: asset.id });
-      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(expect.objectContaining({ bitsPerSample: 10 }), {
-        lockedPropertiesBehavior: 'skip',
-      });
+      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+        expect.objectContaining({
+          exif: expect.objectContaining({ bitsPerSample: 10 }),
+          lockedPropertiesBehavior: 'skip',
+        }),
+      );
     });
 
     it('should extract autoStackId from BurstID', async () => {
@@ -2067,9 +2106,12 @@ describe(MetadataService.name, () => {
       mockReadTags({ BurstID: 'burst-123' });
 
       await sut.handleMetadataExtraction({ id: asset.id });
-      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(expect.objectContaining({ autoStackId: 'burst-123' }), {
-        lockedPropertiesBehavior: 'skip',
-      });
+      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+        expect.objectContaining({
+          exif: expect.objectContaining({ autoStackId: 'burst-123' }),
+          lockedPropertiesBehavior: 'skip',
+        }),
+      );
     });
 
     it('should extract autoStackId from BurstUUID when BurstID is not present', async () => {
@@ -2078,9 +2120,12 @@ describe(MetadataService.name, () => {
       mockReadTags({ BurstUUID: 'burst-uuid-456' });
 
       await sut.handleMetadataExtraction({ id: asset.id });
-      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(expect.objectContaining({ autoStackId: 'burst-uuid-456' }), {
-        lockedPropertiesBehavior: 'skip',
-      });
+      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+        expect.objectContaining({
+          exif: expect.objectContaining({ autoStackId: 'burst-uuid-456' }),
+          lockedPropertiesBehavior: 'skip',
+        }),
+      );
     });
 
     it('should parse ImageSize dimensions from exif tags', async () => {
@@ -2090,8 +2135,10 @@ describe(MetadataService.name, () => {
 
       await sut.handleMetadataExtraction({ id: asset.id });
       expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
-        expect.objectContaining({ exifImageWidth: 4000, exifImageHeight: 3000 }),
-        { lockedPropertiesBehavior: 'skip' },
+        expect.objectContaining({
+          exif: expect.objectContaining({ exifImageWidth: 4000, exifImageHeight: 3000 }),
+          lockedPropertiesBehavior: 'skip',
+        }),
       );
     });
 
@@ -2801,7 +2848,7 @@ describe(MetadataService.name, () => {
           // eslint-disable-next-line unicorn/no-useless-undefined
           cleanup: vi.fn().mockResolvedValue(undefined),
         });
-        mocks.media.probe.mockResolvedValue(probeStub.videoStreamH264);
+        mocks.media.probe.mockResolvedValue(videoInfoStub.videoStreamH264);
         mockReadTags();
 
         await sut.handleMetadataExtraction({ id: asset.id });
