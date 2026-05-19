@@ -236,7 +236,8 @@
         sharedSpacePersonMergeDto: { ids: [person.id] },
       });
       toastManager.success($t('spaces_people_merged'));
-      await invalidateAll();
+      // The current route person is the merge source and no longer exists; navigate
+      // straight to the surviving suggested person instead of reloading a deleted route.
       await goto(getSpacePersonRoute(suggestedPerson.id), { replaceState: true });
     } catch (error) {
       handleError(error, $t('cannot_merge_people'));
@@ -305,7 +306,9 @@
         }));
 
     toastManager.success($t('spaces_people_merged'));
-    return person;
+    // Return the surviving target, not the page's route person — after an auto-swap
+    // the route person is a merged-away source and would 404 on reload.
+    return targetPerson;
   };
 
   const handleBack = async () => {
@@ -333,11 +336,30 @@
   }
 
   async function handleMergeComplete(updatedPerson: ScopedMergeCandidate) {
-    if (isSharedSpacePerson(updatedPerson)) {
-      setPerson(updatedPerson);
-    }
     setAction(null);
-    await invalidateAll();
+
+    const targetRef = toScopedPersonRef(updatedPerson);
+    const targetIsCurrentSpacePerson =
+      targetRef.type === ScopedPersonProfileType.SpacePerson &&
+      (targetRef.spaceId ?? space.id) === space.id &&
+      targetRef.id === person.id;
+
+    if (targetIsCurrentSpacePerson) {
+      // The route person survived as the merge target — refresh it in place.
+      if (isSharedSpacePerson(updatedPerson)) {
+        setPerson(updatedPerson);
+      }
+      await invalidateAll();
+      return;
+    }
+
+    // The route person was a merged-away source; navigate to the surviving target
+    // instead of reloading a deleted route (which 400s with "Person not found").
+    const destination =
+      targetRef.type === ScopedPersonProfileType.SpacePerson
+        ? Route.viewSpacePerson(targetRef.spaceId ?? space.id, targetRef.id, previousRouteParams)
+        : Route.viewPerson({ id: targetRef.id }, previousRouteParams);
+    await goto(destination, { replaceState: true });
   }
 
   async function openBirthDateModal() {
