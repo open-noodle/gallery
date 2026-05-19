@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/svelte';
+import { AssetTypeEnum } from '@immich/sdk';
 import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import { getResizeObserverMock } from '$lib/__mocks__/resize-observer.mock';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
@@ -48,7 +49,7 @@ describe('AssetViewer space context', () => {
 
   it('refreshes person updates with the current spaceId', async () => {
     const ownerId = 'owner-id';
-    const asset = assetFactory.build({ ownerId });
+    const asset = assetFactory.build({ ownerId, type: AssetTypeEnum.Image });
     const refreshedAsset = assetFactory.build({ id: asset.id, ownerId, people: [] });
 
     authManager.setUser(userAdminFactory.build({ id: ownerId }));
