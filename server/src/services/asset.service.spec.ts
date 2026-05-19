@@ -783,11 +783,14 @@ describe(AssetService.name, () => {
 
       expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
         expect.objectContaining({
-          assetId: asset.id,
-          latitude: 40.7128,
-          longitude: -74.006,
+          exif: expect.objectContaining({
+            assetId: asset.id,
+            latitude: 40.7128,
+            longitude: -74.006,
+            lockedProperties: ['latitude', 'longitude'],
+          }),
+          lockedPropertiesBehavior: 'append',
         }),
-        { lockedPropertiesBehavior: 'append' },
       );
       expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.SidecarWrite, data: { id: asset.id } });
     });
@@ -803,14 +806,17 @@ describe(AssetService.name, () => {
       expect(mocks.map.reverseGeocode).toHaveBeenCalledWith({ latitude: 52.52, longitude: 13.405 });
       expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
         expect.objectContaining({
-          assetId: asset.id,
-          latitude: 52.52,
-          longitude: 13.405,
-          country: 'Germany',
-          state: 'Berlin',
-          city: 'Berlin',
+          exif: expect.objectContaining({
+            assetId: asset.id,
+            latitude: 52.52,
+            longitude: 13.405,
+            country: 'Germany',
+            state: 'Berlin',
+            city: 'Berlin',
+            lockedProperties: ['latitude', 'longitude'],
+          }),
+          lockedPropertiesBehavior: 'append',
         }),
-        { lockedPropertiesBehavior: 'append' },
       );
     });
 
