@@ -53,9 +53,11 @@ import 'package:immich_mobile/infrastructure/entities/trashed_local_asset.entity
     as i25;
 import 'package:immich_mobile/infrastructure/entities/asset_edit.entity.drift.dart'
     as i26;
-import 'package:immich_mobile/infrastructure/entities/merged_asset.drift.dart'
+import 'package:immich_mobile/infrastructure/entities/metadata.entity.drift.dart'
     as i27;
-import 'package:drift/internal/modular.dart' as i28;
+import 'package:immich_mobile/infrastructure/entities/merged_asset.drift.dart'
+    as i28;
+import 'package:drift/internal/modular.dart' as i29;
 
 abstract class $Drift extends i0.GeneratedDatabase {
   $Drift(i0.QueryExecutor e) : super(e);
@@ -110,9 +112,12 @@ abstract class $Drift extends i0.GeneratedDatabase {
       .$TrashedLocalAssetEntityTable(this);
   late final i26.$AssetEditEntityTable assetEditEntity = i26
       .$AssetEditEntityTable(this);
-  i27.MergedAssetDrift get mergedAssetDrift => i28.ReadDatabaseContainer(
+  late final i27.$MetadataEntityTable metadataEntity = i27.$MetadataEntityTable(
     this,
-  ).accessor<i27.MergedAssetDrift>(i27.MergedAssetDrift.new);
+  );
+  i28.MergedAssetDrift get mergedAssetDrift => i29.ReadDatabaseContainer(
+    this,
+  ).accessor<i28.MergedAssetDrift>(i28.MergedAssetDrift.new);
   @override
   Iterable<i0.TableInfo<i0.Table, Object?>> get allTables =>
       allSchemaEntities.whereType<i0.TableInfo<i0.Table, Object?>>();
@@ -161,6 +166,7 @@ abstract class $Drift extends i0.GeneratedDatabase {
     storeEntity,
     trashedLocalAssetEntity,
     assetEditEntity,
+    metadataEntity,
     i14.idxPartnerSharedWithId,
     i15.idxLatLng,
     i16.idxRemoteAlbumAssetAlbumAsset,
@@ -501,4 +507,6 @@ class $DriftManager {
       );
   i26.$$AssetEditEntityTableTableManager get assetEditEntity =>
       i26.$$AssetEditEntityTableTableManager(_db, _db.assetEditEntity);
+  i27.$$MetadataEntityTableTableManager get metadataEntity =>
+      i27.$$MetadataEntityTableTableManager(_db, _db.metadataEntity);
 }

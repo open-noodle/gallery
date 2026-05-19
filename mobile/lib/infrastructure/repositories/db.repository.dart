@@ -14,6 +14,7 @@ import 'package:immich_mobile/infrastructure/entities/local_asset.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/local_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/memory.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/memory_asset.entity.dart';
+import 'package:immich_mobile/infrastructure/entities/metadata.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/partner.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/person.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_album.entity.dart';
@@ -64,6 +65,7 @@ import 'package:logging/logging.dart';
     StoreEntity,
     TrashedLocalAssetEntity,
     AssetEditEntity,
+    MetadataEntity,
   ],
   include: {'package:immich_mobile/infrastructure/entities/merged_asset.drift'},
 )
@@ -106,7 +108,7 @@ class Drift extends $Drift {
   }
 
   @override
-  int get schemaVersion => 27;
+  int get schemaVersion => 28;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -288,6 +290,9 @@ class Drift extends $Drift {
           from26To27: (m, v27) async {
             await customStatement('DROP INDEX IF EXISTS idx_remote_album_owner_id');
             await m.alterTable(TableMigration(v27.remoteAlbumEntity));
+          },
+          from27To28: (m, v28) async {
+            await m.createTable(v28.metadata);
           },
         ),
       );
