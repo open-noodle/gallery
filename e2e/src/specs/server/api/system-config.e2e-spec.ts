@@ -151,12 +151,11 @@ describe('/system-config', () => {
       expect(status).toBe(403);
     });
 
-    it('rejects machineLearning.clip.maxDistance below 0 (Min validator) — PR #294', async () => {
-      // CLIPConfig.maxDistance has @Min(0) @Max(2). 0 means "disabled" — the
+    it('rejects machineLearning.clip.maxDistance below 0 — PR #294', async () => {
+      // CLIPConfig.maxDistance allows values from 0 to 2. 0 means "disabled" — the
       // smart-search filter is opt-in. Pin both bounds to defend against a
-      // future loosening that would silently break the threshold. Asserting
-      // the message field references `maxDistance` so a different validator
-      // firing (e.g. urls validation) doesn't satisfy the test.
+      // future loosening that would silently break the threshold. Assert the
+      // validation path so a different error doesn't satisfy the test.
       const { status, body } = await request(app)
         .put('/system-config')
         .set('Authorization', `Bearer ${admin.accessToken}`)
@@ -168,10 +167,14 @@ describe('/system-config', () => {
           },
         });
       expect(status).toBe(400);
-      expect(body.message).toEqual(expect.arrayContaining([expect.stringContaining('maxDistance')]));
+      expect(body).toEqual(
+        errorDto.validationError([
+          { path: ['machineLearning', 'clip', 'maxDistance'], message: 'Too small: expected number to be >=0' },
+        ]),
+      );
     });
 
-    it('rejects machineLearning.clip.maxDistance above 2 (Max validator) — PR #294', async () => {
+    it('rejects machineLearning.clip.maxDistance above 2 — PR #294', async () => {
       const { status, body } = await request(app)
         .put('/system-config')
         .set('Authorization', `Bearer ${admin.accessToken}`)
@@ -183,7 +186,11 @@ describe('/system-config', () => {
           },
         });
       expect(status).toBe(400);
-      expect(body.message).toEqual(expect.arrayContaining([expect.stringContaining('maxDistance')]));
+      expect(body).toEqual(
+        errorDto.validationError([
+          { path: ['machineLearning', 'clip', 'maxDistance'], message: 'Too big: expected number to be <=2' },
+        ]),
+      );
     });
 
     it('accepts machineLearning.clip.maxDistance = 0 (disabled) and round-trips it', async () => {
@@ -207,12 +214,9 @@ describe('/system-config', () => {
       expect(after.machineLearning.clip.maxDistance).toBe(0);
     });
 
-    it('rejects machineLearning.urls = [] when enabled=true (ValidateIf + ArrayMinSize)', async () => {
-      // SystemConfigMachineLearningDto.urls has @ValidateIf((dto) => dto.enabled),
-      // @ArrayMinSize(1). Disabling enabled would skip validation; enabled=true
-      // requires at least one URL. Pin the message references `urls` so a
-      // future change in the payload (or different validator firing) doesn't
-      // silently satisfy the test.
+    it('rejects machineLearning.urls = [] when enabled=true', async () => {
+      // Enabled machine learning requires at least one URL. Pin the validation
+      // path so a different error doesn't satisfy the test.
       const { status, body } = await request(app)
         .put('/system-config')
         .set('Authorization', `Bearer ${admin.accessToken}`)
@@ -221,7 +225,11 @@ describe('/system-config', () => {
           machineLearning: { ...baseConfig.machineLearning, enabled: true, urls: [] },
         });
       expect(status).toBe(400);
-      expect(body.message).toEqual(expect.arrayContaining([expect.stringContaining('urls')]));
+      expect(body).toEqual(
+        errorDto.validationError([
+          { path: ['machineLearning', 'urls'], message: 'Too small: expected array to have >=1 items' },
+        ]),
+      );
     });
 
     it('round-trips a trash config change', async () => {
