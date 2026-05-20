@@ -93,7 +93,7 @@ void main() {
 
     expect(result, response);
     expect(Store.get(StoreKey.accessToken), 'demo-token');
-    expect(Store.get(StoreKey.deviceIdHash), isA<int>());
+    expect(Store.get(StoreKey.deviceId), 'device-id');
     expect(sut.state.isAuthenticated, isTrue);
     expect(sut.state.userId, 'demo-user-id');
     expect(sut.state.userEmail, 'demo@gallery.app');
