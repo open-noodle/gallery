@@ -103,8 +103,7 @@ describe(MapService.name, () => {
       const auth = AuthFactory.create();
       const spaceId = '00000000-0000-4000-8000-000000000003';
       mocks.partner.getAll.mockResolvedValue([]);
-      mocks.album.getOwned.mockResolvedValue([]);
-      mocks.album.getShared.mockResolvedValue([]);
+      mocks.album.getAllIds.mockResolvedValue([]);
       mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
       mocks.map.getMapMarkers.mockResolvedValue([]);
 
