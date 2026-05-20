@@ -5,23 +5,23 @@ import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
+const expectValidationError = (body: unknown, pathSegment: string, message: string) => {
+  expect(body).toEqual(
+    expect.objectContaining({
+      message: 'Validation failed',
+      errors: expect.arrayContaining([
+        expect.objectContaining({
+          path: expect.arrayContaining([pathSegment]),
+          message: expect.stringContaining(message),
+        }),
+      ]),
+    }),
+  );
+};
+
 describe('/classification', () => {
   let admin: LoginResponseDto;
   let user: LoginResponseDto;
-
-  const expectValidationError = (body: unknown, pathSegment: string, message: string) => {
-    expect(body).toEqual(
-      expect.objectContaining({
-        message: 'Validation failed',
-        errors: expect.arrayContaining([
-          expect.objectContaining({
-            path: expect.arrayContaining([pathSegment]),
-            message: expect.stringContaining(message),
-          }),
-        ]),
-      }),
-    );
-  };
 
   beforeAll(async () => {
     await utils.resetDatabase();
