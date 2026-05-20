@@ -9,6 +9,20 @@ describe('/classification', () => {
   let admin: LoginResponseDto;
   let user: LoginResponseDto;
 
+  const expectValidationError = (body: unknown, pathSegment: string, message: string) => {
+    expect(body).toEqual(
+      expect.objectContaining({
+        message: 'Validation failed',
+        errors: expect.arrayContaining([
+          expect.objectContaining({
+            path: expect.arrayContaining([pathSegment]),
+            message: expect.stringContaining(message),
+          }),
+        ]),
+      }),
+    );
+  };
+
   beforeAll(async () => {
     await utils.resetDatabase();
 
@@ -135,12 +149,7 @@ describe('/classification', () => {
             },
           });
         expect(status).toBe(400);
-        // class-validator returns a string array for nested DTO errors; the
-        // message is wrapped in `classification.<original>` because the error
-        // is on a nested field. Use arrayContaining + stringContaining.
-        expect(body.message).toEqual(
-          expect.arrayContaining([expect.stringContaining('Category names must be unique')]),
-        );
+        expectValidationError(body, 'categories', 'Category names must be unique');
       });
 
       it('rejects an invalid action with 400 (IsIn validator)', async () => {
@@ -155,10 +164,7 @@ describe('/classification', () => {
             },
           });
         expect(status).toBe(400);
-        // Pin that the failing field is `action` so a future change in the
-        // payload (or a different validator firing) doesn't silently satisfy
-        // the test.
-        expect(body.message).toEqual(expect.arrayContaining([expect.stringContaining('action')]));
+        expectValidationError(body, 'action', 'Invalid option');
       });
 
       it('rejects similarity < 0 with 400 (Min validator)', async () => {
@@ -173,7 +179,7 @@ describe('/classification', () => {
             },
           });
         expect(status).toBe(400);
-        expect(body.message).toEqual(expect.arrayContaining([expect.stringContaining('similarity')]));
+        expectValidationError(body, 'similarity', 'Too small');
       });
 
       it('rejects similarity > 1 with 400 (Max validator)', async () => {
@@ -188,7 +194,7 @@ describe('/classification', () => {
             },
           });
         expect(status).toBe(400);
-        expect(body.message).toEqual(expect.arrayContaining([expect.stringContaining('similarity')]));
+        expectValidationError(body, 'similarity', 'Too big');
       });
 
       it('rejects empty prompts array with 400 (ArrayMinSize validator)', async () => {
@@ -203,7 +209,7 @@ describe('/classification', () => {
             },
           });
         expect(status).toBe(400);
-        expect(body.message).toEqual(expect.arrayContaining([expect.stringContaining('prompts')]));
+        expectValidationError(body, 'prompts', 'Too small');
       });
     });
 
