@@ -180,9 +180,9 @@ describe(PersonController.name, () => {
 
       expect(status).toBe(400);
       expect(body).toEqual(
-        errorDto.badRequest([
-          '[target.type] Invalid option: expected one of "person"|"space-person"',
-          '[sources] Too small: expected array to have >=1 items',
+        errorDto.validationError([
+          { path: ['target', 'type'], message: 'Invalid option: expected one of "person"|"space-person"' },
+          { path: ['sources'], message: 'Too small: expected array to have >=1 items' },
         ]),
       );
     });
@@ -197,7 +197,11 @@ describe(PersonController.name, () => {
         .set('Authorization', `Bearer token`);
 
       expect(status).toBe(400);
-      expect(body).toEqual(errorDto.badRequest(['[sources.0.spaceId] spaceId is required for space-person refs']));
+      expect(body).toEqual(
+        errorDto.validationError([
+          { path: ['sources', 0, 'spaceId'], message: 'spaceId is required for space-person refs' },
+        ]),
+      );
     });
   });
 
@@ -241,7 +245,7 @@ describe(PersonController.name, () => {
         .set('Authorization', `Bearer token`);
 
       expect(status).toBe(400);
-      expect(body).toEqual(errorDto.badRequest(['[assetFaceId] Invalid UUID']));
+      expect(body).toEqual(errorDto.validationError([{ path: ['assetFaceId'], message: 'Invalid UUID' }]));
     });
 
     it('should parse person face page query values', async () => {
