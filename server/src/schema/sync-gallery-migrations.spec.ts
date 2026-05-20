@@ -8,7 +8,7 @@ type SyncGalleryMigrations = (options: { serverRoot: string; logger?: { log: (me
   removed: number;
 };
 
-// @ts-ignore - this executable bin module exports its testable core for regression coverage.
+// @ts-expect-error - this executable bin module exports its testable core for regression coverage.
 const { syncGalleryMigrations } = (await import('../../bin/sync-gallery-migrations.mjs')) as {
   syncGalleryMigrations: SyncGalleryMigrations;
 };
