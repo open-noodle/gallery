@@ -1,5 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import { AssetTypeEnum } from '@immich/sdk';
+import { fireEvent, screen, waitFor } from '@testing-library/svelte';
 import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import { getResizeObserverMock } from '$lib/__mocks__/resize-observer.mock';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
