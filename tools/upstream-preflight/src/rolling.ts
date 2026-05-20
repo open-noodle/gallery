@@ -8,7 +8,6 @@ import {
 } from './batch';
 import {
   cherryEquivalent,
-  commitSubjects,
   currentBranch,
   getGitPath,
   hasGitOperationInProgress,
@@ -18,7 +17,6 @@ import {
   revParse,
   runGit,
 } from './git';
-import type { BatchPlan } from './types';
 
 const fullShaPattern = /^[0-9a-f]{40}$/;
 
@@ -477,13 +475,16 @@ export function runRollingFinalCheckCommand(
     }
 
     const plan = readPersistedBatchPlan(options.repoPath, options.outputDir);
-    errors.push(...findMissingSubjectMatches(options.repoPath, plan, state));
+    const finalAuditBatch = lastCompletedBatchId(
+      selectNextBatch(plan, options.repoPath),
+    );
+    errors.push(...findMissingSubjectMatches(options.repoPath, state));
     errors.push(...findPatchMismatches(options.repoPath, state));
 
     const checks = options.runChecks
       ? options.runChecks({ phase: 'final' })
       : runCommandList(
-          defaultFinalChecks(),
+          defaultFinalChecks(finalAuditBatch),
           options.repoPath,
           options.shellRunner,
         );
@@ -766,11 +767,15 @@ export function defaultForkSyncChecks(_batch?: string): string[] {
   ];
 }
 
-export function defaultFinalChecks(): string[] {
+export function defaultFinalChecks(batch?: string): string[] {
+  const postRebaseAudit = batch
+    ? `make upstream-postrebase-audit BATCH=${batch}`
+    : 'make upstream-postrebase-audit';
+
   return [
     'make fork-ownership-coverage-check',
     'make upstream-next-batch',
-    'make upstream-postrebase-audit',
+    postRebaseAudit,
     'make ci-invariants-check',
     'make fork-patches-check',
     'pnpm --filter @gallery/upstream-preflight run test',
@@ -856,16 +861,15 @@ function appendCheckHistory(
 
 function findMissingSubjectMatches(
   repoPath: string,
-  plan: BatchPlan,
   state: RollingState,
 ): string[] {
-  const forkSubjects = commitSubjects(
+  const forkSubjects = replayableCommitSubjects(
     repoPath,
-    `${plan.metadata.mergeBase}..${state.forkRef}`,
+    forkAccountingRange(state),
   );
-  const headSubjects = commitSubjects(
+  const headSubjects = replayableCommitSubjects(
     repoPath,
-    `${plan.metadata.mergeBase}..HEAD`,
+    `${state.upstreamTargetHead}..HEAD`,
   ).map((item) => item.subject);
 
   return forkSubjects
@@ -876,20 +880,45 @@ function findMissingSubjectMatches(
 }
 
 function findPatchMismatches(repoPath: string, state: RollingState): string[] {
-  const result = cherryEquivalent(repoPath, 'HEAD', state.forkRef);
+  const result = cherryEquivalent(
+    repoPath,
+    'HEAD',
+    state.forkRef,
+    state.startedForkHead,
+  );
   if (result.missing.length === 0) return [];
 
-  const subjectsBySha = new Map(
-    commitSubjects(
-      repoPath,
-      `${state.upstreamTargetHead}..${state.forkRef}`,
-    ).map((item) => [item.sha, item.subject]),
+  const headSubjects = replayableCommitSubjects(
+    repoPath,
+    `${state.upstreamTargetHead}..HEAD`,
+  ).map((item) => item.subject);
+  const missingShas = new Set(result.missing);
+  const missingCommits = replayableCommitSubjects(
+    repoPath,
+    forkAccountingRange(state),
+  ).filter(
+    (item) =>
+      missingShas.has(item.sha) &&
+      !hasSubjectOrPrMatch(item.subject, headSubjects),
   );
 
-  return result.missing.map((sha) => {
-    const subject = subjectsBySha.get(sha) ?? sha;
-    return `Patch-equivalence mismatch for fork commit: ${subject}`;
-  });
+  return missingCommits.map(
+    (item) => `Patch-equivalence mismatch for fork commit: ${item.subject}`,
+  );
+}
+
+function forkAccountingRange(state: RollingState): string {
+  return `${state.startedForkHead}..${state.forkRef}`;
+}
+
+function replayableCommitSubjects(
+  repoPath: string,
+  range: string,
+): Array<{ sha: string; subject: string }> {
+  return listReplayableForkCommits(repoPath, range).map((sha) => ({
+    sha,
+    subject: runGit(repoPath, ['log', '-1', '--format=%s', sha]),
+  }));
 }
 
 function normalizeSubject(subject: string): string {

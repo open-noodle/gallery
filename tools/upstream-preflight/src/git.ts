@@ -117,8 +117,9 @@ export function cherryEquivalent(
   cwd: string,
   upstream: string,
   head: string,
+  limit?: string,
 ): CherryEquivalentResult {
-  const raw = runGit(cwd, ['cherry', upstream, head])
+  const raw = runGit(cwd, ['cherry', upstream, head, ...(limit ? [limit] : [])])
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
