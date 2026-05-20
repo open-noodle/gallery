@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "build": "nest build",
-    "postbuild": "cp dist/schema/migrations-gallery/*.js dist/schema/migrations/ 2>/dev/null || true",
+    "postbuild": "node bin/sync-gallery-migrations.mjs",
     "format": "prettier --cache --check .",
     "format:fix": "prettier --cache --write --list-different .",
     "start": "pnpm run start:dev",
