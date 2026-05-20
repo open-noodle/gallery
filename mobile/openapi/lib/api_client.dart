@@ -294,6 +294,8 @@ class ApiClient {
           return AssetOcrResponseDto.fromJson(value);
         case 'AssetOrder':
           return AssetOrderTypeTransformer().decode(value);
+        case 'AssetOrderBy':
+          return AssetOrderByTypeTransformer().decode(value);
         case 'AssetRejectReason':
           return AssetRejectReasonTypeTransformer().decode(value);
         case 'AssetResponseDto':

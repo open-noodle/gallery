@@ -436,6 +436,7 @@ Class | Method | HTTP request | Description
  - [AssetMetadataUpsertItemDto](doc//AssetMetadataUpsertItemDto.md)
  - [AssetOcrResponseDto](doc//AssetOcrResponseDto.md)
  - [AssetOrder](doc//AssetOrder.md)
+ - [AssetOrderBy](doc//AssetOrderBy.md)
  - [AssetRejectReason](doc//AssetRejectReason.md)
  - [AssetResponseDto](doc//AssetResponseDto.md)
  - [AssetStackResponseDto](doc//AssetStackResponseDto.md)
