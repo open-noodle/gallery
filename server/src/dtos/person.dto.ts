@@ -199,7 +199,6 @@ export class RepresentativeFaceUpdateDto extends createZodDto(RepresentativeFace
 export class PersonFaceResponseDto extends createZodDto(PersonFaceResponseSchema) {}
 export class PersonFacePageResponseDto extends createZodDto(PersonFacePageResponseSchema) {}
 
-
 export class AssetFaceResponseDto extends createZodDto(AssetFaceResponseSchema) {}
 
 const AssetFaceUpdateItemSchema = z
