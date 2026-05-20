@@ -97,12 +97,7 @@ export class AssetService extends BaseService {
 
     if (auth.sharedLink) {
       data.people = [];
-      data.unassignedFaces = [];
     } else if (spaceId) {
-      if (data.ownerId !== auth.user.id) {
-        data.unassignedFaces = [];
-      }
-
       const member = await this.sharedSpaceRepository.getMember(spaceId, auth.user.id);
       if (!member) {
         throw new ForbiddenException('Not a member of this space');
@@ -125,8 +120,6 @@ export class AssetService extends BaseService {
         data.people = data.people.filter((p) => p.spacePersonId && !spacePersonMap.get(p.id)?.isHidden);
       }
     } else if (data.ownerId !== auth.user.id) {
-      data.unassignedFaces = [];
-
       // No spaceId — try to find a space containing this asset for this user
       const spaceForAsset = await this.sharedSpaceRepository.findSpaceForAssetAndUser(id, auth.user.id);
       if (spaceForAsset) {
