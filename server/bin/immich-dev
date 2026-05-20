@@ -7,4 +7,5 @@ fi
 
 cd /usr/src/app || exit
 pnpm --filter @immich/plugin-sdk build
+node server/bin/sync-gallery-migrations.mjs
 pnpm --filter immich exec nest start --debug "0.0.0.0:9230" --watch -- "$@"
