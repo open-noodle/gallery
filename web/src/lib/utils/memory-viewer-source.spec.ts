@@ -32,7 +32,6 @@ const asset = (id: string): AssetResponseDto => ({
   people: [
     {
       birthDate: null,
-      faces: [],
       id: `${id}-person`,
       isHidden: false,
       name: 'Ada Lovelace',
