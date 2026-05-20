@@ -108,7 +108,7 @@ class Drift extends $Drift {
   }
 
   @override
-  int get schemaVersion => 28;
+  int get schemaVersion => 29;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -293,6 +293,9 @@ class Drift extends $Drift {
           },
           from27To28: (m, v28) async {
             await m.createTable(v28.metadata);
+          },
+          from28To29: (m, v29) async {
+            await m.addColumn(v29.remoteAssetEntity, v29.remoteAssetEntity.uploadedAt);
           },
         ),
       );
