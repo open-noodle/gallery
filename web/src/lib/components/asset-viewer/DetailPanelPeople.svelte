@@ -112,9 +112,7 @@
     <div class="mt-2 grid {visiblePeople.length <= 6 ? 'grid-cols-3 gap-3' : 'grid-cols-4 gap-2'}">
       {#each visiblePeople as person (person.id)}
         {@const personFaces = faceManager.facesByPersonId.get(person.id) ?? []}
-        {@const isHighlighted = personFaces.some((f) =>
-          assetViewerManager.highlightedFaces.some((b) => b.id === f.id),
-        )}
+        {@const isHighlighted = personFaces.some((f) => assetViewerManager.highlightedFaces.some((b) => b.id === f.id))}
         {@const fallbackThumbnailUrl = getPersonFallbackThumbnailUrl(person)}
         <a
           class="group outline-none"
