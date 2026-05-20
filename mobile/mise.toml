@@ -189,7 +189,7 @@ run = "dart analyze --fatal-infos"
 [tasks."analyze:dcm"]
 description = "Run Dart Code Metrics"
 hide = true
-run = "dcm analyze lib --fatal-style --fatal-warnings"
+run = "if [ -n \"${DCM_CI_KEY:-}\" ] && [ -n \"${DCM_EMAIL:-}\" ]; then dcm analyze lib --fatal-style --fatal-warnings; else echo \"Skipping DCM analysis; DCM_CI_KEY and DCM_EMAIL are not configured.\"; fi"
 
 [tasks."analyze-fix:dart"]
 description = "Auto-fix Dart analysis"
