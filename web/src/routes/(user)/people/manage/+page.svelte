@@ -38,9 +38,7 @@
     const hiddenById = new Map(updatedVisibilityPeople.map((person) => [person.id, person.isHidden]));
     people = people.map((person: PersonResponseDto) => {
       const nextHidden = hiddenById.get(person.id);
-      return nextHidden === undefined || nextHidden === person.isHidden
-        ? person
-        : { ...person, isHidden: nextHidden };
+      return nextHidden === undefined || nextHidden === person.isHidden ? person : { ...person, isHidden: nextHidden };
     });
   };
 

@@ -95,7 +95,14 @@ describe('/pet-detection', () => {
         .send(config);
 
       expect(status).toBe(400);
-      expect(body).toEqual(errorDto.badRequest());
+      expect(body).toEqual(
+        errorDto.validationError([
+          {
+            path: ['machineLearning', 'petDetection', 'minScore'],
+            message: 'Too small: expected number to be >=0.1',
+          },
+        ]),
+      );
     });
 
     it('should reject minScore above 1.0', async () => {
@@ -108,7 +115,14 @@ describe('/pet-detection', () => {
         .send(config);
 
       expect(status).toBe(400);
-      expect(body).toEqual(errorDto.badRequest());
+      expect(body).toEqual(
+        errorDto.validationError([
+          {
+            path: ['machineLearning', 'petDetection', 'minScore'],
+            message: 'Too big: expected number to be <=1',
+          },
+        ]),
+      );
     });
 
     it('should reject empty modelName', async () => {
@@ -121,7 +135,14 @@ describe('/pet-detection', () => {
         .send(config);
 
       expect(status).toBe(400);
-      expect(body).toEqual(errorDto.badRequest());
+      expect(body).toEqual(
+        errorDto.validationError([
+          {
+            path: ['machineLearning', 'petDetection', 'modelName'],
+            message: 'Too small: expected string to have >=1 characters',
+          },
+        ]),
+      );
     });
 
     it('should reset to defaults', async () => {
