@@ -357,7 +357,9 @@ describe(SearchController.name, () => {
           .query({ type: 'country', albumId, spaceId });
 
         expect(status).toBe(400);
-        expect(body).toEqual(errorDto.validationError([{ path: [], message: 'albumId cannot exist alongside spaceId' }]));
+        expect(body).toEqual(
+          errorDto.validationError([{ path: [], message: 'albumId cannot exist alongside spaceId' }]),
+        );
       });
 
       it('accepts personIds for scoped city suggestions', async () => {
@@ -415,7 +417,9 @@ describe(SearchController.name, () => {
 
         expect(status).toBe(400);
         expect(body).toEqual(
-          errorDto.validationError([{ path: ['personIds', 0], message: expect.stringContaining('must match pattern') }]),
+          errorDto.validationError([
+            { path: ['personIds', 0], message: expect.stringContaining('must match pattern') },
+          ]),
         );
       });
     });
@@ -463,7 +467,9 @@ describe(SearchController.name, () => {
           .query({ albumId, spaceId });
 
         expect(status).toBe(400);
-        expect(body).toEqual(errorDto.validationError([{ path: [], message: 'albumId cannot exist alongside spaceId' }]));
+        expect(body).toEqual(
+          errorDto.validationError([{ path: [], message: 'albumId cannot exist alongside spaceId' }]),
+        );
       });
 
       it('rejects an invalid albumId query param', async () => {
@@ -522,7 +528,9 @@ describe(SearchController.name, () => {
 
         expect(status).toBe(400);
         expect(body).toEqual(
-          errorDto.validationError([{ path: ['personIds', 0], message: expect.stringContaining('must match pattern') }]),
+          errorDto.validationError([
+            { path: ['personIds', 0], message: expect.stringContaining('must match pattern') },
+          ]),
         );
       });
     });
