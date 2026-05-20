@@ -138,10 +138,7 @@ describe('DetailPanel', () => {
   const makeFace = (
     id: string,
     person: PersonResponseDto,
-    bounds: Pick<
-      AssetFaceResponseDto,
-      'boundingBoxX1' | 'boundingBoxX2' | 'boundingBoxY1' | 'boundingBoxY2'
-    >,
+    bounds: Pick<AssetFaceResponseDto, 'boundingBoxX1' | 'boundingBoxX2' | 'boundingBoxY1' | 'boundingBoxY2'>,
   ): AssetFaceResponseDto => ({
     id,
     imageWidth: 1000,
