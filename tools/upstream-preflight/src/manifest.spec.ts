@@ -41,7 +41,7 @@ patches:
   - id: immich-ui-command-patch
     package: '@immich/ui'
     version_source: pnpm-workspace.yaml
-    expected_patch: patches/@immich__ui@0.76.2.patch
+    expected_patch: patches/@immich__ui@0.77.3.patch
     required_check: mobile-drift-rebase-check
 risk_patterns:
   - id: breaking-refactor
@@ -80,7 +80,7 @@ describe('parseManifest', () => {
     expect(manifest.checks?.['mobile-drift-rebase-check'].cost).toBe('cheap');
     expect(manifest.ci_invariants?.[0].id).toBe('no-push-o-matic');
     expect(manifest.patches?.[0].expected_patch).toBe(
-      'patches/@immich__ui@0.76.2.patch',
+      'patches/@immich__ui@0.77.3.patch',
     );
     expect(manifest.risk_patterns?.[0].id).toBe('breaking-refactor');
     expect(manifest.coverage_ignore).toEqual(['docs/superpowers/**']);
@@ -224,7 +224,7 @@ checks:
     expect(() =>
       parseManifest(
         validManifest.replace(
-          'expected_patch: patches/@immich__ui@0.76.2.patch',
+          'expected_patch: patches/@immich__ui@0.77.3.patch',
           'expected_patch: 12',
         ),
       ),
