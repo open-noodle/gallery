@@ -1586,11 +1586,24 @@ describe('rolling final check', () => {
       'pnpm --filter @gallery/upstream-preflight run check',
       'pnpm --filter @gallery/upstream-preflight run format',
     ]);
+    expect(defaultFinalChecks('112')).toEqual([
+      'make fork-ownership-coverage-check',
+      'make upstream-next-batch',
+      'make upstream-postrebase-audit BATCH=112',
+      'make ci-invariants-check',
+      'make fork-patches-check',
+      'pnpm --filter @gallery/upstream-preflight run test',
+      'pnpm --filter @gallery/upstream-preflight run check',
+      'pnpm --filter @gallery/upstream-preflight run format',
+    ]);
   });
 
   it('runs default final checks when no injected check runner is provided', () => {
     const { repo, outputDir, plan } = createRepoWithPlan();
     const commands: string[] = [];
+    const expectedCommands = defaultFinalChecks(
+      plan.batches[plan.batches.length - 1]?.id,
+    );
     repo.git(
       'checkout',
       '-b',
@@ -1615,11 +1628,11 @@ describe('rolling final check', () => {
     });
 
     expect(exitCode).toBe(0);
-    expect(commands).toEqual(defaultFinalChecks());
+    expect(commands).toEqual(expectedCommands);
     expect(readRollingState(repo.path, outputDir).checkHistory).toContainEqual(
       expect.objectContaining({
         phase: 'final',
-        commands: defaultFinalChecks(),
+        commands: expectedCommands,
         ok: true,
       }),
     );
@@ -1724,9 +1737,9 @@ describe('rolling final check', () => {
     expect(errors.join('\n')).toContain('#44');
   });
 
-  it('reports patch-equivalence mismatches even when subjects match', () => {
+  it('accepts subject-matched fork commits whose patch changed during conflict resolution', () => {
     const { repo, outputDir, plan } = createRepoWithPlan();
-    const errors: string[] = [];
+    const output: string[] = [];
     repo.git('checkout', 'main');
     repo.write('same-subject.txt', 'origin patch');
     const newForkHead = repo.commit('feat: same subject (#55)');
@@ -1753,12 +1766,48 @@ describe('rolling final check', () => {
       outputDir,
       fetchFork: () => undefined,
       runChecks: () => ({ ok: true, commands: [] }),
+      write: (message) => output.push(message),
+    });
+
+    expect(exitCode).toBe(0);
+    expect(output.join('\n')).toContain(
+      'Rolling upstream rebase final check passed',
+    );
+  });
+
+  it('reports patch-equivalence mismatches when neither subject nor patch matches', () => {
+    const { repo, outputDir, plan } = createRepoWithPlan();
+    const errors: string[] = [];
+    repo.git('checkout', 'main');
+    repo.write('original.txt', 'origin patch');
+    const newForkHead = repo.commit('feat: original fork work (#56)');
+    repo.git(
+      'checkout',
+      '-b',
+      'rebase/upstream-2026-05',
+      plan.metadata.upstreamHead,
+    );
+    repo.write('different.txt', 'different patch');
+    repo.commit('feat: different work (#57)');
+    writeRollingState(
+      repo.path,
+      validStateFromPlan(plan, 'rebase/upstream-2026-05', {
+        integratedForkHead: newForkHead,
+      }),
+      outputDir,
+    );
+
+    const exitCode = runRollingFinalCheckCommand({
+      repoPath: repo.path,
+      outputDir,
+      fetchFork: () => undefined,
+      runChecks: () => ({ ok: true, commands: [] }),
       writeError: (message) => errors.push(message),
     });
 
     expect(exitCode).toBe(1);
     expect(errors.join('\n')).toContain('Patch-equivalence mismatch');
-    expect(errors.join('\n')).toContain('#55');
+    expect(errors.join('\n')).toContain('#56');
   });
 
   it('accepts an equivalent fork commit when the PR number still matches after retitling', () => {
