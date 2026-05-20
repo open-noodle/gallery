@@ -1,11 +1,11 @@
-import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
-import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import { personFactory } from '@test-data/factories/person-factory';
 import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'svelte';
 import { vi } from 'vitest';
+import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
+import { sdkMock } from '$lib/__mocks__/sdk.mock';
+import { personFactory } from '@test-data/factories/person-factory';
 import ManagePeoplePage from './+page.svelte';
 import ManagePeoplePageTestWrapper from './ManagePeopleVisibility.test-wrapper.svelte';
 
