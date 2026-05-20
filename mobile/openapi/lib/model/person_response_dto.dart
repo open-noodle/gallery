@@ -22,6 +22,7 @@ class PersonResponseDto {
     required this.name,
     this.numberOfAssets,
     this.primaryProfile,
+    this.spacePersonId,
     this.species,
     required this.thumbnailPath,
     this.type = 'person',
@@ -87,6 +88,15 @@ class PersonResponseDto {
   ///
   ScopedPrimaryProfile? primaryProfile;
 
+  /// Space person ID when viewed through a shared space
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  String? spacePersonId;
+
   /// Pet species (e.g. dog, cat)
   String? species;
 
@@ -116,6 +126,7 @@ class PersonResponseDto {
     other.name == name &&
     other.numberOfAssets == numberOfAssets &&
     other.primaryProfile == primaryProfile &&
+    other.spacePersonId == spacePersonId &&
     other.species == species &&
     other.thumbnailPath == thumbnailPath &&
     other.type == type &&
@@ -133,13 +144,14 @@ class PersonResponseDto {
     (name.hashCode) +
     (numberOfAssets == null ? 0 : numberOfAssets!.hashCode) +
     (primaryProfile == null ? 0 : primaryProfile!.hashCode) +
+    (spacePersonId == null ? 0 : spacePersonId!.hashCode) +
     (species == null ? 0 : species!.hashCode) +
     (thumbnailPath.hashCode) +
     (type.hashCode) +
     (updatedAt == null ? 0 : updatedAt!.hashCode);
 
   @override
-  String toString() => 'PersonResponseDto[birthDate=$birthDate, color=$color, filterId=$filterId, id=$id, isFavorite=$isFavorite, isHidden=$isHidden, name=$name, numberOfAssets=$numberOfAssets, primaryProfile=$primaryProfile, species=$species, thumbnailPath=$thumbnailPath, type=$type, updatedAt=$updatedAt]';
+  String toString() => 'PersonResponseDto[birthDate=$birthDate, color=$color, filterId=$filterId, id=$id, isFavorite=$isFavorite, isHidden=$isHidden, name=$name, numberOfAssets=$numberOfAssets, primaryProfile=$primaryProfile, spacePersonId=$spacePersonId, species=$species, thumbnailPath=$thumbnailPath, type=$type, updatedAt=$updatedAt]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -176,6 +188,11 @@ class PersonResponseDto {
     } else {
     //  json[r'primaryProfile'] = null;
     }
+    if (this.spacePersonId != null) {
+      json[r'spacePersonId'] = this.spacePersonId;
+    } else {
+    //  json[r'spacePersonId'] = null;
+    }
     if (this.species != null) {
       json[r'species'] = this.species;
     } else {
@@ -209,6 +226,7 @@ class PersonResponseDto {
         name: mapValueOfType<String>(json, r'name')!,
         numberOfAssets: mapValueOfType<int>(json, r'numberOfAssets'),
         primaryProfile: ScopedPrimaryProfile.fromJson(json[r'primaryProfile']),
+        spacePersonId: mapValueOfType<String>(json, r'spacePersonId'),
         species: mapValueOfType<String>(json, r'species'),
         thumbnailPath: mapValueOfType<String>(json, r'thumbnailPath')!,
         type: mapValueOfType<String>(json, r'type') ?? 'person',
