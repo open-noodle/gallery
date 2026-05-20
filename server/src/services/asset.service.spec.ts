@@ -333,7 +333,7 @@ describe(AssetService.name, () => {
       expect(result).toHaveProperty('people', []);
     });
 
-    it('should strip unassigned faces for space member with spaceId', async () => {
+    it('should not expose unassigned faces for space member with spaceId', async () => {
       const asset = AssetFactory.from().exif().face({ id: 'unassigned-face-id' }).build();
       mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
@@ -343,7 +343,7 @@ describe(AssetService.name, () => {
 
       const result = await sut.get(authStub.admin, asset.id, 'space-id');
 
-      expect(result).toHaveProperty('unassignedFaces', []);
+      expect(result).not.toHaveProperty('unassignedFaces');
     });
 
     it('should strip people for space member without spaceId', async () => {

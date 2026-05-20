@@ -1,4 +1,10 @@
-import { AssetTypeEnum, AssetVisibility, type AssetResponseDto } from '@immich/sdk';
+import {
+  AssetTypeEnum,
+  AssetVisibility,
+  type AssetFaceResponseDto,
+  type AssetResponseDto,
+  type PersonResponseDto,
+} from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { screen, waitFor } from '@testing-library/svelte';
 import { getAppleMapsUrl, getGoogleMapsUrl, getOpenStreetMapUrl } from '$lib/utils/exif-utils';
@@ -6,7 +12,12 @@ import { renderWithTooltips } from '$tests/helpers';
 import { assetFactory } from '@test-data/factories/asset-factory';
 import DetailPanel from './DetailPanel.svelte';
 
-const { getAllAlbumsMock, getAssetInfoMock, zoomImageToBase64Mock } = vi.hoisted(() => ({
+const { faceManagerMock, getAllAlbumsMock, getAssetInfoMock, zoomImageToBase64Mock } = vi.hoisted(() => ({
+  faceManagerMock: {
+    data: [] as AssetFaceResponseDto[],
+    facesByPersonId: new Map<string, AssetFaceResponseDto[]>(),
+    people: [] as PersonResponseDto[],
+  },
   getAllAlbumsMock: vi.fn(),
   getAssetInfoMock: vi.fn(),
   zoomImageToBase64Mock: vi.fn(),
@@ -25,6 +36,10 @@ vi.mock('$app/navigation', () => ({ goto: vi.fn().mockResolvedValue(undefined) }
 
 vi.mock('$lib/utils/people-utils', () => ({
   zoomImageToBase64: zoomImageToBase64Mock,
+}));
+
+vi.mock('$lib/stores/face.svelte', () => ({
+  faceManager: faceManagerMock,
 }));
 
 vi.mock('$lib/managers/auth-manager.svelte', () => ({
@@ -120,8 +135,26 @@ vi.mock('$lib/components/shared-components/LoadingSpinner.svelte', async () => {
 });
 
 describe('DetailPanel', () => {
+  const makeFace = (
+    id: string,
+    person: PersonResponseDto,
+    bounds: Pick<
+      AssetFaceResponseDto,
+      'boundingBoxX1' | 'boundingBoxX2' | 'boundingBoxY1' | 'boundingBoxY2'
+    >,
+  ): AssetFaceResponseDto => ({
+    id,
+    imageWidth: 1000,
+    imageHeight: 800,
+    ...bounds,
+    person,
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    faceManagerMock.data = [];
+    faceManagerMock.facesByPersonId = new Map();
+    faceManagerMock.people = [];
     getAllAlbumsMock.mockResolvedValue([]);
     getAssetInfoMock.mockResolvedValue(undefined);
     zoomImageToBase64Mock.mockResolvedValue(null);
@@ -129,6 +162,26 @@ describe('DetailPanel', () => {
 
   it('uses the detected face crop instead of the shared-space person thumbnail when spacePersonId is present', async () => {
     zoomImageToBase64Mock.mockResolvedValue('data:image/jpeg;base64,current-face');
+
+    const person: PersonResponseDto = {
+      id: 'global-person-1',
+      name: 'Alice',
+      thumbnailPath: '/ignored.jpg',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      isHidden: false,
+      birthDate: null,
+      type: 'person',
+      spacePersonId: 'space-person-1',
+    };
+    const face = makeFace('face-1', person, {
+      boundingBoxX1: 100,
+      boundingBoxY1: 200,
+      boundingBoxX2: 300,
+      boundingBoxY2: 400,
+    });
+    faceManagerMock.data = [face];
+    faceManagerMock.people = [person];
+    faceManagerMock.facesByPersonId = new Map([[person.id, [face]]]);
 
     const asset: AssetResponseDto = {
       id: 'asset-1',
@@ -155,30 +208,7 @@ describe('DetailPanel', () => {
       width: 1000,
       height: 800,
       isEdited: false,
-      people: [
-        {
-          id: 'global-person-1',
-          name: 'Alice',
-          thumbnailPath: '/ignored.jpg',
-          updatedAt: '2026-01-02T00:00:00.000Z',
-          isHidden: false,
-          birthDate: null,
-          type: 'person',
-          faces: [
-            {
-              id: 'face-1',
-              imageWidth: 1000,
-              imageHeight: 800,
-              boundingBoxX1: 100,
-              boundingBoxY1: 200,
-              boundingBoxX2: 300,
-              boundingBoxY2: 400,
-            },
-          ],
-          spacePersonId: 'space-person-1',
-        },
-      ],
-      unassignedFaces: [],
+      people: [person],
     };
 
     const { container } = renderWithTooltips(DetailPanel, {
@@ -187,9 +217,7 @@ describe('DetailPanel', () => {
       spaceId: 'space-1',
     });
 
-    await waitFor(() =>
-      expect(zoomImageToBase64Mock).toHaveBeenCalledWith(asset.people![0].faces[0], asset.id, asset.type, undefined),
-    );
+    await waitFor(() => expect(zoomImageToBase64Mock).toHaveBeenCalledWith(face, asset.id, asset.type, undefined));
 
     const croppedFace = container.querySelector('img[src="data:image/jpeg;base64,current-face"]');
     expect(croppedFace).toBeTruthy();
@@ -201,6 +229,45 @@ describe('DetailPanel', () => {
       .mockResolvedValueOnce('data:image/jpeg;base64,first-face')
       .mockResolvedValueOnce('data:image/jpeg;base64,second-face');
 
+    const alice: PersonResponseDto = {
+      id: 'global-person-1',
+      name: 'Alice',
+      thumbnailPath: '/ignored-1.jpg',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      isHidden: false,
+      birthDate: null,
+      type: 'person',
+      spacePersonId: 'space-person-1',
+    };
+    const bob: PersonResponseDto = {
+      id: 'global-person-2',
+      name: 'Bob',
+      thumbnailPath: '/ignored-2.jpg',
+      updatedAt: '2026-01-03T00:00:00.000Z',
+      isHidden: false,
+      birthDate: null,
+      type: 'person',
+      spacePersonId: 'space-person-1',
+    };
+    const aliceFace = makeFace('face-1', alice, {
+      boundingBoxX1: 100,
+      boundingBoxY1: 200,
+      boundingBoxX2: 300,
+      boundingBoxY2: 400,
+    });
+    const bobFace = makeFace('face-2', bob, {
+      boundingBoxX1: 500,
+      boundingBoxY1: 200,
+      boundingBoxX2: 700,
+      boundingBoxY2: 400,
+    });
+    faceManagerMock.data = [aliceFace, bobFace];
+    faceManagerMock.people = [alice, bob];
+    faceManagerMock.facesByPersonId = new Map([
+      [alice.id, [aliceFace]],
+      [bob.id, [bobFace]],
+    ]);
+
     const asset: AssetResponseDto = {
       id: 'asset-1',
       ownerId: 'owner-1',
@@ -226,51 +293,7 @@ describe('DetailPanel', () => {
       width: 1000,
       height: 800,
       isEdited: false,
-      people: [
-        {
-          id: 'global-person-1',
-          name: 'Alice',
-          thumbnailPath: '/ignored-1.jpg',
-          updatedAt: '2026-01-02T00:00:00.000Z',
-          isHidden: false,
-          birthDate: null,
-          type: 'person',
-          faces: [
-            {
-              id: 'face-1',
-              imageWidth: 1000,
-              imageHeight: 800,
-              boundingBoxX1: 100,
-              boundingBoxY1: 200,
-              boundingBoxX2: 300,
-              boundingBoxY2: 400,
-            },
-          ],
-          spacePersonId: 'space-person-1',
-        },
-        {
-          id: 'global-person-2',
-          name: 'Bob',
-          thumbnailPath: '/ignored-2.jpg',
-          updatedAt: '2026-01-03T00:00:00.000Z',
-          isHidden: false,
-          birthDate: null,
-          type: 'person',
-          faces: [
-            {
-              id: 'face-2',
-              imageWidth: 1000,
-              imageHeight: 800,
-              boundingBoxX1: 500,
-              boundingBoxY1: 200,
-              boundingBoxX2: 700,
-              boundingBoxY2: 400,
-            },
-          ],
-          spacePersonId: 'space-person-1',
-        },
-      ],
-      unassignedFaces: [],
+      people: [alice, bob],
     };
 
     const { container } = renderWithTooltips(DetailPanel, {
