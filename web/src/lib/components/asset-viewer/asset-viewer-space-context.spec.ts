@@ -55,6 +55,7 @@ describe('AssetViewer space context', () => {
     authManager.setUser(userAdminFactory.build({ id: ownerId }));
     authManager.setPreferences(preferencesFactory.build({ cast: { gCastEnabled: false } }));
     sdkMock.getAssetInfo.mockResolvedValue(refreshedAsset);
+    sdkMock.getFaces.mockResolvedValue([]);
 
     renderWithTooltips(AssetViewer, {
       cursor: { current: asset },
