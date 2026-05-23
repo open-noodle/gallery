@@ -26,6 +26,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const locationAssetFilepath = `${testAssetDir}/metadata/gps-position/thompson-springs.jpg`;
 const ratingAssetFilepath = `${testAssetDir}/metadata/rating/mongolels.jpg`;
 const facesAssetDir = `${testAssetDir}/metadata/faces`;
+const videoAssetFilepath = `${testAssetDir}/../../server/test/fixtures/videos/short.mp4`;
 
 const readTags = async (bytes: Buffer, filename: string) => {
   const filepath = join(tempDir, filename);
@@ -665,7 +666,7 @@ describe('/asset', () => {
 
     it('should clean up live photos', async () => {
       const { id: motionId } = await utils.createAsset(admin.accessToken, {
-        assetData: { filename: 'test.mp4', bytes: makeRandomImage() },
+        assetData: { filename: 'test.mp4', bytes: await readFile(videoAssetFilepath) },
       });
       const { id: photoId } = await utils.createAsset(admin.accessToken, { livePhotoVideoId: motionId });
 
@@ -687,7 +688,7 @@ describe('/asset', () => {
 
     it('should not delete a shared motion asset', async () => {
       const { id: motionId } = await utils.createAsset(admin.accessToken, {
-        assetData: { filename: 'test.mp4', bytes: makeRandomImage() },
+        assetData: { filename: 'test.mp4', bytes: await readFile(videoAssetFilepath) },
       });
       const { id: asset1 } = await utils.createAsset(admin.accessToken, { livePhotoVideoId: motionId });
       const { id: asset2 } = await utils.createAsset(admin.accessToken, { livePhotoVideoId: motionId });
