@@ -1,6 +1,6 @@
 import { ModuleRef } from '@nestjs/core';
 import { setTimeout } from 'node:timers/promises';
-import { JobName, QueueName } from 'src/enum';
+import { JobName, QueueJobStatus, QueueName } from 'src/enum';
 import { ConfigRepository } from 'src/repositories/config.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { JobRepository } from 'src/repositories/job.repository';
@@ -24,15 +24,23 @@ const emptyCounts = (): JobCounts => ({
 });
 
 const setup = (counts: JobCounts[] = []) => {
+  const client = {
+    exists: vi.fn().mockResolvedValue(0),
+    lrange: vi.fn().mockResolvedValue([]),
+    lrem: vi.fn().mockResolvedValue(0),
+    srem: vi.fn().mockResolvedValue(0),
+  };
   const queue = {
     add: vi.fn().mockResolvedValue({}),
     addBulk: vi.fn().mockResolvedValue([]),
     clean: vi.fn().mockResolvedValue([]),
+    client: Promise.resolve(client),
     drain: vi.fn().mockResolvedValue(void 0),
     getJob: vi.fn().mockResolvedValue(void 0),
     getJobCounts: vi.fn().mockResolvedValue(emptyCounts()),
     getJobs: vi.fn().mockResolvedValue([]),
     isPaused: vi.fn().mockResolvedValue(false),
+    toKey: vi.fn((key: string) => `queue:${key}`),
   };
 
   for (const value of counts) {
@@ -49,7 +57,7 @@ const setup = (counts: JobCounts[] = []) => {
 
   const sut = new JobRepository(moduleRef, {} as ConfigRepository, {} as EventRepository, logger);
 
-  return { sut, queue, logger };
+  return { sut, queue, client, logger };
 };
 
 const setHandlers = (sut: JobRepository, jobs: JobName[]) => {
@@ -133,6 +141,45 @@ describe(JobRepository.name, () => {
 
     expect(queue.drain).toHaveBeenCalledWith(true);
     expect(queue.clean).not.toHaveBeenCalled();
+  });
+
+  it('removes active queue ids whose job hash and lock are both gone before counting jobs', async () => {
+    const { sut, client, queue, logger } = setup([emptyCounts()]);
+    client.lrange.mockResolvedValue(['face-identity-backfill/space-person/orphan']);
+    client.lrem.mockResolvedValue(1);
+
+    await sut.getJobCounts(QueueName.PeopleBackfill);
+
+    expect(client.lrange).toHaveBeenCalledWith('queue:active', 0, -1);
+    expect(client.exists).toHaveBeenCalledWith('queue:face-identity-backfill/space-person/orphan');
+    expect(client.exists).toHaveBeenCalledWith('queue:face-identity-backfill/space-person/orphan:lock');
+    expect(client.lrem).toHaveBeenCalledWith('queue:active', 0, 'face-identity-backfill/space-person/orphan');
+    expect(client.srem).toHaveBeenCalledWith('queue:stalled', 'face-identity-backfill/space-person/orphan');
+    expect(queue.getJobCounts).toHaveBeenCalledWith('active', 'completed', 'failed', 'delayed', 'waiting', 'paused');
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Removed 1 dangling active job id from peopleBackfill: face-identity-backfill/space-person/orphan',
+    );
+  });
+
+  it('removes dangling active ids and ignores missing job hashes when searching jobs', async () => {
+    const { sut, client, queue } = setup();
+    client.lrange.mockResolvedValue(['face-identity-backfill/space-person/orphan']);
+    client.lrem.mockResolvedValue(1);
+    queue.getJobs.mockResolvedValue([
+      undefined,
+      { id: 'face-identity-backfill/root', name: JobName.FaceIdentityBackfill, timestamp: 123, data: {} },
+    ]);
+
+    await expect(
+      sut.searchJobs(QueueName.PeopleBackfill, {
+        status: [QueueJobStatus.Active, QueueJobStatus.Waiting],
+      }),
+    ).resolves.toEqual([
+      { id: 'face-identity-backfill/root', name: JobName.FaceIdentityBackfill, timestamp: 123, data: {} },
+    ]);
+
+    expect(client.lrem).toHaveBeenCalledWith('queue:active', 0, 'face-identity-backfill/space-person/orphan');
+    expect(queue.getJobs).toHaveBeenCalledWith([QueueJobStatus.Active, QueueJobStatus.Waiting], 0, 1000);
   });
 
   it('returns queue counts and oldest job ages', async () => {

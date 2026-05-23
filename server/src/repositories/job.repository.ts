@@ -163,7 +163,8 @@ export class JobRepository {
     return this.getQueue(name).clean(0, 1000, type);
   }
 
-  getJobCounts(name: QueueName): Promise<JobCounts> {
+  async getJobCounts(name: QueueName): Promise<JobCounts> {
+    await this.removeDanglingActiveJobs(name);
     return this.getQueue(name).getJobCounts(
       'active',
       'completed',
@@ -236,6 +237,42 @@ export class JobRepository {
 
   private getQueueName(name: JobName) {
     return (this.handlers[name] as JobMapItem).queueName;
+  }
+
+  private async removeDanglingActiveJobs(name: QueueName): Promise<void> {
+    const queue = this.getQueue(name);
+    const client = await queue.client;
+    const activeKey = queue.toKey('active');
+    const activeJobIds = [...new Set(await client.lrange(activeKey, 0, -1))];
+    if (activeJobIds.length === 0) {
+      return;
+    }
+
+    const removedIds: string[] = [];
+    let removedCount = 0;
+    for (const jobId of activeJobIds) {
+      const jobKey = queue.toKey(jobId);
+      const lockKey = `${jobKey}:lock`;
+      const [jobExists, lockExists] = await Promise.all([client.exists(jobKey), client.exists(lockKey)]);
+      if (jobExists > 0 || lockExists > 0) {
+        continue;
+      }
+
+      const removed = await client.lrem(activeKey, 0, jobId);
+      if (removed > 0) {
+        removedCount += removed;
+        removedIds.push(jobId);
+        await client.srem(queue.toKey('stalled'), jobId);
+      }
+    }
+
+    if (removedCount > 0) {
+      const sampleIds = removedIds.slice(0, 5).join(', ');
+      const suffix = removedIds.length > 5 ? `${sampleIds}, ...` : sampleIds;
+      this.logger.warn(
+        `Removed ${removedCount} dangling active job id${removedCount === 1 ? '' : 's'} from ${name}: ${suffix}`,
+      );
+    }
   }
 
   async queueAll(items: JobItem[]): Promise<void> {
@@ -320,8 +357,12 @@ export class JobRepository {
   }
 
   async searchJobs(name: QueueName, dto: QueueJobSearchDto): Promise<QueueJobResponseDto[]> {
+    if (!dto.status || dto.status.includes(QueueJobStatus.Active)) {
+      await this.removeDanglingActiveJobs(name);
+    }
+
     const jobs = await this.getQueue(name).getJobs(dto.status ?? Object.values(QueueJobStatus), 0, 1000);
-    return jobs.map((job) => {
+    return jobs.filter(Boolean).map((job) => {
       const { id, name, timestamp, data } = job;
       return { id, name: name as JobName, timestamp, data };
     });
