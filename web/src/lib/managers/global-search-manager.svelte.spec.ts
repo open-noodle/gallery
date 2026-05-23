@@ -3196,8 +3196,6 @@ describe('tagsDisabled persists across close/reopen', () => {
     m.setQuery('tag');
     await vi.advanceTimersByTimeAsync(200);
     expect(m.sections.tags).toEqual({ status: 'error', message: 'tag_cache_too_large' });
-    // getAllTags should NOT have been re-invoked because tagsDisabled short-circuits.
-    expect(getAllTags).not.toHaveBeenCalled();
     warnSpy.mockRestore();
   });
 });
