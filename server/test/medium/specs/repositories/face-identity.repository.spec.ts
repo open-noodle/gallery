@@ -315,6 +315,48 @@ describe(FaceIdentityRepository.name, () => {
     }
   });
 
+  it('repairs stale personal face identity links when the assigned person has no identity yet', async () => {
+    const { ctx, sut } = setup();
+    const { user } = await ctx.newUser();
+    let staleIdentityId: string | undefined;
+
+    try {
+      const staleIdentity = await ctx.database
+        .insertInto('face_identity')
+        .values({ type: 'person' })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      staleIdentityId = staleIdentity.id;
+
+      const { person } = await ctx.newPerson({ ownerId: user.id, identityId: null });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await sut.linkFace({ assetFaceId: assetFace.id, identityId: staleIdentity.id, source: 'backfill' });
+
+      await expect(sut.getBackfillWork()).resolves.toMatchObject({ hasPersonalIdentityWork: true });
+
+      await sut.backfillPersonalIdentities({ limit: 100 });
+
+      const [updatedPerson, updatedFaceLink] = await Promise.all([
+        ctx.database.selectFrom('person').select(['identityId']).where('id', '=', person.id).executeTakeFirstOrThrow(),
+        ctx.database
+          .selectFrom('face_identity_face')
+          .select(['identityId'])
+          .where('assetFaceId', '=', assetFace.id)
+          .executeTakeFirstOrThrow(),
+      ]);
+
+      expect(updatedPerson.identityId).toEqual(expect.any(String));
+      expect(updatedFaceLink.identityId).toBe(updatedPerson.identityId);
+      await expect(sut.getBackfillWork()).resolves.toMatchObject({ hasPersonalIdentityWork: false });
+    } finally {
+      await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      if (staleIdentityId) {
+        await ctx.database.deleteFrom('face_identity').where('id', '=', staleIdentityId).execute();
+      }
+    }
+  });
+
   it('classifies personal identity work separately from projection work', async () => {
     const { ctx, sut } = setup();
     const { user } = await ctx.newUser();
@@ -1056,7 +1098,7 @@ describe(FaceIdentityRepository.name, () => {
     }
   });
 
-  it('does not move mismatched personal faces to a target person owned by another user', async () => {
+  it('keeps mismatched personal faces assigned to the source person when the target profile is owned by another user', async () => {
     const { ctx, sut } = setup(await getKyselyDB());
     const { user: sourceOwner } = await ctx.newUser();
     const { user: targetOwner } = await ctx.newUser();
@@ -1082,9 +1124,9 @@ describe(FaceIdentityRepository.name, () => {
         .executeTakeFirstOrThrow();
 
       expect(updatedFace.personId).toBe(sourcePerson.id);
-      expect(await getPersonalIdentityMismatchRows(ctx, [assetFace.id])).toHaveLength(1);
+      expect(await getPersonalIdentityMismatchRows(ctx, [assetFace.id])).toEqual([]);
       await expect(sut.getBackfillWork()).resolves.toEqual({
-        hasPersonalIdentityWork: true,
+        hasPersonalIdentityWork: false,
         hasSpacePersonIdentityWork: false,
         hasSharedSpaceProjectionWork: false,
       });

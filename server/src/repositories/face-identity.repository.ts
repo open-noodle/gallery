@@ -2138,7 +2138,9 @@ export class FaceIdentityRepository {
         await this.linkFace({ assetFaceId: face.id, identityId: identity.id, source: 'backfill' });
       }
 
-      affectedSpaceAssets.push(...(await this.repairPersonalIdentityAssignments(person)));
+      const currentPerson = { ...person, identityId: identity.id };
+      affectedSpaceAssets.push(...(await this.repairPersonalIdentityAssignments(currentPerson)));
+      affectedSpaceAssets.push(...(await this.repairRemainingPersonalIdentityFaceLinks(currentPerson)));
     }
 
     return {
@@ -2180,6 +2182,23 @@ export class FaceIdentityRepository {
     return this.addPendingSharedSpaceFaceMatchBackfillTargetsForAssetFaces([...affectedAssetFaceIds]);
   }
 
+  private async repairRemainingPersonalIdentityFaceLinks(
+    person: PersonalBackfillRow,
+  ): Promise<SharedSpaceFaceMatchBackfillTarget[]> {
+    if (!person.identityId) {
+      return [];
+    }
+
+    const assetFaceIds = await this.getPersonalBackfillAssetFaceIdsForMismatch(person.id, person.identityId);
+    if (assetFaceIds.length === 0) {
+      return [];
+    }
+
+    const affectedSpaceAssets = await this.addPendingSharedSpaceFaceMatchBackfillTargetsForAssetFaces(assetFaceIds);
+    await this.linkPersonFaces({ personId: person.id, identityId: person.identityId, source: 'backfill' });
+    return affectedSpaceAssets;
+  }
+
   private getPersonalBackfillIdentityGroups(person: PersonalBackfillRow): Promise<PersonalBackfillIdentityGroup[]> {
     return this.db
       .selectFrom('asset_face')
@@ -2204,6 +2223,22 @@ export class FaceIdentityRepository {
       .select('asset_face.id')
       .where('asset_face.personId', '=', personId)
       .where('face_identity_face.identityId', '=', identityId)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', '=', true)
+      .where('asset.deletedAt', 'is', null)
+      .execute();
+
+    return rows.map((row) => row.id);
+  }
+
+  private async getPersonalBackfillAssetFaceIdsForMismatch(personId: string, identityId: string): Promise<string[]> {
+    const rows = await this.db
+      .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
+      .select('asset_face.id')
+      .where('asset_face.personId', '=', personId)
+      .where('face_identity_face.identityId', '!=', identityId)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
       .where('asset.deletedAt', 'is', null)
