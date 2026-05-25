@@ -288,7 +288,7 @@ describe('SharedSpaceService space face suggestions', () => {
       .select('assetFaceId')
       .where('assetFaceId', '=', fx.assetFace.id)
       .executeTakeFirst();
-    expect(row.status).toBe('dismissed');
+    expect(row.status).toBe('rejected');
     expect(link).toBeUndefined();
   });
 });
