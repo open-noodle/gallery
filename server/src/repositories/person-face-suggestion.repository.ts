@@ -99,10 +99,6 @@ export class PersonFaceSuggestionRepository {
     return this.markPersonalResolved(personId, assetFaceId, 'ignored');
   }
 
-  async markDismissed(personId: string, assetFaceId: string): Promise<number> {
-    return this.markRejected(personId, assetFaceId);
-  }
-
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async markConfirmedForSpacePerson(spacePersonId: string, assetFaceId: string): Promise<number> {
     const result = await this.db

@@ -1,5 +1,6 @@
 import { PersonController } from 'src/controllers/person.controller';
 import { PersonStatisticsResponseDto } from 'src/dtos/person.dto';
+import { Permission } from 'src/enum';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { PersonService } from 'src/services/person.service';
 import request from 'supertest';
@@ -284,6 +285,73 @@ describe(PersonController.name, () => {
         page: 1,
         size: 25,
       });
+    });
+  });
+
+  describe('face suggestion routes', () => {
+    const personId = '00000000-0000-4000-8000-000000000001';
+    const assetFaceId = '00000000-0000-4000-8000-000000000002';
+
+    it('POST reject should require person update permission and respond with 200', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .post(`/people/${personId}/face-suggestions/${assetFaceId}/reject`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ permission: Permission.PersonUpdate }),
+        }),
+      );
+      expect(service.rejectFaceSuggestion).toHaveBeenCalledWith(undefined, personId, assetFaceId);
+    });
+
+    it('POST ignore should require person update permission and respond with 200', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .post(`/people/${personId}/face-suggestions/${assetFaceId}/ignore`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ permission: Permission.PersonUpdate }),
+        }),
+      );
+      expect(service.ignoreFaceSuggestion).toHaveBeenCalledWith(undefined, personId, assetFaceId);
+    });
+
+    it('POST dismiss should require person update permission and respond with 200', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .post(`/people/${personId}/face-suggestions/${assetFaceId}/dismiss`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ permission: Permission.PersonUpdate }),
+        }),
+      );
+      expect(service.dismissFaceSuggestion).toHaveBeenCalledWith(undefined, personId, assetFaceId);
+    });
+
+    it('POST reject should validate assetFaceId independently', async () => {
+      const { status, body } = await request(ctx.getHttpServer())
+        .post(`/people/${personId}/face-suggestions/not-a-uuid/reject`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.badRequest(['[assetFaceId] Invalid UUID']));
+      expect(service.rejectFaceSuggestion).not.toHaveBeenCalled();
+    });
+
+    it('POST ignore should validate assetFaceId independently', async () => {
+      const { status, body } = await request(ctx.getHttpServer())
+        .post(`/people/${personId}/face-suggestions/not-a-uuid/ignore`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.badRequest(['[assetFaceId] Invalid UUID']));
+      expect(service.ignoreFaceSuggestion).not.toHaveBeenCalled();
     });
   });
 

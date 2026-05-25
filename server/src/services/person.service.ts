@@ -330,7 +330,7 @@ export class PersonService extends BaseService {
 
     const confirmed = await this.personFaceSuggestionRepository.markConfirmed(personId, assetFaceId);
     if (confirmed === 0) {
-      // Idempotent: the row was already confirmed/dismissed (double-submit, or a concurrent
+      // Idempotent: the row was already confirmed/rejected/ignored (double-submit, or a concurrent
       // scan/auto-assign resolved it) while person+face still exist. A CASCADE-deleted
       // person/face never reaches here — the requireAccess checks above already threw 400
       // (owner-only precedence; edges 9/10 — the client treats that 400 as benign-advance).
@@ -344,16 +344,26 @@ export class PersonService extends BaseService {
     await this.reassignFacesById(auth, personId, { id: assetFaceId });
   }
 
-  async dismissFaceSuggestion(auth: AuthDto, personId: string, assetFaceId: string): Promise<void> {
-    // Owner-only on the PERSON only — intentionally asymmetric with confirm. Dismiss never
+  async rejectFaceSuggestion(auth: AuthDto, personId: string, assetFaceId: string): Promise<void> {
+    // Owner-only on the PERSON only — intentionally asymmetric with confirm. Reject never
     // touches the face (it only suppresses a (personId, assetFaceId) suggestion row), so
     // person ownership is sufficient; confirm additionally checks face ownership because it
-    // assigns the face. Consequence: dismiss on a CASCADE-deleted face (person still exists)
-    // → markDismissed affects 0 rows → benign 200; that asymmetry is by-design, not a gap.
+    // assigns the face. Consequence: reject on a CASCADE-deleted face (person still exists)
+    // → markRejected affects 0 rows → benign 200; that asymmetry is by-design, not a gap.
     await this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [personId] });
-    await this.personFaceSuggestionRepository.markDismissed(personId, assetFaceId);
+    await this.personFaceSuggestionRepository.markRejected(personId, assetFaceId);
     // Face stays unassigned; the Phase-1 conditional upsertPending never resurrects a
-    // 'dismissed' row, so a later scan will not re-suggest it for this person.
+    // 'rejected' row, so a later scan will not re-suggest it for this person.
+  }
+
+  async ignoreFaceSuggestion(auth: AuthDto, personId: string, assetFaceId: string): Promise<void> {
+    await this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [personId] });
+    await this.personFaceSuggestionRepository.markIgnored(personId, assetFaceId);
+    // Face stays unassigned; ignored rows suppress future suggestions without rejecting the match.
+  }
+
+  async dismissFaceSuggestion(auth: AuthDto, personId: string, assetFaceId: string): Promise<void> {
+    return this.rejectFaceSuggestion(auth, personId, assetFaceId);
   }
 
   async getFacesForPicker(auth: AuthDto, id: string, dto: PersonFacePageQueryDto): Promise<PersonFacePageResponseDto> {

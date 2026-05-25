@@ -5725,10 +5725,10 @@ describe(PersonService.name, () => {
       expect(mocks.personFaceSuggestion.resolveAssignedFace).toHaveBeenCalledWith(face.id);
     });
 
-    it('is idempotent when the row is already resolved but person+face still exist → 200, no reassign', async () => {
+    it('is idempotent when the row is already confirmed/rejected/ignored but person+face still exist → 200, no reassign', async () => {
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set(['face-1']));
-      mocks.personFaceSuggestion.markConfirmed.mockResolvedValue(0); // already confirmed/dismissed
+      mocks.personFaceSuggestion.markConfirmed.mockResolvedValue(0); // already confirmed/rejected/ignored
 
       await expect(sut.confirmFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).resolves.toBeUndefined();
       expect(mocks.person.reassignFace).not.toHaveBeenCalled();
@@ -5744,26 +5744,68 @@ describe(PersonService.name, () => {
     });
   });
 
-  describe('dismissFaceSuggestion', () => {
-    it('denies a non-owner with NO state change (edge 18 absence)', async () => {
+  describe('rejectFaceSuggestion / ignoreFaceSuggestion / dismissFaceSuggestion', () => {
+    it('denies a non-owner for reject and ignore with NO state change (edge 18 absence)', async () => {
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
 
-      await expect(sut.dismissFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).rejects.toBeInstanceOf(
+      await expect(sut.rejectFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).rejects.toBeInstanceOf(
         BadRequestException,
       );
-      expect(mocks.personFaceSuggestion.markDismissed).not.toHaveBeenCalled();
+      await expect(sut.ignoreFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(mocks.personFaceSuggestion.markRejected).not.toHaveBeenCalled();
+      expect(mocks.personFaceSuggestion.markIgnored).not.toHaveBeenCalled();
     });
 
-    it('flips the row to dismissed and never assigns the face (idempotent 200)', async () => {
+    it('reject flips the row to rejected and never assigns or reassigns the face', async () => {
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
-      mocks.personFaceSuggestion.markDismissed.mockResolvedValue(1);
+      mocks.personFaceSuggestion.markRejected.mockResolvedValue(1);
 
-      await expect(sut.dismissFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).resolves.toBeUndefined();
-      expect(mocks.personFaceSuggestion.markDismissed).toHaveBeenCalledWith('person-1', 'face-1');
+      await expect(sut.rejectFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).resolves.toBeUndefined();
+
+      expect(mocks.personFaceSuggestion.markRejected).toHaveBeenCalledWith('person-1', 'face-1');
+      expect(mocks.personFaceSuggestion.markIgnored).not.toHaveBeenCalled();
       expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
+    });
 
-      mocks.personFaceSuggestion.markDismissed.mockResolvedValue(0); // re-dismiss → still 200
+    it('ignore flips the row to ignored and never assigns or reassigns the face', async () => {
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
+      mocks.personFaceSuggestion.markIgnored.mockResolvedValue(1);
+
+      await expect(sut.ignoreFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).resolves.toBeUndefined();
+
+      expect(mocks.personFaceSuggestion.markIgnored).toHaveBeenCalledWith('person-1', 'face-1');
+      expect(mocks.personFaceSuggestion.markRejected).not.toHaveBeenCalled();
+      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
+    });
+
+    it('reject and ignore no-op stale or already-resolved rows and never assigns or reassigns the face', async () => {
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
+      mocks.personFaceSuggestion.markRejected.mockResolvedValue(0);
+      mocks.personFaceSuggestion.markIgnored.mockResolvedValue(0);
+
+      await expect(sut.rejectFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).resolves.toBeUndefined();
+      await expect(sut.ignoreFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).resolves.toBeUndefined();
+
+      expect(mocks.personFaceSuggestion.markRejected).toHaveBeenCalledWith('person-1', 'face-1');
+      expect(mocks.personFaceSuggestion.markIgnored).toHaveBeenCalledWith('person-1', 'face-1');
+      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
+    });
+
+    it('dismiss remains a compatibility wrapper around reject', async () => {
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
+      mocks.personFaceSuggestion.markRejected.mockResolvedValue(1);
+
       await expect(sut.dismissFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).resolves.toBeUndefined();
+
+      expect(mocks.personFaceSuggestion.markRejected).toHaveBeenCalledWith('person-1', 'face-1');
+      expect(mocks.personFaceSuggestion.markIgnored).not.toHaveBeenCalled();
+      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
     });
   });
 });

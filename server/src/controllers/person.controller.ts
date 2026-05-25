@@ -324,12 +324,42 @@ export class PersonController {
     return this.service.confirmFaceSuggestion(auth, id, assetFaceId);
   }
 
+  @Post(':id/face-suggestions/:assetFaceId/reject')
+  @Authenticated({ permission: Permission.PersonUpdate })
+  @HttpCode(HttpStatus.OK)
+  @Endpoint({
+    summary: 'Reject a face suggestion',
+    description: 'Reject this suggestion for the person. The face stays unassigned. Idempotent.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  rejectPersonFaceSuggestion(
+    @Auth() auth: AuthDto,
+    @Param() { id, assetFaceId }: PersonFaceSuggestionParamsDto,
+  ): Promise<void> {
+    return this.service.rejectFaceSuggestion(auth, id, assetFaceId);
+  }
+
+  @Post(':id/face-suggestions/:assetFaceId/ignore')
+  @Authenticated({ permission: Permission.PersonUpdate })
+  @HttpCode(HttpStatus.OK)
+  @Endpoint({
+    summary: 'Ignore a face suggestion',
+    description: 'Ignore this suggestion for the person. The face stays unassigned. Idempotent.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  ignorePersonFaceSuggestion(
+    @Auth() auth: AuthDto,
+    @Param() { id, assetFaceId }: PersonFaceSuggestionParamsDto,
+  ): Promise<void> {
+    return this.service.ignoreFaceSuggestion(auth, id, assetFaceId);
+  }
+
   @Post(':id/face-suggestions/:assetFaceId/dismiss')
   @Authenticated({ permission: Permission.PersonUpdate })
   @HttpCode(HttpStatus.OK)
   @Endpoint({
     summary: 'Dismiss a face suggestion',
-    description: 'Suppress this suggestion for the person forever. The face stays unassigned. Idempotent.',
+    description: 'Compatibility alias for rejecting this suggestion. The face stays unassigned. Idempotent.',
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
   dismissPersonFaceSuggestion(
