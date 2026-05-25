@@ -1,4 +1,4 @@
-import { PluginTriggerType, type LoginResponseDto } from '@immich/sdk';
+import { WorkflowTrigger, type LoginResponseDto } from '@immich/sdk';
 import { authHeaders, type Actor } from 'src/actors';
 import { createUserDto } from 'src/fixtures';
 import { app, asBearerAuth, utils } from 'src/utils';
@@ -8,24 +8,21 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // Coverage for the fork-only /workflows controller (workflow.controller.ts).
 //
 // Service shape (workflow.service.ts):
-//   - create: validates triggerType + per-plugin filter/action IDs (400 on bad ID)
-//   - getAll: scoped to auth.user.id (owner-only)
+//   - create: validates trigger + plugin method steps (400 on bad method)
+//   - search: scoped to auth.user.id (owner-only)
 //   - get/update/delete: requireAccess(WorkflowRead/Update/Delete) → 400 for non-owner
 //     (bulk-access pattern)
-//   - update with no fields → BadRequestException('No fields to update')
 //
 // Workflows are per-user — there's no concept of sharing them across spaces
 // or with partners. Cross-user access is uniformly rejected at the access layer.
 
-// Helper: create an empty workflow (no filters/actions). The service supports
-// empty arrays — `validateAndMap*` for-loops are no-ops with zero items. Pure
-// (token + name as args), hoisted to file scope.
+// Helper: create an empty workflow (no steps). Pure (token + name as args),
+// hoisted to file scope.
 const createEmptyWorkflow = async (token: string, name: string) =>
   request(app).post('/workflows').set(asBearerAuth(token)).send({
-    triggerType: PluginTriggerType.AssetCreate,
+    trigger: WorkflowTrigger.AssetCreate,
     name,
-    filters: [],
-    actions: [],
+    steps: [],
   });
 
 describe('/workflows', () => {
@@ -49,48 +46,44 @@ describe('/workflows', () => {
       expect(status).toBe(401);
     });
 
-    it('creates a workflow with empty filters and actions', async () => {
+    it('creates a workflow with empty steps', async () => {
       const { status, body } = await createEmptyWorkflow(userA.accessToken, 'first');
       expect(status).toBe(201);
-      const wf = body as { id: string; name: string; ownerId: string; triggerType: string; enabled: boolean };
+      const wf = body as { id: string; name: string; trigger: string; enabled: boolean; steps: unknown[] };
       expect(wf.id).toMatch(/^[0-9a-f-]{36}$/);
       expect(wf.name).toBe('first');
-      expect(wf.ownerId).toBe(userA.userId);
-      expect(wf.triggerType).toBe('AssetCreate');
-      expect(wf.enabled).toBe(true); // service default at line 30
+      expect(wf.trigger).toBe(WorkflowTrigger.AssetCreate);
+      expect(wf.enabled).toBe(true);
+      expect(wf.steps).toEqual([]);
     });
 
     it('rejects an invalid trigger type with 400', async () => {
       const { status } = await request(app).post('/workflows').set(asBearerAuth(userA.accessToken)).send({
-        triggerType: 'NotAValidTrigger',
+        trigger: 'NotAValidTrigger',
         name: 'bad-trigger',
-        filters: [],
-        actions: [],
+        steps: [],
       });
       expect(status).toBe(400);
     });
 
-    it('rejects an invalid pluginFilterId with 400', async () => {
+    it('rejects an invalid plugin method with 400', async () => {
       const { status, body } = await request(app)
         .post('/workflows')
         .set(asBearerAuth(userA.accessToken))
         .send({
-          triggerType: PluginTriggerType.AssetCreate,
-          name: 'bad-filter',
-          filters: [{ pluginFilterId: '00000000-0000-4000-a000-000000000099' }],
-          actions: [],
+          trigger: WorkflowTrigger.AssetCreate,
+          name: 'bad-method',
+          steps: [{ method: 'missing#method', config: null }],
         });
       expect(status).toBe(400);
-      // Service throws `BadRequestException('Invalid filter ID: ...')`
-      expect((body as { message: string }).message).toMatch(/filter/i);
+      expect((body as { message: string }).message).toMatch(/unknown method/i);
     });
 
     it('rejects an empty name with 400 (DTO @IsNotEmpty)', async () => {
       const { status } = await request(app).post('/workflows').set(asBearerAuth(userA.accessToken)).send({
-        triggerType: PluginTriggerType.AssetCreate,
+        trigger: WorkflowTrigger.AssetCreate,
         name: '',
-        filters: [],
-        actions: [],
+        steps: [],
       });
       expect(status).toBe(400);
     });
@@ -154,13 +147,13 @@ describe('/workflows', () => {
       expect((body as { name: string }).name).toBe('new-name');
     });
 
-    it('rejects an empty update body with 400 (No fields to update)', async () => {
+    it('accepts an empty update body as a no-op', async () => {
       const create = await createEmptyWorkflow(userA.accessToken, 'empty-put');
       const id = (create.body as { id: string }).id;
 
       const { status, body } = await request(app).put(`/workflows/${id}`).set(asBearerAuth(userA.accessToken)).send({});
-      expect(status).toBe(400);
-      expect((body as { message: string }).message).toMatch(/no fields/i);
+      expect(status).toBe(200);
+      expect((body as { name: string }).name).toBe('empty-put');
     });
 
     it('cross-user PUT returns 400 and the workflow is unchanged', async () => {
