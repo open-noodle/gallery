@@ -12,7 +12,13 @@
     type PersonResponseDto,
   } from '@immich/sdk';
   import { Button, IconButton, Modal, ModalBody, ModalFooter } from '@immich/ui';
-  import { mdiAccountCheckOutline, mdiAccountRemoveOutline, mdiChevronLeft, mdiChevronRight } from '@mdi/js';
+  import {
+    mdiAccountCheckOutline,
+    mdiAccountRemoveOutline,
+    mdiChevronLeft,
+    mdiChevronRight,
+    mdiEyeOffOutline,
+  } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
 
@@ -24,10 +30,11 @@
     loadPage: (req: PageReq) => Promise<PersonFaceSuggestionPageResponseDto>;
     confirm: (assetFaceId: string) => Promise<void>;
     dismiss: (assetFaceId: string) => Promise<void>;
+    ignore: (assetFaceId: string) => Promise<void>;
     onClose: (result: { confirmed: number }) => void;
   }
 
-  let { person, referenceThumbnailUrl, loadPage, confirm, dismiss, onClose }: Props = $props();
+  let { person, referenceThumbnailUrl, loadPage, confirm, dismiss, ignore, onClose }: Props = $props();
 
   const PAGE_SIZE = 50;
   const PREFETCH = 3;
@@ -110,7 +117,7 @@
     }
   }
 
-  async function act(kind: 'confirm' | 'dismiss') {
+  async function act(kind: 'confirm' | 'dismiss' | 'ignore') {
     if (busy || !current) {
       return;
     }
@@ -120,8 +127,10 @@
       if (kind === 'confirm') {
         await confirm(face);
         confirmed++;
-      } else {
+      } else if (kind === 'dismiss') {
         await dismiss(face);
+      } else {
+        await ignore(face);
       }
     } catch {
       // edges 9/10/11: benign, advance anyway
@@ -162,6 +171,11 @@
       case 'ArrowLeft': {
         event.preventDefault();
         void act('dismiss');
+        break;
+      }
+      case 'ArrowDown': {
+        event.preventDefault();
+        void act('ignore');
         break;
       }
       case ']': {
@@ -279,6 +293,16 @@
           onclick={() => act('dismiss')}
         >
           {$t('face_suggestion_different')}
+        </Button>
+        <Button
+          shape="round"
+          color="secondary"
+          disabled={busy || !current}
+          leadingIcon={mdiEyeOffOutline}
+          data-testid="suggestion-ignore-btn"
+          onclick={() => act('ignore')}
+        >
+          {$t('face_suggestion_ignore')}
         </Button>
         <Button
           shape="round"

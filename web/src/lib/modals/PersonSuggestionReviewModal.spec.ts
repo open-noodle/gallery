@@ -31,6 +31,7 @@ function setup(
     loadPage: ReturnType<typeof vi.fn>;
     confirm: ReturnType<typeof vi.fn>;
     dismiss: ReturnType<typeof vi.fn>;
+    ignore: ReturnType<typeof vi.fn>;
     onClose: ReturnType<typeof vi.fn>;
   }> = {},
 ) {
@@ -40,6 +41,7 @@ function setup(
     loadPage: overrides.loadPage ?? vi.fn().mockResolvedValue(page1),
     confirm: overrides.confirm ?? vi.fn().mockResolvedValue(undefined),
     dismiss: overrides.dismiss ?? vi.fn().mockResolvedValue(undefined),
+    ignore: overrides.ignore ?? vi.fn().mockResolvedValue(undefined),
     onClose: overrides.onClose ?? vi.fn(),
   };
   render(PersonSuggestionReviewModal, { props });
@@ -85,6 +87,19 @@ describe('PersonSuggestionReviewModal', () => {
     expect(dismiss).toHaveBeenCalledWith('f1');
   });
 
+  it('Ignore face calls ignore and advances without counting a confirmation', async () => {
+    const ignore = vi.fn().mockResolvedValue(undefined);
+    const onClose = vi.fn();
+    setup({ ignore, onClose });
+    await waitFor(() => screen.getByTestId('suggestion-ignore-btn'));
+
+    await userEvent.click(screen.getByTestId('suggestion-ignore-btn'));
+    expect(ignore).toHaveBeenCalledWith('f1');
+    await userEvent.click(screen.getByTestId('suggestion-ignore-btn'));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledWith({ confirmed: 0 }));
+  });
+
   it('Next then Prev step the queue WITHOUT confirm/dismiss; Prev disabled at start', async () => {
     const confirm = vi.fn();
     const dismiss = vi.fn();
@@ -103,15 +118,24 @@ describe('PersonSuggestionReviewModal', () => {
     expect(dismiss).not.toHaveBeenCalled();
   });
 
-  it('keyboard: ArrowRight confirms, ArrowLeft dismisses', async () => {
+  it('keyboard: ArrowRight confirms, ArrowLeft dismisses, ArrowDown ignores', async () => {
     const confirm = vi.fn().mockResolvedValue(undefined);
     const dismiss = vi.fn().mockResolvedValue(undefined);
-    setup({ confirm, dismiss });
+    const ignore = vi.fn().mockResolvedValue(undefined);
+    setup({ confirm, dismiss, ignore });
     await waitFor(() => screen.getByTestId('suggestion-same-btn'));
     await userEvent.keyboard('{ArrowRight}'); // f1 → confirm
     expect(confirm).toHaveBeenCalledWith('f1');
-    await userEvent.keyboard('{ArrowLeft}'); // f2 → dismiss
-    expect(dismiss).toHaveBeenCalledWith('f2');
+    await userEvent.keyboard('{ArrowDown}'); // f2 → ignore
+    expect(ignore).toHaveBeenCalledWith('f2');
+  });
+
+  it('keyboard: ArrowLeft dismisses', async () => {
+    const dismiss = vi.fn().mockResolvedValue(undefined);
+    setup({ dismiss });
+    await waitFor(() => screen.getByTestId('suggestion-different-btn'));
+    await userEvent.keyboard('{ArrowLeft}'); // f1 → dismiss
+    expect(dismiss).toHaveBeenCalledWith('f1');
   });
 
   it('a stale item (confirm rejects — edges 9/10/11) still advances', async () => {
@@ -131,6 +155,16 @@ describe('PersonSuggestionReviewModal', () => {
     await waitFor(() => screen.getByTestId('suggestion-different-btn'));
     await userEvent.click(screen.getByTestId('suggestion-different-btn')); // f1 errors
     await userEvent.click(screen.getByTestId('suggestion-different-btn')); // f2
+    await waitFor(() => expect(onClose).toHaveBeenCalledWith({ confirmed: 0 }));
+  });
+
+  it('a stale item (ignore rejects — edges 9/10/11) still advances (symmetry)', async () => {
+    const ignore = vi.fn().mockRejectedValue(new Error('404'));
+    const onClose = vi.fn();
+    setup({ ignore, onClose });
+    await waitFor(() => screen.getByTestId('suggestion-ignore-btn'));
+    await userEvent.click(screen.getByTestId('suggestion-ignore-btn')); // f1 errors
+    await userEvent.click(screen.getByTestId('suggestion-ignore-btn')); // f2
     await waitFor(() => expect(onClose).toHaveBeenCalledWith({ confirmed: 0 }));
   });
 

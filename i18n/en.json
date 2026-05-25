@@ -1404,6 +1404,7 @@
   "face_suggestion_confirmed_toast": "{count, plural, one {# face added} other {# faces added}}",
   "face_suggestion_count": "{count, plural, one {# face found} other {# faces found}}",
   "face_suggestion_different": "Different person",
+  "face_suggestion_ignore": "Ignore face",
   "face_suggestion_modal_title": "Is this {name}?",
   "face_suggestion_modal_title_unnamed": "Is this the same person?",
   "face_suggestion_not_now": "Not now",

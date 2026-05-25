@@ -54,6 +54,7 @@
     getPersonFaces,
     getPersonFaceSuggestions,
     getPerson,
+    ignorePersonFaceSuggestion,
     mergePerson,
     mergeScopedPeople,
     searchPerson,
@@ -133,8 +134,6 @@
     if (action == 'merge') {
       viewMode = PersonPageViewMode.MERGE_PEOPLE;
     }
-
-    void loadSuggestionSummary();
 
     return websocketEvents.on('on_person_thumbnail', (personId: string) => {
       if (person.id === personId) {
@@ -356,32 +355,43 @@
   let suggestionTotal = $state(0);
   let suggestionPreviews = $state<PersonFaceSuggestionResponseDto[]>([]);
 
-  const loadSuggestionSummary = async () => {
-    if (isSpaceScopedPerson(person)) {
+  const loadSuggestionSummary = async (currentPerson: PersonResponseDto) => {
+    if (isSpaceScopedPerson(currentPerson)) {
       suggestionTotal = 0;
       suggestionPreviews = [];
       return;
     }
     try {
-      const res = await getPersonFaceSuggestions({ id: person.id, page: 1, size: 5 });
+      const res = await getPersonFaceSuggestions({ id: currentPerson.id, page: 1, size: 5 });
+      if (currentPerson.id !== person.id) {
+        return;
+      }
       suggestionTotal = res.total;
       suggestionPreviews = res.items;
     } catch {
+      if (currentPerson.id !== person.id) {
+        return;
+      }
       suggestionTotal = 0;
       suggestionPreviews = [];
     }
   };
 
   const openSuggestionReview = async () => {
+    const currentPerson = person;
+    const currentPersonId = person.id;
+    const currentThumbnailUrl = getPeopleThumbnailUrl(person);
+
     const result = await modalManager.show(PersonSuggestionReviewModal, {
-      person,
-      referenceThumbnailUrl: getPeopleThumbnailUrl(person),
+      person: currentPerson,
+      referenceThumbnailUrl: currentThumbnailUrl,
       loadPage: ({ page, size }: { page: number; size: number }) =>
-        getPersonFaceSuggestions({ id: person.id, page, size }),
-      confirm: (assetFaceId: string) => confirmPersonFaceSuggestion({ id: person.id, assetFaceId }),
-      dismiss: (assetFaceId: string) => dismissPersonFaceSuggestion({ id: person.id, assetFaceId }),
+        getPersonFaceSuggestions({ id: currentPersonId, page, size }),
+      confirm: (assetFaceId: string) => confirmPersonFaceSuggestion({ id: currentPersonId, assetFaceId }),
+      dismiss: (assetFaceId: string) => dismissPersonFaceSuggestion({ id: currentPersonId, assetFaceId }),
+      ignore: (assetFaceId: string) => ignorePersonFaceSuggestion({ id: currentPersonId, assetFaceId }),
     });
-    await loadSuggestionSummary();
+    await loadSuggestionSummary(currentPerson);
     if (result && result.confirmed > 0) {
       await invalidateAll();
       thumbnailData = getScopedThumbnailUrl(person, Date.now().toString());
@@ -467,6 +477,13 @@
       }
     },
   };
+
+  $effect(() => {
+    const currentPerson = person;
+    suggestionTotal = 0;
+    suggestionPreviews = [];
+    void loadSuggestionSummary(currentPerson);
+  });
 </script>
 
 <OnEvents
