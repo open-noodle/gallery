@@ -33417,21 +33417,13 @@
       "UserGroupResponseDto": {
         "properties": {
           "color": {
-            "description": "Group color",
-            "enum": [
-              "primary",
-              "pink",
-              "red",
-              "yellow",
-              "blue",
-              "green",
-              "purple",
-              "orange",
-              "gray",
-              "amber"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserAvatarColor"
+              }
             ],
-            "nullable": true,
-            "type": "string"
+            "description": "Group color",
+            "nullable": true
           },
           "createdAt": {
             "description": "Creation date",
