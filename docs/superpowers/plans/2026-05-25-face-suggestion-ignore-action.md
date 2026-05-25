@@ -26,6 +26,7 @@ Migration and schema:
 Backend behavior:
 
 - Modify: `server/src/repositories/person-face-suggestion.repository.ts`
+- Modify: `server/src/queries/person.face.suggestion.repository.sql`
 - Modify: `server/test/medium/specs/repositories/person-face-suggestion.repository.spec.ts`
 - Modify: `server/src/services/person.service.ts`
 - Modify: `server/src/services/person.service.spec.ts`
@@ -157,7 +158,51 @@ it('converts old dismissed rows to rejected on up and back to dismissed on down'
 
       throw rollback;
     }),
-  ).rejects.toThrow(rollback);
+  ).rejects.toThrow('rollback-intent-status-test');
+});
+```
+
+Add this constraint behavior test:
+
+```ts
+it('accepts rejected and ignored statuses and rejects legacy or unknown statuses', async () => {
+  const { personId, assetFaceId } = await seedPendingSuggestion(db);
+
+  await expect(
+    db
+      .updateTable('person_face_suggestion')
+      .set({ status: 'rejected' })
+      .where('personId', '=', personId)
+      .where('assetFaceId', '=', assetFaceId)
+      .execute(),
+  ).resolves.toBeDefined();
+
+  await expect(
+    db
+      .updateTable('person_face_suggestion')
+      .set({ status: 'ignored' })
+      .where('personId', '=', personId)
+      .where('assetFaceId', '=', assetFaceId)
+      .execute(),
+  ).resolves.toBeDefined();
+
+  await expect(
+    db
+      .updateTable('person_face_suggestion')
+      .set({ status: 'dismissed' as never })
+      .where('personId', '=', personId)
+      .where('assetFaceId', '=', assetFaceId)
+      .execute(),
+  ).rejects.toThrow('person_face_suggestion_status_chk');
+
+  await expect(
+    db
+      .updateTable('person_face_suggestion')
+      .set({ status: 'bogus' as never })
+      .where('personId', '=', personId)
+      .where('assetFaceId', '=', assetFaceId)
+      .execute(),
+  ).rejects.toThrow('person_face_suggestion_status_chk');
 });
 ```
 
@@ -166,7 +211,7 @@ it('converts old dismissed rows to rejected on up and back to dismissed on down'
 Run:
 
 ```bash
-pnpm --filter immich test:medium -- person-face-suggestion.migration.spec.ts --run
+pnpm --filter immich exec vitest --config test/vitest.config.medium.mjs run person-face-suggestion.migration.spec.ts
 ```
 
 Expected: fail because `1779100000000-AddFaceSuggestionIntentStatuses.ts` does not exist and the current check constraint still contains `dismissed`.
@@ -242,7 +287,7 @@ expression: `"status" IN ('pending', 'confirmed', 'rejected', 'ignored')`,
 Run:
 
 ```bash
-pnpm --filter immich test:medium -- person-face-suggestion.migration.spec.ts --run
+pnpm --filter immich exec vitest --config test/vitest.config.medium.mjs run person-face-suggestion.migration.spec.ts
 ```
 
 Expected: pass.
@@ -261,6 +306,7 @@ git commit -m "feat(server): add face suggestion intent statuses"
 **Files:**
 
 - Modify: `server/src/repositories/person-face-suggestion.repository.ts`
+- Modify: `server/src/queries/person.face.suggestion.repository.sql`
 - Modify: `server/test/medium/specs/repositories/person-face-suggestion.repository.spec.ts`
 
 - [ ] **Step 1: Write failing repository tests for personal rows**
@@ -339,6 +385,50 @@ it('resolved rows are pending-only and cannot be overwritten by another resoluti
   const row = await getRow(personId, assetFaceId);
   expect(row.status).toBe('ignored');
 });
+
+it('reject and ignore race through the same pending-only guard', async () => {
+  const { sut } = setup();
+  await sut.upsertPending([{ personId, assetFaceId, distance: 0.6 }]);
+
+  const results = await Promise.all([sut.markRejected(personId, assetFaceId), sut.markIgnored(personId, assetFaceId)]);
+  expect(results.toSorted()).toEqual([0, 1]);
+
+  const row = await getRow(personId, assetFaceId);
+  expect(['rejected', 'ignored']).toContain(row.status);
+});
+
+it('reject and ignore resolve only the target suggestion row', async () => {
+  const { ctx, sut } = setup();
+  const { user } = await ctx.newUser();
+  const { person: target } = await ctx.newPerson({ ownerId: user.id, name: 'Target Person', isHidden: false });
+  const { person: sibling } = await ctx.newPerson({ ownerId: user.id, name: 'Sibling Person', isHidden: false });
+  const { asset } = await ctx.newAsset({ ownerId: user.id });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+  const { assetFace: ignoredFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+
+  await sut.upsertPending([
+    { personId: target.id, assetFaceId: assetFace.id, distance: 0.6 },
+    { personId: sibling.id, assetFaceId: assetFace.id, distance: 0.62 },
+    { personId: target.id, assetFaceId: ignoredFace.id, distance: 0.61 },
+    { personId: sibling.id, assetFaceId: ignoredFace.id, distance: 0.63 },
+  ]);
+
+  expect(await sut.markRejected(target.id, assetFace.id)).toBe(1);
+  expect((await getRow(target.id, assetFace.id)).status).toBe('rejected');
+  expect((await getRow(sibling.id, assetFace.id)).status).toBe('pending');
+
+  expect(await sut.markIgnored(target.id, ignoredFace.id)).toBe(1);
+  expect((await getRow(target.id, ignoredFace.id)).status).toBe('ignored');
+  expect((await getRow(sibling.id, ignoredFace.id)).status).toBe('pending');
+});
+```
+
+In the `resolveAssignedFace` tests, replace the old `dismissed` setup/assertion with both `rejected` and `ignored` rows. The final assertion should verify `resolveAssignedFace` deletes only `pending` rows and preserves all resolved rows:
+
+```ts
+expect(await countRows(faceXId, 'rejected')).toBe(1);
+expect(await countRows(faceXId, 'ignored')).toBe(1);
+expect(await countRows(faceXId, 'confirmed')).toBe(1);
 ```
 
 - [ ] **Step 2: Write failing repository tests for space-person rows**
@@ -374,6 +464,78 @@ it('markRejectedForSpacePerson and markIgnoredForSpacePerson are idempotent and 
     .executeTakeFirstOrThrow();
   expect(row.status).toBe('rejected');
 });
+
+it('space-person reject and ignore race through the same pending-only guard', async () => {
+  const { ctx, sut } = setup();
+  const { user } = await ctx.newUser();
+  const { sharedSpace } = await ctx.newSharedSpace({ ownerId: user.id, name: 'Intent Race Space' });
+  const { sharedSpacePerson } = await ctx.newSharedSpacePerson({
+    spaceId: sharedSpace.id,
+    name: 'Intent Race Person',
+    isHidden: false,
+  });
+  const { asset } = await ctx.newAsset({ ownerId: user.id });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+
+  await sut.upsertPendingForSpacePerson([
+    { spacePersonId: sharedSpacePerson.id, assetFaceId: assetFace.id, distance: 0.6 },
+  ]);
+
+  const results = await Promise.all([
+    sut.markRejectedForSpacePerson(sharedSpacePerson.id, assetFace.id),
+    sut.markIgnoredForSpacePerson(sharedSpacePerson.id, assetFace.id),
+  ]);
+  expect(results.toSorted()).toEqual([0, 1]);
+
+  const row = await defaultDatabase
+    .selectFrom('person_face_suggestion')
+    .select('status')
+    .where('spacePersonId', '=', sharedSpacePerson.id)
+    .where('assetFaceId', '=', assetFace.id)
+    .executeTakeFirstOrThrow();
+  expect(['rejected', 'ignored']).toContain(row.status);
+});
+
+it('space-person reject and ignore resolve only the target suggestion row', async () => {
+  const { ctx, sut } = setup();
+  const { user } = await ctx.newUser();
+  const { sharedSpace } = await ctx.newSharedSpace({ ownerId: user.id, name: 'Intent Target Space' });
+  const { sharedSpacePerson: target } = await ctx.newSharedSpacePerson({
+    spaceId: sharedSpace.id,
+    name: 'Target Space Person',
+    isHidden: false,
+  });
+  const { sharedSpacePerson: sibling } = await ctx.newSharedSpacePerson({
+    spaceId: sharedSpace.id,
+    name: 'Sibling Space Person',
+    isHidden: false,
+  });
+  const { asset } = await ctx.newAsset({ ownerId: user.id });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+  const { assetFace: ignoredFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+
+  await sut.upsertPendingForSpacePerson([
+    { spacePersonId: target.id, assetFaceId: assetFace.id, distance: 0.6 },
+    { spacePersonId: sibling.id, assetFaceId: assetFace.id, distance: 0.62 },
+    { spacePersonId: target.id, assetFaceId: ignoredFace.id, distance: 0.61 },
+    { spacePersonId: sibling.id, assetFaceId: ignoredFace.id, distance: 0.63 },
+  ]);
+
+  expect(await sut.markRejectedForSpacePerson(target.id, assetFace.id)).toBe(1);
+  expect(await sut.markIgnoredForSpacePerson(target.id, ignoredFace.id)).toBe(1);
+
+  const rows = await defaultDatabase
+    .selectFrom('person_face_suggestion')
+    .select(['spacePersonId', 'assetFaceId', 'status'])
+    .where('spacePersonId', 'in', [target.id, sibling.id])
+    .where('assetFaceId', 'in', [assetFace.id, ignoredFace.id])
+    .execute();
+  const statusByKey = new Map(rows.map((row) => [`${row.spacePersonId}:${row.assetFaceId}`, row.status]));
+  expect(statusByKey.get(`${target.id}:${assetFace.id}`)).toBe('rejected');
+  expect(statusByKey.get(`${sibling.id}:${assetFace.id}`)).toBe('pending');
+  expect(statusByKey.get(`${target.id}:${ignoredFace.id}`)).toBe('ignored');
+  expect(statusByKey.get(`${sibling.id}:${ignoredFace.id}`)).toBe('pending');
+});
 ```
 
 - [ ] **Step 3: Run repository tests and verify they fail**
@@ -381,7 +543,7 @@ it('markRejectedForSpacePerson and markIgnoredForSpacePerson are idempotent and 
 Run:
 
 ```bash
-pnpm --filter immich test:medium -- person-face-suggestion.repository.spec.ts --run
+pnpm --filter immich exec vitest --config test/vitest.config.medium.mjs run person-face-suggestion.repository.spec.ts
 ```
 
 Expected: fail because `markRejected`, `markIgnored`, `markRejectedForSpacePerson`, and `markIgnoredForSpacePerson` are not implemented.
@@ -406,16 +568,18 @@ In `server/src/repositories/person-face-suggestion.repository.ts`, add a private
     return Number(result.numUpdatedRows ?? 0n);
   }
 
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async markRejected(personId: string, assetFaceId: string): Promise<number> {
     return this.markPersonalResolved(personId, assetFaceId, 'rejected');
   }
 
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async markIgnored(personId: string, assetFaceId: string): Promise<number> {
     return this.markPersonalResolved(personId, assetFaceId, 'ignored');
   }
 ```
 
-Keep this temporary compatibility method so Task 2 remains buildable before service callers are renamed:
+Keep this temporary compatibility method so Task 2 remains buildable before service callers are renamed. Do not decorate temporary compatibility aliases with `@GenerateSql`; only the final public intent methods should appear in the generated SQL snapshot.
 
 ```ts
   async markDismissed(personId: string, assetFaceId: string): Promise<number> {
@@ -441,16 +605,18 @@ After `markConfirmedForSpacePerson`, add:
     return Number(result.numUpdatedRows ?? 0n);
   }
 
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async markRejectedForSpacePerson(spacePersonId: string, assetFaceId: string): Promise<number> {
     return this.markSpacePersonResolved(spacePersonId, assetFaceId, 'rejected');
   }
 
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async markIgnoredForSpacePerson(spacePersonId: string, assetFaceId: string): Promise<number> {
     return this.markSpacePersonResolved(spacePersonId, assetFaceId, 'ignored');
   }
 ```
 
-Keep this temporary compatibility method so Task 2 remains buildable before shared-space service callers are renamed:
+Keep this temporary compatibility method so Task 2 remains buildable before shared-space service callers are renamed. Do not decorate temporary compatibility aliases with `@GenerateSql`.
 
 ```ts
   async markDismissedForSpacePerson(spacePersonId: string, assetFaceId: string): Promise<number> {
@@ -463,15 +629,18 @@ Keep this temporary compatibility method so Task 2 remains buildable before shar
 Run:
 
 ```bash
-pnpm --filter immich test:medium -- person-face-suggestion.repository.spec.ts --run
+pnpm --filter immich exec vitest --config test/vitest.config.medium.mjs run person-face-suggestion.repository.spec.ts
+make sql
+rg -n "markRejected|markIgnored|markRejectedForSpacePerson|markIgnoredForSpacePerson" server/src/queries/person.face.suggestion.repository.sql
 ```
 
-Expected: pass.
+Expected: the repository tests pass, `make sql` exits 0, and the generated SQL snapshot contains the four renamed intent methods.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add server/src/repositories/person-face-suggestion.repository.ts \
+  server/src/queries/person.face.suggestion.repository.sql \
   server/test/medium/specs/repositories/person-face-suggestion.repository.spec.ts
 git commit -m "feat(server): persist face suggestion rejection and ignore intents"
 ```
@@ -523,6 +692,16 @@ describe('rejectFaceSuggestion / ignoreFaceSuggestion / dismissFaceSuggestion', 
     expect(mocks.person.reassignFace).not.toHaveBeenCalled();
   });
 
+  it('reject and ignore no-op stale or already-resolved rows', async () => {
+    mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
+    mocks.personFaceSuggestion.markRejected.mockResolvedValue(0);
+    mocks.personFaceSuggestion.markIgnored.mockResolvedValue(0);
+
+    await expect(sut.rejectFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).resolves.toBeUndefined();
+    await expect(sut.ignoreFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).resolves.toBeUndefined();
+    expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+  });
+
   it('dismiss remains a compatibility wrapper around reject', async () => {
     mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
     mocks.personFaceSuggestion.markRejected.mockResolvedValue(1);
@@ -536,7 +715,7 @@ describe('rejectFaceSuggestion / ignoreFaceSuggestion / dismissFaceSuggestion', 
 
 - [ ] **Step 2: Write failing controller tests**
 
-In `server/src/controllers/person.controller.spec.ts`, add a `face suggestion routes` block using the existing `factory.uuid()` pattern:
+In `server/src/controllers/person.controller.spec.ts`, import `Permission` from `src/enum` if it is not already imported. Add a `face suggestion routes` block using valid UUID params:
 
 ```ts
 describe('face suggestion routes', () => {
@@ -549,6 +728,11 @@ describe('face suggestion routes', () => {
       .set('Authorization', `Bearer token`);
 
     expect(status).toBe(200);
+    expect(ctx.authenticate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ permission: Permission.PersonUpdate }),
+      }),
+    );
     expect(service.rejectFaceSuggestion).toHaveBeenCalledWith(undefined, personId, assetFaceId);
   });
 
@@ -558,6 +742,11 @@ describe('face suggestion routes', () => {
       .set('Authorization', `Bearer token`);
 
     expect(status).toBe(200);
+    expect(ctx.authenticate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ permission: Permission.PersonUpdate }),
+      }),
+    );
     expect(service.ignoreFaceSuggestion).toHaveBeenCalledWith(undefined, personId, assetFaceId);
   });
 
@@ -567,6 +756,11 @@ describe('face suggestion routes', () => {
       .set('Authorization', `Bearer token`);
 
     expect(status).toBe(200);
+    expect(ctx.authenticate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ permission: Permission.PersonUpdate }),
+      }),
+    );
     expect(service.dismissFaceSuggestion).toHaveBeenCalledWith(undefined, personId, assetFaceId);
   });
 
@@ -579,6 +773,16 @@ describe('face suggestion routes', () => {
     expect(body).toEqual(errorDto.badRequest(['[assetFaceId] Invalid UUID']));
     expect(service.rejectFaceSuggestion).not.toHaveBeenCalled();
   });
+
+  it('POST ignore should validate assetFaceId independently', async () => {
+    const { status, body } = await request(ctx.getHttpServer())
+      .post(`/people/${personId}/face-suggestions/not-a-uuid/ignore`)
+      .set('Authorization', `Bearer token`);
+
+    expect(status).toBe(400);
+    expect(body).toEqual(errorDto.badRequest(['[assetFaceId] Invalid UUID']));
+    expect(service.ignoreFaceSuggestion).not.toHaveBeenCalled();
+  });
 });
 ```
 
@@ -587,7 +791,7 @@ describe('face suggestion routes', () => {
 Run:
 
 ```bash
-pnpm --filter immich test -- src/services/person.service.spec.ts src/controllers/person.controller.spec.ts --run
+pnpm --filter immich exec vitest --config test/vitest.config.mjs run src/services/person.service.spec.ts src/controllers/person.controller.spec.ts
 ```
 
 Expected: fail because service/controller methods are not implemented and repository mock names are not updated.
@@ -612,7 +816,7 @@ In `server/src/services/person.service.ts`, replace `dismissFaceSuggestion` with
   }
 ```
 
-Keep `confirmFaceSuggestion(auth, personId, assetFaceId)` unchanged except for repository method names in comments that mention `dismissed`; update those comments to `rejected/ignored`.
+Keep `confirmFaceSuggestion(auth, personId, assetFaceId)` unchanged except for comments and existing test descriptions that mention `dismissed`; update that language to `rejected/ignored`.
 
 - [ ] **Step 5: Remove the personal repository compatibility method**
 
@@ -671,7 +875,7 @@ description: 'Compatibility alias for rejecting a face suggestion. The face stay
 Run:
 
 ```bash
-pnpm --filter immich test -- src/services/person.service.spec.ts src/controllers/person.controller.spec.ts --run
+pnpm --filter immich exec vitest --config test/vitest.config.mjs run src/services/person.service.spec.ts src/controllers/person.controller.spec.ts
 ```
 
 Expected: pass.
@@ -722,6 +926,38 @@ describe('rejectSpacePersonFaceSuggestion / ignoreSpacePersonFaceSuggestion / di
     await expect(
       sut.ignoreSpacePersonFaceSuggestion(factory.auth(), 'space-1', 'space-person-1', 'face-1'),
     ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(mocks.personFaceSuggestion.markRejectedForSpacePerson).not.toHaveBeenCalled();
+    expect(mocks.personFaceSuggestion.markIgnoredForSpacePerson).not.toHaveBeenCalled();
+  });
+
+  it('denies removed members before lookup or mutation', async () => {
+    mocks.sharedSpace.getMember.mockResolvedValue(void 0);
+
+    await expect(
+      sut.rejectSpacePersonFaceSuggestion(factory.auth(), 'space-1', 'space-person-1', 'face-1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      sut.ignoreSpacePersonFaceSuggestion(factory.auth(), 'space-1', 'space-person-1', 'face-1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(mocks.sharedSpace.getPersonById).not.toHaveBeenCalled();
+    expect(mocks.personFaceSuggestion.hasPendingForSpacePerson).not.toHaveBeenCalled();
+    expect(mocks.personFaceSuggestion.markRejectedForSpacePerson).not.toHaveBeenCalled();
+    expect(mocks.personFaceSuggestion.markIgnoredForSpacePerson).not.toHaveBeenCalled();
+  });
+
+  it('rejects a person from another space before mutation', async () => {
+    mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+    mocks.sharedSpace.getPersonById.mockResolvedValue(
+      factory.sharedSpacePerson({ id: 'space-person-1', spaceId: 'other-space' }),
+    );
+
+    await expect(
+      sut.rejectSpacePersonFaceSuggestion(factory.auth(), 'space-1', 'space-person-1', 'face-1'),
+    ).rejects.toThrow(new BadRequestException('Person not found'));
+    await expect(
+      sut.ignoreSpacePersonFaceSuggestion(factory.auth(), 'space-1', 'space-person-1', 'face-1'),
+    ).rejects.toThrow(new BadRequestException('Person not found'));
+    expect(mocks.personFaceSuggestion.hasPendingForSpacePerson).not.toHaveBeenCalled();
     expect(mocks.personFaceSuggestion.markRejectedForSpacePerson).not.toHaveBeenCalled();
     expect(mocks.personFaceSuggestion.markIgnoredForSpacePerson).not.toHaveBeenCalled();
   });
@@ -808,6 +1044,26 @@ it('POST ignore should require shared-space update permission and respond with 2
   );
   expect(service.ignoreSpacePersonFaceSuggestion).toHaveBeenCalledWith(undefined, spaceId, personId, assetFaceId);
 });
+
+it('POST reject should validate assetFaceId independently', async () => {
+  const { status, body } = await request(ctx.getHttpServer())
+    .post(`/shared-spaces/${spaceId}/people/${personId}/face-suggestions/not-a-uuid/reject`)
+    .set('Authorization', `Bearer token`);
+
+  expect(status).toBe(400);
+  expect(body).toEqual(errorDto.badRequest(['[assetFaceId] Invalid UUID']));
+  expect(service.rejectSpacePersonFaceSuggestion).not.toHaveBeenCalled();
+});
+
+it('POST ignore should validate assetFaceId independently', async () => {
+  const { status, body } = await request(ctx.getHttpServer())
+    .post(`/shared-spaces/${spaceId}/people/${personId}/face-suggestions/not-a-uuid/ignore`)
+    .set('Authorization', `Bearer token`);
+
+  expect(status).toBe(400);
+  expect(body).toEqual(errorDto.badRequest(['[assetFaceId] Invalid UUID']));
+  expect(service.ignoreSpacePersonFaceSuggestion).not.toHaveBeenCalled();
+});
 ```
 
 - [ ] **Step 3: Run shared-space API tests and verify they fail**
@@ -815,7 +1071,7 @@ it('POST ignore should require shared-space update permission and respond with 2
 Run:
 
 ```bash
-pnpm --filter immich test -- src/services/shared-space.service.spec.ts src/controllers/shared-space.controller.spec.ts --run
+pnpm --filter immich exec vitest --config test/vitest.config.mjs run src/services/shared-space.service.spec.ts src/controllers/shared-space.controller.spec.ts
 ```
 
 Expected: fail because shared-space reject/ignore service and controller methods do not exist.
@@ -937,7 +1193,7 @@ description: 'Compatibility alias for rejecting a face suggestion. The face stay
 Run:
 
 ```bash
-pnpm --filter immich test -- src/services/shared-space.service.spec.ts src/controllers/shared-space.controller.spec.ts --run
+pnpm --filter immich exec vitest --config test/vitest.config.mjs run src/services/shared-space.service.spec.ts src/controllers/shared-space.controller.spec.ts
 ```
 
 Expected: pass.
@@ -961,7 +1217,21 @@ git commit -m "feat(server): add shared-space face suggestion reject and ignore 
 - Modify: `mobile/openapi/lib/api/shared_spaces_api.dart`
 - Review `git status --short mobile/openapi` after generation and include every changed file under `mobile/openapi` in the OpenAPI commit.
 
-- [ ] **Step 1: Run OpenAPI generation**
+- [ ] **Step 1: Verify generated clients are stale before regeneration**
+
+Run:
+
+```bash
+rg -n "rejectPersonFaceSuggestion|ignorePersonFaceSuggestion|rejectSpacePersonFaceSuggestion|ignoreSpacePersonFaceSuggestion" \
+  open-api/immich-openapi-specs.json \
+  open-api/typescript-sdk/src/fetch-client.ts \
+  mobile/openapi/lib/api/people_api.dart \
+  mobile/openapi/lib/api/shared_spaces_api.dart
+```
+
+Expected: fail or return incomplete results because the controller endpoints exist but generated clients have not been regenerated yet.
+
+- [ ] **Step 2: Run OpenAPI generation**
 
 Run:
 
@@ -971,7 +1241,7 @@ make open-api
 
 Expected: server builds, OpenAPI spec syncs, TypeScript SDK builds, and Dart client regenerates. If the command fails because Java is unavailable for Dart generation, run `make open-api-typescript`, keep the TypeScript/OpenAPI changes, and record the exact Java failure in the final implementation notes before handing off for Dart generation on a machine with Java.
 
-- [ ] **Step 2: Verify generated functions exist**
+- [ ] **Step 3: Verify generated functions exist**
 
 Run:
 
@@ -985,7 +1255,7 @@ rg -n "rejectPersonFaceSuggestion|ignorePersonFaceSuggestion|rejectSpacePersonFa
 
 Expected: each new operation appears in the OpenAPI JSON, TypeScript SDK, and Dart API files.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add open-api/immich-openapi-specs.json open-api/typescript-sdk/src/fetch-client.ts mobile/openapi
@@ -1047,6 +1317,16 @@ it('Different person calls reject and advances', async () => {
 Add:
 
 ```ts
+it('renders three actions without adding explanatory copy to the modal surface', async () => {
+  setup();
+  await waitFor(() => screen.getByTestId('suggestion-same-btn'));
+
+  expect(screen.getByTestId('suggestion-same-btn')).toHaveTextContent('face_suggestion_same');
+  expect(screen.getByTestId('suggestion-different-btn')).toHaveTextContent('face_suggestion_different');
+  expect(screen.getByTestId('suggestion-ignore-btn')).toHaveTextContent('face_suggestion_ignore');
+  expect(screen.queryByText(/not useful|identity judgment|tiny background/i)).not.toBeInTheDocument();
+});
+
 it('Ignore face calls ignore and advances', async () => {
   const ignore = vi.fn().mockResolvedValue(undefined);
   setup({ ignore });
@@ -1069,12 +1349,36 @@ it('keyboard: ArrowRight confirms, ArrowLeft rejects, and no ignore shortcut is 
 });
 ```
 
+Update the stale-action tests so both negative callbacks are covered:
+
+```ts
+it('a stale item (reject rejects) still advances', async () => {
+  const reject = vi.fn().mockRejectedValue(new Error('404'));
+  const onClose = vi.fn();
+  setup({ reject, onClose });
+  await waitFor(() => screen.getByTestId('suggestion-different-btn'));
+  await userEvent.click(screen.getByTestId('suggestion-different-btn'));
+  await userEvent.click(screen.getByTestId('suggestion-different-btn'));
+  await waitFor(() => expect(onClose).toHaveBeenCalledWith({ confirmed: 0 }));
+});
+
+it('a stale item (ignore rejects) still advances', async () => {
+  const ignore = vi.fn().mockRejectedValue(new Error('404'));
+  const onClose = vi.fn();
+  setup({ ignore, onClose });
+  await waitFor(() => screen.getByTestId('suggestion-ignore-btn'));
+  await userEvent.click(screen.getByTestId('suggestion-ignore-btn'));
+  await userEvent.click(screen.getByTestId('suggestion-ignore-btn'));
+  await waitFor(() => expect(onClose).toHaveBeenCalledWith({ confirmed: 0 }));
+});
+```
+
 - [ ] **Step 2: Run modal tests and verify they fail**
 
 Run:
 
 ```bash
-pnpm --filter immich-web test -- src/lib/modals/PersonSuggestionReviewModal.spec.ts --run
+pnpm --filter immich-web exec vitest run src/lib/modals/PersonSuggestionReviewModal.spec.ts
 ```
 
 Expected: fail because the modal still expects `dismiss` and does not render `suggestion-ignore-btn`.
@@ -1135,11 +1439,12 @@ Import `mdiEyeOffOutline`:
 Change the footer action buttons to this structure:
 
 ```svelte
-      <div class="flex min-w-0 flex-1 flex-col-reverse justify-center gap-2 sm:flex-row sm:flex-none sm:gap-3">
+      <div class="grid min-w-0 flex-1 grid-cols-2 gap-2 sm:flex sm:flex-none sm:justify-center sm:gap-3">
         <Button
           shape="round"
           color="secondary"
           variant="ghost"
+          class="order-3 sm:order-1"
           disabled={busy || !current}
           leadingIcon={mdiEyeOffOutline}
           data-testid="suggestion-ignore-btn"
@@ -1150,6 +1455,7 @@ Change the footer action buttons to this structure:
         <Button
           shape="round"
           color="secondary"
+          class="order-2 sm:order-2"
           disabled={busy || !current}
           leadingIcon={mdiAccountRemoveOutline}
           data-testid="suggestion-different-btn"
@@ -1159,6 +1465,7 @@ Change the footer action buttons to this structure:
         </Button>
         <Button
           shape="round"
+          class="order-1 col-span-2 sm:order-3 sm:col-span-1"
           disabled={busy || !current}
           leadingIcon={mdiAccountCheckOutline}
           data-testid="suggestion-same-btn"
@@ -1257,10 +1564,9 @@ expect(sdkMock.ignoreSpacePersonFaceSuggestion).toHaveBeenCalledWith({
 Run:
 
 ```bash
-pnpm --filter immich-web test -- src/lib/modals/PersonSuggestionReviewModal.spec.ts \
+pnpm --filter immich-web exec vitest run src/lib/modals/PersonSuggestionReviewModal.spec.ts \
   'src/routes/(user)/people/[personId]/[[photos=photos]]/[[assetId=id]]/person-detail-page.spec.ts' \
-  'src/routes/(user)/spaces/[spaceId]/people/[personId]/[[photos=photos]]/[[assetId=id]]/space-person-detail-page.spec.ts' \
-  --run
+  'src/routes/(user)/spaces/[spaceId]/people/[personId]/[[photos=photos]]/[[assetId=id]]/space-person-detail-page.spec.ts'
 ```
 
 Expected: pass.
@@ -1314,6 +1620,13 @@ async function getSuggestionStatus(db: Awaited<ReturnType<(typeof utils)['connec
   );
   return result.rows[0].status;
 }
+
+async function getAssetFacePersonId(db: Awaited<ReturnType<(typeof utils)['connectDatabase']>>, assetFaceId: string) {
+  const result = await db.query<{ personId: string | null }>(`SELECT "personId" FROM asset_face WHERE id = $1`, [
+    assetFaceId,
+  ]);
+  return result.rows[0].personId;
+}
 ```
 
 Add tests:
@@ -1327,6 +1640,7 @@ describe('POST /people/:id/face-suggestions/:assetFaceId/reject', () => {
       .set(asBearerAuth(owner.accessToken));
     expect(status).toBe(200);
     expect(await getSuggestionStatus(db, faceForReject)).toBe('rejected');
+    expect(await getAssetFacePersonId(db, faceForReject)).toBeNull();
   });
 });
 
@@ -1338,11 +1652,12 @@ describe('POST /people/:id/face-suggestions/:assetFaceId/ignore', () => {
       .set(asBearerAuth(owner.accessToken));
     expect(status).toBe(200);
     expect(await getSuggestionStatus(db, faceForIgnore)).toBe('ignored');
+    expect(await getAssetFacePersonId(db, faceForIgnore)).toBeNull();
   });
 });
 ```
 
-Update the old dismiss status assertion so compatibility stores `rejected`.
+Update the old dismiss status assertion so compatibility stores `rejected` and leaves the face unassigned.
 
 - [ ] **Step 2: Update web E2E coverage**
 
@@ -1362,6 +1677,8 @@ test('Ignore face suppresses a suggestion without assignment', async ({ context,
   await page.goto(`/people/${personId}`);
   await page.evaluate(() => localStorage.clear());
   await page.reload();
+  const before = await page.request.get(`/api/people/${personId}/face-suggestions`);
+  const beforeBody = await before.json();
 
   await page.locator('[data-testid="suggestion-review-btn"]').click();
   const ignoreResponse = page.waitForResponse(
@@ -1372,11 +1689,15 @@ test('Ignore face suppresses a suggestion without assignment', async ({ context,
 
   const res = await page.request.get(`/api/people/${personId}/face-suggestions`);
   const body = await res.json();
-  expect(body.total).toBeLessThan(3);
+  expect(body.total).toBe(beforeBody.total - 1);
 });
 ```
 
-In `e2e/src/specs/web/space-person-face-suggestions.e2e-spec.ts`, add a modal visibility assertion for `suggestion-ignore-btn` in the editor test and click it in a new fixture-backed test. Use `expect(response.status()).toBe(200)` on the POST and then assert the GET total dropped by one.
+In `e2e/src/specs/web/space-person-face-suggestions.e2e-spec.ts`, add modal visibility assertions for all three buttons in the editor test. Add fixture-backed tests for both **Different person** and **Ignore face**:
+
+- Editor clicking **Different person** sends `POST /api/shared-spaces/:spaceId/people/:personId/face-suggestions/:assetFaceId/reject`, the response is `200`, the suggestion row status is `rejected`, the candidate face remains unassigned, and the GET total drops by one.
+- Editor clicking **Ignore face** sends `POST /api/shared-spaces/:spaceId/people/:personId/face-suggestions/:assetFaceId/ignore`, the response is `200`, the suggestion row status is `ignored`, the candidate face remains unassigned, and the GET total drops by one.
+- Viewer direct `POST /api/shared-spaces/:spaceId/people/:personId/face-suggestions/:assetFaceId/reject` and `POST /api/shared-spaces/:spaceId/people/:personId/face-suggestions/:assetFaceId/ignore` requests are denied, matching the existing viewer no-banner coverage.
 
 - [ ] **Step 3: Update user docs**
 
@@ -1401,7 +1722,7 @@ Keep and update the existing note:
 Run:
 
 ```bash
-pnpm --filter immich-e2e test -- src/specs/server/api/person-face-suggestions.e2e-spec.ts
+pnpm --filter immich-e2e exec vitest run src/specs/server/api/person-face-suggestions.e2e-spec.ts
 ```
 
 Expected: pass.
@@ -1409,7 +1730,7 @@ Expected: pass.
 Run web E2E only if the local dev stack is running:
 
 ```bash
-pnpm --filter immich-e2e test:web -- src/specs/web/person-face-suggestions.e2e-spec.ts src/specs/web/space-person-face-suggestions.e2e-spec.ts
+pnpm --filter immich-e2e exec playwright test --project=web src/specs/web/person-face-suggestions.e2e-spec.ts src/specs/web/space-person-face-suggestions.e2e-spec.ts
 ```
 
 Expected: pass with visible `suggestion-ignore-btn` and successful reject/ignore POSTs.
@@ -1420,21 +1741,28 @@ Run:
 
 ```bash
 pnpm --filter immich check
-pnpm --filter immich test -- src/services/person.service.spec.ts src/services/shared-space.service.spec.ts src/controllers/person.controller.spec.ts src/controllers/shared-space.controller.spec.ts --run
-pnpm --filter immich test:medium -- person-face-suggestion.migration.spec.ts person-face-suggestion.repository.spec.ts --run
-pnpm --filter immich-web test -- src/lib/modals/PersonSuggestionReviewModal.spec.ts \
+pnpm --filter immich-web check:svelte
+pnpm --filter immich-web check:typescript
+pnpm --filter immich exec vitest --config test/vitest.config.mjs run src/services/person.service.spec.ts src/services/shared-space.service.spec.ts src/controllers/person.controller.spec.ts src/controllers/shared-space.controller.spec.ts
+pnpm --filter immich exec vitest --config test/vitest.config.medium.mjs run person-face-suggestion.migration.spec.ts person-face-suggestion.repository.spec.ts
+pnpm --filter immich-web exec vitest run src/lib/modals/PersonSuggestionReviewModal.spec.ts \
   'src/routes/(user)/people/[personId]/[[photos=photos]]/[[assetId=id]]/person-detail-page.spec.ts' \
-  'src/routes/(user)/spaces/[spaceId]/people/[personId]/[[photos=photos]]/[[assetId=id]]/space-person-detail-page.spec.ts' \
-  --run
-rg -n "dismissed" server/src/repositories/person-face-suggestion.repository.ts server/src/schema/tables/person-face-suggestion.table.ts
+  'src/routes/(user)/spaces/[spaceId]/people/[personId]/[[photos=photos]]/[[assetId=id]]/space-person-detail-page.spec.ts'
+pnpm --filter immich-e2e exec vitest run src/specs/server/api/person-face-suggestions.e2e-spec.ts
+make sql
+git diff --exit-code server/src/queries/person.face.suggestion.repository.sql
+! rg -n "dismissed" server/src/repositories/person-face-suggestion.repository.ts server/src/schema/tables/person-face-suggestion.table.ts
 ```
 
 Expected:
 
 - `pnpm --filter immich check` exits 0.
+- Web Svelte and TypeScript checks pass.
 - Server service/controller tests pass.
 - Migration and repository medium tests pass.
 - Web tests pass.
+- API E2E tests pass.
+- `make sql` exits 0 and the generated SQL diff check reports no drift.
 - The final `rg` command returns no matches in active repository/schema code.
 
 - [ ] **Step 6: Commit**
