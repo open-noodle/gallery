@@ -71,7 +71,7 @@ Notes:
 
 ## 5. Switch your compose file to upstream Immich
 
-Edit your `docker-compose.yml` and replace every reference to the Gallery image with the upstream `immich-server` image. Pin a version close to the Immich release Gallery was last rebased from — you can find it in [`server/package.json`](https://github.com/open-noodle/gallery/blob/main/server/package.json) in the Gallery repository, under the `version` field.
+Edit your `docker-compose.yml` and replace every reference to the Gallery image with the upstream `immich-server` image. Pin a version close to the Immich release Gallery was last rebased from — you can find it in [`branding/config.json`](https://github.com/open-noodle/gallery/blob/main/branding/config.json) in the Gallery repository, under `upstream.version`.
 
 ```yaml
 services:
