@@ -416,10 +416,16 @@ END $$;
 -- schema rollback is required.
 
 -- 1778614946174-UpdateWorkflowTables replaced the v2.7.5 plugin/workflow
--- schema. Recreate the older empty tables after dropping the newer shape.
+-- schema. Recreate the older empty tables after dropping both old and new
+-- shapes. Some Gallery images may not yet contain the 177861 migration, so
+-- the old child tables can still exist here.
 DROP TABLE IF EXISTS "workflow_step" CASCADE;
+DROP TABLE IF EXISTS "workflow_filter" CASCADE;
+DROP TABLE IF EXISTS "workflow_action" CASCADE;
 DROP TABLE IF EXISTS "workflow" CASCADE;
 DROP TABLE IF EXISTS "plugin_method" CASCADE;
+DROP TABLE IF EXISTS "plugin_filter" CASCADE;
+DROP TABLE IF EXISTS "plugin_action" CASCADE;
 DROP TABLE IF EXISTS "plugin" CASCADE;
 
 CREATE TABLE IF NOT EXISTS "plugin" (
