@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
@@ -39,6 +40,30 @@ class MockAuthNotifier extends StateNotifier<AuthState> with Mock implements Aut
       );
 }
 
+Future<void> pumpDisclosureAction(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
+}
+
+Future<void> pumpNetworkingSettings(
+  WidgetTester tester, {
+  required MockAuthNotifier authNotifier,
+  required NetworkService networkService,
+}) async {
+  addTearDown(() async {
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
+
+  await tester.pumpConsumerWidget(
+    const NetworkingSettings(),
+    overrides: [
+      authProvider.overrideWith((ref) => authNotifier),
+      networkServiceProvider.overrideWithValue(networkService),
+    ],
+  );
+}
+
 void main() {
   late Drift db;
   late MockAuthNotifier authNotifier;
@@ -76,13 +101,7 @@ void main() {
     when(() => permissionRepository.hasLocationWhenInUsePermission()).thenAnswer((_) async => false);
     when(() => permissionRepository.hasLocationAlwaysPermission()).thenAnswer((_) async => false);
 
-    await tester.pumpConsumerWidget(
-      const NetworkingSettings(),
-      overrides: [
-        authProvider.overrideWith((ref) => authNotifier),
-        networkServiceProvider.overrideWithValue(networkService),
-      ],
-    );
+    await pumpNetworkingSettings(tester, authNotifier: authNotifier, networkService: networkService);
     await tester.pumpAndSettle();
 
     expect(find.text('location_permission'), findsOneWidget);
@@ -104,13 +123,7 @@ void main() {
     when(() => permissionRepository.hasLocationWhenInUsePermission()).thenAnswer((_) async => true);
     when(() => permissionRepository.hasLocationAlwaysPermission()).thenAnswer((_) async => false);
 
-    await tester.pumpConsumerWidget(
-      const NetworkingSettings(),
-      overrides: [
-        authProvider.overrideWith((ref) => authNotifier),
-        networkServiceProvider.overrideWithValue(networkService),
-      ],
-    );
+    await pumpNetworkingSettings(tester, authNotifier: authNotifier, networkService: networkService);
     await tester.pumpAndSettle();
 
     expect(find.text('background_location_permission'), findsOneWidget);
@@ -132,19 +145,13 @@ void main() {
     when(() => permissionRepository.requestLocationAlwaysPermission()).thenAnswer((_) async => false);
     when(() => permissionRepository.openSettings()).thenAnswer((_) async => true);
 
-    await tester.pumpConsumerWidget(
-      const NetworkingSettings(),
-      overrides: [
-        authProvider.overrideWith((ref) => authNotifier),
-        networkServiceProvider.overrideWithValue(networkService),
-      ],
-    );
+    await pumpNetworkingSettings(tester, authNotifier: authNotifier, networkService: networkService);
     await tester.pumpAndSettle();
 
     expect(find.text('background_location_permission'), findsOneWidget);
 
     await tester.tap(find.text('grant_permission'));
-    await tester.pumpAndSettle();
+    await pumpDisclosureAction(tester);
 
     verify(() => permissionRepository.requestLocationAlwaysPermission()).called(1);
     verify(() => permissionRepository.openSettings()).called(1);
@@ -154,24 +161,18 @@ void main() {
     when(() => permissionRepository.hasLocationWhenInUsePermission()).thenAnswer((_) async => true);
     when(() => permissionRepository.hasLocationAlwaysPermission()).thenAnswer((_) async => true);
 
-    await tester.pumpConsumerWidget(
-      const NetworkingSettings(),
-      overrides: [
-        authProvider.overrideWith((ref) => authNotifier),
-        networkServiceProvider.overrideWithValue(networkService),
-      ],
-    );
+    await pumpNetworkingSettings(tester, authNotifier: authNotifier, networkService: networkService);
     await tester.pumpAndSettle();
 
     expect(find.text('location_permission'), findsOneWidget);
 
     await tester.tap(find.text('grant_permission'));
-    await tester.pumpAndSettle();
+    await pumpDisclosureAction(tester);
 
     expect(find.text('background_location_permission'), findsOneWidget);
 
     await tester.tap(find.text('grant_permission'));
-    await tester.pumpAndSettle();
+    await pumpDisclosureAction(tester);
 
     expect(Store.get(StoreKey.autoEndpointLocationDisclosureAccepted), isTrue);
     verifyNever(() => permissionRepository.requestLocationWhenInUsePermission());
@@ -183,13 +184,7 @@ void main() {
     when(() => permissionRepository.hasLocationWhenInUsePermission()).thenAnswer((_) async => true);
     when(() => permissionRepository.hasLocationAlwaysPermission()).thenAnswer((_) async => true);
 
-    await tester.pumpConsumerWidget(
-      const NetworkingSettings(),
-      overrides: [
-        authProvider.overrideWith((ref) => authNotifier),
-        networkServiceProvider.overrideWithValue(networkService),
-      ],
-    );
+    await pumpNetworkingSettings(tester, authNotifier: authNotifier, networkService: networkService);
     await tester.pumpAndSettle();
 
     expect(find.text('location_permission'), findsOneWidget);
