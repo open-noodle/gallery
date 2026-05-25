@@ -459,7 +459,7 @@ class SharedSpacesApi {
 
   /// Dismiss a face suggestion for a person in a shared space
   ///
-  /// Suppress this suggestion for the space person forever. The face stays unassigned. Idempotent.
+  /// Compatibility alias for rejecting this suggestion for the space person. The face stays unassigned. Idempotent.
   ///
   /// Note: This method returns the HTTP [Response].
   ///
@@ -503,7 +503,7 @@ class SharedSpacesApi {
 
   /// Dismiss a face suggestion for a person in a shared space
   ///
-  /// Suppress this suggestion for the space person forever. The face stays unassigned. Idempotent.
+  /// Compatibility alias for rejecting this suggestion for the space person. The face stays unassigned. Idempotent.
   ///
   /// Parameters:
   ///
@@ -1651,6 +1651,71 @@ class SharedSpacesApi {
     return null;
   }
 
+  /// Ignore a face suggestion for a person in a shared space
+  ///
+  /// Ignore this suggestion for the space person. The face stays unassigned. Idempotent.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetFaceId (required):
+  ///   Unassigned asset face ID being reviewed
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  ///
+  /// * [String] personId (required):
+  ///   Space person ID
+  Future<Response> ignoreSpacePersonFaceSuggestionWithHttpInfo(String assetFaceId, String id, String personId,) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/people/{personId}/face-suggestions/{assetFaceId}/ignore'
+      .replaceAll('{assetFaceId}', assetFaceId)
+      .replaceAll('{id}', id)
+      .replaceAll('{personId}', personId);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'POST',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Ignore a face suggestion for a person in a shared space
+  ///
+  /// Ignore this suggestion for the space person. The face stays unassigned. Idempotent.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetFaceId (required):
+  ///   Unassigned asset face ID being reviewed
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  ///
+  /// * [String] personId (required):
+  ///   Space person ID
+  Future<void> ignoreSpacePersonFaceSuggestion(String assetFaceId, String id, String personId,) async {
+    final response = await ignoreSpacePersonFaceSuggestionWithHttpInfo(assetFaceId, id, personId,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
   /// Link a library to a shared space
   ///
   /// Link an external library so its assets appear in the space. Requires admin and space editor/owner.
@@ -1806,6 +1871,71 @@ class SharedSpacesApi {
   /// * [SharedSpacePersonMergeDto] sharedSpacePersonMergeDto (required):
   Future<void> mergeSpacePeople(String id, String personId, SharedSpacePersonMergeDto sharedSpacePersonMergeDto,) async {
     final response = await mergeSpacePeopleWithHttpInfo(id, personId, sharedSpacePersonMergeDto,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
+  /// Reject a face suggestion for a person in a shared space
+  ///
+  /// Reject this suggestion for the space person. The face stays unassigned. Idempotent.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetFaceId (required):
+  ///   Unassigned asset face ID being reviewed
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  ///
+  /// * [String] personId (required):
+  ///   Space person ID
+  Future<Response> rejectSpacePersonFaceSuggestionWithHttpInfo(String assetFaceId, String id, String personId,) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/people/{personId}/face-suggestions/{assetFaceId}/reject'
+      .replaceAll('{assetFaceId}', assetFaceId)
+      .replaceAll('{id}', id)
+      .replaceAll('{personId}', personId);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'POST',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Reject a face suggestion for a person in a shared space
+  ///
+  /// Reject this suggestion for the space person. The face stays unassigned. Idempotent.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetFaceId (required):
+  ///   Unassigned asset face ID being reviewed
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  ///
+  /// * [String] personId (required):
+  ///   Space person ID
+  Future<void> rejectSpacePersonFaceSuggestion(String assetFaceId, String id, String personId,) async {
+    final response = await rejectSpacePersonFaceSuggestionWithHttpInfo(assetFaceId, id, personId,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }

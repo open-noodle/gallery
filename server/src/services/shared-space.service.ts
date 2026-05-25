@@ -1006,11 +1006,9 @@ export class SharedSpaceService extends BaseService {
       return;
     }
 
-    if (action === 'rejected') {
-      await this.personFaceSuggestionRepository.markRejectedForSpacePerson(person.id, assetFaceId);
-    } else {
-      await this.personFaceSuggestionRepository.markIgnoredForSpacePerson(person.id, assetFaceId);
-    }
+    await (action === 'rejected'
+      ? this.personFaceSuggestionRepository.markRejectedForSpacePerson(person.id, assetFaceId)
+      : this.personFaceSuggestionRepository.markIgnoredForSpacePerson(person.id, assetFaceId));
   }
 
   async rejectSpacePersonFaceSuggestion(
