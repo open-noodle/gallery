@@ -6,10 +6,10 @@ import 'package:immich_mobile/data/db/main/database.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/infrastructure/repositories/metadata.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/models/auth/auxilary_endpoint.model.dart';
 import 'package:immich_mobile/models/auth/login_response.model.dart';
-import 'package:immich_mobile/services/app_settings.service.dart';
 import 'package:immich_mobile/services/auth.service.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart';
@@ -43,6 +43,7 @@ void main() {
     WidgetsFlutterBinding.ensureInitialized();
     db = Drift(DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
     await StoreService.init(storeRepository: StoreRepository(db));
+    await MetadataRepository.ensureInitialized(db);
   });
 
   tearDownAll(() async {
@@ -108,9 +109,6 @@ void main() {
       when(() => authApiRepository.logout()).thenAnswer((_) async => {});
       when(() => backgroundSyncManager.cancel()).thenAnswer((_) async => {});
       when(() => authRepository.clearLocalData()).thenAnswer((_) => Future.value(null));
-      when(
-        () => appSettingsService.setSetting(AppSettingsEnum.enableBackup, false),
-      ).thenAnswer((_) => Future.value(null));
       await sut.logout();
 
       verify(() => authApiRepository.logout()).called(1);
@@ -122,9 +120,6 @@ void main() {
       when(() => authApiRepository.logout()).thenThrow(Exception('Server error'));
       when(() => backgroundSyncManager.cancel()).thenAnswer((_) async => {});
       when(() => authRepository.clearLocalData()).thenAnswer((_) => Future.value(null));
-      when(
-        () => appSettingsService.setSetting(AppSettingsEnum.enableBackup, false),
-      ).thenAnswer((_) => Future.value(null));
       await sut.logout();
 
       verify(() => authApiRepository.logout()).called(1);
