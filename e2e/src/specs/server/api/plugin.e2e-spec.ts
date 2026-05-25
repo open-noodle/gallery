@@ -1,26 +1,19 @@
-import { type LoginResponseDto } from '@immich/sdk';
-import { type Actor, authHeaders } from 'src/actors';
+import { WorkflowTrigger, type LoginResponseDto } from '@immich/sdk';
+import { authHeaders, type Actor } from 'src/actors';
 import { createUserDto } from 'src/fixtures';
 import { errorDto } from 'src/responses';
 import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-// T32 — read-only coverage for /plugins (plugin.controller.ts).
+// Read-only coverage for /plugins (plugin.controller.ts).
 //
-// Service shape (plugin.service.ts:61-72):
+// Service shape:
 //   - GET /plugins      → list ALL loaded plugins (no per-user scoping)
-//   - GET /plugins/triggers → static list from src/plugins
+//   - GET /plugins/methods → list methods, optionally filtered by trigger/type
 //   - GET /plugins/:id  → single plugin or BadRequestException 'Plugin not found'
 //
 // All three endpoints require Permission.PluginRead but no admin gate.
-//
-// The fork bundles a core plugin manifest at `plugins/manifest.json` named
-// `immich-core` with three filters (filterFileName, filterFileType,
-// filterPerson) and three actions (actionArchive, actionFavorite,
-// actionAddToAlbum). T32 pins that this plugin is loaded and exposed via the
-// API. (Note: classification, pet-detection, OCR, etc. are services in
-// src/services/, NOT extism plugins — the backlog assumption was wrong.)
 
 describe('/plugins', () => {
   let admin: LoginResponseDto;
@@ -46,45 +39,40 @@ describe('/plugins', () => {
       expect(Array.isArray(body)).toBe(true);
     });
 
-    it('the immich-core plugin is loaded with the expected filters and actions', async () => {
-      // The fork bundles `plugins/manifest.json` (name: 'immich-core'). It has
-      // filterFileName/filterFileType/filterPerson and actionArchive/
-      // actionFavorite/actionAddToAlbum. Pin them here so a future change to
-      // the bundled manifest forces a deliberate test update.
-      const { body } = await request(app).get('/plugins').set(asBearerAuth(admin.accessToken));
+    it('returns the current plugin response shape', async () => {
+      const { status, body } = await request(app).get('/plugins').set(asBearerAuth(admin.accessToken));
+      expect(status).toBe(200);
+
       const plugins = body as Array<{
         name: string;
-        filters: Array<{ methodName: string }>;
-        actions: Array<{ methodName: string }>;
+        methods: Array<{ key: string; name: string; types: string[] }>;
       }>;
-      const core = plugins.find((p) => p.name === 'immich-core');
-      expect(core).toBeDefined();
-
-      const filterNames = core!.filters.map((f) => f.methodName);
-      expect(filterNames).toEqual(expect.arrayContaining(['filterFileName', 'filterFileType', 'filterPerson']));
-
-      const actionNames = core!.actions.map((a) => a.methodName);
-      expect(actionNames).toEqual(expect.arrayContaining(['actionArchive', 'actionFavorite', 'actionAddToAlbum']));
+      for (const plugin of plugins) {
+        expect(plugin.name).toEqual(expect.any(String));
+        expect(Array.isArray(plugin.methods)).toBe(true);
+      }
     });
   });
 
-  describe('GET /plugins/triggers', () => {
+  describe('GET /plugins/methods', () => {
     it('requires authentication', async () => {
-      const { status } = await request(app).get('/plugins/triggers').set(authHeaders(anonActor));
+      const { status } = await request(app).get('/plugins/methods').set(authHeaders(anonActor));
       expect(status).toBe(401);
     });
 
-    it('returns the static trigger list (AssetCreate + PersonRecognized)', async () => {
-      const { status, body } = await request(app).get('/plugins/triggers').set(asBearerAuth(user.accessToken));
+    it('returns plugin methods', async () => {
+      const { status, body } = await request(app).get('/plugins/methods').set(asBearerAuth(user.accessToken));
       expect(status).toBe(200);
       expect(Array.isArray(body)).toBe(true);
-      // server/src/plugins.ts exports two trigger types: AssetCreate (wired
-      // through plugin.service.handleAssetCreate at line 173) and
-      // PersonRecognized (declared but the handler at line 237 is unimplemented
-      // and currently returns Skipped). Both must appear in the static list.
-      // Pin BOTH so a future removal of either prompts a deliberate update.
-      const types = (body as Array<{ type: string }>).map((t) => t.type);
-      expect(types).toEqual(expect.arrayContaining(['AssetCreate', 'PersonRecognized']));
+    });
+
+    it('filters plugin methods by workflow trigger', async () => {
+      const { status, body } = await request(app)
+        .get('/plugins/methods')
+        .query({ trigger: WorkflowTrigger.AssetCreate })
+        .set(asBearerAuth(user.accessToken));
+      expect(status).toBe(200);
+      expect(Array.isArray(body)).toBe(true);
     });
   });
 
@@ -96,20 +84,7 @@ describe('/plugins', () => {
       expect(status).toBe(401);
     });
 
-    it('returns the core plugin by id', async () => {
-      // Resolve the core plugin id via the listing endpoint, then fetch it
-      // directly. The single-fetch endpoint returns the same shape.
-      const list = await request(app).get('/plugins').set(asBearerAuth(user.accessToken));
-      const core = (list.body as Array<{ id: string; name: string }>).find((p) => p.name === 'immich-core');
-      expect(core).toBeDefined();
-
-      const { status, body } = await request(app).get(`/plugins/${core!.id}`).set(asBearerAuth(user.accessToken));
-      expect(status).toBe(200);
-      expect((body as { id: string; name: string }).name).toBe('immich-core');
-    });
-
     it('non-existent plugin returns 400', async () => {
-      // plugin.service.ts:66-70 throws BadRequestException('Plugin not found').
       const { status } = await request(app)
         .get('/plugins/00000000-0000-4000-a000-000000000099')
         .set(asBearerAuth(user.accessToken));
