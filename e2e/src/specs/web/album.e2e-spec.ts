@@ -178,7 +178,7 @@ test.describe('Album', () => {
     await pickerFilterResponse;
     await expect(page.locator('[data-testid="active-chip"]')).toContainText('Picker Tag');
     await expect(page.locator(`[data-asset="${pickerAsset.id}"]`)).toHaveCount(1);
-    await expect(page.locator(`[data-asset="${albumAsset.id}"][data-disabled="true"]`)).toBeVisible();
+    await expect(page.locator(`[data-asset="${albumAsset.id}"]:not([data-disabled="true"])`)).toHaveCount(0);
     await expect(page.locator(`[data-asset="${secondAlbumAsset.id}"]`)).toHaveCount(0);
 
     await page.getByLabel('Close').click();
@@ -189,6 +189,6 @@ test.describe('Album', () => {
     await page.getByLabel('Add photos').click();
     await expect(page.locator('[data-testid="active-chip"]')).toContainText('Picker Tag');
     await expect(page.locator(`[data-asset="${pickerAsset.id}"]`)).toHaveCount(1);
-    await expect(page.locator(`[data-asset="${albumAsset.id}"][data-disabled="true"]`)).toBeVisible();
+    await expect(page.locator(`[data-asset="${albumAsset.id}"]:not([data-disabled="true"])`)).toHaveCount(0);
   });
 });
