@@ -301,7 +301,7 @@ export class JobRepository {
           }
 
           job.options = action.options;
-        } else if (this.isSharedSpaceFacePipelineJob(item.name)) {
+        } else if (this.isSharedSpaceFacePipelineJob(item.name) && job.options.jobId) {
           await this.removePausedStableJob(queue, job.options.jobId);
         }
 
