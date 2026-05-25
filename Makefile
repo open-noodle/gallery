@@ -44,9 +44,9 @@ e2e-integration-dev-ui:
 
 .PHONY: e2e-rebase-smoke
 e2e-rebase-smoke:
-	cd e2e && docker compose up -d --build --wait
-	cd e2e && PLAYWRIGHT_DISABLE_WEBSERVER=true pnpm exec playwright test --project=rebase-smoke
-	cd e2e && docker compose down -v
+	pnpm --filter @immich/sdk build
+	cd e2e && pnpm exec playwright install chromium --only-shell
+	cd e2e && { trap 'docker compose down -v' EXIT; docker compose up -d --build --wait && PLAYWRIGHT_DISABLE_WEBSERVER=true pnpm exec playwright test --project=rebase-smoke; }
 
 .PHONY: storage-migration-tests
 storage-migration-tests:
