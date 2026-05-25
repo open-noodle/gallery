@@ -14,13 +14,13 @@ import { AssetFaceTable } from 'src/schema/tables/asset-face.table';
 import { PersonTable } from 'src/schema/tables/person.table';
 import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table';
 
-export type PersonFaceSuggestionStatus = 'pending' | 'confirmed' | 'dismissed';
+export type PersonFaceSuggestionStatus = 'pending' | 'confirmed' | 'rejected' | 'ignored';
 
 @Table('person_face_suggestion')
 @UpdatedAtTrigger('person_face_suggestion_updatedAt')
 @Check({
   name: 'person_face_suggestion_status_chk',
-  expression: `"status" IN ('pending', 'confirmed', 'dismissed')`,
+  expression: `"status" IN ('pending', 'confirmed', 'rejected', 'ignored')`,
 })
 @Check({
   name: 'person_face_suggestion_exactly_one_target_chk',

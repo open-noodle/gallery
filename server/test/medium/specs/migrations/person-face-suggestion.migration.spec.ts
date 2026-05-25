@@ -1,5 +1,10 @@
 import { Kysely, sql } from 'kysely';
+import { PersonFaceSuggestionRepository } from 'src/repositories/person-face-suggestion.repository';
+import { LoggingRepository } from 'src/repositories/logging.repository';
 import { DB } from 'src/schema';
+import { up as upIntentStatuses, down as downIntentStatuses } from 'src/schema/migrations-gallery/1779100000000-AddFaceSuggestionIntentStatuses';
+import { BaseService } from 'src/services/base.service';
+import { newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -12,6 +17,24 @@ beforeAll(async () => {
 afterAll(async () => {
   await db.destroy();
 });
+
+async function seedPendingSuggestion(testDb: Kysely<DB>) {
+  const { ctx } = newMediumService(BaseService, {
+    database: testDb,
+    real: [PersonFaceSuggestionRepository],
+    mock: [LoggingRepository],
+  });
+  const { user } = await ctx.newUser();
+  const { asset } = await ctx.newAsset({ ownerId: user.id });
+  const { result: person } = await ctx.newPerson({ ownerId: user.id, name: 'Suggestion Target' });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id });
+
+  await ctx.get(PersonFaceSuggestionRepository).upsertPending([
+    { personId: person.id, assetFaceId: assetFace.id, distance: 0.6 },
+  ]);
+
+  return { personId: person.id, assetFaceId: assetFace.id };
+}
 
 describe('person_face_suggestion migration', () => {
   it('creates the table with the expected columns', async () => {
@@ -105,13 +128,72 @@ describe('person_face_suggestion migration', () => {
     expect(Number(c.rows[0].count)).toBe(2);
   });
 
-  it('defines the status check constraint', async () => {
-    const r = await sql<{ count: string }>`
-      SELECT COUNT(*) AS count FROM pg_constraint
+  it('defines the status check constraint with intent statuses', async () => {
+    const r = await sql<{ definition: string }>`
+      SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
       WHERE conname = 'person_face_suggestion_status_chk'
         AND contype = 'c'
     `.execute(db);
-    expect(Number(r.rows[0].count)).toBe(1);
+    expect(r.rows).toHaveLength(1);
+    expect(r.rows[0].definition).toContain("'pending'");
+    expect(r.rows[0].definition).toContain("'confirmed'");
+    expect(r.rows[0].definition).toContain("'rejected'");
+    expect(r.rows[0].definition).toContain("'ignored'");
+    expect(r.rows[0].definition).not.toContain("'dismissed'");
+  });
+
+  it('converts dismissed suggestions to rejected on up and back to dismissed on down', async () => {
+    await expect(
+      db.transaction().execute(async (trx) => {
+        await downIntentStatuses(trx);
+        const { personId, assetFaceId } = await seedPendingSuggestion(trx);
+
+        await trx
+          .updateTable('person_face_suggestion')
+          .set({ status: 'dismissed' })
+          .where('personId', '=', personId)
+          .where('assetFaceId', '=', assetFaceId)
+          .execute();
+
+        await upIntentStatuses(trx);
+        await expect(
+          trx
+            .selectFrom('person_face_suggestion')
+            .select('status')
+            .where('personId', '=', personId)
+            .where('assetFaceId', '=', assetFaceId)
+            .executeTakeFirstOrThrow(),
+        ).resolves.toMatchObject({ status: 'rejected' });
+
+        await downIntentStatuses(trx);
+        await expect(
+          trx
+            .selectFrom('person_face_suggestion')
+            .select('status')
+            .where('personId', '=', personId)
+            .where('assetFaceId', '=', assetFaceId)
+            .executeTakeFirstOrThrow(),
+        ).resolves.toMatchObject({ status: 'dismissed' });
+
+        throw new Error('rollback-intent-status-test');
+      }),
+    ).rejects.toThrow('rollback-intent-status-test');
+  });
+
+  it('allows rejected and ignored statuses and rejects removed status values', async () => {
+    const { personId, assetFaceId } = await seedPendingSuggestion(db);
+    const updateStatus = (status: string) =>
+      db
+        .updateTable('person_face_suggestion')
+        .set({ status: sql`${status}` })
+        .where('personId', '=', personId)
+        .where('assetFaceId', '=', assetFaceId)
+        .execute();
+
+    await expect(updateStatus('rejected')).resolves.toBeDefined();
+    await expect(updateStatus('ignored')).resolves.toBeDefined();
+    await expect(updateStatus('dismissed')).rejects.toThrow('person_face_suggestion_status_chk');
+    await expect(updateStatus('bogus')).rejects.toThrow('person_face_suggestion_status_chk');
   });
 
   it('registered the updatedAt trigger override row', async () => {
