@@ -74,16 +74,33 @@ export class PersonFaceSuggestionRepository {
     return Number(result.numUpdatedRows ?? 0n);
   }
 
-  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
-  async markDismissed(personId: string, assetFaceId: string): Promise<number> {
+  private async markPersonalResolved(
+    personId: string,
+    assetFaceId: string,
+    status: 'rejected' | 'ignored',
+  ): Promise<number> {
     const result = await this.db
       .updateTable('person_face_suggestion')
-      .set({ status: 'dismissed' })
+      .set({ status })
       .where('personId', '=', personId)
       .where('assetFaceId', '=', assetFaceId)
       .where('status', '=', 'pending')
       .executeTakeFirst();
     return Number(result.numUpdatedRows ?? 0n);
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async markRejected(personId: string, assetFaceId: string): Promise<number> {
+    return this.markPersonalResolved(personId, assetFaceId, 'rejected');
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async markIgnored(personId: string, assetFaceId: string): Promise<number> {
+    return this.markPersonalResolved(personId, assetFaceId, 'ignored');
+  }
+
+  async markDismissed(personId: string, assetFaceId: string): Promise<number> {
+    return this.markRejected(personId, assetFaceId);
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
@@ -98,16 +115,33 @@ export class PersonFaceSuggestionRepository {
     return Number(result.numUpdatedRows ?? 0n);
   }
 
-  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
-  async markDismissedForSpacePerson(spacePersonId: string, assetFaceId: string): Promise<number> {
+  private async markSpacePersonResolved(
+    spacePersonId: string,
+    assetFaceId: string,
+    status: 'rejected' | 'ignored',
+  ): Promise<number> {
     const result = await this.db
       .updateTable('person_face_suggestion')
-      .set({ status: 'dismissed' })
+      .set({ status })
       .where('spacePersonId', '=', spacePersonId)
       .where('assetFaceId', '=', assetFaceId)
       .where('status', '=', 'pending')
       .executeTakeFirst();
     return Number(result.numUpdatedRows ?? 0n);
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async markRejectedForSpacePerson(spacePersonId: string, assetFaceId: string): Promise<number> {
+    return this.markSpacePersonResolved(spacePersonId, assetFaceId, 'rejected');
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async markIgnoredForSpacePerson(spacePersonId: string, assetFaceId: string): Promise<number> {
+    return this.markSpacePersonResolved(spacePersonId, assetFaceId, 'ignored');
+  }
+
+  async markDismissedForSpacePerson(spacePersonId: string, assetFaceId: string): Promise<number> {
+    return this.markRejectedForSpacePerson(spacePersonId, assetFaceId);
   }
 
   @GenerateSql({

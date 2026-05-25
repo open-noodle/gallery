@@ -145,17 +145,19 @@ describe('person_face_suggestion migration', () => {
   it('converts dismissed suggestions to rejected on up and back to dismissed on down', async () => {
     await expect(
       db.transaction().execute(async (trx) => {
-        await downIntentStatuses(trx);
+        const migrationDb = trx as unknown as Kysely<unknown>;
+
+        await downIntentStatuses(migrationDb);
         const { personId, assetFaceId } = await seedPendingSuggestion(trx);
 
         await trx
           .updateTable('person_face_suggestion')
-          .set({ status: 'dismissed' })
+          .set({ status: sql`dismissed` })
           .where('personId', '=', personId)
           .where('assetFaceId', '=', assetFaceId)
           .execute();
 
-        await upIntentStatuses(trx);
+        await upIntentStatuses(migrationDb);
         await expect(
           trx
             .selectFrom('person_face_suggestion')
@@ -165,7 +167,7 @@ describe('person_face_suggestion migration', () => {
             .executeTakeFirstOrThrow(),
         ).resolves.toMatchObject({ status: 'rejected' });
 
-        await downIntentStatuses(trx);
+        await downIntentStatuses(migrationDb);
         await expect(
           trx
             .selectFrom('person_face_suggestion')

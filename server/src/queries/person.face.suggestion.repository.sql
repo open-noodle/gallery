@@ -43,7 +43,16 @@ where
   and "assetFaceId" = $3
   and "status" = $4
 
--- PersonFaceSuggestionRepository.markDismissed
+-- PersonFaceSuggestionRepository.markRejected
+update "person_face_suggestion"
+set
+  "status" = $1
+where
+  "personId" = $2
+  and "assetFaceId" = $3
+  and "status" = $4
+
+-- PersonFaceSuggestionRepository.markIgnored
 update "person_face_suggestion"
 set
   "status" = $1
@@ -61,7 +70,16 @@ where
   and "assetFaceId" = $3
   and "status" = $4
 
--- PersonFaceSuggestionRepository.markDismissedForSpacePerson
+-- PersonFaceSuggestionRepository.markRejectedForSpacePerson
+update "person_face_suggestion"
+set
+  "status" = $1
+where
+  "spacePersonId" = $2
+  and "assetFaceId" = $3
+  and "status" = $4
+
+-- PersonFaceSuggestionRepository.markIgnoredForSpacePerson
 update "person_face_suggestion"
 set
   "status" = $1
