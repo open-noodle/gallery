@@ -134,12 +134,12 @@ cleanup (step 14) remains separate because it needs `if: always()`.
    belt-and-braces in case `open-noodle/*` packages are private now or
    become private later; no-op for public packages.
 3. **Determine upstream version** — inline in a later shell step:
-   `UPSTREAM_TAG=v$(jq -r .version server/package.json)`. Gallery's
-   `server/package.json` tracks the upstream Immich version Gallery is
-   rebased from (current value `2.7.5`, confirmed against the latest
-   upstream-sync report). Rebasing onto a new Immich version automatically
-   bumps this file, so the workflow auto-follows Gallery's base without
-   manual edits.
+   `UPSTREAM_TAG=v$(jq -r '.upstream.version' branding/config.json)`.
+   `branding/config.json` tracks the latest tagged upstream Immich release
+   Gallery is compatible with (current value `2.7.5`, confirmed against the
+   latest upstream-sync report). Rebasing onto unreleased upstream commits may
+   bump package metadata ahead of the latest tag, so the workflow follows this
+   explicit release pointer instead of `server/package.json`.
 4. **Create docker network** — `docker network create "$NETWORK_NAME"`.
 5. **Start postgres** — `docker run -d --name database --network "$NETWORK_NAME"
 -e POSTGRES_USER -e POSTGRES_PASSWORD -e POSTGRES_DB
