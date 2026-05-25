@@ -212,10 +212,8 @@ test.describe('Spaces FilterPanel', () => {
       await page.locator('[data-testid="year-btn-2023"]').click();
       await expect(page.locator('[data-testid="month-grid"]')).toBeVisible();
 
-      // Wait for the timeline/buckets API response after applying filter
-      const bucketResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
       await page.locator('[data-testid="media-type-image"]').click();
-      await bucketResponse;
+      await expect(page.locator('[data-testid="active-chip"]').filter({ hasText: 'Photos only' })).toHaveCount(1);
 
       // Month grid should still be visible
       await expect(page.locator('[data-testid="month-grid"]')).toBeVisible();
@@ -1279,15 +1277,10 @@ test.describe('Spaces FilterPanel', () => {
       const { space } = await createPopulatedSpace('Combined AND');
       await gotoSpace(context, page, space.id);
 
-      // Apply rating and wait for timeline update
-      const ratingResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
       await page.locator('[data-testid="rating-star-3"]').click();
-      await ratingResponse;
+      await expect(page.locator('[data-testid="active-chip"]').filter({ hasText: '3+' })).toHaveCount(1);
 
-      // Apply media type and wait for timeline update
-      const mediaResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
       await page.locator('[data-testid="media-type-image"]').click();
-      await mediaResponse;
 
       // Both chips should be present
       const chips = page.locator('[data-testid="active-chip"]');
@@ -1304,10 +1297,8 @@ test.describe('Spaces FilterPanel', () => {
       const { space } = await createPopulatedSpace('Count Decrease');
       await gotoSpace(context, page, space.id);
 
-      // Apply first filter and wait for API response
-      const firstResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
       await page.locator('[data-testid="media-type-image"]').click();
-      await firstResponse;
+      await expect(page.locator('[data-testid="active-chip"]').filter({ hasText: 'Photos only' })).toHaveCount(1);
 
       const countElem = page.locator('[data-testid="result-count"]');
       await expect(countElem).toBeVisible();
@@ -1317,9 +1308,8 @@ test.describe('Spaces FilterPanel', () => {
       const firstCount = Number.parseInt(firstCountText?.match(/(\d+)/)?.[1] ?? '0', 10);
 
       // Apply second filter — count should not increase (AND logic reduces or equals)
-      const secondResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
       await page.locator('[data-testid="rating-star-5"]').click();
-      await secondResponse;
+      await expect(page.locator('[data-testid="active-chip"]')).toHaveCount(2);
 
       await expect(countElem).toBeVisible();
       const secondCountText = await countElem.textContent();
