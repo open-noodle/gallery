@@ -5,6 +5,7 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
+import 'package:immich_mobile/providers/user.provider.dart';
 
 @RoutePage()
 class AssetSelectionTimelinePage extends StatelessWidget {
@@ -22,7 +23,8 @@ class AssetSelectionTimelinePage extends StatelessWidget {
         ),
         timelineServiceProvider.overrideWith((ref) {
           final timelineUsers = ref.watch(timelineUsersProvider).valueOrNull ?? [];
-          final timelineService = ref.watch(timelineFactoryProvider).main(timelineUsers);
+          final currentUserId = ref.watch(currentUserProvider.select((u) => u?.id)) ?? '';
+          final timelineService = ref.watch(timelineFactoryProvider).main(timelineUsers, currentUserId);
           ref.onDispose(timelineService.dispose);
           return timelineService;
         }),
