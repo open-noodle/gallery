@@ -59,7 +59,8 @@
 --
 -- 4. Switch your docker-compose image back to ghcr.io/immich-app/immich-server
 --    (pin a version close to the Immich version Gallery rebased from — this
---    repository's `server/package.json` shows the version under "version").
+--    repository's `branding/config.json` shows the upstream version under
+--    `upstream.version`).
 --    Start the stack.
 --
 -- =============================================================================
@@ -241,11 +242,12 @@ DELETE FROM "migration_overrides"
 -- 7. Undo post-v2.7.5 upstream migrations that Gallery pulled in via rebase.
 --
 -- Gallery regularly rebases onto `upstream/main`, which sits ahead of the
--- latest tagged Immich release (the one in `server/package.json`). The
+-- latest tagged Immich release (the one in `branding/config.json` under
+-- `upstream.version`). The
 -- migrations in `server/src/schema/migrations/` therefore include a handful
 -- of upstream migrations that the tagged release does NOT have. On a
 -- Gallery-migrated DB those rows exist in `kysely_migrations` and their
--- schema changes have been applied — but upstream v<package.json.version>
+-- schema changes have been applied — but upstream v<branding upstream.version>
 -- doesn't ship the corresponding migration files, so on boot its migrator
 -- aborts with "corrupted migrations: previously executed migration X is
 -- missing", and schema-check reports drift for every column/table touched.
@@ -304,8 +306,218 @@ UPDATE "system_metadata"
 DROP INDEX IF EXISTS "session_oauthSid_idx";
 ALTER TABLE "session" DROP COLUMN IF EXISTS "oauthSid";
 
+-- 1776792304485-ReconcileSqlToolsUpgradeChanges — restore the sql-tools
+-- override text that v2.7.5 generated.
+UPDATE "migration_overrides" SET "value" = '{"sql":"CREATE INDEX \"asset_localDateTime_month_idx\" ON \"asset\" ((date_trunc(''MONTH''::text, (\"localDateTime\" AT TIME ZONE ''UTC''::text)) AT TIME ZONE ''UTC''::text));","name":"asset_localDateTime_month_idx","type":"index"}'::jsonb WHERE "name" = 'index_asset_localDateTime_month_idx';
+UPDATE "migration_overrides" SET "value" = '{"sql":"CREATE INDEX \"asset_localDateTime_idx\" ON \"asset\" (((\"localDateTime\" at time zone ''UTC'')::date));","name":"asset_localDateTime_idx","type":"index"}'::jsonb WHERE "name" = 'index_asset_localDateTime_idx';
+UPDATE "migration_overrides" SET "value" = '{"sql":"CREATE UNIQUE INDEX \"activity_like_idx\" ON \"activity\" (\"assetId\", \"userId\", \"albumId\") WHERE (\"isLiked\" = true);","name":"activity_like_idx","type":"index"}'::jsonb WHERE "name" = 'index_activity_like_idx';
+UPDATE "migration_overrides" SET "value" = '{"sql":"CREATE INDEX \"asset_id_timeline_notDeleted_idx\" ON \"asset\" (\"id\") WHERE visibility = ''timeline'' AND \"deletedAt\" IS NULL;","name":"asset_id_timeline_notDeleted_idx","type":"index"}'::jsonb WHERE "name" = 'index_asset_id_timeline_notDeleted_idx';
+UPDATE "migration_overrides" SET "value" = '{"sql":"CREATE INDEX \"asset_face_personId_assetId_notDeleted_isVisible_idx\" ON \"asset_face\" (\"personId\", \"assetId\") WHERE \"deletedAt\" IS NULL AND \"isVisible\" IS TRUE;","name":"asset_face_personId_assetId_notDeleted_isVisible_idx","type":"index"}'::jsonb WHERE "name" = 'index_asset_face_personId_assetId_notDeleted_isVisible_idx';
+
+-- 1776848612954-MigrateAlbumOwnerIdToAlbumUser — v2.7.5 still stores the
+-- owner directly on album and uses a varchar album_user.role column.
+CREATE OR REPLACE FUNCTION public.album_user_after_insert()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      UPDATE album SET "updatedAt" = clock_timestamp(), "updateId" = immich_uuid_v7(clock_timestamp())
+      WHERE "id" IN (SELECT DISTINCT "albumId" FROM inserted_rows);
+      RETURN NULL;
+    END
+  $function$;
+
+CREATE OR REPLACE FUNCTION public.album_delete_audit()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      INSERT INTO album_audit ("albumId", "userId")
+      SELECT "id", "ownerId"
+      FROM OLD;
+      RETURN NULL;
+    END
+  $function$;
+
+ALTER TABLE "album" ADD COLUMN IF NOT EXISTS "ownerId" uuid;
+UPDATE "album" AS album
+   SET "ownerId" = album_user."userId"
+  FROM "album_user" AS album_user
+ WHERE album_user."albumId" = album."id"
+   AND album_user."role"::text = 'owner'
+   AND album."ownerId" IS NULL;
+ALTER TABLE "album" ALTER COLUMN "ownerId" SET NOT NULL;
+
+DROP INDEX IF EXISTS "album_user_unique_owner";
+ALTER TABLE "album_user" ALTER COLUMN "role" DROP DEFAULT;
+ALTER TABLE "album_user" ALTER COLUMN "role" TYPE character varying USING "role"::text;
+ALTER TABLE "album_user" ALTER COLUMN "role" SET DEFAULT 'editor';
+DROP TYPE IF EXISTS "album_user_role_enum";
+
+CREATE INDEX IF NOT EXISTS "album_ownerId_idx" ON "album" ("ownerId");
+ALTER TABLE "album" DROP CONSTRAINT IF EXISTS "album_ownerId_fkey";
+ALTER TABLE "album" ADD CONSTRAINT "album_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "user" ("id") ON UPDATE CASCADE ON DELETE CASCADE;
+
+DROP TRIGGER IF EXISTS "album_delete_audit" ON "album";
+CREATE OR REPLACE TRIGGER "album_delete_audit"
+  AFTER DELETE ON "album"
+  REFERENCING OLD TABLE AS "old"
+  FOR EACH STATEMENT
+  WHEN ((pg_trigger_depth() = 0))
+  EXECUTE FUNCTION album_delete_audit();
+
+INSERT INTO "migration_overrides" ("name", "value") VALUES ('function_album_delete_audit', '{"sql":"CREATE OR REPLACE FUNCTION album_delete_audit()\n  RETURNS TRIGGER\n  LANGUAGE PLPGSQL\n  AS $$\n    BEGIN\n      INSERT INTO album_audit (\"albumId\", \"userId\")\n      SELECT \"id\", \"ownerId\"\n      FROM OLD;\n      RETURN NULL;\n    END\n  $$;","name":"album_delete_audit","type":"function"}'::jsonb)
+  ON CONFLICT ("name") DO UPDATE SET "value" = EXCLUDED."value";
+INSERT INTO "migration_overrides" ("name", "value") VALUES ('trigger_album_delete_audit', '{"sql":"CREATE OR REPLACE TRIGGER \"album_delete_audit\"\n  AFTER DELETE ON \"album\"\n  REFERENCING OLD TABLE AS \"old\"\n  FOR EACH STATEMENT\n  WHEN (pg_trigger_depth() = 0)\n  EXECUTE FUNCTION album_delete_audit();","name":"album_delete_audit","type":"trigger"}'::jsonb)
+  ON CONFLICT ("name") DO UPDATE SET "value" = EXCLUDED."value";
+UPDATE "migration_overrides" SET "value" = '{"sql":"CREATE OR REPLACE FUNCTION album_user_after_insert()\n  RETURNS TRIGGER\n  LANGUAGE PLPGSQL\n  AS $$\n    BEGIN\n      UPDATE album SET \"updatedAt\" = clock_timestamp(), \"updateId\" = immich_uuid_v7(clock_timestamp())\n      WHERE \"id\" IN (SELECT DISTINCT \"albumId\" FROM inserted_rows);\n      RETURN NULL;\n    END\n  $$;","name":"album_user_after_insert","type":"function"}'::jsonb WHERE "name" = 'function_album_user_after_insert';
+DELETE FROM "migration_overrides" WHERE "name" = 'index_album_user_unique_owner';
+
+-- 1777415973792-AddVideoStreamTables — remove the transient stream tables.
+DROP TABLE IF EXISTS "video_stream_segment";
+DROP TABLE IF EXISTS "video_stream_variant";
+DROP TABLE IF EXISTS "video_stream_session";
+DROP TYPE IF EXISTS "video_stream_variant_codec_enum";
+
+-- 1777654048096-CreateAudioVideoTables — remove extracted media metadata
+-- tables that v2.7.5 does not know about.
+DROP TABLE IF EXISTS "asset_audio";
+DROP TABLE IF EXISTS "asset_video";
+DROP TABLE IF EXISTS "asset_keyframe";
+
+-- 1777667825574-ChangeDurationToInteger — convert duration back to the
+-- string format used by v2.7.5.
+DO $$
+DECLARE
+  duration_type text;
+BEGIN
+  SELECT data_type INTO duration_type
+    FROM information_schema.columns
+   WHERE table_schema = current_schema()
+     AND table_name = 'asset'
+     AND column_name = 'duration';
+
+  IF duration_type IS DISTINCT FROM 'character varying' THEN
+    ALTER TABLE asset
+    ALTER COLUMN duration TYPE varchar
+    USING (
+      CASE
+        WHEN duration IS NULL THEN NULL
+        ELSE lpad((duration / 3600000)::text, 2, '0')
+          || ':' || lpad(((duration / 60000) % 60)::text, 2, '0')
+          || ':' || lpad(((duration / 1000) % 60)::text, 2, '0')
+          || '.' || lpad((duration % 1000)::text, 3, '0')
+      END
+    );
+  END IF;
+END $$;
+
+-- 1777897107000-PartnerAssetSyncReset only deleted sync checkpoints; no
+-- schema rollback is required.
+
+-- 1778614946174-UpdateWorkflowTables replaced the v2.7.5 plugin/workflow
+-- schema. Recreate the older empty tables after dropping the newer shape.
+DROP TABLE IF EXISTS "workflow_step" CASCADE;
+DROP TABLE IF EXISTS "workflow" CASCADE;
+DROP TABLE IF EXISTS "plugin_method" CASCADE;
+DROP TABLE IF EXISTS "plugin" CASCADE;
+
+CREATE TABLE IF NOT EXISTS "plugin" (
+  "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+  "name" character varying NOT NULL,
+  "title" character varying NOT NULL,
+  "description" character varying NOT NULL,
+  "author" character varying NOT NULL,
+  "version" character varying NOT NULL,
+  "wasmPath" character varying NOT NULL,
+  "createdAt" timestamp with time zone NOT NULL DEFAULT now(),
+  "updatedAt" timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT "plugin_name_uq" UNIQUE ("name"),
+  CONSTRAINT "plugin_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "plugin_name_idx" ON "plugin" ("name");
+
+CREATE TABLE IF NOT EXISTS "plugin_filter" (
+  "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+  "pluginId" uuid NOT NULL,
+  "methodName" character varying NOT NULL,
+  "title" character varying NOT NULL,
+  "description" character varying NOT NULL,
+  "supportedContexts" character varying[] NOT NULL,
+  "schema" jsonb,
+  CONSTRAINT "plugin_filter_pluginId_fkey" FOREIGN KEY ("pluginId") REFERENCES "plugin" ("id") ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT "plugin_filter_methodName_uq" UNIQUE ("methodName"),
+  CONSTRAINT "plugin_filter_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "plugin_filter_supportedContexts_idx" ON "plugin_filter" USING gin ("supportedContexts");
+CREATE INDEX IF NOT EXISTS "plugin_filter_pluginId_idx" ON "plugin_filter" ("pluginId");
+CREATE INDEX IF NOT EXISTS "plugin_filter_methodName_idx" ON "plugin_filter" ("methodName");
+
+CREATE TABLE IF NOT EXISTS "plugin_action" (
+  "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+  "pluginId" uuid NOT NULL,
+  "methodName" character varying NOT NULL,
+  "title" character varying NOT NULL,
+  "description" character varying NOT NULL,
+  "supportedContexts" character varying[] NOT NULL,
+  "schema" jsonb,
+  CONSTRAINT "plugin_action_pluginId_fkey" FOREIGN KEY ("pluginId") REFERENCES "plugin" ("id") ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT "plugin_action_methodName_uq" UNIQUE ("methodName"),
+  CONSTRAINT "plugin_action_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "plugin_action_supportedContexts_idx" ON "plugin_action" USING gin ("supportedContexts");
+CREATE INDEX IF NOT EXISTS "plugin_action_pluginId_idx" ON "plugin_action" ("pluginId");
+CREATE INDEX IF NOT EXISTS "plugin_action_methodName_idx" ON "plugin_action" ("methodName");
+
+CREATE TABLE IF NOT EXISTS "workflow" (
+  "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+  "ownerId" uuid NOT NULL,
+  "triggerType" character varying NOT NULL,
+  "name" character varying,
+  "description" character varying NOT NULL,
+  "createdAt" timestamp with time zone NOT NULL DEFAULT now(),
+  "enabled" boolean NOT NULL DEFAULT true,
+  CONSTRAINT "workflow_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "user" ("id") ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT "workflow_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "workflow_ownerId_idx" ON "workflow" ("ownerId");
+
+CREATE TABLE IF NOT EXISTS "workflow_filter" (
+  "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+  "workflowId" uuid NOT NULL,
+  "pluginFilterId" uuid NOT NULL,
+  "filterConfig" jsonb,
+  "order" integer NOT NULL,
+  CONSTRAINT "workflow_filter_workflowId_fkey" FOREIGN KEY ("workflowId") REFERENCES "workflow" ("id") ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT "workflow_filter_pluginFilterId_fkey" FOREIGN KEY ("pluginFilterId") REFERENCES "plugin_filter" ("id") ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT "workflow_filter_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "workflow_filter_pluginFilterId_idx" ON "workflow_filter" ("pluginFilterId");
+CREATE INDEX IF NOT EXISTS "workflow_filter_workflowId_order_idx" ON "workflow_filter" ("workflowId", "order");
+CREATE INDEX IF NOT EXISTS "workflow_filter_workflowId_idx" ON "workflow_filter" ("workflowId");
+
+CREATE TABLE IF NOT EXISTS "workflow_action" (
+  "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+  "workflowId" uuid NOT NULL,
+  "pluginActionId" uuid NOT NULL,
+  "actionConfig" jsonb,
+  "order" integer NOT NULL,
+  CONSTRAINT "workflow_action_workflowId_fkey" FOREIGN KEY ("workflowId") REFERENCES "workflow" ("id") ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT "workflow_action_pluginActionId_fkey" FOREIGN KEY ("pluginActionId") REFERENCES "plugin_action" ("id") ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT "workflow_action_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "workflow_action_pluginActionId_idx" ON "workflow_action" ("pluginActionId");
+CREATE INDEX IF NOT EXISTS "workflow_action_workflowId_order_idx" ON "workflow_action" ("workflowId", "order");
+CREATE INDEX IF NOT EXISTS "workflow_action_workflowId_idx" ON "workflow_action" ("workflowId");
+
+DELETE FROM "migration_overrides" WHERE "name" = 'trigger_workflow_updatedAt';
+INSERT INTO "migration_overrides" ("name", "value") VALUES ('index_plugin_filter_supportedContexts_idx', '{"type":"index","name":"plugin_filter_supportedContexts_idx","sql":"CREATE INDEX \"plugin_filter_supportedContexts_idx\" ON \"plugin_filter\" (\"supportedContexts\") USING gin;"}'::jsonb)
+  ON CONFLICT ("name") DO UPDATE SET "value" = EXCLUDED."value";
+INSERT INTO "migration_overrides" ("name", "value") VALUES ('index_plugin_action_supportedContexts_idx', '{"type":"index","name":"plugin_action_supportedContexts_idx","sql":"CREATE INDEX \"plugin_action_supportedContexts_idx\" ON \"plugin_action\" (\"supportedContexts\") USING gin;"}'::jsonb)
+  ON CONFLICT ("name") DO UPDATE SET "value" = EXCLUDED."value";
+
 -- -----------------------------------------------------------------------------
--- 8. Delete Gallery + post-v<package.json.version> upstream migration rows
+-- 8. Delete Gallery + post-v<branding upstream.version> upstream migration rows
 --    from kysely_migrations.
 --
 -- This is the ONE step that is load-bearing for "Immich starts up cleanly."
@@ -347,6 +559,7 @@ DELETE FROM "kysely_migrations"
    '1778500000000-AddSpacePersonRepresentativeFaceSource',
    '1778600000000-SortSpacePeopleByNameIndex',
    '1778700000000-AddSharedSpaceFaceMatchBackfillTarget',
+   '1778800000000-ReconcileFaceIdentityIndexOverrides',
    '1778800000000-TrimSpacePersonNameIndex',
 
    -- Post-v2.7.5 upstream migrations pulled in by rebase. Paired with the
@@ -354,7 +567,14 @@ DELETE FROM "kysely_migrations"
    '1776217577402-DropAuditTable',
    '1776263790468-DropDeviceIdAndDeviceAssetId',
    '1776332807985-SetOAuthAllowInsecureRequests',
-   '1776442031775-AddOauthSidToSession'
+   '1776442031775-AddOauthSidToSession',
+   '1776792304485-ReconcileSqlToolsUpgradeChanges',
+   '1776848612954-MigrateAlbumOwnerIdToAlbumUser',
+   '1777415973792-AddVideoStreamTables',
+   '1777654048096-CreateAudioVideoTables',
+   '1777667825574-ChangeDurationToInteger',
+   '1777897107000-PartnerAssetSyncReset',
+   '1778614946174-UpdateWorkflowTables'
  );
 
 -- -----------------------------------------------------------------------------
@@ -386,6 +606,7 @@ BEGIN
       OR "name" LIKE '%AddFaceIdentities%'
       OR "name" LIKE '%AddSpacePersonRepresentativeFaceSource%'
       OR "name" LIKE '%SortSpacePeopleByNameIndex%'
+      OR "name" LIKE '%ReconcileFaceIdentityIndexOverrides%'
       OR "name" LIKE '%TrimSpacePersonNameIndex%';
   IF fork_rows_left > 0 THEN
     RAISE EXCEPTION 'revert-to-immich: % Gallery row(s) still present in kysely_migrations after cleanup — aborting.', fork_rows_left;
