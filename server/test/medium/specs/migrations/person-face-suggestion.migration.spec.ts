@@ -152,7 +152,7 @@ describe('person_face_suggestion migration', () => {
 
         await trx
           .updateTable('person_face_suggestion')
-          .set({ status: sql`dismissed` })
+          .set({ status: sql.lit('dismissed') as never })
           .where('personId', '=', personId)
           .where('assetFaceId', '=', assetFaceId)
           .execute();
