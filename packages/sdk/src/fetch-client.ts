@@ -3189,7 +3189,7 @@ export type UserGroupMemberResponseDto = {
 };
 export type UserGroupResponseDto = {
     /** Group color */
-    color?: Color | null;
+    color?: (UserAvatarColor) | null;
     /** Creation date */
     createdAt: string;
     /** Group ID */
