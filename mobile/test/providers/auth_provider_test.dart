@@ -8,9 +8,11 @@ import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/metadata.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/models/auth/login_response.model.dart';
 import 'package:immich_mobile/providers/auth.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/metadata.provider.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:immich_mobile/services/auth.service.dart';
 import 'package:immich_mobile/services/secure_storage.service.dart';
@@ -43,6 +45,7 @@ void main() {
   setUpAll(() async {
     db = Drift(DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
     await StoreService.init(storeRepository: DriftStoreRepository(db));
+    await MetadataRepository.ensureInitialized(db);
   });
 
   setUp(() async {
@@ -69,6 +72,7 @@ void main() {
     when(
       () => widgetService.writeCredentials('https://demo.opennoodle.de/api', 'demo-token', null),
     ).thenAnswer((_) async {});
+    when(() => ref.read(metadataProvider)).thenReturn(MetadataRepository.instance);
 
     sut = AuthNotifier(authService, apiService, userService, secureStorageService, widgetService, ref);
   });
