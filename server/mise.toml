@@ -3,7 +3,10 @@ run = "pnpm install --filter immich --frozen-lockfile"
 
 [tasks.build]
 env._.path = "./node_modules/.bin"
-run = "nest build"
+run = [
+  "nest build",
+  "node bin/sync-gallery-migrations.mjs",
+]
 
 [tasks.test]
 env._.path = "./node_modules/.bin"
