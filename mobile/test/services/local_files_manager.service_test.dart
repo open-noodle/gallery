@@ -1,39 +1,48 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:immich_mobile/services/local_files_manager.service.dart';
+import 'package:immich_mobile/platform/permission_api.g.dart';
+import 'package:immich_mobile/repositories/permission.repository.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const channel = MethodChannel('file_trash');
-  const service = LocalFilesManagerService();
+  const channel = BasicMessageChannel<Object?>(
+    'dev.flutter.pigeon.immich_mobile.PermissionApi.manageMediaPermission',
+    PermissionApi.pigeonChannelCodec,
+  );
 
   tearDown(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockDecodedMessageHandler<Object?>(
+      channel,
+      null,
+    );
   });
 
-  group('LocalFilesManagerService', () {
-    test('requests manage media settings through the file_trash channel', () async {
-      final calls = <MethodCall>[];
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
-        MethodCall call,
+  group('PermissionRepository.manageMediaPermission', () {
+    test('requests manage media settings through the permission API channel', () async {
+      final repository = PermissionRepository(PermissionApi());
+      final calls = <Object?>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockDecodedMessageHandler<Object?>(channel, (
+        Object? message,
       ) async {
-        calls.add(call);
-        return true;
+        calls.add(message);
+        return <Object?>[true];
       });
 
-      final result = await service.manageMediaPermission();
+      final result = await repository.manageMediaPermission();
 
       expect(result, isTrue);
       expect(calls, hasLength(1));
-      expect(calls.single.method, 'manageMediaPermission');
-      expect(calls.single.arguments, isNull);
+      expect(calls.single, isNull);
     });
 
-    test('returns false when the native file_trash handler is missing', () async {
-      final result = await service.manageMediaPermission();
+    test('throws when the native permission API handler is missing', () async {
+      final repository = PermissionRepository(PermissionApi());
 
-      expect(result, isFalse);
+      await expectLater(
+        repository.manageMediaPermission(),
+        throwsA(isA<PlatformException>().having((e) => e.code, 'code', 'channel-error')),
+      );
     });
   });
 }
