@@ -1,5 +1,5 @@
 import { createZodDto } from 'nestjs-zod';
-import { UserAvatarColor, UserAvatarColorSchema } from 'src/enum';
+import { UserAvatarColorSchema } from 'src/enum';
 import z from 'zod';
 
 const UserGroupCreateSchema = z
@@ -36,7 +36,7 @@ const UserGroupResponseSchema = z
   .object({
     id: z.string().describe('Group ID'),
     name: z.string().describe('Group name'),
-    color: z.enum(UserAvatarColor).nullable().optional().describe('Group color'),
+    color: UserAvatarColorSchema.nullable().optional().describe('Group color'),
     origin: z.string().describe('Group origin (manual or oidc)'),
     createdAt: z.string().describe('Creation date'),
     members: z.array(UserGroupMemberResponseSchema).describe('Members'),
