@@ -461,12 +461,43 @@ export class SharedSpaceController {
     return this.service.confirmSpacePersonFaceSuggestion(auth, id, personId, assetFaceId);
   }
 
+  @Post(':id/people/:personId/face-suggestions/:assetFaceId/reject')
+  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  @HttpCode(HttpStatus.OK)
+  @Endpoint({
+    summary: 'Reject a face suggestion for a person in a shared space',
+    description: 'Reject this suggestion for the space person. The face stays unassigned. Idempotent.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  rejectSpacePersonFaceSuggestion(
+    @Auth() auth: AuthDto,
+    @Param() { id, personId, assetFaceId }: SpacePersonFaceSuggestionParamsDto,
+  ): Promise<void> {
+    return this.service.rejectSpacePersonFaceSuggestion(auth, id, personId, assetFaceId);
+  }
+
+  @Post(':id/people/:personId/face-suggestions/:assetFaceId/ignore')
+  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  @HttpCode(HttpStatus.OK)
+  @Endpoint({
+    summary: 'Ignore a face suggestion for a person in a shared space',
+    description: 'Ignore this suggestion for the space person. The face stays unassigned. Idempotent.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  ignoreSpacePersonFaceSuggestion(
+    @Auth() auth: AuthDto,
+    @Param() { id, personId, assetFaceId }: SpacePersonFaceSuggestionParamsDto,
+  ): Promise<void> {
+    return this.service.ignoreSpacePersonFaceSuggestion(auth, id, personId, assetFaceId);
+  }
+
   @Post(':id/people/:personId/face-suggestions/:assetFaceId/dismiss')
   @Authenticated({ permission: Permission.SharedSpaceUpdate })
   @HttpCode(HttpStatus.OK)
   @Endpoint({
     summary: 'Dismiss a face suggestion for a person in a shared space',
-    description: 'Suppress this suggestion for the space person forever. The face stays unassigned. Idempotent.',
+    description:
+      'Compatibility alias for rejecting this suggestion for the space person. The face stays unassigned. Idempotent.',
     history: new HistoryBuilder().added('v2').stable('v2'),
   })
   dismissSpacePersonFaceSuggestion(

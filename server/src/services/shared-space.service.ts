@@ -986,11 +986,12 @@ export class SharedSpaceService extends BaseService {
     await this.personFaceSuggestionRepository.resolveAssignedFace(assetFaceId);
   }
 
-  async dismissSpacePersonFaceSuggestion(
+  private async resolveSpacePersonFaceSuggestion(
     auth: AuthDto,
     spaceId: string,
     personId: string,
     assetFaceId: string,
+    action: 'rejected' | 'ignored',
   ): Promise<void> {
     await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
     const person = await this.requireSpacePersonInSpace(spaceId, personId);
@@ -1005,7 +1006,38 @@ export class SharedSpaceService extends BaseService {
       return;
     }
 
-    await this.personFaceSuggestionRepository.markDismissedForSpacePerson(person.id, assetFaceId);
+    if (action === 'rejected') {
+      await this.personFaceSuggestionRepository.markRejectedForSpacePerson(person.id, assetFaceId);
+    } else {
+      await this.personFaceSuggestionRepository.markIgnoredForSpacePerson(person.id, assetFaceId);
+    }
+  }
+
+  async rejectSpacePersonFaceSuggestion(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    assetFaceId: string,
+  ): Promise<void> {
+    await this.resolveSpacePersonFaceSuggestion(auth, spaceId, personId, assetFaceId, 'rejected');
+  }
+
+  async ignoreSpacePersonFaceSuggestion(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    assetFaceId: string,
+  ): Promise<void> {
+    await this.resolveSpacePersonFaceSuggestion(auth, spaceId, personId, assetFaceId, 'ignored');
+  }
+
+  async dismissSpacePersonFaceSuggestion(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    assetFaceId: string,
+  ): Promise<void> {
+    await this.rejectSpacePersonFaceSuggestion(auth, spaceId, personId, assetFaceId);
   }
 
   async updateSpacePersonRepresentativeFace(

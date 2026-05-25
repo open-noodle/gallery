@@ -269,6 +269,34 @@ describe(SharedSpaceController.name, () => {
       expect(service.dismissSpacePersonFaceSuggestion).toHaveBeenCalledWith(undefined, spaceId, personId, assetFaceId);
     });
 
+    it('POST reject should require shared-space update permission and respond with 200', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .post(`/shared-spaces/${spaceId}/people/${personId}/face-suggestions/${assetFaceId}/reject`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ permission: Permission.SharedSpaceUpdate }),
+        }),
+      );
+      expect(service.rejectSpacePersonFaceSuggestion).toHaveBeenCalledWith(undefined, spaceId, personId, assetFaceId);
+    });
+
+    it('POST ignore should require shared-space update permission and respond with 200', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .post(`/shared-spaces/${spaceId}/people/${personId}/face-suggestions/${assetFaceId}/ignore`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ permission: Permission.SharedSpaceUpdate }),
+        }),
+      );
+      expect(service.ignoreSpacePersonFaceSuggestion).toHaveBeenCalledWith(undefined, spaceId, personId, assetFaceId);
+    });
+
     it('POST confirm should validate assetFaceId independently', async () => {
       const { status, body } = await request(ctx.getHttpServer())
         .post(`/shared-spaces/${spaceId}/people/${personId}/face-suggestions/not-a-uuid/confirm`)
@@ -277,6 +305,26 @@ describe(SharedSpaceController.name, () => {
       expect(status).toBe(400);
       expect(body).toEqual(errorDto.badRequest(['[assetFaceId] Invalid UUID']));
       expect(service.confirmSpacePersonFaceSuggestion).not.toHaveBeenCalled();
+    });
+
+    it('POST reject should validate assetFaceId independently', async () => {
+      const { status, body } = await request(ctx.getHttpServer())
+        .post(`/shared-spaces/${spaceId}/people/${personId}/face-suggestions/not-a-uuid/reject`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.badRequest(['[assetFaceId] Invalid UUID']));
+      expect(service.rejectSpacePersonFaceSuggestion).not.toHaveBeenCalled();
+    });
+
+    it('POST ignore should validate assetFaceId independently', async () => {
+      const { status, body } = await request(ctx.getHttpServer())
+        .post(`/shared-spaces/${spaceId}/people/${personId}/face-suggestions/not-a-uuid/ignore`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.badRequest(['[assetFaceId] Invalid UUID']));
+      expect(service.ignoreSpacePersonFaceSuggestion).not.toHaveBeenCalled();
     });
   });
 });

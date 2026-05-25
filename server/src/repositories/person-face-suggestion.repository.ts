@@ -136,10 +136,6 @@ export class PersonFaceSuggestionRepository {
     return this.markSpacePersonResolved(spacePersonId, assetFaceId, 'ignored');
   }
 
-  async markDismissedForSpacePerson(spacePersonId: string, assetFaceId: string): Promise<number> {
-    return this.markRejectedForSpacePerson(spacePersonId, assetFaceId);
-  }
-
   @GenerateSql({
     params: [DummyValue.UUID, { maxDistance: 0.5, suggestionMaxDistance: 0.8, page: 1, size: 10 }],
   })
