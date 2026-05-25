@@ -59,13 +59,13 @@ Keyboard behavior can stay conservative:
 The suggestion status model should move from:
 
 ```ts
-'pending' | 'confirmed' | 'dismissed'
+'pending' | 'confirmed' | 'dismissed';
 ```
 
 to:
 
 ```ts
-'pending' | 'confirmed' | 'rejected' | 'ignored'
+'pending' | 'confirmed' | 'rejected' | 'ignored';
 ```
 
 Semantics:
@@ -166,26 +166,26 @@ The docs should avoid implying that the system learns model-level negative examp
 
 ## Edge Cases
 
-| Edge case | Required behavior |
-| --- | --- |
-| User marks a suggestion as **Different person** | Row becomes `rejected`; face stays unassigned; same suggestion does not return for that target. |
-| User ignores a technically correct but irrelevant face | Row becomes `ignored`; face stays unassigned; same suggestion does not return for that target. |
-| User clicks reject/ignore twice | First request resolves the pending row; later requests return success and leave the first resolved status unchanged. |
-| User clicks reject and ignore concurrently | Only one pending-only update wins. The loser returns success and must not overwrite the first resolved status. |
-| User confirms while another request rejects/ignores | Only the first pending-only resolution wins. If confirm wins, the face is assigned and sibling pending suggestions are resolved; if a negative action wins first, confirm becomes a benign stale action and must not assign the face. |
-| Face is assigned elsewhere between load and action | Negative actions return success without changing assignment; confirm follows existing stale-confirm behavior and does not create a second assignment. |
-| Face is deleted between load and action | Negative actions return success with no-op semantics; the modal advances. |
-| Person or space person is deleted between load and action | Existing not-found/access behavior is acceptable; the modal must keep treating stale action failures as benign and advance. |
-| Suggestion band is disabled or changed after the modal loads | Already-visible review actions remain benign and do not resurrect or assign rows unexpectedly. |
-| Pending row is outside the current read band | It should not appear in fresh reads. If acted on from a stale modal, the endpoint should return success without creating a new pending row. |
-| Existing `dismissed` data exists before migration | `up()` converts it to `rejected`; it stays suppressed and is not returned by pending reads. |
-| Rollback after new ignored/rejected rows exist | `down()` converts both to `dismissed` to preserve suppression under the old schema. |
-| Shared-space reviewer is viewer | GET returns no actionable suggestions, matching current behavior; POST reject/ignore/confirm requires editor and is denied. |
-| Shared-space reviewer is not a member | GET and POST are denied by membership checks. |
-| Shared-space asset is removed from the space between load and action | Negative actions are benign and do not affect global identity state; confirm must not assign an inaccessible face. |
-| Multiple people or space people have pending suggestions for the same face | Reject/ignore resolves only the target row. Confirm still resolves sibling pending rows because it assigns the face. |
-| Old client calls `dismiss` | Endpoint records `rejected` and remains idempotent. |
-| New client calls `reject` or `ignore`; old server is not upgraded | This is not supported after SDK regeneration; deployment must upgrade server and web together as usual for branch-local API additions. |
+| Edge case                                                                  | Required behavior                                                                                                                                                                                                                     |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| User marks a suggestion as **Different person**                            | Row becomes `rejected`; face stays unassigned; same suggestion does not return for that target.                                                                                                                                       |
+| User ignores a technically correct but irrelevant face                     | Row becomes `ignored`; face stays unassigned; same suggestion does not return for that target.                                                                                                                                        |
+| User clicks reject/ignore twice                                            | First request resolves the pending row; later requests return success and leave the first resolved status unchanged.                                                                                                                  |
+| User clicks reject and ignore concurrently                                 | Only one pending-only update wins. The loser returns success and must not overwrite the first resolved status.                                                                                                                        |
+| User confirms while another request rejects/ignores                        | Only the first pending-only resolution wins. If confirm wins, the face is assigned and sibling pending suggestions are resolved; if a negative action wins first, confirm becomes a benign stale action and must not assign the face. |
+| Face is assigned elsewhere between load and action                         | Negative actions return success without changing assignment; confirm follows existing stale-confirm behavior and does not create a second assignment.                                                                                 |
+| Face is deleted between load and action                                    | Negative actions return success with no-op semantics; the modal advances.                                                                                                                                                             |
+| Person or space person is deleted between load and action                  | Existing not-found/access behavior is acceptable; the modal must keep treating stale action failures as benign and advance.                                                                                                           |
+| Suggestion band is disabled or changed after the modal loads               | Already-visible review actions remain benign and do not resurrect or assign rows unexpectedly.                                                                                                                                        |
+| Pending row is outside the current read band                               | It should not appear in fresh reads. If acted on from a stale modal, the endpoint should return success without creating a new pending row.                                                                                           |
+| Existing `dismissed` data exists before migration                          | `up()` converts it to `rejected`; it stays suppressed and is not returned by pending reads.                                                                                                                                           |
+| Rollback after new ignored/rejected rows exist                             | `down()` converts both to `dismissed` to preserve suppression under the old schema.                                                                                                                                                   |
+| Shared-space reviewer is viewer                                            | GET returns no actionable suggestions, matching current behavior; POST reject/ignore/confirm requires editor and is denied.                                                                                                           |
+| Shared-space reviewer is not a member                                      | GET and POST are denied by membership checks.                                                                                                                                                                                         |
+| Shared-space asset is removed from the space between load and action       | Negative actions are benign and do not affect global identity state; confirm must not assign an inaccessible face.                                                                                                                    |
+| Multiple people or space people have pending suggestions for the same face | Reject/ignore resolves only the target row. Confirm still resolves sibling pending rows because it assigns the face.                                                                                                                  |
+| Old client calls `dismiss`                                                 | Endpoint records `rejected` and remains idempotent.                                                                                                                                                                                   |
+| New client calls `reject` or `ignore`; old server is not upgraded          | This is not supported after SDK regeneration; deployment must upgrade server and web together as usual for branch-local API additions.                                                                                                |
 
 ## Testing
 

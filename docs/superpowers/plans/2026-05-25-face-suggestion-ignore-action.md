@@ -94,7 +94,10 @@ it('defines the face suggestion intent status check constraint', async () => {
 Add this import near the top of the file:
 
 ```ts
-import { up as upIntentStatuses, down as downIntentStatuses } from 'src/schema/migrations-gallery/1779100000000-AddFaceSuggestionIntentStatuses';
+import {
+  up as upIntentStatuses,
+  down as downIntentStatuses,
+} from 'src/schema/migrations-gallery/1779100000000-AddFaceSuggestionIntentStatuses';
 import { BaseService } from 'src/services/base.service';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { PersonFaceSuggestionRepository } from 'src/repositories/person-face-suggestion.repository';
@@ -1388,9 +1391,9 @@ Expected: fail because the modal still expects `dismiss` and does not render `su
 In `web/src/lib/modals/PersonSuggestionReviewModal.svelte`, change the props interface to:
 
 ```ts
-    confirm: (assetFaceId: string) => Promise<void>;
-    reject: (assetFaceId: string) => Promise<void>;
-    ignore: (assetFaceId: string) => Promise<void>;
+confirm: (assetFaceId: string) => Promise<void>;
+reject: (assetFaceId: string) => Promise<void>;
+ignore: (assetFaceId: string) => Promise<void>;
 ```
 
 Change the props destructuring to include `reject` and `ignore`.
@@ -1398,28 +1401,28 @@ Change the props destructuring to include `reject` and `ignore`.
 Change `act` to:
 
 ```ts
-  async function act(kind: 'confirm' | 'reject' | 'ignore') {
-    if (busy || !current) {
-      return;
-    }
-    busy = true;
-    const face = current.assetFaceId;
-    try {
-      if (kind === 'confirm') {
-        await confirm(face);
-        confirmed++;
-      } else if (kind === 'reject') {
-        await reject(face);
-      } else {
-        await ignore(face);
-      }
-    } catch {
-      // stale/deleted suggestions are benign; advance to keep review flow moving
-    } finally {
-      busy = false;
-    }
-    await advance();
+async function act(kind: 'confirm' | 'reject' | 'ignore') {
+  if (busy || !current) {
+    return;
   }
+  busy = true;
+  const face = current.assetFaceId;
+  try {
+    if (kind === 'confirm') {
+      await confirm(face);
+      confirmed++;
+    } else if (kind === 'reject') {
+      await reject(face);
+    } else {
+      await ignore(face);
+    }
+  } catch {
+    // stale/deleted suggestions are benign; advance to keep review flow moving
+  } finally {
+    busy = false;
+  }
+  await advance();
+}
 ```
 
 Change keyboard handling from `act('dismiss')` to `act('reject')`.
@@ -1427,13 +1430,13 @@ Change keyboard handling from `act('dismiss')` to `act('reject')`.
 Import `mdiEyeOffOutline`:
 
 ```ts
-  import {
-    mdiAccountCheckOutline,
-    mdiAccountRemoveOutline,
-    mdiChevronLeft,
-    mdiChevronRight,
-    mdiEyeOffOutline,
-  } from '@mdi/js';
+import {
+  mdiAccountCheckOutline,
+  mdiAccountRemoveOutline,
+  mdiChevronLeft,
+  mdiChevronRight,
+  mdiEyeOffOutline,
+} from '@mdi/js';
 ```
 
 Change the footer action buttons to this structure:
