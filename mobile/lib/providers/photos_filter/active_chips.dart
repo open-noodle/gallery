@@ -3,7 +3,7 @@
 //
 // Order (design §5.5):
 //   people → tags → location → date → rating → media → favourite → archive
-//   → not-in-album → text.
+//   → not-in-album → untagged → text.
 
 import 'package:flutter/material.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
@@ -196,6 +196,16 @@ List<ActiveChipSpec> activeChipsFromFilter(SearchFilter filter, {FilterSuggestio
         label: 'filter_sheet_not_in_album',
         visual: ChipVisual.toggle,
         icon: Icons.folder_off_rounded,
+      ),
+    );
+  }
+  if (filter.display.isUntagged) {
+    out.add(
+      const ActiveChipSpec(
+        id: UntaggedChipId(),
+        label: 'untagged',
+        visual: ChipVisual.toggle,
+        icon: Icons.label_off_rounded,
       ),
     );
   }

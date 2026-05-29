@@ -166,10 +166,11 @@ void main() {
       expect(chip.label, endsWith('…"'));
     });
 
-    test('favourites / archived / notInAlbum emit toggle chips', () {
-      final f = _base()..display = SearchDisplayFilters(isFavorite: true, isArchive: true, isNotInAlbum: true);
+    test('favourites / archived / notInAlbum / untagged emit toggle chips', () {
+      final f = _base()
+        ..display = SearchDisplayFilters(isFavorite: true, isArchive: true, isNotInAlbum: true, isUntagged: true);
       final ids = activeChipsFromFilter(f).map((c) => c.id.runtimeType).toSet();
-      expect(ids, containsAll([FavouriteChipId, ArchiveChipId, NotInAlbumChipId]));
+      expect(ids, containsAll([FavouriteChipId, ArchiveChipId, NotInAlbumChipId, UntaggedChipId]));
     });
 
     test('combined filter preserves documented order', () {
@@ -180,7 +181,7 @@ void main() {
         ..date = SearchDateFilter(takenAfter: DateTime(2024, 4, 1))
         ..rating = SearchRatingFilter(rating: 4)
         ..mediaType = AssetType.image
-        ..display = SearchDisplayFilters(isFavorite: true, isArchive: true, isNotInAlbum: true)
+        ..display = SearchDisplayFilters(isFavorite: true, isArchive: true, isNotInAlbum: true, isUntagged: true)
         ..context = 'paris';
       final chips = activeChipsFromFilter(f);
       final visuals = chips.map((c) => c.visual).toList();
@@ -194,6 +195,7 @@ void main() {
         ChipVisual.toggle, // favourite
         ChipVisual.toggle, // archive
         ChipVisual.toggle, // not in album
+        ChipVisual.toggle, // untagged
         ChipVisual.text,
       ]);
     });
