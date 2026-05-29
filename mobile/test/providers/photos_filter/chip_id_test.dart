@@ -20,6 +20,7 @@ void main() {
       expect(const FavouriteChipId(), const FavouriteChipId());
       expect(const ArchiveChipId(), const ArchiveChipId());
       expect(const NotInAlbumChipId(), const NotInAlbumChipId());
+      expect(const UntaggedChipId(), const UntaggedChipId());
       expect(const TextChipId(), const TextChipId());
     });
     test('Different value-less chip ids are NOT equal', () {
