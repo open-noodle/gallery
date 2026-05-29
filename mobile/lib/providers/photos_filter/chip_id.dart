@@ -77,6 +77,14 @@ class NotInAlbumChipId extends ChipId {
   int get hashCode => (NotInAlbumChipId).hashCode;
 }
 
+class UntaggedChipId extends ChipId {
+  const UntaggedChipId();
+  @override
+  bool operator ==(Object other) => other is UntaggedChipId;
+  @override
+  int get hashCode => (UntaggedChipId).hashCode;
+}
+
 class TextChipId extends ChipId {
   const TextChipId();
   @override
