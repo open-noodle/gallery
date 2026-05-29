@@ -18,21 +18,26 @@ void main() {
   });
 
   group('paginatedSearchProvider', () {
-    test('remote content changes rerun the active search from page 1', () async {
+    test('remote content changes do not rerun the active search', () async {
       final search = _MockSearch();
       final filter = SearchFilter.empty()..context = 'paris';
-      when(() => search.search(any(), any())).thenAnswer((_) async => const SearchResult(assets: []));
+      when(
+        () => search.search(any(), any()),
+      ).thenAnswer((_) async => const SearchResult(assets: []));
 
-      final container = ProviderContainer(overrides: [searchServiceProvider.overrideWithValue(search)]);
+      final container = ProviderContainer(
+        overrides: [searchServiceProvider.overrideWithValue(search)],
+      );
       addTearDown(container.dispose);
 
       await container.read(paginatedSearchProvider.notifier).search(filter);
       verify(() => search.search(filter, 1)).called(1);
+      clearInteractions(search);
 
       container.read(syncStatusProvider.notifier).markRemoteContentChanged();
       await Future<void>.delayed(const Duration(milliseconds: 5));
 
-      verify(() => search.search(filter, 1)).called(1);
+      verifyNever(() => search.search(filter, 1));
     });
   });
 }

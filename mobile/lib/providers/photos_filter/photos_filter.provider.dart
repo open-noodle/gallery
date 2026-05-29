@@ -33,7 +33,8 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
     } else {
       current.add(tagId);
     }
-    state = state.copyWith()..tagIds = current.isEmpty ? null : current;
+    state = state.copyWith(display: state.display.copyWith(isUntagged: false))
+      ..tagIds = current.isEmpty ? null : current;
   }
 
   void setLocation(SearchLocationFilter? location) =>
@@ -52,6 +53,11 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
   void setArchivedIncluded(bool v) => state = state.copyWith(display: state.display.copyWith(isArchive: v));
 
   void setNotInAlbum(bool v) => state = state.copyWith(display: state.display.copyWith(isNotInAlbum: v));
+
+  void setUntagged(bool v) {
+    final previousTagIds = state.tagIds;
+    state = state.copyWith(display: state.display.copyWith(isUntagged: v))..tagIds = v ? null : previousTagIds;
+  }
 
   void clearPeople() => state = state.copyWith(people: const {});
 
@@ -101,6 +107,8 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
         setArchivedIncluded(false);
       case NotInAlbumChipId():
         setNotInAlbum(false);
+      case UntaggedChipId():
+        setUntagged(false);
       case TextChipId():
         setText('');
     }
