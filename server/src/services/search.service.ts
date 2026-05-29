@@ -44,6 +44,8 @@ import { applyLockedVisibilityPolicy, collectFilterIds } from 'src/utils/search-
 // of env reads).
 const searchTimingEnabled = process.env.GALLERY_SEARCH_TIMING === 'true';
 
+const unique = <T>(items: T[]) => [...new Set(items)];
+
 type ResolvedSmartSearch = {
   options: Omit<SmartSearchDto, 'page' | 'size' | 'order' | 'visibility'> & {
     embedding: string;
@@ -703,9 +705,9 @@ export class SearchService extends BaseService {
 
     return {
       ...dto,
-      personIds: resolution.legacyPersonIds,
-      identityIds: resolution.identityIds,
-      spacePersonIds: [...new Set([...(dto.spacePersonIds ?? []), ...resolution.legacySpacePersonIds])],
+      personIds: unique(resolution.legacyPersonIds),
+      identityIds: unique(resolution.identityIds),
+      spacePersonIds: unique([...(dto.spacePersonIds ?? []), ...resolution.legacySpacePersonIds]),
       forceEmptyResult: dto.forceEmptyResult || resolution.hasInaccessibleToken,
     };
   }
