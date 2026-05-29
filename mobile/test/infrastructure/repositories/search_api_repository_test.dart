@@ -1,0 +1,71 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/infrastructure/repositories/search_api.repository.dart';
+import 'package:immich_mobile/models/search/search_filter.model.dart';
+import 'package:immich_mobile/services/api.service.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:openapi/api.dart';
+
+class _MockApiService extends Mock implements ApiService {}
+
+class _MockSearchApi extends Mock implements SearchApi {}
+
+void main() {
+  late _MockApiService apiService;
+  late _MockSearchApi searchApi;
+  late SearchApiRepository sut;
+
+  setUpAll(() {
+    registerFallbackValue(MetadataSearchDto());
+    registerFallbackValue(SmartSearchDto());
+  });
+
+  setUp(() {
+    apiService = _MockApiService();
+    searchApi = _MockSearchApi();
+    when(() => apiService.searchApi).thenReturn(searchApi);
+    sut = SearchApiRepository(apiService);
+  });
+
+  group('search', () {
+    test('empty metadata search serializes tagIds as an empty list, not untagged null', () async {
+      when(() => searchApi.searchAssets(any())).thenAnswer((_) async => null);
+
+      await sut.search(SearchFilter.empty(), 1);
+
+      final dto = verify(() => searchApi.searchAssets(captureAny())).captured.single as MetadataSearchDto;
+      final json = dto.toJson();
+      expect(dto.tagIds, isEmpty);
+      expect(json, contains('tagIds'));
+      expect(json['tagIds'], isEmpty);
+    });
+
+    test('untagged metadata search serializes explicit tagIds null', () async {
+      when(() => searchApi.searchAssets(any())).thenAnswer((_) async => null);
+      final filter = SearchFilter.empty().copyWith(display: SearchFilter.empty().display.copyWith(isUntagged: true));
+
+      await sut.search(filter, 1);
+
+      final dto = verify(() => searchApi.searchAssets(captureAny())).captured.single as MetadataSearchDto;
+      final json = dto.toJson();
+      expect(dto.tagIds, isNull);
+      expect(json, contains('tagIds'));
+      expect(json['tagIds'], isNull);
+    });
+
+    test('untagged smart search serializes explicit tagIds null', () async {
+      when(() => searchApi.searchSmart(any())).thenAnswer((_) async => null);
+      final filter = SearchFilter.empty().copyWith(
+        context: 'beach',
+        display: SearchFilter.empty().display.copyWith(isUntagged: true),
+      );
+
+      await sut.search(filter, 1);
+
+      final dto = verify(() => searchApi.searchSmart(captureAny())).captured.single as SmartSearchDto;
+      final json = dto.toJson();
+      expect(dto.tagIds, isNull);
+      expect(json, contains('tagIds'));
+      expect(json['tagIds'], isNull);
+    });
+  });
+}
