@@ -86,6 +86,8 @@ export const asUuid = (id: string | Expression<string>) => sql<string>`${id}::uu
 
 export const anyUuid = (ids: string[]) => sql<string>`any(${`{${ids}}`}::uuid[])`;
 
+const uniqueTruthyIds = (ids: string[] = []) => [...new Set(ids.filter(Boolean))];
+
 export const unnest = (array: string[]) => sql<Record<string, string>>`unnest(array[${sql.join(array)}]::text[])`;
 
 export const removeUndefinedKeys = <T extends object>(update: T, template: unknown) => {
@@ -283,16 +285,21 @@ export function withFacesAndPeople({ viewingUserId, withHidden, withDeletedFace 
 }
 
 export function hasPeople<O>(qb: SelectQueryBuilder<DB, 'asset', O>, personGroupIds: string[]) {
+  const ids = uniqueTruthyIds(personGroupIds);
+  if (ids.length === 0) {
+    return qb;
+  }
+
   return qb.innerJoin(
     (eb) =>
       eb
         .selectFrom('asset_face')
         .select('assetId')
-        .where('personGroupId', '=', anyUuid(personGroupIds!))
+        .where('personGroupId', '=', anyUuid(ids))
         .where('deletedAt', 'is', null)
         .where('isVisible', 'is', true)
         .groupBy('assetId')
-        .having((eb) => eb.fn.count('personGroupId').distinct(), '=', personGroupIds.length)
+        .having((eb) => eb.fn.count('personGroupId').distinct(), '=', ids.length)
         .as('has_people'),
     (join) => join.onRef('has_people.assetId', '=', 'asset.id'),
   );
@@ -314,12 +321,17 @@ export function inSharedAlbum(eb: ExpressionBuilder<DB, 'asset'>, userId: string
 }
 
 export function hasAnyPerson<O>(qb: SelectQueryBuilder<DB, 'asset', O>, personIds: string[]) {
+  const ids = uniqueTruthyIds(personIds);
+  if (ids.length === 0) {
+    return qb;
+  }
+
   return qb.innerJoin(
     (eb) =>
       eb
         .selectFrom('asset_face')
         .select('assetId')
-        .where('personGroupId', '=', anyUuid(personIds))
+        .where('personGroupId', '=', anyUuid(ids))
         .where('deletedAt', 'is', null)
         .where('isVisible', 'is', true)
         .groupBy('assetId')
@@ -329,30 +341,40 @@ export function hasAnyPerson<O>(qb: SelectQueryBuilder<DB, 'asset', O>, personId
 }
 
 export function hasFaceIdentities<O>(qb: SelectQueryBuilder<DB, 'asset', O>, identityIds: string[]) {
+  const ids = uniqueTruthyIds(identityIds);
+  if (ids.length === 0) {
+    return qb;
+  }
+
   return qb.innerJoin(
     (eb) =>
       eb
         .selectFrom('asset_face')
         .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
         .select('asset_face.assetId')
-        .where('face_identity_face.identityId', '=', anyUuid(identityIds))
+        .where('face_identity_face.identityId', '=', anyUuid(ids))
         .where('asset_face.deletedAt', 'is', null)
         .where('asset_face.isVisible', 'is', true)
         .groupBy('asset_face.assetId')
-        .having((eb) => eb.fn.count('face_identity_face.identityId').distinct(), '=', identityIds.length)
+        .having((eb) => eb.fn.count('face_identity_face.identityId').distinct(), '=', ids.length)
         .as('has_face_identities'),
     (join) => join.onRef('has_face_identities.assetId', '=', 'asset.id'),
   );
 }
 
 export function hasAnyFaceIdentity<O>(qb: SelectQueryBuilder<DB, 'asset', O>, identityIds: string[]) {
+  const ids = uniqueTruthyIds(identityIds);
+  if (ids.length === 0) {
+    return qb;
+  }
+
   return qb.innerJoin(
     (eb) =>
       eb
         .selectFrom('asset_face')
         .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
         .select('asset_face.assetId')
-        .where('face_identity_face.identityId', '=', anyUuid(identityIds))
+        .where('face_identity_face.identityId', '=', anyUuid(ids))
         .where('asset_face.deletedAt', 'is', null)
         .where('asset_face.isVisible', 'is', true)
         .groupBy('asset_face.assetId')
@@ -376,6 +398,11 @@ export function hasSpacePerson<O>(qb: SelectQueryBuilder<DB, 'asset', O>, spaceP
 }
 
 export function hasAnySpacePerson<O>(qb: SelectQueryBuilder<DB, 'asset', O>, spacePersonIds: string[]) {
+  const ids = uniqueTruthyIds(spacePersonIds);
+  if (ids.length === 0) {
+    return qb;
+  }
+
   return qb.where((eb) =>
     eb.exists(
       eb
@@ -384,9 +411,98 @@ export function hasAnySpacePerson<O>(qb: SelectQueryBuilder<DB, 'asset', O>, spa
         .whereRef('asset_face.assetId', '=', 'asset.id')
         .where('asset_face.deletedAt', 'is', null)
         .where('asset_face.isVisible', 'is', true)
-        .where('shared_space_person_face.personId', '=', anyUuid(spacePersonIds)),
+        .where('shared_space_person_face.personId', '=', anyUuid(ids)),
     ),
   );
+}
+
+export function hasSpacePeople<O>(qb: SelectQueryBuilder<DB, 'asset', O>, spacePersonIds: string[]) {
+  const ids = uniqueTruthyIds(spacePersonIds);
+  if (ids.length === 0) {
+    return qb;
+  }
+
+  return qb.where((eb) =>
+    eb.and(
+      ids.map((spacePersonId) =>
+        eb.exists(
+          eb
+            .selectFrom('shared_space_person_face')
+            .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+            .whereRef('asset_face.assetId', '=', 'asset.id')
+            .where('asset_face.deletedAt', 'is', null)
+            .where('asset_face.isVisible', 'is', true)
+            .where('shared_space_person_face.personId', '=', asUuid(spacePersonId)),
+        ),
+      ),
+    ),
+  );
+}
+
+type PeopleFilterIds = { personIds?: string[]; identityIds?: string[]; spacePersonIds?: string[] };
+
+export function hasAllPeople<O>(qb: SelectQueryBuilder<DB, 'asset', O>, filters: PeopleFilterIds) {
+  return hasSpacePeople(
+    hasFaceIdentities(hasPeople(qb, filters.personIds ?? []), filters.identityIds ?? []),
+    filters.spacePersonIds ?? [],
+  );
+}
+
+export function hasAnyPeople<O>(qb: SelectQueryBuilder<DB, 'asset', O>, filters: PeopleFilterIds) {
+  const personIds = uniqueTruthyIds(filters.personIds);
+  const identityIds = uniqueTruthyIds(filters.identityIds);
+  const spacePersonIds = uniqueTruthyIds(filters.spacePersonIds);
+
+  if (personIds.length === 0 && identityIds.length === 0 && spacePersonIds.length === 0) {
+    return qb;
+  }
+
+  return qb.where((eb) => {
+    const predicates: Expression<SqlBool>[] = [];
+
+    if (personIds.length > 0) {
+      predicates.push(
+        eb.exists(
+          eb
+            .selectFrom('asset_face')
+            .whereRef('asset_face.assetId', '=', 'asset.id')
+            .where('asset_face.deletedAt', 'is', null)
+            .where('asset_face.isVisible', 'is', true)
+            .where('asset_face.personId', '=', anyUuid(personIds)),
+        ),
+      );
+    }
+
+    if (identityIds.length > 0) {
+      predicates.push(
+        eb.exists(
+          eb
+            .selectFrom('asset_face')
+            .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
+            .whereRef('asset_face.assetId', '=', 'asset.id')
+            .where('asset_face.deletedAt', 'is', null)
+            .where('asset_face.isVisible', 'is', true)
+            .where('face_identity_face.identityId', '=', anyUuid(identityIds)),
+        ),
+      );
+    }
+
+    if (spacePersonIds.length > 0) {
+      predicates.push(
+        eb.exists(
+          eb
+            .selectFrom('shared_space_person_face')
+            .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+            .whereRef('asset_face.assetId', '=', 'asset.id')
+            .where('asset_face.deletedAt', 'is', null)
+            .where('asset_face.isVisible', 'is', true)
+            .where('shared_space_person_face.personId', '=', anyUuid(spacePersonIds)),
+        ),
+      );
+    }
+
+    return eb.or(predicates);
+  });
 }
 
 export function inAlbums<O>(qb: SelectQueryBuilder<DB, 'asset', O>, albumIds: string[]) {
@@ -574,17 +690,15 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
         ]),
       ),
     )
-    .$if(!!options.spacePersonIds?.length, (qb) => hasAnySpacePerson(qb, options.spacePersonIds!))
+    .$if(!!(options.personIds?.length || options.identityIds?.length || options.spacePersonIds?.length), (qb) =>
+      options.personMatchAny ? hasAnyPeople(qb, options) : hasAllPeople(qb, options),
+    )
     .$if(!!options.tagIds && options.tagIds.length > 0, (qb) =>
       options.tagMatchAny ? withAnyTagId(qb, options.tagIds!) : hasTags(qb, options.tagIds!),
     )
     .$if(options.tagIds === null, (qb) =>
       qb.where((eb) => eb.not(eb.exists((eb) => eb.selectFrom('tag_asset').whereRef('assetId', '=', 'asset.id')))),
     )
-    .$if(!!options.personIds && options.personIds.length > 0, (qb) =>
-      options.personMatchAny ? hasAnyPerson(qb, options.personIds!) : hasPeople(qb, options.personIds!),
-    )
-    .$if(!!options.identityIds && options.identityIds.length > 0, (qb) => hasFaceIdentities(qb, options.identityIds!))
     .$if(!!options.createdBefore, (qb) => qb.where('asset.createdAt', '<=', options.createdBefore!))
     .$if(!!options.createdAfter, (qb) => qb.where('asset.createdAt', '>=', options.createdAfter!))
     .$if(!!options.updatedBefore, (qb) => qb.where('asset.updatedAt', '<=', options.updatedBefore!))

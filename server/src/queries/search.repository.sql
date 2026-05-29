@@ -282,7 +282,7 @@ from
           "asset_face"."assetId" = "asset"."id"
           and "asset_face"."deletedAt" is null
           and "asset_face"."isVisible" is true
-          and "shared_space_person_face"."personId" = any ($5::uuid[])
+          and "shared_space_person_face"."personId" = $5::uuid
       )
       and "asset"."fileCreatedAt" >= $6
       and "asset_exif"."lensModel" = $7
