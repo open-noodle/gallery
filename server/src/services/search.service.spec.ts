@@ -1516,6 +1516,29 @@ describe(SearchService.name, () => {
         expect.objectContaining({ albumIds: [albumId], timelineSpaceIds: [spaceId] }),
       );
     });
+
+    it('deduplicates resolved scoped person filters before repository search', async () => {
+      const token = `person:${newUuid()}`;
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+      mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
+      (mocks.faceIdentity as any).resolveScopedPersonTokens.mockResolvedValue({
+        identityIds: ['00000000-0000-4000-8000-000000000010', '00000000-0000-4000-8000-000000000010'],
+        legacyPersonIds: ['00000000-0000-4000-8000-000000000020', '00000000-0000-4000-8000-000000000020'],
+        legacySpacePersonIds: ['00000000-0000-4000-8000-000000000030', '00000000-0000-4000-8000-000000000030'],
+        hasInaccessibleToken: false,
+      });
+
+      await sut.searchMetadata(authStub.user1, { withSharedSpaces: true, personIds: [token, token] });
+
+      expect(mocks.search.searchMetadata).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          identityIds: ['00000000-0000-4000-8000-000000000010'],
+          personIds: ['00000000-0000-4000-8000-000000000020'],
+          spacePersonIds: ['00000000-0000-4000-8000-000000000030'],
+        }),
+      );
+    });
   });
 
   describe('searchStatistics', () => {
