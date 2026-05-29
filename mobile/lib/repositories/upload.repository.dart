@@ -3,23 +3,48 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:background_downloader/background_downloader.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:http/http.dart';
 import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/infrastructure/repositories/network.repository.dart';
 import 'package:immich_mobile/utils/debug_print.dart';
 import 'package:logging/logging.dart';
 
 final uploadRepositoryProvider = Provider((ref) => UploadRepository());
 
+typedef BackgroundDownloaderMethodInvoker = Future<void> Function(String method, Object? arguments);
+typedef BackgroundDownloaderConfigurator = Future<void> Function(List<(String, dynamic)> globalConfig);
+
 class UploadRepository {
   final Logger logger = Logger('UploadRepository');
+  static const _backgroundDownloaderChannel = MethodChannel('com.bbflight.background_downloader');
+  final BackgroundDownloaderMethodInvoker _backgroundDownloaderMethodInvoker;
+  final BackgroundDownloaderConfigurator _backgroundDownloaderConfigurator;
   void Function(TaskStatusUpdate)? onUploadStatus;
   void Function(TaskProgressUpdate)? onTaskProgress;
 
-  UploadRepository() {
+  UploadRepository()
+    : _backgroundDownloaderMethodInvoker = ((method, arguments) =>
+          _backgroundDownloaderChannel.invokeMethod<void>(method, arguments)),
+      _backgroundDownloaderConfigurator = ((globalConfig) => FileDownloader().configure(globalConfig: globalConfig)) {
+    _registerCallbacks();
+  }
+
+  @visibleForTesting
+  UploadRepository.forTesting({
+    required BackgroundDownloaderMethodInvoker backgroundDownloaderMethodInvoker,
+    BackgroundDownloaderConfigurator? backgroundDownloaderConfigurator,
+  }) : _backgroundDownloaderMethodInvoker = backgroundDownloaderMethodInvoker,
+       _backgroundDownloaderConfigurator =
+           backgroundDownloaderConfigurator ??
+           ((globalConfig) => FileDownloader().configure(globalConfig: globalConfig));
+
+  void _registerCallbacks() {
     FileDownloader().registerCallbacks(
       group: kBackupGroup,
       taskStatusCallback: (update) => onUploadStatus?.call(update),
@@ -43,6 +68,49 @@ class UploadRepository {
 
   Future<List<bool>> enqueueBackgroundAll(List<UploadTask> tasks) {
     return FileDownloader().enqueueAll(tasks);
+  }
+
+  Future<void> disableHoldingQueue() {
+    return _backgroundDownloaderConfigurator([(Config.holdingQueue, Config.never)]);
+  }
+
+  Future<void> restoreDefaultHoldingQueue() {
+    return _backgroundDownloaderConfigurator([(Config.holdingQueue, (6, 6, 3))]);
+  }
+
+  Future<void> updateNotification(Task task, TaskStatus? status) {
+    // background_downloader's iOS enqueueAll holding-queue path can report a
+    // successful enqueue without registering the group notification. Post the
+    // existing backup group notification immediately so the background task is
+    // visible before URLSession starts sending data.
+    final notificationConfig = TaskNotificationConfig(
+      taskOrGroup: task.group,
+      running: TaskNotification('uploading_media'.t(), 'backup_background_service_in_progress_notification'.t()),
+      complete: TaskNotification('upload_finished'.t(), 'backup_background_service_complete_notification'.t()),
+      error: TaskNotification(
+        'backup_background_service_error_title'.t(),
+        'backup_background_service_backup_failed_message'.t(),
+      ),
+      groupNotificationId: kBackupGroup,
+    );
+
+    // The iOS plugin handler performs the native update but does not reply on
+    // the method channel in background_downloader 9.5.x, so do not await the
+    // platform response from the background enqueue path.
+    try {
+      unawaited(
+        _backgroundDownloaderMethodInvoker('updateNotification', [
+          jsonEncode(task.toJson()),
+          jsonEncode(notificationConfig.toJson()),
+          status?.index,
+        ]).catchError((Object error, StackTrace stackTrace) {
+          logger.warning('Failed to update upload notification', error, stackTrace);
+        }),
+      );
+    } catch (error, stackTrace) {
+      logger.warning('Failed to update upload notification', error, stackTrace);
+    }
+    return Future.value();
   }
 
   Future<void> deleteDatabaseRecords(String group) {

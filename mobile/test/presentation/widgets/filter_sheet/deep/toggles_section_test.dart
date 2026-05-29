@@ -8,13 +8,14 @@ import '../../../../widget_tester_extensions.dart';
 
 void main() {
   group('TogglesSection', () {
-    testWidgets('3 switches rendered: favourites / archived / not-in-album', (tester) async {
+    testWidgets('4 switches rendered: favourites / archived / not-in-album / untagged', (tester) async {
       await tester.pumpConsumerWidget(const Material(child: TogglesSection()));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('toggle-favourites')), findsOneWidget);
       expect(find.byKey(const Key('toggle-archived')), findsOneWidget);
       expect(find.byKey(const Key('toggle-not-in-album')), findsOneWidget);
+      expect(find.byKey(const Key('toggle-untagged')), findsOneWidget);
     });
 
     testWidgets('favourites toggle flips independently', (tester) async {
@@ -50,6 +51,19 @@ void main() {
       expect(container.read(photosFilterProvider).display.isNotInAlbum, isTrue);
     });
 
+    testWidgets('untagged toggle flips independently', (tester) async {
+      await tester.pumpConsumerWidget(const Material(child: TogglesSection()));
+      final container = ProviderScope.containerOf(tester.element(find.byType(TogglesSection)));
+
+      await tester.tap(find.byKey(const Key('toggle-untagged')));
+      await tester.pumpAndSettle();
+
+      expect(container.read(photosFilterProvider).display.isUntagged, isTrue);
+      expect(container.read(photosFilterProvider).display.isFavorite, isFalse);
+      expect(container.read(photosFilterProvider).display.isArchive, isFalse);
+      expect(container.read(photosFilterProvider).display.isNotInAlbum, isFalse);
+    });
+
     testWidgets('initial switch state reflects provider', (tester) async {
       await tester.pumpConsumerWidget(const Material(child: TogglesSection()));
       final container = ProviderScope.containerOf(tester.element(find.byType(TogglesSection)));
@@ -66,6 +80,7 @@ void main() {
       expectTapTargetMin(tester, find.byKey(const Key('toggle-favourites')));
       expectTapTargetMin(tester, find.byKey(const Key('toggle-archived')));
       expectTapTargetMin(tester, find.byKey(const Key('toggle-not-in-album')));
+      expectTapTargetMin(tester, find.byKey(const Key('toggle-untagged')));
     });
 
     testWidgets('renders correctly in dark theme', (tester) async {
@@ -74,6 +89,7 @@ void main() {
       expect(find.byKey(const Key('toggle-favourites')), findsOneWidget);
       expect(find.byKey(const Key('toggle-archived')), findsOneWidget);
       expect(find.byKey(const Key('toggle-not-in-album')), findsOneWidget);
+      expect(find.byKey(const Key('toggle-untagged')), findsOneWidget);
     });
   });
 }
