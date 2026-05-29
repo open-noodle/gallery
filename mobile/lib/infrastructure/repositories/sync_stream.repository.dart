@@ -205,8 +205,10 @@ class SyncStreamRepository extends DatabaseAccessor<Drift> with $SyncStreamRepos
 
   Future<void> updateAssetsV1(Iterable<SyncAssetV1> data, {String debugLabel = 'user'}) async {
     try {
+      final assets = data.toList();
+
       await _db.batch((batch) {
-        for (final asset in data) {
+        for (final asset in assets) {
           final companion = RemoteAssetEntityCompanion(
             name: Value(asset.originalFileName),
             type: Value(asset.type.toAssetType()),
@@ -237,6 +239,8 @@ class SyncStreamRepository extends DatabaseAccessor<Drift> with $SyncStreamRepos
           );
         }
       });
+
+      await _hideReferencedLivePhotoMotionAssets();
     } catch (error, stack) {
       _logger.severe('Error: updateAssetsV1 - $debugLabel', error, stack);
       rethrow;
@@ -281,6 +285,24 @@ class SyncStreamRepository extends DatabaseAccessor<Drift> with $SyncStreamRepos
       _logger.severe('Error: updateAssetsV2 - $debugLabel', error, stack);
       rethrow;
     }
+  }
+
+  Future<void> _hideReferencedLivePhotoMotionAssets() {
+    return _db.customUpdate(
+      '''
+      UPDATE remote_asset_entity
+      SET visibility = ?
+      WHERE id IN (
+        SELECT live_photo_video_id
+        FROM remote_asset_entity
+        WHERE live_photo_video_id IS NOT NULL
+      )
+      AND visibility != ?
+      ''',
+      variables: [Variable.withInt(AssetVisibility.hidden.index), Variable.withInt(AssetVisibility.hidden.index)],
+      updates: {_db.remoteAssetEntity},
+      updateKind: UpdateKind.update,
+    );
   }
 
   Future<void> updateAssetsExifV1(Iterable<SyncAssetExifV1> data, {String debugLabel = 'user'}) async {

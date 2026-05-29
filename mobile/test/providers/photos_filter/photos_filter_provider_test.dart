@@ -184,6 +184,34 @@ void main() {
     });
   });
 
+  group('setUntagged', () {
+    test('toggles untagged flag', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setUntagged(true);
+      expect(container.read(photosFilterProvider).display.isUntagged, true);
+      notifier.setUntagged(false);
+      expect(container.read(photosFilterProvider).display.isUntagged, false);
+    });
+
+    test('enabling untagged clears selected tag ids', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.toggleTag('tag-1');
+      notifier.setUntagged(true);
+      final f = container.read(photosFilterProvider);
+      expect(f.display.isUntagged, true);
+      expect(f.tagIds, anyOf(isNull, isEmpty));
+    });
+
+    test('selecting a tag clears untagged', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setUntagged(true);
+      notifier.toggleTag('tag-1');
+      final f = container.read(photosFilterProvider);
+      expect(f.display.isUntagged, false);
+      expect(f.tagIds, ['tag-1']);
+    });
+  });
+
   group('clearPeople', () {
     test('empties the people set leaving other dimensions intact', () {
       final notifier = container.read(photosFilterProvider.notifier);
@@ -270,11 +298,13 @@ void main() {
       notifier.setFavouritesOnly(true);
       notifier.setArchivedIncluded(true);
       notifier.setNotInAlbum(true);
+      notifier.setUntagged(true);
       notifier.clearDimension(Dimension.display);
       final d = container.read(photosFilterProvider).display;
       expect(d.isFavorite, false);
       expect(d.isArchive, false);
       expect(d.isNotInAlbum, false);
+      expect(d.isUntagged, false);
     });
     test('clears text dimension', () {
       final notifier = container.read(photosFilterProvider.notifier);
@@ -358,6 +388,12 @@ void main() {
       notifier.setNotInAlbum(true);
       notifier.removeChip(const NotInAlbumChipId());
       expect(container.read(photosFilterProvider).display.isNotInAlbum, false);
+    });
+    test('UntaggedChipId clears untagged', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setUntagged(true);
+      notifier.removeChip(const UntaggedChipId());
+      expect(container.read(photosFilterProvider).display.isUntagged, false);
     });
     test('TextChipId clears text', () {
       final notifier = container.read(photosFilterProvider.notifier);

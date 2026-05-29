@@ -1,6 +1,9 @@
 import 'dart:async';
 
+import 'package:background_downloader/background_downloader.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/providers/backup/backup.provider.dart';
 import 'package:immich_mobile/services/background_upload.service.dart';
 import 'package:immich_mobile/services/foreground_upload.service.dart';
@@ -14,96 +17,75 @@ class MockBackgroundUploadService extends Mock implements BackgroundUploadServic
 void main() {
   late MockForegroundUploadService foregroundUploadService;
   late MockBackgroundUploadService backgroundUploadService;
-  late BackupNotifier notifier;
+  late StreamController<TaskStatusUpdate> statusController;
+  late StreamController<TaskProgressUpdate> progressController;
+  late BackupNotifier sut;
 
   setUpAll(() {
     registerFallbackValue(Completer<void>());
-    registerFallbackValue(const UploadCallbacks());
   });
 
   setUp(() {
     foregroundUploadService = MockForegroundUploadService();
     backgroundUploadService = MockBackgroundUploadService();
-    notifier = BackupNotifier(foregroundUploadService, backgroundUploadService, UploadSpeedManager());
-    addTearDown(() {
-      if (notifier.mounted) {
-        notifier.dispose();
-      }
-    });
+    statusController = StreamController<TaskStatusUpdate>.broadcast();
+    progressController = StreamController<TaskProgressUpdate>.broadcast();
+
+    when(() => backgroundUploadService.taskStatusStream).thenAnswer((_) => statusController.stream);
+    when(() => backgroundUploadService.taskProgressStream).thenAnswer((_) => progressController.stream);
+
+    sut = BackupNotifier(foregroundUploadService, backgroundUploadService, UploadSpeedManager());
   });
 
-  void mockCounts({required int total, required int remainder, int processing = 0}) {
-    when(
-      () => foregroundUploadService.getBackupCounts('user-1'),
-    ).thenAnswer((_) async => (total: total, remainder: remainder, processing: processing));
-  }
+  tearDown(() async {
+    sut.dispose();
+    await statusController.close();
+    await progressController.close();
+  });
 
-  // Drives a backup run so we can grab the onSuccess callback the notifier wires up.
-  Future<void Function(String, String)> startAndCaptureOnSuccess() async {
-    void Function(String, String)? onSuccess;
-    when(() => foregroundUploadService.uploadCandidates(any(), any(), callbacks: any(named: 'callbacks'))).thenAnswer((
-      invocation,
-    ) async {
-      onSuccess = (invocation.namedArguments[#callbacks] as UploadCallbacks).onSuccess;
-    });
-    await notifier.startForegroundBackup('user-1');
-    return onSuccess!;
-  }
+  test('tracks iOS URLSession backup progress in upload state', () async {
+    final task = UploadTask(
+      taskId: 'asset-1',
+      url: 'http://test-server.com/assets',
+      filename: 'asset.jpg',
+      displayName: 'asset.jpg',
+      baseDirectory: BaseDirectory.temporary,
+      group: kBackupGroup,
+    );
 
-  group('foreground backup counts', () {
-    test('successes move one asset from remainder to backup', () async {
-      mockCounts(total: 25, remainder: 25);
-      final onSuccess = await startAndCaptureOnSuccess();
+    progressController.add(TaskProgressUpdate(task, 0.5, 1000, 0.25));
+    await pumpEventQueue();
 
-      for (var i = 0; i < 10; i++) {
-        onSuccess('asset-$i', 'remote-$i');
-      }
+    expect(
+      sut.state.uploadItems['asset-1'],
+      isA<UploadStatus>()
+          .having((status) => status.filename, 'filename', 'asset.jpg')
+          .having((status) => status.progress, 'progress', 0.5)
+          .having((status) => status.fileSize, 'fileSize', 1000),
+    );
+  });
 
-      expect(notifier.state.remainderCount, 15);
-      expect(notifier.state.backupCount, 10);
-      expect(notifier.state.backupCount + notifier.state.remainderCount, notifier.state.totalCount);
-    });
+  test('starts URLSession backup on iOS instead of foreground upload', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
 
-    test('a duplicate success after pause and resume cannot go below zero', () async {
-      // #26215: app pauses mid-backup, sync has not recorded the upload yet, so the
-      // resumed run re-uploads the same asset and the server answers 200 duplicate.
-      // The start of each run re-baselines the counters from the DB, so the duplicate
-      // success is counted against a baseline that includes the asset again.
-      mockCounts(total: 1, remainder: 1);
+    when(() => backgroundUploadService.getActiveTasks(kBackupGroup)).thenAnswer((_) async => []);
+    when(() => backgroundUploadService.uploadBackupCandidates('user-1')).thenAnswer((_) async {});
 
-      final firstRun = await startAndCaptureOnSuccess();
-      expect(notifier.state.remainderCount, 1);
-      firstRun('asset-1', 'remote-1');
-      expect(notifier.state.remainderCount, 0);
+    await sut.startBackup('user-1');
 
-      notifier.stopForegroundBackup(reason: "test");
+    verify(() => backgroundUploadService.uploadBackupCandidates('user-1')).called(1);
+    verifyNever(() => foregroundUploadService.uploadCandidates(any(), any()));
+  });
 
-      final resumedRun = await startAndCaptureOnSuccess();
-      expect(notifier.state.remainderCount, 1);
-      verify(() => foregroundUploadService.getBackupCounts('user-1')).called(2);
+  test('stops URLSession backup on iOS when backup is disabled', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
 
-      resumedRun('asset-1', 'remote-1');
-      expect(notifier.state.remainderCount, 0);
-      expect(notifier.state.backupCount, 1);
-    });
+    when(() => backgroundUploadService.cancel()).thenAnswer((_) async => 0);
 
-    test('a drifted counter state heals at run start', () async {
-      mockCounts(total: 91, remainder: 7);
-      notifier.state = notifier.state.copyWith(totalCount: 91, backupCount: 103, remainderCount: -12);
+    await sut.stopBackup(reason: 'backup disabled');
 
-      await startAndCaptureOnSuccess();
-
-      expect(notifier.state.totalCount, 91);
-      expect(notifier.state.remainderCount, 7);
-      expect(notifier.state.backupCount, 84);
-    });
-
-    test('a late success after dispose does not throw', () async {
-      mockCounts(total: 2, remainder: 2);
-      final onSuccess = await startAndCaptureOnSuccess();
-      notifier.dispose();
-
-      onSuccess('asset-1', 'remote-1');
-    });
+    verify(() => backgroundUploadService.cancel()).called(1);
   });
 }
