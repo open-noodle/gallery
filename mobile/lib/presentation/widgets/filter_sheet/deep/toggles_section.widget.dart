@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
-/// Three adaptive toggles: Favourites, Archived, Not-in-album.
+/// Adaptive toggles: Favourites, Archived, Not-in-album, Untagged.
 /// Each toggle flips independently and its initial state reflects the provider.
 class TogglesSection extends ConsumerWidget {
   const TogglesSection({super.key});
@@ -55,6 +55,16 @@ class TogglesSection extends ConsumerWidget {
             onChanged: (v) {
               HapticFeedback.selectionClick();
               notifier.setNotInAlbum(v);
+            },
+          ),
+          SwitchListTile.adaptive(
+            key: const Key('toggle-untagged'),
+            contentPadding: EdgeInsets.zero,
+            title: Text('untagged'.tr()),
+            value: display.isUntagged,
+            onChanged: (v) {
+              HapticFeedback.selectionClick();
+              notifier.setUntagged(v);
             },
           ),
         ],
