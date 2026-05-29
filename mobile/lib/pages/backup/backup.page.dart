@@ -100,7 +100,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         Logger("BackupPage").warning("Remote sync did not complete successfully, skipping backup");
         return;
       }
-      await backupNotifier.startForegroundBackup(currentUser.id);
+      await backupNotifier.startBackup(currentUser.id);
     }
 
     return Scaffold(
@@ -141,7 +141,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                     onStart: () async => await startBackup(),
                     onStop: () {
                       syncSuccess = null;
-                      backupNotifier.stopForegroundBackup(reason: "backup button toggled off");
+                      unawaited(backupNotifier.stopBackup(reason: "backup button toggled off"));
                     },
                   ),
                   switch (error) {

@@ -22,9 +22,17 @@ class BackgroundWorkerApiImpl: BackgroundWorkerFgHostApi {
     print("BackgroundWorkerApiImpl:disableUploadWorker Disabled background workers")
   }
   
-  private static let taskIDs = Bundle.main.object(forInfoDictionaryKey: "BGTaskSchedulerPermittedIdentifiers") as! [String]
-  private static let refreshTaskID = taskIDs.first { $0.hasSuffix(".refreshUpload") }!
-  private static let processingTaskID = taskIDs.first { $0.hasSuffix(".processingUpload") }!
+  // Same intent as upstream #30574 (derive the BGTaskScheduler ids from Info.plist rather than
+  // hard-coding them), but keep the fork's non-crashing form from #627: upstream force-unwraps
+  // both the plist lookup (`as!`) and the suffix match (`!`), which traps at launch if the key is
+  // missing or carries no matching id. The fork ships branded identifiers, so it must degrade to
+  // the literals instead of crashing.
+  private static let permittedTaskIDs =
+    Bundle.main.object(forInfoDictionaryKey: "BGTaskSchedulerPermittedIdentifiers") as? [String] ?? []
+  private static let refreshTaskID =
+    permittedTaskIDs.first { $0.hasSuffix(".refreshUpload") } ?? "app.alextran.immich.background.refreshUpload"
+  private static let processingTaskID =
+    permittedTaskIDs.first { $0.hasSuffix(".processingUpload") } ?? "app.alextran.immich.background.processingUpload"
   private static let taskSemaphore = DispatchSemaphore(value: 1)
 
   public static func registerBackgroundWorkers() {
