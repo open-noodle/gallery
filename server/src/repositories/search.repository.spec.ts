@@ -210,6 +210,15 @@ describe(SearchRepository.name, () => {
       expect(sql).toContain('"tag_asset"');
     });
 
+    it('space person filters emit one EXISTS per selected space person for smart facet totals', () => {
+      const sql = buildFacetFilteredIdsSql(sut, {
+        ...baseOptions,
+        spacePersonIds: ['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'],
+      });
+      expect(countMatches(sql, /exists\s*\(select\b[\s\S]+?from\s+"shared_space_person_face"/gi)).toBe(2);
+      expect(sql).not.toMatch(/"shared_space_person_face"\."personId"\s*=\s*any\(/i);
+    });
+
     it('candidate query omits the distance threshold when maxDistance is disabled', () => {
       const sql = buildFacetCandidateSql(sut, { ...baseOptions, maxDistance: 0 });
 
@@ -408,6 +417,23 @@ describe(SearchRepository.name, () => {
       expect(sql).toContain('"face_identity_face"."identityId"');
     });
 
+    it('global person suggestion filters require every selected person', () => {
+      const sql = compileFilteredAssetIds(sut, {
+        personIds: ['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'],
+      });
+      expect(sql).toContain('"has_people"');
+      expect(sql).toMatch(/having count\(distinct "personId"\) = \$\d+/i);
+    });
+
+    it('space person suggestion filters require every selected space person', () => {
+      const sql = compileFilteredAssetIds(sut, {
+        spaceId: '11111111-1111-1111-1111-111111111111',
+        personIds: ['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'],
+      });
+      expect(countMatches(sql, /exists\s*\(select\b[\s\S]+?from\s+"shared_space_person_face"/gi)).toBe(2);
+      expect(sql).not.toMatch(/"shared_space_person_face"\."personId"\s*=\s*any\(/i);
+    });
+
     it('forceEmptyResult compiles to an impossible predicate', () => {
       const sql = compileFilteredAssetIds(sut, { forceEmptyResult: true });
 
@@ -508,6 +534,57 @@ describe(SearchRepository.name, () => {
       expect(sql).toMatch(/rating"?\s+is\s+null/i);
       expect(sql).not.toMatch(/rating"?\s*>=\s*\$\d+/i);
       expect(sql).not.toMatch(/rating"?\s*=\s*\$\d+/i);
+    });
+  });
+
+  describe('searchAssetBuilder people semantics', () => {
+    it('uses AND semantics for space person filters by default', () => {
+      const sql = buildAssetSearchSql({
+        userIds: ['00000000-0000-0000-0000-000000000000'],
+        spacePersonIds: ['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'],
+      });
+      expect(countMatches(sql, /exists\s*\(select\b[\s\S]+?from\s+"shared_space_person_face"/gi)).toBe(2);
+      expect(sql).not.toMatch(/"shared_space_person_face"\."personId"\s*=\s*any\(/i);
+    });
+
+    it('keeps personMatchAny as OR for identity and space person filters', () => {
+      const sql = buildAssetSearchSql({
+        userIds: ['00000000-0000-0000-0000-000000000000'],
+        personMatchAny: true,
+        personIds: ['00000000-0000-0000-0000-000000000001'],
+        identityIds: ['00000000-0000-0000-0000-000000000002'],
+        spacePersonIds: ['00000000-0000-0000-0000-000000000003'],
+      });
+      expect(sql).toMatch(/\bor\b/i);
+      expect(sql).toContain('"face_identity_face"');
+      expect(sql).toContain('"shared_space_person_face"');
+      expect(sql).not.toContain('"has_face_identities"');
+      expect(sql).not.toContain('"has_people"');
+    });
+
+    it('does not apply people predicates for empty people arrays', () => {
+      const sql = buildAssetSearchSql({
+        userIds: ['00000000-0000-0000-0000-000000000000'],
+        personIds: [],
+        identityIds: [],
+        spacePersonIds: [],
+      });
+      expect(sql).not.toContain('"asset_face"');
+      expect(sql).not.toContain('"face_identity_face"');
+      expect(sql).not.toContain('"shared_space_person_face"');
+    });
+
+    it('keeps mixed people categories cumulative by default', () => {
+      const sql = buildAssetSearchSql({
+        userIds: ['00000000-0000-0000-0000-000000000000'],
+        personIds: ['00000000-0000-0000-0000-000000000001'],
+        identityIds: ['00000000-0000-0000-0000-000000000002'],
+        spacePersonIds: ['00000000-0000-0000-0000-000000000003'],
+      });
+      expect(sql).toContain('"has_people"');
+      expect(sql).toContain('"has_face_identities"');
+      expect(sql).toContain('"shared_space_person_face"');
+      expect(sql).not.toMatch(/\bor\b/i);
     });
   });
 });
