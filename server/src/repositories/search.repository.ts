@@ -12,8 +12,8 @@ import { AssetExifTable } from 'src/schema/tables/asset-exif.table';
 import {
   anyUuid,
   asUuid,
-  hasAnySpacePerson,
   hasPeople,
+  hasSpacePeople,
   hasTags,
   searchAssetBuilder,
   searchAssetBuilderLegacy,
@@ -706,7 +706,7 @@ export class SearchRepository {
         ),
       )
       .$if(exclude !== 'people' && !!options.spacePersonIds?.length, (qb) =>
-        hasAnySpacePerson(qb, options.spacePersonIds!),
+        hasSpacePeople(qb, options.spacePersonIds!),
       )
       .$if(exclude !== 'tags' && !!options.tagIds?.length, (qb) => hasTags(qb, options.tagIds!))
       .$if(exclude !== 'tags' && options.tagIds === null, (qb) =>
@@ -1410,29 +1410,8 @@ export class SearchRepository {
           .$if(!!options.model, (qb) => qb.where('asset_exif.model', '=', options.model!))
           .$if(!!options.rating, (qb) => qb.where('asset_exif.rating', '>=', options.rating!)),
       )
-      .$if(!!options.personIds?.length && !!options.spaceId, (qb) =>
-        qb.where((eb) =>
-          eb.exists(
-            eb
-              .selectFrom('shared_space_person_face')
-              .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
-              .whereRef('asset_face.assetId', '=', 'asset.id')
-              .where('asset_face.deletedAt', 'is', null)
-              .where('asset_face.isVisible', 'is', true)
-              .where('shared_space_person_face.personId', '=', anyUuid(options.personIds!)),
-          ),
-        ),
-      )
-      .$if(!!options.personIds?.length && !options.spaceId, (qb) =>
-        qb.where((eb) =>
-          eb.exists(
-            eb
-              .selectFrom('asset_face')
-              .whereRef('asset_face.assetId', '=', 'asset.id')
-              .where('asset_face.personId', '=', anyUuid(options.personIds!)),
-          ),
-        ),
-      )
+      .$if(!!options.personIds?.length && !!options.spaceId, (qb) => hasSpacePeople(qb, options.personIds!))
+      .$if(!!options.personIds?.length && !options.spaceId, (qb) => hasPeople(qb, options.personIds!))
       .$if(!!options.identityIds?.length, (qb) =>
         qb.where((eb) =>
           eb.and(
