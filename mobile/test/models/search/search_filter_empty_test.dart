@@ -13,5 +13,10 @@ void main() {
     test('two empty filters compare empty-equivalent', () {
       expect(SearchFilter.empty().isEmpty, SearchFilter.empty().isEmpty);
     });
+
+    test('untagged display filter is not empty', () {
+      final f = SearchFilter.empty().copyWith(display: SearchFilter.empty().display.copyWith(isUntagged: true));
+      expect(f.isEmpty, false);
+    });
   });
 }

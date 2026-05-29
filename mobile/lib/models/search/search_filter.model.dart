@@ -110,8 +110,12 @@ abstract class SearchRatingFilter with _$SearchRatingFilter {
 
 @freezed
 abstract class SearchDisplayFilters with _$SearchDisplayFilters {
-  const factory SearchDisplayFilters({required bool isNotInAlbum, required bool isArchive, required bool isFavorite}) =
-      _SearchDisplayFilters;
+  const factory SearchDisplayFilters({
+    required bool isNotInAlbum,
+    required bool isArchive,
+    required bool isFavorite,
+    @Default(false) bool isUntagged,
+  }) = _SearchDisplayFilters;
 }
 
 @freezed
@@ -163,6 +167,7 @@ abstract class SearchFilter with _$SearchFilter {
         display.isNotInAlbum == false &&
         display.isArchive == false &&
         display.isFavorite == false &&
+        display.isUntagged == false &&
         rating.rating.isNone &&
         mediaType == AssetType.other;
   }
