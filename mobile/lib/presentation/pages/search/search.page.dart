@@ -452,6 +452,7 @@ class SearchPage extends HookConsumerWidget {
           isNotInAlbum: value[DisplayOption.notInAlbum] ?? display.isNotInAlbum,
           isArchive: value[DisplayOption.archive] ?? display.isArchive,
           isFavorite: value[DisplayOption.favorite] ?? display.isFavorite,
+          isUntagged: value[DisplayOption.untagged] ?? display.isUntagged,
         );
       }
 
@@ -469,11 +470,17 @@ class SearchPage extends HookConsumerWidget {
           if (display.isNotInAlbum) context.t.search_filter_display_option_not_in_album,
           if (display.isArchive) context.t.archive,
           if (display.isFavorite) context.t.favorite,
+          if (display.isUntagged) context.t.untagged,
         ];
         displayOptionCurrentFilterWidget.value = filterText.isNotEmpty
             ? Text(filterText.join(', '), style: context.textTheme.labelLarge)
             : null;
-        search(filter.value.copyWith(display: display));
+        final nextFilter = filter.value.copyWith(display: display);
+        if (display.isUntagged) {
+          tagCurrentFilterWidget.value = null;
+          nextFilter.tagIds = null;
+        }
+        search(nextFilter);
       }
 
       unawaited(
