@@ -1,6 +1,19 @@
 **/node_modules/**
 
 .DS_Store
+
+# Certificates and secrets
+*.pem
+*.crt
+*.key
+*.csr
+*.p12
+*.pfx
+*.jks
+*.keystore
+secrets/
+.certificates/
+certs/
 .vscode/*
 !.vscode/launch.json
 !.vscode/extensions.json
@@ -20,6 +33,9 @@ mobile/ios/build
 packages/**/build
 mobile/android/fastlane/report.xml
 mobile/ios/fastlane/report.xml
+mobile/android/fastlane/play-store-key.json
+mobile/ios/AppStore_*.mobileprovision
+mobile/ios/distribution.cer
 
 vite.config.js.timestamp-*
 .pnpm-store
