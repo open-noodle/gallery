@@ -1,9 +1,8 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
-import 'package:immich_mobile/domain/models/events.model.dart';
 import 'package:immich_mobile/domain/models/memory.model.dart';
-import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
+import 'package:immich_mobile/providers/asset_viewer/scroll_to_date_notifier.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:intl/intl.dart';
 
@@ -39,8 +38,12 @@ class MemoryBottomInfo extends StatelessWidget {
             child: MaterialButton(
               minWidth: 0,
               onPressed: () async {
-                await context.router.navigate(const TabShellRoute(children: [MainTimelineRoute()]));
-                EventStream.shared.emit(ScrollToDateEvent(fileCreatedDate.toLocal()));
+                await context.maybePop();
+                // Activate the existing timeline tab without rebuilding it (a fresh
+                // TabShellRoute would reload the timeline to the top and discard the scroll).
+                await context.navigateTo(const MainTimelineRoute());
+                // #28941: scroll to the date in the viewer's local time, not UTC.
+                scrollToDateNotifierProvider.scrollToDate(fileCreatedDate.toLocal());
               },
               shape: const CircleBorder(),
               color: Colors.white.withValues(alpha: 0.2),
