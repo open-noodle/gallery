@@ -30,7 +30,13 @@
     "shared_group": "group.de.opennoodle.gallery.share",
     "download_dir": "DCIM/NoodleGallery",
     "background_task_prefix": "de.opennoodle.gallery.background",
-    "apple_team_id": "77MWNP37MV"
+    "apple_team_id": "77MWNP37MV",
+    "app_store_url": "https://apps.apple.com/us/app/noodle-gallery/id6761776289",
+    "play_store_url": "https://play.google.com/store/apps/details?id=de.opennoodle.gallery"
+  },
+
+  "email": {
+    "asset_base_url": "https://docs.opennoodle.de/img"
   },
 
   "docker": {
