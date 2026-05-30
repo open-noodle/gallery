@@ -98,8 +98,24 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
     super.dispose();
   }
 
+  bool _isBackgroundBackupGroup(String group) {
+    return group == kBackupGroup || group == kBackupLivePhotoGroup;
+  }
+
+  bool _isLivePhotoMotionTask(Task task) {
+    if (task.group != kBackupGroup || task.metaData.isEmpty) {
+      return false;
+    }
+
+    try {
+      return UploadTaskMetadata.fromJson(task.metaData).isLivePhotos;
+    } catch (_) {
+      return false;
+    }
+  }
+
   void _handleBackgroundBackupProgress(TaskProgressUpdate update) {
-    if (!mounted || update.task.group != kBackupGroup) {
+    if (!mounted || !_isBackgroundBackupGroup(update.task.group)) {
       return;
     }
 
@@ -127,17 +143,19 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
   }
 
   void _handleBackgroundBackupStatus(TaskStatusUpdate update) {
-    if (!mounted || update.task.group != kBackupGroup) {
+    if (!mounted || !_isBackgroundBackupGroup(update.task.group)) {
       return;
     }
 
     final taskId = update.task.taskId;
     switch (update.status) {
       case TaskStatus.complete:
-        state = state.copyWith(backupCount: state.backupCount + 1, remainderCount: state.remainderCount - 1);
-        Future.delayed(const Duration(milliseconds: 1000), () {
-          _removeUploadItem(taskId);
-        });
+        if (!_isLivePhotoMotionTask(update.task)) {
+          state = state.copyWith(backupCount: state.backupCount + 1, remainderCount: state.remainderCount - 1);
+          Future.delayed(const Duration(milliseconds: 1000), () {
+            _removeUploadItem(taskId);
+          });
+        }
         break;
       case TaskStatus.failed:
       case TaskStatus.notFound:
@@ -363,7 +381,11 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
     }
     _logger.info("Start background backup sequence");
     state = state.copyWith(error: BackupError.none);
-    final tasks = await _backgroundUploadService.getActiveTasks(kBackupGroup);
+    final taskGroups = await Future.wait([
+      _backgroundUploadService.getActiveTasks(kBackupGroup),
+      _backgroundUploadService.getActiveTasks(kBackupLivePhotoGroup),
+    ]);
+    final tasks = taskGroups.expand((group) => group).toList(growable: false);
     if (!mounted) {
       _logger.warning("Skip handleBackupResume (post-call): notifier disposed");
       return;
