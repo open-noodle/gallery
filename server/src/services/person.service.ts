@@ -171,17 +171,19 @@ export class PersonService extends BaseService {
     if (!resolved.accessible) {
       throw new BadRequestException('One or more people were not found or are not accessible');
     }
-    if (!resolved.allAttachedProfilesRepairable) {
-      throw new ForbiddenException('Cannot merge identities with inaccessible attached profiles');
-    }
-    if (resolved.hasScopedProfileConflict) {
-      throw new BadRequestException('Cannot merge people that already have separate profiles in the same scope');
+    if (resolved.blockingConflict) {
+      throw new ForbiddenException(
+        resolved.blockingConflict.scope === 'space'
+          ? `These people also share a separate profile in shared space "${resolved.blockingConflict.spaceName}", which you can only view. Ask an editor of "${resolved.blockingConflict.spaceName}" to merge them.`
+          : `These people are also linked in another user's library, so they can't be merged here.`,
+      );
     }
 
     await this.faceIdentityRepository.mergeIdentities({
       targetIdentityId: resolved.targetIdentityId,
       sourceIdentityIds: resolved.sourceIdentityIds,
       source: 'manual',
+      collapseScopedConflicts: true,
     });
     await this.queueSpacePersonMetadataBackfill();
   }

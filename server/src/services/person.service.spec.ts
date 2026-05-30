@@ -4809,7 +4809,6 @@ describe(PersonService.name, () => {
       const auth = AuthFactory.create();
       mocks.faceIdentity.resolveRepairRefs.mockResolvedValue({
         accessible: false,
-        allAttachedProfilesRepairable: false,
       } as any);
 
       await expect(
@@ -4829,7 +4828,7 @@ describe(PersonService.name, () => {
         targetIdentityId: 'identity-1',
         sourceIdentityIds: ['identity-2'],
         type: 'person',
-        allAttachedProfilesRepairable: true,
+        blockingConflict: undefined,
       } as any);
       mocks.faceIdentity.mergeIdentities.mockResolvedValue({
         personalProfileConflictCount: 0,
@@ -4845,6 +4844,7 @@ describe(PersonService.name, () => {
         targetIdentityId: 'identity-1',
         sourceIdentityIds: ['identity-2'],
         source: 'manual',
+        collapseScopedConflicts: true,
       });
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.SharedSpacePersonMetadataBackfill,
@@ -4852,14 +4852,14 @@ describe(PersonService.name, () => {
       });
     });
 
-    it('rejects global merge when an involved identity has inaccessible attached profiles', async () => {
+    it('rejects merge when a same-scope conflict lives in a space the actor can only view', async () => {
       const auth = AuthFactory.create();
       mocks.faceIdentity.resolveRepairRefs.mockResolvedValue({
         accessible: true,
         targetIdentityId: 'identity-1',
         sourceIdentityIds: ['identity-2'],
         type: 'person',
-        allAttachedProfilesRepairable: false,
+        blockingConflict: { scope: 'space', spaceId: 'space-1', spaceName: 'Holidays' },
       } as any);
 
       await expect(
@@ -4867,30 +4867,72 @@ describe(PersonService.name, () => {
           target: { type: 'person', id: newUuid() },
           sources: [{ type: 'space-person', id: newUuid(), spaceId: newUuid() }],
         }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toThrow(
+        expect.objectContaining({
+          constructor: ForbiddenException,
+          message: expect.stringContaining('Holidays'),
+        }),
+      );
 
       expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
     });
 
-    it('rejects same-person repair when the scoped profiles conflict in the same owner or space', async () => {
+    it('allows a repairable same-scope conflict alongside an unrelated view-only attachment', async () => {
       const auth = AuthFactory.create();
       mocks.faceIdentity.resolveRepairRefs.mockResolvedValue({
         accessible: true,
         targetIdentityId: 'identity-1',
         sourceIdentityIds: ['identity-2'],
         type: 'person',
-        allAttachedProfilesRepairable: true,
-        hasScopedProfileConflict: true,
+        blockingConflict: undefined,
       } as any);
+      mocks.faceIdentity.mergeIdentities.mockResolvedValue({
+        personalProfileConflictCount: 0,
+        spaceProfileConflictCount: 0,
+      });
 
       await expect(
         sut.mergeScopedPeople(auth, {
           target: { type: 'person', id: newUuid() },
           sources: [{ type: 'person', id: newUuid() }],
         }),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).resolves.not.toThrow();
 
-      expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.mergeIdentities).toHaveBeenCalledWith({
+        targetIdentityId: 'identity-1',
+        sourceIdentityIds: ['identity-2'],
+        source: 'manual',
+        collapseScopedConflicts: true,
+      });
+    });
+
+    it('collapses same-scope conflicts the actor can repair', async () => {
+      const auth = AuthFactory.create();
+      mocks.faceIdentity.resolveRepairRefs.mockResolvedValue({
+        accessible: true,
+        targetIdentityId: 'identity-1',
+        sourceIdentityIds: ['identity-2'],
+        type: 'person',
+        blockingConflict: undefined,
+      } as any);
+      mocks.faceIdentity.mergeIdentities.mockResolvedValue({
+        personalProfileConflictCount: 0,
+        spaceProfileConflictCount: 0,
+      });
+
+      await expect(
+        sut.mergeScopedPeople(auth, {
+          target: { type: 'person', id: newUuid() },
+          sources: [{ type: 'person', id: newUuid() }],
+        }),
+      ).resolves.not.toThrow();
+
+      expect(mocks.faceIdentity.mergeIdentities).toHaveBeenCalledWith({
+        targetIdentityId: 'identity-1',
+        sourceIdentityIds: ['identity-2'],
+        source: 'manual',
+        collapseScopedConflicts: true,
+      });
     });
 
     it('detaches a scoped profile after access and backing-face checks', async () => {

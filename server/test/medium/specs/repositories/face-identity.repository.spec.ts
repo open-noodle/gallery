@@ -3821,7 +3821,7 @@ describe(FaceIdentityRepository.name, () => {
       );
     });
 
-    it('reports identity repair as unsafe when an attached space profile is not repairable by the actor', async () => {
+    it('does not block a merge when an attached space profile in a view-only space has no same-space collision', async () => {
       const { ctx, sut } = setup();
       const { user: actor } = await ctx.newUser();
       const { user: stranger } = await ctx.newUser();
@@ -3853,10 +3853,10 @@ describe(FaceIdentityRepository.name, () => {
       });
 
       expect(actorIdentity.id).toBeTruthy();
-      expect(resolved).toEqual(expect.objectContaining({ accessible: true, allAttachedProfilesRepairable: false }));
+      expect(resolved).toEqual(expect.objectContaining({ accessible: true, blockingConflict: undefined }));
     });
 
-    it('reports same-owner personal repair as a scoped profile conflict', async () => {
+    it('does not block a same-owner personal repair the actor controls', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
       const { person: targetPerson } = await ctx.newPerson({ ownerId: user.id });
@@ -3869,7 +3869,7 @@ describe(FaceIdentityRepository.name, () => {
         sources: [{ type: 'person', id: sourcePerson.id }],
       });
 
-      expect(resolved).toEqual(expect.objectContaining({ accessible: true, hasScopedProfileConflict: true }));
+      expect(resolved).toEqual(expect.objectContaining({ accessible: true, blockingConflict: undefined }));
     });
 
     it('reports a same-space conflict in a view-only space as a blocking space conflict', async () => {

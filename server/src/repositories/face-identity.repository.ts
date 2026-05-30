@@ -129,8 +129,6 @@ export type RepairRefsResolution =
       targetIdentityId: string;
       sourceIdentityIds: string[];
       type: string;
-      allAttachedProfilesRepairable: boolean;
-      hasScopedProfileConflict: boolean;
       blockingConflict?: { scope: 'space'; spaceId: string; spaceName: string } | { scope: 'personal' };
     };
 
@@ -1152,19 +1150,13 @@ export class FaceIdentityRepository {
       ),
     ];
     const identityIds = [...new Set([target.identityId, ...sourceIdentityIds])];
-    const [allAttachedProfilesRepairable, hasScopedProfileConflict, blockingConflict] = await Promise.all([
-      this.areAttachedProfilesRepairable(actorUserId, identityIds),
-      this.hasRepairProfileConflict(target.identityId, sourceIdentityIds),
-      this.findBlockingMergeConflictScope(actorUserId, identityIds),
-    ]);
+    const blockingConflict = await this.findBlockingMergeConflictScope(actorUserId, identityIds);
 
     return {
       accessible: true,
       targetIdentityId: target.identityId,
       sourceIdentityIds,
       type: target.identityType,
-      allAttachedProfilesRepairable,
-      hasScopedProfileConflict,
       blockingConflict,
     };
   }
@@ -1301,71 +1293,6 @@ export class FaceIdentityRepository {
           representativeFaceId: row.representativeFaceId,
         }
       : null;
-  }
-
-  private async areAttachedProfilesRepairable(actorUserId: string, identityIds: string[]): Promise<boolean> {
-    if (identityIds.length === 0) {
-      return false;
-    }
-
-    const inaccessiblePersonal = await this.db
-      .selectFrom('person')
-      .select('id')
-      .where('identityId', 'in', identityIds)
-      .where('ownerId', '!=', actorUserId)
-      .limit(1)
-      .executeTakeFirst();
-    if (inaccessiblePersonal) {
-      return false;
-    }
-
-    const spaceRows = await this.db
-      .selectFrom('shared_space_person')
-      .leftJoin('shared_space_member', (join) =>
-        join
-          .onRef('shared_space_member.spaceId', '=', 'shared_space_person.spaceId')
-          .on('shared_space_member.userId', '=', actorUserId),
-      )
-      .select(['shared_space_person.id', 'shared_space_member.role'])
-      .where('shared_space_person.identityId', 'in', identityIds)
-      .execute();
-
-    return spaceRows.every((row) => this.isRepairRole(row.role));
-  }
-
-  private async hasRepairProfileConflict(targetIdentityId: string, sourceIdentityIds: string[]): Promise<boolean> {
-    if (sourceIdentityIds.length === 0) {
-      return false;
-    }
-
-    const personalConflict = await this.db
-      .selectFrom('person as source_person')
-      .innerJoin('person as target_person', (join) =>
-        join
-          .onRef('target_person.ownerId', '=', 'source_person.ownerId')
-          .on('target_person.identityId', '=', targetIdentityId),
-      )
-      .select('source_person.id')
-      .where('source_person.identityId', 'in', sourceIdentityIds)
-      .limit(1)
-      .executeTakeFirst();
-    if (personalConflict) {
-      return true;
-    }
-
-    const spaceConflict = await this.db
-      .selectFrom('shared_space_person as source_person')
-      .innerJoin('shared_space_person as target_person', (join) =>
-        join
-          .onRef('target_person.spaceId', '=', 'source_person.spaceId')
-          .on('target_person.identityId', '=', targetIdentityId),
-      )
-      .select('source_person.id')
-      .where('source_person.identityId', 'in', sourceIdentityIds)
-      .limit(1)
-      .executeTakeFirst();
-
-    return !!spaceConflict;
   }
 
   /**
