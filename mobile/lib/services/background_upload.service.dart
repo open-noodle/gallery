@@ -8,6 +8,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/domain/models/asset/asset_metadata.model.dart';
+import 'package:immich_mobile/domain/models/background_backup_status.model.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
@@ -21,6 +22,7 @@ import 'package:immich_mobile/providers/infrastructure/storage.provider.dart';
 import 'package:immich_mobile/repositories/asset_media.repository.dart';
 import 'package:immich_mobile/repositories/upload.repository.dart';
 import 'package:immich_mobile/services/api.service.dart';
+import 'package:immich_mobile/services/background_backup_status.service.dart';
 import 'package:immich_mobile/utils/debug_print.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart' as api;
@@ -36,6 +38,7 @@ final backgroundUploadServiceProvider = Provider((ref) {
     db.localAssetRepository,
     db.backupRepository,
     ref.watch(assetMediaRepositoryProvider),
+    ref.watch(backgroundBackupStatusServiceProvider),
   );
 
   ref.onDispose(service.dispose);
@@ -86,6 +89,7 @@ class BackgroundUploadService {
     this._localAssetRepository,
     this._backupRepository,
     this._assetMediaRepository,
+    this._backgroundBackupStatusService,
   ) {
     _uploadRepository.onUploadStatus = _onUploadCallback;
     _uploadRepository.onTaskProgress = _onTaskProgressCallback;
@@ -96,6 +100,7 @@ class BackgroundUploadService {
   final LocalAssetRepository _localAssetRepository;
   final BackupRepository _backupRepository;
   final AssetMediaRepository _assetMediaRepository;
+  final BackgroundBackupStatusService _backgroundBackupStatusService;
   final Logger _logger = Logger('BackgroundUploadService');
 
   final StreamController<TaskStatusUpdate> _taskStatusController = StreamController<TaskStatusUpdate>.broadcast();
@@ -161,6 +166,7 @@ class BackgroundUploadService {
     shouldAbortQueuingTasks = false;
 
     final candidates = await _backupRepository.getCandidates(userId);
+    await _backgroundBackupStatusService.recordCandidateCount(candidates.length);
     if (candidates.isEmpty) {
       _logger.info("No new backup candidates found, finishing background upload");
       return;
@@ -182,6 +188,7 @@ class BackgroundUploadService {
     if (tasks.isNotEmpty && !shouldAbortQueuingTasks) {
       _logger.info("Enqueuing ${tasks.length} background upload tasks");
       await enqueueTasks(tasks);
+      await _backgroundBackupStatusService.recordUploadEnqueue(candidateCount: tasks.length);
     }
   }
 
@@ -204,9 +211,24 @@ class BackgroundUploadService {
     return _uploadRepository.start();
   }
 
+  bool _isLivePhotoMotionTask(Task task) {
+    if (task.group != kBackupGroup || task.metaData.isEmpty) {
+      return false;
+    }
+
+    try {
+      return UploadTaskMetadata.fromJson(task.metaData).isLivePhotos;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> _handleTaskStatusUpdate(TaskStatusUpdate update) async {
     switch (update.status) {
       case TaskStatus.complete:
+        if (!_isLivePhotoMotionTask(update.task)) {
+          unawaited(_backgroundBackupStatusService.recordUploadSuccess());
+        }
         unawaited(_handleLivePhoto(update));
 
         if (CurrentPlatform.isIOS) {
@@ -217,6 +239,12 @@ class BackgroundUploadService {
             _logger.severe('Error deleting file path for iOS: $e');
           }
         }
+
+      case TaskStatus.failed:
+      case TaskStatus.notFound:
+      case TaskStatus.canceled:
+        unawaited(_backgroundBackupStatusService.recordFailure(BackgroundBackupFailureReason.uploadFailed));
+
 
       default:
         break;
