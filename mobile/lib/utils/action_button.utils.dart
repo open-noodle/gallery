@@ -27,6 +27,7 @@ import 'package:immich_mobile/presentation/actions/stack.action.dart';
 import 'package:immich_mobile/presentation/actions/upload.action.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/base_action_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/like_activity_action_button.widget.dart';
+import 'package:immich_mobile/providers/asset_viewer/scroll_to_date_notifier.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 
 class ActionButtonContext {
@@ -216,8 +217,9 @@ enum ActionButtonType {
         onPressed: buildContext == null
             ? null
             : () async {
-                await buildContext.router.navigate(const TabShellRoute(children: [MainTimelineRoute()]));
-                EventStream.shared.emit(ScrollToDateEvent(context.asset.createdAt));
+                await buildContext.maybePop();
+                await buildContext.navigateTo(const MainTimelineRoute());
+                scrollToDateNotifierProvider.scrollToDate(context.asset.createdAt);
               },
       ),
       ActionButtonType.cast => const ActionMenuItem(action: CastAction()),
