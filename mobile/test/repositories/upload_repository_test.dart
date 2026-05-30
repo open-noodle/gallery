@@ -220,5 +220,22 @@ void main() {
       await repository.updateNotification(task, TaskStatus.enqueued);
       await Future<void>.delayed(Duration.zero);
     });
+
+    test('updateNotification consumes synchronous native failures', () async {
+      final repository = UploadRepository.forTesting(
+        backgroundDownloaderMethodInvoker: (_, _) {
+          throw StateError('channel unavailable');
+        },
+      );
+      final task = UploadTask(
+        taskId: 'asset-sync-fail',
+        url: 'http://test-server.com/assets',
+        filename: 'asset.jpg',
+        baseDirectory: BaseDirectory.temporary,
+        group: kBackupGroup,
+      );
+
+      await repository.updateNotification(task, TaskStatus.enqueued);
+    });
   });
 }
