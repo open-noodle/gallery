@@ -216,7 +216,7 @@ pnpm --dir server test src/services/person.service.spec.ts -- --run -t "mergePer
   - two same-space duplicates → 200; the surviving identity resolves to one accessible person with the **combined** asset and face counts.
   - a **non-admin editor** merges two duplicates in their editor space → success (Test case B for a non-admin).
   - a **non-admin** merges two of their own personal duplicates that also appear (no collision) in a view-only space → success (tester Part 1).
-  - a **viewer** merging two profiles that both appear in that view-only space → `403` with the space-named message.
+  - a **viewer** who owns two personal people whose identities ALSO collide as separate space-people in a space they can only view → `403` with the space-named message. (Note: a viewer passing the view-only `space-person` refs _directly_ yields `400` — a viewer cannot resolve a space-person ref it can't repair, so the conflict check is never reached. The `403` path requires the actor to select refs it CAN repair, here its own personal people.)
   - fetching the collapsed source profile id afterward → not-found.
 
 ```bash
