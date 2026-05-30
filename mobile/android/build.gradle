@@ -3,6 +3,20 @@ allprojects {
         google()
         mavenCentral()
     }
+
+    // The home_widget plugin requests `androidx.glance:glance-appwidget:1.+`, a dynamic
+    // version that resolves to the highest published 1.x — which now includes pre-release
+    // alphas. glance-appwidget 1.3.0-alpha01 (published 2026-05-19) and its transitive
+    // androidx.compose.remote require compileSdk 37 / AGP 9.1.0, which breaks our
+    // compileSdk 36 / AGP 8.11.2 release build (`:app:checkReleaseAarMetadata` fails).
+    // Pin to the stable version our version catalog already targets
+    // (mobile/android/gradle/libs.versions.toml: glance = "1.1.1") so the plugin's `1.+`
+    // selector can no longer drift into alpha releases.
+    configurations.all {
+        resolutionStrategy {
+            force "androidx.glance:glance-appwidget:1.1.1"
+        }
+    }
 }
 
 rootProject.buildDir = '../build'
