@@ -3222,6 +3222,421 @@ describe(FaceIdentityRepository.name, () => {
         await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
       }
     });
+
+    it('keeps the survivor on the target identity when the target has a profile in the scope', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      try {
+        const { person: targetPerson } = await ctx.newPerson({ ownerId: user.id });
+        const { person: sourcePerson } = await ctx.newPerson({ ownerId: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: targetPerson.id });
+        const { assetFace: sourceFace } = await ctx.newAssetFace({ assetId: asset.id, personId: sourcePerson.id });
+        const targetIdentity = await sut.ensurePersonIdentity(targetPerson.id);
+        const sourceIdentity = await sut.ensurePersonIdentity(sourcePerson.id);
+        await sut.linkFace({ assetFaceId: targetFace.id, identityId: targetIdentity.id, source: 'owner-person' });
+
+        await sut.mergeIdentities({
+          targetIdentityId: targetIdentity.id,
+          sourceIdentityIds: [sourceIdentity.id],
+          source: 'manual',
+          collapseScopedConflicts: true,
+        });
+
+        const survivors = await ctx.database
+          .selectFrom('person')
+          .select(['id', 'identityId'])
+          .where('ownerId', '=', user.id)
+          .execute();
+        const reassignedFace = await ctx.database
+          .selectFrom('asset_face')
+          .select('personId')
+          .where('id', '=', sourceFace.id)
+          .executeTakeFirstOrThrow();
+
+        // The target row survives (its own id is kept); the source's faces move onto it.
+        expect(survivors).toEqual([{ id: targetPerson.id, identityId: targetIdentity.id }]);
+        expect(reassignedFace.personId).toBe(targetPerson.id);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    it('keeps the lowest-id source profile when the target identity is absent from the scope', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      try {
+        // The target identity owns a personal profile, so it is never deleted.
+        const { person: targetAnchor } = await ctx.newPerson({ ownerId: user.id });
+        const targetIdentity = await sut.ensurePersonIdentity(targetAnchor.id);
+        // Two SOURCE identities both have a profile in this space; the target identity does not.
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+        const sourceSpacePersonA = await newSpacePerson(ctx, space.id);
+        const sourceSpacePersonB = await newSpacePerson(ctx, space.id);
+        const sourceIdentityA = await sut.ensureSpacePersonIdentity(sourceSpacePersonA.id);
+        const sourceIdentityB = await sut.ensureSpacePersonIdentity(sourceSpacePersonB.id);
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        const { assetFace: faceA } = await ctx.newAssetFace({ assetId: asset.id });
+        const { assetFace: faceB } = await ctx.newAssetFace({ assetId: asset.id });
+        await linkSpaceFace(ctx, sourceSpacePersonA.id, faceA.id);
+        await linkSpaceFace(ctx, sourceSpacePersonB.id, faceB.id);
+
+        await sut.mergeIdentities({
+          targetIdentityId: targetIdentity.id,
+          sourceIdentityIds: [sourceIdentityA.id, sourceIdentityB.id],
+          source: 'manual',
+          collapseScopedConflicts: true,
+        });
+
+        const survivors = await ctx.database
+          .selectFrom('shared_space_person')
+          .select(['id', 'identityId'])
+          .where('spaceId', '=', space.id)
+          .execute();
+        const survivorFaces = await ctx.database
+          .selectFrom('shared_space_person_face')
+          .select('assetFaceId')
+          .where('personId', '=', [sourceSpacePersonA.id, sourceSpacePersonB.id].toSorted()[0])
+          .orderBy('assetFaceId')
+          .execute();
+
+        // The lowest-id source profile survives and is reassigned to the target identity.
+        const expectedSurvivorId = [sourceSpacePersonA.id, sourceSpacePersonB.id].toSorted()[0];
+        expect(survivors).toEqual([{ id: expectedSurvivorId, identityId: targetIdentity.id }]);
+        expect(survivorFaces.map((row) => row.assetFaceId).toSorted()).toEqual([faceA.id, faceB.id].toSorted());
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    it('collapses two source identities in one space into a single survivor without a unique-index violation', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      try {
+        const { person: targetAnchor } = await ctx.newPerson({ ownerId: user.id });
+        const targetIdentity = await sut.ensurePersonIdentity(targetAnchor.id);
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+        const sourceSpacePersonA = await newSpacePerson(ctx, space.id);
+        const sourceSpacePersonB = await newSpacePerson(ctx, space.id);
+        const sourceIdentityA = await sut.ensureSpacePersonIdentity(sourceSpacePersonA.id);
+        const sourceIdentityB = await sut.ensureSpacePersonIdentity(sourceSpacePersonB.id);
+
+        // A naive single UPDATE of both source rows to the target identity would violate
+        // shared_space_person_spaceId_identityId_key; survivor selection must collapse instead.
+        await expect(
+          sut.mergeIdentities({
+            targetIdentityId: targetIdentity.id,
+            sourceIdentityIds: [sourceIdentityA.id, sourceIdentityB.id],
+            source: 'manual',
+            collapseScopedConflicts: true,
+          }),
+        ).resolves.toEqual({ personalProfileConflictCount: 0, spaceProfileConflictCount: 0 });
+
+        const survivors = await ctx.database
+          .selectFrom('shared_space_person')
+          .select(['id', 'identityId'])
+          .where('spaceId', '=', space.id)
+          .execute();
+
+        expect(survivors).toEqual([
+          { id: [sourceSpacePersonA.id, sourceSpacePersonB.id].toSorted()[0], identityId: targetIdentity.id },
+        ]);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    it('collapses a conflicting scope while reassigning a non-conflicting scope in a multi-source batch', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      try {
+        // Target identity anchored by a personal profile so it is never deleted.
+        const { person: targetAnchor } = await ctx.newPerson({ ownerId: user.id });
+        const targetIdentity = await sut.ensurePersonIdentity(targetAnchor.id);
+
+        // Conflicted space: both sources have a profile here, target identity absent → collapse to one.
+        const { space: conflictedSpace } = await ctx.newSharedSpace({ createdById: user.id });
+        await ctx.newSharedSpaceMember({ spaceId: conflictedSpace.id, userId: user.id, role: SharedSpaceRole.Owner });
+        const conflictPersonA = await newSpacePerson(ctx, conflictedSpace.id);
+        const conflictPersonB = await newSpacePerson(ctx, conflictedSpace.id);
+        const sourceIdentityA = await sut.ensureSpacePersonIdentity(conflictPersonA.id);
+        const sourceIdentityB = await sut.ensureSpacePersonIdentity(conflictPersonB.id);
+
+        // Non-conflicted space: only source B has a profile here → reassign, no deletion.
+        const { space: cleanSpace } = await ctx.newSharedSpace({ createdById: user.id });
+        await ctx.newSharedSpaceMember({ spaceId: cleanSpace.id, userId: user.id, role: SharedSpaceRole.Owner });
+        const cleanPerson = await ctx.database
+          .insertInto('shared_space_person')
+          .values({ spaceId: cleanSpace.id, identityId: sourceIdentityB.id })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+
+        await sut.mergeIdentities({
+          targetIdentityId: targetIdentity.id,
+          sourceIdentityIds: [sourceIdentityA.id, sourceIdentityB.id],
+          source: 'manual',
+          collapseScopedConflicts: true,
+        });
+
+        const conflictedSurvivors = await ctx.database
+          .selectFrom('shared_space_person')
+          .select(['id', 'identityId'])
+          .where('spaceId', '=', conflictedSpace.id)
+          .execute();
+        const cleanSurvivors = await ctx.database
+          .selectFrom('shared_space_person')
+          .select(['id', 'identityId'])
+          .where('spaceId', '=', cleanSpace.id)
+          .execute();
+
+        expect(conflictedSurvivors).toEqual([
+          { id: [conflictPersonA.id, conflictPersonB.id].toSorted()[0], identityId: targetIdentity.id },
+        ]);
+        // The non-conflicted profile is reassigned to the target identity, not deleted.
+        expect(cleanSurvivors).toEqual([{ id: cleanPerson.id, identityId: targetIdentity.id }]);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    it('collapses two pet-type space people in one space carrying the type through', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      try {
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+        const targetSpacePerson = await ctx.database
+          .insertInto('shared_space_person')
+          .values({ spaceId: space.id, type: 'pet' })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        const sourceSpacePerson = await ctx.database
+          .insertInto('shared_space_person')
+          .values({ spaceId: space.id, type: 'pet' })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        const { assetFace: sourceFace } = await ctx.newAssetFace({ assetId: asset.id });
+        await linkSpaceFace(ctx, sourceSpacePerson.id, sourceFace.id);
+        const targetIdentity = await sut.ensureSpacePersonIdentity(targetSpacePerson.id);
+        const sourceIdentity = await sut.ensureSpacePersonIdentity(sourceSpacePerson.id);
+
+        const result = await sut.mergeIdentities({
+          targetIdentityId: targetIdentity.id,
+          sourceIdentityIds: [sourceIdentity.id],
+          source: 'manual',
+          collapseScopedConflicts: true,
+        });
+
+        const survivors = await ctx.database
+          .selectFrom('shared_space_person')
+          .select(['id', 'identityId', 'type'])
+          .where('spaceId', '=', space.id)
+          .execute();
+        const survivorFaces = await ctx.database
+          .selectFrom('shared_space_person_face')
+          .select('assetFaceId')
+          .where('personId', '=', targetSpacePerson.id)
+          .execute();
+
+        expect(result).toEqual({ personalProfileConflictCount: 0, spaceProfileConflictCount: 0 });
+        expect(survivors).toEqual([{ id: targetSpacePerson.id, identityId: targetIdentity.id, type: 'pet' }]);
+        expect(survivorFaces.map((row) => row.assetFaceId)).toEqual([sourceFace.id]);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    it('preserves the survivor isHidden flag regardless of source/survivor hidden state', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      try {
+        // Case 1: hidden source collapses into a visible survivor → survivor stays visible.
+        const { person: visibleSurvivor } = await ctx.newPerson({ ownerId: user.id, isHidden: false });
+        const { person: hiddenSource } = await ctx.newPerson({ ownerId: user.id, isHidden: true });
+        const visibleIdentity = await sut.ensurePersonIdentity(visibleSurvivor.id);
+        const hiddenSourceIdentity = await sut.ensurePersonIdentity(hiddenSource.id);
+
+        // Case 2: visible source collapses into a hidden survivor → survivor stays hidden.
+        const { person: hiddenSurvivor } = await ctx.newPerson({ ownerId: user.id, isHidden: true });
+        const { person: visibleSource } = await ctx.newPerson({ ownerId: user.id, isHidden: false });
+        const hiddenIdentity = await sut.ensurePersonIdentity(hiddenSurvivor.id);
+        const visibleSourceIdentity = await sut.ensurePersonIdentity(visibleSource.id);
+
+        await sut.mergeIdentities({
+          targetIdentityId: visibleIdentity.id,
+          sourceIdentityIds: [hiddenSourceIdentity.id],
+          source: 'manual',
+          collapseScopedConflicts: true,
+        });
+        await sut.mergeIdentities({
+          targetIdentityId: hiddenIdentity.id,
+          sourceIdentityIds: [visibleSourceIdentity.id],
+          source: 'manual',
+          collapseScopedConflicts: true,
+        });
+
+        const visibleSurvivorRow = await ctx.database
+          .selectFrom('person')
+          .select(['id', 'isHidden'])
+          .where('id', '=', visibleSurvivor.id)
+          .executeTakeFirstOrThrow();
+        const hiddenSurvivorRow = await ctx.database
+          .selectFrom('person')
+          .select(['id', 'isHidden'])
+          .where('id', '=', hiddenSurvivor.id)
+          .executeTakeFirstOrThrow();
+
+        expect(visibleSurvivorRow.isHidden).toBe(false);
+        expect(hiddenSurvivorRow.isHidden).toBe(true);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    it('does not delete a personal and a space profile in different scopes (identity merge only)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      try {
+        // Source identity has a personal profile (owner scope).
+        const { person: sourcePerson } = await ctx.newPerson({ ownerId: user.id });
+        const sourceIdentity = await sut.ensurePersonIdentity(sourcePerson.id);
+        // Target identity has a space profile (space scope) — different physical scope, no conflict.
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+        const targetSpacePerson = await newSpacePerson(ctx, space.id);
+        const targetIdentity = await sut.ensureSpacePersonIdentity(targetSpacePerson.id);
+
+        await sut.mergeIdentities({
+          targetIdentityId: targetIdentity.id,
+          sourceIdentityIds: [sourceIdentity.id],
+          source: 'manual',
+          collapseScopedConflicts: true,
+        });
+
+        const personRow = await ctx.database
+          .selectFrom('person')
+          .select(['id', 'identityId'])
+          .where('id', '=', sourcePerson.id)
+          .executeTakeFirst();
+        const spaceRow = await ctx.database
+          .selectFrom('shared_space_person')
+          .select(['id', 'identityId'])
+          .where('id', '=', targetSpacePerson.id)
+          .executeTakeFirst();
+
+        // Both rows survive on the target identity; nothing deleted.
+        expect(personRow).toEqual({ id: sourcePerson.id, identityId: targetIdentity.id });
+        expect(spaceRow).toEqual({ id: targetSpacePerson.id, identityId: targetIdentity.id });
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    it('does not delete two space profiles in different spaces (identity merge only)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      try {
+        const { space: spaceA } = await ctx.newSharedSpace({ createdById: user.id });
+        await ctx.newSharedSpaceMember({ spaceId: spaceA.id, userId: user.id, role: SharedSpaceRole.Owner });
+        const targetSpacePerson = await newSpacePerson(ctx, spaceA.id);
+        const targetIdentity = await sut.ensureSpacePersonIdentity(targetSpacePerson.id);
+
+        const { space: spaceB } = await ctx.newSharedSpace({ createdById: user.id });
+        await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: user.id, role: SharedSpaceRole.Owner });
+        const sourceSpacePerson = await newSpacePerson(ctx, spaceB.id);
+        const sourceIdentity = await sut.ensureSpacePersonIdentity(sourceSpacePerson.id);
+
+        await sut.mergeIdentities({
+          targetIdentityId: targetIdentity.id,
+          sourceIdentityIds: [sourceIdentity.id],
+          source: 'manual',
+          collapseScopedConflicts: true,
+        });
+
+        const targetRow = await ctx.database
+          .selectFrom('shared_space_person')
+          .select(['id', 'identityId'])
+          .where('id', '=', targetSpacePerson.id)
+          .executeTakeFirst();
+        const sourceRow = await ctx.database
+          .selectFrom('shared_space_person')
+          .select(['id', 'identityId'])
+          .where('id', '=', sourceSpacePerson.id)
+          .executeTakeFirst();
+
+        // Different spaces ⇒ both rows survive on the target identity.
+        expect(targetRow).toEqual({ id: targetSpacePerson.id, identityId: targetIdentity.id });
+        expect(sourceRow).toEqual({ id: sourceSpacePerson.id, identityId: targetIdentity.id });
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    it('is idempotent: re-running the merged set changes nothing', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      try {
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+        const targetSpacePerson = await newSpacePerson(ctx, space.id);
+        const sourceSpacePerson = await newSpacePerson(ctx, space.id);
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        const { assetFace: sourceFace } = await ctx.newAssetFace({ assetId: asset.id });
+        await linkSpaceFace(ctx, sourceSpacePerson.id, sourceFace.id);
+        const targetIdentity = await sut.ensureSpacePersonIdentity(targetSpacePerson.id);
+        const sourceIdentity = await sut.ensureSpacePersonIdentity(sourceSpacePerson.id);
+
+        await sut.mergeIdentities({
+          targetIdentityId: targetIdentity.id,
+          sourceIdentityIds: [sourceIdentity.id],
+          source: 'manual',
+          collapseScopedConflicts: true,
+        });
+
+        const snapshot = async () => {
+          const survivors = await ctx.database
+            .selectFrom('shared_space_person')
+            .select(['id', 'identityId'])
+            .where('spaceId', '=', space.id)
+            .orderBy('id')
+            .execute();
+          const faces = await ctx.database
+            .selectFrom('shared_space_person_face')
+            .select('assetFaceId')
+            .where('personId', '=', targetSpacePerson.id)
+            .orderBy('assetFaceId')
+            .execute();
+          const identities = await ctx.database
+            .selectFrom('face_identity')
+            .select('id')
+            .where('id', 'in', [targetIdentity.id, sourceIdentity.id])
+            .orderBy('id')
+            .execute();
+          return { survivors, faces, identities };
+        };
+
+        const before = await snapshot();
+
+        // Re-run: the source identity is gone, so the effective source set is empty → genuine no-op.
+        const second = await sut.mergeIdentities({
+          targetIdentityId: targetIdentity.id,
+          sourceIdentityIds: [sourceIdentity.id],
+          source: 'manual',
+          collapseScopedConflicts: true,
+        });
+
+        const after = await snapshot();
+
+        expect(second).toEqual({ personalProfileConflictCount: 0, spaceProfileConflictCount: 0 });
+        expect(after).toEqual(before);
+        expect(before.identities).toEqual([{ id: targetIdentity.id }]);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
   });
 
   it('counts same-owner personal conflicts before identity merge', async () => {
