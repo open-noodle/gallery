@@ -37,4 +37,24 @@ void main() {
 
     expect(logs.single, 'Failed to reschedule 1 background downloader tasks');
   });
+
+  test('logs warning when recovery throws', () async {
+    final warnings = <String>[];
+
+    await recoverBackgroundDownloaderTasks(
+      delay: Duration.zero,
+      resumeFromBackground: () async {
+        throw StateError('resume failed');
+      },
+      rescheduleKilledTasks: () async {
+        return (<Task>[], <Task>[]);
+      },
+      logWarning: (message, error, stackTrace) {
+        warnings.add('$message:$error');
+      },
+    );
+
+    expect(warnings.single, contains('Failed to recover background downloader tasks'));
+    expect(warnings.single, contains('resume failed'));
+  });
 }
