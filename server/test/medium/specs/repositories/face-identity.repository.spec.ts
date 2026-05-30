@@ -3872,6 +3872,135 @@ describe(FaceIdentityRepository.name, () => {
       expect(resolved).toEqual(expect.objectContaining({ accessible: true, hasScopedProfileConflict: true }));
     });
 
+    it('reports a same-space conflict in a view-only space as a blocking space conflict', async () => {
+      const { ctx, sut } = setup();
+      const { user: actor } = await ctx.newUser();
+      const { user: spaceOwner } = await ctx.newUser();
+      const { person: personAlpha } = await ctx.newPerson({ ownerId: actor.id });
+      const { person: personBeta } = await ctx.newPerson({ ownerId: actor.id });
+      const identityAlpha = await sut.ensurePersonIdentity(personAlpha.id);
+      const identityBeta = await sut.ensurePersonIdentity(personBeta.id);
+      const { space } = await ctx.newSharedSpace({ createdById: spaceOwner.id, name: 'Holidays' });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: spaceOwner.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: actor.id, role: SharedSpaceRole.Viewer });
+      await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: space.id, identityId: identityAlpha.id, type: 'person' })
+        .execute();
+      await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: space.id, identityId: identityBeta.id, type: 'person' })
+        .execute();
+
+      const resolved = await sut.resolveRepairRefs(actor.id, {
+        target: { type: 'person', id: personAlpha.id },
+        sources: [{ type: 'person', id: personBeta.id }],
+      });
+
+      expect(resolved).toEqual(
+        expect.objectContaining({
+          accessible: true,
+          blockingConflict: { scope: 'space', spaceId: space.id, spaceName: 'Holidays' },
+        }),
+      );
+    });
+
+    it('does not block a same-space conflict in a space the actor can edit', async () => {
+      const { ctx, sut } = setup();
+      const { user: actor } = await ctx.newUser();
+      const { user: spaceOwner } = await ctx.newUser();
+      const { person: personAlpha } = await ctx.newPerson({ ownerId: actor.id });
+      const { person: personBeta } = await ctx.newPerson({ ownerId: actor.id });
+      const identityAlpha = await sut.ensurePersonIdentity(personAlpha.id);
+      const identityBeta = await sut.ensurePersonIdentity(personBeta.id);
+      const { space } = await ctx.newSharedSpace({ createdById: spaceOwner.id, name: 'Holidays' });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: spaceOwner.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: actor.id, role: SharedSpaceRole.Editor });
+      await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: space.id, identityId: identityAlpha.id, type: 'person' })
+        .execute();
+      await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: space.id, identityId: identityBeta.id, type: 'person' })
+        .execute();
+
+      const resolved = await sut.resolveRepairRefs(actor.id, {
+        target: { type: 'person', id: personAlpha.id },
+        sources: [{ type: 'person', id: personBeta.id }],
+      });
+
+      expect(resolved).toEqual(expect.objectContaining({ accessible: true, blockingConflict: undefined }));
+    });
+
+    it("reports a same-owner conflict in another user's personal scope as a blocking personal conflict", async () => {
+      const { ctx, sut } = setup();
+      const { user: actor } = await ctx.newUser();
+      const { user: stranger } = await ctx.newUser();
+      const { space: spaceAlpha } = await ctx.newSharedSpace({ createdById: actor.id });
+      const { space: spaceBeta } = await ctx.newSharedSpace({ createdById: actor.id });
+      await ctx.newSharedSpaceMember({ spaceId: spaceAlpha.id, userId: actor.id, role: SharedSpaceRole.Editor });
+      await ctx.newSharedSpaceMember({ spaceId: spaceBeta.id, userId: actor.id, role: SharedSpaceRole.Editor });
+
+      // Identity alpha: stranger personal + editor space person (alpha space).
+      const { person: strangerAlpha } = await ctx.newPerson({ ownerId: stranger.id });
+      const identityAlpha = await sut.ensurePersonIdentity(strangerAlpha.id);
+      const spacePersonAlpha = await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: spaceAlpha.id, identityId: identityAlpha.id, type: 'person' })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+
+      // Identity beta: stranger personal + editor space person (beta space, different space).
+      const { person: strangerBeta } = await ctx.newPerson({ ownerId: stranger.id });
+      const identityBeta = await sut.ensurePersonIdentity(strangerBeta.id);
+      const spacePersonBeta = await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: spaceBeta.id, identityId: identityBeta.id, type: 'person' })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+
+      const resolved = await sut.resolveRepairRefs(actor.id, {
+        target: { type: 'space-person', id: spacePersonAlpha.id, spaceId: spaceAlpha.id },
+        sources: [{ type: 'space-person', id: spacePersonBeta.id, spaceId: spaceBeta.id }],
+      });
+
+      expect(resolved).toEqual(expect.objectContaining({ accessible: true, blockingConflict: { scope: 'personal' } }));
+    });
+
+    it('does not block own personal duplicates that also live in different view-only spaces without collision', async () => {
+      const { ctx, sut } = setup();
+      const { user: actor } = await ctx.newUser();
+      const { user: spaceOwner } = await ctx.newUser();
+      const { person: personAlpha } = await ctx.newPerson({ ownerId: actor.id });
+      const { person: personBeta } = await ctx.newPerson({ ownerId: actor.id });
+      const identityAlpha = await sut.ensurePersonIdentity(personAlpha.id);
+      const identityBeta = await sut.ensurePersonIdentity(personBeta.id);
+
+      const { space: spaceOne } = await ctx.newSharedSpace({ createdById: spaceOwner.id });
+      await ctx.newSharedSpaceMember({ spaceId: spaceOne.id, userId: spaceOwner.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceMember({ spaceId: spaceOne.id, userId: actor.id, role: SharedSpaceRole.Viewer });
+      await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: spaceOne.id, identityId: identityAlpha.id, type: 'person' })
+        .execute();
+
+      const { space: spaceTwo } = await ctx.newSharedSpace({ createdById: spaceOwner.id });
+      await ctx.newSharedSpaceMember({ spaceId: spaceTwo.id, userId: spaceOwner.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceMember({ spaceId: spaceTwo.id, userId: actor.id, role: SharedSpaceRole.Viewer });
+      await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: spaceTwo.id, identityId: identityBeta.id, type: 'person' })
+        .execute();
+
+      const resolved = await sut.resolveRepairRefs(actor.id, {
+        target: { type: 'person', id: personAlpha.id },
+        sources: [{ type: 'person', id: personBeta.id }],
+      });
+
+      expect(resolved).toEqual(expect.objectContaining({ accessible: true, blockingConflict: undefined }));
+    });
+
     it('rejects detach when selected space-person faces also back non-repairable personal profiles', async () => {
       const { ctx, sut } = setup();
       const { user: actor } = await ctx.newUser();

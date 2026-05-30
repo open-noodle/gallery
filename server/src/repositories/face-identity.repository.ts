@@ -131,6 +131,7 @@ export type RepairRefsResolution =
       type: string;
       allAttachedProfilesRepairable: boolean;
       hasScopedProfileConflict: boolean;
+      blockingConflict?: { scope: 'space'; spaceId: string; spaceName: string } | { scope: 'personal' };
     };
 
 export type DetachRefResolution =
@@ -1151,9 +1152,10 @@ export class FaceIdentityRepository {
       ),
     ];
     const identityIds = [...new Set([target.identityId, ...sourceIdentityIds])];
-    const [allAttachedProfilesRepairable, hasScopedProfileConflict] = await Promise.all([
+    const [allAttachedProfilesRepairable, hasScopedProfileConflict, blockingConflict] = await Promise.all([
       this.areAttachedProfilesRepairable(actorUserId, identityIds),
       this.hasRepairProfileConflict(target.identityId, sourceIdentityIds),
+      this.findBlockingMergeConflictScope(actorUserId, identityIds),
     ]);
 
     return {
@@ -1163,6 +1165,7 @@ export class FaceIdentityRepository {
       type: target.identityType,
       allAttachedProfilesRepairable,
       hasScopedProfileConflict,
+      blockingConflict,
     };
   }
 
@@ -1363,6 +1366,53 @@ export class FaceIdentityRepository {
       .executeTakeFirst();
 
     return !!spaceConflict;
+  }
+
+  /**
+   * Returns the physical scope whose same-scope conflict the actor cannot repair, or `undefined` when every
+   * conflicted scope is repairable. A scope is conflicted when two or more of the merged identities hold a separate
+   * profile there. A space result is preferred over a personal one because it yields a more actionable message.
+   */
+  private async findBlockingMergeConflictScope(
+    actorUserId: string,
+    identityIds: string[],
+  ): Promise<{ scope: 'space'; spaceId: string; spaceName: string } | { scope: 'personal' } | undefined> {
+    if (identityIds.length < 2) {
+      return undefined;
+    }
+
+    const blockingSpace = await this.db
+      .selectFrom('shared_space_person')
+      .innerJoin('shared_space', 'shared_space.id', 'shared_space_person.spaceId')
+      .leftJoin('shared_space_member', (join) =>
+        join
+          .onRef('shared_space_member.spaceId', '=', 'shared_space_person.spaceId')
+          .on('shared_space_member.userId', '=', actorUserId)
+          .on('shared_space_member.role', 'in', [SharedSpaceRole.Owner, SharedSpaceRole.Editor]),
+      )
+      .select(['shared_space_person.spaceId as spaceId', 'shared_space.name as spaceName'])
+      .where('shared_space_person.identityId', 'in', identityIds)
+      .groupBy(['shared_space_person.spaceId', 'shared_space.name'])
+      .having((eb) => eb.fn.count('shared_space_person.identityId').distinct(), '>=', 2)
+      .having((eb) => eb.fn.count('shared_space_member.userId'), '=', 0)
+      .limit(1)
+      .executeTakeFirst();
+
+    if (blockingSpace) {
+      return { scope: 'space', spaceId: blockingSpace.spaceId, spaceName: blockingSpace.spaceName };
+    }
+
+    const blockingPersonal = await this.db
+      .selectFrom('person')
+      .select('person.ownerId')
+      .where('person.identityId', 'in', identityIds)
+      .where('person.ownerId', '!=', actorUserId)
+      .groupBy('person.ownerId')
+      .having((eb) => eb.fn.count('person.identityId').distinct(), '>=', 2)
+      .limit(1)
+      .executeTakeFirst();
+
+    return blockingPersonal ? { scope: 'personal' } : undefined;
   }
 
   private async getProfileForDetach(
