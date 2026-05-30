@@ -59,7 +59,9 @@ enum StoreKey<T> {
   legacyMapIncludeArchived<bool>._(121),
   legacyMapThemeMode<int>._(124),
   legacyMapwithPartners<bool>._(125),
-  legacyLogLevel<int>._(115);
+  legacyLogLevel<int>._(115),
+
+  backgroundBackupStatus<String>._(1014);
 
   const StoreKey._(this.id);
   final int id;
