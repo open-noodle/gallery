@@ -2004,8 +2004,8 @@ export class FaceIdentityRepository {
   }
 
   @GenerateSql({ params: [{ personId: DummyValue.UUID, identityId: DummyValue.UUID, source: 'manual' }] })
-  async linkPersonFaces(input: LinkPersonFacesInput): Promise<void> {
-    await this.db
+  async linkPersonFaces(input: LinkPersonFacesInput, db: Kysely<DB> | Transaction<DB> = this.db): Promise<void> {
+    await db
       .insertInto('face_identity_face')
       .columns(['assetFaceId', 'identityId', 'source', 'confidence'])
       .expression((eb) =>
@@ -2497,6 +2497,7 @@ export class FaceIdentityRepository {
     targetIdentityId: string;
     sourceIdentityIds: string[];
     source: FaceIdentityFaceSource;
+    collapseScopedConflicts?: boolean;
   }): Promise<MergeIdentitiesResult> {
     const sourceIdentityIds = [...new Set(input.sourceIdentityIds)].filter((id) => id !== input.targetIdentityId);
     if (sourceIdentityIds.length === 0) {
@@ -2518,6 +2519,13 @@ export class FaceIdentityRepository {
       );
       if (incompatible) {
         throw new Error('Cannot merge face identities with different types');
+      }
+
+      if (input.collapseScopedConflicts) {
+        await this.collapseScopedConflicts(trx, {
+          targetIdentityId: input.targetIdentityId,
+          sourceIdentityIds,
+        });
       }
 
       const { personalProfileConflictCount, spaceProfileConflictCount } = await this.countMergeConflicts(trx, {
@@ -2591,6 +2599,214 @@ export class FaceIdentityRepository {
         spaceProfileConflictCount,
       };
     });
+  }
+
+  /**
+   * Collapse same-physical-scope duplicate profiles before the identity-link reassignment runs.
+   *
+   * A "same-scope conflict" is two or more profiles whose identity is in `I = {target} ∪ sources`
+   * that share one physical scope (`person.ownerId` or `shared_space_person.spaceId`). The
+   * partial-unique indexes `person_ownerId_identityId_key` / `shared_space_person_spaceId_identityId_key`
+   * forbid two of them carrying the target identity, so we pick a deterministic survivor per scope,
+   * move the redundant profiles' faces onto it, link them to the target identity, and delete the rest.
+   *
+   * Transaction discipline (issue #595): every query runs on `trx`. We never call a `this.db`-based
+   * repository helper here — that would reserve a second pool connection while the transaction holds
+   * the first and deadlock the 10-connection pool. The SQL below mirrors `personRepository.reassignFaces`,
+   * `sharedSpaceRepository.reassignPersonFacesSafe`, and `recountPersons`, issued directly on `trx`.
+   */
+  private async collapseScopedConflicts(
+    trx: Transaction<DB>,
+    input: {
+      targetIdentityId: string;
+      sourceIdentityIds: string[];
+    },
+  ): Promise<void> {
+    const identityIds = [input.targetIdentityId, ...input.sourceIdentityIds];
+
+    // Lock the candidate identity rows so a concurrent overlapping merge serialises behind us
+    // and observes the collapsed state (or fails its own transaction) rather than racing.
+    await trx.selectFrom('face_identity').select('id').where('id', 'in', identityIds).forUpdate().execute();
+
+    await this.collapsePersonalConflicts(trx, input);
+    await this.collapseSpaceConflicts(trx, input);
+  }
+
+  private async collapsePersonalConflicts(
+    trx: Transaction<DB>,
+    input: {
+      targetIdentityId: string;
+      sourceIdentityIds: string[];
+    },
+  ): Promise<void> {
+    const identityIds = [input.targetIdentityId, ...input.sourceIdentityIds];
+    const rows = await trx
+      .selectFrom('person')
+      .select(['id', 'ownerId', 'identityId', 'name', 'birthDate'])
+      .where('identityId', 'in', identityIds)
+      .execute();
+
+    const byOwner = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const group = byOwner.get(row.ownerId);
+      if (group) {
+        group.push(row);
+      } else {
+        byOwner.set(row.ownerId, [row]);
+      }
+    }
+
+    for (const group of byOwner.values()) {
+      if (group.length < 2) {
+        continue;
+      }
+
+      const survivor = this.pickSurvivor(group, input.targetIdentityId);
+      for (const nonSurvivor of group) {
+        if (nonSurvivor.id === survivor.id) {
+          continue;
+        }
+
+        // Fill missing display metadata from the collapsed row (mirrors mergePerson's fill-if-empty).
+        const update: { name?: string; birthDate?: typeof nonSurvivor.birthDate } = {};
+        if (!survivor.name && nonSurvivor.name) {
+          update.name = nonSurvivor.name;
+          survivor.name = nonSurvivor.name;
+        }
+        if (!survivor.birthDate && nonSurvivor.birthDate) {
+          update.birthDate = nonSurvivor.birthDate;
+          survivor.birthDate = nonSurvivor.birthDate;
+        }
+        if (Object.keys(update).length > 0) {
+          await trx.updateTable('person').set(update).where('id', '=', survivor.id).execute();
+        }
+
+        // Mirror personRepository.reassignFaces (asset_face.personId source → survivor).
+        await trx
+          .updateTable('asset_face')
+          .set({ personId: survivor.id })
+          .where('personId', '=', nonSurvivor.id)
+          .execute();
+
+        // Link the survivor's faces (including freshly-moved ones with no prior identity link)
+        // to the target identity — mergeIdentities' own reassignment only moves existing links.
+        await this.linkPersonFaces(
+          { personId: survivor.id, identityId: input.targetIdentityId, source: 'manual' },
+          trx,
+        );
+
+        // Suggestions, aliases, etc. cascade-delete with the row.
+        await trx.deleteFrom('person').where('id', '=', nonSurvivor.id).execute();
+      }
+    }
+  }
+
+  private async collapseSpaceConflicts(
+    trx: Transaction<DB>,
+    input: {
+      targetIdentityId: string;
+      sourceIdentityIds: string[];
+    },
+  ): Promise<void> {
+    const identityIds = [input.targetIdentityId, ...input.sourceIdentityIds];
+    const rows = await trx
+      .selectFrom('shared_space_person')
+      .select(['id', 'spaceId', 'identityId'])
+      .where('identityId', 'in', identityIds)
+      .execute();
+
+    const bySpace = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const group = bySpace.get(row.spaceId);
+      if (group) {
+        group.push(row);
+      } else {
+        bySpace.set(row.spaceId, [row]);
+      }
+    }
+
+    for (const group of bySpace.values()) {
+      if (group.length < 2) {
+        continue;
+      }
+
+      const survivor = this.pickSurvivor(group, input.targetIdentityId);
+      for (const nonSurvivor of group) {
+        if (nonSurvivor.id === survivor.id) {
+          continue;
+        }
+
+        // Conflict-safe reassign of shared_space_person_face (mirrors reassignPersonFacesSafe):
+        // (personId, assetFaceId) is the PK, so drop links already on the survivor before moving.
+        await trx
+          .deleteFrom('shared_space_person_face')
+          .where('personId', '=', nonSurvivor.id)
+          .where(
+            'assetFaceId',
+            'in',
+            trx.selectFrom('shared_space_person_face').select('assetFaceId').where('personId', '=', survivor.id),
+          )
+          .execute();
+        await trx
+          .updateTable('shared_space_person_face')
+          .set({ personId: survivor.id })
+          .where('personId', '=', nonSurvivor.id)
+          .execute();
+
+        // Faces/aliases/suggestions of the redundant row cascade-delete with it.
+        await trx.deleteFrom('shared_space_person').where('id', '=', nonSurvivor.id).execute();
+      }
+
+      // Recompute the survivor's face/asset counts (mirrors recountPersons' self-contained UPDATE).
+      // The queued SharedSpacePersonMetadataBackfill does NOT recount per-space-person, so this is required.
+      await this.recountSpacePerson(trx, survivor.id);
+    }
+  }
+
+  private pickSurvivor<T extends { id: string; identityId: string | null }>(group: T[], targetIdentityId: string): T {
+    const onTarget = group.filter((row) => row.identityId === targetIdentityId);
+    const candidates = onTarget.length > 0 ? onTarget : group;
+    let best = candidates[0];
+    for (const row of candidates) {
+      if (row.id < best.id) {
+        best = row;
+      }
+    }
+    return best;
+  }
+
+  private async recountSpacePerson(trx: Transaction<DB>, personId: string): Promise<void> {
+    await trx
+      .updateTable('shared_space_person')
+      .set((eb) => ({
+        faceCount: eb
+          .selectFrom('shared_space_person_face')
+          .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+          .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+          .where('asset_face.deletedAt', 'is', null)
+          .where('asset_face.isVisible', 'is', true)
+          .where('asset.deletedAt', 'is', null)
+          .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
+          .select((eb2) => eb2.fn.countAll().$castTo<number>().as('count'))
+          .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id'),
+        assetCount: eb
+          .selectFrom('shared_space_person_face')
+          .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+          .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+          .where('asset_face.deletedAt', 'is', null)
+          .where('asset_face.isVisible', 'is', true)
+          .where('asset.deletedAt', 'is', null)
+          .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
+          .select((eb2) =>
+            eb2.fn
+              .count(eb2.fn('distinct', ['asset_face.assetId']))
+              .$castTo<number>()
+              .as('count'),
+          )
+          .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id'),
+      }))
+      .where('id', '=', personId)
+      .execute();
   }
 
   private async countMergeConflicts(
