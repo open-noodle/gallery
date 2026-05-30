@@ -15,6 +15,7 @@ import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/permission.provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
 import 'package:immich_mobile/providers/websocket.provider.dart';
+import 'package:immich_mobile/services/background_backup_reminder.service.dart';
 import 'package:logging/logging.dart';
 
 enum AppLifeCycleEnum { active, inactive, paused, resumed, detached, hidden }
@@ -169,6 +170,10 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
     if (isEnableBackup) {
       final currentUser = Store.tryGet(StoreKey.currentUser);
       if (currentUser != null) {
+        await _safeRun(
+          () => _ref.read(backgroundBackupReminderServiceProvider).maybeShowReminder(),
+          "backgroundBackupReminder",
+        );
         await _safeRun(() => _ref.read(backupProvider.notifier).startBackup(currentUser.id), "handleBackupResume");
       }
     }
