@@ -6,8 +6,28 @@ select distinct
 from
   "asset"
 where
-  "ownerId" = $2::uuid
-  and "visibility" = $3
+  (
+    "asset"."ownerId" = $2::uuid
+    or exists (
+      select
+      from
+        "shared_space_asset"
+        inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
+      where
+        "shared_space_asset"."assetId" = "asset"."id"
+        and "shared_space_member"."userId" = $3::uuid
+    )
+    or exists (
+      select
+      from
+        "shared_space_library"
+        inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_library"."spaceId"
+      where
+        "shared_space_library"."libraryId" = "asset"."libraryId"
+        and "shared_space_member"."userId" = $4::uuid
+    )
+  )
+  and "visibility" = $5
   and "deletedAt" is null
   and "fileCreatedAt" is not null
   and "fileModifiedAt" is not null
@@ -23,13 +43,33 @@ from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
 where
-  "ownerId" = $1::uuid
-  and "visibility" = $2
+  (
+    "asset"."ownerId" = $1::uuid
+    or exists (
+      select
+      from
+        "shared_space_asset"
+        inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
+      where
+        "shared_space_asset"."assetId" = "asset"."id"
+        and "shared_space_member"."userId" = $2::uuid
+    )
+    or exists (
+      select
+      from
+        "shared_space_library"
+        inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_library"."spaceId"
+      where
+        "shared_space_library"."libraryId" = "asset"."libraryId"
+        and "shared_space_member"."userId" = $3::uuid
+    )
+  )
+  and "visibility" = $4
   and "deletedAt" is null
   and "fileCreatedAt" is not null
   and "fileModifiedAt" is not null
   and "localDateTime" is not null
-  and "originalPath" like $3
-  and "originalPath" not like $4
+  and "originalPath" like $5
+  and "originalPath" not like $6
 order by
-  regexp_replace("asset"."originalPath", $5, $6) asc
+  regexp_replace("asset"."originalPath", $7, $8) asc
