@@ -1,5 +1,12 @@
-import { getPerson, LoginResponseDto, PersonResponseDto } from '@immich/sdk';
-import { uuidDto } from 'src/fixtures';
+import {
+  getPerson,
+  LoginResponseDto,
+  mergeScopedPeople,
+  PersonResponseDto,
+  Type2 as ScopedPersonRefType,
+  SharedSpaceRole,
+} from '@immich/sdk';
+import { createUserDto, uuidDto } from 'src/fixtures';
 import { errorDto } from 'src/responses';
 import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
@@ -342,5 +349,174 @@ describe('/people', () => {
       expect(status).toBe(400);
       expect(body).toEqual(errorDto.badRequest('Cannot merge a person into themselves'));
     });
+  });
+});
+
+// Gives an identity-LESS shared_space_person (from utils.createSpacePerson) its own
+// face_identity, so two such rows in the SAME space sit on DIFFERENT identities and
+// therefore form a same-space conflict that mergeScopedPeople must collapse.
+//
+// Mirrors the medium-test `createAccessibleSpaceIdentity` helper: insert a
+// face_identity (type 'person'), point both the backing global person row and the
+// space-person row at it, and link the backing face to it with source 'manual'.
+const giveSpacePersonAnIdentity = async (input: {
+  globalPersonId: string;
+  spacePersonId: string;
+  faceId: string;
+}): Promise<string> => {
+  const client = await utils.connectDatabase();
+
+  const identityResult = await client.query(
+    `INSERT INTO "face_identity" ("type", "representativeFaceId") VALUES ('person', $1) RETURNING id`,
+    [input.faceId],
+  );
+  const identityId = identityResult.rows[0].id as string;
+
+  await client.query(`UPDATE "person" SET "identityId" = $1 WHERE id = $2`, [identityId, input.globalPersonId]);
+  await client.query(`UPDATE "shared_space_person" SET "identityId" = $1 WHERE id = $2`, [
+    identityId,
+    input.spacePersonId,
+  ]);
+  await client.query(
+    `INSERT INTO "face_identity_face" ("assetFaceId", "identityId", "source") VALUES ($1, $2, 'manual')`,
+    [input.faceId, identityId],
+  );
+
+  return identityId;
+};
+
+describe('/people/same-person (scoped merge collapse)', () => {
+  let admin: LoginResponseDto;
+
+  beforeAll(async () => {
+    await utils.resetDatabase();
+    admin = await utils.adminSetup();
+  });
+
+  it('collapses two same-owner personal duplicates into one surviving person', async () => {
+    // Test case A: two personal people owned by the same user, each on its own identity
+    // (utils.createFace mints an identity per person). The merge must collapse the source
+    // into the target and delete the source person row.
+    const [target, source] = await Promise.all([
+      utils.createPerson(admin.accessToken, { name: 'Same Owner Target' }),
+      utils.createPerson(admin.accessToken, { name: 'Same Owner Source' }),
+    ]);
+
+    const targetAsset = await utils.createAsset(admin.accessToken);
+    const sourceAsset = await utils.createAsset(admin.accessToken);
+    await utils.createFace({ assetId: targetAsset.id, personId: target.id });
+    await utils.createFace({ assetId: sourceAsset.id, personId: source.id });
+
+    await mergeScopedPeople(
+      {
+        mergeScopedPeopleDto: {
+          target: { type: ScopedPersonRefType.Person, id: target.id },
+          sources: [{ type: ScopedPersonRefType.Person, id: source.id }],
+        },
+      },
+      { headers: asBearerAuth(admin.accessToken) },
+    );
+
+    // Target survives.
+    const survivor = await getPerson({ id: target.id }, { headers: asBearerAuth(admin.accessToken) });
+    expect(survivor).toMatchObject({ id: target.id });
+
+    // Source person row is gone (collapsed). Missing personal person → 400 (bulk-access pattern).
+    const { status: sourceStatus, body: sourceBody } = await request(app)
+      .get(`/people/${source.id}`)
+      .set('Authorization', `Bearer ${admin.accessToken}`);
+    expect(sourceStatus).toBe(400);
+    expect(sourceBody).toEqual(errorDto.badRequest());
+  });
+
+  it('collapses two same-space duplicates into one surviving space person', async () => {
+    // Test case B: two space-people in ONE space, on two different identities. The merge
+    // collapses them to a single surviving shared_space_person row; the other id is gone.
+    const space = await utils.createSpace(admin.accessToken, { name: 'Same Space Collapse' });
+    const asset = await utils.createAsset(admin.accessToken);
+    await utils.addSpaceAssets(admin.accessToken, space.id, [asset.id]);
+
+    const targetSp = await utils.createSpacePerson(space.id, 'Space Target', admin.userId, asset.id);
+    const sourceSp = await utils.createSpacePerson(space.id, 'Space Source', admin.userId, asset.id);
+    await giveSpacePersonAnIdentity(targetSp);
+    await giveSpacePersonAnIdentity(sourceSp);
+
+    await mergeScopedPeople(
+      {
+        mergeScopedPeopleDto: {
+          target: { type: ScopedPersonRefType.SpacePerson, id: targetSp.spacePersonId, spaceId: space.id },
+          sources: [{ type: ScopedPersonRefType.SpacePerson, id: sourceSp.spacePersonId, spaceId: space.id }],
+        },
+      },
+      { headers: asBearerAuth(admin.accessToken) },
+    );
+
+    // Exactly one of the two created space-people survives, and it is the target.
+    const { status: listStatus, body: listBody } = await request(app)
+      .get(`/shared-spaces/${space.id}/people?withHidden=true`)
+      .set('Authorization', `Bearer ${admin.accessToken}`);
+    expect(listStatus).toBe(200);
+    const remainingIds = (listBody as { id: string }[]).map((p) => p.id);
+    expect(remainingIds).toContain(targetSp.spacePersonId);
+    expect(remainingIds).not.toContain(sourceSp.spacePersonId);
+
+    // The collapsed source space-person id is no longer addressable → 400 'Person not found'.
+    const { status: sourceStatus, body: sourceBody } = await request(app)
+      .get(`/shared-spaces/${space.id}/people/${sourceSp.spacePersonId}`)
+      .set('Authorization', `Bearer ${admin.accessToken}`);
+    expect(sourceStatus).toBe(400);
+    expect((sourceBody as { message: string }).message).toMatch(/Person not found/i);
+  });
+
+  it('refuses a same-space conflict in a view-only space with a space-named message', async () => {
+    // The actor owns two PERSONAL people on two different identities, and both identities
+    // also appear as separate space-people in a space the actor can only VIEW.
+    //
+    // Why personal refs (not space-person refs): a space-person ref only resolves when the
+    // actor is owner/editor of the space (resolveRepairProfile → isRepairRole gate at
+    // face-identity.repository.ts:1286). A viewer passing space-person refs would 400
+    // ('not found or not accessible'), never reaching the conflict check. To exercise the
+    // ForbiddenException path (the actual viewer-refusal behaviour), the actor selects refs
+    // it CAN repair (its own personal people) while the blocking same-space conflict is
+    // discovered by findBlockingMergeConflictScope — it groups shared_space_person by space,
+    // finds two of the merged identities there, and sees the actor is not owner/editor
+    // (face-identity.repository.ts:1311-1330), producing the 403 with the space name.
+    const owner = await utils.userSetup(admin.accessToken, createUserDto.create('scoped-merge-owner'));
+    const viewer = await utils.userSetup(admin.accessToken, createUserDto.create('scoped-merge-viewer'));
+
+    // The space, owned by `owner`; `viewer` is added as a Viewer.
+    const space = await utils.createSpace(owner.accessToken, { name: 'View Only Holidays' });
+    const ownerAsset = await utils.createAsset(owner.accessToken);
+    await utils.addSpaceAssets(owner.accessToken, space.id, [ownerAsset.id]);
+    await utils.addSpaceMember(owner.accessToken, space.id, {
+      userId: viewer.userId,
+      role: SharedSpaceRole.Viewer,
+    });
+
+    // Two space-people on two distinct identities in that view-only space.
+    const spA = await utils.createSpacePerson(space.id, 'Alice', owner.userId, ownerAsset.id);
+    const spB = await utils.createSpacePerson(space.id, 'Alice (2)', owner.userId, ownerAsset.id);
+    const identityA = await giveSpacePersonAnIdentity(spA);
+    const identityB = await giveSpacePersonAnIdentity(spB);
+
+    // The viewer's own two personal people, each pinned onto one of those identities so the
+    // refs the viewer selects are repairable (own personal rows) but the merge would have to
+    // collapse a row in the view-only space.
+    const viewerPersonA = await utils.createPerson(viewer.accessToken, { name: 'My Alice' });
+    const viewerPersonB = await utils.createPerson(viewer.accessToken, { name: 'My Alice (2)' });
+    const client = await utils.connectDatabase();
+    await client.query(`UPDATE "person" SET "identityId" = $1 WHERE id = $2`, [identityA, viewerPersonA.id]);
+    await client.query(`UPDATE "person" SET "identityId" = $1 WHERE id = $2`, [identityB, viewerPersonB.id]);
+
+    const { status, body } = await request(app)
+      .post('/people/same-person')
+      .set('Authorization', `Bearer ${viewer.accessToken}`)
+      .send({
+        target: { type: 'person', id: viewerPersonA.id },
+        sources: [{ type: 'person', id: viewerPersonB.id }],
+      });
+
+    expect(status).toBe(403);
+    expect((body as { message: string }).message).toContain('View Only Holidays');
   });
 });
