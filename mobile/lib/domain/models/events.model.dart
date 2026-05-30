@@ -9,12 +9,6 @@ class ScrollToTopEvent extends Event {
   const ScrollToTopEvent();
 }
 
-class ScrollToDateEvent extends Event {
-  final DateTime date;
-
-  const ScrollToDateEvent(this.date);
-}
-
 // Asset Viewer Events
 class ViewerShowDetailsEvent extends Event {
   const ViewerShowDetailsEvent();
