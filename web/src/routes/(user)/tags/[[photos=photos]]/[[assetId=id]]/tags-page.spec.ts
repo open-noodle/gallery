@@ -1,6 +1,6 @@
-import type { TagResponseDto } from '@immich/sdk';
+import { AssetVisibility, type TagResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
-import { render } from '@testing-library/svelte';
+import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import TagsPage from './+page.svelte';
@@ -198,5 +198,24 @@ describe('Tags page cmdk selection context', () => {
     expect(options.getOnDelete()).toEqual(expect.any(Function));
     expect(options.getOnUndoDelete()).toEqual(expect.any(Function));
     expect(options.getAddSelectedToCurrentSpace?.()).toBeUndefined();
+  });
+});
+
+describe('Tags page timeline scope', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // Non-admin space members can see a tag owned by the space creator, but the assets
+  // under it belong to the creator and are only reachable through the shared space.
+  // The timeline must opt into shared-space assets (and pin timeline visibility, which
+  // withSharedSpaces requires) so the tag actually shows photos for them (issue #647).
+  it('requests shared-space assets so non-admin members see photos under a tag', () => {
+    renderPage();
+
+    const options = screen.getByTestId('timeline-options').textContent ?? '';
+    expect(options).toContain('"tagId":"tag-1"');
+    expect(options).toContain('"withSharedSpaces":true');
+    expect(options).toContain(`"visibility":"${AssetVisibility.Timeline}"`);
   });
 });
