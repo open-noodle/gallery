@@ -187,8 +187,6 @@ export class AssetMediaService extends BaseService {
         await this.addToSharedLink(auth.sharedLink, asset.id);
       }
 
-      await this.userRepository.updateUsage(auth.user.id, file.size);
-
       return { id: asset.id, status: AssetMediaStatus.CREATED };
     } catch (error: any) {
       return this.handleUploadError(error, auth, file, sidecarFile, asset);
@@ -430,7 +428,7 @@ export class AssetMediaService extends BaseService {
         }
       }
 
-      await this.eventRepository.emit('AssetCreate', { asset });
+      await this.eventRepository.emit('AssetCreate', { asset, file });
 
       await this.jobRepository.queue({ name: JobName.AssetExtractMetadata, data: { id: asset.id, source: 'upload' } });
     } catch (error: Error | any) {
