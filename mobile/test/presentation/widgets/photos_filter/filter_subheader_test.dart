@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/active_filter_chip.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/match_count_label.widget.dart';
 import 'package:immich_mobile/presentation/widgets/photos_filter/filter_subheader.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
@@ -43,6 +44,19 @@ void main() {
 
       expect(container.read(photosFilterProvider).isEmpty, isTrue);
       expect(find.byKey(const Key('photos-filter-subheader')), findsNothing);
+    });
+
+    testWidgets('strip pins Clear all only — sort moved to the app bar, count to the sheet footer', (tester) async {
+      await tester.pumpConsumerWidget(_scroll(const PhotosFilterSubheader()));
+      await tester.pumpAndSettle();
+      final container = ProviderScope.containerOf(tester.element(find.byType(CustomScrollView)));
+      container.read(photosFilterProvider.notifier).setText('paris');
+      await tester.pumpAndSettle();
+
+      // The crowding fix: the strip no longer hosts the sort control or the
+      // match count, freeing the full width for the scrollable filter chips.
+      expect(find.byKey(const Key('photos-filter-sort-chip')), findsNothing);
+      expect(find.byType(MatchCountLabel), findsNothing);
     });
 
     testWidgets('clear-all label uses existing clear_all i18n key', (tester) async {
