@@ -670,7 +670,7 @@
       </ButtonContextMenu>
     </AssetSelectControlBar>
   {:else}
-    <ControlAppBar showBackButton backIcon={mdiArrowLeft} onClose={handleBack}>
+    <ControlAppBar backIcon={mdiArrowLeft} onClose={handleBack}>
       {#snippet trailing()}
         {#if isEditor && action !== 'merge'}
           <ContextMenuButton items={actionItems} aria-label={$t('show_person_options')} />
