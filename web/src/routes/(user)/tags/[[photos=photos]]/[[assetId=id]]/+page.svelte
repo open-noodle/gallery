@@ -31,7 +31,7 @@
   import { getAssetBulkActions } from '$lib/services/asset.service';
   import { getTagActions } from '$lib/services/tag.service';
   import { joinPaths, TreeNode } from '$lib/utils/tree-utils';
-  import { getAllTags, type TagResponseDto } from '@immich/sdk';
+  import { AssetVisibility, getAllTags, type TagResponseDto } from '@immich/sdk';
   import { ActionButton, CommandPaletteDefaultProvider, Text } from '@immich/ui';
   import { mdiDotsVertical, mdiTag, mdiTagMultiple } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -48,7 +48,15 @@
   const tag = $derived(tree.traverse(data.path));
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
-  const options = $derived({ deferInit: !tag, tagId: tag?.id });
+  // Tags can belong to a space's owner while the tagged assets are only reachable
+  // through the shared space. Opt into shared-space assets (which requires an explicit
+  // timeline visibility) so non-admin members actually see photos under a tag (#647).
+  const options = $derived({
+    deferInit: !tag,
+    tagId: tag?.id,
+    visibility: AssetVisibility.Timeline,
+    withSharedSpaces: true,
+  });
 
   const handleNavigation = (tag: string) => navigateToView(joinPaths(data.path, tag));
 
