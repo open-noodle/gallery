@@ -31,6 +31,7 @@ REPO_NAME=$(jq -r '.repository.name' "$CONFIG")
 REPO_URL=$(jq -r '.repository.url' "$CONFIG")
 REPO_DOCS_URL=$(jq -r '.repository.docs_url' "$CONFIG")
 REPO_ISSUES_URL=$(jq -r '.repository.issues_url' "$CONFIG")
+REPO_RELEASES_URL=$(jq -r '.repository.releases_url' "$CONFIG")
 
 # Docker
 DOCKER_REGISTRY=$(jq -r '.docker.registry' "$CONFIG")
@@ -156,6 +157,55 @@ patch_web() {
     sed -i "s/Immich/${NAME}/g" "$openapi"
     echo "  Patched OpenAPI spec"
   fi
+}
+
+#
+# --- App download modal ---
+#
+# The "App download links" modal (Tools menu + onboarding) hardcodes the upstream
+# Immich Play Store, App Store, and F-Droid badges (issue #649). Repoint the two
+# store badges to the Noodle Gallery apps. Noodle Gallery is not published on
+# F-Droid, so that badge is replaced with a link to the GitHub releases page.
+patch_app_download_modal() {
+  echo "--- Patching app download modal ---"
+  local modal="$REPO_ROOT/web/src/lib/modals/AppDownloadModal.svelte"
+  [[ -f "$modal" ]] || return 0
+
+  # Repoint the Play Store + App Store badges to the Noodle Gallery apps.
+  sed -i "s|https://play\.google\.com/store/apps/details?id=app\.alextran\.immich|${PLAY_STORE_URL}|g" "$modal"
+  sed -i "s|https://apps\.apple\.com/us/app/immich/id1613945652|${APP_STORE_URL}|g" "$modal"
+
+  # Replace the F-Droid badge (no Noodle F-Droid app) with a GitHub releases
+  # link. Mirrors patch_help_modal's awk block-rewrite: swap the <a id="fdroid-link">
+  # ...</a> anchor for a text link styled like the adjacent Obtainium link.
+  local tmp
+  tmp=$(mktemp)
+  awk -v url="$REPO_RELEASES_URL" '
+    /id="fdroid-link"/ { skip = 1 }
+    skip && /<\/a>/ {
+      skip = 0
+      print "    <a"
+      print "      href=\"" url "\""
+      print "      target=\"_blank\""
+      print "      rel=\"noreferrer\""
+      print "      id=\"github-release-link\""
+      print "      class=\"mt-2 text-center underline text-sm immich-form-label\""
+      print "    >"
+      print "      Get it on GitHub"
+      print "    </a>"
+      next
+    }
+    skip { next }
+    { print }
+  ' "$modal" > "$tmp"
+  chmod 644 "$tmp"
+  mv "$tmp" "$modal"
+
+  # fdroidBadge import is now unused — drop it to keep the build lint-clean
+  # regardless of where it sits in the destructured import list.
+  sed -i "s/, fdroidBadge//g; s/fdroidBadge, //g" "$modal"
+
+  echo "  Patched AppDownloadModal.svelte"
 }
 
 #
@@ -721,6 +771,7 @@ main() {
   patch_versions
   patch_i18n
   patch_web
+  patch_app_download_modal
   patch_emails
   patch_help_modal
   patch_assets
