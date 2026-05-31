@@ -497,7 +497,7 @@ const handleQuickRotate = async (asset: AssetResponseDto, angle: number) => {
       angle,
     );
 
-    const editCompleted = waitForWebsocketEvent('AssetEditReadyV1', (event) => event.asset.id === asset.id, 10_000);
+    const editCompleted = waitForWebsocketEvent('AssetEditReadyV2', (event) => event.asset.id === asset.id, 10_000);
 
     await (edits.length === 0
       ? removeAssetEdits({ id: asset.id })
