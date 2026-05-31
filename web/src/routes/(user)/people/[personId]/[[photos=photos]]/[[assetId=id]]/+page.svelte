@@ -604,7 +604,7 @@
       </ButtonContextMenu>
     </AssetSelectControlBar>
   {:else if viewMode === PersonPageViewMode.VIEW_ASSETS}
-    <ControlAppBar showBackButton backIcon={mdiArrowLeft} onClose={() => goto(previousRoute)}>
+    <ControlAppBar backIcon={mdiArrowLeft} onClose={() => goto(previousRoute)}>
       {#snippet trailing()}
         <ContextMenuButton
           items={[
