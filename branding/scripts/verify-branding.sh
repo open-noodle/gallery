@@ -105,6 +105,18 @@ if [[ -f "$help_modal" ]]; then
   fi
 fi
 
+# App download modal (issue #649) — store badges must not point at the Immich apps.
+# Noodle has no F-Droid listing, so that badge is replaced with a GitHub link.
+app_download_modal="$REPO_ROOT/web/src/lib/modals/AppDownloadModal.svelte"
+if [[ -f "$app_download_modal" ]]; then
+  if grep -qE "app\.alextran\.immich|app/immich/id1613945652|f-droid\.org|fdroidBadge" "$app_download_modal"; then
+    echo "  WARN: Immich store link/F-Droid badge still present in AppDownloadModal.svelte"
+    EXIT_CODE=1
+  else
+    echo "  OK: AppDownloadModal.svelte (store links patched)"
+  fi
+fi
+
 # Check Dockerfiles for upstream repo references
 echo "--- Checking Dockerfiles ---"
 for dockerfile in "server/Dockerfile" "machine-learning/Dockerfile"; do
