@@ -377,6 +377,7 @@ describe(AssetMediaService.name, () => {
       });
 
       expect(mocks.asset.create).toHaveBeenCalled();
+      expect(mocks.user.updateUsage).not.toHaveBeenCalled();
       expect(mocks.storage.utimes).toHaveBeenCalledWith(
         file.originalPath,
         expect.any(Date),
@@ -445,8 +446,7 @@ describe(AssetMediaService.name, () => {
       expect(mocks.asset.remove).toHaveBeenCalledWith({ id: assetEntity.id });
       expect(mocks.asset.create).toHaveBeenCalledTimes(2);
       expect(mocks.asset.getUploadAssetIdByChecksum).not.toHaveBeenCalled();
-      expect(mocks.user.updateUsage).toHaveBeenCalledTimes(1);
-      expect(mocks.user.updateUsage).toHaveBeenCalledWith(authStub.user1.user.id, file.size);
+      expect(mocks.user.updateUsage).not.toHaveBeenCalled();
     });
 
     it('should keep uploaded disk files when removing the incomplete asset row fails', async () => {
