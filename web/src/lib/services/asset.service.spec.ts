@@ -22,15 +22,6 @@ vitest.mock('@immich/ui', () => ({
   },
 }));
 
-vitest.mock('#lib/utils/asset-utils.js', async () => {
-  const originalModule =
-    await vitest.importActual<typeof import('#lib/utils/asset-utils.ts')>('#lib/utils/asset-utils.ts');
-  return {
-    ...originalModule,
-    downloadUrl: downloadUrlMock,
-  };
-});
-
 vitest.mock('#lib/utils/i18n.js', () => ({
   getFormatter: vitest.fn(),
   getPreferredLocale: vitest.fn(),
@@ -55,6 +46,7 @@ vitest.mock('#lib/utils.js', async () => {
   return {
     ...originalModule,
     sleep: vitest.fn(),
+    downloadUrl: downloadUrlMock,
   };
 });
 
