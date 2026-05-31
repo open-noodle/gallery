@@ -73,7 +73,33 @@ select
 from
   "tag"
 where
-  "userId" = $1
+  (
+    "tag"."userId" = $1::uuid
+    or exists (
+      select
+      from
+        "tag_asset"
+        inner join "asset" on "asset"."id" = "tag_asset"."assetId"
+        inner join "shared_space_asset" on "shared_space_asset"."assetId" = "asset"."id"
+        inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
+      where
+        "tag_asset"."tagId" = "tag"."id"
+        and "asset"."deletedAt" is null
+        and "shared_space_member"."userId" = $2::uuid
+    )
+    or exists (
+      select
+      from
+        "tag_asset"
+        inner join "asset" on "asset"."id" = "tag_asset"."assetId"
+        inner join "shared_space_library" on "shared_space_library"."libraryId" = "asset"."libraryId"
+        inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_library"."spaceId"
+      where
+        "tag_asset"."tagId" = "tag"."id"
+        and "asset"."deletedAt" is null
+        and "shared_space_member"."userId" = $3::uuid
+    )
+  )
 order by
   "value"
 
