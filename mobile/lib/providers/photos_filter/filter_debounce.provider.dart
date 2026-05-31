@@ -3,7 +3,7 @@
 // `photosFilterDebouncedProvider` — 250 ms; feeds the suggestions provider and
 // the filter-sheet strips (design §8 "Debounce filter-change → suggestions call").
 //
-// `photosTimelineFilterProvider` — 500 ms; feeds `photosTimelineQueryProvider`
+// `photosTimelineFilterProvider` — 800 ms; feeds `photosTimelineQueryProvider`
 // (design §6.4.1 / §8 "timeline refetch debounce").
 
 import 'dart:async';
@@ -18,7 +18,7 @@ final photosFilterDebouncedProvider = Provider<SearchFilter>(
 );
 
 final photosTimelineFilterProvider = Provider<SearchFilter>(
-  (ref) => _debouncedFilter(ref, const Duration(milliseconds: 500)),
+  (ref) => _debouncedFilter(ref, const Duration(milliseconds: 800)),
   dependencies: const [],
 );
 
