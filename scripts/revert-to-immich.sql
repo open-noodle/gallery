@@ -419,6 +419,10 @@ END $$;
 -- schema. Recreate the older empty tables after dropping both old and new
 -- shapes. Some Gallery images may not yet contain the 177861 migration, so
 -- the old child tables can still exist here.
+--
+-- 1779806699547-AddPluginTemplates later added "plugin"."templates" and
+-- "plugin"."sha256hash". Recreating the plugin table to its v2.7.5 shape below
+-- drops both columns, so no separate rollback is needed.
 DROP TABLE IF EXISTS "workflow_step" CASCADE;
 DROP TABLE IF EXISTS "workflow_filter" CASCADE;
 DROP TABLE IF EXISTS "workflow_action" CASCADE;
@@ -580,7 +584,8 @@ DELETE FROM "kysely_migrations"
    '1777654048096-CreateAudioVideoTables',
    '1777667825574-ChangeDurationToInteger',
    '1777897107000-PartnerAssetSyncReset',
-   '1778614946174-UpdateWorkflowTables'
+   '1778614946174-UpdateWorkflowTables',
+   '1779806699547-AddPluginTemplates'
  );
 
 -- -----------------------------------------------------------------------------

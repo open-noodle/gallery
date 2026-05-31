@@ -187,13 +187,13 @@ describe('album detail filter panel route', () => {
     await user.click(screen.getByTestId('people-item-person-picker'));
     expect(screen.getByTestId('active-chip')).toHaveTextContent('Picker Person');
 
-    await fireEvent.click(screen.getByLabelText('close'));
+    await fireEvent.click(screen.getByLabelText('Close'));
     expect(screen.getByTestId('active-chip')).toHaveTextContent('Album Person');
 
     await fireEvent.click(screen.getByLabelText('add_photos'));
     expect(screen.getByTestId('active-chip')).toHaveTextContent('Picker Person');
 
-    await fireEvent.click(screen.getByLabelText('close'));
+    await fireEvent.click(screen.getByLabelText('Close'));
     await user.click(screen.getByLabelText('album_options'));
     await user.click(screen.getByText('select_album_cover'));
     expect(screen.getByTestId('discovery-panel')).toBeInTheDocument();

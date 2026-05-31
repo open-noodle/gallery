@@ -243,7 +243,7 @@ describe('Spaces person detail page', () => {
   it('returns to the previous route when opened from global people', async () => {
     renderPage({ previousRoute: '/people' });
 
-    await userEvent.click(screen.getByLabelText('close'));
+    await userEvent.click(screen.getByLabelText('Close'));
 
     expect(gotoMock).toHaveBeenCalledWith('/people');
   });
