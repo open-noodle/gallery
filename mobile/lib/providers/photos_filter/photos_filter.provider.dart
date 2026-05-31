@@ -18,7 +18,18 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
   void reset() => state = SearchFilter.empty();
 
   // SearchFilter.copyWith null-coalesces, so use cascade to set nullable fields.
-  void setText(String text) => state = state.copyWith()..context = text.isEmpty ? null : text;
+  void setText(String text) {
+    final next = state.copyWith()..context = text.isEmpty ? null : text;
+    // Relevance is only valid for smart (text) search; coerce to Newest for metadata.
+    state = (next.context == null && next.sort == SearchSortOrder.relevance)
+        ? next.copyWith(sort: SearchSortOrder.newest)
+        : next;
+  }
+
+  void setSort(SearchSortOrder sort) => state = state.copyWith(sort: sort);
+
+  void setSimilarTo(String assetId) =>
+      state = SearchFilter.empty().copyWith(assetId: assetId, mediaType: AssetType.image);
 
   void togglePerson(PersonDto person) {
     final next = Set<PersonDto>.from(state.people);
