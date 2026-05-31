@@ -8,13 +8,11 @@ import 'package:immich_mobile/domain/models/events.model.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
-import 'package:immich_mobile/presentation/pages/search/paginated_search.provider.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
-import 'package:immich_mobile/providers/search/search_input_focus.provider.dart';
 import 'package:immich_mobile/providers/tab.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 
@@ -37,12 +35,6 @@ class _TabShellPageState extends ConsumerState<TabShellPage> {
         label: context.t.photos,
         icon: const Icon(Icons.photo_library_outlined),
         selectedIcon: Icon(Icons.photo_library, color: context.primaryColor),
-      ),
-      NavigationDestination(
-        label: context.t.search,
-        icon: const Icon(Icons.search_rounded),
-        selectedIcon: Icon(Icons.search, color: context.primaryColor),
-        enabled: !isReadonlyModeEnabled,
       ),
       NavigationDestination(
         label: 'Spaces',
@@ -78,7 +70,7 @@ class _TabShellPageState extends ConsumerState<TabShellPage> {
     }
 
     return AutoTabsRouter(
-      routes: const [MainTimelineRoute(), SearchRoute(), SpacesRoute(), LibraryRoute()],
+      routes: const [MainTimelineRoute(), SpacesRoute(), LibraryRoute()],
       duration: const Duration(milliseconds: 600),
       transitionBuilder: (context, child, animation) => FadeTransition(opacity: animation, child: child),
       builder: (context, child) {
@@ -113,15 +105,6 @@ void _onNavigationSelected(TabsRouter router, int index, WidgetRef ref) {
 
   if (index == kPhotoTabIndex) {
     ref.invalidate(memoryLaneProvider);
-  }
-
-  if (router.activeIndex != kSearchTabIndex && index == kSearchTabIndex) {
-    ref.read(searchPreFilterProvider.notifier).clear();
-  }
-
-  // On Search page tapped
-  if (router.activeIndex == kSearchTabIndex && index == kSearchTabIndex) {
-    ref.read(searchInputFocusProvider).requestFocus();
   }
 
   // Spaces page
