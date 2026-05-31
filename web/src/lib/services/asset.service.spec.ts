@@ -20,14 +20,6 @@ vitest.mock('@immich/ui', () => ({
   },
 }));
 
-vitest.mock('$lib/utils/asset-utils', async () => {
-  const originalModule = await vitest.importActual<typeof import('$lib/utils/asset-utils')>('$lib/utils/asset-utils');
-  return {
-    ...originalModule,
-    downloadUrl: downloadUrlMock,
-  };
-});
-
 vitest.mock('$lib/utils/i18n', () => ({
   getFormatter: vitest.fn(),
   getPreferredLocale: vitest.fn(),
@@ -52,6 +44,7 @@ vitest.mock('$lib/utils', async () => {
   return {
     ...originalModule,
     sleep: vitest.fn(),
+    downloadUrl: downloadUrlMock,
   };
 });
 
