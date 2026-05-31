@@ -65,7 +65,7 @@ const manifest: Manifest = {
       id: 'immich-ui-command-patch',
       package: '@immich/ui',
       version_source: 'pnpm-workspace.yaml',
-      expected_patch: 'patches/@immich__ui@0.77.3.patch',
+      expected_patch: 'patches/@immich__ui@0.79.0.patch',
       required_check: 'mobile-drift-rebase-check',
     },
   ],
