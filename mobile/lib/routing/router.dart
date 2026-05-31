@@ -72,7 +72,6 @@ import 'package:immich_mobile/presentation/pages/profile/profile_picture_crop.pa
 import 'package:immich_mobile/presentation/pages/recently_added.page.dart';
 import 'package:immich_mobile/presentation/pages/recently_taken.page.dart';
 import 'package:immich_mobile/presentation/pages/remote_album.page.dart';
-import 'package:immich_mobile/presentation/pages/search/search.page.dart';
 import 'package:immich_mobile/presentation/pages/slideshow.page.dart';
 import 'package:immich_mobile/presentation/pages/trash.page.dart';
 import 'package:immich_mobile/presentation/pages/user_selection.page.dart';
@@ -130,7 +129,7 @@ class AppRouter extends RootStackRouter {
       guards: [_authGuard, _duplicateGuard],
       children: [
         AutoRoute(page: MainTimelineRoute.page, guards: [_authGuard, _duplicateGuard]),
-        AutoRoute(page: SearchRoute.page, guards: [_authGuard, _duplicateGuard], maintainState: false),
+
         AutoRoute(page: SpacesRoute.page, guards: [_authGuard, _duplicateGuard]),
         AutoRoute(page: LibraryRoute.page, guards: [_authGuard, _duplicateGuard]),
       ],
