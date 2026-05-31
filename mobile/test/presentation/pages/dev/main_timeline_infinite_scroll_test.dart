@@ -14,6 +14,7 @@ import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/metadata.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/presentation/pages/dev/main_timeline.page.dart';
@@ -80,6 +81,7 @@ void main() {
     registerFallbackValue(_FakeFilter());
     db = Drift(DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
     await StoreService.init(storeRepository: DriftStoreRepository(db));
+    await MetadataRepository.ensureInitialized(db);
     await Store.put(StoreKey.serverEndpoint, 'http://localhost:0');
   });
   tearDownAll(() => db.close());
