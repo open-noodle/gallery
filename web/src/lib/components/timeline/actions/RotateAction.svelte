@@ -30,7 +30,7 @@
           );
 
           const editCompleted = waitForWebsocketEvent(
-            'AssetEditReadyV1',
+            'AssetEditReadyV2',
             (event) => event.asset.id === asset.id,
             10_000,
           );
