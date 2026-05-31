@@ -118,6 +118,8 @@ abstract class SearchDisplayFilters with _$SearchDisplayFilters {
   }) = _SearchDisplayFilters;
 }
 
+enum SearchSortOrder { relevance, newest, oldest }
+
 @freezed
 abstract class SearchFilter with _$SearchFilter {
   const SearchFilter._();
@@ -137,6 +139,7 @@ abstract class SearchFilter with _$SearchFilter {
     required SearchRatingFilter rating,
     required SearchDisplayFilters display,
     required AssetType mediaType,
+    @Default(SearchSortOrder.relevance) SearchSortOrder sort,
   }) = _SearchFilter;
 
   static SearchFilter empty() => SearchFilter(
