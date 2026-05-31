@@ -8,6 +8,7 @@ import { StorageService } from 'src/services/storage.service';
 import { UserService } from 'src/services/user.service';
 import { clearConfigCache } from 'src/utils/config';
 import { ImmichFileResponse } from 'src/utils/file';
+import { AssetFactory } from 'test/factories/asset.factory';
 import { AuthFactory } from 'test/factories/auth.factory';
 import { UserFactory } from 'test/factories/user.factory';
 import { authStub } from 'test/fixtures/auth.stub';
@@ -895,6 +896,23 @@ describe(UserService.name, () => {
 
       expect(mocks.storage.unlinkDir).toHaveBeenCalledTimes(5);
       expect((StorageService as any).s3Backend).toBeUndefined();
+    });
+  });
+
+  describe('onAssetCreate', () => {
+    it('should update usage by the uploaded file size', async () => {
+      const asset = AssetFactory.create({ ownerId: authStub.user1.user.id });
+      const file = {
+        uuid: 'random-uuid',
+        checksum: Buffer.from('file hash', 'utf8'),
+        originalPath: 'fake_path/asset_1.jpeg',
+        originalName: 'asset_1.jpeg',
+        size: 42,
+      };
+
+      await sut.onAssetCreate({ asset, file });
+
+      expect(mocks.user.updateUsage).toHaveBeenCalledWith(asset.ownerId, file.size);
     });
   });
 
