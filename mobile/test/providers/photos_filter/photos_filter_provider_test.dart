@@ -403,6 +403,32 @@ void main() {
     });
   });
 
+  test('setSort updates the filter sort', () {
+    final c = ProviderContainer();
+    addTearDown(c.dispose);
+    c.read(photosFilterProvider.notifier).setSort(SearchSortOrder.oldest);
+    expect(c.read(photosFilterProvider).sort, SearchSortOrder.oldest);
+  });
+
+  test('clearing text while Relevance coerces sort to Newest', () {
+    final c = ProviderContainer();
+    addTearDown(c.dispose);
+    final n = c.read(photosFilterProvider.notifier);
+    n.setText('beach');
+    n.setSort(SearchSortOrder.relevance);
+    n.setText('');
+    expect(c.read(photosFilterProvider).sort, SearchSortOrder.newest);
+  });
+
+  test('setSimilarTo builds an assetId-only image filter', () {
+    final c = ProviderContainer();
+    addTearDown(c.dispose);
+    c.read(photosFilterProvider.notifier).setSimilarTo('abc');
+    final f = c.read(photosFilterProvider);
+    expect(f.assetId, 'abc');
+    expect(f.isEmpty, isFalse);
+  });
+
   group('no-op safety', () {
     test('clearPeople on an already-empty filter does not emit', () {
       final listener = ListenerMock<SearchFilter>();
