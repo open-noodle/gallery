@@ -113,7 +113,7 @@ void main() {
       verify(() => factory.fromAssetStream(any(), any(), TimelineOrigin.search)).called(1);
     });
 
-    test('remote content changes refresh the active search-backed timeline', () async {
+    test('remote content change does NOT re-fire the search-backed timeline', () async {
       final factory = _MockFactory();
       final search = _MockSearch();
       final fake = _FakeService();
@@ -127,13 +127,16 @@ void main() {
 
       container.read(photosTimelineQueryProvider);
       await Future<void>.delayed(const Duration(milliseconds: 5));
+      // Exactly one search call for the initial query.
       verify(() => search.search(any(), 1)).called(1);
 
+      // Remote-content changes must NOT rebuild/reset the search-backed timeline
+      // (search results are a server snapshot; they refresh only when the query changes).
       container.read(syncStatusProvider.notifier).markRemoteContentChanged();
       container.read(photosTimelineQueryProvider);
       await Future<void>.delayed(const Duration(milliseconds: 5));
 
-      verify(() => search.search(any(), 1)).called(1);
+      verifyNever(() => search.search(any(), any()));
     });
 
     test('disposes the created service when the container disposes', () async {
