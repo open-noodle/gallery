@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Insertable, InsertQueryBuilder, Kysely, QueryCreator, Selectable, Updateable } from 'kysely';
+import { ExpressionBuilder, Insertable, InsertQueryBuilder, Kysely, QueryCreator, Selectable, Updateable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { columns } from 'src/database';
 import { Chunked, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators';
@@ -7,6 +7,8 @@ import { LoggingRepository } from 'src/repositories/logging.repository';
 import { DB } from 'src/schema';
 import { TagAssetTable } from 'src/schema/tables/tag-asset.table';
 import { TagTable } from 'src/schema/tables/tag.table';
+import { asUuid } from 'src/utils/database';
+
 @Injectable()
 export class TagRepository {
   constructor(
@@ -45,7 +47,43 @@ export class TagRepository {
 
   @GenerateSql({ params: [DummyValue.UUID] })
   getAll(userId: string) {
-    return this.db.selectFrom('tag').select(columns.tag).where('userId', '=', userId).orderBy('value').execute();
+    return this.db
+      .selectFrom('tag')
+      .select(columns.tag)
+      .where((eb) => this.ownedOrSpaceAccessible(eb, userId))
+      .orderBy('value')
+      .execute();
+  }
+
+  // The tag explorer lists tags for assets a user can actually see: their own tags,
+  // plus tags on any asset reachable through a shared space they are a member of —
+  // either added to the space directly or via a library linked to the space. Mirrors
+  // the access rules in AccessRepository/ViewRepository so non-admin space members are
+  // not stuck with an empty tag tree (issue #647).
+  private ownedOrSpaceAccessible(eb: ExpressionBuilder<DB, 'tag'>, userId: string) {
+    return eb.or([
+      eb('tag.userId', '=', asUuid(userId)),
+      eb.exists(
+        eb
+          .selectFrom('tag_asset')
+          .innerJoin('asset', 'asset.id', 'tag_asset.assetId')
+          .innerJoin('shared_space_asset', 'shared_space_asset.assetId', 'asset.id')
+          .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
+          .whereRef('tag_asset.tagId', '=', 'tag.id')
+          .where('asset.deletedAt', 'is', null)
+          .where('shared_space_member.userId', '=', asUuid(userId)),
+      ),
+      eb.exists(
+        eb
+          .selectFrom('tag_asset')
+          .innerJoin('asset', 'asset.id', 'tag_asset.assetId')
+          .innerJoin('shared_space_library', 'shared_space_library.libraryId', 'asset.libraryId')
+          .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_library.spaceId')
+          .whereRef('tag_asset.tagId', '=', 'tag.id')
+          .where('asset.deletedAt', 'is', null)
+          .where('shared_space_member.userId', '=', asUuid(userId)),
+      ),
+    ]);
   }
 
   @GenerateSql({ params: [{ userId: DummyValue.UUID, color: DummyValue.STRING, value: DummyValue.STRING }] })
