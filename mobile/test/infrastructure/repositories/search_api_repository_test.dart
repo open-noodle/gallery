@@ -67,5 +67,29 @@ void main() {
       expect(json, contains('tagIds'));
       expect(json['tagIds'], isNull);
     });
+
+    test('smart search maps newest -> AssetOrder.desc', () async {
+      when(() => searchApi.searchSmart(any())).thenAnswer((_) async => null);
+      final filter = SearchFilter.empty().copyWith(context: 'beach', sort: SearchSortOrder.newest);
+      await sut.search(filter, 1);
+      final dto = verify(() => searchApi.searchSmart(captureAny())).captured.single as SmartSearchDto;
+      expect(dto.order, AssetOrder.desc);
+    });
+
+    test('smart search relevance omits order', () async {
+      when(() => searchApi.searchSmart(any())).thenAnswer((_) async => null);
+      final filter = SearchFilter.empty().copyWith(context: 'beach', sort: SearchSortOrder.relevance);
+      await sut.search(filter, 1);
+      final dto = verify(() => searchApi.searchSmart(captureAny())).captured.single as SmartSearchDto;
+      expect(dto.order, isNull);
+    });
+
+    test('metadata search maps oldest -> AssetOrder.asc', () async {
+      when(() => searchApi.searchAssets(any())).thenAnswer((_) async => null);
+      final filter = SearchFilter.empty().copyWith(sort: SearchSortOrder.oldest);
+      await sut.search(filter, 1);
+      final dto = verify(() => searchApi.searchAssets(captureAny())).captured.single as MetadataSearchDto;
+      expect(dto.order, AssetOrder.asc);
+    });
   });
 }
