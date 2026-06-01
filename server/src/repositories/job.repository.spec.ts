@@ -3,7 +3,7 @@ import { setTimeout } from 'node:timers/promises';
 import { JobName, QueueName } from 'src/enum';
 import { ConfigRepository } from 'src/repositories/config.repository';
 import { EventRepository } from 'src/repositories/event.repository';
-import { JobRepository } from 'src/repositories/job.repository';
+import { buildWorkerOptions, JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { JobCounts } from 'src/types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -52,6 +52,16 @@ const setup = (counts: JobCounts[] = []) => {
   return { sut, queue, logger };
 };
 
+const stubActiveList = (queue: ReturnType<typeof setup>['queue'], activeIds: string[]) => {
+  const client = {
+    lrange: vi.fn().mockResolvedValue(activeIds),
+    lrem: vi.fn().mockResolvedValue(1),
+  };
+  (queue as any).client = Promise.resolve(client);
+  (queue as any).toKey = vi.fn((type: string) => `immich_bull:facialRecognition:${type}`);
+  return client;
+};
+
 const setHandlers = (sut: JobRepository, jobs: JobName[]) => {
   (sut as unknown as { handlers: Record<JobName, { queueName: QueueName }> }).handlers = Object.fromEntries(
     jobs.map((name) => [name, { queueName: QueueName.BackgroundTask }]),
@@ -65,6 +75,65 @@ describe(JobRepository.name, () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe('buildWorkerOptions', () => {
+    it('gives the FacialRecognition queue a lock and stalled interval well above the 30s default', () => {
+      const options = buildWorkerOptions({ prefix: 'immich_bull' } as any, QueueName.FacialRecognition);
+
+      expect(options.concurrency).toBe(1);
+      expect(options.prefix).toBe('immich_bull');
+      // Long handlers (face-match-all, identity reconciliation, a dedup pass on a huge space) must
+      // not be declared stalled and orphaned while still healthy.
+      expect(options.lockDuration ?? 0).toBeGreaterThanOrEqual(120_000);
+      expect(options.stalledInterval ?? 0).toBeGreaterThanOrEqual(120_000);
+    });
+
+    it('leaves other queues on BullMQ lock defaults', () => {
+      const options = buildWorkerOptions({ prefix: 'immich_bull' } as any, QueueName.ThumbnailGeneration);
+
+      expect(options.concurrency).toBe(1);
+      expect(options.prefix).toBe('immich_bull');
+      expect(options.lockDuration).toBeUndefined();
+      expect(options.stalledInterval).toBeUndefined();
+    });
+  });
+
+  describe('removeOrphanedActiveJobs', () => {
+    it('removes active job ids whose hash is gone (orphans) and leaves real active jobs untouched', async () => {
+      const { sut, queue } = setup();
+      const client = stubActiveList(queue, ['orphan-1', 'real-1']);
+      // A real active job still has its hash; an orphan's hash was removed (e.g. removeOnComplete
+      // racing stalled-recovery) leaving a dangling id that wedges the concurrency-1 queue.
+      queue.getJob = vi.fn((id: string) => Promise.resolve(id === 'real-1' ? ({ id } as any) : undefined));
+
+      const removed = await sut.removeOrphanedActiveJobs(QueueName.FacialRecognition);
+
+      expect(removed).toEqual(['orphan-1']);
+      expect(client.lrem).toHaveBeenCalledWith('immich_bull:facialRecognition:active', 0, 'orphan-1');
+      expect(client.lrem).not.toHaveBeenCalledWith('immich_bull:facialRecognition:active', 0, 'real-1');
+    });
+
+    it('does nothing when the active list is empty', async () => {
+      const { sut, queue } = setup();
+      const client = stubActiveList(queue, []);
+
+      const removed = await sut.removeOrphanedActiveJobs(QueueName.FacialRecognition);
+
+      expect(removed).toEqual([]);
+      expect(client.lrem).not.toHaveBeenCalled();
+    });
+
+    it('does not remove anything when every active id still has a backing job', async () => {
+      const { sut, queue } = setup();
+      const client = stubActiveList(queue, ['real-1', 'real-2']);
+      queue.getJob = vi.fn((id: string) => Promise.resolve({ id }) as any);
+
+      const removed = await sut.removeOrphanedActiveJobs(QueueName.FacialRecognition);
+
+      expect(removed).toEqual([]);
+      expect(client.lrem).not.toHaveBeenCalled();
+    });
   });
 
   it('should return immediately when queues have no active waiting delayed or paused jobs', async () => {
@@ -672,6 +741,35 @@ describe(JobRepository.name, () => {
     for (const call of queue.add.mock.calls) {
       expect(call[2]).not.toHaveProperty('removeOnFail', true);
     }
+  });
+
+  it('uses a pass-scoped job id for follow-up dedup passes so they enqueue while the base job is active', async () => {
+    const { sut, queue } = setup();
+    setHandlers(sut, [JobName.SharedSpacePersonDedup]);
+
+    await sut.queueAll([
+      { name: JobName.SharedSpacePersonDedup, data: { spaceId: 'space-1', pass: 1 } },
+      { name: JobName.SharedSpacePersonDedup, data: { spaceId: 'space-1', pass: 2 } },
+      { name: JobName.SharedSpacePersonDedup, data: { spaceId: 'space-1', pass: 3 } },
+    ]);
+
+    // pass 1 (and the no-pass initial trigger) keep the bare jobId so external triggers dedupe.
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SharedSpacePersonDedup,
+      { spaceId: 'space-1', pass: 1 },
+      { jobId: 'space-dedup-space-1', removeOnComplete: true },
+    );
+    // Follow-up passes are pass-scoped so they don't collide with the still-active current job.
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SharedSpacePersonDedup,
+      { spaceId: 'space-1', pass: 2 },
+      { jobId: 'space-dedup-space-1-pass-2', removeOnComplete: true },
+    );
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SharedSpacePersonDedup,
+      { spaceId: 'space-1', pass: 3 },
+      { jobId: 'space-dedup-space-1-pass-3', removeOnComplete: true },
+    );
   });
 
   it('does not remove failed from-backfill shared-space jobs while queueing duplicates', async () => {

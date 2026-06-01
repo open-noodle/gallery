@@ -64,6 +64,24 @@ export type MergeIdentitiesResult = {
   spaceProfileConflictCount: number;
 };
 
+/**
+ * A pair of `shared_space_person` rows in the SAME space that both hold one side of an identity
+ * merge — one row on the target identity, one on a source identity. Merging would collide with the
+ * `(spaceId, identityId)` unique partial index, so these pairs are collapsed (loser folded into the
+ * survivor) before the identity merge runs.
+ */
+export type SpaceMergeConflictPair = {
+  spaceId: string;
+  sourceId: string;
+  sourceName: string;
+  sourceNameSource: string;
+  sourceFaceCount: number;
+  targetId: string;
+  targetName: string;
+  targetNameSource: string;
+  targetFaceCount: number;
+};
+
 export type AccessibleIdentityFaceMatch = {
   identityId: string;
   type: string;
@@ -2602,5 +2620,43 @@ export class FaceIdentityRepository {
     sourceIdentityIds: string[];
   }): Promise<MergeIdentitiesResult> {
     return this.countMergeConflicts(this.db, input);
+  }
+
+  /**
+   * Returns the same-space `shared_space_person` conflict pairs that block this identity merge:
+   * for every space holding both a target-identity row and a source-identity row, the two rows with
+   * the fields needed to choose a collapse survivor (id, name, nameSource, faceCount). Spans all
+   * spaces because {@link mergeIdentities} checks conflicts globally — collapsing only the current
+   * space would still leave the merge blocked by another space's pair.
+   */
+  async getSpaceMergeConflictPairs(input: {
+    targetIdentityId: string;
+    sourceIdentityIds: string[];
+  }): Promise<SpaceMergeConflictPair[]> {
+    const sourceIdentityIds = [...new Set(input.sourceIdentityIds)].filter((id) => id !== input.targetIdentityId);
+    if (sourceIdentityIds.length === 0) {
+      return [];
+    }
+
+    return this.db
+      .selectFrom('shared_space_person as source_person')
+      .innerJoin('shared_space_person as target_person', (join) =>
+        join
+          .onRef('target_person.spaceId', '=', 'source_person.spaceId')
+          .on('target_person.identityId', '=', input.targetIdentityId),
+      )
+      .where('source_person.identityId', 'in', sourceIdentityIds)
+      .select([
+        'source_person.spaceId as spaceId',
+        'source_person.id as sourceId',
+        'source_person.name as sourceName',
+        'source_person.nameSource as sourceNameSource',
+        'source_person.faceCount as sourceFaceCount',
+        'target_person.id as targetId',
+        'target_person.name as targetName',
+        'target_person.nameSource as targetNameSource',
+        'target_person.faceCount as targetFaceCount',
+      ])
+      .execute();
   }
 }
