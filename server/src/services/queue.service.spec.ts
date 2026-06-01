@@ -124,39 +124,71 @@ describe(QueueService.name, () => {
   });
 
   describe('onBootstrap', () => {
-    it('should setup job repository', () => {
+    it('should setup job repository', async () => {
       sut.setServices([]);
-      sut.onBootstrap();
+      await sut.onBootstrap();
 
       expect(mocks.job.setup).toHaveBeenCalledWith([]);
     });
 
-    it('should start workers on microservices', () => {
+    it('should start workers on microservices', async () => {
       mocks.config.getWorker.mockReturnValue(ImmichWorker.Microservices);
 
       sut.setServices([]);
-      sut.onBootstrap();
+      await sut.onBootstrap();
 
       expect(mocks.job.setup).toHaveBeenCalled();
       expect(mocks.job.startWorkers).toHaveBeenCalled();
     });
 
-    it('should not start workers on non-microservices', () => {
+    it('should not start workers on non-microservices', async () => {
       mocks.config.getWorker.mockReturnValue(ImmichWorker.Api);
 
       sut.setServices([]);
-      sut.onBootstrap();
+      await sut.onBootstrap();
 
       expect(mocks.job.setup).toHaveBeenCalled();
       expect(mocks.job.startWorkers).not.toHaveBeenCalled();
     });
+
+    it('should reconcile orphaned active jobs before starting workers on microservices', async () => {
+      mocks.config.getWorker.mockReturnValue(ImmichWorker.Microservices);
+      mocks.job.reconcileOrphanedActiveJobs.mockResolvedValue();
+
+      sut.setServices([]);
+      await sut.onBootstrap();
+
+      expect(mocks.job.reconcileOrphanedActiveJobs).toHaveBeenCalled();
+      const reconcileOrder = mocks.job.reconcileOrphanedActiveJobs.mock.invocationCallOrder[0];
+      const startOrder = mocks.job.startWorkers.mock.invocationCallOrder[0];
+      expect(reconcileOrder).toBeLessThan(startOrder);
+    });
+
+    it('should not reconcile orphaned active jobs on non-microservices', async () => {
+      mocks.config.getWorker.mockReturnValue(ImmichWorker.Api);
+
+      sut.setServices([]);
+      await sut.onBootstrap();
+
+      expect(mocks.job.reconcileOrphanedActiveJobs).not.toHaveBeenCalled();
+    });
+
+    it('still starts workers when orphan reconciliation fails', async () => {
+      mocks.config.getWorker.mockReturnValue(ImmichWorker.Microservices);
+      mocks.job.reconcileOrphanedActiveJobs.mockRejectedValue(new Error('redis down'));
+
+      sut.setServices([]);
+      await sut.onBootstrap();
+
+      expect(mocks.job.startWorkers).toHaveBeenCalled();
+    });
   });
 
   describe('setServices', () => {
-    it('should store service constructors', () => {
+    it('should store service constructors', async () => {
       class TestService {}
       sut.setServices([TestService]);
-      sut.onBootstrap();
+      await sut.onBootstrap();
 
       expect(mocks.job.setup).toHaveBeenCalledWith([TestService]);
     });
