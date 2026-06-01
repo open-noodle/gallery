@@ -1,5 +1,6 @@
+import { WorkflowTrigger } from '@immich/plugin-sdk';
 import { BadRequestException } from '@nestjs/common';
-import { WorkflowTrigger, WorkflowType } from 'src/enum';
+import { WorkflowType } from 'src/enum';
 import { PluginService } from 'src/services/plugin.service';
 import { newUuid } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
