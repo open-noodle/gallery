@@ -76,9 +76,17 @@ export class QueueService extends BaseService {
   }
 
   @OnEvent({ name: 'AppBootstrap', priority: BootstrapEventPriority.JobService })
-  onBootstrap() {
+  async onBootstrap() {
     this.jobRepository.setup(this.services);
     if (this.worker === ImmichWorker.Microservices) {
+      // Best-effort: clear job ids orphaned in the BullMQ "active" list (no backing hash) before
+      // workers start. Such orphans permanently wedge a concurrency-1 queue with no user-reachable
+      // recovery. Never block worker startup on this maintenance step.
+      try {
+        await this.jobRepository.reconcileOrphanedActiveJobs();
+      } catch (error) {
+        this.logger.warn(`Failed to reconcile orphaned active jobs on bootstrap: ${error}`);
+      }
       this.jobRepository.startWorkers();
     } else if (this.worker === ImmichWorker.Api) {
       this.jobRepository.watchWorkers();
