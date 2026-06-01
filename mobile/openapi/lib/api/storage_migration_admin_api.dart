@@ -26,7 +26,7 @@ class StorageMigrationAdminApi {
   ///
   /// * [StorageMigrationDirection] direction (required):
   ///   Migration direction
-  Future<Response> getEstimateWithHttpInfo(StorageMigrationDirection direction,) async {
+  Future<Response> getEstimateWithHttpInfo(StorageMigrationDirection direction, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/storage-migration/estimate';
 
@@ -50,6 +50,7 @@ class StorageMigrationAdminApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -61,8 +62,8 @@ class StorageMigrationAdminApi {
   ///
   /// * [StorageMigrationDirection] direction (required):
   ///   Migration direction
-  Future<void> getEstimate(StorageMigrationDirection direction,) async {
-    final response = await getEstimateWithHttpInfo(direction,);
+  Future<void> getEstimate(StorageMigrationDirection direction, { Future<void>? abortTrigger, }) async {
+    final response = await getEstimateWithHttpInfo(direction, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -73,7 +74,7 @@ class StorageMigrationAdminApi {
   /// Retrieve the current status of the storage migration queue, including active and pending job counts.
   ///
   /// Note: This method returns the HTTP [Response].
-  Future<Response> getStatusWithHttpInfo() async {
+  Future<Response> getStatusWithHttpInfo({ Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/storage-migration/status';
 
@@ -95,14 +96,15 @@ class StorageMigrationAdminApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
   /// Get storage migration status
   ///
   /// Retrieve the current status of the storage migration queue, including active and pending job counts.
-  Future<void> getStatus() async {
-    final response = await getStatusWithHttpInfo();
+  Future<void> getStatus({ Future<void>? abortTrigger, }) async {
+    final response = await getStatusWithHttpInfo(abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -118,7 +120,7 @@ class StorageMigrationAdminApi {
   ///
   /// * [String] batchId (required):
   ///   Batch ID
-  Future<Response> rollbackWithHttpInfo(String batchId,) async {
+  Future<Response> rollbackWithHttpInfo(String batchId, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/storage-migration/rollback/{batchId}'
       .replaceAll('{batchId}', batchId);
@@ -141,6 +143,7 @@ class StorageMigrationAdminApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -152,8 +155,8 @@ class StorageMigrationAdminApi {
   ///
   /// * [String] batchId (required):
   ///   Batch ID
-  Future<void> rollback(String batchId,) async {
-    final response = await rollbackWithHttpInfo(batchId,);
+  Future<void> rollback(String batchId, { Future<void>? abortTrigger, }) async {
+    final response = await rollbackWithHttpInfo(batchId, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -168,7 +171,7 @@ class StorageMigrationAdminApi {
   /// Parameters:
   ///
   /// * [StorageMigrationStartDto] storageMigrationStartDto (required):
-  Future<Response> startWithHttpInfo(StorageMigrationStartDto storageMigrationStartDto,) async {
+  Future<Response> startWithHttpInfo(StorageMigrationStartDto storageMigrationStartDto, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/storage-migration/start';
 
@@ -190,6 +193,7 @@ class StorageMigrationAdminApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -200,8 +204,8 @@ class StorageMigrationAdminApi {
   /// Parameters:
   ///
   /// * [StorageMigrationStartDto] storageMigrationStartDto (required):
-  Future<void> start(StorageMigrationStartDto storageMigrationStartDto,) async {
-    final response = await startWithHttpInfo(storageMigrationStartDto,);
+  Future<void> start(StorageMigrationStartDto storageMigrationStartDto, { Future<void>? abortTrigger, }) async {
+    final response = await startWithHttpInfo(storageMigrationStartDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
