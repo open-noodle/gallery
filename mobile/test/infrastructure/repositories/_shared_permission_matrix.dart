@@ -39,7 +39,10 @@ typedef MatrixCase = ({
 /// time would pin to a stale instance — every helper must dereference the
 /// getter at call time so it sees the current setUp's database.
 class MatrixFixtures {
-  MatrixFixtures({required Drift Function() db, required this.insertAsset}) : _db = db;
+  MatrixFixtures({required Drift Function() db, required this.insertAsset})
+    // Keep call sites readable as `db:` instead of exposing `_db:`.
+    // ignore: prefer_initializing_formals
+    : _db = db;
 
   final Drift Function() _db;
   Drift get db => _db();
