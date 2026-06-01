@@ -44,7 +44,7 @@ describe(WorkflowService.name, () => {
       expect.objectContaining({ id: item.id, name: 'mine' }),
     ]);
 
-    expect(mocks.workflow.search).toHaveBeenCalledWith({ enabled: true, ownerId: auth.user.id });
+    expect(mocks.workflow.search).toHaveBeenCalledWith({ enabled: true, userId: auth.user.id });
   });
 
   it('creates a workflow with validated plugin method steps', async () => {
