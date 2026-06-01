@@ -1,7 +1,7 @@
 import { getQueueToken } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import { ModuleRef, Reflector } from '@nestjs/core';
-import { JobsOptions, Queue, Worker } from 'bullmq';
+import { JobsOptions, Queue, Worker, WorkerOptions } from 'bullmq';
 import { setTimeout } from 'node:timers/promises';
 import { JobConfig } from 'src/decorators';
 import { QueueJobResponseDto, QueueJobSearchDto } from 'src/dtos/queue.dto';
@@ -22,6 +22,26 @@ type JobMapItem = {
 const WORKER_WATCH_INTERVAL_MS = 30_000;
 
 const FORCE_FACIAL_RECOGNITION_QUEUE_ALL_JOB_ID = `${JobName.FacialRecognitionQueueAll}/force`;
+
+/**
+ * Per-queue worker lock overrides. BullMQ defaults to a 30s lock + 30s stalled check + maxStalledCount
+ * 1, which is fine for short handlers but dangerous for queues whose handlers can legitimately run for
+ * minutes. The FacialRecognition queue (concurrency 1) runs space face-match-all, identity
+ * reconciliation, and per-pass dedup; on a large space a single healthy handler can exceed 30s, get
+ * declared stalled, and be orphaned in the "active" list — starving the whole queue, core face
+ * recognition included. A longer lock + stalled interval keeps slow-but-healthy jobs alive.
+ */
+const WORKER_OPTIONS_BY_QUEUE: Partial<Record<QueueName, Pick<WorkerOptions, 'lockDuration' | 'stalledInterval'>>> = {
+  [QueueName.FacialRecognition]: { lockDuration: 300_000, stalledInterval: 300_000 },
+};
+
+/** Builds the BullMQ worker options for a queue, layering any per-queue lock overrides on top. */
+export const buildWorkerOptions = (baseConfig: WorkerOptions, queueName: QueueName): WorkerOptions => ({
+  ...baseConfig,
+  concurrency: 1,
+  name: ImmichWorker.Microservices,
+  ...WORKER_OPTIONS_BY_QUEUE[queueName],
+});
 
 export type QueueTelemetryStatus = 'active' | 'completed' | 'failed' | 'delayed' | 'waiting' | 'paused';
 export type QueueTelemetryStalenessStatus = 'waiting' | 'delayed' | 'failed';
@@ -116,7 +136,7 @@ export class JobRepository {
       this.workers[queueName] = new Worker(
         queueName,
         (job) => this.eventRepository.emit('JobRun', queueName, job as JobItem),
-        { ...bull.config, concurrency: 1, name: ImmichWorker.Microservices },
+        buildWorkerOptions(bull.config, queueName),
       );
     }
   }
@@ -200,6 +220,41 @@ export class JobRepository {
 
   clear(name: QueueName, type: QueueCleanType) {
     return this.getQueue(name).clean(0, 1000, type);
+  }
+
+  /** Reconcile every queue's "active" list against its job hashes, dropping orphaned entries. */
+  async reconcileOrphanedActiveJobs(): Promise<void> {
+    for (const queueName of Object.values(QueueName)) {
+      const removed = await this.removeOrphanedActiveJobs(queueName);
+      if (removed.length > 0) {
+        this.logger.warn(`Removed ${removed.length} orphaned active job(s) from ${queueName}: ${removed.join(', ')}`);
+      }
+    }
+  }
+
+  /**
+   * Removes job ids stuck in a queue's BullMQ "active" list that no longer have a backing job hash.
+   * These orphans (e.g. removeOnComplete racing stalled-recovery) permanently wedge a concurrency-1
+   * queue with no user-reachable recovery. We deliberately do NOT use `clean(0, _, 'active')`, which
+   * targets jobs by age and would kill legitimately-running jobs; instead we LREM only ids whose
+   * `getJob` returns nothing. A genuine in-flight job always has its hash, so it is never touched.
+   * Intended to run at bootstrap, before workers start.
+   */
+  async removeOrphanedActiveJobs(name: QueueName): Promise<string[]> {
+    const queue = this.getQueue(name);
+    const activeKey = queue.toKey('active');
+    const client = await queue.client;
+    const activeIds = await client.lrange(activeKey, 0, -1);
+
+    const removed: string[] = [];
+    for (const jobId of activeIds) {
+      const job = await queue.getJob(jobId);
+      if (!job) {
+        await client.lrem(activeKey, 0, jobId);
+        removed.push(jobId);
+      }
+    }
+    return removed;
   }
 
   getJobCounts(name: QueueName): Promise<JobCounts> {
@@ -440,7 +495,14 @@ export class JobRepository {
         };
       }
       case JobName.SharedSpacePersonDedup: {
-        return { jobId: `space-dedup-${item.data.spaceId}`, removeOnComplete: true };
+        // Follow-up passes (pass >= 2) use a pass-scoped jobId so they enqueue even while the
+        // current dedup job is still "active" (the base jobId stays occupied until the handler
+        // returns). The initial trigger (no pass) keeps the bare jobId so concurrent external
+        // triggers still dedupe into one.
+        const pass = (item.data as { pass?: number }).pass;
+        const jobId =
+          pass && pass > 1 ? `space-dedup-${item.data.spaceId}-pass-${pass}` : `space-dedup-${item.data.spaceId}`;
+        return { jobId, removeOnComplete: true };
       }
       case JobName.SharedSpaceIdentityReconciliation: {
         const data = item.data as { spaceId: string; userId?: string; spacePersonId?: string };
