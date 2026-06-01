@@ -74,21 +74,23 @@ ARG TARGETPLATFORM
 
 COPY --from=ghcr.io/jdx/mise:2026.8.16@sha256:05fdec33a6b3f72198fd918927cfa2a345dc3df48175531c1bc3050eaa06f328 /usr/local/bin/mise /usr/local/bin/mise
 
-COPY ./mise.toml ./mise.toml
-COPY ./mise.lock ./mise.lock
-COPY ./packages/plugin-core/mise.toml ./packages/plugin-core/
-ENV MISE_TRUSTED_CONFIG_PATHS=/usr/src/app/mise.toml
-ENV MISE_DATA_DIR=/buildcache/mise
-ENV MISE_DISABLE_TOOLS=flutter
-RUN --mount=type=cache,id=mise-tools-${TARGETPLATFORM},target=/buildcache/mise \
-  mise install --locked
-
+# Gallery does NOT run `mise install --locked` here: resolving the full tool list hits the GitHub
+# API and has repeatedly failed the build on rate limits. Only js-pdk is needed, and it is fetched
+# on demand by `mise exec` below, with wasm-opt supplied by the binaryen package instead of mise.
+# WORKDIR is inherited from builder (/usr/src/app) — the final stage copies plugin-core from there.
 COPY ./packages/plugin-core ./packages/plugin-core/
+ENV MISE_DATA_DIR=/buildcache/mise
+
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends binaryen && \
+  rm -rf /var/lib/apt/lists/*
 
 # Build plugins
 RUN --mount=type=cache,id=pnpm,target=/buildcache/pnpm-store \
-  --mount=type=cache,id=mise-tools-${TARGETPLATFORM},target=/buildcache/mise \
-  mise //:plugins
+  --mount=type=cache,id=mise-plugin-tools-${TARGETPLATFORM},target=/buildcache/mise \
+  pnpm --filter @immich/plugin-sdk --filter @immich/plugin-core install --frozen-lockfile && \
+  mise exec --no-deps --jobs=1 github:extism/js-pdk@1.6.0 -- \
+    pnpm --filter @immich/plugin-sdk --filter @immich/plugin-core build
 
 FROM ghcr.io/immich-app/base-server-prod:202608300913@sha256:e809772a5ee5babfe2073563a40757818f997feff8d161d30bf7b904ca49eb6b
 
