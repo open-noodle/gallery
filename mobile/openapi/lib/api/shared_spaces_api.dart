@@ -27,7 +27,7 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [SharedSpaceAssetAddDto] sharedSpaceAssetAddDto (required):
-  Future<Response> addAssetsWithHttpInfo(String id, SharedSpaceAssetAddDto sharedSpaceAssetAddDto,) async {
+  Future<Response> addAssetsWithHttpInfo(String id, SharedSpaceAssetAddDto sharedSpaceAssetAddDto, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/assets'
       .replaceAll('{id}', id);
@@ -50,6 +50,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -62,8 +63,8 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [SharedSpaceAssetAddDto] sharedSpaceAssetAddDto (required):
-  Future<void> addAssets(String id, SharedSpaceAssetAddDto sharedSpaceAssetAddDto,) async {
-    final response = await addAssetsWithHttpInfo(id, sharedSpaceAssetAddDto,);
+  Future<void> addAssets(String id, SharedSpaceAssetAddDto sharedSpaceAssetAddDto, { Future<void>? abortTrigger, }) async {
+    final response = await addAssetsWithHttpInfo(id, sharedSpaceAssetAddDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -80,7 +81,7 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [SharedSpaceMemberCreateDto] sharedSpaceMemberCreateDto (required):
-  Future<Response> addMemberWithHttpInfo(String id, SharedSpaceMemberCreateDto sharedSpaceMemberCreateDto,) async {
+  Future<Response> addMemberWithHttpInfo(String id, SharedSpaceMemberCreateDto sharedSpaceMemberCreateDto, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/members'
       .replaceAll('{id}', id);
@@ -103,6 +104,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -115,8 +117,8 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [SharedSpaceMemberCreateDto] sharedSpaceMemberCreateDto (required):
-  Future<SharedSpaceMemberResponseDto?> addMember(String id, SharedSpaceMemberCreateDto sharedSpaceMemberCreateDto,) async {
-    final response = await addMemberWithHttpInfo(id, sharedSpaceMemberCreateDto,);
+  Future<SharedSpaceMemberResponseDto?> addMember(String id, SharedSpaceMemberCreateDto sharedSpaceMemberCreateDto, { Future<void>? abortTrigger, }) async {
+    final response = await addMemberWithHttpInfo(id, sharedSpaceMemberCreateDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -139,7 +141,7 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<Response> bulkAddAssetsWithHttpInfo(String id,) async {
+  Future<Response> bulkAddAssetsWithHttpInfo(String id, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/assets/bulk-add'
       .replaceAll('{id}', id);
@@ -162,6 +164,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -172,8 +175,8 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<void> bulkAddAssets(String id,) async {
-    final response = await bulkAddAssetsWithHttpInfo(id,);
+  Future<void> bulkAddAssets(String id, { Future<void>? abortTrigger, }) async {
+    final response = await bulkAddAssetsWithHttpInfo(id, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -188,7 +191,7 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [SharedSpaceCreateDto] sharedSpaceCreateDto (required):
-  Future<Response> createSpaceWithHttpInfo(SharedSpaceCreateDto sharedSpaceCreateDto,) async {
+  Future<Response> createSpaceWithHttpInfo(SharedSpaceCreateDto sharedSpaceCreateDto, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces';
 
@@ -210,6 +213,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -220,8 +224,8 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [SharedSpaceCreateDto] sharedSpaceCreateDto (required):
-  Future<SharedSpaceResponseDto?> createSpace(SharedSpaceCreateDto sharedSpaceCreateDto,) async {
-    final response = await createSpaceWithHttpInfo(sharedSpaceCreateDto,);
+  Future<SharedSpaceResponseDto?> createSpace(SharedSpaceCreateDto sharedSpaceCreateDto, { Future<void>? abortTrigger, }) async {
+    final response = await createSpaceWithHttpInfo(sharedSpaceCreateDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -244,7 +248,7 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<Response> deduplicateSpacePeopleWithHttpInfo(String id,) async {
+  Future<Response> deduplicateSpacePeopleWithHttpInfo(String id, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people/deduplicate'
       .replaceAll('{id}', id);
@@ -267,6 +271,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -277,8 +282,8 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<void> deduplicateSpacePeople(String id,) async {
-    final response = await deduplicateSpacePeopleWithHttpInfo(id,);
+  Future<void> deduplicateSpacePeople(String id, { Future<void>? abortTrigger, }) async {
+    final response = await deduplicateSpacePeopleWithHttpInfo(id, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -295,7 +300,7 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] personId (required):
-  Future<Response> deleteSpacePersonWithHttpInfo(String id, String personId,) async {
+  Future<Response> deleteSpacePersonWithHttpInfo(String id, String personId, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people/{personId}'
       .replaceAll('{id}', id)
@@ -319,6 +324,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -331,8 +337,8 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] personId (required):
-  Future<void> deleteSpacePerson(String id, String personId,) async {
-    final response = await deleteSpacePersonWithHttpInfo(id, personId,);
+  Future<void> deleteSpacePerson(String id, String personId, { Future<void>? abortTrigger, }) async {
+    final response = await deleteSpacePersonWithHttpInfo(id, personId, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -349,7 +355,7 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] personId (required):
-  Future<Response> deleteSpacePersonAliasWithHttpInfo(String id, String personId,) async {
+  Future<Response> deleteSpacePersonAliasWithHttpInfo(String id, String personId, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people/{personId}/alias'
       .replaceAll('{id}', id)
@@ -373,6 +379,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -385,8 +392,8 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] personId (required):
-  Future<void> deleteSpacePersonAlias(String id, String personId,) async {
-    final response = await deleteSpacePersonAliasWithHttpInfo(id, personId,);
+  Future<void> deleteSpacePersonAlias(String id, String personId, { Future<void>? abortTrigger, }) async {
+    final response = await deleteSpacePersonAliasWithHttpInfo(id, personId, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -397,7 +404,7 @@ class SharedSpacesApi {
   /// Retrieve all shared spaces the user is a member of.
   ///
   /// Note: This method returns the HTTP [Response].
-  Future<Response> getAllSpacesWithHttpInfo() async {
+  Future<Response> getAllSpacesWithHttpInfo({ Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces';
 
@@ -419,14 +426,15 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
   /// Get all shared spaces
   ///
   /// Retrieve all shared spaces the user is a member of.
-  Future<List<SharedSpaceResponseDto>?> getAllSpaces() async {
-    final response = await getAllSpacesWithHttpInfo();
+  Future<List<SharedSpaceResponseDto>?> getAllSpaces({ Future<void>? abortTrigger, }) async {
+    final response = await getAllSpacesWithHttpInfo(abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -452,7 +460,7 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<Response> getMembersWithHttpInfo(String id,) async {
+  Future<Response> getMembersWithHttpInfo(String id, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/members'
       .replaceAll('{id}', id);
@@ -475,6 +483,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -485,8 +494,8 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<List<SharedSpaceMemberResponseDto>?> getMembers(String id,) async {
-    final response = await getMembersWithHttpInfo(id,);
+  Future<List<SharedSpaceMemberResponseDto>?> getMembers(String id, { Future<void>? abortTrigger, }) async {
+    final response = await getMembersWithHttpInfo(id, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -512,7 +521,7 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<Response> getSpaceWithHttpInfo(String id,) async {
+  Future<Response> getSpaceWithHttpInfo(String id, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}'
       .replaceAll('{id}', id);
@@ -535,6 +544,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -545,8 +555,8 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<SharedSpaceResponseDto?> getSpace(String id,) async {
-    final response = await getSpaceWithHttpInfo(id,);
+  Future<SharedSpaceResponseDto?> getSpace(String id, { Future<void>? abortTrigger, }) async {
+    final response = await getSpaceWithHttpInfo(id, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -573,7 +583,7 @@ class SharedSpacesApi {
   ///
   /// * [int] offset:
   ///   Number of items to skip
-  Future<Response> getSpaceActivitiesWithHttpInfo(String id, { int? limit, int? offset, }) async {
+  Future<Response> getSpaceActivitiesWithHttpInfo(String id, { int? limit, int? offset, Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/activities'
       .replaceAll('{id}', id);
@@ -603,6 +613,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -617,8 +628,8 @@ class SharedSpacesApi {
   ///
   /// * [int] offset:
   ///   Number of items to skip
-  Future<List<SharedSpaceActivityResponseDto>?> getSpaceActivities(String id, { int? limit, int? offset, }) async {
-    final response = await getSpaceActivitiesWithHttpInfo(id,  limit: limit, offset: offset, );
+  Future<List<SharedSpaceActivityResponseDto>?> getSpaceActivities(String id, { int? limit, int? offset, Future<void>? abortTrigger, }) async {
+    final response = await getSpaceActivitiesWithHttpInfo(id, limit: limit, offset: offset, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -644,7 +655,7 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<Response> getSpaceMapMarkersWithHttpInfo(String id,) async {
+  Future<Response> getSpaceMapMarkersWithHttpInfo(String id, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/map-markers'
       .replaceAll('{id}', id);
@@ -667,6 +678,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -677,8 +689,8 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<List<MapMarkerResponseDto>?> getSpaceMapMarkers(String id,) async {
-    final response = await getSpaceMapMarkersWithHttpInfo(id,);
+  Future<List<MapMarkerResponseDto>?> getSpaceMapMarkers(String id, { Future<void>? abortTrigger, }) async {
+    final response = await getSpaceMapMarkersWithHttpInfo(id, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -721,7 +733,7 @@ class SharedSpacesApi {
   /// * [DateTime] takenBefore:
   ///
   /// * [bool] withHidden:
-  Future<Response> getSpacePeopleWithHttpInfo(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, }) async {
+  Future<Response> getSpacePeopleWithHttpInfo(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people'
       .replaceAll('{id}', id);
@@ -766,6 +778,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -793,8 +806,8 @@ class SharedSpacesApi {
   /// * [DateTime] takenBefore:
   ///
   /// * [bool] withHidden:
-  Future<List<SharedSpacePersonResponseDto>?> getSpacePeople(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, }) async {
-    final response = await getSpacePeopleWithHttpInfo(id,  limit: limit, name: name, named: named, offset: offset, takenAfter: takenAfter, takenBefore: takenBefore, withHidden: withHidden, );
+  Future<List<SharedSpacePersonResponseDto>?> getSpacePeople(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, Future<void>? abortTrigger, }) async {
+    final response = await getSpacePeopleWithHttpInfo(id, limit: limit, name: name, named: named, offset: offset, takenAfter: takenAfter, takenBefore: takenBefore, withHidden: withHidden, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -837,7 +850,7 @@ class SharedSpacesApi {
   /// * [DateTime] takenBefore:
   ///
   /// * [bool] withHidden:
-  Future<Response> getSpacePeopleFaceStatisticsWithHttpInfo(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, }) async {
+  Future<Response> getSpacePeopleFaceStatisticsWithHttpInfo(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people/face-statistics'
       .replaceAll('{id}', id);
@@ -882,6 +895,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -909,8 +923,8 @@ class SharedSpacesApi {
   /// * [DateTime] takenBefore:
   ///
   /// * [bool] withHidden:
-  Future<PeopleFaceStatisticsResponseDto?> getSpacePeopleFaceStatistics(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, }) async {
-    final response = await getSpacePeopleFaceStatisticsWithHttpInfo(id,  limit: limit, name: name, named: named, offset: offset, takenAfter: takenAfter, takenBefore: takenBefore, withHidden: withHidden, );
+  Future<PeopleFaceStatisticsResponseDto?> getSpacePeopleFaceStatistics(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, Future<void>? abortTrigger, }) async {
+    final response = await getSpacePeopleFaceStatisticsWithHttpInfo(id, limit: limit, name: name, named: named, offset: offset, takenAfter: takenAfter, takenBefore: takenBefore, withHidden: withHidden, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -950,7 +964,7 @@ class SharedSpacesApi {
   /// * [DateTime] takenBefore:
   ///
   /// * [bool] withHidden:
-  Future<Response> getSpacePeopleStatisticsWithHttpInfo(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, }) async {
+  Future<Response> getSpacePeopleStatisticsWithHttpInfo(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people/statistics'
       .replaceAll('{id}', id);
@@ -995,6 +1009,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -1022,8 +1037,8 @@ class SharedSpacesApi {
   /// * [DateTime] takenBefore:
   ///
   /// * [bool] withHidden:
-  Future<SharedSpacePeopleStatisticsResponseDto?> getSpacePeopleStatistics(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, }) async {
-    final response = await getSpacePeopleStatisticsWithHttpInfo(id,  limit: limit, name: name, named: named, offset: offset, takenAfter: takenAfter, takenBefore: takenBefore, withHidden: withHidden, );
+  Future<SharedSpacePeopleStatisticsResponseDto?> getSpacePeopleStatistics(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, Future<void>? abortTrigger, }) async {
+    final response = await getSpacePeopleStatisticsWithHttpInfo(id, limit: limit, name: name, named: named, offset: offset, takenAfter: takenAfter, takenBefore: takenBefore, withHidden: withHidden, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1048,7 +1063,7 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] personId (required):
-  Future<Response> getSpacePersonWithHttpInfo(String id, String personId,) async {
+  Future<Response> getSpacePersonWithHttpInfo(String id, String personId, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people/{personId}'
       .replaceAll('{id}', id)
@@ -1072,6 +1087,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -1084,8 +1100,8 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] personId (required):
-  Future<SharedSpacePersonResponseDto?> getSpacePerson(String id, String personId,) async {
-    final response = await getSpacePersonWithHttpInfo(id, personId,);
+  Future<SharedSpacePersonResponseDto?> getSpacePerson(String id, String personId, { Future<void>? abortTrigger, }) async {
+    final response = await getSpacePersonWithHttpInfo(id, personId, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1110,7 +1126,7 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] personId (required):
-  Future<Response> getSpacePersonAssetsWithHttpInfo(String id, String personId,) async {
+  Future<Response> getSpacePersonAssetsWithHttpInfo(String id, String personId, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people/{personId}/assets'
       .replaceAll('{id}', id)
@@ -1134,6 +1150,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -1146,8 +1163,8 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] personId (required):
-  Future<List<String>?> getSpacePersonAssets(String id, String personId,) async {
-    final response = await getSpacePersonAssetsWithHttpInfo(id, personId,);
+  Future<List<String>?> getSpacePersonAssets(String id, String personId, { Future<void>? abortTrigger, }) async {
+    final response = await getSpacePersonAssetsWithHttpInfo(id, personId, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1177,7 +1194,7 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] personId (required):
-  Future<Response> getSpacePersonFaceThumbnailWithHttpInfo(String faceId, String id, String personId,) async {
+  Future<Response> getSpacePersonFaceThumbnailWithHttpInfo(String faceId, String id, String personId, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people/{personId}/faces/{faceId}/thumbnail'
       .replaceAll('{faceId}', faceId)
@@ -1202,6 +1219,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -1216,8 +1234,8 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] personId (required):
-  Future<MultipartFile?> getSpacePersonFaceThumbnail(String faceId, String id, String personId,) async {
-    final response = await getSpacePersonFaceThumbnailWithHttpInfo(faceId, id, personId,);
+  Future<MultipartFile?> getSpacePersonFaceThumbnail(String faceId, String id, String personId, { Future<void>? abortTrigger, }) async {
+    final response = await getSpacePersonFaceThumbnailWithHttpInfo(faceId, id, personId, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1248,7 +1266,7 @@ class SharedSpacesApi {
   ///
   /// * [int] size:
   ///   Number of faces per page
-  Future<Response> getSpacePersonFacesWithHttpInfo(String id, String personId, { int? page, int? size, }) async {
+  Future<Response> getSpacePersonFacesWithHttpInfo(String id, String personId, { int? page, int? size, Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people/{personId}/faces'
       .replaceAll('{id}', id)
@@ -1279,6 +1297,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -1297,8 +1316,8 @@ class SharedSpacesApi {
   ///
   /// * [int] size:
   ///   Number of faces per page
-  Future<PersonFacePageResponseDto?> getSpacePersonFaces(String id, String personId, { int? page, int? size, }) async {
-    final response = await getSpacePersonFacesWithHttpInfo(id, personId,  page: page, size: size, );
+  Future<PersonFacePageResponseDto?> getSpacePersonFaces(String id, String personId, { int? page, int? size, Future<void>? abortTrigger, }) async {
+    final response = await getSpacePersonFacesWithHttpInfo(id, personId, page: page, size: size, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1323,7 +1342,7 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] personId (required):
-  Future<Response> getSpacePersonStatisticsWithHttpInfo(String id, String personId,) async {
+  Future<Response> getSpacePersonStatisticsWithHttpInfo(String id, String personId, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people/{personId}/statistics'
       .replaceAll('{id}', id)
@@ -1347,6 +1366,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -1359,8 +1379,8 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] personId (required):
-  Future<PersonStatisticsResponseDto?> getSpacePersonStatistics(String id, String personId,) async {
-    final response = await getSpacePersonStatisticsWithHttpInfo(id, personId,);
+  Future<PersonStatisticsResponseDto?> getSpacePersonStatistics(String id, String personId, { Future<void>? abortTrigger, }) async {
+    final response = await getSpacePersonStatisticsWithHttpInfo(id, personId, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1385,7 +1405,7 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] personId (required):
-  Future<Response> getSpacePersonThumbnailWithHttpInfo(String id, String personId,) async {
+  Future<Response> getSpacePersonThumbnailWithHttpInfo(String id, String personId, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people/{personId}/thumbnail'
       .replaceAll('{id}', id)
@@ -1409,6 +1429,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -1421,8 +1442,8 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] personId (required):
-  Future<MultipartFile?> getSpacePersonThumbnail(String id, String personId,) async {
-    final response = await getSpacePersonThumbnailWithHttpInfo(id, personId,);
+  Future<MultipartFile?> getSpacePersonThumbnail(String id, String personId, { Future<void>? abortTrigger, }) async {
+    final response = await getSpacePersonThumbnailWithHttpInfo(id, personId, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1447,7 +1468,7 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [SharedSpaceLibraryLinkDto] sharedSpaceLibraryLinkDto (required):
-  Future<Response> linkLibraryWithHttpInfo(String id, SharedSpaceLibraryLinkDto sharedSpaceLibraryLinkDto,) async {
+  Future<Response> linkLibraryWithHttpInfo(String id, SharedSpaceLibraryLinkDto sharedSpaceLibraryLinkDto, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/libraries'
       .replaceAll('{id}', id);
@@ -1470,6 +1491,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -1482,8 +1504,8 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [SharedSpaceLibraryLinkDto] sharedSpaceLibraryLinkDto (required):
-  Future<void> linkLibrary(String id, SharedSpaceLibraryLinkDto sharedSpaceLibraryLinkDto,) async {
-    final response = await linkLibraryWithHttpInfo(id, sharedSpaceLibraryLinkDto,);
+  Future<void> linkLibrary(String id, SharedSpaceLibraryLinkDto sharedSpaceLibraryLinkDto, { Future<void>? abortTrigger, }) async {
+    final response = await linkLibraryWithHttpInfo(id, sharedSpaceLibraryLinkDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1498,7 +1520,7 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<Response> markSpaceViewedWithHttpInfo(String id,) async {
+  Future<Response> markSpaceViewedWithHttpInfo(String id, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/view'
       .replaceAll('{id}', id);
@@ -1521,6 +1543,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -1531,8 +1554,8 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<void> markSpaceViewed(String id,) async {
-    final response = await markSpaceViewedWithHttpInfo(id,);
+  Future<void> markSpaceViewed(String id, { Future<void>? abortTrigger, }) async {
+    final response = await markSpaceViewedWithHttpInfo(id, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1551,7 +1574,7 @@ class SharedSpacesApi {
   /// * [String] personId (required):
   ///
   /// * [SharedSpacePersonMergeDto] sharedSpacePersonMergeDto (required):
-  Future<Response> mergeSpacePeopleWithHttpInfo(String id, String personId, SharedSpacePersonMergeDto sharedSpacePersonMergeDto,) async {
+  Future<Response> mergeSpacePeopleWithHttpInfo(String id, String personId, SharedSpacePersonMergeDto sharedSpacePersonMergeDto, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people/{personId}/merge'
       .replaceAll('{id}', id)
@@ -1575,6 +1598,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -1589,8 +1613,8 @@ class SharedSpacesApi {
   /// * [String] personId (required):
   ///
   /// * [SharedSpacePersonMergeDto] sharedSpacePersonMergeDto (required):
-  Future<void> mergeSpacePeople(String id, String personId, SharedSpacePersonMergeDto sharedSpacePersonMergeDto,) async {
-    final response = await mergeSpacePeopleWithHttpInfo(id, personId, sharedSpacePersonMergeDto,);
+  Future<void> mergeSpacePeople(String id, String personId, SharedSpacePersonMergeDto sharedSpacePersonMergeDto, { Future<void>? abortTrigger, }) async {
+    final response = await mergeSpacePeopleWithHttpInfo(id, personId, sharedSpacePersonMergeDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1607,7 +1631,7 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [SharedSpaceAssetRemoveDto] sharedSpaceAssetRemoveDto (required):
-  Future<Response> removeAssetsWithHttpInfo(String id, SharedSpaceAssetRemoveDto sharedSpaceAssetRemoveDto,) async {
+  Future<Response> removeAssetsWithHttpInfo(String id, SharedSpaceAssetRemoveDto sharedSpaceAssetRemoveDto, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/assets'
       .replaceAll('{id}', id);
@@ -1630,6 +1654,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -1642,8 +1667,8 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [SharedSpaceAssetRemoveDto] sharedSpaceAssetRemoveDto (required):
-  Future<void> removeAssets(String id, SharedSpaceAssetRemoveDto sharedSpaceAssetRemoveDto,) async {
-    final response = await removeAssetsWithHttpInfo(id, sharedSpaceAssetRemoveDto,);
+  Future<void> removeAssets(String id, SharedSpaceAssetRemoveDto sharedSpaceAssetRemoveDto, { Future<void>? abortTrigger, }) async {
+    final response = await removeAssetsWithHttpInfo(id, sharedSpaceAssetRemoveDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1660,7 +1685,7 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] userId (required):
-  Future<Response> removeMemberWithHttpInfo(String id, String userId,) async {
+  Future<Response> removeMemberWithHttpInfo(String id, String userId, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/members/{userId}'
       .replaceAll('{id}', id)
@@ -1684,6 +1709,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -1696,8 +1722,8 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] userId (required):
-  Future<void> removeMember(String id, String userId,) async {
-    final response = await removeMemberWithHttpInfo(id, userId,);
+  Future<void> removeMember(String id, String userId, { Future<void>? abortTrigger, }) async {
+    final response = await removeMemberWithHttpInfo(id, userId, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1712,7 +1738,7 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<Response> removeSpaceWithHttpInfo(String id,) async {
+  Future<Response> removeSpaceWithHttpInfo(String id, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}'
       .replaceAll('{id}', id);
@@ -1735,6 +1761,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -1745,8 +1772,8 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<void> removeSpace(String id,) async {
-    final response = await removeSpaceWithHttpInfo(id,);
+  Future<void> removeSpace(String id, { Future<void>? abortTrigger, }) async {
+    final response = await removeSpaceWithHttpInfo(id, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1765,7 +1792,7 @@ class SharedSpacesApi {
   /// * [String] personId (required):
   ///
   /// * [SharedSpacePersonAliasDto] sharedSpacePersonAliasDto (required):
-  Future<Response> setSpacePersonAliasWithHttpInfo(String id, String personId, SharedSpacePersonAliasDto sharedSpacePersonAliasDto,) async {
+  Future<Response> setSpacePersonAliasWithHttpInfo(String id, String personId, SharedSpacePersonAliasDto sharedSpacePersonAliasDto, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people/{personId}/alias'
       .replaceAll('{id}', id)
@@ -1789,6 +1816,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -1803,8 +1831,8 @@ class SharedSpacesApi {
   /// * [String] personId (required):
   ///
   /// * [SharedSpacePersonAliasDto] sharedSpacePersonAliasDto (required):
-  Future<void> setSpacePersonAlias(String id, String personId, SharedSpacePersonAliasDto sharedSpacePersonAliasDto,) async {
-    final response = await setSpacePersonAliasWithHttpInfo(id, personId, sharedSpacePersonAliasDto,);
+  Future<void> setSpacePersonAlias(String id, String personId, SharedSpacePersonAliasDto sharedSpacePersonAliasDto, { Future<void>? abortTrigger, }) async {
+    final response = await setSpacePersonAliasWithHttpInfo(id, personId, sharedSpacePersonAliasDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1821,7 +1849,7 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] libraryId (required):
-  Future<Response> unlinkLibraryWithHttpInfo(String id, String libraryId,) async {
+  Future<Response> unlinkLibraryWithHttpInfo(String id, String libraryId, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/libraries/{libraryId}'
       .replaceAll('{id}', id)
@@ -1845,6 +1873,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -1857,8 +1886,8 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] libraryId (required):
-  Future<void> unlinkLibrary(String id, String libraryId,) async {
-    final response = await unlinkLibraryWithHttpInfo(id, libraryId,);
+  Future<void> unlinkLibrary(String id, String libraryId, { Future<void>? abortTrigger, }) async {
+    final response = await unlinkLibraryWithHttpInfo(id, libraryId, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1877,7 +1906,7 @@ class SharedSpacesApi {
   /// * [String] userId (required):
   ///
   /// * [SharedSpaceMemberUpdateDto] sharedSpaceMemberUpdateDto (required):
-  Future<Response> updateMemberWithHttpInfo(String id, String userId, SharedSpaceMemberUpdateDto sharedSpaceMemberUpdateDto,) async {
+  Future<Response> updateMemberWithHttpInfo(String id, String userId, SharedSpaceMemberUpdateDto sharedSpaceMemberUpdateDto, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/members/{userId}'
       .replaceAll('{id}', id)
@@ -1901,6 +1930,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -1915,8 +1945,8 @@ class SharedSpacesApi {
   /// * [String] userId (required):
   ///
   /// * [SharedSpaceMemberUpdateDto] sharedSpaceMemberUpdateDto (required):
-  Future<SharedSpaceMemberResponseDto?> updateMember(String id, String userId, SharedSpaceMemberUpdateDto sharedSpaceMemberUpdateDto,) async {
-    final response = await updateMemberWithHttpInfo(id, userId, sharedSpaceMemberUpdateDto,);
+  Future<SharedSpaceMemberResponseDto?> updateMember(String id, String userId, SharedSpaceMemberUpdateDto sharedSpaceMemberUpdateDto, { Future<void>? abortTrigger, }) async {
+    final response = await updateMemberWithHttpInfo(id, userId, sharedSpaceMemberUpdateDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1943,7 +1973,7 @@ class SharedSpacesApi {
   /// * [String] userId (required):
   ///
   /// * [SharedSpaceMemberMetadataContributionDto] sharedSpaceMemberMetadataContributionDto (required):
-  Future<Response> updateMemberMetadataContributionWithHttpInfo(String id, String userId, SharedSpaceMemberMetadataContributionDto sharedSpaceMemberMetadataContributionDto,) async {
+  Future<Response> updateMemberMetadataContributionWithHttpInfo(String id, String userId, SharedSpaceMemberMetadataContributionDto sharedSpaceMemberMetadataContributionDto, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/members/{userId}/metadata-contribution'
       .replaceAll('{id}', id)
@@ -1967,6 +1997,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -1981,8 +2012,8 @@ class SharedSpacesApi {
   /// * [String] userId (required):
   ///
   /// * [SharedSpaceMemberMetadataContributionDto] sharedSpaceMemberMetadataContributionDto (required):
-  Future<SharedSpaceMemberResponseDto?> updateMemberMetadataContribution(String id, String userId, SharedSpaceMemberMetadataContributionDto sharedSpaceMemberMetadataContributionDto,) async {
-    final response = await updateMemberMetadataContributionWithHttpInfo(id, userId, sharedSpaceMemberMetadataContributionDto,);
+  Future<SharedSpaceMemberResponseDto?> updateMemberMetadataContribution(String id, String userId, SharedSpaceMemberMetadataContributionDto sharedSpaceMemberMetadataContributionDto, { Future<void>? abortTrigger, }) async {
+    final response = await updateMemberMetadataContributionWithHttpInfo(id, userId, sharedSpaceMemberMetadataContributionDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -2007,7 +2038,7 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [SharedSpaceMemberPreferencesDto] sharedSpaceMemberPreferencesDto (required):
-  Future<Response> updateMemberPreferencesWithHttpInfo(String id, SharedSpaceMemberPreferencesDto sharedSpaceMemberPreferencesDto,) async {
+  Future<Response> updateMemberPreferencesWithHttpInfo(String id, SharedSpaceMemberPreferencesDto sharedSpaceMemberPreferencesDto, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/members/me/preferences'
       .replaceAll('{id}', id);
@@ -2030,6 +2061,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -2042,8 +2074,8 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [SharedSpaceMemberPreferencesDto] sharedSpaceMemberPreferencesDto (required):
-  Future<SharedSpaceMemberResponseDto?> updateMemberPreferences(String id, SharedSpaceMemberPreferencesDto sharedSpaceMemberPreferencesDto,) async {
-    final response = await updateMemberPreferencesWithHttpInfo(id, sharedSpaceMemberPreferencesDto,);
+  Future<SharedSpaceMemberResponseDto?> updateMemberPreferences(String id, SharedSpaceMemberPreferencesDto sharedSpaceMemberPreferencesDto, { Future<void>? abortTrigger, }) async {
+    final response = await updateMemberPreferencesWithHttpInfo(id, sharedSpaceMemberPreferencesDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -2068,7 +2100,7 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [SharedSpaceMemberTimelineDto] sharedSpaceMemberTimelineDto (required):
-  Future<Response> updateMemberTimelineWithHttpInfo(String id, SharedSpaceMemberTimelineDto sharedSpaceMemberTimelineDto,) async {
+  Future<Response> updateMemberTimelineWithHttpInfo(String id, SharedSpaceMemberTimelineDto sharedSpaceMemberTimelineDto, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/members/me/timeline'
       .replaceAll('{id}', id);
@@ -2091,6 +2123,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -2103,8 +2136,8 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [SharedSpaceMemberTimelineDto] sharedSpaceMemberTimelineDto (required):
-  Future<SharedSpaceMemberResponseDto?> updateMemberTimeline(String id, SharedSpaceMemberTimelineDto sharedSpaceMemberTimelineDto,) async {
-    final response = await updateMemberTimelineWithHttpInfo(id, sharedSpaceMemberTimelineDto,);
+  Future<SharedSpaceMemberResponseDto?> updateMemberTimeline(String id, SharedSpaceMemberTimelineDto sharedSpaceMemberTimelineDto, { Future<void>? abortTrigger, }) async {
+    final response = await updateMemberTimelineWithHttpInfo(id, sharedSpaceMemberTimelineDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -2129,7 +2162,7 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [SharedSpaceUpdateDto] sharedSpaceUpdateDto (required):
-  Future<Response> updateSpaceWithHttpInfo(String id, SharedSpaceUpdateDto sharedSpaceUpdateDto,) async {
+  Future<Response> updateSpaceWithHttpInfo(String id, SharedSpaceUpdateDto sharedSpaceUpdateDto, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}'
       .replaceAll('{id}', id);
@@ -2152,6 +2185,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -2164,8 +2198,8 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [SharedSpaceUpdateDto] sharedSpaceUpdateDto (required):
-  Future<SharedSpaceResponseDto?> updateSpace(String id, SharedSpaceUpdateDto sharedSpaceUpdateDto,) async {
-    final response = await updateSpaceWithHttpInfo(id, sharedSpaceUpdateDto,);
+  Future<SharedSpaceResponseDto?> updateSpace(String id, SharedSpaceUpdateDto sharedSpaceUpdateDto, { Future<void>? abortTrigger, }) async {
+    final response = await updateSpaceWithHttpInfo(id, sharedSpaceUpdateDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -2192,7 +2226,7 @@ class SharedSpacesApi {
   /// * [String] personId (required):
   ///
   /// * [SharedSpacePersonUpdateDto] sharedSpacePersonUpdateDto (required):
-  Future<Response> updateSpacePersonWithHttpInfo(String id, String personId, SharedSpacePersonUpdateDto sharedSpacePersonUpdateDto,) async {
+  Future<Response> updateSpacePersonWithHttpInfo(String id, String personId, SharedSpacePersonUpdateDto sharedSpacePersonUpdateDto, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people/{personId}'
       .replaceAll('{id}', id)
@@ -2216,6 +2250,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -2230,8 +2265,8 @@ class SharedSpacesApi {
   /// * [String] personId (required):
   ///
   /// * [SharedSpacePersonUpdateDto] sharedSpacePersonUpdateDto (required):
-  Future<SharedSpacePersonResponseDto?> updateSpacePerson(String id, String personId, SharedSpacePersonUpdateDto sharedSpacePersonUpdateDto,) async {
-    final response = await updateSpacePersonWithHttpInfo(id, personId, sharedSpacePersonUpdateDto,);
+  Future<SharedSpacePersonResponseDto?> updateSpacePerson(String id, String personId, SharedSpacePersonUpdateDto sharedSpacePersonUpdateDto, { Future<void>? abortTrigger, }) async {
+    final response = await updateSpacePersonWithHttpInfo(id, personId, sharedSpacePersonUpdateDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -2258,7 +2293,7 @@ class SharedSpacesApi {
   /// * [String] personId (required):
   ///
   /// * [SpaceRepresentativeFaceUpdateDto] spaceRepresentativeFaceUpdateDto (required):
-  Future<Response> updateSpacePersonRepresentativeFaceWithHttpInfo(String id, String personId, SpaceRepresentativeFaceUpdateDto spaceRepresentativeFaceUpdateDto,) async {
+  Future<Response> updateSpacePersonRepresentativeFaceWithHttpInfo(String id, String personId, SpaceRepresentativeFaceUpdateDto spaceRepresentativeFaceUpdateDto, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people/{personId}/representative-face'
       .replaceAll('{id}', id)
@@ -2282,6 +2317,7 @@ class SharedSpacesApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -2296,8 +2332,8 @@ class SharedSpacesApi {
   /// * [String] personId (required):
   ///
   /// * [SpaceRepresentativeFaceUpdateDto] spaceRepresentativeFaceUpdateDto (required):
-  Future<SharedSpacePersonResponseDto?> updateSpacePersonRepresentativeFace(String id, String personId, SpaceRepresentativeFaceUpdateDto spaceRepresentativeFaceUpdateDto,) async {
-    final response = await updateSpacePersonRepresentativeFaceWithHttpInfo(id, personId, spaceRepresentativeFaceUpdateDto,);
+  Future<SharedSpacePersonResponseDto?> updateSpacePersonRepresentativeFace(String id, String personId, SpaceRepresentativeFaceUpdateDto spaceRepresentativeFaceUpdateDto, { Future<void>? abortTrigger, }) async {
+    final response = await updateSpacePersonRepresentativeFaceWithHttpInfo(id, personId, spaceRepresentativeFaceUpdateDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
