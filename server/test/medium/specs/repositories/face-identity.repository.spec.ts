@@ -3017,6 +3017,134 @@ describe(FaceIdentityRepository.name, () => {
     }
   });
 
+  describe('getSpaceMergeConflictPairs', () => {
+    it('returns the conflicting same-space rows with the fields needed to pick a survivor', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      try {
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+
+        const targetSpacePerson = await ctx.database
+          .insertInto('shared_space_person')
+          .values({ spaceId: space.id, name: '', nameSource: 'auto', faceCount: 1, type: 'person' })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        const sourceSpacePerson = await ctx.database
+          .insertInto('shared_space_person')
+          .values({ spaceId: space.id, name: 'Alice', nameSource: 'manual', faceCount: 3, type: 'person' })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        const targetIdentity = await sut.ensureSpacePersonIdentity(targetSpacePerson.id);
+        const sourceIdentity = await sut.ensureSpacePersonIdentity(sourceSpacePerson.id);
+
+        await expect(
+          sut.getSpaceMergeConflictPairs({
+            targetIdentityId: targetIdentity.id,
+            sourceIdentityIds: [sourceIdentity.id],
+          }),
+        ).resolves.toEqual([
+          {
+            spaceId: space.id,
+            sourceId: sourceSpacePerson.id,
+            sourceName: 'Alice',
+            sourceNameSource: 'manual',
+            sourceFaceCount: 3,
+            targetId: targetSpacePerson.id,
+            targetName: '',
+            targetNameSource: 'auto',
+            targetFaceCount: 1,
+          },
+        ]);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    it('returns no pairs when only one side is present in a space', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      try {
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+        const sourceSpacePerson = await newSpacePerson(ctx, space.id);
+        const targetSpacePerson = await newSpacePerson(ctx, space.id);
+        const targetIdentity = await sut.ensureSpacePersonIdentity(targetSpacePerson.id);
+        const sourceIdentity = await sut.ensureSpacePersonIdentity(sourceSpacePerson.id);
+        // Remove the target-identity row so the space holds only the source side.
+        await ctx.database.deleteFrom('shared_space_person').where('id', '=', targetSpacePerson.id).execute();
+
+        await expect(
+          sut.getSpaceMergeConflictPairs({
+            targetIdentityId: targetIdentity.id,
+            sourceIdentityIds: [sourceIdentity.id],
+          }),
+        ).resolves.toEqual([]);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+  });
+
+  describe('same-space collapse convergence', () => {
+    it('migrates the surviving space-person onto the target identity once the colliding row is collapsed', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      try {
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+        // The loser holds the target identity; the survivor holds the source identity and must end
+        // up on the canonical target identity after the collapse + merge.
+        const loserSpacePerson = await newSpacePerson(ctx, space.id);
+        const survivorSpacePerson = await newSpacePerson(ctx, space.id);
+        const targetIdentity = await sut.ensureSpacePersonIdentity(loserSpacePerson.id);
+        const sourceIdentity = await sut.ensureSpacePersonIdentity(survivorSpacePerson.id);
+
+        // While both rows exist the merge is blocked by the (spaceId, identityId) unique index.
+        await expect(
+          sut.mergeIdentities({
+            targetIdentityId: targetIdentity.id,
+            sourceIdentityIds: [sourceIdentity.id],
+            source: 'shared-space-evidence',
+          }),
+        ).resolves.toEqual({ personalProfileConflictCount: 0, spaceProfileConflictCount: 1 });
+        const blocked = await ctx.database
+          .selectFrom('shared_space_person')
+          .select('identityId')
+          .where('id', '=', survivorSpacePerson.id)
+          .executeTakeFirstOrThrow();
+        expect(blocked.identityId).toBe(sourceIdentity.id);
+
+        // Collapse the colliding row away (faces are reassigned to the survivor in the service path).
+        await ctx.database.deleteFrom('shared_space_person').where('id', '=', loserSpacePerson.id).execute();
+
+        await expect(
+          sut.mergeIdentities({
+            targetIdentityId: targetIdentity.id,
+            sourceIdentityIds: [sourceIdentity.id],
+            source: 'shared-space-evidence',
+          }),
+        ).resolves.toEqual({ personalProfileConflictCount: 0, spaceProfileConflictCount: 0 });
+
+        const survivor = await ctx.database
+          .selectFrom('shared_space_person')
+          .select(['id', 'identityId'])
+          .where('id', '=', survivorSpacePerson.id)
+          .executeTakeFirstOrThrow();
+        expect(survivor.identityId).toBe(targetIdentity.id);
+
+        const loserGone = await ctx.database
+          .selectFrom('shared_space_person')
+          .select('id')
+          .where('id', '=', loserSpacePerson.id)
+          .executeTakeFirst();
+        expect(loserGone).toBeUndefined();
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+  });
+
   describe('repair', () => {
     it('merges non-conflicting identities by moving face links without merging scoped metadata', async () => {
       const { ctx, sut } = setup();
