@@ -3,11 +3,11 @@ import 'package:drift/native.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
+import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
-import 'package:immich_mobile/domain/models/metadata_key.dart';
-import 'package:immich_mobile/infrastructure/repositories/metadata.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/models/auth/auth_state.model.dart';
 import 'package:immich_mobile/providers/auth.provider.dart';
@@ -76,12 +76,12 @@ void main() {
     TestUtils.init();
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
     await StoreService.init(storeRepository: DriftStoreRepository(db));
-    await MetadataRepository.ensureInitialized(db);
+    await SettingsRepository.ensureInitialized(db);
   });
 
   setUp(() async {
     await Store.clear();
-    await MetadataRepository.instance.write(MetadataKey.networkAutoEndpointSwitching, true);
+    await SettingsRepository.instance.write(SettingsKey.networkAutoEndpointSwitching, true);
 
     authNotifier = MockAuthNotifier();
     networkRepository = MockNetworkRepository();
