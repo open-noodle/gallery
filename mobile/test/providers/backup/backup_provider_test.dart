@@ -107,11 +107,11 @@ void main() {
     when(
       () => backgroundUploadService.getActiveTasks(kBackupLivePhotoGroup),
     ).thenAnswer((_) async => [livePhotoStillTask]);
-    when(() => backgroundUploadService.resume()).thenAnswer((_) async {});
+    when(() => backgroundUploadService.resume('user-1')).thenAnswer((_) async {});
 
     await sut.startBackup('user-1');
 
-    verify(() => backgroundUploadService.resume()).called(1);
+    verify(() => backgroundUploadService.resume('user-1')).called(1);
     verifyNever(() => backgroundUploadService.uploadBackupCandidates('user-1'));
   });
 
