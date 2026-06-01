@@ -19,7 +19,7 @@ class ClassificationApi {
   /// Scan all libraries for classification
   ///
   /// Note: This method returns the HTTP [Response].
-  Future<Response> scanClassificationWithHttpInfo() async {
+  Future<Response> scanClassificationWithHttpInfo({ Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/classification/scan';
 
@@ -41,12 +41,13 @@ class ClassificationApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
   /// Scan all libraries for classification
-  Future<void> scanClassification() async {
-    final response = await scanClassificationWithHttpInfo();
+  Future<void> scanClassification({ Future<void>? abortTrigger, }) async {
+    final response = await scanClassificationWithHttpInfo(abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }

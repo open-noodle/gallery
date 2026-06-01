@@ -25,7 +25,7 @@ class UserGroupsApi {
   /// Parameters:
   ///
   /// * [UserGroupCreateDto] userGroupCreateDto (required):
-  Future<Response> createGroupWithHttpInfo(UserGroupCreateDto userGroupCreateDto,) async {
+  Future<Response> createGroupWithHttpInfo(UserGroupCreateDto userGroupCreateDto, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/user-groups';
 
@@ -47,6 +47,7 @@ class UserGroupsApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -57,8 +58,8 @@ class UserGroupsApi {
   /// Parameters:
   ///
   /// * [UserGroupCreateDto] userGroupCreateDto (required):
-  Future<UserGroupResponseDto?> createGroup(UserGroupCreateDto userGroupCreateDto,) async {
-    final response = await createGroupWithHttpInfo(userGroupCreateDto,);
+  Future<UserGroupResponseDto?> createGroup(UserGroupCreateDto userGroupCreateDto, { Future<void>? abortTrigger, }) async {
+    final response = await createGroupWithHttpInfo(userGroupCreateDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -77,7 +78,7 @@ class UserGroupsApi {
   /// Retrieve all user groups created by the current user.
   ///
   /// Note: This method returns the HTTP [Response].
-  Future<Response> getAllGroupsWithHttpInfo() async {
+  Future<Response> getAllGroupsWithHttpInfo({ Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/user-groups';
 
@@ -99,14 +100,15 @@ class UserGroupsApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
   /// Get all user groups
   ///
   /// Retrieve all user groups created by the current user.
-  Future<List<UserGroupResponseDto>?> getAllGroups() async {
-    final response = await getAllGroupsWithHttpInfo();
+  Future<List<UserGroupResponseDto>?> getAllGroups({ Future<void>? abortTrigger, }) async {
+    final response = await getAllGroupsWithHttpInfo(abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -132,7 +134,7 @@ class UserGroupsApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<Response> getGroupWithHttpInfo(String id,) async {
+  Future<Response> getGroupWithHttpInfo(String id, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/user-groups/{id}'
       .replaceAll('{id}', id);
@@ -155,6 +157,7 @@ class UserGroupsApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -165,8 +168,8 @@ class UserGroupsApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<UserGroupResponseDto?> getGroup(String id,) async {
-    final response = await getGroupWithHttpInfo(id,);
+  Future<UserGroupResponseDto?> getGroup(String id, { Future<void>? abortTrigger, }) async {
+    final response = await getGroupWithHttpInfo(id, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -189,7 +192,7 @@ class UserGroupsApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<Response> removeGroupWithHttpInfo(String id,) async {
+  Future<Response> removeGroupWithHttpInfo(String id, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/user-groups/{id}'
       .replaceAll('{id}', id);
@@ -212,6 +215,7 @@ class UserGroupsApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -222,8 +226,8 @@ class UserGroupsApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<void> removeGroup(String id,) async {
-    final response = await removeGroupWithHttpInfo(id,);
+  Future<void> removeGroup(String id, { Future<void>? abortTrigger, }) async {
+    final response = await removeGroupWithHttpInfo(id, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -240,7 +244,7 @@ class UserGroupsApi {
   /// * [String] id (required):
   ///
   /// * [UserGroupMemberSetDto] userGroupMemberSetDto (required):
-  Future<Response> setMembersWithHttpInfo(String id, UserGroupMemberSetDto userGroupMemberSetDto,) async {
+  Future<Response> setMembersWithHttpInfo(String id, UserGroupMemberSetDto userGroupMemberSetDto, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/user-groups/{id}/members'
       .replaceAll('{id}', id);
@@ -263,6 +267,7 @@ class UserGroupsApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -275,8 +280,8 @@ class UserGroupsApi {
   /// * [String] id (required):
   ///
   /// * [UserGroupMemberSetDto] userGroupMemberSetDto (required):
-  Future<List<UserGroupMemberResponseDto>?> setMembers(String id, UserGroupMemberSetDto userGroupMemberSetDto,) async {
-    final response = await setMembersWithHttpInfo(id, userGroupMemberSetDto,);
+  Future<List<UserGroupMemberResponseDto>?> setMembers(String id, UserGroupMemberSetDto userGroupMemberSetDto, { Future<void>? abortTrigger, }) async {
+    final response = await setMembersWithHttpInfo(id, userGroupMemberSetDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -304,7 +309,7 @@ class UserGroupsApi {
   /// * [String] id (required):
   ///
   /// * [UserGroupUpdateDto] userGroupUpdateDto (required):
-  Future<Response> updateGroupWithHttpInfo(String id, UserGroupUpdateDto userGroupUpdateDto,) async {
+  Future<Response> updateGroupWithHttpInfo(String id, UserGroupUpdateDto userGroupUpdateDto, { Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/user-groups/{id}'
       .replaceAll('{id}', id);
@@ -327,6 +332,7 @@ class UserGroupsApi {
       headerParams,
       formParams,
       contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
     );
   }
 
@@ -339,8 +345,8 @@ class UserGroupsApi {
   /// * [String] id (required):
   ///
   /// * [UserGroupUpdateDto] userGroupUpdateDto (required):
-  Future<UserGroupResponseDto?> updateGroup(String id, UserGroupUpdateDto userGroupUpdateDto,) async {
-    final response = await updateGroupWithHttpInfo(id, userGroupUpdateDto,);
+  Future<UserGroupResponseDto?> updateGroup(String id, UserGroupUpdateDto userGroupUpdateDto, { Future<void>? abortTrigger, }) async {
+    final response = await updateGroupWithHttpInfo(id, userGroupUpdateDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
