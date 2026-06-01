@@ -302,6 +302,8 @@ export interface ISharedSpaceIdentityReconciliationJob extends IBaseJob {
 
 export interface ISharedSpacePersonDedupJob extends IBaseJob {
   spaceId: string;
+  /** 1-based pass number. Each dedup job runs one pass and re-queues the next with pass + 1. */
+  pass?: number;
 }
 
 export interface ISharedSpacePersonMetadataBackfillJob extends IBaseJob {
