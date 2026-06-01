@@ -19,11 +19,16 @@ import { signupDto } from 'src/fixtures';
 import { parseTimeBucketKey } from 'src/ui/generators/timeline/utils';
 import type { MockTimelineAsset, MockTimelineData } from './timeline-config';
 
+type MockTimeBucketAssetResponseDto = TimeBucketAssetResponseDto & {
+  city: NonNullable<TimeBucketAssetResponseDto['city']>;
+  country: NonNullable<TimeBucketAssetResponseDto['country']>;
+};
+
 /**
  * Convert timeline/asset models to columnar format (parallel arrays)
  */
 export function toColumnarFormat(assets: MockTimelineAsset[]): TimeBucketAssetResponseDto {
-  const result: TimeBucketAssetResponseDto = {
+  const result: MockTimeBucketAssetResponseDto = {
     id: [],
     ownerId: [],
     ratio: [],
