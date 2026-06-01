@@ -39,7 +39,10 @@ class UploadRepository {
   UploadRepository.forTesting({
     required BackgroundDownloaderMethodInvoker backgroundDownloaderMethodInvoker,
     BackgroundDownloaderConfigurator? backgroundDownloaderConfigurator,
-  }) : _backgroundDownloaderMethodInvoker = backgroundDownloaderMethodInvoker,
+  })
+    // Keep the test constructor's existing named parameter API.
+    // ignore: prefer_initializing_formals
+    : _backgroundDownloaderMethodInvoker = backgroundDownloaderMethodInvoker,
        _backgroundDownloaderConfigurator =
            backgroundDownloaderConfigurator ??
            ((globalConfig) => FileDownloader().configure(globalConfig: globalConfig));
