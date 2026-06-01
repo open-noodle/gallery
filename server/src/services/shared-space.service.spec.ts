@@ -20,7 +20,7 @@ import {
   SharedSpaceRole,
   UserAvatarColor,
 } from 'src/enum';
-import { SharedSpaceService } from 'src/services/shared-space.service';
+import { SHARED_SPACE_DEDUP_MAX_PASSES, SharedSpaceService } from 'src/services/shared-space.service';
 import { StorageService } from 'src/services/storage.service';
 import { ImmichFileResponse, ImmichStreamResponse } from 'src/utils/file';
 import { factory, newDate, newUuid } from 'test/small.factory';
@@ -2841,6 +2841,109 @@ describe(SharedSpaceService.name, () => {
 
       await sut.handleSharedSpaceIdentityReconciliation({ spaceId: 'space-1', userId: 'member-1' });
 
+      expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
+    });
+
+    it('should collapse a same-space conflict into the higher-precedence survivor and proceed with the merge', async () => {
+      setupStrictReconciliationFixture(mocks);
+      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
+      mocks.faceIdentity.getMergeConflicts.mockResolvedValue({
+        personalProfileConflictCount: 0,
+        spaceProfileConflictCount: 1,
+      });
+      // Two same-space space-persons hold the two sides of the merge. The source-identity row is
+      // manually named; the target-identity row is auto-named, so the manual row must survive.
+      mocks.faceIdentity.getSpaceMergeConflictPairs.mockResolvedValue([
+        {
+          spaceId: 'space-1',
+          sourceId: 'space-person-dup',
+          sourceName: 'Alice',
+          sourceNameSource: 'manual',
+          sourceFaceCount: 3,
+          targetId: 'space-person-1',
+          targetName: '',
+          targetNameSource: 'auto',
+          targetFaceCount: 1,
+        },
+      ]);
+
+      await sut.handleSharedSpaceIdentityReconciliation({ spaceId: 'space-1', userId: 'member-1' });
+
+      // The auto-named loser is folded into the manual-named survivor before the identity merge.
+      expect(mocks.sharedSpace.reassignPersonFacesSafe).toHaveBeenCalledWith('space-person-1', 'space-person-dup');
+      expect(mocks.sharedSpace.migrateAliases).toHaveBeenCalledWith('space-person-1', 'space-person-dup');
+      expect(mocks.sharedSpace.deletePerson).toHaveBeenCalledWith('space-person-1');
+      expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledWith(['space-person-dup']);
+
+      // With the colliding row gone, the merge now proceeds instead of being skipped.
+      expect(mocks.faceIdentity.mergeIdentities).toHaveBeenCalledWith({
+        targetIdentityId: 'space-identity',
+        sourceIdentityIds: ['local-identity'],
+        source: 'shared-space-evidence',
+      });
+    });
+
+    it('should break a nameSource tie by face count, keeping the larger space-person', async () => {
+      setupStrictReconciliationFixture(mocks);
+      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
+      mocks.faceIdentity.getMergeConflicts.mockResolvedValue({
+        personalProfileConflictCount: 0,
+        spaceProfileConflictCount: 1,
+      });
+      // Both rows are manually named, so the tie falls to face count: the target row (5 faces)
+      // outweighs the source row (2 faces) and survives.
+      mocks.faceIdentity.getSpaceMergeConflictPairs.mockResolvedValue([
+        {
+          spaceId: 'space-1',
+          sourceId: 'space-person-dup',
+          sourceName: 'Bob',
+          sourceNameSource: 'manual',
+          sourceFaceCount: 2,
+          targetId: 'space-person-1',
+          targetName: 'Robert',
+          targetNameSource: 'manual',
+          targetFaceCount: 5,
+        },
+      ]);
+
+      await sut.handleSharedSpaceIdentityReconciliation({ spaceId: 'space-1', userId: 'member-1' });
+
+      expect(mocks.sharedSpace.reassignPersonFacesSafe).toHaveBeenCalledWith('space-person-dup', 'space-person-1');
+      expect(mocks.sharedSpace.deletePerson).toHaveBeenCalledWith('space-person-dup');
+      expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledWith(['space-person-1']);
+      expect(mocks.faceIdentity.mergeIdentities).toHaveBeenCalled();
+    });
+
+    it('should still skip without collapsing when the conflict is a personal-profile conflict', async () => {
+      setupStrictReconciliationFixture(mocks);
+      mocks.faceIdentity.getMergeConflicts.mockResolvedValue({
+        personalProfileConflictCount: 1,
+        spaceProfileConflictCount: 0,
+      });
+
+      await sut.handleSharedSpaceIdentityReconciliation({ spaceId: 'space-1', userId: 'member-1' });
+
+      expect(mocks.faceIdentity.getSpaceMergeConflictPairs).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.reassignPersonFacesSafe).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.deletePerson).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
+    });
+
+    it('should not collapse or merge when a personal-profile conflict accompanies a space conflict', async () => {
+      setupStrictReconciliationFixture(mocks);
+      mocks.faceIdentity.getMergeConflicts.mockResolvedValue({
+        personalProfileConflictCount: 1,
+        spaceProfileConflictCount: 1,
+      });
+
+      await sut.handleSharedSpaceIdentityReconciliation({ spaceId: 'space-1', userId: 'member-1' });
+
+      expect(mocks.faceIdentity.getSpaceMergeConflictPairs).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.reassignPersonFacesSafe).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
     });
 
@@ -8064,6 +8167,104 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.sharedSpace.deleteOrphanedPersons).toHaveBeenCalledWith(spaceId);
     });
 
+    it('runs a single pass and re-queues the next dedup pass after a merge (keeps each job short)', async () => {
+      const spaceId = newUuid();
+      const personA = newUuid();
+      const personB = newUuid();
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.sharedSpace.getSpacePersonsWithEmbeddings
+        .mockResolvedValueOnce([
+          {
+            id: personA,
+            name: 'Alice',
+            type: 'person',
+            isHidden: false,
+            faceCount: 5,
+            representativeFaceId: null,
+            embedding: '[0.1,0.2]',
+          },
+          {
+            id: personB,
+            name: '',
+            type: 'person',
+            isHidden: false,
+            faceCount: 2,
+            representativeFaceId: null,
+            embedding: '[0.11,0.21]',
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: personA,
+            name: 'Alice',
+            type: 'person',
+            isHidden: false,
+            faceCount: 7,
+            representativeFaceId: null,
+            embedding: '[0.1,0.2]',
+          },
+        ]);
+      mocks.sharedSpace.findClosestSpacePerson.mockImplementation(
+        (_spaceId: string, _embedding: string, options: { excludePersonIds?: string[] }) => {
+          if (options.excludePersonIds?.includes(personA)) {
+            return Promise.resolve([{ personId: personB, name: '', distance: 0.1 }]);
+          }
+          return Promise.resolve([]);
+        },
+      );
+      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.updatePerson.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
+
+      const result = await sut.handleSharedSpacePersonDedup({ spaceId });
+
+      expect(result).toBe(JobStatus.Success);
+      // Exactly one pass per job — the in-process up-to-100-pass loop is gone, so the BullMQ lock
+      // never expires under a long handler.
+      expect(mocks.sharedSpace.getSpacePersonsWithEmbeddings).toHaveBeenCalledTimes(1);
+      // A merge happened, so a fresh, short follow-up pass is queued to continue the work.
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpacePersonDedup,
+        data: { spaceId, pass: 2 },
+      });
+    });
+
+    it('does not re-queue another dedup pass when nothing merged', async () => {
+      const spaceId = newUuid();
+      const personA = newUuid();
+      const personB = newUuid();
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.sharedSpace.getSpacePersonsWithEmbeddings.mockResolvedValue([
+        {
+          id: personA,
+          name: 'Alice',
+          type: 'person',
+          isHidden: false,
+          faceCount: 5,
+          representativeFaceId: null,
+          embedding: '[0.1,0.2]',
+        },
+        {
+          id: personB,
+          name: 'Bob',
+          type: 'person',
+          isHidden: false,
+          faceCount: 2,
+          representativeFaceId: null,
+          embedding: '[9,9]',
+        },
+      ]);
+      mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
+
+      const result = await sut.handleSharedSpacePersonDedup({ spaceId });
+
+      expect(result).toBe(JobStatus.Success);
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.SharedSpacePersonDedup }),
+      );
+    });
+
     it('should physically merge strict identity-backed space people before merging supporting identities', async () => {
       const spaceId = 'space-1';
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
@@ -8297,7 +8498,16 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.updatePerson.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
 
-      const result = await sut.handleSharedSpacePersonDedup({ spaceId });
+      // Each job now runs a single pass and re-queues the next, so a transitive chain spans multiple
+      // jobs: pass 1 merges B, pass 2 merges C, pass 3 converges. Drain the chain explicitly.
+      await sut.handleSharedSpacePersonDedup({ spaceId });
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpacePersonDedup,
+        data: { spaceId, pass: 2 },
+      });
+      await sut.handleSharedSpacePersonDedup({ spaceId, pass: 2 });
+      const result = await sut.handleSharedSpacePersonDedup({ spaceId, pass: 3 });
+
       expect(result).toBe(JobStatus.Success);
       expect(mocks.sharedSpace.deletePerson).toHaveBeenCalledWith(personB);
       expect(mocks.sharedSpace.deletePerson).toHaveBeenCalledWith(personC);
@@ -8570,13 +8780,14 @@ describe(SharedSpaceService.name, () => {
       );
     });
 
-    it('should abort after MAX_PASSES to prevent infinite loop', async () => {
+    it('should stop re-queuing at the pass cap to prevent a runaway chain', async () => {
       const spaceId = newUuid();
       const personA = newUuid();
       const personB = newUuid();
 
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
-      // Always return same 2 persons — simulates bug where deleted person keeps reappearing
+      // Always return the same 2 persons — simulates the bug where a deleted person keeps reappearing
+      // and every pass keeps merging, so only the cap can stop the chain.
       mocks.sharedSpace.getSpacePersonsWithEmbeddings.mockResolvedValue([
         {
           id: personA,
@@ -8603,10 +8814,22 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.updatePerson.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
 
-      const result = await sut.handleSharedSpacePersonDedup({ spaceId });
+      // Below the cap a merge re-queues the next pass.
+      await sut.handleSharedSpacePersonDedup({ spaceId, pass: SHARED_SPACE_DEDUP_MAX_PASSES - 1 });
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpacePersonDedup,
+        data: { spaceId, pass: SHARED_SPACE_DEDUP_MAX_PASSES },
+      });
+
+      mocks.job.queue.mockClear();
+
+      // At the cap the merge still happens but no further pass is queued.
+      const result = await sut.handleSharedSpacePersonDedup({ spaceId, pass: SHARED_SPACE_DEDUP_MAX_PASSES });
       expect(result).toBe(JobStatus.Success);
-      // Should have been called many times but eventually stopped
       expect(mocks.sharedSpace.deletePerson).toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.SharedSpacePersonDedup }),
+      );
     });
 
     it('should clean up orphaned persons even with no merges', async () => {
