@@ -37,6 +37,9 @@ class PhotosFilterSearchNotifier extends StateNotifier<PhotosFilterSearchState> 
   late final Future<void> firstLoad;
 
   PhotosFilterSearchNotifier({required SearchService search, required SearchFilter filter})
+    // Keep the public named parameters stable; `this._search` would expose a
+    // private parameter name to callers.
+    // ignore: prefer_initializing_formals
     : _search = search,
       _filter = filter,
       super(const PhotosFilterSearchState()) {
