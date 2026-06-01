@@ -72,6 +72,22 @@ const ROLE_HIERARCHY: Record<SharedSpaceRole, number> = {
 const getSharedSpaceRoleScore = (role: string) => ROLE_HIERARCHY[role as SharedSpaceRole] ?? 0;
 const getMetadataSourceScore = (sourceProfileType?: string | null) => (sourceProfileType === 'user-person' ? 1 : 0);
 
+/** nameSource collapse precedence: a manually-set name wins over an inherited/auto/empty one. */
+const NAME_SOURCE_PRECEDENCE: Record<string, number> = {
+  manual: 3,
+  inherited: 2,
+  auto: 1,
+  none: 0,
+};
+const getNameSourcePrecedence = (nameSource: string) => NAME_SOURCE_PRECEDENCE[nameSource] ?? 0;
+
+/**
+ * Upper bound on chained {@link SharedSpaceService.handleSharedSpacePersonDedup} passes for one
+ * space. Each job runs a single pass and re-queues the next; this caps the chain so a pathological
+ * always-reappears bug can't queue passes forever.
+ */
+export const SHARED_SPACE_DEDUP_MAX_PASSES = 100;
+
 type SpacePersonMatchResult = {
   id: string;
   identityId?: string | null;
@@ -1488,11 +1504,23 @@ export class SharedSpaceService extends BaseService {
       targetIdentityId: claim.targetIdentityId,
       sourceIdentityIds: [claim.sourceIdentityId],
     });
-    if (conflicts.personalProfileConflictCount > 0 || conflicts.spaceProfileConflictCount > 0) {
+
+    // A personal-profile conflict means a single owner has two local people on the two identities.
+    // Auto-collapsing a user's own people could be wrong, so we still refuse to merge here.
+    if (conflicts.personalProfileConflictCount > 0) {
       this.logger.warn(
-        `Skipping shared-space identity reconciliation for space person ${claim.spacePersonId}: merge conflicts`,
+        `Skipping shared-space identity reconciliation for space person ${claim.spacePersonId}: personal-profile conflict`,
       );
       return;
+    }
+
+    // A space-profile conflict means the same space already has two space-people on the two
+    // identities — they are the same real person bridged by a member's local profile, but dedup
+    // can never close their embedding gap, so reconciliation is the only path. Collapse them
+    // (loser folded into the higher-precedence survivor) before merging, otherwise mergeIdentities
+    // would bail forever on the (spaceId, identityId) unique index.
+    if (conflicts.spaceProfileConflictCount > 0) {
+      await this.collapseSameSpaceReconciliationConflicts(claim);
     }
 
     await this.faceIdentityRepository.mergeIdentities({
@@ -1501,6 +1529,64 @@ export class SharedSpaceService extends BaseService {
       source: 'shared-space-evidence',
     });
     await this.queueSpacePersonMetadataBackfill(claim.targetIdentityId);
+  }
+
+  /**
+   * Collapses every same-space `shared_space_person` pair that would block the identity merge.
+   * For each pair the survivor is chosen by nameSource precedence (manual > inherited > auto >
+   * none), tie-broken by face count then id; the loser's faces and aliases move to the survivor and
+   * the loser row is deleted. The survivor's winning name is preserved by construction (it always
+   * has at least the loser's nameSource precedence). The subsequent mergeIdentities then sets the
+   * survivor onto the canonical target identity without colliding.
+   */
+  private async collapseSameSpaceReconciliationConflicts(claim: SharedSpaceIdentityReconciliationClaim): Promise<void> {
+    const pairs = await this.faceIdentityRepository.getSpaceMergeConflictPairs({
+      targetIdentityId: claim.targetIdentityId,
+      sourceIdentityIds: [claim.sourceIdentityId],
+    });
+
+    for (const pair of pairs) {
+      const target = {
+        id: pair.targetId,
+        name: pair.targetName,
+        nameSource: pair.targetNameSource,
+        faceCount: pair.targetFaceCount,
+      };
+      const source = {
+        id: pair.sourceId,
+        name: pair.sourceName,
+        nameSource: pair.sourceNameSource,
+        faceCount: pair.sourceFaceCount,
+      };
+      const [survivor, loser] = this.chooseSpaceConflictSurvivor(target, source);
+
+      this.logger.log(
+        `Collapsing same-space identity conflict in space ${pair.spaceId}: folding ${loser.id} (${loser.name || 'unnamed'}, ${loser.nameSource}) into ${survivor.id} (${survivor.name || 'unnamed'}, ${survivor.nameSource})`,
+      );
+
+      await this.sharedSpaceRepository.reassignPersonFacesSafe(loser.id, survivor.id);
+      await this.sharedSpaceRepository.migrateAliases(loser.id, survivor.id);
+      await this.sharedSpaceRepository.deletePerson(loser.id);
+      await this.sharedSpaceRepository.recountPersons([survivor.id]);
+    }
+  }
+
+  private chooseSpaceConflictSurvivor<T extends { id: string; nameSource: string; faceCount: number }>(
+    a: T,
+    b: T,
+  ): [survivor: T, loser: T] {
+    const [survivor, loser] = [a, b].toSorted((x, y) => {
+      const precedenceDelta = getNameSourcePrecedence(y.nameSource) - getNameSourcePrecedence(x.nameSource);
+      if (precedenceDelta !== 0) {
+        return precedenceDelta;
+      }
+      const faceDelta = Number(y.faceCount) - Number(x.faceCount);
+      if (faceDelta !== 0) {
+        return faceDelta;
+      }
+      return x.id.localeCompare(y.id);
+    });
+    return [survivor, loser];
   }
 
   @OnJob({ name: JobName.SharedSpaceFaceMatch, queue: QueueName.FacialRecognition })
@@ -1718,159 +1804,166 @@ export class SharedSpaceService extends BaseService {
     await this.sharedSpaceRepository.repairInvalidRepresentativeFaces(job.spaceId);
     await this.sharedSpaceRepository.repairOrphanedRepresentativeFaces(job.spaceId);
 
-    const MAX_PASSES = 100;
-    let totalMerges = 0;
-    let pass = 0;
-    let mergedAny = true;
+    // One pass per job. A single in-process up-to-100-pass loop on a large space (e.g. Hagen's
+    // 563k-asset space) easily ran for minutes — far longer than BullMQ's 30s lock. When the lock
+    // expired mid-pass the entry could be orphaned in the "active" list with no recovery, starving
+    // the whole concurrency-1 FacialRecognition queue (core face recognition included). Each
+    // invocation now does exactly ONE pass and re-queues a fresh, short follow-up when a merge
+    // happened, carrying a pass counter that is capped to prevent a runaway chain.
+    const pass = job.pass ?? 1;
     const affectedIdentityIds = new Set<string>();
+    let mergedAny = false;
 
-    while (mergedAny) {
-      mergedAny = false;
-      pass++;
+    const persons = await this.sharedSpaceRepository.getSpacePersonsWithEmbeddings(job.spaceId);
+    this.logger.log(`Dedup pass ${pass} for space ${job.spaceId}: ${persons.length} persons to check`);
 
-      if (pass > MAX_PASSES) {
-        this.logger.error(
-          `Dedup for space ${job.spaceId} exceeded ${MAX_PASSES} passes — aborting to prevent infinite loop`,
-        );
-        break;
-      }
-
-      const persons = await this.sharedSpaceRepository.getSpacePersonsWithEmbeddings(job.spaceId);
-      this.logger.log(`Dedup pass ${pass} for space ${job.spaceId}: ${persons.length} persons to check`);
-
-      if (persons.length <= 1) {
-        break;
-      }
-
-      const deletedIds = new Set<string>();
-      const targetIds = new Set<string>();
-      let passMerges = 0;
-
-      for (const person of persons) {
-        if (deletedIds.has(person.id)) {
-          continue;
-        }
-
-        if (person.isHidden) {
-          continue;
-        }
-
-        const matches = await this.sharedSpaceRepository.findClosestSpacePerson(job.spaceId, person.embedding, {
-          maxDistance,
-          numResults: 2,
-          excludePersonIds: [person.id, ...deletedIds],
-          type: person.type,
-        });
-
-        if (matches.length === 0) {
-          continue;
-        }
-
-        const compatibleMatches: Array<{ person: (typeof persons)[number]; distance: number }> = [];
-        for (const match of matches) {
-          const matchPerson = persons.find((p) => p.id === match.personId);
-          if (!matchPerson || deletedIds.has(match.personId)) {
-            this.logger.debug(
-              `Dedup: skipping stale match ${match.personId} for person ${person.id} (already merged in this pass)`,
-            );
-            continue;
-          }
-          if (matchPerson.isHidden || matchPerson.type !== person.type) {
-            continue;
-          }
-          compatibleMatches.push({ person: matchPerson, distance: match.distance });
-        }
-
-        if (compatibleMatches.length !== 1) {
-          continue;
-        }
-
-        const { person: matchPerson, distance } = compatibleMatches[0];
-
-        // Determine target (more faces) and source
-        const [target, source] =
-          person.faceCount >= matchPerson.faceCount ? [person, matchPerson] : [matchPerson, person];
-
-        this.logger.log(
-          `Dedup: merging person ${source.id} (${source.name || 'unnamed'}, ${source.faceCount} faces) into ${target.id} (${target.name || 'unnamed'}, ${target.faceCount} faces), distance=${distance.toFixed(4)}`,
-        );
-
-        // Reassign faces and migrate aliases
-        await this.sharedSpaceRepository.reassignPersonFacesSafe(source.id, target.id);
-        await this.sharedSpaceRepository.migrateAliases(source.id, target.id);
-
-        const candidateIdentityIds = [target.identityId, source.identityId].filter(
-          (identityId): identityId is string => !!identityId,
-        );
-        if (candidateIdentityIds.length > 0) {
-          const mergedIdentityId = await this.mergeIdentitiesForSpacePersonEvidence({
-            spaceId: job.spaceId,
-            targetSpacePersonId: target.id,
-            candidateIdentityIds,
-          });
-          await this.inheritSpacePersonMetadata(job.spaceId, target.id, mergedIdentityId);
-          affectedIdentityIds.add(mergedIdentityId);
-        }
-
-        // Refresh representativeFaceId to a face with a valid embedding from the merged pool
-        if (target.representativeFaceSource !== 'manual') {
-          const newRepFace = await this.sharedSpaceRepository.getFirstFaceIdForPerson(target.id);
-          if (newRepFace && newRepFace !== target.representativeFaceId) {
-            try {
-              await this.sharedSpaceRepository.updatePerson(target.id, { representativeFaceId: newRepFace });
-            } catch (error) {
-              this.logger.warn(`Dedup: failed to update representativeFaceId for target ${target.id}: ${error}`);
-            }
-          }
-        }
-
-        // Determine merged properties
-        const updates: Partial<{ name: string; isHidden: boolean }> = {};
-        if (!target.name && source.name) {
-          updates.name = source.name;
-        }
-
-        // Update and delete separately so deletePerson still runs if updatePerson fails
-        try {
-          if (Object.keys(updates).length > 0) {
-            await this.sharedSpaceRepository.updatePerson(target.id, updates);
-          }
-        } catch (error) {
-          // Target may have been concurrently deleted — faces were already reassigned, continue to delete source
-          this.logger.warn(`Dedup: updatePerson failed for target ${target.id}: ${error}`);
-        }
-
-        try {
-          await this.sharedSpaceRepository.deletePerson(source.id);
-        } catch (error) {
-          // Source may have been concurrently deleted — safe to ignore
-          this.logger.warn(`Dedup: deletePerson failed for source ${source.id}: ${error}`);
-        }
-
-        deletedIds.add(source.id);
-        targetIds.add(target.id);
-        passMerges++;
-        mergedAny = true;
-      }
-
-      if (targetIds.size > 0) {
-        await this.sharedSpaceRepository.recountPersons([...targetIds]);
-      }
-
-      totalMerges += passMerges;
-      this.logger.log(`Dedup pass ${pass} complete: ${passMerges} merges`);
+    if (persons.length <= 1) {
+      // Safety net: drop space-persons left with no faces.
+      await this.sharedSpaceRepository.deleteOrphanedPersons(job.spaceId);
+      return JobStatus.Success;
     }
 
-    // Clean up orphaned persons (no faces linked) as safety net
+    const deletedIds = new Set<string>();
+    const targetIds = new Set<string>();
+    let passMerges = 0;
+
+    for (const person of persons) {
+      if (deletedIds.has(person.id)) {
+        continue;
+      }
+
+      if (person.isHidden) {
+        continue;
+      }
+
+      const matches = await this.sharedSpaceRepository.findClosestSpacePerson(job.spaceId, person.embedding, {
+        maxDistance,
+        numResults: 2,
+        excludePersonIds: [person.id, ...deletedIds],
+        type: person.type,
+      });
+
+      if (matches.length === 0) {
+        continue;
+      }
+
+      const compatibleMatches: Array<{ person: (typeof persons)[number]; distance: number }> = [];
+      for (const match of matches) {
+        const matchPerson = persons.find((p) => p.id === match.personId);
+        if (!matchPerson || deletedIds.has(match.personId)) {
+          this.logger.debug(
+            `Dedup: skipping stale match ${match.personId} for person ${person.id} (already merged in this pass)`,
+          );
+          continue;
+        }
+        if (matchPerson.isHidden || matchPerson.type !== person.type) {
+          continue;
+        }
+        compatibleMatches.push({ person: matchPerson, distance: match.distance });
+      }
+
+      if (compatibleMatches.length !== 1) {
+        continue;
+      }
+
+      const { person: matchPerson, distance } = compatibleMatches[0];
+
+      // Determine target (more faces) and source
+      const [target, source] =
+        person.faceCount >= matchPerson.faceCount ? [person, matchPerson] : [matchPerson, person];
+
+      this.logger.log(
+        `Dedup: merging person ${source.id} (${source.name || 'unnamed'}, ${source.faceCount} faces) into ${target.id} (${target.name || 'unnamed'}, ${target.faceCount} faces), distance=${distance.toFixed(4)}`,
+      );
+
+      // Reassign faces and migrate aliases
+      await this.sharedSpaceRepository.reassignPersonFacesSafe(source.id, target.id);
+      await this.sharedSpaceRepository.migrateAliases(source.id, target.id);
+
+      const candidateIdentityIds = [target.identityId, source.identityId].filter(
+        (identityId): identityId is string => !!identityId,
+      );
+      if (candidateIdentityIds.length > 0) {
+        const mergedIdentityId = await this.mergeIdentitiesForSpacePersonEvidence({
+          spaceId: job.spaceId,
+          targetSpacePersonId: target.id,
+          candidateIdentityIds,
+        });
+        await this.inheritSpacePersonMetadata(job.spaceId, target.id, mergedIdentityId);
+        affectedIdentityIds.add(mergedIdentityId);
+      }
+
+      // Refresh representativeFaceId to a face with a valid embedding from the merged pool
+      if (target.representativeFaceSource !== 'manual') {
+        const newRepFace = await this.sharedSpaceRepository.getFirstFaceIdForPerson(target.id);
+        if (newRepFace && newRepFace !== target.representativeFaceId) {
+          try {
+            await this.sharedSpaceRepository.updatePerson(target.id, { representativeFaceId: newRepFace });
+          } catch (error) {
+            this.logger.warn(`Dedup: failed to update representativeFaceId for target ${target.id}: ${error}`);
+          }
+        }
+      }
+
+      // Determine merged properties
+      const updates: Partial<{ name: string; isHidden: boolean }> = {};
+      if (!target.name && source.name) {
+        updates.name = source.name;
+      }
+
+      // Update and delete separately so deletePerson still runs if updatePerson fails
+      try {
+        if (Object.keys(updates).length > 0) {
+          await this.sharedSpaceRepository.updatePerson(target.id, updates);
+        }
+      } catch (error) {
+        // Target may have been concurrently deleted — faces were already reassigned, continue to delete source
+        this.logger.warn(`Dedup: updatePerson failed for target ${target.id}: ${error}`);
+      }
+
+      try {
+        await this.sharedSpaceRepository.deletePerson(source.id);
+      } catch (error) {
+        // Source may have been concurrently deleted — safe to ignore
+        this.logger.warn(`Dedup: deletePerson failed for source ${source.id}: ${error}`);
+      }
+
+      deletedIds.add(source.id);
+      targetIds.add(target.id);
+      passMerges++;
+      mergedAny = true;
+    }
+
+    if (targetIds.size > 0) {
+      await this.sharedSpaceRepository.recountPersons([...targetIds]);
+    }
+
+    // Clean up orphaned persons (no faces linked) as a safety net. Cheap and idempotent, so it runs
+    // each pass rather than only on convergence.
     await this.sharedSpaceRepository.deleteOrphanedPersons(job.spaceId);
 
     for (const identityId of affectedIdentityIds) {
       await this.queueSpacePersonMetadataBackfill(identityId);
     }
 
-    this.logger.log(
-      `Dedup finished for space ${job.spaceId}: ${totalMerges} total merges across ${pass} pass${pass === 1 ? '' : 'es'}`,
-    );
+    this.logger.log(`Dedup pass ${pass} for space ${job.spaceId} complete: ${passMerges} merges`);
+
+    // Re-queue a fresh, short follow-up pass while merges are still happening, capped to avoid a
+    // runaway chain. The follow-up uses a pass-scoped jobId (see job.repository getJobOptions) so it
+    // enqueues even though this job is still "active".
+    if (mergedAny) {
+      if (pass < SHARED_SPACE_DEDUP_MAX_PASSES) {
+        await this.jobRepository.queue({
+          name: JobName.SharedSpacePersonDedup,
+          data: { spaceId: job.spaceId, pass: pass + 1 },
+        });
+      } else {
+        this.logger.error(
+          `Dedup for space ${job.spaceId} reached the ${SHARED_SPACE_DEDUP_MAX_PASSES}-pass cap — stopping to prevent a runaway chain`,
+        );
+      }
+    }
+
     return JobStatus.Success;
   }
 
