@@ -1,5 +1,6 @@
+import { WorkflowTrigger } from '@immich/plugin-sdk';
 import { BadRequestException } from '@nestjs/common';
-import { WorkflowTrigger, WorkflowType } from 'src/enum';
+import { WorkflowType } from 'src/enum';
 import { WorkflowService } from 'src/services/workflow.service';
 import { factory, newUuid } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
@@ -32,6 +33,7 @@ describe(WorkflowService.name, () => {
     expect(sut.getTriggers()).toEqual([
       { trigger: WorkflowTrigger.AssetCreate, types: [WorkflowType.AssetV1] },
       { trigger: WorkflowTrigger.PersonRecognized, types: [WorkflowType.AssetPersonV1] },
+      { trigger: WorkflowTrigger.AssetMetadataExtraction, types: [WorkflowType.AssetV1] },
     ]);
   });
 
