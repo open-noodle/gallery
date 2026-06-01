@@ -88,7 +88,8 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
 # Build plugins
 RUN --mount=type=cache,id=pnpm,target=/buildcache/pnpm-store \
   --mount=type=cache,id=mise-plugin-tools-${TARGETPLATFORM},target=/buildcache/mise \
-  pnpm --filter @immich/plugin-sdk --filter @immich/plugin-core install --frozen-lockfile && \
+  pnpm --filter @immich/sdk --filter @immich/plugin-sdk --filter @immich/plugin-core install --frozen-lockfile && \
+  pnpm --filter @immich/sdk build && \
   mise exec --no-deps --jobs=1 github:extism/js-pdk@1.6.0 -- \
     pnpm --filter @immich/plugin-sdk --filter @immich/plugin-core build
 
