@@ -208,7 +208,7 @@ Expected: FAIL because `runStrictOwnershipConfidenceAudit` is not exported.
 Patch `tools/upstream-preflight/src/audits/rebase-confidence.ts`:
 
 ```ts
-import { findUncoveredFiles } from '../coverage';
+import { findBroadOptionalOnlyFiles, findUncoveredFiles } from '../coverage';
 import type {
   AuditResult,
   CoverageClassification,
@@ -241,10 +241,15 @@ export function runStrictOwnershipConfidenceAudit(
   input: StrictOwnershipConfidenceInput,
 ): AuditResult {
   const uncovered = findUncoveredFiles(input.forkFiles, input.manifest);
+  const broadOptionalOnly = findBroadOptionalOnlyFiles(
+    input.forkFiles,
+    input.manifest,
+    input.headValidation.changedSinceBaseline,
+  );
   const details = [
     ...input.headValidation.errors,
     ...uncovered.map((file) => `Ownership manifest does not cover ${file}`),
-    ...input.broadOptionalOnly.map(
+    ...broadOptionalOnly.map(
       (classification) =>
         `${classification.file} is covered only by broad optional glob ${classification.broadOptionalGlobs.join(', ')}`,
     ),

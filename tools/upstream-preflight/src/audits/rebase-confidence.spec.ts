@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import path from 'node:path';
+import type { Manifest } from '../types';
 import {
   classifyConfidenceSurfaces,
   renderRequiredConfidenceChecks,
   runGalleryWorkflowAssertions,
   runRebaseConfidenceAudits,
+  runStrictOwnershipConfidenceAudit,
   validateGalleryWorkflowText,
 } from './rebase-confidence';
 
@@ -32,6 +34,26 @@ const minimalWorkflow = [
   '      - run: echo ghcr.io/open-noodle/gallery-server:${RC_TAG}',
   '      - run: echo ghcr.io/open-noodle/gallery-ml:${RC_TAG}',
 ].join('\n');
+
+const ownershipManifest: Manifest = {
+  version: 1,
+  metadata: {
+    upstream_remote: 'upstream',
+    upstream_branch: 'main',
+    fork_remote: 'origin',
+    fork_branch: 'main',
+    last_verified_fork_head: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  },
+  features: {
+    mobile: {
+      title: 'Mobile',
+      risk: 'high',
+      domains: ['mobile'],
+      owned_paths: ['mobile/lib/explicit.dart'],
+      optional_paths: ['mobile/**', 'mobile/lib/narrow-*.dart'],
+    },
+  },
+};
 
 describe('classifyConfidenceSurfaces', () => {
   it('treats ordinary server files as low confidence risk', () => {
@@ -383,6 +405,142 @@ describe('validateGalleryWorkflowText', () => {
   });
 });
 
+describe('runStrictOwnershipConfidenceAudit', () => {
+  it('passes when the manifest baseline is current and fork files are covered', () => {
+    const result = runStrictOwnershipConfidenceAudit({
+      manifest: ownershipManifest,
+      forkFiles: ['mobile/lib/explicit.dart'],
+      headValidation: {
+        ok: true,
+        errors: [],
+        warnings: [],
+        changedSinceBaseline: [],
+      },
+      broadOptionalOnly: [],
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      title: 'Strict Ownership Confidence',
+      details: [
+        'Ownership manifest is current and all fork files have explicit or narrow coverage',
+      ],
+    });
+  });
+
+  it('passes with baseline drift details when changed files have narrow coverage', () => {
+    const result = runStrictOwnershipConfidenceAudit({
+      manifest: ownershipManifest,
+      forkFiles: ['mobile/lib/narrow-gallery.dart'],
+      headValidation: {
+        ok: true,
+        errors: [],
+        warnings: [
+          'Ownership manifest last_verified_fork_head aaaaaaaa is behind bbbbbbbb; 1 files changed since manifest verification.',
+          'Changed since manifest baseline: mobile/lib/narrow-gallery.dart',
+        ],
+        changedSinceBaseline: ['mobile/lib/narrow-gallery.dart'],
+      },
+      broadOptionalOnly: [],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.details).toContain(
+      'Ownership manifest last_verified_fork_head aaaaaaaa is behind bbbbbbbb; 1 files changed since manifest verification.',
+    );
+    expect(result.details).toContain(
+      'Changed since manifest baseline: mobile/lib/narrow-gallery.dart',
+    );
+  });
+
+  it('fails when a post-baseline file is covered only by a broad optional glob', () => {
+    const result = runStrictOwnershipConfidenceAudit({
+      manifest: ownershipManifest,
+      forkFiles: ['mobile/lib/broad-only.dart'],
+      headValidation: {
+        ok: true,
+        errors: [],
+        warnings: [],
+        changedSinceBaseline: ['mobile/lib/broad-only.dart'],
+      },
+      broadOptionalOnly: [
+        {
+          file: 'mobile/lib/broad-only.dart',
+          explicitGlobs: [],
+          broadOptionalGlobs: ['mobile/**'],
+          narrowOptionalGlobs: [],
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.details).toEqual([
+      'mobile/lib/broad-only.dart is covered only by broad optional glob mobile/**',
+    ]);
+  });
+
+  it('derives broad-only failures when caller-provided classifications are stale', () => {
+    const result = runStrictOwnershipConfidenceAudit({
+      manifest: ownershipManifest,
+      forkFiles: ['mobile/lib/broad-only.dart'],
+      headValidation: {
+        ok: true,
+        errors: [],
+        warnings: [],
+        changedSinceBaseline: ['mobile/lib/broad-only.dart'],
+      },
+      broadOptionalOnly: [],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.details).toEqual([
+      'mobile/lib/broad-only.dart is covered only by broad optional glob mobile/**',
+    ]);
+  });
+
+  it('fails for uncovered fork files', () => {
+    const result = runStrictOwnershipConfidenceAudit({
+      manifest: ownershipManifest,
+      forkFiles: ['web/src/routes/uncovered.svelte'],
+      headValidation: {
+        ok: true,
+        errors: [],
+        warnings: [],
+        changedSinceBaseline: [],
+      },
+      broadOptionalOnly: [],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.details).toEqual([
+      'Ownership manifest does not cover web/src/routes/uncovered.svelte',
+    ]);
+  });
+
+  it('fails for missing or non-ancestor manifest baseline errors', () => {
+    const result = runStrictOwnershipConfidenceAudit({
+      manifest: ownershipManifest,
+      forkFiles: ['mobile/lib/explicit.dart'],
+      headValidation: {
+        ok: false,
+        errors: [
+          'Ownership manifest last_verified_fork_head missing is not present in this repository; fetch fork history or reconcile docs/fork/ownership.yml.',
+          'Ownership manifest last_verified_fork_head side is not an ancestor of head; reconcile docs/fork/ownership.yml before rebasing.',
+        ],
+        warnings: [],
+        changedSinceBaseline: [],
+      },
+      broadOptionalOnly: [],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.details).toEqual([
+      'Ownership manifest last_verified_fork_head missing is not present in this repository; fetch fork history or reconcile docs/fork/ownership.yml.',
+      'Ownership manifest last_verified_fork_head side is not an ancestor of head; reconcile docs/fork/ownership.yml before rebasing.',
+    ]);
+  });
+});
+
 describe('runRebaseConfidenceAudits', () => {
   it('returns passing workflow assertions and low-risk requirement details', () => {
     const results = runRebaseConfidenceAudits({
@@ -410,5 +568,44 @@ describe('runRebaseConfidenceAudits', () => {
         ],
       },
     ]);
+  });
+
+  it('includes strict ownership confidence results when ownership input is provided', () => {
+    const results = runRebaseConfidenceAudits({
+      upstreamTouchedFiles: ['docs/fork/ownership.yml'],
+      batch: '176',
+      workflowTexts: {
+        '.github/workflows/gallery-rc-build.yml': minimalWorkflow,
+        '.github/workflows/gallery-release-server-only.yml': minimalWorkflow,
+        '.github/workflows/gallery-release-mobile.yml': minimalWorkflow,
+        '.github/workflows/gallery-build-mobile.yml': minimalWorkflow,
+      },
+      ownership: {
+        manifest: ownershipManifest,
+        forkFiles: ['mobile/lib/broad-only.dart'],
+        headValidation: {
+          ok: true,
+          errors: [],
+          warnings: [],
+          changedSinceBaseline: ['mobile/lib/broad-only.dart'],
+        },
+        broadOptionalOnly: [
+          {
+            file: 'mobile/lib/broad-only.dart',
+            explicitGlobs: [],
+            broadOptionalGlobs: ['mobile/**'],
+            narrowOptionalGlobs: [],
+          },
+        ],
+      },
+    });
+
+    expect(results).toContainEqual({
+      ok: false,
+      title: 'Strict Ownership Confidence',
+      details: [
+        'mobile/lib/broad-only.dart is covered only by broad optional glob mobile/**',
+      ],
+    });
   });
 });
