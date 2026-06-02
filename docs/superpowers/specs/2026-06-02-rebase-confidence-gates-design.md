@@ -217,7 +217,8 @@ workflow remains the supported remote fallback.
 ### Operator Output
 
 `make upstream-next-batch` and `make rebase-confidence-check` should print
-risk-based recommendations in operator terms:
+risk-based recommendations in operator terms once the referenced target or
+workflow exists:
 
 ```text
 Required confidence checks for batch 176:
@@ -228,6 +229,12 @@ Required confidence checks for batch 176:
 
 The output should explain why each check is required by listing the matched
 batch files or feature domains.
+
+During incremental implementation, `rebase-confidence-check` must not print a
+runnable command for a target or workflow file that does not exist yet. It
+should instead print a planned-check line naming the missing target/workflow and
+the later slice that will add it. Later slices replace those planned lines with
+the exact command by adding the target/workflow.
 
 `rebase-confidence-check` verifies local/static requirements and reports the
 extra remote checks that are required for the batch. It does not claim those
@@ -243,7 +250,9 @@ and Make target. This slice covers risk-surface classification, release/RC
 workflow static assertions, operator output for required future mobile/ML remote
 checks, and command wiring. It does not add the branding, mobile, or ML smoke
 implementations yet; it reports those checks as required when the matched batch
-surfaces demand them.
+surfaces demand them. If a required target or workflow is not available until a
+later slice, the output marks it as planned instead of printing a runnable
+command.
 
 Slice 1 is complete when:
 
