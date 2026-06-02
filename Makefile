@@ -110,6 +110,10 @@ fork-patches-check:
 rebase-confidence-check:
 	$(UPSTREAM_PREFLIGHT) run rebase-confidence-check $(if $(BATCH),--batch $(BATCH),)
 
+.PHONY: gallery-branding-check
+gallery-branding-check:
+	branding/scripts/gallery-branding-check.sh
+
 .PHONY: fork-ownership-coverage-check
 fork-ownership-coverage-check:
 	git diff --name-only upstream/main...origin/main | sort > /tmp/gallery-fork-files.txt
