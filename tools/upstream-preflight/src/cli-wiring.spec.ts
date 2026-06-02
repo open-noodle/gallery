@@ -47,6 +47,16 @@ describe('rolling rebase CLI wiring', () => {
     expect(makefile).toContain('branding/scripts/gallery-branding-check.sh');
   });
 
+  it('exposes a local Gallery ML smoke Make target', () => {
+    const makefile = fs.readFileSync(
+      path.resolve(process.cwd(), '../../Makefile'),
+      'utf8',
+    );
+
+    expect(makefile).toContain('.PHONY: gallery-ml-smoke');
+    expect(makefile).toContain('machine-learning/scripts/gallery-ml-smoke.sh');
+  });
+
   it('keeps the Gallery branding check isolated in a temporary worktree', () => {
     const script = fs.readFileSync(
       path.resolve(
@@ -67,6 +77,80 @@ describe('rolling rebase CLI wiring', () => {
     expect(script).toContain('branding/scripts/apply-branding.sh');
     expect(script).toContain('branding/scripts/verify-branding.sh');
     expect(script).toContain('active worktree status changed');
+  });
+
+  it('checks Docker availability and probes the ML container in the ML smoke script', () => {
+    const script = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        '../../machine-learning/scripts/gallery-ml-smoke.sh',
+      ),
+      'utf8',
+    );
+
+    expect(script).toContain('Docker is required for gallery-ml-smoke');
+    expect(script).toContain('buildx build');
+    expect(script).toContain('--load');
+    expect(script).toContain('--build-arg DEVICE=cpu');
+    expect(script).toContain('"$DOCKER_BIN" run --detach');
+    expect(script).toContain('"$DOCKER_BIN" inspect');
+    expect(script).toContain('python3 healthcheck.py');
+    expect(script).toContain('immich_ml.main');
+    expect(script).toContain('immich_ml.models');
+    expect(script).toContain('"$DOCKER_BIN" logs');
+    expect(script).toContain('"$DOCKER_BIN" rm --force');
+  });
+
+  it('keeps the ML smoke health timeout message aligned with wait timing', () => {
+    const script = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        '../../machine-learning/scripts/gallery-ml-smoke.sh',
+      ),
+      'utf8',
+    );
+
+    expect(script).toContain('HEALTH_TIMEOUT_SECONDS=180');
+    expect(script).toContain('HEALTH_SLEEP_SECONDS=2');
+    expect(script).toContain(
+      'HEALTH_ATTEMPTS=$((HEALTH_TIMEOUT_SECONDS / HEALTH_SLEEP_SECONDS))',
+    );
+    expect(script).not.toContain('within 90 seconds');
+    expect(script).not.toContain('within 300 seconds');
+    expect(script).toMatch(
+      /did not become healthy within \$\{?HEALTH_TIMEOUT_SECONDS\}? seconds|did not become healthy within 180 seconds/,
+    );
+  });
+
+  it('fails clearly when the ML image has no Docker healthcheck metadata', () => {
+    const script = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        '../../machine-learning/scripts/gallery-ml-smoke.sh',
+      ),
+      'utf8',
+    );
+
+    expect(script).toContain('missing-healthcheck');
+    expect(script).toContain('ML container has no Docker healthcheck metadata');
+  });
+
+  it('checks ML container runtime state separately from Docker health', () => {
+    const script = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        '../../machine-learning/scripts/gallery-ml-smoke.sh',
+      ),
+      'utf8',
+    );
+
+    expect(script).toContain('.State.Status');
+    expect(script).toContain('runtime_state=');
+    expect(script).toContain('health_status=');
+    expect(script).toContain('[[ "$runtime_state" != "running" ]]');
+    expect(script).toContain(
+      'ML container is not running; state: $runtime_state, health: $health_status',
+    );
   });
 
   it('forwards rolling Make target options without an extra argument separator', () => {

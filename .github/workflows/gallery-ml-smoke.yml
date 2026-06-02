@@ -1,0 +1,40 @@
+name: Gallery ML Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch, tag, or SHA to test. Defaults to the triggering ref.'
+        required: false
+        type: string
+        default: ''
+
+concurrency:
+  group: gallery-ml-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  cpu-ml-smoke:
+    name: CPU ML container smoke
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+          token: ${{ github.token }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: ./.github/actions/apply-branding
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+
+      - name: Run ML smoke
+        run: machine-learning/scripts/gallery-ml-smoke.sh
