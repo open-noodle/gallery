@@ -59,6 +59,24 @@ const mobileSmokeWorkflow = [
   '      - run: flutter build apk --debug',
 ].join('\n');
 
+const mlSmokeWorkflow = [
+  'name: Gallery ML Smoke',
+  '',
+  'on:',
+  '  workflow_dispatch:',
+  '    inputs:',
+  '      ref:',
+  'jobs:',
+  '  smoke:',
+  '    steps:',
+  '      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd',
+  '        with:',
+  '          ref: ${{ inputs.ref || github.sha }}',
+  '      - uses: ./.github/actions/apply-branding',
+  '      - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2',
+  '      - run: machine-learning/scripts/gallery-ml-smoke.sh',
+].join('\n');
+
 const ownershipManifest: Manifest = {
   version: 1,
   metadata: {
@@ -194,10 +212,19 @@ describe('renderRequiredConfidenceChecks', () => {
       'gh workflow run gallery-mobile-smoke.yml --ref rebase/upstream-batch-176 (required by mobile: mobile/lib/routing/router.dart)',
     );
     expect(details).toContain(
+      'make gallery-ml-smoke (required by docker: server/Dockerfile, machine-learning/Dockerfile; ml: machine-learning/Dockerfile)',
+    );
+    expect(details).toContain(
+      'gh workflow run gallery-ml-smoke.yml --ref rebase/upstream-batch-176 (required by docker: server/Dockerfile, machine-learning/Dockerfile; ml: machine-learning/Dockerfile)',
+    );
+    expect(details).not.toContain(
       'planned Slice 5 check: make gallery-ml-smoke (target missing; required by docker: server/Dockerfile, machine-learning/Dockerfile; ml: machine-learning/Dockerfile)',
     );
     expect(details).not.toContain(
       'planned Slice 4 workflow: gallery-mobile-smoke.yml (workflow missing; required by mobile: mobile/lib/routing/router.dart)',
+    );
+    expect(details).not.toContain(
+      'planned Slice 5 workflow: gallery-ml-smoke.yml (workflow missing; required by docker: server/Dockerfile, machine-learning/Dockerfile; ml: machine-learning/Dockerfile)',
     );
   });
 
@@ -270,6 +297,97 @@ describe('validateGalleryWorkflowText', () => {
     );
 
     expect(result.ok).toBe(true);
+  });
+
+  it('passes for the ML smoke workflow structure', () => {
+    const result = validateGalleryWorkflowText(
+      'gallery-ml-smoke.yml',
+      mlSmokeWorkflow,
+      {
+        requireDispatch: true,
+        requiredDispatchInputs: ['ref'],
+        requireBranding: true,
+        brandingBeforeMarkers: ['machine-learning/scripts/gallery-ml-smoke.sh'],
+        requiredWorkflowReferences: [
+          'docker/setup-buildx-action',
+          'machine-learning/scripts/gallery-ml-smoke.sh',
+        ],
+        requiredWorkflowName: 'Gallery ML Smoke',
+        requireRequestedRefCheckout: true,
+      },
+    );
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('fails when the ML smoke workflow misses branding or the smoke script', () => {
+    const result = validateGalleryWorkflowText(
+      'gallery-ml-smoke.yml',
+      [
+        'on:',
+        '  workflow_dispatch:',
+        '    inputs:',
+        '      ref:',
+        'jobs:',
+        '  smoke:',
+        '    steps:',
+        '      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd',
+        '      - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2',
+      ].join('\n'),
+      {
+        requireDispatch: true,
+        requiredDispatchInputs: ['ref'],
+        requireBranding: true,
+        brandingBeforeMarkers: ['machine-learning/scripts/gallery-ml-smoke.sh'],
+        requiredWorkflowReferences: [
+          'docker/setup-buildx-action',
+          'machine-learning/scripts/gallery-ml-smoke.sh',
+        ],
+        requiredWorkflowName: 'Gallery ML Smoke',
+        requireRequestedRefCheckout: true,
+      },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.details).toContain(
+      'gallery-ml-smoke.yml is missing ./.github/actions/apply-branding',
+    );
+    expect(result.details).toContain(
+      'gallery-ml-smoke.yml is missing workflow reference machine-learning/scripts/gallery-ml-smoke.sh',
+    );
+  });
+
+  it('fails when the ML smoke workflow name is missing or wrong', () => {
+    const result = validateGalleryWorkflowText(
+      'gallery-ml-smoke.yml',
+      mlSmokeWorkflow.replace('name: Gallery ML Smoke', 'name: ML Smoke'),
+      {
+        requiredWorkflowName: 'Gallery ML Smoke',
+      },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.details).toContain(
+      'gallery-ml-smoke.yml is missing workflow name Gallery ML Smoke',
+    );
+  });
+
+  it('fails when the ML smoke workflow does not check out the requested ref', () => {
+    const result = validateGalleryWorkflowText(
+      'gallery-ml-smoke.yml',
+      mlSmokeWorkflow.replace(
+        '          ref: ${{ inputs.ref || github.sha }}',
+        '',
+      ),
+      {
+        requireRequestedRefCheckout: true,
+      },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.details).toContain(
+      'gallery-ml-smoke.yml is missing checkout ref: ${{ inputs.ref || github.sha }}',
+    );
   });
 
   it('fails when the mobile smoke workflow misses branding or generated drift checks', () => {
@@ -528,6 +646,24 @@ describe('validateGalleryWorkflowText', () => {
     );
   });
 
+  it('requires the Gallery ML smoke workflow in release workflow assertions', () => {
+    const result = runGalleryWorkflowAssertions(
+      '/tmp/gallery-missing-workflows',
+      {
+        '.github/workflows/gallery-rc-build.yml': minimalWorkflow,
+        '.github/workflows/gallery-release-server-only.yml': minimalWorkflow,
+        '.github/workflows/gallery-release-mobile.yml': minimalWorkflow,
+        '.github/workflows/gallery-build-mobile.yml': minimalWorkflow,
+        '.github/workflows/gallery-mobile-smoke.yml': mobileSmokeWorkflow,
+      },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.details).toContain(
+      '.github/workflows/gallery-ml-smoke.yml is missing workflow_dispatch',
+    );
+  });
+
   it('passes the current Gallery release workflow static assertions', () => {
     expect(
       runGalleryWorkflowAssertions(path.resolve(process.cwd(), '../..')).ok,
@@ -682,6 +818,7 @@ describe('runRebaseConfidenceAudits', () => {
         '.github/workflows/gallery-release-mobile.yml': minimalWorkflow,
         '.github/workflows/gallery-build-mobile.yml': minimalWorkflow,
         '.github/workflows/gallery-mobile-smoke.yml': mobileSmokeWorkflow,
+        '.github/workflows/gallery-ml-smoke.yml': mlSmokeWorkflow,
       },
     });
 
