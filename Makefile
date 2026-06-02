@@ -106,6 +106,10 @@ ci-invariants-check:
 fork-patches-check:
 	$(UPSTREAM_PREFLIGHT) run fork-patches-check
 
+.PHONY: rebase-confidence-check
+rebase-confidence-check:
+	$(UPSTREAM_PREFLIGHT) run rebase-confidence-check $(if $(BATCH),--batch $(BATCH),)
+
 .PHONY: fork-ownership-coverage-check
 fork-ownership-coverage-check:
 	git diff --name-only upstream/main...origin/main | sort > /tmp/gallery-fork-files.txt
