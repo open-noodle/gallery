@@ -114,6 +114,10 @@ rebase-confidence-check:
 gallery-branding-check:
 	branding/scripts/gallery-branding-check.sh
 
+.PHONY: gallery-ml-smoke
+gallery-ml-smoke:
+	machine-learning/scripts/gallery-ml-smoke.sh
+
 .PHONY: fork-ownership-coverage-check
 fork-ownership-coverage-check:
 	git diff --name-only upstream/main...origin/main | sort > /tmp/gallery-fork-files.txt
