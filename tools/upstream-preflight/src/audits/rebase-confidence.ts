@@ -27,6 +27,8 @@ export type WorkflowAssertionOptions = {
   requiredDispatchInputs?: string[];
   requireBranding?: boolean;
   brandingBeforeMarkers?: string[];
+  requiredWorkflowName?: string;
+  requireRequestedRefCheckout?: boolean;
   requireServerImage?: boolean;
   requireMlImage?: boolean;
   requireRcSummaryLinks?: boolean;
@@ -60,6 +62,8 @@ type PlannedCheck = {
   reason: string;
   command?: string;
 };
+
+const requestedRefCheckout = 'ref: ${{ inputs.ref || github.sha }}';
 
 const surfaceGlobs: Record<ConfidenceSurface, string[]> = {
   branding: [
@@ -146,6 +150,18 @@ const workflowAssertions: Record<string, WorkflowAssertionOptions> = {
       'mise //mobile:analyze',
       'mise //mobile:test',
       'flutter build apk --debug',
+    ],
+  },
+  '.github/workflows/gallery-ml-smoke.yml': {
+    requireDispatch: true,
+    requiredDispatchInputs: ['ref'],
+    requiredWorkflowName: 'Gallery ML Smoke',
+    requireRequestedRefCheckout: true,
+    requireBranding: true,
+    brandingBeforeMarkers: ['machine-learning/scripts/gallery-ml-smoke.sh'],
+    requiredWorkflowReferences: [
+      'docker/setup-buildx-action',
+      'machine-learning/scripts/gallery-ml-smoke.sh',
     ],
   },
 };
@@ -278,6 +294,20 @@ export function validateGalleryWorkflowText(
   if (options.requireDispatch && !text.includes('workflow_dispatch')) {
     details.push(`${workflowPath} is missing workflow_dispatch`);
   }
+  if (
+    options.requiredWorkflowName &&
+    !hasWorkflowName(text, options.requiredWorkflowName)
+  ) {
+    details.push(
+      `${workflowPath} is missing workflow name ${options.requiredWorkflowName}`,
+    );
+  }
+  if (
+    options.requireRequestedRefCheckout &&
+    !text.includes(requestedRefCheckout)
+  ) {
+    details.push(`${workflowPath} is missing checkout ${requestedRefCheckout}`);
+  }
   for (const input of options.requiredDispatchInputs ?? []) {
     if (!hasWorkflowDispatchInput(text, input)) {
       details.push(
@@ -358,6 +388,13 @@ export function validateGalleryWorkflowText(
 function hasWorkflowDispatchInput(text: string, input: string): boolean {
   const escapedInput = input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp(`(^|\\n)\\s{6,}${escapedInput}:`, 'm').test(text);
+}
+
+function hasWorkflowName(text: string, name: string): boolean {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|\\n)name:\\s*${escapedName}\\s*(\\n|$)`, 'm').test(
+    text,
+  );
 }
 
 export function runGalleryWorkflowAssertions(
