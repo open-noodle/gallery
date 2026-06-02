@@ -397,6 +397,29 @@ names in release workflows.
 `make fork-patches-check` verifies package patch metadata, including expected
 patch files and references in `pnpm-workspace.yaml`.
 
+## Risk-Based Confidence Checks
+
+After each batch, run:
+
+```bash
+make rebase-confidence-check BATCH=NN
+```
+
+This check always verifies Gallery release workflow structure and strict
+ownership freshness. It also prints extra local or remote confidence checks when
+the batch touches high-risk surfaces:
+
+- `make gallery-branding-check` for branding, release, and Docker surfaces.
+- `make gallery-ml-smoke` for ML and Docker surfaces.
+- `gh workflow run gallery-mobile-smoke.yml --ref rebase/upstream-batch-NN` for
+  mobile or mobile-branding surfaces.
+- `gh workflow run gallery-ml-smoke.yml --ref rebase/upstream-batch-NN` for ML
+  and Docker surfaces.
+
+The command verifies local/static requirements and prints dispatch commands; it
+does not prove those remote workflows are green. Dispatch and babysit any
+required workflow before claiming the batch is fully verified.
+
 ## Generated Artifacts
 
 If preflight or post-rebase audits report generated artifacts, regenerate them
@@ -427,6 +450,7 @@ make upstream-preflight
 make upstream-batch-plan
 make upstream-next-batch
 make upstream-postrebase-audit
+make rebase-confidence-check
 make ci-invariants-check
 make fork-patches-check
 pnpm --filter @gallery/upstream-preflight run test
