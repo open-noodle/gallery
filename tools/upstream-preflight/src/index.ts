@@ -10,11 +10,15 @@ import {
   runPostRebaseAudits,
   writePostRebaseAuditReport,
 } from './audits/post-rebase';
+import { runRebaseConfidenceAudits } from './audits/rebase-confidence';
 import {
   planBatches,
   readPersistedBatchAuditScope,
+  readPersistedBatchPlan,
   renderBatchMarkdown,
   runNextBatchCommand,
+  selectBatchAuditScope,
+  validatePersistedBatchPlan,
   writeBatchPlanReports,
 } from './batch';
 import {
@@ -490,6 +494,53 @@ program
       loadManifest(resolveCliPath(options.manifest)),
       repoRoot(),
     );
+    for (const result of results) {
+      console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
+      for (const detail of result.details) console.log(`- ${detail}`);
+    }
+    process.exitCode = results.every((result) => result.ok) ? 0 : 1;
+  });
+
+program
+  .command('rebase-confidence-check')
+  .option('--manifest <path>', 'ownership manifest path', defaultManifestPath)
+  .option('--batch <id>', 'upstream batch id')
+  .option('--plan-dir <path>', 'persisted batch plan directory')
+  .action((options: { manifest: string; batch?: string; planDir?: string }) => {
+    const batch = options.batch ?? process.env.BATCH;
+    const auditScope = batch
+      ? (() => {
+          const root = repoRoot();
+          const batchPlan = readPersistedBatchPlan(
+            root,
+            options.planDir ? resolveCliPath(options.planDir) : undefined,
+          );
+          validatePersistedBatchPlan(batchPlan, root);
+          const upstreamTouchedFiles = [
+            ...new Set(
+              batchPlan.batches.flatMap((planBatch) =>
+                planBatch.commits.flatMap((commit) => commit.files),
+              ),
+            ),
+          ].sort();
+          return selectBatchAuditScope({
+            batch,
+            batchPlan,
+            upstreamTouchedFiles,
+          });
+        })()
+      : (() => {
+          const context = buildPreflightContext(options.manifest);
+          return {
+            batch: undefined,
+            upstreamTouchedFiles: context.upstreamRange.files,
+          };
+        })();
+    const results = runRebaseConfidenceAudits({
+      upstreamTouchedFiles: auditScope.upstreamTouchedFiles,
+      batch: auditScope.batch ?? batch,
+      cwd: repoRoot(),
+    });
     for (const result of results) {
       console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
       for (const detail of result.details) console.log(`- ${detail}`);
