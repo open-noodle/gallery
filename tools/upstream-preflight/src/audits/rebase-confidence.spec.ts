@@ -140,7 +140,7 @@ describe('renderRequiredConfidenceChecks', () => {
     );
   });
 
-  it('does not emit runnable commands for missing repo targets and workflows', () => {
+  it('emits available local commands while keeping missing future workflows planned', () => {
     const results = runRebaseConfidenceAudits({
       upstreamTouchedFiles: [
         'mobile/lib/routing/router.dart',
@@ -161,13 +161,16 @@ describe('renderRequiredConfidenceChecks', () => {
     )?.details;
 
     expect(details).toContain(
+      'make gallery-branding-check (required by docker: server/Dockerfile, machine-learning/Dockerfile)',
+    );
+    expect(details).not.toContain(
       'planned Slice 3 check: make gallery-branding-check (target missing; required by docker: server/Dockerfile, machine-learning/Dockerfile)',
     );
     expect(details).toContain(
       'planned Slice 4 workflow: gallery-mobile-smoke.yml (workflow missing; required by mobile: mobile/lib/routing/router.dart)',
     );
-    expect(details).not.toContain(
-      'make gallery-branding-check (required by docker: server/Dockerfile, machine-learning/Dockerfile)',
+    expect(details).toContain(
+      'planned Slice 5 check: make gallery-ml-smoke (target missing; required by docker: server/Dockerfile, machine-learning/Dockerfile; ml: machine-learning/Dockerfile)',
     );
     expect(details).not.toContain(
       'gh workflow run gallery-mobile-smoke.yml --ref rebase/upstream-batch-176 (required by mobile: mobile/lib/routing/router.dart)',
