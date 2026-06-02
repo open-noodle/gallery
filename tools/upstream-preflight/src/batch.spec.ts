@@ -803,6 +803,27 @@ describe('batch-scoped audit CLI commands', () => {
     );
     expect(reportMarkdown).not.toContain(plan.batches[0].commits[0].files[0]);
   });
+
+  it('rebase-confidence-check BATCH env fallback rejects stale persisted plans before risk classification', () => {
+    const { repo, outputDir, plan } = createRepoWithPersistedPlan();
+    persistBatchFiles(plan, outputDir, '02', ['server/Dockerfile']);
+    repo.git('checkout', 'upstream');
+    repo.write('upstream/three.txt', 'three');
+    repo.commit('upstream three');
+    repo.git('checkout', 'main');
+
+    const result = runCli(
+      repo.path,
+      ['rebase-confidence-check', '--plan-dir', outputDir],
+      { BATCH: '02' },
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Persisted batch plan is stale');
+    expect(result.stderr).toContain('Run make upstream-batch-plan.');
+    expect(result.stdout).not.toContain('Risk-Based Confidence Requirements');
+    expect(result.stdout).not.toContain('make gallery-branding-check');
+  });
 });
 
 function createRepoWithPersistedPlan(
