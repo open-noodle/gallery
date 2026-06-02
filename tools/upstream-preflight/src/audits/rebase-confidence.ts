@@ -121,6 +121,33 @@ const workflowAssertions: Record<string, WorkflowAssertionOptions> = {
     requireBranding: true,
     brandingBeforeMarkers: ['Build signed Android App Bundle', 'flutter build'],
   },
+  '.github/workflows/gallery-mobile-smoke.yml': {
+    requireDispatch: true,
+    requiredDispatchInputs: ['ref'],
+    requireBranding: true,
+    brandingBeforeMarkers: [
+      'mise //mobile:codegen:translation',
+      'mise //mobile:codegen:dart',
+      'mise //mobile:codegen:pigeon',
+      'mise //mobile:analyze',
+      'mise //mobile:test',
+      'flutter build apk --debug',
+    ],
+    requiredWorkflowReferences: [
+      'immich-app/devtools/actions/use-mise',
+      'flutter pub get',
+      'mise //mobile:codegen:translation',
+      'mise //mobile:codegen:dart',
+      'mise //mobile:codegen:pigeon',
+      'tj-actions/verify-changed-files',
+      'mobile/**/*.g.dart',
+      'mobile/**/*.gr.dart',
+      'mobile/**/*.drift.dart',
+      'mise //mobile:analyze',
+      'mise //mobile:test',
+      'flutter build apk --debug',
+    ],
+  },
 };
 
 export function classifyConfidenceSurfaces(
