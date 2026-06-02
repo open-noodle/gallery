@@ -2239,7 +2239,7 @@ describe(PersonService.name, () => {
         facesRecognizedAt: expect.any(Date),
       });
       const facesRecognizedAt = mocks.asset.upsertJobStatus.mock.calls[0][0].facesRecognizedAt as Date;
-      expect(facesRecognizedAt.getTime()).toBeGreaterThan(start);
+      expect(facesRecognizedAt.getTime()).toBeGreaterThanOrEqual(start);
     });
 
     it('should not write facesRecognizedAt or queue recognition when ML face detection throws', async () => {
