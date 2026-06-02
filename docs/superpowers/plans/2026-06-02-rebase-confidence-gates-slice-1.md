@@ -4,11 +4,46 @@
 
 **Goal:** Add the core risk-based `rebase-confidence-check` audit, CLI command, package script, and Make target.
 
-**Architecture:** Implement a focused `tools/upstream-preflight/src/audits/rebase-confidence.ts` module that classifies touched files into confidence surfaces, verifies existing Gallery release/RC workflow invariants, and renders required local/remote operator commands for risky batches. Wire it into `tools/upstream-preflight/src/index.ts`, `tools/upstream-preflight/package.json`, and `Makefile`; later slices will implement the commands/workflows that slice 1 reports.
+**Architecture:** Implement a focused `tools/upstream-preflight/src/audits/rebase-confidence.ts` module that classifies touched files into confidence surfaces, verifies existing Gallery release/RC workflow invariants, and renders required local/remote operator commands for risky batches only when the referenced target or workflow exists. When later-slice targets/workflows are still missing, render planned-check lines that name the later slice instead of pretending a runnable command exists. Wire the command into `tools/upstream-preflight/src/index.ts`, `tools/upstream-preflight/package.json`, and `Makefile`; later slices will add the planned targets/workflows and make the same renderer print exact commands.
 
 **Tech Stack:** TypeScript, Vitest, micromatch, YAML parser already present in `@gallery/upstream-preflight`, Make.
 
 ---
+
+## Post-Review Amendments
+
+The implementation went through subagent spec-compliance and code-quality
+review. The final accepted Slice 1 implementation includes these corrections on
+top of the starter snippets below:
+
+- `renderRequiredConfidenceChecks()` is availability-aware. It accepts repo
+  availability data and prints exact `make ...` / `gh workflow run ...`
+  commands only when the referenced Make target or workflow file exists.
+- Missing later-slice targets/workflows render planned lines instead:
+  - `planned Slice 3 check: make gallery-branding-check ...`
+  - `planned Slice 4 workflow: gallery-mobile-smoke.yml ...`
+  - `planned Slice 5 check/workflow: gallery-ml-smoke ...`
+- Release workflow assertions check required `workflow_dispatch` inputs,
+  branding-before-build ordering, release-mobile delegation to
+  `gallery-build-mobile.yml`, Gallery image names, RC summary links, malformed
+  workflow text, and missing/renamed workflow files.
+- Slice 1 intentionally does not emit a strict ownership confidence command;
+  strict ownership behavior is Slice 2.
+- `rebase-confidence-check --batch` validates the persisted batch plan before
+  risk classification. Stale plans fail before printing
+  `Risk-Based Confidence Requirements`.
+
+Accepted Slice 1 verification:
+
+```bash
+export PATH="$HOME/.local/share/mise/shims:$PATH"
+pnpm --filter @gallery/upstream-preflight run test -- src/audits/rebase-confidence.spec.ts src/cli-wiring.spec.ts src/batch.spec.ts
+pnpm --filter @gallery/upstream-preflight run check
+pnpm --filter @gallery/upstream-preflight run format
+```
+
+Result: `15` test files passed, `190` tests passed, typecheck passed, format
+passed.
 
 ## File Structure
 
@@ -85,7 +120,7 @@ describe('classifyConfidenceSurfaces', () => {
 });
 
 describe('renderRequiredConfidenceChecks', () => {
-  it('renders matched-file reasons and exact remote commands for risky batches', () => {
+  it('renders matched-file reasons and exact commands when referenced targets exist', () => {
     const details = renderRequiredConfidenceChecks(
       classifyConfidenceSurfaces([
         'mobile/lib/routing/router.dart',
@@ -93,6 +128,10 @@ describe('renderRequiredConfidenceChecks', () => {
         'machine-learning/Dockerfile',
       ]),
       '176',
+      {
+        makeTargets: new Set(['gallery-branding-check', 'gallery-ml-smoke']),
+        workflows: new Set(['gallery-mobile-smoke.yml', 'gallery-ml-smoke.yml']),
+      },
     );
 
     expect(details).toContain(
@@ -114,6 +153,24 @@ describe('renderRequiredConfidenceChecks', () => {
       'No extra risk-based confidence checks are required for this batch',
     ]);
   });
+
+  it('marks future checks as planned when referenced targets do not exist yet', () => {
+    const details = renderRequiredConfidenceChecks(
+      classifyConfidenceSurfaces([
+        'mobile/lib/routing/router.dart',
+        'machine-learning/Dockerfile',
+      ]),
+      '176',
+      { makeTargets: new Set(), workflows: new Set() },
+    );
+
+    expect(details).toEqual([
+      'planned Slice 3 check: make gallery-branding-check (target missing; required by docker: machine-learning/Dockerfile)',
+      'planned Slice 5 check: make gallery-ml-smoke (target missing; required by docker: machine-learning/Dockerfile; ml: machine-learning/Dockerfile)',
+      'planned Slice 4 workflow: gallery-mobile-smoke.yml (workflow missing; required by mobile: mobile/lib/routing/router.dart)',
+      'planned Slice 5 workflow: gallery-ml-smoke.yml (workflow missing; required by docker: machine-learning/Dockerfile; ml: machine-learning/Dockerfile)',
+    ]);
+  });
 });
 
 describe('validateGalleryWorkflowText', () => {
@@ -132,20 +189,116 @@ describe('validateGalleryWorkflowText', () => {
   it('fails when workflow dispatch is missing', () => {
     const result = validateGalleryWorkflowText('gallery-rc-build.yml', 'on:\n  push:\n', {
       requireDispatch: true,
+      requiredDispatchInputs: ['rc_tag', 'ref', 'build_ml'],
     });
 
     expect(result.details).toEqual([
       'gallery-rc-build.yml is missing workflow_dispatch',
+      'gallery-rc-build.yml is missing workflow_dispatch input rc_tag',
+      'gallery-rc-build.yml is missing workflow_dispatch input ref',
+      'gallery-rc-build.yml is missing workflow_dispatch input build_ml',
+    ]);
+  });
+
+  it('fails when required workflow dispatch inputs are missing', () => {
+    const result = validateGalleryWorkflowText(
+      'gallery-rc-build.yml',
+      [
+        'on:',
+        '  workflow_dispatch:',
+        '    inputs:',
+        '      rc_tag:',
+        '      build_ml:',
+      ].join('\n'),
+      {
+        requireDispatch: true,
+        requiredDispatchInputs: ['rc_tag', 'ref', 'build_ml'],
+      },
+    );
+
+    expect(result.details).toEqual([
+      'gallery-rc-build.yml is missing workflow_dispatch input ref',
     ]);
   });
 
   it('fails when branding is missing before a required release build', () => {
     const result = validateGalleryWorkflowText('gallery-release-server-only.yml', minimalWorkflow.replace('      - uses: ./.github/actions/apply-branding\n', ''), {
       requireBranding: true,
+      brandingBeforeMarkers: ['docker/build-push-action'],
     });
 
     expect(result.details).toEqual([
       'gallery-release-server-only.yml is missing ./.github/actions/apply-branding',
+    ]);
+  });
+
+  it('fails when branding appears after a Docker build marker', () => {
+    const result = validateGalleryWorkflowText(
+      'gallery-release-server-only.yml',
+      [
+        'on:',
+        '  workflow_dispatch:',
+        'jobs:',
+        '  build:',
+        '    steps:',
+        '      - uses: docker/build-push-action@v6',
+        '      - uses: ./.github/actions/apply-branding',
+      ].join('\n'),
+      {
+        requireBranding: true,
+        brandingBeforeMarkers: ['docker/build-push-action'],
+      },
+    );
+
+    expect(result.details).toEqual([
+      'gallery-release-server-only.yml must apply branding before docker/build-push-action',
+    ]);
+  });
+
+  it('fails when release-mobile stops delegating to the branded mobile build workflow', () => {
+    const result = validateGalleryWorkflowText(
+      'gallery-release-mobile.yml',
+      [
+        'on:',
+        '  workflow_dispatch:',
+        '    inputs:',
+        '      version:',
+        'jobs:',
+        '  build-mobile:',
+        '    steps:',
+        '      - run: flutter build appbundle --release',
+      ].join('\n'),
+      {
+        requireDispatch: true,
+        requiredDispatchInputs: ['version'],
+        requiredWorkflowReferences: ['gallery-build-mobile.yml'],
+      },
+    );
+
+    expect(result.details).toEqual([
+      'gallery-release-mobile.yml is missing workflow reference gallery-build-mobile.yml',
+    ]);
+  });
+
+  it('reports path-specific failures for malformed workflow structure', () => {
+    const result = validateGalleryWorkflowText(
+      'gallery-build-mobile.yml',
+      'not a workflow',
+      {
+        requireDispatch: true,
+        requiredDispatchInputs: ['environment', 'version', 'build_target'],
+        requireBranding: true,
+        brandingBeforeMarkers: ['flutter build'],
+      },
+    );
+
+    expect(result.details).toEqual([
+      'gallery-build-mobile.yml is missing workflow_dispatch',
+      'gallery-build-mobile.yml is missing workflow_dispatch input environment',
+      'gallery-build-mobile.yml is missing workflow_dispatch input version',
+      'gallery-build-mobile.yml is missing workflow_dispatch input build_target',
+      'gallery-build-mobile.yml is missing ./.github/actions/apply-branding',
+      'gallery-build-mobile.yml is missing mobile build marker flutter build',
     ]);
   });
 
@@ -174,6 +327,15 @@ describe('validateGalleryWorkflowText', () => {
     expect(result.details).toContain(
       '.github/workflows/gallery-release-server-only.yml is missing ./.github/actions/apply-branding',
     );
+  });
+
+  it('does not emit strict ownership checks before Slice 2', () => {
+    expect(
+      renderRequiredConfidenceChecks(
+        classifyConfidenceSurfaces(['docs/fork/ownership.yml']),
+        '176',
+      ),
+    ).toEqual([]);
   });
 });
 
@@ -242,10 +404,13 @@ export type ConfidenceSurfaceMatch = {
 
 export type WorkflowAssertionOptions = {
   requireDispatch?: boolean;
+  requiredDispatchInputs?: string[];
   requireBranding?: boolean;
+  brandingBeforeMarkers?: string[];
   requireServerImage?: boolean;
   requireMlImage?: boolean;
   requireRcSummaryLinks?: boolean;
+  requiredWorkflowReferences?: string[];
 };
 
 export type RebaseConfidenceAuditInput = {
@@ -284,23 +449,31 @@ const surfaceGlobs: Record<ConfidenceSurface, string[]> = {
 const workflowAssertions: Record<string, WorkflowAssertionOptions> = {
   '.github/workflows/gallery-rc-build.yml': {
     requireDispatch: true,
+    requiredDispatchInputs: ['rc_tag', 'ref', 'build_ml'],
     requireBranding: true,
+    brandingBeforeMarkers: ['docker/build-push-action'],
     requireServerImage: true,
     requireMlImage: true,
     requireRcSummaryLinks: true,
   },
   '.github/workflows/gallery-release-server-only.yml': {
     requireDispatch: true,
+    requiredDispatchInputs: ['version', 'commit'],
     requireBranding: true,
+    brandingBeforeMarkers: ['docker/build-push-action'],
     requireServerImage: true,
     requireMlImage: true,
   },
   '.github/workflows/gallery-release-mobile.yml': {
     requireDispatch: true,
+    requiredDispatchInputs: ['version'],
+    requiredWorkflowReferences: ['gallery-build-mobile.yml'],
   },
   '.github/workflows/gallery-build-mobile.yml': {
     requireDispatch: true,
+    requiredDispatchInputs: ['environment', 'version', 'build_target'],
     requireBranding: true,
+    brandingBeforeMarkers: ['Build signed Android App Bundle', 'flutter build'],
   },
 };
 
@@ -369,8 +542,31 @@ export function validateGalleryWorkflowText(
   if (options.requireDispatch && !text.includes('workflow_dispatch')) {
     details.push(`${workflowPath} is missing workflow_dispatch`);
   }
+  for (const input of options.requiredDispatchInputs ?? []) {
+    if (!hasWorkflowDispatchInput(text, input)) {
+      details.push(`${workflowPath} is missing workflow_dispatch input ${input}`);
+    }
+  }
   if (options.requireBranding && !text.includes('./.github/actions/apply-branding')) {
     details.push(`${workflowPath} is missing ./.github/actions/apply-branding`);
+  }
+  if (options.requireBranding) {
+    for (const marker of options.brandingBeforeMarkers ?? []) {
+      const markerIndex = text.indexOf(marker);
+      if (markerIndex === -1) {
+        details.push(`${workflowPath} is missing mobile build marker ${marker}`);
+        continue;
+      }
+      const brandingIndex = text.indexOf('./.github/actions/apply-branding');
+      if (brandingIndex !== -1 && brandingIndex > markerIndex) {
+        details.push(`${workflowPath} must apply branding before ${marker}`);
+      }
+    }
+  }
+  for (const reference of options.requiredWorkflowReferences ?? []) {
+    if (!text.includes(reference)) {
+      details.push(`${workflowPath} is missing workflow reference ${reference}`);
+    }
   }
   if (options.requireServerImage && !text.includes('ghcr.io/open-noodle/gallery-server')) {
     details.push(`${workflowPath} is missing ghcr.io/open-noodle/gallery-server`);
@@ -401,6 +597,11 @@ export function validateGalleryWorkflowText(
     title: `${workflowPath} static assertions`,
     details: details.length === 0 ? [`${workflowPath} passed`] : details,
   };
+}
+
+function hasWorkflowDispatchInput(text: string, input: string): boolean {
+  const escapedInput = input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|\\n)\\s{6,}${escapedInput}:`, 'm').test(text);
 }
 
 export function runGalleryWorkflowAssertions(
@@ -573,18 +774,65 @@ Expected: PASS.
 **Files:**
 - Verify all files changed in Tasks 1-2.
 
-- [ ] **Step 1: Run focused upstream-preflight suite**
+- [ ] **Step 1: Add stale persisted-plan coverage for the new command**
+
+Patch `tools/upstream-preflight/src/batch.spec.ts` in the existing batch-scoped audit CLI command tests with a failing test that:
+
+- creates a persisted batch plan
+- advances the upstream ref after the plan is written
+- runs `rebase-confidence-check` with `BATCH=02`
+- expects exit code `1`
+- expects stderr to contain `Persisted batch plan is stale`
+- expects stdout not to contain `Risk-Based Confidence Requirements`
+
+The test should follow the existing `runCli`, `createRepoWithPersistedPlan`, and `persistBatchFiles` patterns in `batch.spec.ts`.
+
+- [ ] **Step 2: Run stale-plan test to verify RED**
 
 Run:
 
 ```bash
 export PATH="$HOME/.local/share/mise/shims:$PATH"
-pnpm --filter @gallery/upstream-preflight run test -- src/audits/rebase-confidence.spec.ts src/cli-wiring.spec.ts
+pnpm --filter @gallery/upstream-preflight run test -- src/batch.spec.ts
+```
+
+Expected: FAIL because `rebase-confidence-check` has not yet validated persisted batch plans before risk classification.
+
+- [ ] **Step 3: Validate persisted batch plans in the new CLI command**
+
+Patch `tools/upstream-preflight/src/index.ts` so the `rebase-confidence-check` batch path:
+
+- reads the persisted plan with `readPersistedBatchPlan`
+- validates it with `validatePersistedBatchPlan`
+- derives `upstreamTouchedFiles`
+- selects the requested batch with `selectBatchAuditScope`
+- only then calls `runRebaseConfidenceAudits`
+
+Use `repoRoot()` as the repo path so tests that run through `pnpm --dir` validate against the fixture repo, not the package directory.
+
+- [ ] **Step 4: Run stale-plan test to verify GREEN**
+
+Run:
+
+```bash
+export PATH="$HOME/.local/share/mise/shims:$PATH"
+pnpm --filter @gallery/upstream-preflight run test -- src/batch.spec.ts
 ```
 
 Expected: PASS.
 
-- [ ] **Step 2: Run upstream-preflight type check**
+- [ ] **Step 5: Run focused upstream-preflight suite**
+
+Run:
+
+```bash
+export PATH="$HOME/.local/share/mise/shims:$PATH"
+pnpm --filter @gallery/upstream-preflight run test -- src/audits/rebase-confidence.spec.ts src/cli-wiring.spec.ts src/batch.spec.ts
+```
+
+Expected: PASS.
+
+- [ ] **Step 6: Run upstream-preflight type check**
 
 Run:
 
@@ -595,7 +843,7 @@ pnpm --filter @gallery/upstream-preflight run check
 
 Expected: PASS.
 
-- [ ] **Step 3: Run upstream-preflight format check**
+- [ ] **Step 7: Run upstream-preflight format check**
 
 Run:
 
@@ -612,7 +860,7 @@ pnpm --filter @gallery/upstream-preflight run format:fix
 pnpm --filter @gallery/upstream-preflight run format
 ```
 
-- [ ] **Step 4: Run the new command against the current batch plan if available**
+- [ ] **Step 8: Run the new command against the current batch plan if available**
 
 Run:
 
@@ -623,13 +871,13 @@ make rebase-confidence-check BATCH=175
 
 Expected: PASS with `OK: Gallery Release Workflow Static Assertions` and `OK: Risk-Based Confidence Requirements`. The requirements may list extra checks if batch 175 touched Docker/base-image surfaces.
 
-- [ ] **Step 5: Commit slice 1**
+- [ ] **Step 9: Commit slice 1**
 
 Run:
 
 ```bash
 git status --short
-git add Makefile tools/upstream-preflight/package.json tools/upstream-preflight/src/index.ts tools/upstream-preflight/src/cli-wiring.spec.ts tools/upstream-preflight/src/audits/rebase-confidence.ts tools/upstream-preflight/src/audits/rebase-confidence.spec.ts docs/superpowers/plans/2026-06-02-rebase-confidence-gates-slice-1.md
+git add Makefile tools/upstream-preflight/package.json tools/upstream-preflight/src/index.ts tools/upstream-preflight/src/batch.spec.ts tools/upstream-preflight/src/cli-wiring.spec.ts tools/upstream-preflight/src/audits/rebase-confidence.ts tools/upstream-preflight/src/audits/rebase-confidence.spec.ts docs/superpowers/plans/2026-06-02-rebase-confidence-gates-slice-1.md
 git commit -m "feat(rebase): add confidence gate core"
 ```
 
