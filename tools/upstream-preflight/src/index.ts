@@ -508,6 +508,7 @@ program
   .option('--plan-dir <path>', 'persisted batch plan directory')
   .action((options: { manifest: string; batch?: string; planDir?: string }) => {
     const batch = options.batch ?? process.env.BATCH;
+    const context = batch ? undefined : buildPreflightContext(options.manifest);
     const auditScope = batch
       ? (() => {
           const root = repoRoot();
@@ -529,17 +530,21 @@ program
             upstreamTouchedFiles,
           });
         })()
-      : (() => {
-          const context = buildPreflightContext(options.manifest);
-          return {
-            batch: undefined,
-            upstreamTouchedFiles: context.upstreamRange.files,
-          };
-        })();
+      : {
+          batch: undefined,
+          upstreamTouchedFiles: context!.upstreamRange.files,
+        };
+    const ownershipContext = context ?? buildPreflightContext(options.manifest);
     const results = runRebaseConfidenceAudits({
       upstreamTouchedFiles: auditScope.upstreamTouchedFiles,
       batch: auditScope.batch ?? batch,
       cwd: repoRoot(),
+      ownership: {
+        manifest: ownershipContext.manifest,
+        forkFiles: ownershipContext.forkRange.files,
+        headValidation: ownershipContext.headValidation,
+        broadOptionalOnly: ownershipContext.broadOptionalOnly,
+      },
     });
     for (const result of results) {
       console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
