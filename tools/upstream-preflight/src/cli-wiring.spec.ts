@@ -13,6 +13,7 @@ describe('rolling rebase CLI wiring', () => {
       'rolling-status': 'tsx src/index.ts rolling-status',
       'sync-fork-main': 'tsx src/index.ts sync-fork-main',
       'rolling-final-check': 'tsx src/index.ts rolling-final-check',
+      'rebase-confidence-check': 'tsx src/index.ts rebase-confidence-check',
     });
   });
 
@@ -30,6 +31,10 @@ describe('rolling rebase CLI wiring', () => {
     expect(makefile).toContain('$(UPSTREAM_PREFLIGHT) run sync-fork-main');
     expect(makefile).toContain('.PHONY: upstream-rolling-final-check');
     expect(makefile).toContain('$(UPSTREAM_PREFLIGHT) run rolling-final-check');
+    expect(makefile).toContain('.PHONY: rebase-confidence-check');
+    expect(makefile).toContain(
+      '$(UPSTREAM_PREFLIGHT) run rebase-confidence-check',
+    );
   });
 
   it('forwards rolling Make target options without an extra argument separator', () => {
@@ -49,6 +54,9 @@ describe('rolling rebase CLI wiring', () => {
     );
     expect(makefile).toContain(
       '$(UPSTREAM_PREFLIGHT) run mobile-drift-check $(if $(BATCH),--batch $(BATCH),)',
+    );
+    expect(makefile).toContain(
+      '$(UPSTREAM_PREFLIGHT) run rebase-confidence-check $(if $(BATCH),--batch $(BATCH),)',
     );
     expect(makefile).not.toContain('-- --resume');
     expect(makefile).not.toContain('-- --continue');
