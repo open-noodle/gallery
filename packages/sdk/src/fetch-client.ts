@@ -2387,10 +2387,10 @@ export type ServerFeaturesDto = {
     ocr: boolean;
     /** Whether password login is enabled */
     passwordLogin: boolean;
-    /** Whether real-time transcoding is enabled */
-    realtimeTranscoding: boolean;
     /** Whether the people face statistics UI is enabled */
     peopleStatistics: boolean;
+    /** Whether real-time transcoding is enabled */
+    realtimeTranscoding: boolean;
     /** Whether reverse geocoding is enabled */
     reverseGeocoding: boolean;
     /** Whether search is enabled */
