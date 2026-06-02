@@ -1,7 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import micromatch from 'micromatch';
-import type { AuditResult } from '../types';
+import { findBroadOptionalOnlyFiles, findUncoveredFiles } from '../coverage';
+import type {
+  AuditResult,
+  CoverageClassification,
+  Manifest,
+  ManifestHeadValidation,
+} from '../types';
 
 export type ConfidenceSurface =
   | 'branding'
@@ -32,6 +38,14 @@ export type RebaseConfidenceAuditInput = {
   batch?: string;
   cwd?: string;
   workflowTexts?: Record<string, string>;
+  ownership?: StrictOwnershipConfidenceInput;
+};
+
+export type StrictOwnershipConfidenceInput = {
+  manifest: Manifest;
+  forkFiles: string[];
+  headValidation: ManifestHeadValidation;
+  broadOptionalOnly: CoverageClassification[];
 };
 
 export type ConfidenceCheckAvailability = {
@@ -355,14 +369,57 @@ export function runRebaseConfidenceAudits(
     readConfidenceCheckAvailability(input.cwd ?? process.cwd()),
   );
 
+  const ownershipResults = input.ownership
+    ? [runStrictOwnershipConfidenceAudit(input.ownership)]
+    : [];
+
   return [
     runGalleryWorkflowAssertions(input.cwd, input.workflowTexts),
+    ...ownershipResults,
     {
       ok: true,
       title: 'Risk-Based Confidence Requirements',
       details: requirementDetails,
     },
   ];
+}
+
+export function runStrictOwnershipConfidenceAudit(
+  input: StrictOwnershipConfidenceInput,
+): AuditResult {
+  const uncovered = findUncoveredFiles(input.forkFiles, input.manifest);
+  const broadOptionalOnly = findBroadOptionalOnlyFiles(
+    input.forkFiles,
+    input.manifest,
+    input.headValidation.changedSinceBaseline,
+  );
+  const details = [
+    ...input.headValidation.errors,
+    ...uncovered.map((file) => `Ownership manifest does not cover ${file}`),
+    ...broadOptionalOnly.map(
+      (classification) =>
+        `${classification.file} is covered only by broad optional glob ${classification.broadOptionalGlobs.join(', ')}`,
+    ),
+  ];
+
+  if (details.length > 0) {
+    return {
+      ok: false,
+      title: 'Strict Ownership Confidence',
+      details,
+    };
+  }
+
+  return {
+    ok: true,
+    title: 'Strict Ownership Confidence',
+    details:
+      input.headValidation.warnings.length > 0
+        ? input.headValidation.warnings
+        : [
+            'Ownership manifest is current and all fork files have explicit or narrow coverage',
+          ],
+  };
 }
 
 function readWorkflowText(cwd: string, workflowPath: string): string {
