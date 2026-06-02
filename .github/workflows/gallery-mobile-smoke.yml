@@ -1,0 +1,88 @@
+name: Gallery Mobile Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch, tag, or SHA to test. Defaults to the triggering ref.'
+        required: false
+        type: string
+        default: ''
+
+concurrency:
+  group: gallery-mobile-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  android-smoke:
+    name: Android smoke
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+          token: ${{ github.token }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: ./.github/actions/apply-branding
+
+      - name: Setup Mise
+        uses: immich-app/devtools/actions/use-mise@7b8610a904d57da241e4ddba17fa62b62b15aed4 # use-mise-action-v2.0.2
+        with:
+          github_token: ${{ github.token }}
+
+      - name: Install mobile dependencies
+        working-directory: ./mobile
+        run: flutter pub get
+
+      - name: Install mobile UI package dependencies
+        working-directory: ./mobile/packages/ui
+        run: flutter pub get
+
+      - name: Generate translation files
+        run: mise //mobile:codegen:translation
+
+      - name: Run Build Runner
+        run: mise //mobile:codegen:dart
+
+      - name: Generate platform APIs
+        run: mise //mobile:codegen:pigeon
+
+      - name: Find generated file changes
+        uses: tj-actions/verify-changed-files@a1c6acee9df209257a246f2cc6ae8cb6581c1edf # v20.0.4
+        id: verify-changed-files
+        with:
+          files: |
+            mobile/**/*.g.dart
+            mobile/**/*.gr.dart
+            mobile/**/*.drift.dart
+
+      - name: Verify generated files are current
+        if: steps.verify-changed-files.outputs.files_changed == 'true'
+        env:
+          CHANGED_FILES: ${{ steps.verify-changed-files.outputs.changed_files }}
+        run: |
+          echo "ERROR: Mobile generated files are not current."
+          echo "Run 'mise //mobile:codegen:translation', 'mise //mobile:codegen:dart', and 'mise //mobile:codegen:pigeon'."
+          echo "Changed files: ${CHANGED_FILES}"
+          exit 1
+
+      - name: Analyze mobile code
+        run: mise //mobile:analyze
+
+      - name: Run mobile tests
+        run: mise //mobile:test
+
+      - name: Build unsigned Android APK
+        working-directory: ./mobile
+        run: flutter build apk --debug
