@@ -57,6 +57,7 @@ import { SharedSpaceService } from 'src/services/shared-space.service.js';
 import { StorageMigrationService } from 'src/services/storage-migration.service.js';
 import { UserGroupService } from 'src/services/user-group.service.js';
 import { ClassificationService } from 'src/services/classification.service.js';
+import { FaceRepairService } from 'src/services/face-repair.service.js';
 
 export const services = [
   ApiKeyService,
@@ -75,6 +76,7 @@ export const services = [
   DatabaseService,
   DownloadService,
   DuplicateService,
+  FaceRepairService,
   IntegrityService,
   HlsService,
   JobService,
