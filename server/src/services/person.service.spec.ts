@@ -141,6 +141,17 @@ describe(PersonService.name, () => {
     expect(mocks.systemMetadata.set).not.toHaveBeenCalled();
   };
 
+  const useIdentityMergePropagation = () => {
+    const identityMergePropagation = {
+      mergePersonalPeople: vi.fn(),
+    };
+    (
+      sut as unknown as { identityMergePropagationService: typeof identityMergePropagation }
+    ).identityMergePropagationService = identityMergePropagation;
+
+    return identityMergePropagation;
+  };
+
   it('should be defined', () => {
     expect(sut).toBeDefined();
   });
@@ -4208,44 +4219,162 @@ describe(PersonService.name, () => {
     });
   });
 
-  describe('mergePerson (face identities)', () => {
-    it('should merge source identities after personal people are merged', async () => {
+  describe('mergePerson', () => {
+    it('delegates valid personal merges to identity merge propagation after access validation', async () => {
+      const auth = AuthFactory.create();
+      const [person, mergePerson] = [
+        PersonFactory.create({ id: 'person-x' }),
+        PersonFactory.create({ id: 'person-y' }),
+      ];
+      const identityMergePropagation = useIdentityMergePropagation();
+
+      identityMergePropagation.mergePersonalPeople.mockResolvedValue([{ id: 'person-y', success: true }]);
+      mocks.person.getById.mockResolvedValueOnce(person);
+      mocks.person.getById.mockResolvedValueOnce(mergePerson);
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.id]));
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergePerson.id]));
+
+      await expect(sut.mergePerson(auth, 'person-x', { ids: ['person-y'] })).resolves.toEqual([
+        { id: 'person-y', success: true },
+      ]);
+
+      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalled();
+      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(auth, 'person-x', ['person-y']);
+      expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
+    });
+
+    it('returns bulk failure and does not delegate when a source person is missing or inaccessible', async () => {
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create({ id: 'person-x' });
+      const identityMergePropagation = useIdentityMergePropagation();
+
+      mocks.person.getById.mockResolvedValueOnce(person);
+      mocks.person.getById.mockResolvedValueOnce(void 0);
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.id]));
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set(['person-y']));
+
+      await expect(sut.mergePerson(auth, 'person-x', { ids: ['person-y', 'person-z'] })).resolves.toEqual([
+        { id: 'person-y', success: false, error: BulkIdErrorReason.NOT_FOUND },
+        { id: 'person-z', success: false, error: BulkIdErrorReason.NO_PERMISSION },
+      ]);
+
+      expect(identityMergePropagation.mergePersonalPeople).not.toHaveBeenCalled();
+      expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
+    });
+
+    it('returns only failed source responses and does not delegate valid sources when any source fails validation', async () => {
+      const auth = AuthFactory.create();
+      const [person, validSource] = [
+        PersonFactory.create({ id: 'person-x' }),
+        PersonFactory.create({ id: 'person-y' }),
+      ];
+      const identityMergePropagation = useIdentityMergePropagation();
+
+      mocks.person.getById.mockResolvedValueOnce(person);
+      mocks.person.getById.mockResolvedValueOnce(validSource);
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.id]));
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([validSource.id]));
+
+      await expect(sut.mergePerson(auth, 'person-x', { ids: ['person-y', 'person-z'] })).resolves.toEqual([
+        { id: 'person-z', success: false, error: BulkIdErrorReason.NO_PERMISSION },
+      ]);
+
+      expect(identityMergePropagation.mergePersonalPeople).not.toHaveBeenCalled();
+      expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
+      expect(mocks.person.delete).not.toHaveBeenCalled();
+    });
+
+    it('rejects an empty source list before delegation', async () => {
+      const auth = AuthFactory.create();
+      const identityMergePropagation = useIdentityMergePropagation();
+
+      await expect(sut.mergePerson(auth, 'person-x', { ids: [] })).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(identityMergePropagation.mergePersonalPeople).not.toHaveBeenCalled();
+    });
+
+    it('rejects self-merge before delegation', async () => {
+      const auth = AuthFactory.create();
+      const identityMergePropagation = useIdentityMergePropagation();
+
+      await expect(sut.mergePerson(auth, 'person-x', { ids: ['person-x'] })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(identityMergePropagation.mergePersonalPeople).not.toHaveBeenCalled();
+    });
+
+    it('should require person.write and person.merge permission', async () => {
       const auth = AuthFactory.create();
       const [person, mergePerson] = [PersonFactory.create(), PersonFactory.create()];
 
       mocks.person.getById.mockResolvedValueOnce(person);
       mocks.person.getById.mockResolvedValueOnce(mergePerson);
+
+      await expect(sut.mergePerson(auth, person.id, { ids: [mergePerson.id] })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
+
+      expect(mocks.person.delete).not.toHaveBeenCalled();
+      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.id]));
+    });
+
+    it('should delegate single-source merges without mutating faces directly', async () => {
+      const auth = AuthFactory.create();
+      const [person, mergePerson] = [PersonFactory.create(), PersonFactory.create()];
+      const identityMergePropagation = useIdentityMergePropagation();
+
+      identityMergePropagation.mergePersonalPeople.mockResolvedValue([{ id: mergePerson.id, success: true }]);
+      mocks.person.getById.mockResolvedValueOnce(person);
+      mocks.person.getById.mockResolvedValueOnce(mergePerson);
       mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.id]));
       mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergePerson.id]));
-      mocks.faceIdentity.ensurePersonIdentity
-        .mockResolvedValueOnce({ id: 'target-identity' } as any)
-        .mockResolvedValueOnce({ id: 'source-identity' } as any);
 
       await expect(sut.mergePerson(auth, person.id, { ids: [mergePerson.id] })).resolves.toEqual([
         { id: mergePerson.id, success: true },
       ]);
 
-      expect(mocks.faceIdentity.mergeIdentities).toHaveBeenCalledWith({
-        targetIdentityId: 'target-identity',
-        sourceIdentityIds: ['source-identity'],
-        source: 'manual',
-      });
-      expect(mocks.job.queue).toHaveBeenCalledWith({
+      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(auth, person.id, [mergePerson.id]);
+      expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
+      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.id]));
+    });
+
+    it('should leave identity collapsing to propagation', async () => {
+      const auth = AuthFactory.create();
+      const [person, mergePerson] = [PersonFactory.create(), PersonFactory.create()];
+      const identityMergePropagation = useIdentityMergePropagation();
+
+      identityMergePropagation.mergePersonalPeople.mockResolvedValue([{ id: mergePerson.id, success: true }]);
+      mocks.person.getById.mockResolvedValueOnce(person);
+      mocks.person.getById.mockResolvedValueOnce(mergePerson);
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.id]));
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergePerson.id]));
+
+      await expect(sut.mergePerson(auth, person.id, { ids: [mergePerson.id] })).resolves.toEqual([
+        { id: mergePerson.id, success: true },
+      ]);
+
+      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(auth, person.id, [mergePerson.id]);
+      expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({
         name: JobName.SharedSpacePersonMetadataBackfill,
-        data: { identityId: 'target-identity' },
+        data: expect.anything(),
       });
     });
 
-    it('should merge two people with smart merge', async () => {
+    it('should not perform smart merge updates before delegation', async () => {
       const auth = AuthFactory.create();
       const [person, mergePerson] = [
         PersonFactory.create({ name: undefined }),
         PersonFactory.create({ name: 'Merge person' }),
       ];
+      const identityMergePropagation = useIdentityMergePropagation();
 
+      identityMergePropagation.mergePersonalPeople.mockResolvedValue([{ id: mergePerson.id, success: true }]);
       mocks.person.getById.mockResolvedValueOnce(person);
       mocks.person.getById.mockResolvedValueOnce(mergePerson);
-      mocks.person.update.mockResolvedValue({ ...person, name: mergePerson.name });
       mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.id]));
       mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergePerson.id]));
 
@@ -4253,16 +4382,9 @@ describe(PersonService.name, () => {
         { id: mergePerson.id, success: true },
       ]);
 
-      expect(mocks.person.reassignFaces).toHaveBeenCalledWith({
-        newPersonId: person.id,
-        oldPersonId: mergePerson.id,
-      });
-
-      expect(mocks.person.update).toHaveBeenCalledWith({
-        id: person.id,
-        name: mergePerson.name,
-      });
-
+      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(auth, person.id, [mergePerson.id]);
+      expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
+      expect(mocks.person.update).not.toHaveBeenCalled();
       expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.id]));
     });
 
@@ -4294,20 +4416,21 @@ describe(PersonService.name, () => {
       expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.id]));
     });
 
-    it('should handle an error reassigning faces', async () => {
+    it('does not convert propagation failures to per-source unknown failures', async () => {
       const auth = AuthFactory.create();
       const [person, mergePerson] = [PersonFactory.create(), PersonFactory.create()];
+      const identityMergePropagation = useIdentityMergePropagation();
 
+      identityMergePropagation.mergePersonalPeople.mockRejectedValue(new Error('propagation failed'));
       mocks.person.getById.mockResolvedValueOnce(person);
       mocks.person.getById.mockResolvedValueOnce(mergePerson);
-      mocks.person.reassignFaces.mockRejectedValue(new Error('update failed'));
       mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.id]));
       mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergePerson.id]));
 
-      await expect(sut.mergePerson(auth, person.id, { ids: [mergePerson.id] })).resolves.toEqual([
-        { id: mergePerson.id, success: false, error: BulkIdErrorReason.UNKNOWN },
-      ]);
+      await expect(sut.mergePerson(auth, person.id, { ids: [mergePerson.id] })).rejects.toThrow('propagation failed');
 
+      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(auth, person.id, [mergePerson.id]);
+      expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
       expect(mocks.person.delete).not.toHaveBeenCalled();
       expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.id]));
     });
@@ -4511,17 +4634,18 @@ describe(PersonService.name, () => {
   });
 
   describe('mergePerson (smart merge birthDate)', () => {
-    it('should copy birthDate from merge person when primary has none', async () => {
+    it('should leave birthDate smart merge to propagation', async () => {
       const auth = AuthFactory.create();
       const birthDate = new Date('1990-01-15');
       const [person, mergePerson] = [
         PersonFactory.create({ name: 'Primary', birthDate: null }),
         PersonFactory.create({ name: 'Merge', birthDate }),
       ];
+      const identityMergePropagation = useIdentityMergePropagation();
 
+      identityMergePropagation.mergePersonalPeople.mockResolvedValue([{ id: mergePerson.id, success: true }]);
       mocks.person.getById.mockResolvedValueOnce(person);
       mocks.person.getById.mockResolvedValueOnce(mergePerson);
-      mocks.person.update.mockResolvedValue({ ...person, birthDate });
       mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.id]));
       mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergePerson.id]));
 
@@ -4529,12 +4653,8 @@ describe(PersonService.name, () => {
         { id: mergePerson.id, success: true },
       ]);
 
-      expect(mocks.person.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: person.id,
-          birthDate,
-        }),
-      );
+      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(auth, person.id, [mergePerson.id]);
+      expect(mocks.person.update).not.toHaveBeenCalled();
     });
 
     it('should throw when merging a person into themselves', async () => {
