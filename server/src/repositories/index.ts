@@ -20,6 +20,7 @@ import { DuplicateRepository } from 'src/repositories/duplicate.repository';
 import { EmailRepository } from 'src/repositories/email.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
+import { FaceRepairRepository } from 'src/repositories/face-repair.repository';
 import { IntegrityRepository } from 'src/repositories/integrity.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LibraryRepository } from 'src/repositories/library.repository';
@@ -82,6 +83,7 @@ export const repositories = [
   EmailRepository,
   EventRepository,
   FaceIdentityRepository,
+  FaceRepairRepository,
   IntegrityRepository,
   JobRepository,
   LibraryRepository,
