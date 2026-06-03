@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ExpressionBuilder, Insertable, Kysely, sql, SqlBool, Updateable } from 'kysely';
+import { ExpressionBuilder, Insertable, Kysely, sql, SqlBool, Transaction, Updateable } from 'kysely';
 import { jsonObjectFrom } from 'kysely/helpers/postgres';
 import { InjectKysely } from 'nestjs-kysely';
 import { AssetFace } from 'src/database';
@@ -63,6 +63,8 @@ export interface PeopleFaceStatisticsOptions {
 }
 
 const peopleAssetVisibilities = [AssetVisibility.Archive, AssetVisibility.Timeline];
+
+const isBlank = (value: string | null | undefined) => !value || value.trim().length === 0;
 
 export interface DeleteFacesOptions {
   sourceType: SourceType;
@@ -141,6 +143,102 @@ export class PersonRepository {
       .executeTakeFirst();
 
     return Number(result.numUpdatedRows ?? 0);
+  }
+
+  async mergePersonProfile(
+    input: {
+      sourcePersonId: string;
+      targetPersonId: string;
+      targetIdentityId: string;
+    },
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<{ deletedThumbnailPath: string | null; targetNeedsFeatureFaceRepair: boolean }> {
+    const people = await db
+      .selectFrom('person')
+      .select(['id', 'name', 'birthDate', 'thumbnailPath', 'color', 'species', 'faceAssetId'])
+      .where('id', 'in', [input.sourcePersonId, input.targetPersonId])
+      .execute();
+    const target = people.find((person) => person.id === input.targetPersonId);
+    const source = people.find((person) => person.id === input.sourcePersonId);
+    if (!target || !source) {
+      throw new Error('Person profile not found');
+    }
+
+    const update: Updateable<PersonTable> = { identityId: input.targetIdentityId };
+    if (isBlank(target.name) && !isBlank(source.name)) {
+      update.name = source.name;
+    }
+
+    if (!target.birthDate && source.birthDate) {
+      update.birthDate = source.birthDate;
+    }
+
+    if (isBlank(target.color) && !isBlank(source.color)) {
+      update.color = source.color;
+    }
+
+    if (isBlank(target.species) && !isBlank(source.species)) {
+      update.species = source.species;
+    }
+
+    await db.updateTable('person').set(update).where('id', '=', input.targetPersonId).execute();
+    await db
+      .updateTable('asset_face')
+      .set({ personId: input.targetPersonId })
+      .where('personId', '=', input.sourcePersonId)
+      .execute();
+    const targetNeedsFeatureFaceRepair =
+      !target.faceAssetId || !(await this.isFeatureFaceValid(input.targetPersonId, target.faceAssetId, db));
+    const [deleteResult] = await db.deleteFrom('person').where('id', '=', input.sourcePersonId).execute();
+    if (Number(deleteResult.numDeletedRows ?? 0) === 0) {
+      throw new Error('Person profile not found');
+    }
+
+    return { deletedThumbnailPath: source.thumbnailPath || null, targetNeedsFeatureFaceRepair };
+  }
+
+  async lockPeopleForMerge(personIds: string[], db: Kysely<DB> | Transaction<DB> = this.db): Promise<void> {
+    if (personIds.length === 0) {
+      return;
+    }
+
+    const rows = await db
+      .selectFrom('person')
+      .select('id')
+      .where('id', 'in', [...new Set(personIds)].toSorted())
+      .orderBy('id')
+      .forUpdate()
+      .execute();
+    if (rows.length !== new Set(personIds).size) {
+      throw new Error('Person profile not found');
+    }
+  }
+
+  private async isFeatureFaceValid(
+    personId: string,
+    faceAssetId: string,
+    db: Kysely<DB> | Transaction<DB>,
+  ): Promise<boolean> {
+    const row = await db
+      .selectFrom('asset_face')
+      .select('asset_face.id')
+      .where('asset_face.id', '=', faceAssetId)
+      .where('asset_face.personId', '=', personId)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .executeTakeFirst();
+
+    return !!row;
+  }
+
+  async updatePersonIdentity(
+    input: {
+      personId: string;
+      identityId: string;
+    },
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<void> {
+    await db.updateTable('person').set({ identityId: input.identityId }).where('id', '=', input.personId).execute();
   }
 
   @GenerateSql({ params: [{ sourceType: SourceType.MachineLearning, clusterGroupId: DummyValue.UUID }] })
@@ -914,8 +1012,8 @@ export class PersonRepository {
     await query.selectFrom(dummy).execute();
   }
 
-  async update(person: Updateable<PersonTable> & PersonId) {
-    return this.db
+  async update(person: Updateable<PersonTable> & PersonId, db: Kysely<DB> | Transaction<DB> = this.db) {
+    return db
       .updateTable('person')
       .set(person)
       .where('person.ownerId', '=', person.ownerId)
@@ -978,8 +1076,8 @@ export class PersonRepository {
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
-  getRandomFace(personGroupId: string) {
-    return this.db
+  getRandomFace(personGroupId: string, db: Kysely<DB> | Transaction<DB> = this.db) {
+    return db
       .selectFrom('asset_face')
       .selectAll('asset_face')
       .where('asset_face.personGroupId', '=', personGroupId)
