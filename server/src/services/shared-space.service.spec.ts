@@ -185,6 +185,17 @@ const setupIdentityBackedDedupFixture = (
   mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
 };
 
+const useIdentityMergePropagation = (sut: SharedSpaceService) => {
+  const identityMergePropagation = {
+    mergeSpacePeople: vi.fn().mockResolvedValue(void 0),
+  };
+  (
+    sut as unknown as { identityMergePropagationService: typeof identityMergePropagation }
+  ).identityMergePropagationService = identityMergePropagation;
+
+  return identityMergePropagation;
+};
+
 describe(SharedSpaceService.name, () => {
   let sut: SharedSpaceService;
   let mocks: ServiceMocks;
@@ -6890,25 +6901,31 @@ describe(SharedSpaceService.name, () => {
     });
   });
 
-  describe('mergeSpacePeople', () => {
-    it('should require editor role', async () => {
+  describe('mergeSpacePeople delegation', () => {
+    it('rejects viewer-initiated requests before delegation', async () => {
+      const identityMergePropagation = useIdentityMergePropagation(sut);
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
 
       await expect(
         sut.mergeSpacePeople(factory.auth(), 'space-1', 'target-person', { ids: ['source-person'] }),
       ).rejects.toThrow('Insufficient role');
+
+      expect(identityMergePropagation.mergeSpacePeople).not.toHaveBeenCalled();
     });
 
-    it('should throw when target person not found', async () => {
+    it('rejects an empty source list before delegation', async () => {
+      const identityMergePropagation = useIdentityMergePropagation(sut);
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
-      mocks.sharedSpace.getPersonById.mockResolvedValue(void 0);
 
-      await expect(
-        sut.mergeSpacePeople(factory.auth(), 'space-1', 'target-person', { ids: ['source-person'] }),
-      ).rejects.toThrow('Person not found');
+      await expect(sut.mergeSpacePeople(factory.auth(), 'space-1', 'target-person', { ids: [] })).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(identityMergePropagation.mergeSpacePeople).not.toHaveBeenCalled();
     });
 
-    it('should throw when merging a person into itself', async () => {
+    it('rejects source ids equal to the target id before delegation', async () => {
+      const identityMergePropagation = useIdentityMergePropagation(sut);
       const spaceId = newUuid();
       const personId = newUuid();
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
@@ -6917,65 +6934,53 @@ describe(SharedSpaceService.name, () => {
       await expect(sut.mergeSpacePeople(factory.auth(), spaceId, personId, { ids: [personId] })).rejects.toThrow(
         'Cannot merge a person into themselves',
       );
+
+      expect(identityMergePropagation.mergeSpacePeople).not.toHaveBeenCalled();
     });
 
-    it('should merge source persons into target', async () => {
-      const auth = factory.auth();
+    it('rejects missing target or source people before delegation', async () => {
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(void 0);
+
+      await expect(
+        sut.mergeSpacePeople(factory.auth(), 'space-1', 'target-person', { ids: ['source-person'] }),
+      ).rejects.toThrow('Person not found');
+
       const spaceId = newUuid();
       const targetId = newUuid();
       const sourceId = newUuid();
       const target = factory.sharedSpacePerson({ id: targetId, spaceId });
-      const source = factory.sharedSpacePerson({ id: sourceId, spaceId });
+      mocks.sharedSpace.getPersonById.mockReset();
+      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(target).mockResolvedValueOnce(void 0);
 
-      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
-      mocks.sharedSpace.getPersonById
-        .mockResolvedValueOnce(target) // target lookup
-        .mockResolvedValueOnce(source); // source lookup
-      mocks.sharedSpace.reassignPersonFaces.mockResolvedValue(void 0);
-      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
-      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+      await expect(sut.mergeSpacePeople(factory.auth(), spaceId, targetId, { ids: [sourceId] })).rejects.toThrow(
+        'Source person not found in this space',
+      );
 
-      await sut.mergeSpacePeople(auth, spaceId, targetId, { ids: [sourceId] });
-
-      expect(mocks.sharedSpace.reassignPersonFaces).toHaveBeenCalledWith(sourceId, targetId);
-      expect(mocks.sharedSpace.deletePerson).toHaveBeenCalledWith(sourceId);
-      expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledTimes(1);
-      expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledWith([targetId]);
+      expect(identityMergePropagation.mergeSpacePeople).not.toHaveBeenCalled();
     });
 
-    it('should merge source identities when manually merging identified space people', async () => {
-      const auth = factory.auth();
+    it('rejects mixed person and pet space profiles before delegation', async () => {
+      const identityMergePropagation = useIdentityMergePropagation(sut);
       const spaceId = newUuid();
       const targetId = newUuid();
       const sourceId = newUuid();
-      const targetIdentityId = newUuid();
-      const sourceIdentityId = newUuid();
-      const target = factory.sharedSpacePerson({ id: targetId, spaceId, identityId: targetIdentityId });
-      const source = factory.sharedSpacePerson({ id: sourceId, spaceId, identityId: sourceIdentityId });
+      const target = factory.sharedSpacePerson({ id: targetId, spaceId, type: 'person' });
+      const source = factory.sharedSpacePerson({ id: sourceId, spaceId, type: 'pet' });
 
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
-      mocks.sharedSpace.getPersonById
-        .mockResolvedValueOnce(target)
-        .mockResolvedValueOnce(source)
-        .mockResolvedValue(target);
-      mocks.sharedSpace.getIdentityEvidenceForSpacePerson.mockResolvedValue([
-        { identityId: targetIdentityId, type: 'person', supportingFaceCount: 2 },
-        { identityId: sourceIdentityId, type: 'person', supportingFaceCount: 1 },
-      ]);
-      mocks.sharedSpace.reassignPersonFaces.mockResolvedValue(void 0);
-      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
-      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(target).mockResolvedValueOnce(source);
 
-      await sut.mergeSpacePeople(auth, spaceId, targetId, { ids: [sourceId] });
+      await expect(sut.mergeSpacePeople(factory.auth(), spaceId, targetId, { ids: [sourceId] })).rejects.toThrow(
+        'Cannot merge people of different types',
+      );
 
-      expect(mocks.faceIdentity.mergeIdentities).toHaveBeenCalledWith({
-        targetIdentityId,
-        sourceIdentityIds: [sourceIdentityId],
-        source: 'shared-space-evidence',
-      });
+      expect(identityMergePropagation.mergeSpacePeople).not.toHaveBeenCalled();
     });
 
-    it('should not call recountPersons for deleted source persons', async () => {
+    it('delegates editor-initiated merges after validating source people belong to the initiating space', async () => {
+      const identityMergePropagation = useIdentityMergePropagation(sut);
       const auth = factory.auth();
       const spaceId = newUuid();
       const targetId = newUuid();
@@ -6985,39 +6990,37 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
       mocks.sharedSpace.getPersonById.mockResolvedValueOnce(target).mockResolvedValueOnce(source);
-      mocks.sharedSpace.reassignPersonFaces.mockResolvedValue(void 0);
-      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
-      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
 
       await sut.mergeSpacePeople(auth, spaceId, targetId, { ids: [sourceId] });
 
-      expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledWith([targetId]);
-      expect(mocks.sharedSpace.recountPersons).not.toHaveBeenCalledWith(expect.arrayContaining([sourceId]));
-    });
-
-    it('should throw when a source person does not belong to the space', async () => {
-      const spaceId = newUuid();
-      const targetId = newUuid();
-      const validSourceId = newUuid();
-      const invalidSourceId = newUuid();
-      const target = factory.sharedSpacePerson({ id: targetId, spaceId });
-      const validSource = factory.sharedSpacePerson({ id: validSourceId, spaceId });
-
-      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
-      mocks.sharedSpace.getPersonById
-        .mockResolvedValueOnce(target)
-        .mockResolvedValueOnce(validSource)
-        .mockResolvedValueOnce(void 0);
-
-      await expect(
-        sut.mergeSpacePeople(factory.auth(), spaceId, targetId, { ids: [validSourceId, invalidSourceId] }),
-      ).rejects.toThrow(BadRequestException);
-
+      expect(identityMergePropagation.mergeSpacePeople).toHaveBeenCalledWith(auth, spaceId, targetId, [sourceId]);
       expect(mocks.sharedSpace.reassignPersonFaces).not.toHaveBeenCalled();
       expect(mocks.sharedSpace.deletePerson).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.SharedSpacePersonDedup, data: { spaceId } });
+      expect(mocks.sharedSpace.logActivity).not.toHaveBeenCalled();
     });
 
-    it('should throw when a source person belongs to a different space', async () => {
+    it('keeps automatic shared-space reconciliation conservative', async () => {
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      setupStrictReconciliationFixture(mocks);
+
+      await sut.handleSharedSpaceIdentityReconciliation({ spaceId: 'space-1', userId: 'member-1' });
+
+      expect(mocks.faceIdentity.getMergeConflicts).toHaveBeenCalledWith({
+        targetIdentityId: 'space-identity',
+        sourceIdentityIds: ['local-identity'],
+      });
+      expect(identityMergePropagation.mergeSpacePeople).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.mergeIdentities).toHaveBeenCalledWith({
+        targetIdentityId: 'space-identity',
+        sourceIdentityIds: ['local-identity'],
+        source: 'shared-space-evidence',
+      });
+    });
+
+    it('rejects source people from other spaces before delegation', async () => {
+      const identityMergePropagation = useIdentityMergePropagation(sut);
       const spaceId = newUuid();
       const otherSpaceId = newUuid();
       const targetId = newUuid();
@@ -7031,80 +7034,8 @@ describe(SharedSpaceService.name, () => {
       await expect(sut.mergeSpacePeople(factory.auth(), spaceId, targetId, { ids: [sourceId] })).rejects.toThrow(
         BadRequestException,
       );
-    });
 
-    it('should log activity when merging people', async () => {
-      const spaceId = newUuid();
-      const targetId = newUuid();
-      const sourceId = newUuid();
-      const target = factory.sharedSpacePerson({ id: targetId, spaceId });
-      const source = factory.sharedSpacePerson({ id: sourceId, spaceId });
-
-      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
-      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(target).mockResolvedValueOnce(source);
-      mocks.sharedSpace.reassignPersonFaces.mockResolvedValue(void 0);
-      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
-      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
-
-      await sut.mergeSpacePeople(factory.auth(), spaceId, targetId, { ids: [sourceId] });
-
-      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith({
-        spaceId,
-        userId: expect.any(String),
-        type: SharedSpaceActivityType.PersonMerge,
-        data: { targetPersonId: targetId, mergedCount: 1 },
-      });
-    });
-
-    it('should queue dedup pass after successful merge', async () => {
-      const spaceId = newUuid();
-      const targetId = newUuid();
-      const sourceId = newUuid();
-      const target = factory.sharedSpacePerson({ id: targetId, spaceId });
-      const source = factory.sharedSpacePerson({ id: sourceId, spaceId });
-
-      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
-      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(target).mockResolvedValueOnce(source);
-      mocks.sharedSpace.reassignPersonFaces.mockResolvedValue(void 0);
-      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
-      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
-
-      await sut.mergeSpacePeople(factory.auth(), spaceId, targetId, { ids: [sourceId] });
-
-      expect(mocks.job.queue).toHaveBeenCalledWith({
-        name: JobName.SharedSpacePersonDedup,
-        data: { spaceId },
-      });
-    });
-
-    it('should reject merging across different types', async () => {
-      const spaceId = newUuid();
-      const targetId = newUuid();
-      const sourceId = newUuid();
-      const target = factory.sharedSpacePerson({ id: targetId, spaceId, type: 'person' });
-      const source = factory.sharedSpacePerson({ id: sourceId, spaceId, type: 'pet' });
-
-      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ spaceId, role: SharedSpaceRole.Editor }));
-      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(target).mockResolvedValueOnce(source);
-
-      await expect(sut.mergeSpacePeople(factory.auth(), spaceId, targetId, { ids: [sourceId] })).rejects.toThrow(
-        'Cannot merge people of different types',
-      );
-    });
-
-    it('should reject merging pet into person (reverse direction)', async () => {
-      const spaceId = newUuid();
-      const targetId = newUuid();
-      const sourceId = newUuid();
-      const target = factory.sharedSpacePerson({ id: targetId, spaceId, type: 'pet' });
-      const source = factory.sharedSpacePerson({ id: sourceId, spaceId, type: 'person' });
-
-      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ spaceId, role: SharedSpaceRole.Editor }));
-      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(target).mockResolvedValueOnce(source);
-
-      await expect(sut.mergeSpacePeople(factory.auth(), spaceId, targetId, { ids: [sourceId] })).rejects.toThrow(
-        'Cannot merge people of different types',
-      );
+      expect(identityMergePropagation.mergeSpacePeople).not.toHaveBeenCalled();
     });
   });
 
