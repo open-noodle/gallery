@@ -82,6 +82,21 @@ export type SpaceMergeConflictPair = {
   targetFaceCount: number;
 };
 
+export type MergePropagationProfile = {
+  kind: 'person' | 'space-person';
+  id: string;
+  ownerId?: string;
+  spaceId?: string;
+  identityId: string | null;
+  type: string;
+  name: string;
+  faceCount: number;
+};
+
+export type MergePropagationProfileInput =
+  | { mode: 'profiles'; personIds: string[] }
+  | { mode: 'identities'; identityIds: string[] };
+
 export type AccessibleIdentityFaceMatch = {
   identityId: string;
   type: string;
@@ -1924,23 +1939,23 @@ export class FaceIdentityRepository {
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
-  async ensurePersonIdentity(personId: string): Promise<FaceIdentity> {
-    return this.db.transaction().execute(async (trx) => {
-      const person = await trx
+  async ensurePersonIdentity(personId: string, db: Kysely<DB> | Transaction<DB> = this.db): Promise<FaceIdentity> {
+    const ensure = async (runner: Kysely<DB> | Transaction<DB>) => {
+      const person = await runner
         .selectFrom('person')
         .select(['id', 'identityId', 'type', 'faceAssetId'])
         .where('id', '=', personId)
         .executeTakeFirstOrThrow();
 
       if (person.identityId) {
-        return trx
+        return runner
           .selectFrom('face_identity')
           .selectAll()
           .where('id', '=', person.identityId)
           .executeTakeFirstOrThrow();
       }
 
-      const identity = await trx
+      const identity = await runner
         .insertInto('face_identity')
         .values({
           type: person.type,
@@ -1949,30 +1964,131 @@ export class FaceIdentityRepository {
         .returningAll()
         .executeTakeFirstOrThrow();
 
-      await trx.updateTable('person').set({ identityId: identity.id }).where('id', '=', person.id).execute();
+      await runner.updateTable('person').set({ identityId: identity.id }).where('id', '=', person.id).execute();
 
       return identity;
-    });
+    };
+
+    return db === this.db ? this.db.transaction().execute(ensure) : ensure(db);
+  }
+
+  async getMergePropagationProfiles(
+    input: MergePropagationProfileInput,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<MergePropagationProfile[]> {
+    const { personIds, identityIds } = this.parseMergePropagationProfileInput(input);
+    const profiles: MergePropagationProfile[] = [];
+
+    if (personIds.length > 0 || identityIds.length > 0) {
+      let query = db.selectFrom('person').select(({ selectFrom }) => [
+        'person.id',
+        'person.ownerId',
+        'person.identityId',
+        'person.type',
+        'person.name',
+        selectFrom('asset_face')
+          .select(sql<number>`count(*)::int`.as('faceCount'))
+          .whereRef('asset_face.personId', '=', 'person.id')
+          .as('faceCount'),
+      ]);
+
+      query =
+        personIds.length > 0
+          ? query.where('person.id', 'in', personIds)
+          : query.where('person.identityId', 'in', identityIds);
+
+      const people = await query.execute();
+      profiles.push(
+        ...people.map((person) => ({
+          kind: 'person' as const,
+          id: person.id,
+          ownerId: person.ownerId,
+          identityId: person.identityId,
+          type: person.type,
+          name: person.name,
+          faceCount: Number(person.faceCount ?? 0),
+        })),
+      );
+    }
+
+    if (identityIds.length > 0 && personIds.length === 0) {
+      const spacePeople = await db
+        .selectFrom('shared_space_person')
+        .select([
+          'shared_space_person.id',
+          'shared_space_person.spaceId',
+          'shared_space_person.identityId',
+          'shared_space_person.type',
+          'shared_space_person.name',
+          'shared_space_person.faceCount',
+        ])
+        .where('shared_space_person.identityId', 'in', identityIds)
+        .execute();
+
+      profiles.push(
+        ...spacePeople.map((person) => ({
+          kind: 'space-person' as const,
+          id: person.id,
+          spaceId: person.spaceId,
+          identityId: person.identityId,
+          type: person.type,
+          name: person.name,
+          faceCount: Number(person.faceCount ?? 0),
+        })),
+      );
+    }
+
+    return profiles;
+  }
+
+  private parseMergePropagationProfileInput(input: MergePropagationProfileInput): {
+    personIds: string[];
+    identityIds: string[];
+  } {
+    switch (input.mode) {
+      case 'profiles': {
+        if (Object.hasOwn(input, 'identityIds')) {
+          throw new Error('Cannot lookup merge propagation profiles by profile ids and identity ids in the same call');
+        }
+
+        return { personIds: [...new Set(input.personIds)].filter(Boolean), identityIds: [] };
+      }
+
+      case 'identities': {
+        if (Object.hasOwn(input, 'personIds')) {
+          throw new Error('Cannot lookup merge propagation profiles by profile ids and identity ids in the same call');
+        }
+
+        return { personIds: [], identityIds: [...new Set(input.identityIds)].filter(Boolean) };
+      }
+
+      default: {
+        throw new Error('Invalid merge propagation profile lookup mode');
+      }
+    }
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
-  async ensureSpacePersonIdentity(spacePersonId: string): Promise<FaceIdentity> {
-    return this.db.transaction().execute(async (trx) => {
-      const person = await trx
+  async ensureSpacePersonIdentity(
+    spacePersonId: string,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<FaceIdentity> {
+    const ensure = async (runner: Kysely<DB> | Transaction<DB>) => {
+      const person = await runner
         .selectFrom('shared_space_person')
         .select(['id', 'identityId', 'type', 'representativeFaceId'])
         .where('id', '=', spacePersonId)
         .executeTakeFirstOrThrow();
 
       if (person.identityId) {
-        return trx
+        return runner
           .selectFrom('face_identity')
           .selectAll()
           .where('id', '=', person.identityId)
           .executeTakeFirstOrThrow();
       }
 
-      const identity = await trx
+      const identity = await runner
         .insertInto('face_identity')
         .values({
           type: person.type,
@@ -1981,14 +2097,16 @@ export class FaceIdentityRepository {
         .returningAll()
         .executeTakeFirstOrThrow();
 
-      await trx
+      await runner
         .updateTable('shared_space_person')
         .set({ identityId: identity.id })
         .where('id', '=', person.id)
         .execute();
 
       return identity;
-    });
+    };
+
+    return db === this.db ? this.db.transaction().execute(ensure) : ensure(db);
   }
 
   @GenerateSql({
@@ -2022,8 +2140,8 @@ export class FaceIdentityRepository {
   }
 
   @GenerateSql({ params: [{ personId: DummyValue.UUID, identityId: DummyValue.UUID, source: 'manual' }] })
-  async linkPersonFaces(input: LinkPersonFacesInput): Promise<void> {
-    await this.db
+  async linkPersonFaces(input: LinkPersonFacesInput, db: Kysely<DB> | Transaction<DB> = this.db): Promise<void> {
+    await db
       .insertInto('face_identity_face')
       .columns(['assetFaceId', 'identityId', 'source', 'confidence'])
       .expression((eb) =>
@@ -2572,6 +2690,79 @@ export class FaceIdentityRepository {
         spaceProfileConflictCount,
       };
     });
+  }
+
+  async mergeIdentitiesAfterProfileResolution(
+    input: {
+      targetIdentityId: string;
+      sourceIdentityIds: string[];
+      source: 'manual' | 'shared-space-evidence';
+    },
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<void> {
+    const sourceIdentityIds = [...new Set(input.sourceIdentityIds)].filter((id) => id !== input.targetIdentityId);
+    if (sourceIdentityIds.length === 0) {
+      return;
+    }
+
+    const identities = await db
+      .selectFrom('face_identity')
+      .select(['id', 'type'])
+      .where('id', 'in', [input.targetIdentityId, ...sourceIdentityIds])
+      .execute();
+    const targetIdentity = identities.find((identity) => identity.id === input.targetIdentityId);
+    if (!targetIdentity) {
+      throw new Error('Target face identity not found');
+    }
+    const incompatible = identities.some(
+      (identity) => identity.id !== input.targetIdentityId && identity.type !== targetIdentity.type,
+    );
+    if (incompatible && input.source !== 'manual') {
+      throw new Error('Cannot merge face identities with different types');
+    }
+
+    const { personalProfileConflictCount, spaceProfileConflictCount } = await this.countMergeConflicts(db, {
+      targetIdentityId: input.targetIdentityId,
+      sourceIdentityIds,
+    });
+    if (personalProfileConflictCount > 0 || spaceProfileConflictCount > 0) {
+      throw new Error('Cannot merge face identities with unresolved profile conflicts');
+    }
+
+    await db
+      .updateTable('face_identity_face')
+      .set({ identityId: input.targetIdentityId, source: input.source })
+      .where('identityId', 'in', sourceIdentityIds)
+      .execute();
+
+    await db
+      .updateTable('person')
+      .set({ identityId: input.targetIdentityId })
+      .where('identityId', 'in', sourceIdentityIds)
+      .execute();
+
+    await db
+      .updateTable('shared_space_person')
+      .set({ identityId: input.targetIdentityId })
+      .where('identityId', 'in', sourceIdentityIds)
+      .execute();
+
+    const deletable = await db
+      .selectFrom('face_identity')
+      .leftJoin('person', 'person.identityId', 'face_identity.id')
+      .leftJoin('shared_space_person', 'shared_space_person.identityId', 'face_identity.id')
+      .leftJoin('face_identity_face', 'face_identity_face.identityId', 'face_identity.id')
+      .select('face_identity.id')
+      .where('face_identity.id', 'in', sourceIdentityIds)
+      .where('person.id', 'is', null)
+      .where('shared_space_person.id', 'is', null)
+      .where('face_identity_face.assetFaceId', 'is', null)
+      .execute();
+
+    const deletableIds = deletable.map((identity) => identity.id);
+    if (deletableIds.length > 0) {
+      await db.deleteFrom('face_identity').where('id', 'in', deletableIds).execute();
+    }
   }
 
   private async countMergeConflicts(
