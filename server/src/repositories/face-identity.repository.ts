@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Insertable, Kysely, Selectable, sql, Transaction } from 'kysely';
+import { Insertable, Kysely, RawBuilder, Selectable, sql, Transaction } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators';
 import {
@@ -96,6 +96,20 @@ export type MergePropagationProfile = {
 export type MergePropagationProfileInput =
   | { mode: 'profiles'; personIds: string[] }
   | { mode: 'identities'; identityIds: string[] };
+
+// Automatic shared-space identity merges must never irreversibly fuse two clusters whose averaged
+// embeddings are farther apart than this cosine distance. A single representative-face match (the basis
+// of space dedup / reconciliation) is not enough evidence to merge two identities, so we re-check the
+// whole-cluster centroids at the merge chokepoint. Manual merges bypass this — a human overrides.
+// See docs/plans/2026-05-30-hagen-face-cluster-corruption-diagnosis.md.
+const MERGE_IDENTITY_MAX_CENTROID_DISTANCE = 0.5;
+const MERGE_IDENTITY_CENTROID_SAMPLE_SIZE = 200;
+
+// Defense-in-depth at the point where personal identity backfill rewrites asset_face.personId: never move
+// a face onto a person whose existing cluster it does not resemble (face-to-centroid cosine distance
+// beyond this bound). This contains corruption regardless of how the identity link became wrong — even a
+// link already corrupt in the database. See docs/plans/2026-05-30-hagen-face-cluster-corruption-diagnosis.md.
+const REPAIR_FACE_MAX_PERSON_DISTANCE = 0.5;
 
 export type AccessibleIdentityFaceMatch = {
   identityId: string;
@@ -2296,7 +2310,22 @@ export class FaceIdentityRepository {
         continue;
       }
 
-      const assetFaceIds = await this.getPersonalBackfillAssetFaceIdsForIdentity(person.id, group.identityId);
+      const candidateAssetFaceIds = await this.getPersonalBackfillAssetFaceIdsForIdentity(person.id, group.identityId);
+      if (candidateAssetFaceIds.length === 0) {
+        continue;
+      }
+
+      // Only move faces that actually resemble the target person — a corrupt identity link must not be
+      // allowed to reassign a face onto someone it looks nothing like.
+      const assetFaceIds = await this.filterFacesResemblingPerson(targetPerson.id, candidateAssetFaceIds);
+
+      // Faces we refuse to move keep their current person; realign their identity link to that person so
+      // the mismatch is genuinely resolved. Otherwise person.identityId stays DISTINCT FROM the face's
+      // identity, getBackfillWork() reports work forever, and handleFaceIdentityBackfill re-queues in a loop.
+      const resembling = new Set(assetFaceIds);
+      const blockedAssetFaceIds = candidateAssetFaceIds.filter((id) => !resembling.has(id));
+      await this.realignFacesToPersonIdentity(person.id, blockedAssetFaceIds);
+
       if (assetFaceIds.length === 0) {
         continue;
       }
@@ -2346,6 +2375,79 @@ export class FaceIdentityRepository {
       .execute();
 
     return rows.map((row) => row.id);
+  }
+
+  // Engine-agnostic cluster centroid. Averages each embedding dimension via array decomposition
+  // (unnest -> per-dimension avg -> recompose into a vector) instead of avg(vector), which the
+  // pgvecto.rs `vector` type does not implement (Hagen's production engine; VectorChord does, which
+  // is why the vchord-based test harness never surfaced it). `faces` is a sub-select exposing
+  // "group_key" and "embedding" columns; this returns one ("group_key", centroid) row per non-empty
+  // group. A group with no embedded faces yields no row — callers treat "cannot assess" as consistent.
+  private faceSetCentroidsByGroup(faces: RawBuilder<unknown>): RawBuilder<unknown> {
+    return sql`
+      SELECT grouped."group_key" AS "group_key",
+             array_agg(grouped.v ORDER BY grouped.idx)::real[]::vector AS centroid
+      FROM (
+        SELECT sampled."group_key" AS "group_key", dims.idx AS idx, avg(dims.val) AS v
+        FROM (${faces}) AS sampled,
+             LATERAL unnest(sampled.embedding::real[]) WITH ORDINALITY AS dims(val, idx)
+        GROUP BY sampled."group_key", dims.idx
+      ) AS grouped
+      GROUP BY grouped."group_key"
+    `;
+  }
+
+  // Returns the subset of candidate faces whose embedding is within REPAIR_FACE_MAX_PERSON_DISTANCE of the
+  // target person's existing cluster centroid. Faces with no embedding, or a target with no embedded faces,
+  // are kept (cannot assess => do not block legitimate consolidation).
+  private async filterFacesResemblingPerson(targetPersonId: string, assetFaceIds: string[]): Promise<string[]> {
+    if (assetFaceIds.length === 0) {
+      return [];
+    }
+
+    const targetFaces = sql`
+      SELECT 'target' AS "group_key", target_search.embedding AS embedding
+      FROM (
+        SELECT asset_face.id
+        FROM asset_face
+        WHERE asset_face."personId" = ${targetPersonId}
+          AND asset_face."deletedAt" IS NULL
+          AND asset_face."isVisible" = true
+        LIMIT ${sql.lit(MERGE_IDENTITY_CENTROID_SAMPLE_SIZE)}
+      ) AS target_face
+      INNER JOIN face_search AS target_search ON target_search."faceId" = target_face.id
+    `;
+
+    const result = await sql<{ id: string }>`
+      WITH target_centroid AS (${this.faceSetCentroidsByGroup(targetFaces)})
+      SELECT candidate.id AS id
+      FROM asset_face AS candidate
+      LEFT JOIN face_search AS candidate_search ON candidate_search."faceId" = candidate.id
+      LEFT JOIN target_centroid ON true
+      WHERE candidate.id IN (${sql.join(assetFaceIds)})
+        AND (
+          candidate_search.embedding IS NULL
+          OR target_centroid.centroid IS NULL
+          OR (target_centroid.centroid <=> candidate_search.embedding) <= ${sql.lit(REPAIR_FACE_MAX_PERSON_DISTANCE)}
+        )
+    `.execute(this.db);
+
+    return result.rows.map((row) => row.id);
+  }
+
+  // Repoints the given faces' identity link to their current person's identity. Used when the repair
+  // guard refuses to move embedding-inconsistent faces: trust the (embedding-consistent) person they are
+  // already on over the corrupt identity link, resolving the mismatch instead of leaving perpetual work.
+  private async realignFacesToPersonIdentity(personId: string, assetFaceIds: string[]): Promise<void> {
+    if (assetFaceIds.length === 0) {
+      return;
+    }
+    const identity = await this.ensurePersonIdentity(personId);
+    await this.db
+      .updateTable('face_identity_face')
+      .set({ identityId: identity.id, source: 'backfill' })
+      .where('assetFaceId', 'in', assetFaceIds)
+      .execute();
   }
 
   private getPersonByIdentity(ownerId: string, identityId: string, excludePersonId?: string) {
@@ -2630,16 +2732,32 @@ export class FaceIdentityRepository {
         };
       }
 
+      // Embedding-consistency guard: refuse automatic merges that would fuse embedding-distinct
+      // clusters (the face-cluster corruption root cause). Manual merges are trusted and skip this.
+      let mergeableSourceIdentityIds = sourceIdentityIds;
+      if (input.source === 'shared-space-evidence') {
+        const inconsistent = new Set(
+          await this.getEmbeddingInconsistentSourceIdentityIds(trx, input.targetIdentityId, sourceIdentityIds),
+        );
+        mergeableSourceIdentityIds = sourceIdentityIds.filter((identityId) => !inconsistent.has(identityId));
+        if (mergeableSourceIdentityIds.length === 0) {
+          return {
+            personalProfileConflictCount,
+            spaceProfileConflictCount,
+          };
+        }
+      }
+
       await trx
         .updateTable('face_identity_face')
         .set({ identityId: input.targetIdentityId, source: input.source })
-        .where('identityId', 'in', sourceIdentityIds)
+        .where('identityId', 'in', mergeableSourceIdentityIds)
         .execute();
 
       await trx
         .updateTable('person')
         .set({ identityId: input.targetIdentityId })
-        .where('identityId', 'in', sourceIdentityIds)
+        .where('identityId', 'in', mergeableSourceIdentityIds)
         .where(({ not, exists, selectFrom, ref }) =>
           not(
             exists(
@@ -2655,7 +2773,7 @@ export class FaceIdentityRepository {
       await trx
         .updateTable('shared_space_person')
         .set({ identityId: input.targetIdentityId })
-        .where('identityId', 'in', sourceIdentityIds)
+        .where('identityId', 'in', mergeableSourceIdentityIds)
         .where(({ not, exists, selectFrom, ref }) =>
           not(
             exists(
@@ -2674,7 +2792,7 @@ export class FaceIdentityRepository {
         .leftJoin('shared_space_person', 'shared_space_person.identityId', 'face_identity.id')
         .leftJoin('face_identity_face', 'face_identity_face.identityId', 'face_identity.id')
         .select('face_identity.id')
-        .where('face_identity.id', 'in', sourceIdentityIds)
+        .where('face_identity.id', 'in', mergeableSourceIdentityIds)
         .where('person.id', 'is', null)
         .where('shared_space_person.id', 'is', null)
         .where('face_identity_face.assetFaceId', 'is', null)
@@ -2763,6 +2881,59 @@ export class FaceIdentityRepository {
     if (deletableIds.length > 0) {
       await db.deleteFrom('face_identity').where('id', 'in', deletableIds).execute();
     }
+  }
+
+  // Returns the source identities whose bounded-sample embedding centroid is farther from the target
+  // centroid than MERGE_IDENTITY_MAX_CENTROID_DISTANCE. Identities with no embedded faces never surface
+  // here and are treated as consistent (we cannot assess them, so we do not block the merge).
+  private async getEmbeddingInconsistentSourceIdentityIds(
+    trx: Kysely<DB> | Transaction<DB>,
+    targetIdentityId: string,
+    sourceIdentityIds: string[],
+  ): Promise<string[]> {
+    if (sourceIdentityIds.length === 0) {
+      return [];
+    }
+
+    const targetFaces = sql`
+      SELECT 'target' AS "group_key", target_search.embedding AS embedding
+      FROM (
+        SELECT face_identity_face."assetFaceId"
+        FROM face_identity_face
+        WHERE face_identity_face."identityId" = ${targetIdentityId}
+        LIMIT ${sql.lit(MERGE_IDENTITY_CENTROID_SAMPLE_SIZE)}
+      ) AS target_face
+      INNER JOIN face_search AS target_search ON target_search."faceId" = target_face."assetFaceId"
+    `;
+
+    const sourceFaces = sql`
+      SELECT sampled."identityId" AS "group_key", source_search.embedding AS embedding
+      FROM (
+        SELECT
+          face_identity_face."identityId",
+          face_identity_face."assetFaceId",
+          row_number() OVER (
+            PARTITION BY face_identity_face."identityId"
+            ORDER BY face_identity_face."assetFaceId"
+          ) AS rn
+        FROM face_identity_face
+        WHERE face_identity_face."identityId" IN (${sql.join(sourceIdentityIds)})
+      ) AS sampled
+      INNER JOIN face_search AS source_search ON source_search."faceId" = sampled."assetFaceId"
+      WHERE sampled.rn <= ${sql.lit(MERGE_IDENTITY_CENTROID_SAMPLE_SIZE)}
+    `;
+
+    const result = await sql<{ identityId: string }>`
+      WITH target_centroid AS (${this.faceSetCentroidsByGroup(targetFaces)}),
+      source_centroid AS (${this.faceSetCentroidsByGroup(sourceFaces)})
+      SELECT source_centroid."group_key" AS "identityId"
+      FROM source_centroid
+      CROSS JOIN target_centroid
+      WHERE target_centroid.centroid IS NOT NULL
+        AND (target_centroid.centroid <=> source_centroid.centroid) > ${sql.lit(MERGE_IDENTITY_MAX_CENTROID_DISTANCE)}
+    `.execute(trx);
+
+    return result.rows.map((row) => row.identityId);
   }
 
   private async countMergeConflicts(

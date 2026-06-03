@@ -14,6 +14,7 @@ import { ConfigUserController } from 'src/controllers/config-user.controller.js'
 import { DatabaseBackupController } from 'src/controllers/database-backup.controller.js';
 import { DownloadController } from 'src/controllers/download.controller.js';
 import { DuplicateController } from 'src/controllers/duplicate.controller.js';
+import { FaceRepairAdminController } from 'src/controllers/face-repair-admin.controller.js';
 import { FaceController } from 'src/controllers/face.controller.js';
 import { GalleryMapController } from 'src/controllers/gallery-map.controller.js';
 import { IntegrityAdminController } from 'src/controllers/integrity-admin.controller.js';
@@ -69,6 +70,7 @@ export const controllers = [
   DownloadController,
   DuplicateController,
   FaceController,
+  FaceRepairAdminController,
   GalleryMapController,
   IntegrityAdminController,
   JobController,
