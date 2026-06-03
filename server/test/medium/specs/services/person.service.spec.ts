@@ -53,6 +53,7 @@ const setup = (db?: Kysely<DB>) => {
       PersonUserRepository,
       AssetRepository,
       AssetEditRepository,
+      SharedSpaceRepository,
       SystemMetadataRepository,
       UserRepository,
       ClusterGroupRepository,
