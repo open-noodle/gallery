@@ -25,6 +25,16 @@ import { Mocked } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 
+// Disjoint-axis embeddings (cosine distance ~1.0) stand in for two genuinely different people.
+// newEmbedding() can't: its all-positive random components leave two vectors ~0.75 similar.
+const axisEmbedding = (axis: 'first' | 'second') => {
+  const values = Array.from({ length: 512 }, (_, index) => {
+    const inFirstHalf = index < 256;
+    return (axis === 'first' ? inFirstHalf : !inFirstHalf) ? 1 : 0;
+  });
+  return '[' + values.join(',') + ']';
+};
+
 const setup = (db?: Kysely<DB>) => {
   const { ctx, sut } = newMediumService(PersonService, {
     database: db || defaultDatabase,
@@ -1734,6 +1744,157 @@ describe('People identity RBAC projection', () => {
         numberOfAssets: 2,
       }),
     ]);
+  });
+
+  // End-to-end reproduction of Hagen's face-cluster corruption through the real reconciliation handler:
+  // a space person whose REPRESENTATIVE face is contaminated (axis-B) but whose identity cluster is
+  // axis-A. Reconciliation matches the member's axis-B face to that representative and tries to fuse the
+  // member's (distinct) identity into the space identity. The embedding-consistency guard must refuse it.
+  it('reconciliation does not fuse a member identity into an embedding-distinct space identity', async () => {
+    const { ctx, faceIdentityRepository } = setup();
+    const { sut: sharedSpaceService } = setupSharedSpace();
+    const { user: owner } = await ctx.newUser();
+    const { user: member } = await ctx.newUser();
+    try {
+      const { result: ownerPerson } = await ctx.newPerson({ ownerId: owner.id, name: 'Alejandra' });
+      const ownerIdentity = await faceIdentityRepository.ensurePersonIdentity(ownerPerson.id);
+
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: true });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+      await setSpaceTimeline(ctx, { spaceId: space.id, userId: member.id, showInTimeline: true });
+
+      // The space identity's true cluster: three axis-A faces.
+      const ownerFaceIds: string[] = [];
+      for (let index = 0; index < 3; index++) {
+        const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+        const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: ownerPerson.id });
+        await ctx.database
+          .insertInto('face_search')
+          .values({ faceId, embedding: axisEmbedding('first') })
+          .execute();
+        await faceIdentityRepository.linkFace({
+          assetFaceId: faceId,
+          identityId: ownerIdentity.id,
+          source: 'owner-person',
+        });
+        ownerFaceIds.push(faceId);
+      }
+      // The contaminated representative face: axis-B.
+      const { asset: repAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: repAsset.id, addedById: owner.id });
+      const { result: repFaceId } = await ctx.newAssetFace({ assetId: repAsset.id, personId: ownerPerson.id });
+      await ctx.database
+        .insertInto('face_search')
+        .values({ faceId: repFaceId, embedding: axisEmbedding('second') })
+        .execute();
+      await faceIdentityRepository.linkFace({
+        assetFaceId: repFaceId,
+        identityId: ownerIdentity.id,
+        source: 'owner-person',
+      });
+
+      const spacePerson = await ctx.database
+        .insertInto('shared_space_person')
+        .values({
+          spaceId: space.id,
+          identityId: ownerIdentity.id,
+          name: 'Alejandra',
+          representativeFaceId: repFaceId,
+          type: 'person',
+        })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      for (const faceId of [...ownerFaceIds, repFaceId]) {
+        await ctx.database
+          .insertInto('shared_space_person_face')
+          .values({ personId: spacePerson.id, assetFaceId: faceId })
+          .execute();
+      }
+
+      // The member's local identity is a DIFFERENT person whose face sits on axis-B (matching the rep).
+      const { result: memberPerson } = await ctx.newPerson({ ownerId: member.id, name: 'Karina' });
+      const memberIdentity = await faceIdentityRepository.ensurePersonIdentity(memberPerson.id);
+      const { asset: memberAsset } = await ctx.newAsset({ ownerId: member.id, visibility: AssetVisibility.Timeline });
+      const { result: memberFaceId } = await ctx.newAssetFace({ assetId: memberAsset.id, personId: memberPerson.id });
+      await ctx.database
+        .insertInto('face_search')
+        .values({ faceId: memberFaceId, embedding: axisEmbedding('second') })
+        .execute();
+      await faceIdentityRepository.linkFace({
+        assetFaceId: memberFaceId,
+        identityId: memberIdentity.id,
+        source: 'owner-person',
+      });
+
+      await sharedSpaceService.handleSharedSpaceIdentityReconciliation({ spaceId: space.id, userId: member.id });
+
+      const memberLink = await ctx.database
+        .selectFrom('face_identity_face')
+        .select('identityId')
+        .where('assetFaceId', '=', memberFaceId)
+        .executeTakeFirstOrThrow();
+      const memberPersonRow = await ctx.database
+        .selectFrom('person')
+        .select('identityId')
+        .where('id', '=', memberPerson.id)
+        .executeTakeFirstOrThrow();
+
+      // The member's face and person stay on their own identity — no cross-person fusion.
+      expect(memberLink.identityId).toBe(memberIdentity.id);
+      expect(memberPersonRow.identityId).toBe(memberIdentity.id);
+    } finally {
+      await ctx.database.deleteFrom('user').where('id', 'in', [owner.id, member.id]).execute();
+    }
+  });
+
+  it('does not re-queue the backfill job after the repair guard refuses a face (no infinite loop)', async () => {
+    const { ctx, sut, faceIdentityRepository } = setup();
+    const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const { user } = await ctx.newUser();
+    try {
+      // Person A: a clean axis-A cluster.
+      const { person: personA } = await ctx.newPerson({ ownerId: user.id });
+      const identityA = await faceIdentityRepository.ensurePersonIdentity(personA.id);
+      for (let index = 0; index < 3; index++) {
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: personA.id });
+        await ctx.database
+          .insertInto('face_search')
+          .values({ faceId, embedding: axisEmbedding('first') })
+          .execute();
+        await faceIdentityRepository.linkFace({
+          assetFaceId: faceId,
+          identityId: identityA.id,
+          source: 'owner-person',
+        });
+      }
+      // Person B owns an axis-B face corruptly linked to A's identity — the repair guard will refuse it.
+      const { person: personB } = await ctx.newPerson({ ownerId: user.id });
+      await faceIdentityRepository.ensurePersonIdentity(personB.id);
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { result: corruptFaceId } = await ctx.newAssetFace({ assetId: asset.id, personId: personB.id });
+      await ctx.database
+        .insertInto('face_search')
+        .values({ faceId: corruptFaceId, embedding: axisEmbedding('second') })
+        .execute();
+      await faceIdentityRepository.linkFace({
+        assetFaceId: corruptFaceId,
+        identityId: identityA.id,
+        source: 'shared-space-evidence',
+      });
+
+      jobs.queue.mockClear();
+      await sut.handleFaceIdentityBackfill({});
+
+      // Without the realign, the refused face would leave permanent backfill work and handleFaceIdentityBackfill
+      // would re-queue itself (continuationId toggle) forever.
+      const backfillRequeues = jobs.queue.mock.calls.filter(([job]) => job.name === JobName.FaceIdentityBackfill);
+      expect(backfillRequeues).toEqual([]);
+    } finally {
+      await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+    }
   });
 
   it('removes a removed shared-space asset from visible identity counts without splitting identities', async () => {
