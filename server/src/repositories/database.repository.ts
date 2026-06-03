@@ -1,7 +1,7 @@
 import { schemaDiff, schemaFromCode, schemaFromDatabase } from '@immich/sql-tools';
 import { Injectable } from '@nestjs/common';
 import AsyncLock from 'async-lock';
-import { Kysely, sql } from 'kysely';
+import { Kysely, sql, Transaction } from 'kysely';
 import { Migrator } from 'kysely/migration';
 import { InjectKysely } from 'nestjs-kysely';
 import { join } from 'node:path';
@@ -70,6 +70,10 @@ export class DatabaseRepository {
 
   async shutdown() {
     await this.db.destroy();
+  }
+
+  transaction<T>(callback: (db: Transaction<DB>) => Promise<T>): Promise<T> {
+    return this.db.transaction().execute(callback);
   }
 
   getVectorExtension(): Promise<VectorExtension> {
