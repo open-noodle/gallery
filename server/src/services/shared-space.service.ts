@@ -1276,6 +1276,10 @@ export class SharedSpaceService extends BaseService {
   ): Promise<void> {
     await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
 
+    if (dto.ids.length === 0) {
+      throw new BadRequestException('No source people provided');
+    }
+
     const target = await this.sharedSpaceRepository.getPersonById(targetPersonId);
     if (!target || target.spaceId !== spaceId) {
       throw new BadRequestException('Person not found');
@@ -1297,38 +1301,7 @@ export class SharedSpaceService extends BaseService {
       }
     }
 
-    for (const source of sources) {
-      await this.sharedSpaceRepository.reassignPersonFaces(source.id, targetPersonId);
-      await this.sharedSpaceRepository.deletePerson(source.id);
-    }
-
-    const candidateIdentityIds = [target.identityId, ...sources.map((source) => source.identityId)].filter(
-      (identityId): identityId is string => !!identityId,
-    );
-    if (candidateIdentityIds.length > 0) {
-      const mergedIdentityId = await this.mergeIdentitiesForSpacePersonEvidence({
-        spaceId,
-        targetSpacePersonId: targetPersonId,
-        candidateIdentityIds,
-      });
-      await this.inheritSpacePersonMetadata(spaceId, targetPersonId, mergedIdentityId);
-      await this.queueSpacePersonMetadataBackfill(mergedIdentityId);
-    }
-
-    await this.sharedSpaceRepository.recountPersons([targetPersonId]);
-
-    // Queue dedup pass — merged person's embedding profile may now match other persons
-    await this.jobRepository.queue({
-      name: JobName.SharedSpacePersonDedup,
-      data: { spaceId },
-    });
-
-    await this.sharedSpaceRepository.logActivity({
-      spaceId,
-      userId: auth.user.id,
-      type: SharedSpaceActivityType.PersonMerge,
-      data: { targetPersonId, mergedCount: sources.length },
-    });
+    await this.identityMergePropagationService.mergeSpacePeople(auth, spaceId, targetPersonId, dto.ids);
   }
 
   async setSpacePersonAlias(
