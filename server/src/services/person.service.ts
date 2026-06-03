@@ -1,7 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Insertable, Selectable, Updateable } from 'kysely';
+import { Insertable } from 'kysely';
 import { isAbsolute } from 'node:path';
-import { Person } from 'src/database';
 import { Chunked, OnEvent, OnJob } from 'src/decorators';
 import { BulkIdErrorReason, BulkIdResponseDto, BulkIdsDto } from 'src/dtos/asset-ids.response.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
@@ -48,7 +47,6 @@ import type {
   SharedSpaceFaceMatchBackfillTarget,
 } from 'src/repositories/face-identity.repository';
 import { BoundingBox } from 'src/repositories/machine-learning.repository';
-import { PersonId, UpdateFacesData } from 'src/repositories/person.repository';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table';
 import { PersonTable } from 'src/schema/tables/person.table';
@@ -56,6 +54,7 @@ import {
   buildAutomaticReconciliationClaim,
   chooseAutomaticTargetIdentity,
 } from 'src/services/accessible-identity-reconciliation';
+import { PersonId } from 'src/repositories/person.repository';
 import { BaseService } from 'src/services/base.service';
 import { JobItem, JobOf } from 'src/types';
 import { getDimensions } from 'src/utils/asset.util';
@@ -1192,19 +1191,23 @@ export class PersonService extends BaseService {
 
   async mergePerson(auth: AuthDto, personGroupId: string, dto: MergePersonDto): Promise<BulkIdResponseDto[]> {
     const mergeIds = dto.ids;
-    if (mergeIds.includes(personGroupId)) {
+    if (mergeIds.length === 0) {
+      throw new BadRequestException('No people selected for merge');
+    }
+
+    if (mergeIds.includes(id)) {
       throw new BadRequestException('Cannot merge a person into themselves');
     }
 
-    await this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [personGroupId] });
-
-    const results: BulkIdResponseDto[] = [];
+    await this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [id] });
+    await this.findOrFail(id);
 
     const allowedIds = await this.checkAccess({
       auth,
       permission: Permission.PersonMerge,
       ids: mergeIds,
     });
+    const failures: BulkIdResponseDto[] = [];
 
     let primaryPerson: Selectable<PersonTable> | undefined;
 
@@ -1212,74 +1215,22 @@ export class PersonService extends BaseService {
       const mergeId = mergePerson.personGroupId;
       const hasAccess = allowedIds.has(mergeId);
       if (!hasAccess) {
-        results.push({ id: mergeId, success: false, error: BulkIdErrorReason.NO_PERMISSION });
+        failures.push({ id: mergeId, success: false, error: BulkIdErrorReason.NO_PERMISSION });
         continue;
       }
 
-      if (!primaryPerson || primaryPerson.ownerId !== mergePerson.ownerId) {
-        primaryPerson = await this.personRepository.getByGroupId({ ownerId: mergePerson.ownerId, personGroupId });
-        if (!primaryPerson) {
-          continue;
-        }
-      }
-
-      const changes: Updateable<Person> = {};
-      if (!primaryPerson.name && mergePerson.name) {
-        changes.name = mergePerson.name;
-      }
-
-      if (!primaryPerson.birthDate && mergePerson.birthDate) {
-        changes.birthDate = mergePerson.birthDate;
-      }
-
-      if (
-        (mergePerson.name && mergePerson.name !== primaryPerson.name) ||
-        (mergePerson.birthDate && mergePerson.birthDate !== primaryPerson.birthDate)
-      ) {
-        continue;
-      }
-
-      if (Object.keys(changes).length > 0) {
-        primaryPerson = await this.personRepository.update({
-          ownerId: primaryPerson.ownerId,
-          personGroupId: primaryPerson.personGroupId,
-          ...changes,
-        });
-      }
-
-      const mergeName = mergePerson.name || mergePerson.personGroupId;
-      const mergeData: UpdateFacesData = {
-        oldPersonGroupId: mergeId,
-        newPersonGroupId: primaryPerson.personGroupId,
-        ownerId: primaryPerson.ownerId,
-      };
-      this.logger.log(`Merging ${mergeName} into ${primaryPerson.name || primaryPerson.personGroupId}`);
-
-      try {
-        const targetIdentity = await this.faceIdentityRepository.ensurePersonIdentity(id);
-        const sourceIdentity = await this.faceIdentityRepository.ensurePersonIdentity(mergeId);
-        await this.personRepository.reassignFaces(mergeData);
-        await this.removeAllPersonGroups([mergeId], primaryPerson.ownerId);
-        await this.faceIdentityRepository.linkPersonFaces({
-          personId: id,
-          identityId: targetIdentity.id,
-          source: 'manual',
-        });
-        await this.faceIdentityRepository.mergeIdentities({
-          targetIdentityId: targetIdentity.id,
-          sourceIdentityIds: [sourceIdentity.id],
-          source: 'manual',
-        });
-        await this.queueSpacePersonMetadataBackfill(targetIdentity.id);
-
-        this.logger.log(`Merged ${mergeName} into ${primaryPerson.name || primaryPerson.personGroupId}`);
-        results.push({ id: mergeId, success: true });
-      } catch (error: any) {
-        this.logger.error(`Unable to merge ${mergeId} into ${personGroupId}: ${error}`, error?.stack);
-        results.push({ id: mergeId, success: false, error: BulkIdErrorReason.UNKNOWN });
+      const mergePerson = await this.personRepository.getById(mergeId);
+      if (!mergePerson) {
+        failures.push({ id: mergeId, success: false, error: BulkIdErrorReason.NOT_FOUND });
       }
     }
-    return results;
+
+    if (failures.length > 0) {
+      // Propagation is all-or-nothing after validation, so do not delegate a partial source set.
+      return failures;
+    }
+
+    return this.identityMergePropagationService.mergePersonalPeople(auth, id, mergeIds);
   }
 
   private async queueSpacePersonMetadataBackfill(identityId?: string | null): Promise<void> {
