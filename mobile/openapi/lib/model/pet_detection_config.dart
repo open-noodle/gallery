@@ -64,7 +64,7 @@ class PetDetectionConfig {
 
       return PetDetectionConfig(
         enabled: mapValueOfType<bool>(json, r'enabled')!,
-        minScore: (mapValueOfType<num>(json, r'minScore')!).toDouble(),
+        minScore: mapValueOfType<double>(json, r'minScore')!,
         modelName: mapValueOfType<String>(json, r'modelName')!,
       );
     }

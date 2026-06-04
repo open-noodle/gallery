@@ -200,7 +200,7 @@ class _SpacesCollectionCard extends ConsumerWidget {
                         mainAxisSpacing: 8,
                         physics: const NeverScrollableScrollPhysics(),
                         children: spaces.take(4).map((space) {
-                          final thumbnailId = space.thumbnailAssetId;
+                          final thumbnailId = space.thumbnailAssetId.value;
                           if (thumbnailId == null) {
                             return Container(
                               decoration: BoxDecoration(
