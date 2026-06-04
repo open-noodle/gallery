@@ -49,10 +49,10 @@ void main() {
   late _MockApiService apiService;
 
   setUpAll(() {
-    registerFallbackValue(SessionCreateDto(deviceType: '', deviceOS: ''));
+    registerFallbackValue(SessionCreateDto(deviceType: const Optional.present(''), deviceOS: const Optional.present('')));
     registerFallbackValue(UpdateAssetDto());
     registerFallbackValue(BulkIdsDto(ids: []));
-    registerFallbackValue(PartnerDirection.by);
+    registerFallbackValue(PartnerDirection.sharedBy);
   });
 
   setUp(() {
@@ -119,7 +119,7 @@ void main() {
         people: [],
         hidden: 0,
         total: 0,
-        hasNextPage: false,
+        hasNextPage: const Optional.present(false),
       ),
     );
 
@@ -137,12 +137,12 @@ void main() {
 
     when(() => apiService.partnersApi).thenReturn(newApi);
     when(
-      () => newApi.getPartners(PartnerDirection.by),
+      () => newApi.getPartners(PartnerDirection.sharedBy),
     ).thenAnswer((_) async => []);
 
     await repo.getAll(Direction.sharedByMe);
 
-    verify(() => newApi.getPartners(PartnerDirection.by)).called(1);
+    verify(() => newApi.getPartners(PartnerDirection.sharedBy)).called(1);
     verifyNever(() => oldApi.getPartners(any()));
   });
 
