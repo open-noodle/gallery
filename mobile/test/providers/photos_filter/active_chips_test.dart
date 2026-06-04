@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
+import 'package:immich_mobile/utils/option.dart';
 import 'package:immich_mobile/providers/photos_filter/active_chips.dart';
 import 'package:immich_mobile/providers/photos_filter/chip_id.dart';
 import 'package:openapi/api.dart';
@@ -129,12 +130,12 @@ void main() {
     });
 
     test('rating = 0 → no chip', () {
-      final f = _base()..rating = SearchRatingFilter(rating: 0);
+      final f = _base()..rating = SearchRatingFilter(rating: const Option.some(0));
       expect(activeChipsFromFilter(f), isEmpty);
     });
 
     test('rating = 4 → "★ 4+" chip', () {
-      final f = _base()..rating = SearchRatingFilter(rating: 4);
+      final f = _base()..rating = SearchRatingFilter(rating: const Option.some(4));
       final chips = activeChipsFromFilter(f);
       expect(chips, hasLength(1));
       expect(chips.single.label, '★ 4+');
@@ -179,7 +180,7 @@ void main() {
         ..tagIds = ['t1']
         ..location = SearchLocationFilter(country: 'France')
         ..date = SearchDateFilter(takenAfter: DateTime(2024, 4, 1))
-        ..rating = SearchRatingFilter(rating: 4)
+        ..rating = SearchRatingFilter(rating: const Option.some(4))
         ..mediaType = AssetType.image
         ..display = SearchDisplayFilters(isFavorite: true, isArchive: true, isNotInAlbum: true, isUntagged: true)
         ..context = 'paris';
