@@ -59,7 +59,7 @@ import {
 } from 'src/services/accessible-identity-reconciliation';
 import { BaseService } from 'src/services/base.service';
 import { JobOf } from 'src/types';
-import { asBirthDateString, asDateString } from 'src/utils/date';
+import { asDateString, asDateTimeString } from 'src/utils/date';
 import { ImmichMediaResponse } from 'src/utils/file';
 import { mimeTypes } from 'src/utils/mime-types';
 
@@ -920,7 +920,7 @@ export class SharedSpaceService extends BaseService {
         boundingBoxY1: face.boundingBoxY1,
         boundingBoxY2: face.boundingBoxY2,
         sourceType: face.sourceType,
-        fileCreatedAt: asDateString(face.fileCreatedAt) ?? undefined,
+        fileCreatedAt: asDateTimeString(face.fileCreatedAt) ?? undefined,
         isRepresentative: face.id === person.representativeFaceId,
       })),
       hasNextPage: rows.length > take,
@@ -2430,7 +2430,7 @@ export class SharedSpaceService extends BaseService {
     const nameCandidate = this.selectMetadataCandidate(nameCandidates, (candidate) => candidate.name.trim());
     const birthDateCandidate = this.selectMetadataCandidate(
       birthDateCandidates,
-      (candidate) => asBirthDateString(candidate.birthDate) ?? '',
+      (candidate) => asDateString(candidate.birthDate) ?? '',
     );
 
     if ((person.nameSource === 'none' || person.nameSource === 'inherited') && nameCandidate) {
@@ -2590,7 +2590,7 @@ export class SharedSpaceService extends BaseService {
       name: person.name || '',
       thumbnailPath: '',
       isHidden: person.isHidden,
-      birthDate: asBirthDateString(person.birthDate),
+      birthDate: asDateString(person.birthDate),
       representativeFaceId: person.representativeFaceId,
       representativeFaceSource: person.representativeFaceSource ?? 'auto',
       faceCount: person.faceCount,
