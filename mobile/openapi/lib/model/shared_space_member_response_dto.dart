@@ -13,15 +13,15 @@ part of openapi.api;
 class SharedSpaceMemberResponseDto {
   /// Returns a new [SharedSpaceMemberResponseDto] instance.
   SharedSpaceMemberResponseDto({
-    this.avatarColor,
-    this.contributionCount,
+    this.avatarColor = const Optional.absent(),
+    this.contributionCount = const Optional.absent(),
     required this.email,
     required this.joinedAt,
-    this.lastActiveAt,
+    this.lastActiveAt = const Optional.absent(),
     required this.name,
-    this.profileChangedAt,
-    this.profileImagePath,
-    this.recentAssetId,
+    this.profileChangedAt = const Optional.absent(),
+    this.profileImagePath = const Optional.absent(),
+    this.recentAssetId = const Optional.absent(),
     required this.role,
     required this.sharePersonMetadata,
     required this.showInTimeline,
@@ -35,7 +35,7 @@ class SharedSpaceMemberResponseDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? avatarColor;
+  Optional<String?> avatarColor;
 
   /// Number of photos contributed by this member
   ///
@@ -44,7 +44,7 @@ class SharedSpaceMemberResponseDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  num? contributionCount;
+  Optional<num?> contributionCount;
 
   /// User email
   String email;
@@ -53,7 +53,7 @@ class SharedSpaceMemberResponseDto {
   String joinedAt;
 
   /// Last time this member added a photo
-  String? lastActiveAt;
+  Optional<String?> lastActiveAt;
 
   /// User name
   String name;
@@ -65,7 +65,7 @@ class SharedSpaceMemberResponseDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? profileChangedAt;
+  Optional<String?> profileChangedAt;
 
   /// Profile image path
   ///
@@ -74,10 +74,10 @@ class SharedSpaceMemberResponseDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? profileImagePath;
+  Optional<String?> profileImagePath;
 
   /// Most recently added asset ID by this member
-  String? recentAssetId;
+  Optional<String?> recentAssetId;
 
   SharedSpaceRole role;
 
@@ -128,38 +128,32 @@ class SharedSpaceMemberResponseDto {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-    if (this.avatarColor != null) {
-      json[r'avatarColor'] = this.avatarColor;
-    } else {
-    //  json[r'avatarColor'] = null;
+    if (this.avatarColor.isPresent) {
+      final value = this.avatarColor.value;
+      json[r'avatarColor'] = value;
     }
-    if (this.contributionCount != null) {
-      json[r'contributionCount'] = this.contributionCount;
-    } else {
-    //  json[r'contributionCount'] = null;
+    if (this.contributionCount.isPresent) {
+      final value = this.contributionCount.value;
+      json[r'contributionCount'] = value;
     }
       json[r'email'] = this.email;
       json[r'joinedAt'] = this.joinedAt;
-    if (this.lastActiveAt != null) {
-      json[r'lastActiveAt'] = this.lastActiveAt;
-    } else {
-    //  json[r'lastActiveAt'] = null;
+    if (this.lastActiveAt.isPresent) {
+      final value = this.lastActiveAt.value;
+      json[r'lastActiveAt'] = value;
     }
       json[r'name'] = this.name;
-    if (this.profileChangedAt != null) {
-      json[r'profileChangedAt'] = this.profileChangedAt;
-    } else {
-    //  json[r'profileChangedAt'] = null;
+    if (this.profileChangedAt.isPresent) {
+      final value = this.profileChangedAt.value;
+      json[r'profileChangedAt'] = value;
     }
-    if (this.profileImagePath != null) {
-      json[r'profileImagePath'] = this.profileImagePath;
-    } else {
-    //  json[r'profileImagePath'] = null;
+    if (this.profileImagePath.isPresent) {
+      final value = this.profileImagePath.value;
+      json[r'profileImagePath'] = value;
     }
-    if (this.recentAssetId != null) {
-      json[r'recentAssetId'] = this.recentAssetId;
-    } else {
-    //  json[r'recentAssetId'] = null;
+    if (this.recentAssetId.isPresent) {
+      final value = this.recentAssetId.value;
+      json[r'recentAssetId'] = value;
     }
       json[r'role'] = this.role;
       json[r'sharePersonMetadata'] = this.sharePersonMetadata;
@@ -177,17 +171,15 @@ class SharedSpaceMemberResponseDto {
       final json = value.cast<String, dynamic>();
 
       return SharedSpaceMemberResponseDto(
-        avatarColor: mapValueOfType<String>(json, r'avatarColor'),
-        contributionCount: json[r'contributionCount'] == null
-            ? null
-            : num.parse('${json[r'contributionCount']}'),
+        avatarColor: json.containsKey(r'avatarColor') ? Optional.present(mapValueOfType<String>(json, r'avatarColor')) : const Optional.absent(),
+        contributionCount: json.containsKey(r'contributionCount') ? Optional.present(json[r'contributionCount'] == null ? null : num.parse('${json[r'contributionCount']}')) : const Optional.absent(),
         email: mapValueOfType<String>(json, r'email')!,
         joinedAt: mapValueOfType<String>(json, r'joinedAt')!,
-        lastActiveAt: mapValueOfType<String>(json, r'lastActiveAt'),
+        lastActiveAt: json.containsKey(r'lastActiveAt') ? Optional.present(mapValueOfType<String>(json, r'lastActiveAt')) : const Optional.absent(),
         name: mapValueOfType<String>(json, r'name')!,
-        profileChangedAt: mapValueOfType<String>(json, r'profileChangedAt'),
-        profileImagePath: mapValueOfType<String>(json, r'profileImagePath'),
-        recentAssetId: mapValueOfType<String>(json, r'recentAssetId'),
+        profileChangedAt: json.containsKey(r'profileChangedAt') ? Optional.present(mapValueOfType<String>(json, r'profileChangedAt')) : const Optional.absent(),
+        profileImagePath: json.containsKey(r'profileImagePath') ? Optional.present(mapValueOfType<String>(json, r'profileImagePath')) : const Optional.absent(),
+        recentAssetId: json.containsKey(r'recentAssetId') ? Optional.present(mapValueOfType<String>(json, r'recentAssetId')) : const Optional.absent(),
         role: SharedSpaceRole.fromJson(json[r'role'])!,
         sharePersonMetadata: mapValueOfType<bool>(json, r'sharePersonMetadata')!,
         showInTimeline: mapValueOfType<bool>(json, r'showInTimeline')!,
