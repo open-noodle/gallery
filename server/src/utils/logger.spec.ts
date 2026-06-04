@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { Request } from 'express';
 import { LoggingRepository } from 'src/repositories/logging.repository';
-import { logGlobalError } from 'src/utils/logger';
+import { onRequestError } from 'src/utils/logger';
 import { describe, expect, it, vi } from 'vitest';
 
 const newMockLogger = () =>
@@ -13,12 +14,15 @@ const newMockLogger = () =>
     setContext: vi.fn(),
   }) as unknown as LoggingRepository;
 
-describe('logGlobalError', () => {
+const newMockRequest = (overrides: Partial<Request> = {}) =>
+  ({ destroyed: false, complete: true, ...overrides }) as unknown as Request;
+
+describe('onRequestError', () => {
   it('should log HttpException at debug level with status and response', () => {
     const logger = newMockLogger();
     const exception = new HttpException('Not Found', HttpStatus.NOT_FOUND);
 
-    logGlobalError(logger, exception);
+    onRequestError(newMockRequest(), exception, logger);
 
     expect(logger.debug).toHaveBeenCalledOnce();
     expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('HttpException(404)'));
@@ -30,7 +34,7 @@ describe('logGlobalError', () => {
     const logger = newMockLogger();
     const exception = new HttpException({ message: 'Validation failed', errors: ['field required'] }, 422);
 
-    logGlobalError(logger, exception);
+    onRequestError(newMockRequest(), exception, logger);
 
     expect(logger.debug).toHaveBeenCalledOnce();
     const message = (logger.debug as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
@@ -38,11 +42,22 @@ describe('logGlobalError', () => {
     expect(message).toContain('Validation failed');
   });
 
+  it('should log aborted requests at debug level', () => {
+    const logger = newMockLogger();
+    const error = new Error('socket hang up');
+
+    onRequestError(newMockRequest({ destroyed: true, complete: false }), error, logger);
+
+    expect(logger.debug).toHaveBeenCalledOnce();
+    expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('Client aborted request'));
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
   it('should log generic Error at error level with message and stack', () => {
     const logger = newMockLogger();
     const error = new Error('something broke');
 
-    logGlobalError(logger, error);
+    onRequestError(newMockRequest(), error, logger);
 
     expect(logger.error).toHaveBeenCalledOnce();
     expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Unknown error'), error.stack);
@@ -54,7 +69,7 @@ describe('logGlobalError', () => {
     const logger = newMockLogger();
     const error = new Error('stack test');
 
-    logGlobalError(logger, error);
+    onRequestError(newMockRequest(), error, logger);
 
     const stackArg = (logger.error as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
     expect(stackArg).toContain('stack test');
@@ -72,7 +87,7 @@ describe('logGlobalError', () => {
 
     const error = new CustomError('custom failure');
 
-    logGlobalError(logger, error);
+    onRequestError(newMockRequest(), error, logger);
 
     expect(logger.error).toHaveBeenCalledOnce();
     expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Unknown error'), expect.any(String));
@@ -84,7 +99,7 @@ describe('logGlobalError', () => {
 
     for (const status of [400, 401, 403, 500]) {
       const exception = new HttpException('error', status);
-      logGlobalError(logger, exception);
+      onRequestError(newMockRequest(), exception, logger);
     }
 
     expect(logger.debug).toHaveBeenCalledTimes(4);
