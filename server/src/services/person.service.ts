@@ -58,7 +58,7 @@ import { PersonId } from 'src/repositories/person.repository';
 import { BaseService } from 'src/services/base.service';
 import { JobItem, JobOf } from 'src/types';
 import { getDimensions } from 'src/utils/asset.util';
-import { asDateString } from 'src/utils/date';
+import { asDateTimeString } from 'src/utils/date';
 import { ImmichMediaResponse } from 'src/utils/file';
 import { mimeTypes } from 'src/utils/mime-types';
 import { batched, findOrFail, isFacialRecognitionEnabled } from 'src/utils/misc';
@@ -309,7 +309,7 @@ export class PersonService extends BaseService {
         boundingBoxY1: face.boundingBoxY1,
         boundingBoxY2: face.boundingBoxY2,
         sourceType: face.sourceType,
-        fileCreatedAt: asDateString(face.fileCreatedAt) ?? undefined,
+        fileCreatedAt: asDateTimeString(face.fileCreatedAt) ?? undefined,
         isRepresentative: face.id === person.faceAssetId,
       })),
       hasNextPage: rows.length > take,
