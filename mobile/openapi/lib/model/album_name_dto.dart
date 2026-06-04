@@ -16,10 +16,10 @@ class AlbumNameDto {
     required this.albumName,
     required this.albumThumbnailAssetId,
     required this.assetCount,
-    this.endDate,
+    this.endDate = const Optional.absent(),
     required this.id,
     required this.shared,
-    this.startDate,
+    this.startDate = const Optional.absent(),
   });
 
   String albumName;
@@ -34,7 +34,7 @@ class AlbumNameDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? endDate;
+  Optional<String?> endDate;
 
   String id;
 
@@ -46,7 +46,7 @@ class AlbumNameDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? startDate;
+  Optional<String?> startDate;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is AlbumNameDto &&
@@ -81,17 +81,15 @@ class AlbumNameDto {
     //  json[r'albumThumbnailAssetId'] = null;
     }
       json[r'assetCount'] = this.assetCount;
-    if (this.endDate != null) {
-      json[r'endDate'] = this.endDate;
-    } else {
-    //  json[r'endDate'] = null;
+    if (this.endDate.isPresent) {
+      final value = this.endDate.value;
+      json[r'endDate'] = value;
     }
       json[r'id'] = this.id;
       json[r'shared'] = this.shared;
-    if (this.startDate != null) {
-      json[r'startDate'] = this.startDate;
-    } else {
-    //  json[r'startDate'] = null;
+    if (this.startDate.isPresent) {
+      final value = this.startDate.value;
+      json[r'startDate'] = value;
     }
     return json;
   }
@@ -108,10 +106,10 @@ class AlbumNameDto {
         albumName: mapValueOfType<String>(json, r'albumName')!,
         albumThumbnailAssetId: mapValueOfType<String>(json, r'albumThumbnailAssetId'),
         assetCount: num.parse('${json[r'assetCount']}'),
-        endDate: mapValueOfType<String>(json, r'endDate'),
+        endDate: json.containsKey(r'endDate') ? Optional.present(mapValueOfType<String>(json, r'endDate')) : const Optional.absent(),
         id: mapValueOfType<String>(json, r'id')!,
         shared: mapValueOfType<bool>(json, r'shared')!,
-        startDate: mapValueOfType<String>(json, r'startDate'),
+        startDate: json.containsKey(r'startDate') ? Optional.present(mapValueOfType<String>(json, r'startDate')) : const Optional.absent(),
       );
     }
     return null;
