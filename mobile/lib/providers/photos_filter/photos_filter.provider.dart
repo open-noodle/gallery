@@ -3,6 +3,7 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/photos_filter/chip_id.dart';
+import 'package:immich_mobile/utils/option.dart';
 
 final photosFilterProvider = NotifierProvider<PhotosFilterNotifier, SearchFilter>(PhotosFilterNotifier.new);
 
@@ -55,7 +56,7 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
     date: SearchDateFilter(takenAfter: start, takenBefore: end),
   );
 
-  void setRating(int? rating) => state = state.copyWith(rating: SearchRatingFilter(rating: rating));
+  void setRating(int? rating) => state = state.copyWith(rating: SearchRatingFilter(rating: rating.toOption()));
 
   void setMediaType(AssetType? type) => state = state.copyWith(mediaType: type ?? AssetType.other);
 
