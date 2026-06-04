@@ -13,30 +13,30 @@ part of openapi.api;
 class SharedSpacePersonResponseDto {
   /// Returns a new [SharedSpacePersonResponseDto] instance.
   SharedSpacePersonResponseDto({
-    this.alias,
+    this.alias = const Optional.absent(),
     required this.assetCount,
-    this.birthDate,
+    this.birthDate = const Optional.absent(),
     required this.createdAt,
     required this.faceCount,
     required this.id,
     required this.isHidden,
     required this.name,
-    this.representativeFaceId,
+    this.representativeFaceId = const Optional.absent(),
     required this.representativeFaceSource,
     required this.spaceId,
     required this.thumbnailPath,
-    this.type,
+    this.type = const Optional.absent(),
     required this.updatedAt,
   });
 
   /// User-specific alias for this person
-  String? alias;
+  Optional<String?> alias;
 
   /// Number of unique assets with this person
   num assetCount;
 
   /// Person date of birth
-  DateTime? birthDate;
+  Optional<DateTime?> birthDate;
 
   /// Creation date
   String createdAt;
@@ -54,7 +54,7 @@ class SharedSpacePersonResponseDto {
   String name;
 
   /// Representative face ID
-  String? representativeFaceId;
+  Optional<String?> representativeFaceId;
 
   /// Representative face source
   SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum representativeFaceSource;
@@ -72,7 +72,7 @@ class SharedSpacePersonResponseDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? type;
+  Optional<String?> type;
 
   /// Last update date
   String updatedAt;
@@ -117,34 +117,30 @@ class SharedSpacePersonResponseDto {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-    if (this.alias != null) {
-      json[r'alias'] = this.alias;
-    } else {
-    //  json[r'alias'] = null;
+    if (this.alias.isPresent) {
+      final value = this.alias.value;
+      json[r'alias'] = value;
     }
       json[r'assetCount'] = this.assetCount;
-    if (this.birthDate != null) {
-      json[r'birthDate'] = _dateFormatter.format(this.birthDate!);
-    } else {
-    //  json[r'birthDate'] = null;
+    if (this.birthDate.isPresent) {
+      final value = this.birthDate.value;
+      json[r'birthDate'] = value == null ? null : _dateFormatter.format(value.toUtc());
     }
       json[r'createdAt'] = this.createdAt;
       json[r'faceCount'] = this.faceCount;
       json[r'id'] = this.id;
       json[r'isHidden'] = this.isHidden;
       json[r'name'] = this.name;
-    if (this.representativeFaceId != null) {
-      json[r'representativeFaceId'] = this.representativeFaceId;
-    } else {
-    //  json[r'representativeFaceId'] = null;
+    if (this.representativeFaceId.isPresent) {
+      final value = this.representativeFaceId.value;
+      json[r'representativeFaceId'] = value;
     }
       json[r'representativeFaceSource'] = this.representativeFaceSource;
       json[r'spaceId'] = this.spaceId;
       json[r'thumbnailPath'] = this.thumbnailPath;
-    if (this.type != null) {
-      json[r'type'] = this.type;
-    } else {
-    //  json[r'type'] = null;
+    if (this.type.isPresent) {
+      final value = this.type.value;
+      json[r'type'] = value;
     }
       json[r'updatedAt'] = this.updatedAt;
     return json;
@@ -159,19 +155,19 @@ class SharedSpacePersonResponseDto {
       final json = value.cast<String, dynamic>();
 
       return SharedSpacePersonResponseDto(
-        alias: mapValueOfType<String>(json, r'alias'),
+        alias: json.containsKey(r'alias') ? Optional.present(mapValueOfType<String>(json, r'alias')) : const Optional.absent(),
         assetCount: num.parse('${json[r'assetCount']}'),
-        birthDate: mapDateTime(json, r'birthDate', r''),
+        birthDate: json.containsKey(r'birthDate') ? Optional.present(mapDateTime(json, r'birthDate', r'')) : const Optional.absent(),
         createdAt: mapValueOfType<String>(json, r'createdAt')!,
         faceCount: num.parse('${json[r'faceCount']}'),
         id: mapValueOfType<String>(json, r'id')!,
         isHidden: mapValueOfType<bool>(json, r'isHidden')!,
         name: mapValueOfType<String>(json, r'name')!,
-        representativeFaceId: mapValueOfType<String>(json, r'representativeFaceId'),
+        representativeFaceId: json.containsKey(r'representativeFaceId') ? Optional.present(mapValueOfType<String>(json, r'representativeFaceId')) : const Optional.absent(),
         representativeFaceSource: SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum.fromJson(json[r'representativeFaceSource'])!,
         spaceId: mapValueOfType<String>(json, r'spaceId')!,
         thumbnailPath: mapValueOfType<String>(json, r'thumbnailPath')!,
-        type: mapValueOfType<String>(json, r'type'),
+        type: json.containsKey(r'type') ? Optional.present(mapValueOfType<String>(json, r'type')) : const Optional.absent(),
         updatedAt: mapValueOfType<String>(json, r'updatedAt')!,
       );
     }

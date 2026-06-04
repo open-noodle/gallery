@@ -13,27 +13,27 @@ part of openapi.api;
 class SharedSpaceResponseDto {
   /// Returns a new [SharedSpaceResponseDto] instance.
   SharedSpaceResponseDto({
-    this.assetCount,
-    this.color,
+    this.assetCount = const Optional.absent(),
+    this.color = const Optional.absent(),
     required this.createdAt,
     required this.createdById,
-    this.description,
-    this.faceRecognitionEnabled,
-    this.hasPets,
+    this.description = const Optional.absent(),
+    this.faceRecognitionEnabled = const Optional.absent(),
+    this.hasPets = const Optional.absent(),
     required this.id,
-    this.lastActivityAt,
-    this.lastContributor,
-    this.lastViewedAt,
-    this.linkedLibraries = const [],
-    this.memberCount,
-    this.members = const [],
+    this.lastActivityAt = const Optional.absent(),
+    this.lastContributor = const Optional.absent(),
+    this.lastViewedAt = const Optional.absent(),
+    this.linkedLibraries = const Optional.present(const []),
+    this.memberCount = const Optional.absent(),
+    this.members = const Optional.present(const []),
     required this.name,
-    this.newAssetCount,
-    this.petsEnabled,
-    this.recentAssetIds = const [],
-    this.recentAssetThumbhashes = const [],
-    this.thumbnailAssetId,
-    this.thumbnailCropY,
+    this.newAssetCount = const Optional.absent(),
+    this.petsEnabled = const Optional.absent(),
+    this.recentAssetIds = const Optional.present(const []),
+    this.recentAssetThumbhashes = const Optional.present(const []),
+    this.thumbnailAssetId = const Optional.absent(),
+    this.thumbnailCropY = const Optional.absent(),
     required this.updatedAt,
   });
 
@@ -44,10 +44,10 @@ class SharedSpaceResponseDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  num? assetCount;
+  Optional<num?> assetCount;
 
   /// Space color
-  UserAvatarColor? color;
+  Optional<UserAvatarColor?> color;
 
   /// Creation date
   String createdAt;
@@ -56,7 +56,7 @@ class SharedSpaceResponseDto {
   String createdById;
 
   /// Space description
-  String? description;
+  Optional<String?> description;
 
   /// Whether face recognition is enabled for this space
   ///
@@ -65,7 +65,7 @@ class SharedSpaceResponseDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  bool? faceRecognitionEnabled;
+  Optional<bool?> faceRecognitionEnabled;
 
   /// Whether any pet-type persons exist in this space
   ///
@@ -74,20 +74,20 @@ class SharedSpaceResponseDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  bool? hasPets;
+  Optional<bool?> hasPets;
 
   /// Space ID
   String id;
 
   /// Last activity timestamp (most recent asset add)
-  String? lastActivityAt;
+  Optional<String?> lastActivityAt;
 
-  SharedSpaceResponseDtoLastContributor? lastContributor;
+  Optional<SharedSpaceResponseDtoLastContributor?> lastContributor;
 
   /// When the current user last viewed this space
-  String? lastViewedAt;
+  Optional<String?> lastViewedAt;
 
-  List<SharedSpaceLinkedLibraryDto> linkedLibraries;
+  Optional<List<SharedSpaceLinkedLibraryDto>?> linkedLibraries;
 
   /// Number of members
   ///
@@ -96,10 +96,10 @@ class SharedSpaceResponseDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  num? memberCount;
+  Optional<num?> memberCount;
 
   /// Space members (summary)
-  List<SharedSpaceMemberResponseDto> members;
+  Optional<List<SharedSpaceMemberResponseDto>?> members;
 
   /// Space name
   String name;
@@ -111,7 +111,7 @@ class SharedSpaceResponseDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  num? newAssetCount;
+  Optional<num?> newAssetCount;
 
   /// Whether pets are shown in space people list
   ///
@@ -120,19 +120,19 @@ class SharedSpaceResponseDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  bool? petsEnabled;
+  Optional<bool?> petsEnabled;
 
   /// Recent asset IDs for collage display (up to 4)
-  List<String> recentAssetIds;
+  Optional<List<String>?> recentAssetIds;
 
   /// Thumbhashes for recent assets (parallel array)
-  List<String> recentAssetThumbhashes;
+  Optional<List<String>?> recentAssetThumbhashes;
 
   /// Thumbnail asset ID
-  String? thumbnailAssetId;
+  Optional<String?> thumbnailAssetId;
 
   /// Vertical crop position for cover photo (0-100)
-  num? thumbnailCropY;
+  Optional<num?> thumbnailCropY;
 
   /// Last update date
   String updatedAt;
@@ -193,78 +193,77 @@ class SharedSpaceResponseDto {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-    if (this.assetCount != null) {
-      json[r'assetCount'] = this.assetCount;
-    } else {
-    //  json[r'assetCount'] = null;
+    if (this.assetCount.isPresent) {
+      final value = this.assetCount.value;
+      json[r'assetCount'] = value;
     }
-    if (this.color != null) {
-      json[r'color'] = this.color;
-    } else {
-    //  json[r'color'] = null;
+    if (this.color.isPresent) {
+      final value = this.color.value;
+      json[r'color'] = value;
     }
       json[r'createdAt'] = this.createdAt;
       json[r'createdById'] = this.createdById;
-    if (this.description != null) {
-      json[r'description'] = this.description;
-    } else {
-    //  json[r'description'] = null;
+    if (this.description.isPresent) {
+      final value = this.description.value;
+      json[r'description'] = value;
     }
-    if (this.faceRecognitionEnabled != null) {
-      json[r'faceRecognitionEnabled'] = this.faceRecognitionEnabled;
-    } else {
-    //  json[r'faceRecognitionEnabled'] = null;
+    if (this.faceRecognitionEnabled.isPresent) {
+      final value = this.faceRecognitionEnabled.value;
+      json[r'faceRecognitionEnabled'] = value;
     }
-    if (this.hasPets != null) {
-      json[r'hasPets'] = this.hasPets;
-    } else {
-    //  json[r'hasPets'] = null;
+    if (this.hasPets.isPresent) {
+      final value = this.hasPets.value;
+      json[r'hasPets'] = value;
     }
       json[r'id'] = this.id;
-    if (this.lastActivityAt != null) {
-      json[r'lastActivityAt'] = this.lastActivityAt;
-    } else {
-    //  json[r'lastActivityAt'] = null;
+    if (this.lastActivityAt.isPresent) {
+      final value = this.lastActivityAt.value;
+      json[r'lastActivityAt'] = value;
     }
-    if (this.lastContributor != null) {
-      json[r'lastContributor'] = this.lastContributor;
-    } else {
-    //  json[r'lastContributor'] = null;
+    if (this.lastContributor.isPresent) {
+      final value = this.lastContributor.value;
+      json[r'lastContributor'] = value;
     }
-    if (this.lastViewedAt != null) {
-      json[r'lastViewedAt'] = this.lastViewedAt;
-    } else {
-    //  json[r'lastViewedAt'] = null;
+    if (this.lastViewedAt.isPresent) {
+      final value = this.lastViewedAt.value;
+      json[r'lastViewedAt'] = value;
     }
-      json[r'linkedLibraries'] = this.linkedLibraries;
-    if (this.memberCount != null) {
-      json[r'memberCount'] = this.memberCount;
-    } else {
-    //  json[r'memberCount'] = null;
+    if (this.linkedLibraries.isPresent) {
+      final value = this.linkedLibraries.value;
+      json[r'linkedLibraries'] = value;
     }
-      json[r'members'] = this.members;
+    if (this.memberCount.isPresent) {
+      final value = this.memberCount.value;
+      json[r'memberCount'] = value;
+    }
+    if (this.members.isPresent) {
+      final value = this.members.value;
+      json[r'members'] = value;
+    }
       json[r'name'] = this.name;
-    if (this.newAssetCount != null) {
-      json[r'newAssetCount'] = this.newAssetCount;
-    } else {
-    //  json[r'newAssetCount'] = null;
+    if (this.newAssetCount.isPresent) {
+      final value = this.newAssetCount.value;
+      json[r'newAssetCount'] = value;
     }
-    if (this.petsEnabled != null) {
-      json[r'petsEnabled'] = this.petsEnabled;
-    } else {
-    //  json[r'petsEnabled'] = null;
+    if (this.petsEnabled.isPresent) {
+      final value = this.petsEnabled.value;
+      json[r'petsEnabled'] = value;
     }
-      json[r'recentAssetIds'] = this.recentAssetIds;
-      json[r'recentAssetThumbhashes'] = this.recentAssetThumbhashes;
-    if (this.thumbnailAssetId != null) {
-      json[r'thumbnailAssetId'] = this.thumbnailAssetId;
-    } else {
-    //  json[r'thumbnailAssetId'] = null;
+    if (this.recentAssetIds.isPresent) {
+      final value = this.recentAssetIds.value;
+      json[r'recentAssetIds'] = value;
     }
-    if (this.thumbnailCropY != null) {
-      json[r'thumbnailCropY'] = this.thumbnailCropY;
-    } else {
-    //  json[r'thumbnailCropY'] = null;
+    if (this.recentAssetThumbhashes.isPresent) {
+      final value = this.recentAssetThumbhashes.value;
+      json[r'recentAssetThumbhashes'] = value;
+    }
+    if (this.thumbnailAssetId.isPresent) {
+      final value = this.thumbnailAssetId.value;
+      json[r'thumbnailAssetId'] = value;
+    }
+    if (this.thumbnailCropY.isPresent) {
+      final value = this.thumbnailCropY.value;
+      json[r'thumbnailCropY'] = value;
     }
       json[r'updatedAt'] = this.updatedAt;
     return json;
@@ -279,39 +278,31 @@ class SharedSpaceResponseDto {
       final json = value.cast<String, dynamic>();
 
       return SharedSpaceResponseDto(
-        assetCount: json[r'assetCount'] == null
-            ? null
-            : num.parse('${json[r'assetCount']}'),
-        color: UserAvatarColor.fromJson(json[r'color']),
+        assetCount: json.containsKey(r'assetCount') ? Optional.present(json[r'assetCount'] == null ? null : num.parse('${json[r'assetCount']}')) : const Optional.absent(),
+        color: json.containsKey(r'color') ? Optional.present(UserAvatarColor.fromJson(json[r'color'])) : const Optional.absent(),
         createdAt: mapValueOfType<String>(json, r'createdAt')!,
         createdById: mapValueOfType<String>(json, r'createdById')!,
-        description: mapValueOfType<String>(json, r'description'),
-        faceRecognitionEnabled: mapValueOfType<bool>(json, r'faceRecognitionEnabled'),
-        hasPets: mapValueOfType<bool>(json, r'hasPets'),
+        description: json.containsKey(r'description') ? Optional.present(mapValueOfType<String>(json, r'description')) : const Optional.absent(),
+        faceRecognitionEnabled: json.containsKey(r'faceRecognitionEnabled') ? Optional.present(mapValueOfType<bool>(json, r'faceRecognitionEnabled')) : const Optional.absent(),
+        hasPets: json.containsKey(r'hasPets') ? Optional.present(mapValueOfType<bool>(json, r'hasPets')) : const Optional.absent(),
         id: mapValueOfType<String>(json, r'id')!,
-        lastActivityAt: mapValueOfType<String>(json, r'lastActivityAt'),
-        lastContributor: SharedSpaceResponseDtoLastContributor.fromJson(json[r'lastContributor']),
-        lastViewedAt: mapValueOfType<String>(json, r'lastViewedAt'),
-        linkedLibraries: SharedSpaceLinkedLibraryDto.listFromJson(json[r'linkedLibraries']),
-        memberCount: json[r'memberCount'] == null
-            ? null
-            : num.parse('${json[r'memberCount']}'),
-        members: SharedSpaceMemberResponseDto.listFromJson(json[r'members']),
+        lastActivityAt: json.containsKey(r'lastActivityAt') ? Optional.present(mapValueOfType<String>(json, r'lastActivityAt')) : const Optional.absent(),
+        lastContributor: json.containsKey(r'lastContributor') ? Optional.present(SharedSpaceResponseDtoLastContributor.fromJson(json[r'lastContributor'])) : const Optional.absent(),
+        lastViewedAt: json.containsKey(r'lastViewedAt') ? Optional.present(mapValueOfType<String>(json, r'lastViewedAt')) : const Optional.absent(),
+        linkedLibraries: json.containsKey(r'linkedLibraries') ? Optional.present(SharedSpaceLinkedLibraryDto.listFromJson(json[r'linkedLibraries'])) : const Optional.absent(),
+        memberCount: json.containsKey(r'memberCount') ? Optional.present(json[r'memberCount'] == null ? null : num.parse('${json[r'memberCount']}')) : const Optional.absent(),
+        members: json.containsKey(r'members') ? Optional.present(SharedSpaceMemberResponseDto.listFromJson(json[r'members'])) : const Optional.absent(),
         name: mapValueOfType<String>(json, r'name')!,
-        newAssetCount: json[r'newAssetCount'] == null
-            ? null
-            : num.parse('${json[r'newAssetCount']}'),
-        petsEnabled: mapValueOfType<bool>(json, r'petsEnabled'),
-        recentAssetIds: json[r'recentAssetIds'] is Iterable
+        newAssetCount: json.containsKey(r'newAssetCount') ? Optional.present(json[r'newAssetCount'] == null ? null : num.parse('${json[r'newAssetCount']}')) : const Optional.absent(),
+        petsEnabled: json.containsKey(r'petsEnabled') ? Optional.present(mapValueOfType<bool>(json, r'petsEnabled')) : const Optional.absent(),
+        recentAssetIds: json.containsKey(r'recentAssetIds') ? Optional.present(json[r'recentAssetIds'] is Iterable
             ? (json[r'recentAssetIds'] as Iterable).cast<String>().toList(growable: false)
-            : const [],
-        recentAssetThumbhashes: json[r'recentAssetThumbhashes'] is Iterable
+            : const []) : const Optional.absent(),
+        recentAssetThumbhashes: json.containsKey(r'recentAssetThumbhashes') ? Optional.present(json[r'recentAssetThumbhashes'] is Iterable
             ? (json[r'recentAssetThumbhashes'] as Iterable).cast<String>().toList(growable: false)
-            : const [],
-        thumbnailAssetId: mapValueOfType<String>(json, r'thumbnailAssetId'),
-        thumbnailCropY: json[r'thumbnailCropY'] == null
-            ? null
-            : num.parse('${json[r'thumbnailCropY']}'),
+            : const []) : const Optional.absent(),
+        thumbnailAssetId: json.containsKey(r'thumbnailAssetId') ? Optional.present(mapValueOfType<String>(json, r'thumbnailAssetId')) : const Optional.absent(),
+        thumbnailCropY: json.containsKey(r'thumbnailCropY') ? Optional.present(json[r'thumbnailCropY'] == null ? null : num.parse('${json[r'thumbnailCropY']}')) : const Optional.absent(),
         updatedAt: mapValueOfType<String>(json, r'updatedAt')!,
       );
     }

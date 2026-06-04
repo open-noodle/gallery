@@ -13,10 +13,10 @@ part of openapi.api;
 class UserGroupMemberResponseDto {
   /// Returns a new [UserGroupMemberResponseDto] instance.
   UserGroupMemberResponseDto({
-    this.avatarColor,
+    this.avatarColor = const Optional.absent(),
     required this.email,
     required this.name,
-    this.profileImagePath,
+    this.profileImagePath = const Optional.absent(),
     required this.userId,
   });
 
@@ -27,7 +27,7 @@ class UserGroupMemberResponseDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? avatarColor;
+  Optional<String?> avatarColor;
 
   /// User email
   String email;
@@ -42,7 +42,7 @@ class UserGroupMemberResponseDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? profileImagePath;
+  Optional<String?> profileImagePath;
 
   /// User ID
   String userId;
@@ -69,17 +69,15 @@ class UserGroupMemberResponseDto {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-    if (this.avatarColor != null) {
-      json[r'avatarColor'] = this.avatarColor;
-    } else {
-    //  json[r'avatarColor'] = null;
+    if (this.avatarColor.isPresent) {
+      final value = this.avatarColor.value;
+      json[r'avatarColor'] = value;
     }
       json[r'email'] = this.email;
       json[r'name'] = this.name;
-    if (this.profileImagePath != null) {
-      json[r'profileImagePath'] = this.profileImagePath;
-    } else {
-    //  json[r'profileImagePath'] = null;
+    if (this.profileImagePath.isPresent) {
+      final value = this.profileImagePath.value;
+      json[r'profileImagePath'] = value;
     }
       json[r'userId'] = this.userId;
     return json;
@@ -94,10 +92,10 @@ class UserGroupMemberResponseDto {
       final json = value.cast<String, dynamic>();
 
       return UserGroupMemberResponseDto(
-        avatarColor: mapValueOfType<String>(json, r'avatarColor'),
+        avatarColor: json.containsKey(r'avatarColor') ? Optional.present(mapValueOfType<String>(json, r'avatarColor')) : const Optional.absent(),
         email: mapValueOfType<String>(json, r'email')!,
         name: mapValueOfType<String>(json, r'name')!,
-        profileImagePath: mapValueOfType<String>(json, r'profileImagePath'),
+        profileImagePath: json.containsKey(r'profileImagePath') ? Optional.present(mapValueOfType<String>(json, r'profileImagePath')) : const Optional.absent(),
         userId: mapValueOfType<String>(json, r'userId')!,
       );
     }
