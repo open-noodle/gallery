@@ -14,7 +14,7 @@ class FaceRepairResponseDto {
   /// Returns a new [FaceRepairResponseDto] instance.
   FaceRepairResponseDto({
     required this.dryRun,
-    this.executed,
+    this.executed = const Optional.absent(),
     required this.mutated,
     required this.report,
   });
@@ -27,7 +27,7 @@ class FaceRepairResponseDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  FaceRepairResponseDtoExecuted? executed;
+  Optional<FaceRepairResponseDtoExecuted?> executed;
 
   bool mutated;
 
@@ -54,10 +54,9 @@ class FaceRepairResponseDto {
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'dryRun'] = this.dryRun;
-    if (this.executed != null) {
-      json[r'executed'] = this.executed;
-    } else {
-    //  json[r'executed'] = null;
+    if (this.executed.isPresent) {
+      final value = this.executed.value;
+      json[r'executed'] = value;
     }
       json[r'mutated'] = this.mutated;
       json[r'report'] = this.report;
@@ -74,7 +73,7 @@ class FaceRepairResponseDto {
 
       return FaceRepairResponseDto(
         dryRun: mapValueOfType<bool>(json, r'dryRun')!,
-        executed: FaceRepairResponseDtoExecuted.fromJson(json[r'executed']),
+        executed: json.containsKey(r'executed') ? Optional.present(FaceRepairResponseDtoExecuted.fromJson(json[r'executed'])) : const Optional.absent(),
         mutated: mapValueOfType<bool>(json, r'mutated')!,
         report: FaceRepairResponseDtoReport.fromJson(json[r'report'])!,
       );

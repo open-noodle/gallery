@@ -13,19 +13,20 @@ part of openapi.api;
 class FaceRepairRequestDto {
   /// Returns a new [FaceRepairRequestDto] instance.
   FaceRepairRequestDto({
-    this.dryRun = true,
-    this.maxAttributionDistance,
-    this.maxDistance,
-    this.maxFlaggedFraction,
-    this.minFaces,
-    this.ownerId,
-    this.personId,
-    this.voteMargin,
-    this.voteWindow,
+    this.dryRun = const Optional.present(true),
+    this.maxAttributionDistance = const Optional.absent(),
+    this.maxDistance = const Optional.absent(),
+    this.maxFlaggedFraction = const Optional.absent(),
+    this.minFaces = const Optional.absent(),
+    this.ownerId = const Optional.absent(),
+    this.personId = const Optional.absent(),
+    this.voteMargin = const Optional.absent(),
+    this.voteWindow = const Optional.absent(),
   });
 
-  bool dryRun;
+  Optional<bool?> dryRun;
 
+  /// Minimum value: 0
   /// Maximum value: 2
   ///
   /// Please note: This property should have been non-nullable! Since the specification file
@@ -33,8 +34,9 @@ class FaceRepairRequestDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  num? maxAttributionDistance;
+  Optional<num?> maxAttributionDistance;
 
+  /// Minimum value: 0
   /// Maximum value: 2
   ///
   /// Please note: This property should have been non-nullable! Since the specification file
@@ -42,7 +44,7 @@ class FaceRepairRequestDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  num? maxDistance;
+  Optional<num?> maxDistance;
 
   /// Minimum value: 0
   /// Maximum value: 1
@@ -52,7 +54,7 @@ class FaceRepairRequestDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  num? maxFlaggedFraction;
+  Optional<num?> maxFlaggedFraction;
 
   /// Minimum value: 1
   /// Maximum value: 9007199254740991
@@ -62,7 +64,7 @@ class FaceRepairRequestDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  int? minFaces;
+  Optional<int?> minFaces;
 
   ///
   /// Please note: This property should have been non-nullable! Since the specification file
@@ -70,7 +72,7 @@ class FaceRepairRequestDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? ownerId;
+  Optional<String?> ownerId;
 
   ///
   /// Please note: This property should have been non-nullable! Since the specification file
@@ -78,7 +80,7 @@ class FaceRepairRequestDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? personId;
+  Optional<String?> personId;
 
   /// Minimum value: 0
   /// Maximum value: 9007199254740991
@@ -88,7 +90,7 @@ class FaceRepairRequestDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  int? voteMargin;
+  Optional<int?> voteMargin;
 
   /// Minimum value: 1
   /// Maximum value: 9007199254740991
@@ -98,7 +100,7 @@ class FaceRepairRequestDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  int? voteWindow;
+  Optional<int?> voteWindow;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is FaceRepairRequestDto &&
@@ -130,46 +132,41 @@ class FaceRepairRequestDto {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'dryRun'] = this.dryRun;
-    if (this.maxAttributionDistance != null) {
-      json[r'maxAttributionDistance'] = this.maxAttributionDistance;
-    } else {
-    //  json[r'maxAttributionDistance'] = null;
+    if (this.dryRun.isPresent) {
+      final value = this.dryRun.value;
+      json[r'dryRun'] = value;
     }
-    if (this.maxDistance != null) {
-      json[r'maxDistance'] = this.maxDistance;
-    } else {
-    //  json[r'maxDistance'] = null;
+    if (this.maxAttributionDistance.isPresent) {
+      final value = this.maxAttributionDistance.value;
+      json[r'maxAttributionDistance'] = value;
     }
-    if (this.maxFlaggedFraction != null) {
-      json[r'maxFlaggedFraction'] = this.maxFlaggedFraction;
-    } else {
-    //  json[r'maxFlaggedFraction'] = null;
+    if (this.maxDistance.isPresent) {
+      final value = this.maxDistance.value;
+      json[r'maxDistance'] = value;
     }
-    if (this.minFaces != null) {
-      json[r'minFaces'] = this.minFaces;
-    } else {
-    //  json[r'minFaces'] = null;
+    if (this.maxFlaggedFraction.isPresent) {
+      final value = this.maxFlaggedFraction.value;
+      json[r'maxFlaggedFraction'] = value;
     }
-    if (this.ownerId != null) {
-      json[r'ownerId'] = this.ownerId;
-    } else {
-    //  json[r'ownerId'] = null;
+    if (this.minFaces.isPresent) {
+      final value = this.minFaces.value;
+      json[r'minFaces'] = value;
     }
-    if (this.personId != null) {
-      json[r'personId'] = this.personId;
-    } else {
-    //  json[r'personId'] = null;
+    if (this.ownerId.isPresent) {
+      final value = this.ownerId.value;
+      json[r'ownerId'] = value;
     }
-    if (this.voteMargin != null) {
-      json[r'voteMargin'] = this.voteMargin;
-    } else {
-    //  json[r'voteMargin'] = null;
+    if (this.personId.isPresent) {
+      final value = this.personId.value;
+      json[r'personId'] = value;
     }
-    if (this.voteWindow != null) {
-      json[r'voteWindow'] = this.voteWindow;
-    } else {
-    //  json[r'voteWindow'] = null;
+    if (this.voteMargin.isPresent) {
+      final value = this.voteMargin.value;
+      json[r'voteMargin'] = value;
+    }
+    if (this.voteWindow.isPresent) {
+      final value = this.voteWindow.value;
+      json[r'voteWindow'] = value;
     }
     return json;
   }
@@ -183,21 +180,15 @@ class FaceRepairRequestDto {
       final json = value.cast<String, dynamic>();
 
       return FaceRepairRequestDto(
-        dryRun: mapValueOfType<bool>(json, r'dryRun') ?? true,
-        maxAttributionDistance: json[r'maxAttributionDistance'] == null
-            ? null
-            : num.parse('${json[r'maxAttributionDistance']}'),
-        maxDistance: json[r'maxDistance'] == null
-            ? null
-            : num.parse('${json[r'maxDistance']}'),
-        maxFlaggedFraction: json[r'maxFlaggedFraction'] == null
-            ? null
-            : num.parse('${json[r'maxFlaggedFraction']}'),
-        minFaces: mapValueOfType<int>(json, r'minFaces'),
-        ownerId: mapValueOfType<String>(json, r'ownerId'),
-        personId: mapValueOfType<String>(json, r'personId'),
-        voteMargin: mapValueOfType<int>(json, r'voteMargin'),
-        voteWindow: mapValueOfType<int>(json, r'voteWindow'),
+        dryRun: json.containsKey(r'dryRun') ? Optional.present(mapValueOfType<bool>(json, r'dryRun')) : const Optional.absent(),
+        maxAttributionDistance: json.containsKey(r'maxAttributionDistance') ? Optional.present(json[r'maxAttributionDistance'] == null ? null : num.parse('${json[r'maxAttributionDistance']}')) : const Optional.absent(),
+        maxDistance: json.containsKey(r'maxDistance') ? Optional.present(json[r'maxDistance'] == null ? null : num.parse('${json[r'maxDistance']}')) : const Optional.absent(),
+        maxFlaggedFraction: json.containsKey(r'maxFlaggedFraction') ? Optional.present(json[r'maxFlaggedFraction'] == null ? null : num.parse('${json[r'maxFlaggedFraction']}')) : const Optional.absent(),
+        minFaces: json.containsKey(r'minFaces') ? Optional.present(json[r'minFaces'] == null ? null : int.parse('${json[r'minFaces']}')) : const Optional.absent(),
+        ownerId: json.containsKey(r'ownerId') ? Optional.present(mapValueOfType<String>(json, r'ownerId')) : const Optional.absent(),
+        personId: json.containsKey(r'personId') ? Optional.present(mapValueOfType<String>(json, r'personId')) : const Optional.absent(),
+        voteMargin: json.containsKey(r'voteMargin') ? Optional.present(json[r'voteMargin'] == null ? null : int.parse('${json[r'voteMargin']}')) : const Optional.absent(),
+        voteWindow: json.containsKey(r'voteWindow') ? Optional.present(json[r'voteWindow'] == null ? null : int.parse('${json[r'voteWindow']}')) : const Optional.absent(),
       );
     }
     return null;
