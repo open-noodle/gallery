@@ -59,7 +59,9 @@ describe(FaceRepairAdminController.name, () => {
         .send({ maxFlaggedFraction: 2 });
       expect(status).toBe(400);
       expect(body).toEqual(
-        factory.responses.validationError([{ path: ['maxFlaggedFraction'], message: 'Too big: expected number to be <=1' }]),
+        factory.responses.validationError([
+          { path: ['maxFlaggedFraction'], message: 'Too big: expected number to be <=1' },
+        ]),
       );
       expect(service.runRepair).not.toHaveBeenCalled();
     });
