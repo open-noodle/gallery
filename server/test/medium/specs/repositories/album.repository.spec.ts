@@ -3,7 +3,7 @@ import { AlbumRepository } from 'src/repositories/album.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
-import { asDateString } from 'src/utils/date';
+import { asDateTimeString } from 'src/utils/date';
 import { newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 import { vi } from 'vitest';
@@ -46,10 +46,10 @@ describe(AlbumRepository.name, () => {
         assetCount: 1,
       });
 
-      // startDate / endDate must be coercible by asDateString. Postgres timestamp
-      // returns Date | string depending on Kysely driver config; asDateString handles both.
-      expect(() => asDateString(rows[0].startDate ?? undefined)).not.toThrow();
-      expect(() => asDateString(rows[0].endDate ?? undefined)).not.toThrow();
+      // startDate / endDate must be coercible by asDateTimeString. Postgres timestamp
+      // returns Date | string depending on Kysely driver config; asDateTimeString handles both.
+      expect(() => asDateTimeString(rows[0].startDate ?? undefined)).not.toThrow();
+      expect(() => asDateTimeString(rows[0].endDate ?? undefined)).not.toThrow();
     });
 
     it('does not call updateThumbnails', async () => {
