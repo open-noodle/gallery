@@ -23,7 +23,7 @@ final photosFilterSuggestionsProvider = FutureProvider.autoDispose.family<Filter
     mediaType: mapAssetType(filter.mediaType),
     model: filter.camera.model,
     personIds: filter.people.isEmpty ? null : filter.people.map((p) => p.id).toList(),
-    rating: filter.rating.rating,
+    rating: filter.rating.rating.unwrapOrNull,
     tagIds: filter.tagIds,
     takenAfter: filter.date.takenAfter,
     takenBefore: filter.date.takenBefore,

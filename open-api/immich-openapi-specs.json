@@ -28179,7 +28179,7 @@
           "rating": {
             "description": "Filter by rating [1-5], or null for unrated",
             "maximum": 5,
-            "minimum": -1,
+            "minimum": 1,
             "nullable": true,
             "type": "number",
             "x-immich-history": [
@@ -28195,6 +28195,11 @@
                 "version": "v2.6.0",
                 "state": "Updated",
                 "description": "Using -1 as a rating is deprecated and will be removed in the next major version."
+              },
+              {
+                "version": "v3",
+                "state": "Updated",
+                "description": "Using -1 as a rating is no longer valid."
               }
             ],
             "x-immich-state": "Stable"
