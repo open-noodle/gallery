@@ -14,7 +14,7 @@ class ScopedPrimaryProfile {
   /// Returns a new [ScopedPrimaryProfile] instance.
   ScopedPrimaryProfile({
     required this.id,
-    this.spaceId,
+    this.spaceId = const Optional.absent(),
     required this.type,
   });
 
@@ -26,7 +26,7 @@ class ScopedPrimaryProfile {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? spaceId;
+  Optional<String?> spaceId;
 
   ScopedPrimaryProfileTypeEnum type;
 
@@ -49,10 +49,9 @@ class ScopedPrimaryProfile {
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'id'] = this.id;
-    if (this.spaceId != null) {
-      json[r'spaceId'] = this.spaceId;
-    } else {
-    //  json[r'spaceId'] = null;
+    if (this.spaceId.isPresent) {
+      final value = this.spaceId.value;
+      json[r'spaceId'] = value;
     }
       json[r'type'] = this.type;
     return json;
@@ -68,7 +67,7 @@ class ScopedPrimaryProfile {
 
       return ScopedPrimaryProfile(
         id: mapValueOfType<String>(json, r'id')!,
-        spaceId: mapValueOfType<String>(json, r'spaceId'),
+        spaceId: json.containsKey(r'spaceId') ? Optional.present(mapValueOfType<String>(json, r'spaceId')) : const Optional.absent(),
         type: ScopedPrimaryProfileTypeEnum.fromJson(json[r'type'])!,
       );
     }

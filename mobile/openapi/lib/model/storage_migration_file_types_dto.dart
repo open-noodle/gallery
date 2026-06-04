@@ -13,39 +13,39 @@ part of openapi.api;
 class StorageMigrationFileTypesDto {
   /// Returns a new [StorageMigrationFileTypesDto] instance.
   StorageMigrationFileTypesDto({
-    this.encodedVideos = true,
-    this.fullsize = true,
-    this.originals = true,
-    this.personThumbnails = true,
-    this.previews = true,
-    this.profileImages = true,
-    this.sidecars = true,
-    this.thumbnails = true,
+    this.encodedVideos = const Optional.present(true),
+    this.fullsize = const Optional.present(true),
+    this.originals = const Optional.present(true),
+    this.personThumbnails = const Optional.present(true),
+    this.previews = const Optional.present(true),
+    this.profileImages = const Optional.present(true),
+    this.sidecars = const Optional.present(true),
+    this.thumbnails = const Optional.present(true),
   });
 
   /// Include encoded video files
-  bool encodedVideos;
+  Optional<bool?> encodedVideos;
 
   /// Include full-size files
-  bool fullsize;
+  Optional<bool?> fullsize;
 
   /// Include original files
-  bool originals;
+  Optional<bool?> originals;
 
   /// Include person thumbnail files
-  bool personThumbnails;
+  Optional<bool?> personThumbnails;
 
   /// Include preview files
-  bool previews;
+  Optional<bool?> previews;
 
   /// Include profile image files
-  bool profileImages;
+  Optional<bool?> profileImages;
 
   /// Include sidecar files
-  bool sidecars;
+  Optional<bool?> sidecars;
 
   /// Include thumbnail files
-  bool thumbnails;
+  Optional<bool?> thumbnails;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is StorageMigrationFileTypesDto &&
@@ -75,14 +75,38 @@ class StorageMigrationFileTypesDto {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'encodedVideos'] = this.encodedVideos;
-      json[r'fullsize'] = this.fullsize;
-      json[r'originals'] = this.originals;
-      json[r'personThumbnails'] = this.personThumbnails;
-      json[r'previews'] = this.previews;
-      json[r'profileImages'] = this.profileImages;
-      json[r'sidecars'] = this.sidecars;
-      json[r'thumbnails'] = this.thumbnails;
+    if (this.encodedVideos.isPresent) {
+      final value = this.encodedVideos.value;
+      json[r'encodedVideos'] = value;
+    }
+    if (this.fullsize.isPresent) {
+      final value = this.fullsize.value;
+      json[r'fullsize'] = value;
+    }
+    if (this.originals.isPresent) {
+      final value = this.originals.value;
+      json[r'originals'] = value;
+    }
+    if (this.personThumbnails.isPresent) {
+      final value = this.personThumbnails.value;
+      json[r'personThumbnails'] = value;
+    }
+    if (this.previews.isPresent) {
+      final value = this.previews.value;
+      json[r'previews'] = value;
+    }
+    if (this.profileImages.isPresent) {
+      final value = this.profileImages.value;
+      json[r'profileImages'] = value;
+    }
+    if (this.sidecars.isPresent) {
+      final value = this.sidecars.value;
+      json[r'sidecars'] = value;
+    }
+    if (this.thumbnails.isPresent) {
+      final value = this.thumbnails.value;
+      json[r'thumbnails'] = value;
+    }
     return json;
   }
 
@@ -95,14 +119,14 @@ class StorageMigrationFileTypesDto {
       final json = value.cast<String, dynamic>();
 
       return StorageMigrationFileTypesDto(
-        encodedVideos: mapValueOfType<bool>(json, r'encodedVideos') ?? true,
-        fullsize: mapValueOfType<bool>(json, r'fullsize') ?? true,
-        originals: mapValueOfType<bool>(json, r'originals') ?? true,
-        personThumbnails: mapValueOfType<bool>(json, r'personThumbnails') ?? true,
-        previews: mapValueOfType<bool>(json, r'previews') ?? true,
-        profileImages: mapValueOfType<bool>(json, r'profileImages') ?? true,
-        sidecars: mapValueOfType<bool>(json, r'sidecars') ?? true,
-        thumbnails: mapValueOfType<bool>(json, r'thumbnails') ?? true,
+        encodedVideos: json.containsKey(r'encodedVideos') ? Optional.present(mapValueOfType<bool>(json, r'encodedVideos')) : const Optional.absent(),
+        fullsize: json.containsKey(r'fullsize') ? Optional.present(mapValueOfType<bool>(json, r'fullsize')) : const Optional.absent(),
+        originals: json.containsKey(r'originals') ? Optional.present(mapValueOfType<bool>(json, r'originals')) : const Optional.absent(),
+        personThumbnails: json.containsKey(r'personThumbnails') ? Optional.present(mapValueOfType<bool>(json, r'personThumbnails')) : const Optional.absent(),
+        previews: json.containsKey(r'previews') ? Optional.present(mapValueOfType<bool>(json, r'previews')) : const Optional.absent(),
+        profileImages: json.containsKey(r'profileImages') ? Optional.present(mapValueOfType<bool>(json, r'profileImages')) : const Optional.absent(),
+        sidecars: json.containsKey(r'sidecars') ? Optional.present(mapValueOfType<bool>(json, r'sidecars')) : const Optional.absent(),
+        thumbnails: json.containsKey(r'thumbnails') ? Optional.present(mapValueOfType<bool>(json, r'thumbnails')) : const Optional.absent(),
       );
     }
     return null;

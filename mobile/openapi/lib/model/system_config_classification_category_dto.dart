@@ -15,7 +15,7 @@ class SystemConfigClassificationCategoryDto {
   SystemConfigClassificationCategoryDto({
     required this.action,
     required this.enabled,
-    this.faceExclusion,
+    this.faceExclusion = const Optional.absent(),
     required this.name,
     this.prompts = const [],
     required this.similarity,
@@ -33,7 +33,7 @@ class SystemConfigClassificationCategoryDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  ClassificationFaceExclusion? faceExclusion;
+  Optional<ClassificationFaceExclusion?> faceExclusion;
 
   /// Category name
   String name;
@@ -73,10 +73,9 @@ class SystemConfigClassificationCategoryDto {
     final json = <String, dynamic>{};
       json[r'action'] = this.action;
       json[r'enabled'] = this.enabled;
-    if (this.faceExclusion != null) {
-      json[r'faceExclusion'] = this.faceExclusion;
-    } else {
-    //  json[r'faceExclusion'] = null;
+    if (this.faceExclusion.isPresent) {
+      final value = this.faceExclusion.value;
+      json[r'faceExclusion'] = value;
     }
       json[r'name'] = this.name;
       json[r'prompts'] = this.prompts;
@@ -95,12 +94,12 @@ class SystemConfigClassificationCategoryDto {
       return SystemConfigClassificationCategoryDto(
         action: SystemConfigClassificationCategoryDtoActionEnum.fromJson(json[r'action'])!,
         enabled: mapValueOfType<bool>(json, r'enabled')!,
-        faceExclusion: ClassificationFaceExclusion.fromJson(json[r'faceExclusion']),
+        faceExclusion: json.containsKey(r'faceExclusion') ? Optional.present(ClassificationFaceExclusion.fromJson(json[r'faceExclusion'])) : const Optional.absent(),
         name: mapValueOfType<String>(json, r'name')!,
         prompts: json[r'prompts'] is Iterable
             ? (json[r'prompts'] as Iterable).cast<String>().toList(growable: false)
             : const [],
-        similarity: (mapValueOfType<num>(json, r'similarity')!).toDouble(),
+        similarity: mapValueOfType<double>(json, r'similarity')!,
       );
     }
     return null;
