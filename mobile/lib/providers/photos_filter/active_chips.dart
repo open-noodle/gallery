@@ -133,7 +133,7 @@ List<ActiveChipSpec> activeChipsFromFilter(SearchFilter filter, {FilterSuggestio
   }
 
   // ── rating ───────────────────────────────────────────────────────────
-  final rating = filter.rating.rating;
+  final rating = filter.rating.rating.unwrapOrNull;
   if (rating != null && rating > 0) {
     out.add(
       ActiveChipSpec(
