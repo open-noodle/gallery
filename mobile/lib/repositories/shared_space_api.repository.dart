@@ -28,7 +28,10 @@ class SharedSpaceApiRepository extends ApiRepository {
   }
 
   Future<SharedSpaceResponseDto> create(String name, {String? description}) async {
-    final dto = SharedSpaceCreateDto(name: name, description: description);
+    final dto = SharedSpaceCreateDto(
+      name: name,
+      description: description == null ? const Optional.absent() : Optional.present(description),
+    );
     return await checkNull(_api.createSpace(dto));
   }
 
@@ -46,7 +49,7 @@ class SharedSpaceApiRepository extends ApiRepository {
     String userId, {
     SharedSpaceRole role = SharedSpaceRole.viewer,
   }) async {
-    final dto = SharedSpaceMemberCreateDto(userId: userId, role: role);
+    final dto = SharedSpaceMemberCreateDto(userId: userId, role: Optional.present(role));
     return await checkNull(_api.addMember(spaceId, dto));
   }
 
