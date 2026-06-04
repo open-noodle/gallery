@@ -13,8 +13,8 @@ part of openapi.api;
 class SharedSpaceCreateDto {
   /// Returns a new [SharedSpaceCreateDto] instance.
   SharedSpaceCreateDto({
-    this.color,
-    this.description,
+    this.color = const Optional.absent(),
+    this.description = const Optional.absent(),
     required this.name,
   });
 
@@ -24,7 +24,7 @@ class SharedSpaceCreateDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  UserAvatarColor? color;
+  Optional<UserAvatarColor?> color;
 
   /// Space description
   ///
@@ -33,7 +33,7 @@ class SharedSpaceCreateDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? description;
+  Optional<String?> description;
 
   /// Space name
   String name;
@@ -56,15 +56,13 @@ class SharedSpaceCreateDto {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-    if (this.color != null) {
-      json[r'color'] = this.color;
-    } else {
-    //  json[r'color'] = null;
+    if (this.color.isPresent) {
+      final value = this.color.value;
+      json[r'color'] = value;
     }
-    if (this.description != null) {
-      json[r'description'] = this.description;
-    } else {
-    //  json[r'description'] = null;
+    if (this.description.isPresent) {
+      final value = this.description.value;
+      json[r'description'] = value;
     }
       json[r'name'] = this.name;
     return json;
@@ -79,8 +77,8 @@ class SharedSpaceCreateDto {
       final json = value.cast<String, dynamic>();
 
       return SharedSpaceCreateDto(
-        color: UserAvatarColor.fromJson(json[r'color']),
-        description: mapValueOfType<String>(json, r'description'),
+        color: json.containsKey(r'color') ? Optional.present(UserAvatarColor.fromJson(json[r'color'])) : const Optional.absent(),
+        description: json.containsKey(r'description') ? Optional.present(mapValueOfType<String>(json, r'description')) : const Optional.absent(),
         name: mapValueOfType<String>(json, r'name')!,
       );
     }

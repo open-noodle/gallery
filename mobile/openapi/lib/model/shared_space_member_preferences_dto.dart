@@ -13,8 +13,8 @@ part of openapi.api;
 class SharedSpaceMemberPreferencesDto {
   /// Returns a new [SharedSpaceMemberPreferencesDto] instance.
   SharedSpaceMemberPreferencesDto({
-    this.sharePersonMetadata,
-    this.showInTimeline,
+    this.sharePersonMetadata = const Optional.absent(),
+    this.showInTimeline = const Optional.absent(),
   });
 
   /// Share person names and birth dates with this space
@@ -24,7 +24,7 @@ class SharedSpaceMemberPreferencesDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  bool? sharePersonMetadata;
+  Optional<bool?> sharePersonMetadata;
 
   /// Show space assets in personal timeline
   ///
@@ -33,7 +33,7 @@ class SharedSpaceMemberPreferencesDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  bool? showInTimeline;
+  Optional<bool?> showInTimeline;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is SharedSpaceMemberPreferencesDto &&
@@ -51,15 +51,13 @@ class SharedSpaceMemberPreferencesDto {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-    if (this.sharePersonMetadata != null) {
-      json[r'sharePersonMetadata'] = this.sharePersonMetadata;
-    } else {
-    //  json[r'sharePersonMetadata'] = null;
+    if (this.sharePersonMetadata.isPresent) {
+      final value = this.sharePersonMetadata.value;
+      json[r'sharePersonMetadata'] = value;
     }
-    if (this.showInTimeline != null) {
-      json[r'showInTimeline'] = this.showInTimeline;
-    } else {
-    //  json[r'showInTimeline'] = null;
+    if (this.showInTimeline.isPresent) {
+      final value = this.showInTimeline.value;
+      json[r'showInTimeline'] = value;
     }
     return json;
   }
@@ -73,8 +71,8 @@ class SharedSpaceMemberPreferencesDto {
       final json = value.cast<String, dynamic>();
 
       return SharedSpaceMemberPreferencesDto(
-        sharePersonMetadata: mapValueOfType<bool>(json, r'sharePersonMetadata'),
-        showInTimeline: mapValueOfType<bool>(json, r'showInTimeline'),
+        sharePersonMetadata: json.containsKey(r'sharePersonMetadata') ? Optional.present(mapValueOfType<bool>(json, r'sharePersonMetadata')) : const Optional.absent(),
+        showInTimeline: json.containsKey(r'showInTimeline') ? Optional.present(mapValueOfType<bool>(json, r'showInTimeline')) : const Optional.absent(),
       );
     }
     return null;
