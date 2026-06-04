@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/enums.dart';
@@ -9,6 +10,7 @@ import 'package:immich_mobile/domain/services/device_permission.service.dart';
 import 'package:immich_mobile/domain/services/log.service.dart';
 import 'package:immich_mobile/models/auth/auth_state.model.dart';
 import 'package:immich_mobile/models/server_info/server_version.model.dart';
+import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/app_life_cycle.provider.dart';
 import 'package:immich_mobile/providers/auth.provider.dart';
 import 'package:immich_mobile/providers/background_sync.provider.dart';
@@ -95,138 +97,194 @@ class TestGalleryPermissionNotifier extends GalleryPermissionNotifier {
 }
 
 void main() {
-  late LogService logService;
-  late Completer<ServerVersion?> serverVersion;
-  late MockServerInfoService serverInfoService;
-  late MockBackgroundWorkerLockService lockService;
-  late ProviderContainer container;
-  late TestWebsocketNotifier websocket;
-  late AppLifeCycleNotifier lifeCycle;
-  late int serverVersionCount;
-  late int memoryLaneBuilds;
+  group('resume lifecycle and websocket reconnection', () {
+    late LogService logService;
+    late Completer<ServerVersion?> serverVersion;
+    late MockServerInfoService serverInfoService;
+    late MockBackgroundWorkerLockService lockService;
+    late ProviderContainer container;
+    late TestWebsocketNotifier websocket;
+    late AppLifeCycleNotifier lifeCycle;
+    late int serverVersionCount;
+    late int memoryLaneBuilds;
 
-  setUpAll(() async {
-    final logRepository = MockLogRepository();
-    final settingsRepository = MockSettingsRepository();
-    registerFallbackValue(FakeLogMessage());
-    when(() => logRepository.truncate(limit: any(named: 'limit'))).thenAnswer((_) async {});
-    when(() => logRepository.insert(any())).thenAnswer((_) async => true);
-    when(() => settingsRepository.appConfig).thenReturn(const AppConfig(logLevel: LogLevel.info));
-    logService = await LogService.init(
-      logRepository: logRepository,
-      settingsRepository: settingsRepository,
-      shouldBuffer: false,
-    );
-  });
-
-  tearDownAll(() => logService.dispose());
-
-  setUp(() {
-    serverVersion = Completer<ServerVersion?>();
-    serverInfoService = MockServerInfoService();
-    lockService = MockBackgroundWorkerLockService();
-    final backgroundSync = MockBackgroundSyncManager();
-    serverVersionCount = 0;
-    memoryLaneBuilds = 0;
-
-    when(() => serverInfoService.getServerVersion()).thenAnswer((_) {
-      serverVersionCount++;
-      return serverVersionCount == 1 ? serverVersion.future : Future<ServerVersion?>.value();
+    setUpAll(() async {
+      final logRepository = MockLogRepository();
+      final settingsRepository = MockSettingsRepository();
+      registerFallbackValue(FakeLogMessage());
+      when(() => logRepository.truncate(limit: any(named: 'limit'))).thenAnswer((_) async {});
+      when(() => logRepository.insert(any())).thenAnswer((_) async => true);
+      when(() => settingsRepository.appConfig).thenReturn(const AppConfig(logLevel: LogLevel.info));
+      logService = await LogService.init(
+        logRepository: logRepository,
+        settingsRepository: settingsRepository,
+        shouldBuffer: false,
+      );
     });
-    when(() => lockService.lock()).thenAnswer((_) async {});
-    when(() => lockService.unlock()).thenAnswer((_) async {});
-    when(() => backgroundSync.cancelResumeSyncs()).thenAnswer((_) async {});
-    when(() => backgroundSync.syncLocal(full: any(named: 'full'))).thenAnswer((_) async {});
-    when(() => backgroundSync.syncRemote()).thenAnswer((_) async => true);
-    when(() => backgroundSync.hashAssets()).thenAnswer((_) async {});
 
-    container = ProviderContainer(
-      overrides: [
-        authProvider.overrideWith(TestAuthNotifier.new),
-        serverInfoProvider.overrideWith((_) => ServerInfoNotifier(serverInfoService)),
-        websocketProvider.overrideWith((ref) {
-          return websocket = TestWebsocketNotifier(ref);
-        }),
-        backupProvider.overrideWith((_) => TestDriftBackupNotifier()),
-        backgroundWorkerLockServiceProvider.overrideWithValue(lockService),
-        backgroundSyncProvider.overrideWithValue(backgroundSync),
-        appConfigProvider.overrideWithValue(defaultConfig),
-        notificationPermissionProvider.overrideWith((_) => TestNotificationPermissionNotifier()),
-        galleryPermissionNotifier.overrideWith((_) => TestGalleryPermissionNotifier()),
-        memoryLaneProvider.overrideWith((_) {
-          memoryLaneBuilds++;
-          return const [];
-        }),
-      ],
-    );
-    lifeCycle = container.read(appStateProvider.notifier);
+    tearDownAll(() => logService.dispose());
+
+    setUp(() {
+      serverVersion = Completer<ServerVersion?>();
+      serverInfoService = MockServerInfoService();
+      lockService = MockBackgroundWorkerLockService();
+      final backgroundSync = MockBackgroundSyncManager();
+      serverVersionCount = 0;
+      memoryLaneBuilds = 0;
+
+      when(() => serverInfoService.getServerVersion()).thenAnswer((_) {
+        serverVersionCount++;
+        return serverVersionCount == 1 ? serverVersion.future : Future<ServerVersion?>.value();
+      });
+      when(() => lockService.lock()).thenAnswer((_) async {});
+      when(() => lockService.unlock()).thenAnswer((_) async {});
+      when(() => backgroundSync.cancelResumeSyncs()).thenAnswer((_) async {});
+      when(() => backgroundSync.syncLocal(full: any(named: 'full'))).thenAnswer((_) async {});
+      when(() => backgroundSync.syncRemote()).thenAnswer((_) async => true);
+      when(() => backgroundSync.hashAssets()).thenAnswer((_) async {});
+
+      container = ProviderContainer(
+        overrides: [
+          authProvider.overrideWith(TestAuthNotifier.new),
+          serverInfoProvider.overrideWith((_) => ServerInfoNotifier(serverInfoService)),
+          websocketProvider.overrideWith((ref) {
+            return websocket = TestWebsocketNotifier(ref);
+          }),
+          backupProvider.overrideWith((_) => TestDriftBackupNotifier()),
+          backgroundWorkerLockServiceProvider.overrideWithValue(lockService),
+          backgroundSyncProvider.overrideWithValue(backgroundSync),
+          appConfigProvider.overrideWithValue(defaultConfig),
+          notificationPermissionProvider.overrideWith((_) => TestNotificationPermissionNotifier()),
+          galleryPermissionNotifier.overrideWith((_) => TestGalleryPermissionNotifier()),
+          memoryLaneProvider.overrideWith((_) {
+            memoryLaneBuilds++;
+            return const [];
+          }),
+        ],
+      );
+      lifeCycle = container.read(appStateProvider.notifier);
+    });
+
+    tearDown(() => container.dispose());
+
+    Future<void> startResume() async {
+      await lifeCycle.handleAppPause();
+      unawaited(lifeCycle.handleAppResume());
+      await untilCalled(() => serverInfoService.getServerVersion());
+    }
+
+    Future<void> releaseResume() async {
+      serverVersion.complete();
+      await Future<void>.delayed(Duration.zero);
+    }
+
+    test('pause during resume does not reconnect websocket', () async {
+      await startResume();
+      await lifeCycle.handleAppPause();
+      await releaseResume();
+
+      expect(lifeCycle.getAppState(), AppLifeCycleEnum.paused);
+      expect(serverVersionCount, 1);
+      expect(websocket.disconnectCount, 2);
+      expect(websocket.connectCount, 0);
+    });
+
+    test('inactive resume retries when the app resumes again', () async {
+      await startResume();
+      lifeCycle.handleAppInactivity();
+      await releaseResume();
+
+      unawaited(lifeCycle.handleAppResume());
+      await websocket.connectCalled.future;
+
+      expect(lifeCycle.getAppState(), AppLifeCycleEnum.resumed);
+      expect(serverVersionCount, 2);
+      expect(websocket.disconnectCount, 1);
+      expect(websocket.connectCount, 1);
+    });
+
+    test('pause after an inactive abort resumes once', () async {
+      await startResume();
+      lifeCycle.handleAppInactivity();
+      await releaseResume();
+      await lifeCycle.handleAppPause();
+
+      unawaited(lifeCycle.handleAppResume());
+      await websocket.connectCalled.future;
+      unawaited(lifeCycle.handleAppResume());
+      await Future<void>.delayed(Duration.zero);
+
+      expect(lifeCycle.getAppState(), AppLifeCycleEnum.resumed);
+      expect(serverVersionCount, 2);
+      expect(websocket.disconnectCount, 2);
+      expect(websocket.connectCount, 1);
+    });
+
+    test('resume re-queries the memory lane', () async {
+      container.listen(memoryLaneProvider, (_, _) {});
+      expect(memoryLaneBuilds, 1);
+
+      await lifeCycle.handleAppPause();
+      websocket.throwOnConnect = false;
+      serverVersion.complete();
+      await lifeCycle.handleAppResume();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(memoryLaneBuilds, 2);
+    });
   });
 
-  tearDown(() => container.dispose());
+  // Fork-only (#663): on iOS the foreground URLSession is torn down by the
+  // background worker, so resume must rebuild the HTTP client. Kept as its own
+  // group because it needs a minimal container overriding only apiServiceProvider.
+  // MockApiService comes from ../service.mocks.dart — do not redeclare it here.
+  group('iOS foreground connection refresh on resume', () {
+    late MockApiService apiService;
+    late ProviderContainer container;
+    late AppLifeCycleNotifier sut;
 
-  Future<void> startResume() async {
-    await lifeCycle.handleAppPause();
-    unawaited(lifeCycle.handleAppResume());
-    await untilCalled(() => serverInfoService.getServerVersion());
-  }
+    setUp(() {
+      apiService = MockApiService();
+      when(() => apiService.refreshConnection()).thenAnswer((_) async {});
+      container = ProviderContainer(overrides: [apiServiceProvider.overrideWithValue(apiService)]);
+      sut = container.read(appStateProvider.notifier);
+    });
 
-  Future<void> releaseResume() async {
-    serverVersion.complete();
-    await Future<void>.delayed(Duration.zero);
-  }
+    tearDown(() {
+      container.dispose();
+      debugDefaultTargetPlatformOverride = null;
+    });
 
-  test('pause during resume does not reconnect websocket', () async {
-    await startResume();
-    await lifeCycle.handleAppPause();
-    await releaseResume();
+    test('refreshes the connection on iOS resume after a pause', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
 
-    expect(lifeCycle.getAppState(), AppLifeCycleEnum.paused);
-    expect(serverVersionCount, 1);
-    expect(websocket.disconnectCount, 2);
-    expect(websocket.connectCount, 0);
-  });
+      await sut.refreshConnectionAfterResume(true);
 
-  test('inactive resume retries when the app resumes again', () async {
-    await startResume();
-    lifeCycle.handleAppInactivity();
-    await releaseResume();
+      verify(() => apiService.refreshConnection()).called(1);
+    });
 
-    unawaited(lifeCycle.handleAppResume());
-    await websocket.connectCalled.future;
+    test('does not refresh when the app was not paused', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
 
-    expect(lifeCycle.getAppState(), AppLifeCycleEnum.resumed);
-    expect(serverVersionCount, 2);
-    expect(websocket.disconnectCount, 1);
-    expect(websocket.connectCount, 1);
-  });
+      await sut.refreshConnectionAfterResume(false);
 
-  test('pause after an inactive abort resumes once', () async {
-    await startResume();
-    lifeCycle.handleAppInactivity();
-    await releaseResume();
-    await lifeCycle.handleAppPause();
+      verifyNever(() => apiService.refreshConnection());
+    });
 
-    unawaited(lifeCycle.handleAppResume());
-    await websocket.connectCalled.future;
-    unawaited(lifeCycle.handleAppResume());
-    await Future<void>.delayed(Duration.zero);
+    test('does not refresh on Android', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
 
-    expect(lifeCycle.getAppState(), AppLifeCycleEnum.resumed);
-    expect(serverVersionCount, 2);
-    expect(websocket.disconnectCount, 2);
-    expect(websocket.connectCount, 1);
-  });
+      await sut.refreshConnectionAfterResume(true);
 
-  test('resume re-queries the memory lane', () async {
-    container.listen(memoryLaneProvider, (_, _) {});
-    expect(memoryLaneBuilds, 1);
+      verifyNever(() => apiService.refreshConnection());
+    });
 
-    await lifeCycle.handleAppPause();
-    websocket.throwOnConnect = false;
-    serverVersion.complete();
-    await lifeCycle.handleAppResume();
-    await Future<void>.delayed(Duration.zero);
+    test('swallows refresh errors so resume can continue', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      when(() => apiService.refreshConnection()).thenThrow(Exception('boom'));
 
-    expect(memoryLaneBuilds, 2);
+      await expectLater(sut.refreshConnectionAfterResume(true), completes);
+      verify(() => apiService.refreshConnection()).called(1);
+    });
   });
 }
