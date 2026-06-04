@@ -18,12 +18,12 @@ class PersonFaceResponseDto {
     required this.boundingBoxX2,
     required this.boundingBoxY1,
     required this.boundingBoxY2,
-    this.fileCreatedAt,
+    this.fileCreatedAt = const Optional.absent(),
     required this.id,
     required this.imageHeight,
     required this.imageWidth,
     required this.isRepresentative,
-    this.sourceType,
+    this.sourceType = const Optional.absent(),
   });
 
   /// Asset ID containing the face
@@ -60,7 +60,7 @@ class PersonFaceResponseDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  DateTime? fileCreatedAt;
+  Optional<DateTime?> fileCreatedAt;
 
   /// Face ID
   String id;
@@ -86,7 +86,7 @@ class PersonFaceResponseDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  SourceType? sourceType;
+  Optional<SourceType?> sourceType;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is PersonFaceResponseDto &&
@@ -127,19 +127,17 @@ class PersonFaceResponseDto {
       json[r'boundingBoxX2'] = this.boundingBoxX2;
       json[r'boundingBoxY1'] = this.boundingBoxY1;
       json[r'boundingBoxY2'] = this.boundingBoxY2;
-    if (this.fileCreatedAt != null) {
-      json[r'fileCreatedAt'] = this.fileCreatedAt!.toUtc().toIso8601String();
-    } else {
-    //  json[r'fileCreatedAt'] = null;
+    if (this.fileCreatedAt.isPresent) {
+      final value = this.fileCreatedAt.value;
+      json[r'fileCreatedAt'] = value == null ? null : value.toUtc().toIso8601String();
     }
       json[r'id'] = this.id;
       json[r'imageHeight'] = this.imageHeight;
       json[r'imageWidth'] = this.imageWidth;
       json[r'isRepresentative'] = this.isRepresentative;
-    if (this.sourceType != null) {
-      json[r'sourceType'] = this.sourceType;
-    } else {
-    //  json[r'sourceType'] = null;
+    if (this.sourceType.isPresent) {
+      final value = this.sourceType.value;
+      json[r'sourceType'] = value;
     }
     return json;
   }
@@ -158,12 +156,12 @@ class PersonFaceResponseDto {
         boundingBoxX2: mapValueOfType<int>(json, r'boundingBoxX2')!,
         boundingBoxY1: mapValueOfType<int>(json, r'boundingBoxY1')!,
         boundingBoxY2: mapValueOfType<int>(json, r'boundingBoxY2')!,
-        fileCreatedAt: mapDateTime(json, r'fileCreatedAt', r''),
+        fileCreatedAt: json.containsKey(r'fileCreatedAt') ? Optional.present(mapDateTime(json, r'fileCreatedAt', r'')) : const Optional.absent(),
         id: mapValueOfType<String>(json, r'id')!,
         imageHeight: mapValueOfType<int>(json, r'imageHeight')!,
         imageWidth: mapValueOfType<int>(json, r'imageWidth')!,
         isRepresentative: mapValueOfType<bool>(json, r'isRepresentative')!,
-        sourceType: SourceType.fromJson(json[r'sourceType']),
+        sourceType: json.containsKey(r'sourceType') ? Optional.present(SourceType.fromJson(json[r'sourceType'])) : const Optional.absent(),
       );
     }
     return null;

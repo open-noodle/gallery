@@ -15,7 +15,7 @@ class FilterSuggestionsPersonDto {
   FilterSuggestionsPersonDto({
     required this.id,
     required this.name,
-    this.primaryProfile,
+    this.primaryProfile = const Optional.absent(),
   });
 
   /// Person ID
@@ -30,7 +30,7 @@ class FilterSuggestionsPersonDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  ScopedPrimaryProfile? primaryProfile;
+  Optional<ScopedPrimaryProfile?> primaryProfile;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is FilterSuggestionsPersonDto &&
@@ -52,10 +52,9 @@ class FilterSuggestionsPersonDto {
     final json = <String, dynamic>{};
       json[r'id'] = this.id;
       json[r'name'] = this.name;
-    if (this.primaryProfile != null) {
-      json[r'primaryProfile'] = this.primaryProfile;
-    } else {
-    //  json[r'primaryProfile'] = null;
+    if (this.primaryProfile.isPresent) {
+      final value = this.primaryProfile.value;
+      json[r'primaryProfile'] = value;
     }
     return json;
   }
@@ -71,7 +70,7 @@ class FilterSuggestionsPersonDto {
       return FilterSuggestionsPersonDto(
         id: mapValueOfType<String>(json, r'id')!,
         name: mapValueOfType<String>(json, r'name')!,
-        primaryProfile: ScopedPrimaryProfile.fromJson(json[r'primaryProfile']),
+        primaryProfile: json.containsKey(r'primaryProfile') ? Optional.present(ScopedPrimaryProfile.fromJson(json[r'primaryProfile'])) : const Optional.absent(),
       );
     }
     return null;

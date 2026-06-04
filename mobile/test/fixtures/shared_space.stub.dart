@@ -11,9 +11,9 @@ abstract final class SharedSpaceMemberStub {
     joinedAt: '2024-01-01T00:00:00Z',
     sharePersonMetadata: true,
     showInTimeline: true,
-    avatarColor: 'green',
-    contributionCount: 42,
-    profileChangedAt: '2024-01-01T00:00:00Z',
+    avatarColor: const Optional.present('green'),
+    contributionCount: const Optional.present(42),
+    profileChangedAt: const Optional.present('2024-01-01T00:00:00Z'),
   );
 
   static final editor = SharedSpaceMemberResponseDto(
@@ -24,9 +24,9 @@ abstract final class SharedSpaceMemberStub {
     joinedAt: '2024-02-01T00:00:00Z',
     sharePersonMetadata: true,
     showInTimeline: true,
-    avatarColor: 'red',
-    contributionCount: 15,
-    profileChangedAt: '2024-02-01T00:00:00Z',
+    avatarColor: const Optional.present('red'),
+    contributionCount: const Optional.present(15),
+    profileChangedAt: const Optional.present('2024-02-01T00:00:00Z'),
   );
 
   static final viewer = SharedSpaceMemberResponseDto(
@@ -37,9 +37,9 @@ abstract final class SharedSpaceMemberStub {
     joinedAt: '2024-03-01T00:00:00Z',
     sharePersonMetadata: true,
     showInTimeline: false,
-    avatarColor: 'blue',
-    contributionCount: 0,
-    profileChangedAt: '2024-03-01T00:00:00Z',
+    avatarColor: const Optional.present('blue'),
+    contributionCount: const Optional.present(0),
+    profileChangedAt: const Optional.present('2024-03-01T00:00:00Z'),
   );
 }
 
@@ -52,11 +52,11 @@ abstract final class SharedSpaceStub {
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-15T00:00:00Z',
     createdById: 'user-1',
-    description: 'Shared family photo collection',
-    color: UserAvatarColor.blue,
-    assetCount: 150,
-    memberCount: 3,
-    faceRecognitionEnabled: true,
+    description: const Optional.present('Shared family photo collection'),
+    color: const Optional.present(UserAvatarColor.blue),
+    assetCount: const Optional.present(150),
+    memberCount: const Optional.present(3),
+    faceRecognitionEnabled: const Optional.present(true),
   );
 
   static final space2 = SharedSpaceResponseDto(
@@ -65,10 +65,10 @@ abstract final class SharedSpaceStub {
     createdAt: '2024-06-01T00:00:00Z',
     updatedAt: '2024-06-10T00:00:00Z',
     createdById: 'user-2',
-    color: UserAvatarColor.green,
-    assetCount: 42,
-    memberCount: 2,
-    faceRecognitionEnabled: false,
+    color: const Optional.present(UserAvatarColor.green),
+    assetCount: const Optional.present(42),
+    memberCount: const Optional.present(2),
+    faceRecognitionEnabled: const Optional.present(false),
   );
 
   static final spaceWithMembers = SharedSpaceResponseDto(
@@ -77,19 +77,19 @@ abstract final class SharedSpaceStub {
     createdAt: '2024-03-01T00:00:00Z',
     updatedAt: '2024-03-20T00:00:00Z',
     createdById: 'user-1',
-    description: 'Team collaboration space',
-    color: UserAvatarColor.purple,
-    assetCount: 300,
-    memberCount: 3,
-    members: [SharedSpaceMemberStub.owner, SharedSpaceMemberStub.editor, SharedSpaceMemberStub.viewer],
-    faceRecognitionEnabled: true,
-    thumbnailAssetId: 'asset-thumbnail-1',
-    thumbnailCropY: 50,
-    lastActivityAt: '2024-03-20T12:00:00Z',
-    lastContributor: SharedSpaceResponseDtoLastContributor(id: 'user-2', name: 'Bob'),
-    recentAssetIds: ['asset-1', 'asset-2', 'asset-3', 'asset-4'],
-    recentAssetThumbhashes: ['hash-1', 'hash-2', 'hash-3', 'hash-4'],
-    newAssetCount: 5,
+    description: const Optional.present('Team collaboration space'),
+    color: const Optional.present(UserAvatarColor.purple),
+    assetCount: const Optional.present(300),
+    memberCount: const Optional.present(3),
+    members: Optional.present([SharedSpaceMemberStub.owner, SharedSpaceMemberStub.editor, SharedSpaceMemberStub.viewer]),
+    faceRecognitionEnabled: const Optional.present(true),
+    thumbnailAssetId: const Optional.present('asset-thumbnail-1'),
+    thumbnailCropY: const Optional.present(50),
+    lastActivityAt: const Optional.present('2024-03-20T12:00:00Z'),
+    lastContributor: Optional.present(SharedSpaceResponseDtoLastContributor(id: 'user-2', name: 'Bob')),
+    recentAssetIds: const Optional.present(['asset-1', 'asset-2', 'asset-3', 'asset-4']),
+    recentAssetThumbhashes: const Optional.present(['hash-1', 'hash-2', 'hash-3', 'hash-4']),
+    newAssetCount: const Optional.present(5),
   );
 
   static final emptySpace = SharedSpaceResponseDto(
@@ -98,7 +98,7 @@ abstract final class SharedSpaceStub {
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
     createdById: 'user-1',
-    assetCount: 0,
-    memberCount: 1,
+    assetCount: const Optional.present(0),
+    memberCount: const Optional.present(1),
   );
 }
