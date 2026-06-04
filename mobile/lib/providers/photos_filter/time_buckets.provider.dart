@@ -19,7 +19,7 @@ final timeBucketsProvider = FutureProvider.autoDispose.family<List<BucketLite>, 
     city: filter.location.city,
     isFavorite: filter.display.isFavorite ? true : null,
     personIds: filter.people.isEmpty ? null : filter.people.map((p) => p.id).toList(),
-    rating: filter.rating.rating,
+    rating: filter.rating.rating.unwrapOrNull,
     tagIds: filter.tagIds,
     type: mapAssetType(filter.mediaType),
   );
