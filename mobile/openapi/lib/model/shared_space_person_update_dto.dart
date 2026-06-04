@@ -13,14 +13,14 @@ part of openapi.api;
 class SharedSpacePersonUpdateDto {
   /// Returns a new [SharedSpacePersonUpdateDto] instance.
   SharedSpacePersonUpdateDto({
-    this.birthDate,
-    this.isHidden,
-    this.name,
-    this.representativeFaceId,
+    this.birthDate = const Optional.absent(),
+    this.isHidden = const Optional.absent(),
+    this.name = const Optional.absent(),
+    this.representativeFaceId = const Optional.absent(),
   });
 
   /// Person date of birth
-  DateTime? birthDate;
+  Optional<DateTime?> birthDate;
 
   /// Person visibility (hidden)
   ///
@@ -29,7 +29,7 @@ class SharedSpacePersonUpdateDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  bool? isHidden;
+  Optional<bool?> isHidden;
 
   /// Person name
   ///
@@ -38,10 +38,10 @@ class SharedSpacePersonUpdateDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? name;
+  Optional<String?> name;
 
   /// Representative face ID
-  String? representativeFaceId;
+  Optional<String?> representativeFaceId;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is SharedSpacePersonUpdateDto &&
@@ -63,25 +63,21 @@ class SharedSpacePersonUpdateDto {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-    if (this.birthDate != null) {
-      json[r'birthDate'] = _dateFormatter.format(this.birthDate!);
-    } else {
-    //  json[r'birthDate'] = null;
+    if (this.birthDate.isPresent) {
+      final value = this.birthDate.value;
+      json[r'birthDate'] = value == null ? null : _dateFormatter.format(value.toUtc());
     }
-    if (this.isHidden != null) {
-      json[r'isHidden'] = this.isHidden;
-    } else {
-    //  json[r'isHidden'] = null;
+    if (this.isHidden.isPresent) {
+      final value = this.isHidden.value;
+      json[r'isHidden'] = value;
     }
-    if (this.name != null) {
-      json[r'name'] = this.name;
-    } else {
-    //  json[r'name'] = null;
+    if (this.name.isPresent) {
+      final value = this.name.value;
+      json[r'name'] = value;
     }
-    if (this.representativeFaceId != null) {
-      json[r'representativeFaceId'] = this.representativeFaceId;
-    } else {
-    //  json[r'representativeFaceId'] = null;
+    if (this.representativeFaceId.isPresent) {
+      final value = this.representativeFaceId.value;
+      json[r'representativeFaceId'] = value;
     }
     return json;
   }
@@ -95,10 +91,10 @@ class SharedSpacePersonUpdateDto {
       final json = value.cast<String, dynamic>();
 
       return SharedSpacePersonUpdateDto(
-        birthDate: mapDateTime(json, r'birthDate', r''),
-        isHidden: mapValueOfType<bool>(json, r'isHidden'),
-        name: mapValueOfType<String>(json, r'name'),
-        representativeFaceId: mapValueOfType<String>(json, r'representativeFaceId'),
+        birthDate: json.containsKey(r'birthDate') ? Optional.present(mapDateTime(json, r'birthDate', r'')) : const Optional.absent(),
+        isHidden: json.containsKey(r'isHidden') ? Optional.present(mapValueOfType<bool>(json, r'isHidden')) : const Optional.absent(),
+        name: json.containsKey(r'name') ? Optional.present(mapValueOfType<String>(json, r'name')) : const Optional.absent(),
+        representativeFaceId: json.containsKey(r'representativeFaceId') ? Optional.present(mapValueOfType<String>(json, r'representativeFaceId')) : const Optional.absent(),
       );
     }
     return null;

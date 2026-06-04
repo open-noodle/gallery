@@ -13,8 +13,8 @@ part of openapi.api;
 class StorageMigrationStartDto {
   /// Returns a new [StorageMigrationStartDto] instance.
   StorageMigrationStartDto({
-    this.concurrency = 5,
-    this.deleteSource = false,
+    this.concurrency = const Optional.present(5),
+    this.deleteSource = const Optional.present(false),
     required this.direction,
     required this.fileTypes,
   });
@@ -23,10 +23,10 @@ class StorageMigrationStartDto {
   ///
   /// Minimum value: 1
   /// Maximum value: 20
-  int concurrency;
+  Optional<int?> concurrency;
 
   /// Delete source files after migration
-  bool deleteSource;
+  Optional<bool?> deleteSource;
 
   StorageMigrationDirection direction;
 
@@ -52,8 +52,14 @@ class StorageMigrationStartDto {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'concurrency'] = this.concurrency;
-      json[r'deleteSource'] = this.deleteSource;
+    if (this.concurrency.isPresent) {
+      final value = this.concurrency.value;
+      json[r'concurrency'] = value;
+    }
+    if (this.deleteSource.isPresent) {
+      final value = this.deleteSource.value;
+      json[r'deleteSource'] = value;
+    }
       json[r'direction'] = this.direction;
       json[r'fileTypes'] = this.fileTypes;
     return json;
@@ -68,8 +74,8 @@ class StorageMigrationStartDto {
       final json = value.cast<String, dynamic>();
 
       return StorageMigrationStartDto(
-        concurrency: mapValueOfType<int>(json, r'concurrency') ?? 5,
-        deleteSource: mapValueOfType<bool>(json, r'deleteSource') ?? false,
+        concurrency: json.containsKey(r'concurrency') ? Optional.present(json[r'concurrency'] == null ? null : int.parse('${json[r'concurrency']}')) : const Optional.absent(),
+        deleteSource: json.containsKey(r'deleteSource') ? Optional.present(mapValueOfType<bool>(json, r'deleteSource')) : const Optional.absent(),
         direction: StorageMigrationDirection.fromJson(json[r'direction'])!,
         fileTypes: StorageMigrationFileTypesDto.fromJson(json[r'fileTypes'])!,
       );
