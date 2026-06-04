@@ -1,8 +1,9 @@
 import 'dart:ffi';
-import 'dart:io';
 
 import 'package:cupertino_http/cupertino_http.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:immich_mobile/extensions/platform_extensions.dart';
 import 'package:immich_mobile/infrastructure/repositories/draining_http_client.dart';
 import 'package:immich_mobile/providers/infrastructure/platform.provider.dart';
 import 'package:ok_http/ok_http.dart';
@@ -18,6 +19,30 @@ class NetworkRepository {
   static bool _trackInFlight = false;
   static DrainingHttpClient? _draining;
 
+  /// Test seam: overrides the native client-pointer source.
+  @visibleForTesting
+  static Future<int> Function()? debugClientPointer;
+
+  /// Test seam: overrides native base-client construction (avoids real FFI).
+  @visibleForTesting
+  static http.Client Function(Pointer<Void> pointer)? debugBaseClientFactory;
+
+  /// Test seam: overrides the native session recreation performed by [refresh].
+  @visibleForTesting
+  static Future<void> Function()? debugRecreateSession;
+
+  /// Resets all static state and test seams. Test-only.
+  @visibleForTesting
+  static void debugReset() {
+    _client = null;
+    _clientPointer = null;
+    _draining = null;
+    _trackInFlight = false;
+    debugClientPointer = null;
+    debugBaseClientFactory = null;
+    debugRecreateSession = null;
+  }
+
   /// Enables graceful shutdown tracking of in-flight requests for the current
   /// isolate. Must be called before [init].
   ///
@@ -31,7 +56,8 @@ class NetworkRepository {
   }
 
   static Future<void> init() async {
-    final clientPointer = Pointer<Void>.fromAddress(await networkApi.getClientPointer());
+    final address = await (debugClientPointer ?? networkApi.getClientPointer)();
+    final clientPointer = Pointer<Void>.fromAddress(address);
     if (clientPointer == _clientPointer) {
       return;
     }
@@ -39,28 +65,51 @@ class NetworkRepository {
     _client?.close();
     _draining = null;
 
-    final http.Client base;
-    if (Platform.isIOS) {
-      final session = URLSession.fromRawPointer(clientPointer.cast());
-      base = CupertinoClient.fromSharedSession(session);
-    } else {
-      base = OkHttpClient.fromJniGlobalRef(
-        clientPointer,
-        configuration: const OkHttpClientConfiguration(
-          connectTimeout: Duration(seconds: 30),
-          readTimeout: Duration(seconds: 60),
-          writeTimeout: Duration(seconds: 60),
-        ),
-      );
-    }
+    final http.Client base = debugBaseClientFactory != null
+        ? debugBaseClientFactory!(clientPointer)
+        : _buildBaseClient(clientPointer);
 
     // Only iOS needs draining: the crash is specific to cupertino_http's
     // shared-session FFI delegate. Android's background worker is unaffected.
-    if (_trackInFlight && Platform.isIOS) {
+    if (_trackInFlight && CurrentPlatform.isIOS) {
       _client = _draining = DrainingHttpClient(base);
     } else {
       _client = base;
     }
+  }
+
+  /// Re-establishes this isolate's native HTTP client.
+  ///
+  /// On iOS the foreground and background-worker isolates share one native
+  /// URLSession. When the background-worker isolate is torn down
+  /// (`engine.destroyContext()`) it leaves the shared session's
+  /// `cupertino_http` callback target pointing at a destroyed isolate, so the
+  /// foreground can no longer complete any request until a cold restart.
+  ///
+  /// On resume we recreate the native session (iOS) and rebuild this isolate's
+  /// client — defeating [init]'s same-pointer short-circuit — so the foreground
+  /// owns a fresh, live session again.
+  static Future<void> refresh() async {
+    if (CurrentPlatform.isIOS) {
+      await (debugRecreateSession ?? networkApi.recreateSession)();
+    }
+    _clientPointer = null;
+    await init();
+  }
+
+  static http.Client _buildBaseClient(Pointer<Void> clientPointer) {
+    if (CurrentPlatform.isIOS) {
+      final session = URLSession.fromRawPointer(clientPointer.cast());
+      return CupertinoClient.fromSharedSession(session);
+    }
+    return OkHttpClient.fromJniGlobalRef(
+      clientPointer,
+      configuration: const OkHttpClientConfiguration(
+        connectTimeout: Duration(seconds: 30),
+        readTimeout: Duration(seconds: 60),
+        writeTimeout: Duration(seconds: 60),
+      ),
+    );
   }
 
   /// Aborts and drains any in-flight requests, then closes the client.
@@ -76,14 +125,14 @@ class NetworkRepository {
 
   static Future<void> setHeaders(Map<String, String> headers, List<String> serverUrls, {String? token}) async {
     await networkApi.setRequestHeaders(headers, serverUrls, token);
-    if (Platform.isIOS) {
+    if (CurrentPlatform.isIOS) {
       await init();
     }
   }
 
   // ignore: avoid-unused-parameters
   static Future<WebSocket> createWebSocket(Uri uri, {Map<String, String>? headers, Iterable<String>? protocols}) {
-    if (Platform.isIOS) {
+    if (CurrentPlatform.isIOS) {
       final session = URLSession.fromRawPointer(_clientPointer!.cast());
       return CupertinoWebSocket.connectWithSession(session, uri, protocols: protocols);
     } else {
