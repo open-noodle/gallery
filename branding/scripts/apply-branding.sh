@@ -527,6 +527,10 @@ patch_android() {
   # AndroidManifest.xml — app label
   sed -i "s/android:label=\"Immich\"/android:label=\"${NAME}\"/g" "$manifest"
 
+  # AndroidManifest.xml — view-intent filter labels + comments (upstream #26109 gallery/viewer)
+  sed -i "s/android:label=\"View in Immich\"/android:label=\"View in ${NAME}\"/g" "$manifest"
+  sed -i "s/<!-- Allow Immich to act as/<!-- Allow ${NAME} to act as/g" "$manifest"
+
   # AndroidManifest.xml — register branded deep link scheme alongside immich:// (additive, idempotent)
   if ! grep -q "android:scheme=\"${DEEP_LINK_SCHEME}\"" "$manifest"; then
     sed -i "/        <data android:scheme=\"immich\" \/>/a\\        <data android:scheme=\"${DEEP_LINK_SCHEME}\" />" "$manifest"
