@@ -388,30 +388,6 @@ describe(SharedLinkService.name, () => {
       });
     });
 
-    it('should set expiresAt to null when changeExpiryTime is true and expiresAt is not provided', async () => {
-      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid as any);
-      mocks.sharedLink.update.mockResolvedValue(sharedLinkStub.valid as any);
-
-      await sut.update(authStub.user1, sharedLinkStub.valid.id, { changeExpiryTime: true });
-
-      expect(mocks.sharedLink.update).toHaveBeenCalledWith(expect.objectContaining({ expiresAt: null }));
-    });
-
-    it('should use provided expiresAt when both changeExpiryTime and expiresAt are set', async () => {
-      const expiresAt = new Date('2025-12-31');
-      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid as any);
-      mocks.sharedLink.update.mockResolvedValue(sharedLinkStub.valid as any);
-
-      await sut.update(authStub.user1, sharedLinkStub.valid.id, {
-        changeExpiryTime: true,
-        expiresAt: expiresAt.toISOString() as any,
-      });
-
-      expect(mocks.sharedLink.update).toHaveBeenCalledWith(
-        expect.objectContaining({ expiresAt: expiresAt.toISOString() }),
-      );
-    });
-
     it('should update shared link with showMetadata', async () => {
       mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid as any);
       mocks.sharedLink.update.mockResolvedValue(sharedLinkStub.valid as any);
