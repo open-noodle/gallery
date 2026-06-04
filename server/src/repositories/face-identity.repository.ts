@@ -15,7 +15,7 @@ import { DB } from 'src/schema';
 import { FaceIdentityFaceSource, FaceIdentityFaceTable } from 'src/schema/tables/face-identity-face.table';
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table';
 import { anyUuid } from 'src/utils/database';
-import { asBirthDateString, asDateString } from 'src/utils/date';
+import { asDateString, asDateTimeString } from 'src/utils/date';
 
 export type FaceIdentity = Selectable<FaceIdentityTable>;
 export type FaceIdentityFace = Selectable<FaceIdentityFaceTable>;
@@ -1938,12 +1938,12 @@ export class FaceIdentityRepository {
     return {
       id: row.profileId,
       name: row.name ?? '',
-      birthDate: asBirthDateString(row.birthDate),
+      birthDate: asDateString(row.birthDate),
       thumbnailPath: row.profileType === 'user-person' ? (row.thumbnailPath ?? '') : '',
       isHidden: row.isHidden,
       isFavorite: row.isFavorite ?? undefined,
       color: row.color ?? undefined,
-      updatedAt: asDateString(row.updatedAt) ?? undefined,
+      updatedAt: asDateTimeString(row.updatedAt) ?? undefined,
       primaryProfile,
       filterId: `${row.profileType === 'space-person' ? 'space-person' : 'person'}:${row.profileId}`,
       numberOfAssets: Number(row.numberOfAssets ?? 0),
