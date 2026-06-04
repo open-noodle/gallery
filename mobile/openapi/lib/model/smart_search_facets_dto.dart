@@ -13,31 +13,31 @@ part of openapi.api;
 class SmartSearchFacetsDto {
   /// Returns a new [SmartSearchFacetsDto] instance.
   SmartSearchFacetsDto({
-    this.city,
-    this.country,
-    this.isFavorite,
-    this.isNotInAlbum,
-    this.language,
-    this.make,
-    this.model,
-    this.personIds = const [],
-    this.query,
-    this.queryAssetId,
-    this.rating,
-    this.spaceId,
-    this.spacePersonIds = const [],
-    this.tagIds = const [],
-    this.takenAfter,
-    this.takenBefore,
-    this.type,
-    this.withSharedSpaces,
+    this.city = const Optional.absent(),
+    this.country = const Optional.absent(),
+    this.isFavorite = const Optional.absent(),
+    this.isNotInAlbum = const Optional.absent(),
+    this.language = const Optional.absent(),
+    this.make = const Optional.absent(),
+    this.model = const Optional.absent(),
+    this.personIds = const Optional.present(const []),
+    this.query = const Optional.absent(),
+    this.queryAssetId = const Optional.absent(),
+    this.rating = const Optional.absent(),
+    this.spaceId = const Optional.absent(),
+    this.spacePersonIds = const Optional.present(const []),
+    this.tagIds = const Optional.present(const []),
+    this.takenAfter = const Optional.absent(),
+    this.takenBefore = const Optional.absent(),
+    this.type = const Optional.absent(),
+    this.withSharedSpaces = const Optional.absent(),
   });
 
   /// Filter by city name
-  String? city;
+  Optional<String?> city;
 
   /// Filter by country name
-  String? country;
+  Optional<String?> country;
 
   /// Filter by favorite status
   ///
@@ -46,7 +46,7 @@ class SmartSearchFacetsDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  bool? isFavorite;
+  Optional<bool?> isFavorite;
 
   /// Filter assets not in any album
   ///
@@ -55,7 +55,7 @@ class SmartSearchFacetsDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  bool? isNotInAlbum;
+  Optional<bool?> isNotInAlbum;
 
   /// Search language code
   ///
@@ -64,16 +64,16 @@ class SmartSearchFacetsDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? language;
+  Optional<String?> language;
 
   /// Filter by camera make
-  String? make;
+  Optional<String?> make;
 
   /// Filter by camera model
-  String? model;
+  Optional<String?> model;
 
   /// Filter by person IDs
-  List<String> personIds;
+  Optional<List<String>?> personIds;
 
   /// Natural language search query
   ///
@@ -82,7 +82,7 @@ class SmartSearchFacetsDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? query;
+  Optional<String?> query;
 
   /// Asset ID to use as search reference
   ///
@@ -91,13 +91,13 @@ class SmartSearchFacetsDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? queryAssetId;
+  Optional<String?> queryAssetId;
 
   /// Filter by rating [1-5], or null for unrated
   ///
   /// Minimum value: -1
   /// Maximum value: 5
-  int? rating;
+  Optional<int?> rating;
 
   /// Shared space ID to filter by
   ///
@@ -106,13 +106,13 @@ class SmartSearchFacetsDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? spaceId;
+  Optional<String?> spaceId;
 
   /// Shared space person IDs to filter by
-  List<String> spacePersonIds;
+  Optional<List<String>?> spacePersonIds;
 
   /// Filter by tag IDs
-  List<String>? tagIds;
+  Optional<List<String>?> tagIds;
 
   /// Filter by taken date (after)
   ///
@@ -121,7 +121,7 @@ class SmartSearchFacetsDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  DateTime? takenAfter;
+  Optional<DateTime?> takenAfter;
 
   /// Filter by taken date (before)
   ///
@@ -130,7 +130,7 @@ class SmartSearchFacetsDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  DateTime? takenBefore;
+  Optional<DateTime?> takenBefore;
 
   ///
   /// Please note: This property should have been non-nullable! Since the specification file
@@ -138,7 +138,7 @@ class SmartSearchFacetsDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  AssetTypeEnum? type;
+  Optional<AssetTypeEnum?> type;
 
   /// Include shared spaces the user is a member of
   ///
@@ -147,7 +147,7 @@ class SmartSearchFacetsDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  bool? withSharedSpaces;
+  Optional<bool?> withSharedSpaces;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is SmartSearchFacetsDto &&
@@ -197,91 +197,81 @@ class SmartSearchFacetsDto {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-    if (this.city != null) {
-      json[r'city'] = this.city;
-    } else {
-    //  json[r'city'] = null;
+    if (this.city.isPresent) {
+      final value = this.city.value;
+      json[r'city'] = value;
     }
-    if (this.country != null) {
-      json[r'country'] = this.country;
-    } else {
-    //  json[r'country'] = null;
+    if (this.country.isPresent) {
+      final value = this.country.value;
+      json[r'country'] = value;
     }
-    if (this.isFavorite != null) {
-      json[r'isFavorite'] = this.isFavorite;
-    } else {
-    //  json[r'isFavorite'] = null;
+    if (this.isFavorite.isPresent) {
+      final value = this.isFavorite.value;
+      json[r'isFavorite'] = value;
     }
-    if (this.isNotInAlbum != null) {
-      json[r'isNotInAlbum'] = this.isNotInAlbum;
-    } else {
-    //  json[r'isNotInAlbum'] = null;
+    if (this.isNotInAlbum.isPresent) {
+      final value = this.isNotInAlbum.value;
+      json[r'isNotInAlbum'] = value;
     }
-    if (this.language != null) {
-      json[r'language'] = this.language;
-    } else {
-    //  json[r'language'] = null;
+    if (this.language.isPresent) {
+      final value = this.language.value;
+      json[r'language'] = value;
     }
-    if (this.make != null) {
-      json[r'make'] = this.make;
-    } else {
-    //  json[r'make'] = null;
+    if (this.make.isPresent) {
+      final value = this.make.value;
+      json[r'make'] = value;
     }
-    if (this.model != null) {
-      json[r'model'] = this.model;
-    } else {
-    //  json[r'model'] = null;
+    if (this.model.isPresent) {
+      final value = this.model.value;
+      json[r'model'] = value;
     }
-      json[r'personIds'] = this.personIds;
-    if (this.query != null) {
-      json[r'query'] = this.query;
-    } else {
-    //  json[r'query'] = null;
+    if (this.personIds.isPresent) {
+      final value = this.personIds.value;
+      json[r'personIds'] = value;
     }
-    if (this.queryAssetId != null) {
-      json[r'queryAssetId'] = this.queryAssetId;
-    } else {
-    //  json[r'queryAssetId'] = null;
+    if (this.query.isPresent) {
+      final value = this.query.value;
+      json[r'query'] = value;
     }
-    if (this.rating != null) {
-      json[r'rating'] = this.rating;
-    } else {
-    //  json[r'rating'] = null;
+    if (this.queryAssetId.isPresent) {
+      final value = this.queryAssetId.value;
+      json[r'queryAssetId'] = value;
     }
-    if (this.spaceId != null) {
-      json[r'spaceId'] = this.spaceId;
-    } else {
-    //  json[r'spaceId'] = null;
+    if (this.rating.isPresent) {
+      final value = this.rating.value;
+      json[r'rating'] = value;
     }
-      json[r'spacePersonIds'] = this.spacePersonIds;
-    if (this.tagIds != null) {
-      json[r'tagIds'] = this.tagIds;
-    } else {
-    //  json[r'tagIds'] = null;
+    if (this.spaceId.isPresent) {
+      final value = this.spaceId.value;
+      json[r'spaceId'] = value;
     }
-    if (this.takenAfter != null) {
-      json[r'takenAfter'] = _isEpochMarker(r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$/')
-        ? this.takenAfter!.millisecondsSinceEpoch
-        : this.takenAfter!.toUtc().toIso8601String();
-    } else {
-    //  json[r'takenAfter'] = null;
+    if (this.spacePersonIds.isPresent) {
+      final value = this.spacePersonIds.value;
+      json[r'spacePersonIds'] = value;
     }
-    if (this.takenBefore != null) {
-      json[r'takenBefore'] = _isEpochMarker(r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$/')
-        ? this.takenBefore!.millisecondsSinceEpoch
-        : this.takenBefore!.toUtc().toIso8601String();
-    } else {
-    //  json[r'takenBefore'] = null;
+    if (this.tagIds.isPresent) {
+      final value = this.tagIds.value;
+      json[r'tagIds'] = value;
     }
-    if (this.type != null) {
-      json[r'type'] = this.type;
-    } else {
-    //  json[r'type'] = null;
+    if (this.takenAfter.isPresent) {
+      final value = this.takenAfter.value;
+      json[r'takenAfter'] = value == null ? null : (_isEpochMarker(r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$/')
+        ? value.millisecondsSinceEpoch
+        : value.toUtc().toIso8601String());
     }
-    if (this.withSharedSpaces != null) {
-      json[r'withSharedSpaces'] = this.withSharedSpaces;
-    } else {
-    //  json[r'withSharedSpaces'] = null;
+    if (this.takenBefore.isPresent) {
+      final value = this.takenBefore.value;
+      json[r'takenBefore'] = value == null ? null : (_isEpochMarker(r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$/')
+        ? value.millisecondsSinceEpoch
+        : value.toUtc().toIso8601String());
+    }
+    if (this.type.isPresent) {
+      final value = this.type.value;
+      json[r'type'] = value;
+    }
+    if (this.withSharedSpaces.isPresent) {
+      final value = this.withSharedSpaces.value;
+      json[r'withSharedSpaces'] = value;
     }
     return json;
   }
@@ -295,30 +285,30 @@ class SmartSearchFacetsDto {
       final json = value.cast<String, dynamic>();
 
       return SmartSearchFacetsDto(
-        city: mapValueOfType<String>(json, r'city'),
-        country: mapValueOfType<String>(json, r'country'),
-        isFavorite: mapValueOfType<bool>(json, r'isFavorite'),
-        isNotInAlbum: mapValueOfType<bool>(json, r'isNotInAlbum'),
-        language: mapValueOfType<String>(json, r'language'),
-        make: mapValueOfType<String>(json, r'make'),
-        model: mapValueOfType<String>(json, r'model'),
-        personIds: json[r'personIds'] is Iterable
+        city: json.containsKey(r'city') ? Optional.present(mapValueOfType<String>(json, r'city')) : const Optional.absent(),
+        country: json.containsKey(r'country') ? Optional.present(mapValueOfType<String>(json, r'country')) : const Optional.absent(),
+        isFavorite: json.containsKey(r'isFavorite') ? Optional.present(mapValueOfType<bool>(json, r'isFavorite')) : const Optional.absent(),
+        isNotInAlbum: json.containsKey(r'isNotInAlbum') ? Optional.present(mapValueOfType<bool>(json, r'isNotInAlbum')) : const Optional.absent(),
+        language: json.containsKey(r'language') ? Optional.present(mapValueOfType<String>(json, r'language')) : const Optional.absent(),
+        make: json.containsKey(r'make') ? Optional.present(mapValueOfType<String>(json, r'make')) : const Optional.absent(),
+        model: json.containsKey(r'model') ? Optional.present(mapValueOfType<String>(json, r'model')) : const Optional.absent(),
+        personIds: json.containsKey(r'personIds') ? Optional.present(json[r'personIds'] is Iterable
             ? (json[r'personIds'] as Iterable).cast<String>().toList(growable: false)
-            : const [],
-        query: mapValueOfType<String>(json, r'query'),
-        queryAssetId: mapValueOfType<String>(json, r'queryAssetId'),
-        rating: mapValueOfType<int>(json, r'rating'),
-        spaceId: mapValueOfType<String>(json, r'spaceId'),
-        spacePersonIds: json[r'spacePersonIds'] is Iterable
+            : const []) : const Optional.absent(),
+        query: json.containsKey(r'query') ? Optional.present(mapValueOfType<String>(json, r'query')) : const Optional.absent(),
+        queryAssetId: json.containsKey(r'queryAssetId') ? Optional.present(mapValueOfType<String>(json, r'queryAssetId')) : const Optional.absent(),
+        rating: json.containsKey(r'rating') ? Optional.present(json[r'rating'] == null ? null : int.parse('${json[r'rating']}')) : const Optional.absent(),
+        spaceId: json.containsKey(r'spaceId') ? Optional.present(mapValueOfType<String>(json, r'spaceId')) : const Optional.absent(),
+        spacePersonIds: json.containsKey(r'spacePersonIds') ? Optional.present(json[r'spacePersonIds'] is Iterable
             ? (json[r'spacePersonIds'] as Iterable).cast<String>().toList(growable: false)
-            : const [],
-        tagIds: json[r'tagIds'] is Iterable
+            : const []) : const Optional.absent(),
+        tagIds: json.containsKey(r'tagIds') ? Optional.present(json[r'tagIds'] is Iterable
             ? (json[r'tagIds'] as Iterable).cast<String>().toList(growable: false)
-            : const [],
-        takenAfter: mapDateTime(json, r'takenAfter', r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$/'),
-        takenBefore: mapDateTime(json, r'takenBefore', r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$/'),
-        type: AssetTypeEnum.fromJson(json[r'type']),
-        withSharedSpaces: mapValueOfType<bool>(json, r'withSharedSpaces'),
+            : const []) : const Optional.absent(),
+        takenAfter: json.containsKey(r'takenAfter') ? Optional.present(mapDateTime(json, r'takenAfter', r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$/')) : const Optional.absent(),
+        takenBefore: json.containsKey(r'takenBefore') ? Optional.present(mapDateTime(json, r'takenBefore', r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$/')) : const Optional.absent(),
+        type: json.containsKey(r'type') ? Optional.present(AssetTypeEnum.fromJson(json[r'type'])) : const Optional.absent(),
+        withSharedSpaces: json.containsKey(r'withSharedSpaces') ? Optional.present(mapValueOfType<bool>(json, r'withSharedSpaces')) : const Optional.absent(),
       );
     }
     return null;
