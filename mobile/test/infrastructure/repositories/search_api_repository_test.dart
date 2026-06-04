@@ -34,7 +34,7 @@ void main() {
 
       final dto = verify(() => searchApi.searchAssets(captureAny())).captured.single as MetadataSearchDto;
       final json = dto.toJson();
-      expect(dto.tagIds, isEmpty);
+      expect(dto.tagIds.value, isEmpty);
       expect(json, contains('tagIds'));
       expect(json['tagIds'], isEmpty);
     });
@@ -47,7 +47,7 @@ void main() {
 
       final dto = verify(() => searchApi.searchAssets(captureAny())).captured.single as MetadataSearchDto;
       final json = dto.toJson();
-      expect(dto.tagIds, isNull);
+      expect(dto.tagIds.value, isEmpty);
       expect(json, contains('tagIds'));
       expect(json['tagIds'], isNull);
     });
@@ -63,7 +63,7 @@ void main() {
 
       final dto = verify(() => searchApi.searchSmart(captureAny())).captured.single as SmartSearchDto;
       final json = dto.toJson();
-      expect(dto.tagIds, isNull);
+      expect(dto.tagIds.value, isEmpty);
       expect(json, contains('tagIds'));
       expect(json['tagIds'], isNull);
     });
@@ -73,7 +73,7 @@ void main() {
       final filter = SearchFilter.empty().copyWith(context: 'beach', sort: SearchSortOrder.newest);
       await sut.search(filter, 1);
       final dto = verify(() => searchApi.searchSmart(captureAny())).captured.single as SmartSearchDto;
-      expect(dto.order, AssetOrder.desc);
+      expect(dto.order.value, AssetOrder.desc);
     });
 
     test('smart search relevance omits order', () async {
@@ -81,7 +81,7 @@ void main() {
       final filter = SearchFilter.empty().copyWith(context: 'beach', sort: SearchSortOrder.relevance);
       await sut.search(filter, 1);
       final dto = verify(() => searchApi.searchSmart(captureAny())).captured.single as SmartSearchDto;
-      expect(dto.order, isNull);
+      expect(dto.order.isPresent, isFalse);
     });
 
     test('metadata search maps oldest -> AssetOrder.asc', () async {
@@ -89,7 +89,7 @@ void main() {
       final filter = SearchFilter.empty().copyWith(sort: SearchSortOrder.oldest);
       await sut.search(filter, 1);
       final dto = verify(() => searchApi.searchAssets(captureAny())).captured.single as MetadataSearchDto;
-      expect(dto.order, AssetOrder.asc);
+      expect(dto.order.value, AssetOrder.asc);
     });
   });
 }
