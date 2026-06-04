@@ -12,7 +12,7 @@ class RatingStarsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final current = ref.watch(photosFilterProvider.select((f) => f.rating.rating));
+    final current = ref.watch(photosFilterProvider.select((f) => f.rating.rating.unwrapOrNull));
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
       child: Row(

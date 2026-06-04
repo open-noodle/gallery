@@ -24,7 +24,7 @@ void main() {
       await tester.tap(find.byKey(const Key('rating-star-4')));
       await tester.pumpAndSettle();
 
-      expect(container.read(photosFilterProvider).rating.rating, 4);
+      expect(container.read(photosFilterProvider).rating.rating.unwrapOrNull, 4);
     });
 
     testWidgets('tap star 4 twice clears the rating', (tester) async {
@@ -36,7 +36,7 @@ void main() {
       await tester.tap(find.byKey(const Key('rating-star-4')));
       await tester.pumpAndSettle();
 
-      expect(container.read(photosFilterProvider).rating.rating, isNull);
+      expect(container.read(photosFilterProvider).rating.rating.unwrapOrNull, isNull);
     });
 
     testWidgets('filled icon on stars ≤ current rating', (tester) async {

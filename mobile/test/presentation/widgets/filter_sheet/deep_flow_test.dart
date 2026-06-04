@@ -89,7 +89,7 @@ void main() {
       expect(filter.location.country, 'France');
       expect(filter.location.city, 'Paris');
       expect(filter.tagIds, contains('t1'));
-      expect(filter.rating.rating, 4);
+      expect(filter.rating.rating.unwrapOrNull, 4);
       expect(filter.display.isFavorite, isTrue);
       expect(filter.isEmpty, isFalse);
     });
