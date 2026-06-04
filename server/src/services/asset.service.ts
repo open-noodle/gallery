@@ -54,7 +54,7 @@ import {
   onBeforeUnlink,
 } from 'src/utils/asset.util.js';
 import { updateLockedColumns } from 'src/utils/database.js';
-import { asDateString, extractTimeZone } from 'src/utils/date.js';
+import { asDateTimeString, extractTimeZone } from 'src/utils/date.js';
 import { batched, findOrFail } from 'src/utils/misc.js';
 import { transformOcrBoundingBox } from 'src/utils/transform.js';
 
@@ -161,7 +161,7 @@ export class AssetService extends BaseService {
       }
 
       if (spacePerson.updatedAt !== undefined) {
-        person.updatedAt = asDateString(spacePerson.updatedAt);
+        person.updatedAt = asDateTimeString(spacePerson.updatedAt);
       }
 
       if (spacePerson.type) {
