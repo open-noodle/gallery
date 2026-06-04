@@ -11,7 +11,7 @@ class SpaceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasNewAssets = space.newAssetCount != null && space.newAssetCount! > 0;
+    final hasNewAssets = (space.newAssetCount.value ?? 0) > 0;
 
     return GestureDetector(
       onTap: onTap,
@@ -25,9 +25,9 @@ class SpaceCard extends StatelessWidget {
               return Stack(
                 children: [
                   SpaceCollage(
-                    recentAssetIds: space.recentAssetIds,
-                    recentAssetThumbhashes: space.recentAssetThumbhashes,
-                    color: space.color,
+                    recentAssetIds: space.recentAssetIds.value ?? const [],
+                    recentAssetThumbhashes: space.recentAssetThumbhashes.value ?? const [],
+                    color: space.color.value,
                     size: width,
                   ),
                   // Activity dot
@@ -52,8 +52,8 @@ class SpaceCard extends StatelessWidget {
                       ),
                     ),
                   // Member avatar stack
-                  if (space.members.isNotEmpty)
-                    Positioned(bottom: 8, right: 8, child: _MemberAvatarStack(members: space.members)),
+                  if ((space.members.value ?? const []).isNotEmpty)
+                    Positioned(bottom: 8, right: 8, child: _MemberAvatarStack(members: space.members.value ?? const [])),
                 ],
               );
             },
@@ -95,9 +95,9 @@ class SpaceCard extends StatelessWidget {
   }
 
   String _activityText() {
-    final count = space.newAssetCount?.toInt() ?? 0;
+    final count = space.newAssetCount.value?.toInt() ?? 0;
     final countStr = count > 99 ? '99+' : '$count';
-    final contributorName = space.lastContributor?.name;
+    final contributorName = space.lastContributor.value?.name;
 
     if (contributorName != null && contributorName.isNotEmpty) {
       return '$contributorName added $countStr new';
@@ -106,8 +106,8 @@ class SpaceCard extends StatelessWidget {
   }
 
   String _detailsText() {
-    final assetCount = space.assetCount?.toInt() ?? 0;
-    final memberCount = space.memberCount?.toInt() ?? 0;
+    final assetCount = space.assetCount.value?.toInt() ?? 0;
+    final memberCount = space.memberCount.value?.toInt() ?? 0;
     final photos = '$assetCount photo${assetCount == 1 ? '' : 's'}';
     final members = '$memberCount member${memberCount == 1 ? '' : 's'}';
     return '$photos \u00B7 $members';
