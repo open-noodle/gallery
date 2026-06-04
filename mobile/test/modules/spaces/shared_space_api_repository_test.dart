@@ -18,7 +18,7 @@ void main() {
     registerFallbackValue(
       api.SharedSpaceMemberCreateDto(
         userId: '',
-        role: api.SharedSpaceRole.viewer,
+        role: const api.Optional.present(api.SharedSpaceRole.viewer),
       ),
     );
     registerFallbackValue(
@@ -128,7 +128,7 @@ void main() {
           any(
             that: isA<api.SharedSpaceCreateDto>()
                 .having((d) => d.name, 'name', 'New Space')
-                .having((d) => d.description, 'description', isNull),
+                .having((d) => d.description.isPresent, 'description absent', false),
           ),
         ),
       ).called(1);
@@ -138,7 +138,7 @@ void main() {
       final space = api.SharedSpaceResponseDto(
         id: 'space-new',
         name: 'New Space',
-        description: 'A description',
+        description: const api.Optional.present('A description'),
         createdAt: '2024-01-01T00:00:00Z',
         updatedAt: '2024-01-01T00:00:00Z',
         createdById: 'user-1',
@@ -150,7 +150,7 @@ void main() {
         description: 'A description',
       );
 
-      expect(result.description, equals('A description'));
+      expect(result.description.value, equals('A description'));
     });
   });
 
@@ -222,7 +222,7 @@ void main() {
           any(
             that: isA<api.SharedSpaceMemberCreateDto>()
                 .having((d) => d.userId, 'userId', 'user-2')
-                .having((d) => d.role, 'role', api.SharedSpaceRole.viewer),
+                .having((d) => d.role.value, 'role', api.SharedSpaceRole.viewer),
           ),
         ),
       ).called(1);

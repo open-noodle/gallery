@@ -13,7 +13,7 @@ part of openapi.api;
 class UserGroupCreateDto {
   /// Returns a new [UserGroupCreateDto] instance.
   UserGroupCreateDto({
-    this.color,
+    this.color = const Optional.absent(),
     required this.name,
   });
 
@@ -23,7 +23,7 @@ class UserGroupCreateDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  UserAvatarColor? color;
+  Optional<UserAvatarColor?> color;
 
   /// Group name
   String name;
@@ -44,10 +44,9 @@ class UserGroupCreateDto {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-    if (this.color != null) {
-      json[r'color'] = this.color;
-    } else {
-    //  json[r'color'] = null;
+    if (this.color.isPresent) {
+      final value = this.color.value;
+      json[r'color'] = value;
     }
       json[r'name'] = this.name;
     return json;
@@ -62,7 +61,7 @@ class UserGroupCreateDto {
       final json = value.cast<String, dynamic>();
 
       return UserGroupCreateDto(
-        color: UserAvatarColor.fromJson(json[r'color']),
+        color: json.containsKey(r'color') ? Optional.present(UserAvatarColor.fromJson(json[r'color'])) : const Optional.absent(),
         name: mapValueOfType<String>(json, r'name')!,
       );
     }
