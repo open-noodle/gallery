@@ -13,12 +13,12 @@ part of openapi.api;
 class UserGroupUpdateDto {
   /// Returns a new [UserGroupUpdateDto] instance.
   UserGroupUpdateDto({
-    this.color,
-    this.name,
+    this.color = const Optional.absent(),
+    this.name = const Optional.absent(),
   });
 
   /// Group color
-  UserAvatarColor? color;
+  Optional<UserAvatarColor?> color;
 
   /// Group name
   ///
@@ -27,7 +27,7 @@ class UserGroupUpdateDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? name;
+  Optional<String?> name;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is UserGroupUpdateDto &&
@@ -45,15 +45,13 @@ class UserGroupUpdateDto {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-    if (this.color != null) {
-      json[r'color'] = this.color;
-    } else {
-    //  json[r'color'] = null;
+    if (this.color.isPresent) {
+      final value = this.color.value;
+      json[r'color'] = value;
     }
-    if (this.name != null) {
-      json[r'name'] = this.name;
-    } else {
-    //  json[r'name'] = null;
+    if (this.name.isPresent) {
+      final value = this.name.value;
+      json[r'name'] = value;
     }
     return json;
   }
@@ -67,8 +65,8 @@ class UserGroupUpdateDto {
       final json = value.cast<String, dynamic>();
 
       return UserGroupUpdateDto(
-        color: UserAvatarColor.fromJson(json[r'color']),
-        name: mapValueOfType<String>(json, r'name'),
+        color: json.containsKey(r'color') ? Optional.present(UserAvatarColor.fromJson(json[r'color'])) : const Optional.absent(),
+        name: json.containsKey(r'name') ? Optional.present(mapValueOfType<String>(json, r'name')) : const Optional.absent(),
       );
     }
     return null;

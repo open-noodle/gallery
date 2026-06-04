@@ -13,13 +13,13 @@ part of openapi.api;
 class SharedSpaceUpdateDto {
   /// Returns a new [SharedSpaceUpdateDto] instance.
   SharedSpaceUpdateDto({
-    this.color,
-    this.description,
-    this.faceRecognitionEnabled,
-    this.name,
-    this.petsEnabled,
-    this.thumbnailAssetId,
-    this.thumbnailCropY,
+    this.color = const Optional.absent(),
+    this.description = const Optional.absent(),
+    this.faceRecognitionEnabled = const Optional.absent(),
+    this.name = const Optional.absent(),
+    this.petsEnabled = const Optional.absent(),
+    this.thumbnailAssetId = const Optional.absent(),
+    this.thumbnailCropY = const Optional.absent(),
   });
 
   ///
@@ -28,7 +28,7 @@ class SharedSpaceUpdateDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  UserAvatarColor? color;
+  Optional<UserAvatarColor?> color;
 
   /// Space description
   ///
@@ -37,7 +37,7 @@ class SharedSpaceUpdateDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? description;
+  Optional<String?> description;
 
   /// Enable face recognition for this space
   ///
@@ -46,7 +46,7 @@ class SharedSpaceUpdateDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  bool? faceRecognitionEnabled;
+  Optional<bool?> faceRecognitionEnabled;
 
   /// Space name
   ///
@@ -55,7 +55,7 @@ class SharedSpaceUpdateDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? name;
+  Optional<String?> name;
 
   /// Show pets in space people list
   ///
@@ -64,16 +64,16 @@ class SharedSpaceUpdateDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  bool? petsEnabled;
+  Optional<bool?> petsEnabled;
 
   /// Thumbnail asset ID
-  String? thumbnailAssetId;
+  Optional<String?> thumbnailAssetId;
 
   /// Vertical crop position for cover photo (0-100)
   ///
   /// Minimum value: 0
   /// Maximum value: 100
-  int? thumbnailCropY;
+  Optional<int?> thumbnailCropY;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is SharedSpaceUpdateDto &&
@@ -101,40 +101,33 @@ class SharedSpaceUpdateDto {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-    if (this.color != null) {
-      json[r'color'] = this.color;
-    } else {
-    //  json[r'color'] = null;
+    if (this.color.isPresent) {
+      final value = this.color.value;
+      json[r'color'] = value;
     }
-    if (this.description != null) {
-      json[r'description'] = this.description;
-    } else {
-    //  json[r'description'] = null;
+    if (this.description.isPresent) {
+      final value = this.description.value;
+      json[r'description'] = value;
     }
-    if (this.faceRecognitionEnabled != null) {
-      json[r'faceRecognitionEnabled'] = this.faceRecognitionEnabled;
-    } else {
-    //  json[r'faceRecognitionEnabled'] = null;
+    if (this.faceRecognitionEnabled.isPresent) {
+      final value = this.faceRecognitionEnabled.value;
+      json[r'faceRecognitionEnabled'] = value;
     }
-    if (this.name != null) {
-      json[r'name'] = this.name;
-    } else {
-    //  json[r'name'] = null;
+    if (this.name.isPresent) {
+      final value = this.name.value;
+      json[r'name'] = value;
     }
-    if (this.petsEnabled != null) {
-      json[r'petsEnabled'] = this.petsEnabled;
-    } else {
-    //  json[r'petsEnabled'] = null;
+    if (this.petsEnabled.isPresent) {
+      final value = this.petsEnabled.value;
+      json[r'petsEnabled'] = value;
     }
-    if (this.thumbnailAssetId != null) {
-      json[r'thumbnailAssetId'] = this.thumbnailAssetId;
-    } else {
-    //  json[r'thumbnailAssetId'] = null;
+    if (this.thumbnailAssetId.isPresent) {
+      final value = this.thumbnailAssetId.value;
+      json[r'thumbnailAssetId'] = value;
     }
-    if (this.thumbnailCropY != null) {
-      json[r'thumbnailCropY'] = this.thumbnailCropY;
-    } else {
-    //  json[r'thumbnailCropY'] = null;
+    if (this.thumbnailCropY.isPresent) {
+      final value = this.thumbnailCropY.value;
+      json[r'thumbnailCropY'] = value;
     }
     return json;
   }
@@ -148,13 +141,13 @@ class SharedSpaceUpdateDto {
       final json = value.cast<String, dynamic>();
 
       return SharedSpaceUpdateDto(
-        color: UserAvatarColor.fromJson(json[r'color']),
-        description: mapValueOfType<String>(json, r'description'),
-        faceRecognitionEnabled: mapValueOfType<bool>(json, r'faceRecognitionEnabled'),
-        name: mapValueOfType<String>(json, r'name'),
-        petsEnabled: mapValueOfType<bool>(json, r'petsEnabled'),
-        thumbnailAssetId: mapValueOfType<String>(json, r'thumbnailAssetId'),
-        thumbnailCropY: mapValueOfType<int>(json, r'thumbnailCropY'),
+        color: json.containsKey(r'color') ? Optional.present(UserAvatarColor.fromJson(json[r'color'])) : const Optional.absent(),
+        description: json.containsKey(r'description') ? Optional.present(mapValueOfType<String>(json, r'description')) : const Optional.absent(),
+        faceRecognitionEnabled: json.containsKey(r'faceRecognitionEnabled') ? Optional.present(mapValueOfType<bool>(json, r'faceRecognitionEnabled')) : const Optional.absent(),
+        name: json.containsKey(r'name') ? Optional.present(mapValueOfType<String>(json, r'name')) : const Optional.absent(),
+        petsEnabled: json.containsKey(r'petsEnabled') ? Optional.present(mapValueOfType<bool>(json, r'petsEnabled')) : const Optional.absent(),
+        thumbnailAssetId: json.containsKey(r'thumbnailAssetId') ? Optional.present(mapValueOfType<String>(json, r'thumbnailAssetId')) : const Optional.absent(),
+        thumbnailCropY: json.containsKey(r'thumbnailCropY') ? Optional.present(json[r'thumbnailCropY'] == null ? null : int.parse('${json[r'thumbnailCropY']}')) : const Optional.absent(),
       );
     }
     return null;

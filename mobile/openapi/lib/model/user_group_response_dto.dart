@@ -13,7 +13,7 @@ part of openapi.api;
 class UserGroupResponseDto {
   /// Returns a new [UserGroupResponseDto] instance.
   UserGroupResponseDto({
-    this.color,
+    this.color = const Optional.absent(),
     required this.createdAt,
     required this.id,
     this.members = const [],
@@ -22,7 +22,7 @@ class UserGroupResponseDto {
   });
 
   /// Group color
-  UserAvatarColor? color;
+  Optional<UserAvatarColor?> color;
 
   /// Creation date
   String createdAt;
@@ -63,10 +63,9 @@ class UserGroupResponseDto {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-    if (this.color != null) {
-      json[r'color'] = this.color;
-    } else {
-    //  json[r'color'] = null;
+    if (this.color.isPresent) {
+      final value = this.color.value;
+      json[r'color'] = value;
     }
       json[r'createdAt'] = this.createdAt;
       json[r'id'] = this.id;
@@ -85,7 +84,7 @@ class UserGroupResponseDto {
       final json = value.cast<String, dynamic>();
 
       return UserGroupResponseDto(
-        color: UserAvatarColor.fromJson(json[r'color']),
+        color: json.containsKey(r'color') ? Optional.present(UserAvatarColor.fromJson(json[r'color'])) : const Optional.absent(),
         createdAt: mapValueOfType<String>(json, r'createdAt')!,
         id: mapValueOfType<String>(json, r'id')!,
         members: UserGroupMemberResponseDto.listFromJson(json[r'members']),
