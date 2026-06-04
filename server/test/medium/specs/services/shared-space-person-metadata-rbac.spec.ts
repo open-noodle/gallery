@@ -10,7 +10,7 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository'
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
 import { DB } from 'src/schema';
 import { SharedSpaceService } from 'src/services/shared-space.service';
-import { asBirthDateString } from 'src/utils/date';
+import { asDateString } from 'src/utils/date';
 import { newMediumService } from 'test/medium.factory';
 import { factory, newEmbedding } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
@@ -239,7 +239,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
         birthDateSource: 'inherited',
       }),
     );
-    expect(asBirthDateString(people[0].birthDate)).toBe('1990-01-01');
+    expect(asDateString(people[0].birthDate)).toBe('1990-01-01');
     expect(people[0].faceCount).toBe(2);
   });
 
@@ -414,7 +414,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
     expect(targetSpacePerson.nameSource).toBe('inherited');
     expect(targetSpacePerson.nameSourceProfileType).toBe('space-person');
     expect(targetSpacePerson.nameSourceProfileId).toBe(sourceSpacePerson.id);
-    expect(asBirthDateString(targetSpacePerson.birthDate)).toBe('1980-01-02');
+    expect(asDateString(targetSpacePerson.birthDate)).toBe('1980-01-02');
     expect(targetSpacePerson.birthDateSource).toBe('inherited');
     expect(targetSpacePerson.birthDateSourceProfileType).toBe('space-person');
     expect(targetSpacePerson.birthDateSourceProfileId).toBe(sourceSpacePerson.id);
@@ -580,7 +580,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
     expect(restored.nameSource).toBe('inherited');
     expect(restored.nameSourceProfileType).toBe('space-person');
     expect(restored.nameSourceProfileId).toBe(sourceSpacePerson.id);
-    expect(asBirthDateString(restored.birthDate)).toBe('1980-01-02');
+    expect(asDateString(restored.birthDate)).toBe('1980-01-02');
     expect(restored.birthDateSource).toBe('inherited');
   });
 
@@ -662,7 +662,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
     expect(updated.nameSource).toBe('manual');
     expect(updated.nameSourceProfileType).toBe('space-person');
     expect(updated.nameSourceProfileId).toBe(targetSpacePerson.id);
-    expect(asBirthDateString(updated.birthDate)).toBe('2001-01-01');
+    expect(asDateString(updated.birthDate)).toBe('2001-01-01');
     expect(updated.birthDateSource).toBe('manual');
   });
 
@@ -688,7 +688,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
     expect(afterRejoin.nameSource).toBe('inherited');
     expect(afterRejoin.nameSourceProfileType).toBe('space-person');
     expect(afterRejoin.nameSourceProfileId).toBe(sourceSpacePerson.id);
-    expect(asBirthDateString(afterRejoin.birthDate)).toBe('1980-01-02');
+    expect(asDateString(afterRejoin.birthDate)).toBe('1980-01-02');
     expect(afterRejoin.birthDateSource).toBe('inherited');
   });
 
@@ -716,7 +716,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
     expect(updated.nameSource).toBe('inherited');
     expect(updated.nameSourceProfileType).toBe('space-person');
     expect(updated.nameSourceProfileId).toBe(sourceSpacePerson.id);
-    expect(asBirthDateString(updated.birthDate)).toBe('1980-01-02');
+    expect(asDateString(updated.birthDate)).toBe('1980-01-02');
     expect(updated.birthDateSource).toBe('inherited');
     expect(updated.birthDateSourceProfileType).toBe('space-person');
     expect(updated.birthDateSourceProfileId).toBe(sourceSpacePerson.id);
@@ -877,7 +877,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
     const updated = await getSpacePersonById(ctx, targetSpacePerson.id);
     expect(updated.name).toBe('Manual Target');
     expect(updated.nameSource).toBe('manual');
-    expect(asBirthDateString(updated.birthDate)).toBe('2002-02-02');
+    expect(asDateString(updated.birthDate)).toBe('2002-02-02');
     expect(updated.birthDateSource).toBe('manual');
   });
 
@@ -1011,7 +1011,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
       .executeTakeFirstOrThrow();
     expect(updated.name).toBe('Manual Space Name');
     expect(updated.nameSource).toBe('manual');
-    expect(asBirthDateString(updated.birthDate)).toBe('1999-09-09');
+    expect(asDateString(updated.birthDate)).toBe('1999-09-09');
     expect(updated.birthDateSource).toBe('inherited');
   });
 
@@ -1070,7 +1070,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
       .where('spaceId', '=', space.id)
       .executeTakeFirstOrThrow();
     expect(inherited.name).toBe('Revoked Source');
-    expect(asBirthDateString(inherited.birthDate)).toBe('1988-08-08');
+    expect(asDateString(inherited.birthDate)).toBe('1988-08-08');
 
     await sut.updateMemberMetadataContribution(authFor(owner), space.id, source.id, { sharePersonMetadata: false });
     await sut.backfillSpacePersonMetadata({ identityId: face.identity.id, limit: 1000 });
@@ -1122,7 +1122,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
       .executeTakeFirstOrThrow();
     expect(updated.name).toBe('Manual Space Label');
     expect(updated.nameSource).toBe('manual');
-    expect(asBirthDateString(updated.birthDate)).toBe('2001-01-01');
+    expect(asDateString(updated.birthDate)).toBe('2001-01-01');
     expect(updated.birthDateSource).toBe('manual');
   });
 
