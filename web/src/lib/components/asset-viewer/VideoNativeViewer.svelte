@@ -457,7 +457,6 @@
             onclose={onClose}
             muted={$videoViewerMuted}
             poster={getAssetMediaUrl({ id: asset.id, size: AssetMediaSize.Preview, cacheKey })}
-            src={assetFileUrl}
           ></video>
         {/if}
 
