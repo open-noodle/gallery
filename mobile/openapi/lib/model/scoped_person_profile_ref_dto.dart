@@ -14,7 +14,7 @@ class ScopedPersonProfileRefDto {
   /// Returns a new [ScopedPersonProfileRefDto] instance.
   ScopedPersonProfileRefDto({
     required this.id,
-    this.spaceId,
+    this.spaceId = const Optional.absent(),
     required this.type,
   });
 
@@ -28,7 +28,7 @@ class ScopedPersonProfileRefDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? spaceId;
+  Optional<String?> spaceId;
 
   /// Scoped profile type
   ScopedPersonProfileRefDtoTypeEnum type;
@@ -52,10 +52,9 @@ class ScopedPersonProfileRefDto {
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'id'] = this.id;
-    if (this.spaceId != null) {
-      json[r'spaceId'] = this.spaceId;
-    } else {
-    //  json[r'spaceId'] = null;
+    if (this.spaceId.isPresent) {
+      final value = this.spaceId.value;
+      json[r'spaceId'] = value;
     }
       json[r'type'] = this.type;
     return json;
@@ -71,7 +70,7 @@ class ScopedPersonProfileRefDto {
 
       return ScopedPersonProfileRefDto(
         id: mapValueOfType<String>(json, r'id')!,
-        spaceId: mapValueOfType<String>(json, r'spaceId'),
+        spaceId: json.containsKey(r'spaceId') ? Optional.present(mapValueOfType<String>(json, r'spaceId')) : const Optional.absent(),
         type: ScopedPersonProfileRefDtoTypeEnum.fromJson(json[r'type'])!,
       );
     }

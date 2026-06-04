@@ -13,7 +13,7 @@ part of openapi.api;
 class SharedSpaceMemberCreateDto {
   /// Returns a new [SharedSpaceMemberCreateDto] instance.
   SharedSpaceMemberCreateDto({
-    this.role,
+    this.role = const Optional.absent(),
     required this.userId,
   });
 
@@ -23,7 +23,7 @@ class SharedSpaceMemberCreateDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  SharedSpaceRole? role;
+  Optional<SharedSpaceRole?> role;
 
   /// User ID
   String userId;
@@ -44,10 +44,9 @@ class SharedSpaceMemberCreateDto {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-    if (this.role != null) {
-      json[r'role'] = this.role;
-    } else {
-    //  json[r'role'] = null;
+    if (this.role.isPresent) {
+      final value = this.role.value;
+      json[r'role'] = value;
     }
       json[r'userId'] = this.userId;
     return json;
@@ -62,7 +61,7 @@ class SharedSpaceMemberCreateDto {
       final json = value.cast<String, dynamic>();
 
       return SharedSpaceMemberCreateDto(
-        role: SharedSpaceRole.fromJson(json[r'role']),
+        role: json.containsKey(r'role') ? Optional.present(SharedSpaceRole.fromJson(json[r'role'])) : const Optional.absent(),
         userId: mapValueOfType<String>(json, r'userId')!,
       );
     }

@@ -17,11 +17,11 @@ class SharedSpaceActivityResponseDto {
     this.data = const {},
     required this.id,
     required this.type,
-    this.userAvatarColor,
-    this.userEmail,
-    this.userId,
-    this.userName,
-    this.userProfileImagePath,
+    this.userAvatarColor = const Optional.absent(),
+    this.userEmail = const Optional.absent(),
+    this.userId = const Optional.absent(),
+    this.userName = const Optional.absent(),
+    this.userProfileImagePath = const Optional.absent(),
   });
 
   /// When the event occurred
@@ -37,19 +37,19 @@ class SharedSpaceActivityResponseDto {
   String type;
 
   /// User avatar color
-  String? userAvatarColor;
+  Optional<String?> userAvatarColor;
 
   /// User email
-  String? userEmail;
+  Optional<String?> userEmail;
 
   /// User ID who performed the action
-  String? userId;
+  Optional<String?> userId;
 
   /// User name
-  String? userName;
+  Optional<String?> userName;
 
   /// User profile image path
-  String? userProfileImagePath;
+  Optional<String?> userProfileImagePath;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is SharedSpaceActivityResponseDto &&
@@ -85,30 +85,25 @@ class SharedSpaceActivityResponseDto {
       json[r'data'] = this.data;
       json[r'id'] = this.id;
       json[r'type'] = this.type;
-    if (this.userAvatarColor != null) {
-      json[r'userAvatarColor'] = this.userAvatarColor;
-    } else {
-    //  json[r'userAvatarColor'] = null;
+    if (this.userAvatarColor.isPresent) {
+      final value = this.userAvatarColor.value;
+      json[r'userAvatarColor'] = value;
     }
-    if (this.userEmail != null) {
-      json[r'userEmail'] = this.userEmail;
-    } else {
-    //  json[r'userEmail'] = null;
+    if (this.userEmail.isPresent) {
+      final value = this.userEmail.value;
+      json[r'userEmail'] = value;
     }
-    if (this.userId != null) {
-      json[r'userId'] = this.userId;
-    } else {
-    //  json[r'userId'] = null;
+    if (this.userId.isPresent) {
+      final value = this.userId.value;
+      json[r'userId'] = value;
     }
-    if (this.userName != null) {
-      json[r'userName'] = this.userName;
-    } else {
-    //  json[r'userName'] = null;
+    if (this.userName.isPresent) {
+      final value = this.userName.value;
+      json[r'userName'] = value;
     }
-    if (this.userProfileImagePath != null) {
-      json[r'userProfileImagePath'] = this.userProfileImagePath;
-    } else {
-    //  json[r'userProfileImagePath'] = null;
+    if (this.userProfileImagePath.isPresent) {
+      final value = this.userProfileImagePath.value;
+      json[r'userProfileImagePath'] = value;
     }
     return json;
   }
@@ -126,11 +121,11 @@ class SharedSpaceActivityResponseDto {
         data: mapCastOfType<String, Object>(json, r'data')!,
         id: mapValueOfType<String>(json, r'id')!,
         type: mapValueOfType<String>(json, r'type')!,
-        userAvatarColor: mapValueOfType<String>(json, r'userAvatarColor'),
-        userEmail: mapValueOfType<String>(json, r'userEmail'),
-        userId: mapValueOfType<String>(json, r'userId'),
-        userName: mapValueOfType<String>(json, r'userName'),
-        userProfileImagePath: mapValueOfType<String>(json, r'userProfileImagePath'),
+        userAvatarColor: json.containsKey(r'userAvatarColor') ? Optional.present(mapValueOfType<String>(json, r'userAvatarColor')) : const Optional.absent(),
+        userEmail: json.containsKey(r'userEmail') ? Optional.present(mapValueOfType<String>(json, r'userEmail')) : const Optional.absent(),
+        userId: json.containsKey(r'userId') ? Optional.present(mapValueOfType<String>(json, r'userId')) : const Optional.absent(),
+        userName: json.containsKey(r'userName') ? Optional.present(mapValueOfType<String>(json, r'userName')) : const Optional.absent(),
+        userProfileImagePath: json.containsKey(r'userProfileImagePath') ? Optional.present(mapValueOfType<String>(json, r'userProfileImagePath')) : const Optional.absent(),
       );
     }
     return null;
