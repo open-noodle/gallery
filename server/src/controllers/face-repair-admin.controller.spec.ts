@@ -1,7 +1,7 @@
 import { FaceRepairAdminController } from 'src/controllers/face-repair-admin.controller';
 import { FaceRepairService } from 'src/services/face-repair.service';
 import request from 'supertest';
-import { errorDto } from 'test/medium/responses';
+import { factory } from 'test/small.factory';
 import { ControllerContext, controllerSetup, mockBaseService } from 'test/utils';
 
 describe(FaceRepairAdminController.name, () => {
@@ -59,7 +59,7 @@ describe(FaceRepairAdminController.name, () => {
         .send({ maxFlaggedFraction: 2 });
       expect(status).toBe(400);
       expect(body).toEqual(
-        errorDto.badRequest(expect.arrayContaining([expect.stringContaining('maxFlaggedFraction')])),
+        factory.responses.validationError([{ path: ['maxFlaggedFraction'], message: 'Too big: expected number to be <=1' }]),
       );
       expect(service.runRepair).not.toHaveBeenCalled();
     });
