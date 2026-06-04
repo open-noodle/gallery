@@ -130,13 +130,13 @@ void main() {
     test('sets a rating value', () {
       final notifier = container.read(photosFilterProvider.notifier);
       notifier.setRating(4);
-      expect(container.read(photosFilterProvider).rating.rating, 4);
+      expect(container.read(photosFilterProvider).rating.rating.unwrapOrNull, 4);
     });
     test('null clears the rating', () {
       final notifier = container.read(photosFilterProvider.notifier);
       notifier.setRating(4);
       notifier.setRating(null);
-      expect(container.read(photosFilterProvider).rating.rating, null);
+      expect(container.read(photosFilterProvider).rating.rating.unwrapOrNull, null);
     });
   });
 
@@ -285,7 +285,7 @@ void main() {
       final notifier = container.read(photosFilterProvider.notifier);
       notifier.setRating(4);
       notifier.clearDimension(Dimension.rating);
-      expect(container.read(photosFilterProvider).rating.rating, null);
+      expect(container.read(photosFilterProvider).rating.rating.unwrapOrNull, null);
     });
     test('clears mediaType dimension', () {
       final notifier = container.read(photosFilterProvider.notifier);
@@ -363,7 +363,7 @@ void main() {
       final notifier = container.read(photosFilterProvider.notifier);
       notifier.setRating(4);
       notifier.removeChip(const RatingChipId());
-      expect(container.read(photosFilterProvider).rating.rating, null);
+      expect(container.read(photosFilterProvider).rating.rating.unwrapOrNull, null);
     });
     test('MediaTypeChipId clears mediaType', () {
       final notifier = container.read(photosFilterProvider.notifier);
