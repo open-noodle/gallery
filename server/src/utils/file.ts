@@ -150,11 +150,16 @@ export const sendFile = async (
       return;
     }
 
-    // log non-http errors
-    if (!(error instanceof HttpException)) {
-      logger.error(`Unable to send file: ${error}`, error.stack);
+    // gallery-fork: preserve HttpException status codes. Upstream #28843 masks
+    // every sendFile error as 404, but the fork's shared-space access matrix
+    // relies on 401 < 403 < 404 ordering for files served via sendFile (e.g.
+    // person thumbnails), so a ForbiddenException must stay 403, not become 404.
+    if (error instanceof HttpException) {
+      return next(error);
     }
 
+    // mask internal errors as 404 (upstream #28843)
+    logger.error(`Unable to send file: ${error}`, error.stack);
     next(new NotFoundException());
   }
 };
