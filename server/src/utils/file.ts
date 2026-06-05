@@ -1,4 +1,4 @@
-import { NotFoundException, StreamableFile } from '@nestjs/common';
+import { HttpException, NotFoundException, StreamableFile } from '@nestjs/common';
 import { NextFunction, Response } from 'express';
 import { access, constants } from 'node:fs/promises';
 import { basename, extname, resolve } from 'node:path';
@@ -147,7 +147,15 @@ export const sendFile = async (
   } catch (error: Error | any) {
     const { canWrite } = onRouteError(undefined, res, error, logger);
     if (canWrite) {
-      next(new NotFoundException());
+      // gallery-fork: preserve HttpException status codes. Upstream #28843 masks
+      // every sendFile error as 404, but the fork's shared-space access matrix
+      // relies on 401 < 403 < 404 ordering for files served via sendFile (e.g.
+      // person thumbnails), so a ForbiddenException must stay 403, not become 404.
+      if (error instanceof HttpException) {
+        next(error);
+      } else {
+        next(new NotFoundException());
+      }
     }
   }
 };
