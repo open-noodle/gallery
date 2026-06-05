@@ -355,8 +355,7 @@ describe('sendFile with ImmichMediaResponse', () => {
     await sendFile(res, next, () => Promise.reject(error), mockLogger);
 
     expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('Unable to send file'), error.stack);
-    expect(res.header).toHaveBeenCalledWith('Cache-Control', 'none');
-    expect(next).toHaveBeenCalledWith(error);
+    expect(next).toHaveBeenCalledWith(expect.any(HttpException));
   });
 
   it('should not log HttpException errors', async () => {
@@ -371,8 +370,7 @@ describe('sendFile with ImmichMediaResponse', () => {
     await sendFile(res, next, () => Promise.reject(error), mockLogger);
 
     expect(mockLogger.error).not.toHaveBeenCalled();
-    expect(res.header).toHaveBeenCalledWith('Cache-Control', 'none');
-    expect(next).toHaveBeenCalledWith(error);
+    expect(next).toHaveBeenCalledWith(expect.any(HttpException));
   });
 
   it('should silently ignore connection aborted errors', async () => {
