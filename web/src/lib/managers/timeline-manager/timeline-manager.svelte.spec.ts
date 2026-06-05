@@ -1,4 +1,5 @@
 import { AssetOrderBy, AssetVisibility, type AssetResponseDto, type TimeBucketAssetResponseDto } from '@immich/sdk';
+import { Settings } from 'luxon';
 import { tick } from 'svelte';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { eventManager } from '$lib/managers/event-manager.svelte';
@@ -1097,6 +1098,66 @@ describe('TimelineManager', () => {
         }),
         expect.anything(),
       );
+    });
+  });
+
+  describe('orderBy createdAt (recently-added)', () => {
+    it('places assets into the createdAt month even when their localDateTime is a different month', async () => {
+      const timelineManager = new TimelineManager();
+      // "Recently added": assets created (added to Immich) in 2026-06 but TAKEN
+      // (localDateTime) back in 2024-09 — exactly the staging /recently-added case.
+      const assets = timelineAssetFactory.buildList(3).map((asset) => ({
+        ...asset,
+        createdAt: fromISODateTimeUTCToObject('2026-06-15T12:00:00.000Z'),
+        localDateTime: fromISODateTimeUTCToObject('2024-09-23T18:00:00.000Z'),
+        fileCreatedAt: fromISODateTimeUTCToObject('2024-09-23T18:00:00.000Z'),
+      }));
+      const response = toResponseDto(...assets);
+
+      sdkMock.getTimeBuckets.mockResolvedValue([{ count: 3, timeBucket: '2026-06-01' }]);
+      sdkMock.getTimeBucket.mockResolvedValue(response);
+
+      await timelineManager.updateOptions({ orderBy: AssetOrderBy.CreatedAt });
+      await timelineManager.updateViewport({ width: 1588, height: 1000 });
+      await tick();
+
+      const month = getTimelineMonthByDate(timelineManager, { year: 2026, month: 6 });
+      expect(month?.getAssets().length).toEqual(3);
+    });
+
+    it('buckets createdAt by its UTC month, not the browser-local month (boundary assets in a negative-offset timezone)', async () => {
+      // The server groups time buckets by date_trunc('MONTH', createdAt AT TIME ZONE 'UTC')
+      // and serializes createdAt as a naive-UTC string (e.g. a bulk import at
+      // 2026-06-01T03:00). A viewer whose timezone is behind UTC must still see those
+      // assets in the June bucket — otherwise the whole /recently-added page renders empty.
+      // vite.config pins TZ=UTC for tests, so force a negative-offset zone here.
+      const previousTz = process.env.TZ;
+      process.env.TZ = 'America/Anchorage';
+      Settings.resetCaches();
+      try {
+        const timelineManager = new TimelineManager();
+        const assets = timelineAssetFactory.buildList(3).map((asset) => ({
+          ...asset,
+          localDateTime: fromISODateTimeUTCToObject('2024-09-23T18:00:00.000Z'),
+          fileCreatedAt: fromISODateTimeUTCToObject('2024-09-23T18:00:00.000Z'),
+        }));
+        const response = toResponseDto(...assets);
+        // Exactly the server's naive-UTC createdAt format (03:00 UTC on the 1st).
+        response.createdAt = response.createdAt.map(() => '2026-06-01T03:00:00.000');
+
+        sdkMock.getTimeBuckets.mockResolvedValue([{ count: 3, timeBucket: '2026-06-01' }]);
+        sdkMock.getTimeBucket.mockResolvedValue(response);
+
+        await timelineManager.updateOptions({ orderBy: AssetOrderBy.CreatedAt });
+        await timelineManager.updateViewport({ width: 1588, height: 1000 });
+        await tick();
+
+        const month = getTimelineMonthByDate(timelineManager, { year: 2026, month: 6 });
+        expect(month?.getAssets().length).toEqual(3);
+      } finally {
+        process.env.TZ = previousTz;
+        Settings.resetCaches();
+      }
     });
   });
 });
