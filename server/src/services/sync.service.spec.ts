@@ -131,6 +131,7 @@ const setupSyncMocks = (mocks: ServiceMocks) => {
     assetEdit: makeSub(),
     assetFace: makeSub(),
     assetMetadata: makeSub(),
+    assetOcr: makeSub(),
     authUser: makeSub(),
     memory: makeSub(),
     memoryToAsset: makeSub(),
