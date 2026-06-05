@@ -171,7 +171,7 @@ class Drift extends $Drift {
   }
 
   @override
-  int get schemaVersion => 32;
+  int get schemaVersion => 33;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -373,6 +373,13 @@ class Drift extends $Drift {
           },
           from31To32: (m, v32) async {
             await m.createIndex(v32.idxLocalAssetCreatedAt);
+          },
+          // gallery-fork: upstream #26523 added asset_ocr at its drift v29, which
+          // collides with the fork's v29; re-applied here as v33 (next after the
+          // fork's v32) so OCR sync data has a local table.
+          from32To33: (m, v33) async {
+            await m.createTable(v33.assetOcrEntity);
+            await m.createIndex(v33.idxAssetOcrAssetId);
           },
         ),
       );
