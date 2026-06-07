@@ -12,6 +12,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/events.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_zoom_anchor.model.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/extensions/asyncvalue_extensions.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
@@ -23,16 +24,22 @@ import 'package:immich_mobile/presentation/widgets/timeline/scrubber.widget.dart
 import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_drag_region.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_scroll_target.dart';
 import 'package:immich_mobile/providers/asset_viewer/scroll_to_date_notifier.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
+import 'package:immich_mobile/providers/timeline/zoom_anchor.provider.dart';
 import 'package:immich_mobile/routing/app_navigation_observer.dart';
 import 'package:immich_mobile/widgets/common/immich_loading_indicator.dart';
 import 'package:immich_mobile/widgets/common/immich_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/common/mesmerizing_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/common/selection_sliver_app_bar.dart';
+
+double timelineScrubberSnappingOffset({required double? topSliverWidgetHeight, required double appBarExpandedHeight}) {
+  return (topSliverWidgetHeight ?? 0) + appBarExpandedHeight;
+}
 
 class Timeline extends ConsumerWidget {
   const Timeline({
@@ -159,6 +166,9 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
   double _scaleFactor = 3.0;
   double _baseScaleFactor = 3.0;
   int? _restoreAssetIndex;
+  TimelineZoomAnchor? _scheduledZoomAnchor;
+  TimelineZoomAnchor? _resolvingZoomAnchor;
+  List<Segment>? _lastRenderedSegments;
 
   @override
   void initState() {
@@ -183,6 +193,8 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _requestScrollDrain();
     });
+
+    ref.listenManual(appConfigProvider.select((config) => config.timeline.groupAssetsBy), _onGroupingChanged);
   }
 
   @override
@@ -253,6 +265,39 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
 
   void _onMultiSelectionToggled(_, bool isEnabled) {
     EventStream.shared.emit(MultiSelectToggleEvent(isEnabled));
+  }
+
+  // When the grouping granularity changes (e.g. via the grouping selector),
+  // anchor the rebuilt timeline to the date currently at the top of the viewport
+  // so the user keeps their place instead of jumping to the most recent content.
+  void _onGroupingChanged(GroupAssetsBy? previous, GroupAssetsBy next) {
+    if (previous == null || previous == next) {
+      return;
+    }
+    // A card-tap drilldown sets an explicit year/month anchor right before it
+    // changes the grouping; don't overwrite it with a position-derived anchor.
+    if (!ref.read(timelineZoomAnchorProvider).isEmpty) {
+      return;
+    }
+    final segments = _lastRenderedSegments;
+    if (segments == null) {
+      return;
+    }
+    final date = _currentTopVisibleDate(segments);
+    if (date == null) {
+      return;
+    }
+    ref.read(timelineZoomAnchorProvider.notifier).setDate(date);
+  }
+
+  DateTime? _currentTopVisibleDate(List<Segment> segments) {
+    if (segments.isEmpty || !_scrollController.hasClients) {
+      return null;
+    }
+    final offset = _scrollController.offset.clamp(0.0, _scrollController.position.maxScrollExtent);
+    final segment = segments.findByOffset(offset) ?? segments.firstOrNull;
+    final bucket = segment?.bucket;
+    return bucket is TimeBucket ? bucket.date : null;
   }
 
   int? _getCurrentAssetIndex(List<Segment> segments) {
@@ -352,11 +397,11 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
   }
 
   Segment? _findSegmentForDate(List<Segment> segments, DateTime date) {
-    final dates = segments
-        .map((segment) => segment.bucket is TimeBucket ? (segment.bucket as TimeBucket).date : null)
-        .toList(growable: false);
-    final index = findMatchingSegmentIndex(dates, date);
-    return index == null ? null : segments[index];
+    // findTimelineScrollTargetSegment adds a year-level fallback on top of the
+    // day/month match, so a "view in timeline" request still resolves a segment
+    // when the timeline is in Years/Months grouping (#625) — not only the day
+    // grouping the scroll-drain mechanism (#643) was originally written for.
+    return findTimelineScrollTargetSegment(segments, date);
   }
 
   void _scrollToDate(DateTime date, List<Segment> segments) {
@@ -372,6 +417,70 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
           .animateTo(targetOffset, duration: const Duration(milliseconds: 500), curve: Curves.easeInOut)
           .whenComplete(() => timelineState.setScrubbing(false)),
     );
+  }
+
+  void _scheduleZoomAnchorResolution({
+    required TimelineZoomAnchor anchor,
+    required GroupAssetsBy groupBy,
+    required List<Segment> segments,
+  }) {
+    if (anchor.isEmpty || _scheduledZoomAnchor == anchor || _resolvingZoomAnchor == anchor) {
+      return;
+    }
+
+    _scheduledZoomAnchor = anchor;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      _scheduledZoomAnchor = null;
+      _resolveZoomAnchor(anchor: anchor, groupBy: groupBy, segments: segments);
+    });
+  }
+
+  void _resolveZoomAnchor({
+    required TimelineZoomAnchor anchor,
+    required GroupAssetsBy groupBy,
+    required List<Segment> segments,
+  }) {
+    if (ref.read(timelineZoomAnchorProvider) != anchor || !_scrollController.hasClients) {
+      return;
+    }
+
+    final activeGroupBy =
+        ref.read(timelineArgsProvider).groupBy ?? ref.read(appConfigProvider).timeline.groupAssetsBy;
+    if (activeGroupBy != groupBy) {
+      return;
+    }
+
+    final targetSegment = findTimelineZoomAnchorSegment(segments, anchor, groupBy);
+    if (targetSegment == null) {
+      return;
+    }
+
+    final targetOffset = targetSegment.startOffset - 50;
+    _resolvingZoomAnchor = anchor;
+    ref.read(timelineStateProvider.notifier).setScrubbing(true);
+    _scrollController
+        .animateTo(
+          targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        )
+        .whenComplete(() {
+          if (!mounted) {
+            return;
+          }
+
+          if (ref.read(timelineZoomAnchorProvider) == anchor) {
+            ref.read(timelineZoomAnchorProvider.notifier).clear();
+          }
+          if (_resolvingZoomAnchor == anchor) {
+            _resolvingZoomAnchor = null;
+          }
+          ref.read(timelineStateProvider.notifier).setScrubbing(false);
+        });
   }
 
   // Drag selection methods
@@ -488,6 +597,11 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                     ],
                   ),
               onData: (segments) {
+                _lastRenderedSegments = segments;
+                final activeGroupBy =
+                    ref.watch(timelineArgsProvider).groupBy ?? ref.watch(appConfigProvider).timeline.groupAssetsBy;
+                final zoomAnchor = ref.watch(timelineZoomAnchorProvider);
+                _scheduleZoomAnchorResolution(anchor: zoomAnchor, groupBy: activeGroupBy, segments: segments);
                 final childCount = (segments.lastOrNull?.lastIndex ?? -1) + 1;
                 final double appBarExpandedHeight = widget.appBar != null && widget.appBar is MesmerizingSliverAppBar
                     ? 200
@@ -531,11 +645,15 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                 if (widget.withScrubber) {
                   timeline = Scrubber(
                     snapToMonth: widget.snapToMonth,
+                    groupBy: activeGroupBy,
                     layoutSegments: segments,
                     timelineHeight: maxHeight,
                     topPadding: topPadding,
                     bottomPadding: scrubberBottomPadding,
-                    monthSegmentSnappingOffset: widget.topSliverWidgetHeight ?? 0 + appBarExpandedHeight,
+                    monthSegmentSnappingOffset: timelineScrubberSnappingOffset(
+                      topSliverWidgetHeight: widget.topSliverWidgetHeight,
+                      appBarExpandedHeight: appBarExpandedHeight,
+                    ),
                     hasAppBar: widget.appBar != null,
                     child: grid,
                   );
