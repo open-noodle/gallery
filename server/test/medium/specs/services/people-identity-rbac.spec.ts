@@ -55,6 +55,7 @@ const setup = (db?: Kysely<DB>) => {
   const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
+  jobs.hasInFlightDedupChain.mockResolvedValue(false);
   return { ctx, sut, faceIdentityRepository: ctx.get(FaceIdentityRepository) };
 };
 
@@ -76,6 +77,7 @@ const setupSharedSpace = (db?: Kysely<DB>) => {
   const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
+  jobs.hasInFlightDedupChain.mockResolvedValue(false);
   return { ctx, sut, faceIdentityRepository: ctx.get(FaceIdentityRepository), jobs };
 };
 
