@@ -4,12 +4,19 @@
   import type { Action } from '$lib/components/asset-viewer/actions/action';
   import type { AssetCursor } from '$lib/components/asset-viewer/AssetViewer.svelte';
   import Thumbnail from '$lib/components/assets/thumbnail/Thumbnail.svelte';
+  import TimelineBucketCard from '$lib/components/timeline/TimelineBucketCard.svelte';
+  import TimelineRouteGroupingBar from '$lib/components/timeline/TimelineRouteGroupingBar.svelte';
   import { AssetAction } from '$lib/constants';
   import Portal from '$lib/elements/Portal.svelte';
   import type { AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
-  import type { TimelineAsset, Viewport } from '$lib/managers/timeline-manager/types';
+  import type {
+    TimelineAsset,
+    TimelineGrouping,
+    TimelineTemporalAnchor,
+    Viewport,
+  } from '$lib/managers/timeline-manager/types';
   import AssetDeleteConfirmModal from '$lib/modals/AssetDeleteConfirmModal.svelte';
   import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
   import { Route } from '$lib/route';
@@ -19,9 +26,11 @@
   import { deleteAssets } from '$lib/utils/actions';
   import { archiveAssets, getNextAsset, getPreviousAsset, navigateToAsset } from '$lib/utils/asset-utils';
   import { moveFocus } from '$lib/utils/focus-util';
+  import { buildGalleryViewerBuckets, getGalleryViewerAssetDate } from '$lib/utils/gallery-viewer-grouping';
   import { handleError } from '$lib/utils/handle-error';
   import { getJustifiedLayoutFromAssets } from '$lib/utils/layout-utils';
   import { navigate } from '$lib/utils/navigation';
+  import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
   import { isTimelineAsset, toTimelineAsset } from '$lib/utils/timeline-util';
   import { TUNABLES } from '$lib/utils/tunables';
   import { AssetVisibility, type AssetResponseDto } from '@immich/sdk';
@@ -47,6 +56,7 @@
     slidingWindowOffset?: number;
     arrowNavigation?: boolean;
     allowDeletion?: boolean;
+    enableGrouping?: boolean;
   };
 
   let {
@@ -63,7 +73,17 @@
     pageHeaderOffset = 0,
     arrowNavigation = true,
     allowDeletion = true,
+    enableGrouping = false,
   }: Props = $props();
+
+  let galleryGrouping = $state<TimelineGrouping>('day');
+  let galleryTemporalAnchor = $state<TimelineTemporalAnchor | undefined>();
+  let galleryViewerElement: HTMLElement | undefined = $state();
+  let galleryBuckets = $derived(galleryGrouping === 'day' ? [] : buildGalleryViewerBuckets(assets, galleryGrouping));
+  let showRepresentativeBuckets = $derived(enableGrouping && galleryGrouping !== 'day' && assets.length > 0);
+  let showGalleryGroupingControls = $derived(
+    enableGrouping && assets.length > 0 && !assetInteraction.selectionActive && !assetViewerManager.isViewing,
+  );
 
   const navigationAssets = $derived(viewerAssets ?? assets);
 
@@ -109,6 +129,11 @@
 
   let lastEndReachedHeight = 0;
   $effect(() => {
+    if (enableGrouping && showRepresentativeBuckets) {
+      return;
+    }
+
+    // Intersect if there's only one viewport worth of assets left to scroll.
     if (geometry.containerHeight - slidingWindow.bottom > viewport.height) {
       return;
     }
@@ -166,6 +191,10 @@
 
     let start = assets.findIndex((a) => a.id === startAsset.id);
     let end = assets.findIndex((a) => a.id === endAsset.id);
+
+    if (start === -1 || end === -1) {
+      return;
+    }
 
     if (start > end) {
       [start, end] = [end, start];
@@ -313,6 +342,98 @@
     }
   };
 
+  const handleGalleryGroupingChange = (grouping: TimelineGrouping) => {
+    galleryGrouping = grouping;
+    galleryTemporalAnchor = undefined;
+  };
+
+  const handleGalleryBucketActivate = (bucket: ActivatableTimelineBucket) => {
+    if (assetInteraction.selectionActive) {
+      return;
+    }
+
+    const result = getTimelineBucketZoomTarget(bucket);
+    if (!result) {
+      return;
+    }
+
+    galleryGrouping = result.grouping;
+    galleryTemporalAnchor = result.anchor;
+  };
+
+  const isCurrentGalleryAnchor = (anchor: TimelineTemporalAnchor, grouping: TimelineGrouping) =>
+    galleryGrouping === grouping &&
+    galleryTemporalAnchor?.year === anchor.year &&
+    galleryTemporalAnchor?.month === anchor.month;
+
+  const getGalleryAnchorSelector = (anchor: TimelineTemporalAnchor, grouping: TimelineGrouping) => {
+    if (grouping === 'month' && anchor.month === undefined) {
+      return `[data-gallery-bucket-year="${anchor.year}"]`;
+    }
+
+    if (grouping === 'day' && anchor.month !== undefined) {
+      return `[data-gallery-asset-year="${anchor.year}"][data-gallery-asset-month="${anchor.month}"]`;
+    }
+  };
+
+  const getFirstGalleryAssetIndexForAnchor = (anchor: TimelineTemporalAnchor) =>
+    assets.findIndex((asset) => {
+      const date = getGalleryViewerAssetDate(asset);
+      return date?.year === anchor.year && date.month === anchor.month;
+    });
+
+  const scrollToGalleryAssetIndex = (index: number) => {
+    const top = geometry.getTop(index);
+    scrollTop = top;
+    document.scrollingElement?.scrollTo?.({ top });
+  };
+
+  $effect(() => {
+    const anchor = galleryTemporalAnchor;
+    const grouping = galleryGrouping;
+    const container = galleryViewerElement;
+    if (!anchor || !container) {
+      return;
+    }
+
+    const selector = getGalleryAnchorSelector(anchor, grouping);
+    if (!selector) {
+      galleryTemporalAnchor = undefined;
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      if (!isCurrentGalleryAnchor(anchor, grouping)) {
+        return;
+      }
+
+      const target = container.querySelector<HTMLElement>(selector);
+      if (target) {
+        target.scrollIntoView({ block: 'start', inline: 'nearest' });
+        galleryTemporalAnchor = undefined;
+        return;
+      }
+
+      if (grouping === 'day' && anchor.month !== undefined) {
+        const targetIndex = getFirstGalleryAssetIndexForAnchor(anchor);
+        if (targetIndex !== -1) {
+          scrollToGalleryAssetIndex(targetIndex);
+          requestAnimationFrame(() => {
+            if (!isCurrentGalleryAnchor(anchor, grouping)) {
+              return;
+            }
+
+            container.querySelector<HTMLElement>(selector)?.scrollIntoView({ block: 'start', inline: 'nearest' });
+            galleryTemporalAnchor = undefined;
+          });
+          return;
+        }
+      }
+
+      galleryTemporalAnchor = undefined;
+    });
+  });
+
   $effect(() => {
     if (!lastAssetMouseEvent) {
       assetInteraction.clearCandidates();
@@ -340,47 +461,85 @@
 
 <svelte:document onselectstart={onSelectStart} use:shortcuts={shortcutList} onscroll={() => updateSlidingWindow()} />
 
-{#if assets.length > 0}
-  <div
-    style:position="relative"
-    style:height={geometry.containerHeight + 'px'}
-    style:width={geometry.containerWidth + 'px'}
-  >
-    {#each assets as asset, index (asset.id + '-' + index)}
-      {#if isInOrNearViewport(index)}
-        {@const currentAsset = toTimelineAsset(asset)}
-        <div class="absolute" style:overflow="clip" style={getStyle(index)}>
-          <Thumbnail
-            readonly={disableAssetSelect}
-            onClick={() => {
-              if (assetInteraction.selectionActive) {
-                handleSelectAssets(currentAsset);
-                return;
-              }
-              void navigateToAsset(asset);
-            }}
-            onSelect={() => handleSelectAssets(currentAsset)}
-            onPreview={assetInteraction.selectionActive ? () => void navigateToAsset(asset) : undefined}
-            onMouseEvent={() => assetMouseEventHandler(currentAsset)}
-            {showArchiveIcon}
-            asset={currentAsset}
-            selected={assetInteraction.hasSelectedAsset(currentAsset.id)}
-            selectionCandidate={assetInteraction.hasSelectionCandidate(currentAsset.id)}
-            thumbnailWidth={geometry.getWidth(index)}
-            thumbnailHeight={geometry.getHeight(index)}
+<div bind:this={galleryViewerElement} data-testid="gallery-viewer">
+  {#if enableGrouping && assets.length > 0}
+    <TimelineRouteGroupingBar
+      grouping={galleryGrouping}
+      hidden={!showGalleryGroupingControls}
+      onGroupingChange={handleGalleryGroupingChange}
+    />
+  {/if}
+
+  {#if showRepresentativeBuckets}
+    <div
+      class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4 px-4 py-4"
+      data-testid="gallery-viewer-representative-buckets"
+      data-grouping={galleryGrouping}
+    >
+      {#each galleryBuckets as bucket (bucket.viewId)}
+        <div
+          data-testid={`gallery-viewer-bucket-anchor-${bucket.viewId}`}
+          data-gallery-bucket-year={bucket.date.year}
+          data-gallery-bucket-month={bucket.date.month ?? null}
+        >
+          <TimelineBucketCard
+            {bucket}
+            disabled={assetInteraction.selectionActive}
+            onActivate={handleGalleryBucketActivate}
           />
-          {#if showAssetName && !isTimelineAsset(asset)}
-            <div
-              class="absolute bottom-0 w-full overflow-clip bg-slate-50/75 bg-linear-to-t p-1 text-center font-mono text-xs font-semibold text-ellipsis whitespace-pre-wrap dark:bg-slate-800/75"
-            >
-              {asset.originalFileName}
-            </div>
-          {/if}
         </div>
-      {/if}
-    {/each}
-  </div>
-{/if}
+      {/each}
+    </div>
+  {:else if assets.length > 0}
+    <div
+      style:position="relative"
+      style:height={geometry.containerHeight + 'px'}
+      style:width={geometry.containerWidth + 'px'}
+    >
+      {#each assets as asset, index (asset.id + '-' + index)}
+        {#if isInOrNearViewport(index)}
+          {@const currentAsset = toTimelineAsset(asset)}
+          {@const assetDate = getGalleryViewerAssetDate(asset)}
+          <div
+            class="absolute"
+            style:overflow="clip"
+            style={getStyle(index)}
+            data-testid={`gallery-viewer-asset-anchor-${asset.id}`}
+            data-gallery-asset-year={assetDate?.year ?? null}
+            data-gallery-asset-month={assetDate?.month ?? null}
+          >
+            <Thumbnail
+              readonly={disableAssetSelect}
+              onClick={() => {
+                if (assetInteraction.selectionActive) {
+                  handleSelectAssets(currentAsset);
+                  return;
+                }
+                void navigateToAsset(asset);
+              }}
+              onSelect={() => handleSelectAssets(currentAsset)}
+              onPreview={assetInteraction.selectionActive ? () => void navigateToAsset(asset) : undefined}
+              onMouseEvent={() => assetMouseEventHandler(currentAsset)}
+              {showArchiveIcon}
+              asset={currentAsset}
+              selected={assetInteraction.hasSelectedAsset(currentAsset.id)}
+              selectionCandidate={assetInteraction.hasSelectionCandidate(currentAsset.id)}
+              thumbnailWidth={geometry.getWidth(index)}
+              thumbnailHeight={geometry.getHeight(index)}
+            />
+            {#if showAssetName && !isTimelineAsset(asset)}
+              <div
+                class="absolute bottom-0 w-full overflow-clip bg-slate-50/75 bg-linear-to-t p-1 text-center font-mono text-xs font-semibold text-ellipsis whitespace-pre-wrap dark:bg-slate-800/75"
+              >
+                {asset.originalFileName}
+              </div>
+            {/if}
+          </div>
+        {/if}
+      {/each}
+    </div>
+  {/if}
+</div>
 
 <!-- Overlay Asset Viewer -->
 {#if assetViewerManager.isViewing}

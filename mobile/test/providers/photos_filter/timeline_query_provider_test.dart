@@ -1,11 +1,21 @@
+import 'package:drift/drift.dart' as drift;
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/search_result.model.dart';
+import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/domain/services/search.service.dart';
+import 'package:immich_mobile/domain/models/settings_key.dart';
+import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
+import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/infrastructure/search.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
@@ -13,7 +23,9 @@ import 'package:immich_mobile/providers/infrastructure/user.provider.dart' as in
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/timeline_query.provider.dart';
 import 'package:immich_mobile/providers/sync_status.provider.dart';
+import 'package:immich_mobile/providers/timeline/temporal_scope.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockFactory extends Mock implements TimelineFactory {}
@@ -21,6 +33,9 @@ class _MockFactory extends Mock implements TimelineFactory {}
 class _MockSearch extends Mock implements SearchService {}
 
 class _FakeService extends Fake implements TimelineService {
+  @override
+  TimelineOrigin get origin => TimelineOrigin.main;
+
   bool disposed = false;
   @override
   Future<void> dispose() async {
@@ -57,11 +72,29 @@ ProviderContainer _container({required TimelineFactory factory, required SearchS
 }
 
 void main() {
-  setUpAll(() {
+  late Drift db;
+
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
     registerFallbackValue(_FakeFilter());
     registerFallbackValue(TimelineOrigin.main);
+    registerFallbackValue(const TimelineTemporalScope.none());
     registerFallbackValue(() => const <BaseAsset>[]);
     registerFallbackValue(const Stream<int>.empty());
+    db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
+    await SettingsRepository.ensureInitialized(db);
+    await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+  });
+
+  setUp(() async {
+    await Store.clear();
+    await SettingsRepository.instance.clear(SettingsKey.values);
+  });
+
+  tearDownAll(() async {
+    await Store.clear();
+    await SettingsRepository.instance.clear(SettingsKey.values);
+    await db.close();
   });
 
   group('photosTimelineQueryProvider', () {
@@ -137,6 +170,171 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 5));
 
       verifyNever(() => search.search(any(), any()));
+    });
+
+    test('temporal scope alone makes the Photos timeline search-backed with date bounds', () async {
+      final factory = _MockFactory();
+      final search = _MockSearch();
+      final fake = _FakeService();
+      SearchFilter? captured;
+      when(() => search.search(any(), 1)).thenAnswer((invocation) async {
+        captured = invocation.positionalArguments.first as SearchFilter;
+        return const SearchResult(assets: []);
+      });
+      when(() => factory.fromAssetStream(any(), any(), TimelineOrigin.search)).thenReturn(fake);
+
+      final container = _container(factory: factory, search: search, user: _user('u1'));
+      container.read(timelineTemporalScopeProvider.notifier).setYear(2025);
+      addTearDown(container.dispose);
+
+      final svc = container.read(photosTimelineQueryProvider);
+      expect(svc, same(fake));
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      expect(captured, isNotNull);
+      expect(captured!.date.takenAfter, DateTime(2025));
+      expect(captured!.date.takenBefore, DateTime(2025, 12, 31, 23, 59, 59));
+      verify(() => factory.fromAssetStream(any(), any(), TimelineOrigin.search)).called(1);
+    });
+
+    test('temporal scope composes with active text filter for search-backed timeline', () async {
+      final factory = _MockFactory();
+      final search = _MockSearch();
+      final fake = _FakeService();
+      SearchFilter? captured;
+      when(() => search.search(any(), 1)).thenAnswer((invocation) async {
+        captured = invocation.positionalArguments.first as SearchFilter;
+        return const SearchResult(assets: []);
+      });
+      when(() => factory.fromAssetStream(any(), any(), TimelineOrigin.search)).thenReturn(fake);
+
+      final container = _container(factory: factory, search: search, user: _user('u1'));
+      container.read(photosFilterProvider.notifier).setText('paris');
+      container.read(timelineTemporalScopeProvider.notifier).setMonth(year: 2025, month: 3);
+      addTearDown(container.dispose);
+
+      final svc = container.read(photosTimelineQueryProvider);
+      expect(svc, same(fake));
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      expect(captured, isNotNull);
+      expect(captured!.context, 'paris');
+      expect(captured!.date.takenAfter, DateTime(2025, 3));
+      expect(captured!.date.takenBefore, DateTime(2025, 3, 31, 23, 59, 59));
+    });
+
+    test('cleared temporal scope returns empty Photos filter to main-library service', () {
+      final factory = _MockFactory();
+      final search = _MockSearch();
+      final fake = _FakeService();
+      when(() => factory.main(any(), any())).thenReturn(fake);
+
+      final container = _container(factory: factory, search: search, user: _user('u1'));
+      final temporal = container.read(timelineTemporalScopeProvider.notifier);
+      temporal.setYear(2025);
+      temporal.clear();
+      addTearDown(container.dispose);
+
+      final svc = container.read(photosTimelineQueryProvider);
+      expect(svc, same(fake));
+      verify(() => factory.main(any(), 'u1')).called(1);
+      verifyNever(() => search.search(any(), any()));
+    });
+
+    test('temporal-only Photos timeline builder delegates to main timeline with route scope', () {
+      final factory = _MockFactory();
+      final search = _MockSearch();
+      final fake = _FakeService();
+      when(() => factory.main(any(), any(), temporalScope: any(named: 'temporalScope'))).thenReturn(fake);
+
+      final parent = _container(factory: factory, search: search, user: _user('u1'));
+      addTearDown(parent.dispose);
+      final route = ProviderContainer(
+        parent: parent,
+        overrides: [
+          timelineTemporalScopeProvider.overrideWith(TimelineTemporalScopeNotifier.new),
+          timelineServiceProvider.overrideWith((ref) {
+            final temporalScope = ref.watch(timelineTemporalScopeProvider);
+            return buildPhotosTimelineRouteService(ref, temporalScope);
+          }),
+        ],
+      );
+      addTearDown(route.dispose);
+
+      route.read(timelineTemporalScopeProvider.notifier).setYear(2025);
+
+      expect(route.read(timelineServiceProvider), same(fake));
+      verify(() => factory.main(any(), 'u1', temporalScope: const TimelineTemporalScope.year(2025))).called(1);
+      verifyNever(() => search.search(any(), any()));
+    });
+
+    test('filtered Photos timeline builder composes route scope into search filter', () async {
+      final factory = _MockFactory();
+      final search = _MockSearch();
+      final fake = _FakeService();
+      SearchFilter? captured;
+      when(() => search.search(any(), 1)).thenAnswer((invocation) async {
+        captured = invocation.positionalArguments.first as SearchFilter;
+        return const SearchResult(assets: []);
+      });
+      when(() => factory.fromAssetStream(any(), any(), TimelineOrigin.search)).thenReturn(fake);
+
+      final parent = _container(factory: factory, search: search, user: _user('u1'));
+      parent.read(photosFilterProvider.notifier).setText('paris');
+      addTearDown(parent.dispose);
+      final route = ProviderContainer(
+        parent: parent,
+        overrides: [
+          timelineTemporalScopeProvider.overrideWith(TimelineTemporalScopeNotifier.new),
+          timelineServiceProvider.overrideWith((ref) {
+            final temporalScope = ref.watch(timelineTemporalScopeProvider);
+            return buildPhotosTimelineRouteService(ref, temporalScope);
+          }),
+        ],
+      );
+      addTearDown(route.dispose);
+
+      route.read(timelineTemporalScopeProvider.notifier).setMonth(year: 2025, month: 3);
+
+      expect(route.read(timelineServiceProvider), same(fake));
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      expect(captured, isNotNull);
+      expect(captured!.context, 'paris');
+      expect(captured!.date.takenAfter, DateTime(2025, 3));
+      expect(captured!.date.takenBefore, DateTime(2025, 3, 31, 23, 59, 59));
+    });
+
+    testWidgets('TimelineRouteScope can host the temporal-only Photos timeline builder', (tester) async {
+      final factory = _MockFactory();
+      final search = _MockSearch();
+      final fake = _FakeService();
+      final user = _user('u1');
+      final mockUserSvc = _MockUserService();
+      when(() => factory.main(any(), any(), temporalScope: any(named: 'temporalScope'))).thenReturn(fake);
+      when(() => mockUserSvc.tryGetMyUser()).thenReturn(user);
+      when(() => mockUserSvc.watchMyUser()).thenAnswer((_) => const Stream<UserDto?>.empty());
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            timelineFactoryProvider.overrideWithValue(factory),
+            searchServiceProvider.overrideWithValue(search),
+            infra.userServiceProvider.overrideWithValue(mockUserSvc),
+            currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(mockUserSvc, user)),
+            timelineUsersProvider.overrideWith((_) => Stream<List<String>>.value([user.id])),
+          ],
+          child: TimelineRouteScope(
+            timelineServiceBuilder: buildPhotosTimelineRouteService,
+            child: Directionality(
+              textDirection: TextDirection.ltr,
+              child: Consumer(builder: (context, ref, child) => Text(ref.watch(timelineServiceProvider).origin.name)),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text(fake.origin.name), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
 
     test('disposes the created service when the container disposes', () async {
