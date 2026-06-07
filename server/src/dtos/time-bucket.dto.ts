@@ -1,7 +1,14 @@
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
 import { BBoxSchema } from 'src/dtos/bbox.dto.js';
-import { AssetOrderBySchema, AssetOrderSchema, AssetVisibilitySchema, AssetTypeSchema } from 'src/enum.js';
+import {
+  AssetOrderBySchema,
+  AssetOrderSchema,
+  AssetTypeSchema,
+  AssetVisibilitySchema,
+  TimeBucketSize,
+  TimeBucketSizeSchema,
+} from 'src/enum.js';
 import { stringToBool } from 'src/validation.js';
 
 const UUID_PATTERN = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
@@ -12,6 +19,9 @@ const ScopedPersonTokenSchema = z
 
 const TimeBucketQueryBaseSchema = z
   .object({
+    bucketSize: TimeBucketSizeSchema.optional()
+      .default(TimeBucketSize.Month)
+      .describe('Timeline bucket granularity. Defaults to month for backwards compatibility'),
     userId: z.uuidv4().optional().describe('Filter assets by specific user ID'),
     albumId: z.uuidv4().optional().describe('Filter assets belonging to a specific album'),
     personId: z.uuidv4().optional().describe('Filter assets containing a specific person (face recognition)'),
@@ -167,6 +177,13 @@ export const TimeBucketsResponseSchema = z
       .describe('Time bucket identifier in YYYY-MM-DD format representing the start of the time period')
       .meta({ example: '2024-01-01' }),
     count: z.int().describe('Number of assets in this time bucket').meta({ example: 42 }),
+    representativeAssetId: z.string().nullable().optional().describe('Representative asset ID for this bucket'),
+    representativeThumbhash: z
+      .string()
+      .nullable()
+      .optional()
+      .describe('Representative asset thumbhash, base64 encoded'),
+    representativeRatio: z.number().nullable().optional().describe('Representative asset width/height ratio'),
   })
   .meta({ id: 'TimeBucketsResponseDto' });
 

@@ -201,6 +201,38 @@ void main() {
       expect(buckets[1].assetCount, 2); // April
     });
 
+    test('groups by year when GroupAssetsBy.year', () async {
+      final asset1 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, 5, 12));
+      final asset2 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 9, 15, 12));
+      final asset3 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2025, 5, 5, 12));
+      await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: asset1.id);
+      await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: asset2.id);
+      await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: asset3.id);
+
+      final query = sut.sharedSpace(spaceId, GroupAssetsBy.year);
+      final buckets = await query.bucketSource().first;
+
+      expect(buckets, [
+        TimeBucket(date: DateTime(2026), assetCount: 2),
+        TimeBucket(date: DateTime(2025), assetCount: 1),
+      ]);
+    });
+
+    test('keeps adjacent dates in different years in separate year buckets', () async {
+      final asset1 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2025, 12, 31, 12));
+      final asset2 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 1, 1, 12));
+      await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: asset1.id);
+      await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: asset2.id);
+
+      final query = sut.sharedSpace(spaceId, GroupAssetsBy.year);
+      final buckets = await query.bucketSource().first;
+
+      expect(buckets, [
+        TimeBucket(date: DateTime(2026), assetCount: 1),
+        TimeBucket(date: DateTime(2025), assetCount: 1),
+      ]);
+    });
+
     test('returns a single ungrouped bucket when GroupAssetsBy.none', () async {
       final asset1 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, 5, 12));
       final asset2 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, 15, 12));
