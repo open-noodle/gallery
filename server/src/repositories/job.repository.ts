@@ -268,6 +268,29 @@ export class JobRepository {
     ) as unknown as Promise<JobCounts>;
   }
 
+  /**
+   * True when a dedup chain is already running for the space — a pass-scoped follow-up
+   * (`space-dedup-<spaceId>-pass-<n>`, n >= 2) is queued, active, delayed, or paused on the
+   * FacialRecognition queue. The initial dedup trigger uses the bare `space-dedup-<spaceId>` id,
+   * which only de-duplicates concurrent triggers while pass 1 is still in flight; once a chain
+   * advances to pass-scoped follow-ups the bare id frees, so the next trigger would otherwise start a
+   * parallel chain (doubling work + reviving the removeOnComplete/stalled-recovery orphan race on the
+   * shared pass-scoped jobIds). {@link SharedSpaceService.handleSharedSpacePersonDedup} uses this to
+   * keep one chain per space. Relies on the FacialRecognition queue being concurrency 1: the gating
+   * pass-1 job is the only active dedup job and carries the bare id, never the `-pass-` prefix, so it
+   * never matches itself.
+   */
+  async hasInFlightDedupChain(spaceId: string): Promise<boolean> {
+    const prefix = `space-dedup-${spaceId}-pass-`;
+    const jobs = await this.getQueue(QueueName.FacialRecognition).getJobs(
+      ['active', 'waiting', 'delayed', 'paused'],
+      0,
+      1000,
+      true,
+    );
+    return jobs.some((job) => job?.id?.startsWith(prefix));
+  }
+
   async getJobTypes(name: QueueName): Promise<JobTypeCounts[]> {
     // Process 'paused' before 'waiting': BullMQ may include the same job in both lists
     // when a queue is paused. ID-based dedup then correctly attributes it to 'paused'.
