@@ -1,4 +1,4 @@
-import { AssetResponseDto } from '@immich/sdk';
+import { AssetResponseDto, TimeBucketSize } from '@immich/sdk';
 import { BrowserContext, Page, Request, Route } from '@playwright/test';
 import { basename } from 'node:path';
 import {
@@ -35,10 +35,16 @@ export const setupTimelineMockApiRoutes = async (
       const isArchived = url.searchParams.get('visibility')
         ? url.searchParams.get('visibility') === 'archive'
         : undefined;
+      const bucketSize = (url.searchParams.get('bucketSize') as TimeBucketSize | null) ?? TimeBucketSize.Month;
+      const takenAfter = url.searchParams.get('takenAfter') ?? undefined;
+      const takenBefore = url.searchParams.get('takenBefore') ?? undefined;
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        json: getTimeBuckets(timelineRestData, isTrashed, isArchived, isFavorite, albumId, changes),
+        json: getTimeBuckets(timelineRestData, isTrashed, isArchived, isFavorite, albumId, changes, bucketSize, {
+          takenAfter,
+          takenBefore,
+        }),
       });
     }
     if (pathname === '/api/timeline/bucket') {
