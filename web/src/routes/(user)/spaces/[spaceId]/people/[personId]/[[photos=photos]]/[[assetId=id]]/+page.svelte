@@ -17,10 +17,12 @@
   import TagAction from '$lib/components/timeline/actions/TagAction.svelte';
   import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '$lib/components/timeline/Timeline.svelte';
+  import TimelineRouteGroupingBar from '$lib/components/timeline/TimelineRouteGroupingBar.svelte';
   import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
+  import type { TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
   import { timeBeforeShowLoadingSpinner } from '$lib/constants';
   import PersonEditBirthDateModal from '$lib/modals/PersonEditBirthDateModal.svelte';
   import RepresentativeFacePickerModal from '$lib/modals/RepresentativeFacePickerModal.svelte';
@@ -30,6 +32,8 @@
   import { locale } from '$lib/stores/preferences.store';
   import { getSpacePersonFaceThumbnailUrl } from '$lib/utils/people-utils';
   import { toScopedPersonRef as toPersonScopedRef } from '$lib/utils/scoped-person-ref';
+  import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
+  import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
   import {
     detachScopedPerson,
     getSpacePersonFaces,
@@ -76,6 +80,8 @@
   const routeStateKey = $derived(`${data.space.id}:${data.person.id}:${data.person.updatedAt}:${data.action ?? ''}`);
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
+  let timelineGrouping = $state<TimelineGrouping>('day');
+  let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
   let personOverride = $state<SharedSpacePersonResponseDto>();
   let personOverrideKey = $state('');
   const person = $derived(personOverrideKey === routeStateKey && personOverride ? personOverride : data.person);
@@ -101,10 +107,14 @@
   let actionOverrideKey = $state('');
   const action = $derived(actionOverrideKey === routeStateKey ? actionOverride : data.action);
 
-  const options = $derived({
+  const baseTimelineOptions = $derived({
     spaceId: space.id,
     spacePersonId: person.id,
     withStacked: true,
+  });
+  const options = $derived({
+    ...baseTimelineOptions,
+    grouping: timelineGrouping,
   });
 
   const currentMember = $derived(members.find((member) => member.userId === authManager.user.id));
@@ -328,6 +338,26 @@
     await invalidateAll();
   };
 
+  function handleTimelineGroupingChange(grouping: TimelineGrouping) {
+    const anchor = getTimelineTopVisibleAnchor(timelineManager);
+    timelineGrouping = grouping;
+    temporalAnchor = anchor;
+  }
+
+  function handleTimelineBucketActivate(bucket: ActivatableTimelineBucket) {
+    if (assetMultiSelectManager.selectionActive) {
+      return;
+    }
+
+    const result = getTimelineBucketZoomTarget(bucket);
+    if (!result) {
+      return;
+    }
+
+    timelineGrouping = result.grouping;
+    temporalAnchor = result.anchor;
+  }
+
   async function closeMergeFlow() {
     setAction(null);
     if (data.action === 'merge') {
@@ -488,155 +518,174 @@
   });
 </script>
 
-<main class="relative z-0 h-dvh overflow-hidden px-2 pt-(--navbar-height) md:px-6 md:pt-(--navbar-height-md)">
-  {#key person.id}
-    <Timeline
-      enableRouting={true}
-      bind:timelineManager
-      {options}
-      assetInteraction={assetMultiSelectManager}
-      onEscape={handleBack}
-      spaceId={space.id}
-    >
-      <div
-        class="relative w-fit p-4 pt-12 sm:px-6"
-        use:clickOutside={{
-          onOutclick: () => void saveName(),
-          onEscape: cancelEditingName,
-        }}
-        use:listNavigation={suggestionContainer}
+<main
+  class="relative z-0 flex flex-col h-dvh overflow-hidden px-2 pt-(--navbar-height) md:px-6 md:pt-(--navbar-height-md)"
+>
+  <!-- Sticky grouping switcher: lives outside the scrolling timeline so it stays visible (see Tags).
+       mt-12 clears the taller ControlAppBar, which exceeds the --navbar-height padding reserve. -->
+  <TimelineRouteGroupingBar
+    grouping={timelineGrouping}
+    hidden={assetMultiSelectManager.selectionActive || action === 'merge'}
+    class="shrink-0 mt-12"
+    onGroupingChange={handleTimelineGroupingChange}
+  />
+  <div class="relative flex-1 min-h-0">
+    {#key person.id}
+      <Timeline
+        enableRouting={true}
+        bind:timelineManager
+        {options}
+        assetInteraction={assetMultiSelectManager}
+        onEscape={handleBack}
+        spaceId={space.id}
+        {temporalAnchor}
+        onTimelineBucketActivate={handleTimelineBucketActivate}
+        onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
+        grouping={timelineGrouping}
+        onGroupingChange={handleTimelineGroupingChange}
       >
-        <section class="flex w-64 place-items-center border-black sm:w-96">
-          {#if isEditor}
-            <button
-              type="button"
-              class="relative flex items-center justify-center text-start"
-              aria-label={$t('edit_name')}
-              onclick={startEditingName}
-            >
-              <ImageThumbnail
-                circle
-                shadow
-                url={thumbnailUrl}
-                altText={person.name}
-                widthStyle="3.375rem"
-                heightStyle="3.375rem"
-              />
-            </button>
-          {:else}
-            <div class="relative flex items-center justify-center">
-              <ImageThumbnail
-                circle
-                shadow
-                url={thumbnailUrl}
-                altText={person.name}
-                widthStyle="3.375rem"
-                heightStyle="3.375rem"
-              />
-            </div>
-          {/if}
-          <div class="flex flex-col justify-center px-4 text-start text-primary">
-            {#if isEditingName}
-              <input
-                bind:this={nameInput}
-                bind:value={editedName}
-                class="w-40 rounded-lg bg-gray-100 px-2 py-1 font-medium text-primary outline-hidden focus:ring-2 focus:ring-immich-primary dark:bg-immich-dark-gray dark:focus:ring-immich-dark-primary sm:w-72"
-                placeholder={$t('add_a_name')}
-                aria-label={$t('edit_name')}
-                oninput={() => void searchSpacePeople()}
-                onkeydown={(event) => {
-                  if (event.key === 'Enter') {
-                    void saveName();
-                  }
-                  if (event.key === 'Escape') {
-                    cancelEditingName();
-                  }
-                }}
-              />
-            {:else if isEditor}
-              <button
-                type="button"
-                class="w-40 truncate text-start font-medium sm:w-72"
-                aria-label={$t('edit_name')}
-                onclick={startEditingName}
-              >
-                {person.name || $t('add_a_name')}
-              </button>
-            {:else}
-              <p class="w-40 truncate font-medium sm:w-72">{person.name || $t('add_a_name')}</p>
-            {/if}
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-              {$t('assets_count', { values: { count: statistics.assets } })}
-            </p>
-            {#if featureFlagsManager.value.peopleStatistics}
-              <p class="text-sm text-gray-500 dark:text-gray-400">
-                {$t('faces_count', { values: { count: statistics.faces } })}
-              </p>
-            {/if}
-            {#if person.birthDate}
-              <p class="text-sm text-gray-500 dark:text-gray-400">
-                {$t('person_birthdate', {
-                  values: {
-                    date: DateTime.fromISO(person.birthDate).toLocaleString(
-                      {
-                        month: 'numeric',
-                        day: 'numeric',
-                        year: 'numeric',
-                      },
-                      { locale: $locale },
-                    ),
-                  },
-                })}
-              </p>
-            {/if}
-          </div>
-        </section>
-        {#if isEditingName}
-          <div class="absolute z-1 w-64 sm:w-96">
-            {#if isSearchingPeople}
-              <div
-                class="flex h-14 place-items-center rounded-b-lg border border-gray-400 bg-gray-200 p-2 dark:border-immich-dark-gray dark:bg-gray-700"
-              >
-                <div class="flex w-full place-items-center">
-                  <LoadingSpinner />
+        <div
+          class="relative p-4 pt-12 sm:px-6"
+          use:clickOutside={{
+            onOutclick: () => void saveName(),
+            onEscape: cancelEditingName,
+          }}
+          use:listNavigation={suggestionContainer}
+        >
+          <div class="flex flex-wrap items-center gap-4" data-testid="person-timeline-header">
+            <section class="flex w-fit place-items-center border-black" data-testid="person-timeline-identity">
+              {#if isEditor}
+                <button
+                  type="button"
+                  class="relative flex items-center justify-center text-start"
+                  aria-label={$t('edit_name')}
+                  onclick={startEditingName}
+                >
+                  <ImageThumbnail
+                    circle
+                    shadow
+                    url={thumbnailUrl}
+                    altText={person.name}
+                    widthStyle="3.375rem"
+                    heightStyle="3.375rem"
+                  />
+                </button>
+              {:else}
+                <div class="relative flex items-center justify-center">
+                  <ImageThumbnail
+                    circle
+                    shadow
+                    url={thumbnailUrl}
+                    altText={person.name}
+                    widthStyle="3.375rem"
+                    heightStyle="3.375rem"
+                  />
                 </div>
-              </div>
-            {:else}
-              <div bind:this={suggestionContainer}>
-                {#each suggestedPeople as suggestedPerson, index (suggestedPerson.id)}
+              {/if}
+              <div class="flex flex-col justify-center px-4 text-start text-primary">
+                {#if isEditingName}
+                  <input
+                    bind:this={nameInput}
+                    bind:value={editedName}
+                    class="w-40 rounded-lg bg-gray-100 px-2 py-1 font-medium text-primary outline-hidden focus:ring-2 focus:ring-immich-primary dark:bg-immich-dark-gray dark:focus:ring-immich-dark-primary sm:w-72"
+                    placeholder={$t('add_a_name')}
+                    aria-label={$t('edit_name')}
+                    oninput={() => void searchSpacePeople()}
+                    onkeydown={(event) => {
+                      if (event.key === 'Enter') {
+                        void saveName();
+                      }
+                      if (event.key === 'Escape') {
+                        cancelEditingName();
+                      }
+                    }}
+                  />
+                {:else if isEditor}
                   <button
                     type="button"
-                    class="flex h-14 w-full place-items-center border border-gray-200 bg-gray-100 p-2 hover:bg-gray-300 focus:bg-gray-300 dark:border-immich-dark-gray dark:bg-gray-700 hover:dark:bg-[#232932] focus:dark:bg-[#232932] {index ===
-                    suggestedPeople.length - 1
-                      ? 'rounded-b-lg border-b'
-                      : ''}"
-                    aria-label={suggestedPerson.name}
-                    onclick={() => void selectSuggestedPerson(suggestedPerson)}
+                    class="w-40 truncate text-start font-medium"
+                    aria-label={$t('edit_name')}
+                    onclick={startEditingName}
                   >
-                    <ImageThumbnail
-                      circle
-                      shadow
-                      url={getThumbUrl(suggestedPerson)}
-                      altText={suggestedPerson.name}
-                      widthStyle="2rem"
-                      heightStyle="2rem"
-                    />
-                    <p class="ms-4 text-gray-700 dark:text-gray-100">{suggestedPerson.name}</p>
+                    {person.name || $t('add_a_name')}
                   </button>
-                {/each}
+                {:else}
+                  <p class="w-40 truncate font-medium">{person.name || $t('add_a_name')}</p>
+                {/if}
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  {$t('assets_count', { values: { count: statistics.assets } })}
+                </p>
+                {#if featureFlagsManager.value.peopleStatistics}
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {$t('faces_count', { values: { count: statistics.faces } })}
+                  </p>
+                {/if}
+                {#if person.birthDate}
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {$t('person_birthdate', {
+                      values: {
+                        date: DateTime.fromISO(person.birthDate).toLocaleString(
+                          {
+                            month: 'numeric',
+                            day: 'numeric',
+                            year: 'numeric',
+                          },
+                          { locale: $locale },
+                        ),
+                      },
+                    })}
+                  </p>
+                {/if}
               </div>
-            {/if}
+            </section>
           </div>
-        {/if}
-      </div>
-
-      {#snippet empty()}
-        <div class="mx-auto max-w-md py-16 text-center">
-          <p class="text-gray-500 dark:text-gray-400">{$t('spaces_no_person_assets')}</p>
+          {#if isEditingName}
+            <div class="absolute z-1 w-64 sm:w-96">
+              {#if isSearchingPeople}
+                <div
+                  class="flex h-14 place-items-center rounded-b-lg border border-gray-400 bg-gray-200 p-2 dark:border-immich-dark-gray dark:bg-gray-700"
+                >
+                  <div class="flex w-full place-items-center">
+                    <LoadingSpinner />
+                  </div>
+                </div>
+              {:else}
+                <div bind:this={suggestionContainer}>
+                  {#each suggestedPeople as suggestedPerson, index (suggestedPerson.id)}
+                    <button
+                      type="button"
+                      class="flex h-14 w-full place-items-center border border-gray-200 bg-gray-100 p-2 hover:bg-gray-300 focus:bg-gray-300 dark:border-immich-dark-gray dark:bg-gray-700 hover:dark:bg-[#232932] focus:dark:bg-[#232932] {index ===
+                      suggestedPeople.length - 1
+                        ? 'rounded-b-lg border-b'
+                        : ''}"
+                      aria-label={suggestedPerson.name}
+                      onclick={() => void selectSuggestedPerson(suggestedPerson)}
+                    >
+                      <ImageThumbnail
+                        circle
+                        shadow
+                        url={getThumbUrl(suggestedPerson)}
+                        altText={suggestedPerson.name}
+                        widthStyle="2rem"
+                        heightStyle="2rem"
+                      />
+                      <p class="ms-4 text-gray-700 dark:text-gray-100">{suggestedPerson.name}</p>
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/if}
         </div>
-      {/snippet}
-    </Timeline>
-  {/key}
+
+        {#snippet empty()}
+          <div class="mx-auto max-w-md py-16 text-center">
+            <p class="text-gray-500 dark:text-gray-400">{$t('spaces_no_person_assets')}</p>
+          </div>
+        {/snippet}
+      </Timeline>
+    {/key}
+  </div>
 </main>
 
 <header>

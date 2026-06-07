@@ -79,5 +79,23 @@ void main() {
 
       expect(container.read(photosFilterProvider).people, isEmpty);
     });
+
+    testWidgets('tap on close invokes custom remove callback when provided', (tester) async {
+      const spec = ActiveChipSpec(id: TagChipId('t1'), label: 'wedding', visual: ChipVisual.tag);
+      var removed = 0;
+
+      await tester.pumpConsumerWidget(ActiveFilterChip(spec: spec, onRemove: () => removed++));
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(tester.element(find.byType(ActiveFilterChip)));
+      container.read(photosFilterProvider.notifier).toggleTag('t1');
+      expect(container.read(photosFilterProvider).tagIds, ['t1']);
+
+      await tester.tap(find.byIcon(Icons.close_rounded));
+      await tester.pumpAndSettle();
+
+      expect(removed, 1);
+      expect(container.read(photosFilterProvider).tagIds, ['t1']);
+    });
   });
 }

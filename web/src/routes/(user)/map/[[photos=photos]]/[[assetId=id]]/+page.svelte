@@ -243,7 +243,11 @@
         />
       {/if}
       {#if isMobile}
-        <button type="button" onclick={() => (showMobileFilters = !showMobileFilters)}>
+        <button
+          type="button"
+          data-testid="map-mobile-filter-toggle"
+          onclick={() => (showMobileFilters = !showMobileFilters)}
+        >
           <Icon icon={mdiFilterVariant} size="24" />
         </button>
       {/if}
@@ -344,7 +348,7 @@
               assetCount={selectedClusterIds.size}
               onClose={closeTimelinePanel}
               {spaceId}
-              {filters}
+              bind:filters
             />
           </div>
         {/if}
