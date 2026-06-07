@@ -19,6 +19,7 @@ export const newJobRepositoryMock = (): Mocked<RepositoryInterface<JobRepository
     isActive: vitest.fn(),
     isPaused: vitest.fn(),
     getJobCounts: vitest.fn(),
+    hasInFlightDedupChain: vitest.fn().mockResolvedValue(false),
     getJobTypes: vitest.fn().mockResolvedValue([]),
     getTelemetryMetrics: vitest.fn(),
     clear: vitest.fn(),
