@@ -260,6 +260,12 @@ describe('Search page cmdk selection context', () => {
     await waitFor(() => expect(screen.queryByTestId('asset-row-asset-1')).not.toBeInTheDocument());
   });
 
+  it('enables GalleryViewer grouping for legacy search result grids', async () => {
+    renderPage();
+
+    await waitFor(() => expect(screen.getByTestId('gallery-viewer')).toHaveAttribute('data-enable-grouping', 'true'));
+  });
+
   it('resolves scoped person filter chips from shared people search', async () => {
     const query = encodeURIComponent(
       JSON.stringify({ personIds: ['space-person:space-person-1'], withSharedSpaces: true }),

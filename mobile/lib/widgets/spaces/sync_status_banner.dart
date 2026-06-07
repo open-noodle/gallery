@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/providers/sync_status.provider.dart';
 
+const double kSyncStatusBannerSliverHeight = 48.0;
+
 /// Banner that surfaces remote-sync progress so the user understands why
 /// freshly-opened spaces appear empty for a few seconds. The Drift bucket
 /// queries fed from `sync_api.repository.streamChanges` populate row by row

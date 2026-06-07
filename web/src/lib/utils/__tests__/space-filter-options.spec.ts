@@ -116,6 +116,46 @@ describe('handleSpaceRemoveFilter', () => {
     expect(result.selectedMonth).toBeUndefined();
   });
 
+  it('timeline chip removal clears only temporal filter state', () => {
+    const filters = {
+      ...createFilterState(),
+      personIds: ['person-1'],
+      city: 'Berlin',
+      country: 'Germany',
+      make: 'Sony',
+      model: 'A7C',
+      tagIds: ['tag-1'],
+      rating: 4,
+      mediaType: 'video' as const,
+      isFavorite: true,
+      isNotInAlbum: true,
+      sortOrder: 'asc' as const,
+      dateAfter: '2024-01-01',
+      dateBefore: '2024-12-31',
+      selectedYear: 2023,
+      selectedMonth: 8,
+    };
+
+    const result = handleSpaceRemoveFilter(filters, 'timeline');
+    expect(result).toMatchObject({
+      personIds: ['person-1'],
+      city: 'Berlin',
+      country: 'Germany',
+      make: 'Sony',
+      model: 'A7C',
+      tagIds: ['tag-1'],
+      rating: 4,
+      mediaType: 'video',
+      isFavorite: true,
+      isNotInAlbum: true,
+      sortOrder: 'asc',
+      dateAfter: undefined,
+      dateBefore: undefined,
+      selectedYear: undefined,
+      selectedMonth: undefined,
+    });
+  });
+
   it('clears favorites when removing favorites filter', () => {
     const filters = { ...createFilterState(), isFavorite: true };
 
