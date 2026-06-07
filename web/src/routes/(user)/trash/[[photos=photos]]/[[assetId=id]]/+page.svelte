@@ -8,11 +8,15 @@
   import SelectAllAssets from '#lib/components/timeline/actions/SelectAllAction.svelte';
   import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '#lib/components/timeline/Timeline.svelte';
+  import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
   import { getTrashActions } from '#lib/services/trash.service.ts';
   import { handlePromiseError } from '#lib/utils.ts';
+  import type { TimelineGrouping, TimelineTemporalAnchor } from '#lib/managers/timeline-manager/types.ts';
+  import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '#lib/utils/timeline-zoom-navigation.ts';
+  import { getTimelineTopVisibleAnchor } from '#lib/managers/timeline-manager/timeline-anchor.ts';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
@@ -28,7 +32,17 @@
   let { data }: Props = $props();
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
-  const options = { isTrashed: true };
+  let timelineGrouping = $state<TimelineGrouping>('day');
+  let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
+  const baseTimelineOptions = { isTrashed: true };
+  const options = $derived({
+    ...baseTimelineOptions,
+    grouping: timelineGrouping,
+  });
+  const hideGroupingControls = $derived(
+    assetMultiSelectManager.selectionActive ||
+      Boolean(timelineManager?.isInitialized && timelineManager.assetCount === 0),
+  );
 
   if (!config.trash.enabled) {
     handlePromiseError(goto(Route.photos()));
@@ -43,6 +57,26 @@
     return;
   };
 
+  function handleTimelineGroupingChange(grouping: TimelineGrouping) {
+    const anchor = getTimelineTopVisibleAnchor(timelineManager);
+    timelineGrouping = grouping;
+    temporalAnchor = anchor;
+  }
+
+  function handleTimelineBucketActivate(bucket: ActivatableTimelineBucket) {
+    if (assetMultiSelectManager.selectionActive) {
+      return;
+    }
+
+    const result = getTimelineBucketZoomTarget(bucket);
+    if (!result) {
+      return;
+    }
+
+    timelineGrouping = result.grouping;
+    temporalAnchor = result.anchor;
+  }
+
   const { Empty, RestoreAll } = $derived(getTrashActions($t, timelineManager?.assetCount ?? 0));
 </script>
 
@@ -53,12 +87,22 @@
     title={data.meta.title}
     scrollbar={false}
   >
+    <TimelineRouteGroupingBar
+      grouping={timelineGrouping}
+      hidden={hideGroupingControls}
+      onGroupingChange={handleTimelineGroupingChange}
+    />
     <Timeline
       enableRouting={true}
       bind:timelineManager
       {options}
       assetInteraction={assetMultiSelectManager}
       onEscape={handleEscape}
+      {temporalAnchor}
+      onTimelineBucketActivate={handleTimelineBucketActivate}
+      onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
+      grouping={timelineGrouping}
+      onGroupingChange={handleTimelineGroupingChange}
     >
       <p class="p-4 font-medium text-gray-500/60 dark:text-gray-300/60">
         {$t('trashed_items_will_be_permanently_deleted_after', {

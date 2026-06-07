@@ -7,6 +7,7 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/events.model.dart';
 import 'package:immich_mobile/domain/models/map.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/timeline.repository.dart';
@@ -51,38 +52,94 @@ class TimelineFactory {
     return group == GroupAssetsBy.auto ? GroupAssetsBy.day : group;
   }
 
-  TimelineService main(List<String> timelineUsers, String currentUserId) =>
-      TimelineService(_timelineRepository.main(timelineUsers, currentUserId, groupBy));
+  TimelineService main(
+    List<String> timelineUsers,
+    String currentUserId, {
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => TimelineService(
+    _timelineRepository.main(timelineUsers, currentUserId, groupBy ?? this.groupBy, temporalScope: temporalScope),
+  );
 
-  TimelineService localAlbum({required String albumId}) =>
-      TimelineService(_timelineRepository.localAlbum(albumId, groupBy));
+  TimelineService localAlbum({
+    required String albumId,
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => TimelineService(_timelineRepository.localAlbum(albumId, groupBy ?? this.groupBy, temporalScope: temporalScope));
 
-  TimelineService remoteAlbum({required String albumId}) =>
-      TimelineService(_timelineRepository.remoteAlbum(albumId, groupBy));
+  TimelineService remoteAlbum({
+    required String albumId,
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) =>
+      TimelineService(_timelineRepository.remoteAlbum(albumId, groupBy ?? this.groupBy, temporalScope: temporalScope));
 
-  TimelineService sharedSpace({required String spaceId}) =>
-      TimelineService(_timelineRepository.sharedSpace(spaceId, groupBy));
+  TimelineService sharedSpace({
+    required String spaceId,
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) =>
+      TimelineService(_timelineRepository.sharedSpace(spaceId, groupBy ?? this.groupBy, temporalScope: temporalScope));
 
-  TimelineService remoteAssets(String userId) => TimelineService(_timelineRepository.remote(userId, groupBy));
+  TimelineService remoteAssets(
+    String userId, {
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => TimelineService(_timelineRepository.remote(userId, groupBy ?? this.groupBy, temporalScope: temporalScope));
 
   TimelineService recentlyAdded(String userId) => TimelineService(_timelineRepository.recentlyAdded(userId, groupBy));
 
-  TimelineService favorite(String userId) => TimelineService(_timelineRepository.favorite(userId, groupBy));
+  TimelineService favorite(
+    String userId, {
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => TimelineService(_timelineRepository.favorite(userId, groupBy ?? this.groupBy, temporalScope: temporalScope));
 
-  TimelineService trash(String userId) => TimelineService(_timelineRepository.trash(userId, groupBy));
+  TimelineService trash(
+    String userId, {
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => TimelineService(_timelineRepository.trash(userId, groupBy ?? this.groupBy, temporalScope: temporalScope));
 
-  TimelineService archive(String userId) => TimelineService(_timelineRepository.archived(userId, groupBy));
+  TimelineService archive(
+    String userId, {
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => TimelineService(_timelineRepository.archived(userId, groupBy ?? this.groupBy, temporalScope: temporalScope));
 
-  TimelineService lockedFolder(String userId) => TimelineService(_timelineRepository.locked(userId, groupBy));
+  TimelineService lockedFolder(
+    String userId, {
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => TimelineService(_timelineRepository.locked(userId, groupBy ?? this.groupBy, temporalScope: temporalScope));
 
-  TimelineService video(List<String> userIds, String currentUserId) =>
-      TimelineService(_timelineRepository.video(userIds, currentUserId, groupBy));
+  TimelineService video(
+    List<String> userIds,
+    String currentUserId, {
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => TimelineService(
+    _timelineRepository.video(userIds, currentUserId, groupBy ?? this.groupBy, temporalScope: temporalScope),
+  );
 
-  TimelineService place(String place, List<String> userIds, String currentUserId) =>
-      TimelineService(_timelineRepository.place(place, userIds, currentUserId, groupBy));
+  TimelineService place(
+    String place,
+    List<String> userIds,
+    String currentUserId, {
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => TimelineService(
+    _timelineRepository.place(place, userIds, currentUserId, groupBy ?? this.groupBy, temporalScope: temporalScope),
+  );
 
-  TimelineService person(String userId, String personId) =>
-      TimelineService(_timelineRepository.person(userId, personId, groupBy));
+  TimelineService person(
+    String userId,
+    String personId, {
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => TimelineService(
+    _timelineRepository.person(userId, personId, groupBy ?? this.groupBy, temporalScope: temporalScope),
+  );
 
   TimelineService fromAssets(List<BaseAsset> assets, TimelineOrigin type) =>
       TimelineService(_timelineRepository.fromAssets(assets, type));
@@ -98,9 +155,18 @@ class TimelineFactory {
     List<String> userIds,
     String currentUserId,
     TimelineMapOptions Function() currentOptions,
-    Stream<TimelineMapOptions> optionsStream,
-  ) => TimelineService(
-    _timelineRepository.geographicMap(userIds, currentUserId, currentOptions, optionsStream, groupBy),
+    Stream<TimelineMapOptions> optionsStream, {
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => TimelineService(
+    _timelineRepository.geographicMap(
+      userIds,
+      currentUserId,
+      currentOptions,
+      optionsStream,
+      groupBy ?? this.groupBy,
+      temporalScope: temporalScope,
+    ),
   );
 }
 

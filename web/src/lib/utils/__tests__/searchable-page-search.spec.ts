@@ -76,6 +76,13 @@ describe('typed filter URL state', () => {
     expect(buildSearchablePageUrl(url, '', 'desc', filters)).toBe('/photos?sort=desc');
   });
 
+  it('does not serialize transient year and month selections into URL params', () => {
+    const url = new URL('https://gallery.test/photos?view=timeline');
+    const filters = { ...createFilterState(), personIds: ['person-1'], selectedYear: 2015, selectedMonth: 8 };
+
+    expect(buildSearchablePageUrl(url, '', 'desc', filters)).toBe('/photos?view=timeline&sort=desc&people=person-1');
+  });
+
   it('serializes typed filters into space URLs', () => {
     const url = new URL('https://gallery.test/spaces/space-1/photos?panel=closed');
     const filters = {
