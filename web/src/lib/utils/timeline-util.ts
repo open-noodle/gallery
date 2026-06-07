@@ -73,7 +73,7 @@ export const fromTimelinePlainYearMonth = (timelineYearMonth: TimelineYearMonth)
 export const toISOYearMonthUTC = ({ year, month }: TimelineYearMonth): string => {
   const yearFull = String(year).padStart(4, '0');
   const monthFull = String(month).padStart(2, '0');
-  return `${yearFull}-${monthFull}-01T00:00:00.000Z`;
+  return `${yearFull}-${monthFull}-01`;
 };
 
 export function formatTimelineMonthTitle(_date: DateTime): string {

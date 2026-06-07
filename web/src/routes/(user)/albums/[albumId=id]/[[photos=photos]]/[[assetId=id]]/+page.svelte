@@ -8,6 +8,7 @@
   import ActivityViewer from '$lib/components/asset-viewer/ActivityViewer.svelte';
   import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
+  import { clearTimelineTemporalFilter } from '$lib/utils/timeline-temporal-filters';
   import {
     clearFilters,
     createFilterState,
@@ -35,6 +36,7 @@
   import TagAction from '$lib/components/timeline/actions/TagAction.svelte';
   import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '$lib/components/timeline/Timeline.svelte';
+  import TimelineGroupingControl from '$lib/components/timeline/TimelineGroupingControl.svelte';
   import { AlbumPageViewMode } from '$lib/constants';
   import { activityManager } from '$lib/managers/activity-manager.svelte';
   import { assetMultiSelectManager, AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
@@ -44,7 +46,7 @@
   import { eventManager } from '$lib/managers/event-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-  import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
+  import type { TimelineAsset, TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
   import AlbumOptionsModal from '$lib/modals/AlbumOptionsModal.svelte';
   import { Route } from '$lib/route';
   import {
@@ -62,6 +64,12 @@
   import { handleError } from '$lib/utils/handle-error';
   import { isAlbumsRoute, navigate, type AssetGridRouteSearchParams } from '$lib/utils/navigation';
   import { handlePhotosRemoveFilter } from '$lib/utils/photos-filter-options';
+  import {
+    type ActivatableTimelineBucket,
+    getTimelineBucketZoomTarget,
+    getTimelineManagerTimeBuckets,
+  } from '$lib/utils/timeline-zoom-navigation';
+  import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
   import { AlbumUserRole, getAlbumInfo, updateAlbumInfo, type AlbumResponseDto } from '@immich/sdk';
   import {
     ActionButton,
@@ -104,6 +112,8 @@
   let album = $state(data.album);
   let albumFilters = $state(createFilterState());
   let pickerFilters = $state(createFilterState());
+  let timelineGrouping = $state<TimelineGrouping>('day');
+  let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
   let albumPersonNames = new SvelteMap<string, string>();
   let albumTagNames = new SvelteMap<string, string>();
   let pickerPersonNames = new SvelteMap<string, string>();
@@ -260,6 +270,8 @@
       timelineMultiSelectManager.clear();
       assetMultiSelectManager.clear();
       viewMode = AlbumPageViewMode.VIEW;
+      timelineGrouping = 'day';
+      temporalAnchor = undefined;
       oldAt = null;
     }
   });
@@ -320,22 +332,19 @@
   const showFilteredEmptyState = $derived(
     timelineManager?.isInitialized && !hasTimelineMonths && totalAssetCount === 0 && activeFilterCount > 0,
   );
-  const timeBuckets = $derived(
-    timelineManager?.months?.map((month) => ({
-      timeBucket: `${month.yearMonth.year}-${String(month.yearMonth.month).padStart(2, '0')}-01T00:00:00.000Z`,
-      count: month.assetsCount,
-    })) ?? [],
-  );
+  const timeBuckets = $derived(getTimelineManagerTimeBuckets(timelineManager));
+  const isBrowseTimeline = $derived(viewMode === AlbumPageViewMode.VIEW);
 
   const options = $derived.by(() => {
     if (viewMode === AlbumPageViewMode.SELECT_ASSETS) {
       return buildAlbumAssetPickerOptions(album.id, pickerFilters);
     }
-    return buildAlbumTimelineOptions(
+    const albumOptions = buildAlbumTimelineOptions(
       album.id,
       album.order ?? authManager.preferences.albums.defaultAssetOrder,
       albumFilters,
     );
+    return isBrowseTimeline ? { ...albumOptions, grouping: timelineGrouping } : albumOptions;
   });
 
   const isShared = $derived(viewMode === AlbumPageViewMode.SELECT_ASSETS ? false : album.albumUsers.length > 1);
@@ -377,6 +386,31 @@
   const currentAssetIntersection = $derived(
     viewMode === AlbumPageViewMode.SELECT_ASSETS ? timelineMultiSelectManager : assetMultiSelectManager,
   );
+
+  function handleTimelineGroupingChange(grouping: TimelineGrouping) {
+    const anchor = getTimelineTopVisibleAnchor(timelineManager);
+    timelineGrouping = grouping;
+    temporalAnchor = anchor;
+  }
+
+  function handleTimelineBucketActivate(bucket: ActivatableTimelineBucket) {
+    if (!isBrowseTimeline || assetMultiSelectManager.selectionActive) {
+      return;
+    }
+
+    const result = getTimelineBucketZoomTarget(bucket);
+    if (!result) {
+      return;
+    }
+
+    timelineGrouping = result.grouping;
+    temporalAnchor = result.anchor;
+  }
+
+  function clearAlbumTemporalFilter() {
+    albumFilters = clearTimelineTemporalFilter(albumFilters);
+    temporalAnchor = undefined;
+  }
 
   const onSharedLinkCreate = async () => {
     await refreshAlbum();
@@ -478,6 +512,15 @@
         {/if}
 
         <div class="flex flex-1 flex-col overflow-hidden pl-4">
+          {#if isBrowseTimeline && !assetMultiSelectManager.selectionActive}
+            <div
+              class="hidden shrink-0 items-center gap-2 border-b border-gray-200 bg-gray-50 px-4 py-2 dark:border-gray-700 dark:bg-gray-900 md:flex"
+              data-testid="timeline-desktop-grouping-control"
+            >
+              <TimelineGroupingControl grouping={timelineGrouping} onGroupingChange={handleTimelineGroupingChange} />
+            </div>
+          {/if}
+
           {#if viewMode === AlbumPageViewMode.SELECT_ASSETS && getActiveFilterCount(pickerFilters) > 0}
             <ActiveFiltersBar
               filters={pickerFilters}
@@ -498,10 +541,15 @@
               personNames={albumPersonNames}
               tagNames={albumTagNames}
               onRemoveFilter={(type, id) => {
-                albumFilters = handlePhotosRemoveFilter(albumFilters, type, id);
+                if (type === 'timeline') {
+                  clearAlbumTemporalFilter();
+                } else {
+                  albumFilters = handlePhotosRemoveFilter(albumFilters, type, id);
+                }
               }}
               onClearAll={() => {
                 albumFilters = clearFilters(albumFilters);
+                temporalAnchor = undefined;
               }}
             />
           {/if}
@@ -521,6 +569,7 @@
                     pickerFilters = clearFilters(pickerFilters);
                   } else {
                     albumFilters = clearFilters(albumFilters);
+                    temporalAnchor = undefined;
                   }
                 }}
               >
@@ -542,6 +591,11 @@
               {onSelect}
               onEscape={handleEscape}
               withStacked={true}
+              onTimelineBucketActivate={isBrowseTimeline ? handleTimelineBucketActivate : undefined}
+              temporalAnchor={isBrowseTimeline ? temporalAnchor : undefined}
+              onTemporalAnchorResolved={isBrowseTimeline ? () => (temporalAnchor = undefined) : undefined}
+              grouping={isBrowseTimeline ? timelineGrouping : 'day'}
+              onGroupingChange={isBrowseTimeline ? handleTimelineGroupingChange : undefined}
             >
               {#if viewMode !== AlbumPageViewMode.SELECT_ASSETS}
                 {#if viewMode !== AlbumPageViewMode.SELECT_THUMBNAIL}

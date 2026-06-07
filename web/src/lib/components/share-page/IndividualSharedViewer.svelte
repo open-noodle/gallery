@@ -79,7 +79,13 @@
 
 {#if sharedLink?.allowUpload || assets.length > 1}
   <main class="isolate mx-4 mt-24 mb-40" bind:clientHeight={viewport.height} bind:clientWidth={viewport.width}>
-    <GalleryViewer {assets} assetInteraction={assetMultiSelectManager} {viewport} allowDeletion={false} />
+    <GalleryViewer
+      {assets}
+      assetInteraction={assetMultiSelectManager}
+      {viewport}
+      allowDeletion={false}
+      enableGrouping
+    />
   </main>
 
   <header class="fixed inset-s-0 top-0 w-full">

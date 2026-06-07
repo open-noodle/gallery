@@ -26,6 +26,7 @@ import {
   AssetType,
   AssetVisibility,
   CalendarHeatmapType,
+  TimeBucketSize,
 } from 'src/enum';
 import { DB } from 'src/schema';
 import { AssetAudioTable, AssetKeyframeTable, AssetVideoTable } from 'src/schema/tables/asset-av.table';
@@ -120,11 +121,15 @@ interface AssetBuilderOptions {
 export interface TimeBucketOptions extends AssetBuilderOptions {
   order?: AssetOrder;
   orderBy?: AssetOrderBy;
+  bucketSize?: TimeBucketSize;
 }
 
 export interface TimeBucketItem {
   timeBucket: string;
   count: number;
+  representativeAssetId?: string | null;
+  representativeThumbhash?: string | null;
+  representativeRatio?: number | null;
 }
 
 export interface YearMonthDay {
@@ -966,7 +971,7 @@ export class AssetRepository {
 
     const { order, column } = dateColumns[dto.type];
 
-    const date = truncatedDate<Date>(order, 'DAY');
+    const date = truncatedDate<Date>(order, TimeBucketSize.Day);
 
     return this.db
       .selectFrom('asset')
@@ -981,13 +986,37 @@ export class AssetRepository {
       .execute();
   }
 
-  @GenerateSql({ params: [{}, { user: { id: DummyValue.UUID } }] })
+  @GenerateSql(
+    { params: [{}, { user: { id: DummyValue.UUID } }] },
+    { params: [{ bucketSize: TimeBucketSize.Year }, { user: { id: DummyValue.UUID } }] },
+    { params: [{ bucketSize: TimeBucketSize.Day }, { user: { id: DummyValue.UUID } }] },
+  )
   async getTimeBuckets(options: TimeBucketOptions, auth: AuthDto): Promise<TimeBucketItem[]> {
+    const bucketSize = options.bucketSize ?? TimeBucketSize.Month;
+    const order = options.order === AssetOrder.Asc ? AssetOrder.Asc : AssetOrder.Desc;
+
     return this.db
       .with('asset', (qb) =>
         qb
           .selectFrom('asset')
-          .select(truncatedDate<Date>(options.orderBy).as('timeBucket'))
+          .select((eb) => [
+            truncatedDate<Date>(options.orderBy, bucketSize).as('timeBucket'),
+            'asset.id',
+            'asset.localDateTime',
+            'asset.fileCreatedAt',
+            'asset.thumbhash',
+            eb.fn
+              .coalesce(
+                eb
+                  .case()
+                  .when(sql`asset."height" = 0 or asset."width" = 0 or asset."height" is null or asset."width" is null`)
+                  .then(eb.lit(1))
+                  .else(sql`round(asset."width"::numeric / asset."height"::numeric, 3)::float`)
+                  .end(),
+                eb.lit(1),
+              )
+              .as('ratio'),
+          ])
           .$if(!!options.forceEmptyResult, (qb) => qb.where(sql<SqlBool>`false`))
           .$if(!!options.isTrashed, (qb) => qb.where('asset.status', '!=', AssetStatus.Deleted))
           .where('asset.deletedAt', options.isTrashed ? 'is not' : 'is', null)
@@ -1107,19 +1136,50 @@ export class AssetRepository {
           .$if(!!options.takenAfter, (qb) => qb.where('asset.localDateTime', '>=', new Date(options.takenAfter!)))
           .$if(!!options.takenBefore, (qb) => qb.where('asset.localDateTime', '<=', new Date(options.takenBefore!))),
       )
-      .selectFrom('asset')
-      .select(sql<string>`("timeBucket" AT TIME ZONE 'UTC')::date::text`.as('timeBucket'))
-      .select((eb) => eb.fn.countAll<number>().as('count'))
-      .groupBy('timeBucket')
-      .orderBy('timeBucket', options.order ?? 'desc')
+      .with('bucket_counts', (qb) =>
+        qb
+          .selectFrom('asset')
+          .select(['timeBucket'])
+          .select((eb) => eb.fn.countAll<number>().as('count'))
+          .groupBy('timeBucket'),
+      )
+      .with('bucket_representatives', (qb) =>
+        qb
+          .selectFrom('asset')
+          .distinctOn('timeBucket')
+          .select([
+            'timeBucket',
+            // The inner `asset` CTE's row type is eroded to `{ timeBucket }` by the `as any`
+            // casts in the bbox/exif filter branch, so reference its other columns via raw SQL.
+            sql<string>`"id"`.as('representativeAssetId'),
+            sql<string | null>`encode("thumbhash", 'base64')`.as('representativeThumbhash'),
+            sql<number>`"ratio"`.as('representativeRatio'),
+          ])
+          .orderBy('timeBucket')
+          .orderBy(sql`("localDateTime" AT TIME ZONE 'UTC')::date`, order)
+          .orderBy(sql`"fileCreatedAt"`, order),
+      )
+      .selectFrom('bucket_counts')
+      .innerJoin('bucket_representatives', 'bucket_representatives.timeBucket', 'bucket_counts.timeBucket')
+      .select(sql<string>`("bucket_counts"."timeBucket" AT TIME ZONE 'UTC')::date::text`.as('timeBucket'))
+      .select('bucket_counts.count')
+      .select([
+        'bucket_representatives.representativeAssetId',
+        'bucket_representatives.representativeThumbhash',
+        'bucket_representatives.representativeRatio',
+      ])
+      .orderBy('bucket_counts.timeBucket', order)
       .execute() as any as Promise<TimeBucketItem[]>;
   }
 
-  @GenerateSql({
-    params: [DummyValue.TIME_BUCKET, { withStacked: true }, { user: { id: DummyValue.UUID } }],
-  })
+  @GenerateSql(
+    { params: [DummyValue.TIME_BUCKET, { withStacked: true }, { user: { id: DummyValue.UUID } }] },
+    { params: ['2000-01-01', { bucketSize: TimeBucketSize.Year }, { user: { id: DummyValue.UUID } }] },
+    { params: ['2000-01-02', { bucketSize: TimeBucketSize.Day }, { user: { id: DummyValue.UUID } }] },
+  )
   getTimeBucket(timeBucket: string, options: TimeBucketOptions, auth: AuthDto) {
-    const order = options.order ?? 'desc';
+    const order = options.order === AssetOrder.Asc ? AssetOrder.Asc : AssetOrder.Desc;
+    const bucketSize = options.bucketSize ?? TimeBucketSize.Month;
     const query = this.db
       .with('cte', (qb) =>
         qb
@@ -1174,7 +1234,7 @@ export class AssetRepository {
 
             return withBoundingBox(withBoundingCircle, bbox);
           })
-          .where(truncatedDate(options.orderBy), '=', timeBucket.replace(/^[+-]/, ''))
+          .where(truncatedDate(options.orderBy, bucketSize), '=', timeBucket.replace(/^[+-]/, ''))
           .$if(!!options.albumId, (qb) =>
             qb.where((eb) =>
               eb.exists(
