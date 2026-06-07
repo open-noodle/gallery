@@ -17,13 +17,16 @@
   import TagAction from '$lib/components/timeline/actions/TagAction.svelte';
   import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '$lib/components/timeline/Timeline.svelte';
+  import TimelineRouteGroupingBar from '$lib/components/timeline/TimelineRouteGroupingBar.svelte';
   import Portal from '$lib/elements/Portal.svelte';
   import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
+  import type { TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
   import { getAssetBulkActions } from '$lib/services/asset.service';
-  import type { FilterState } from '$lib/components/filter-panel/filter-panel';
+  import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
   import { mapSettings } from '$lib/stores/preferences.store';
+  import { clearTimelineTemporalFilter } from '$lib/utils/timeline-temporal-filters';
   import {
     updateStackedAssetInTimeline,
     updateUnstackedAssetInTimeline,
@@ -31,6 +34,8 @@
     type OnUnlink,
   } from '$lib/utils/actions';
   import { buildMapTimelineOptions } from '$lib/utils/map-filter-options';
+  import { type ActivatableTimelineBucket, getTimelineBucketZoomTarget } from '$lib/utils/timeline-zoom-navigation';
+  import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
   import { ActionButton, CloseButton, CommandPaletteDefaultProvider, Icon } from '@immich/ui';
   import { mdiDotsVertical, mdiImageMultiple } from '@mdi/js';
   import { ceil, floor } from 'lodash-es';
@@ -45,9 +50,18 @@
     filters?: FilterState;
   }
 
-  let { bbox, selectedClusterIds, assetCount, onClose, spaceId, filters }: Props = $props();
+  let {
+    bbox,
+    selectedClusterIds,
+    assetCount,
+    onClose,
+    spaceId,
+    filters = $bindable(createFilterState()),
+  }: Props = $props();
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
+  let timelineGrouping = $state<TimelineGrouping>('day');
+  let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
   let selectedAssets = $derived(assetMultiSelectManager.assets);
   let isAssetStackSelected = $derived(selectedAssets.length === 1 && !!selectedAssets[0].stack);
   let isLinkActionAvailable = $derived.by(() => {
@@ -79,15 +93,43 @@
     assetMultiSelectManager.clear();
   };
 
+  const handleTimelineGroupingChange = (grouping: TimelineGrouping) => {
+    const anchor = getTimelineTopVisibleAnchor(timelineManager);
+    timelineGrouping = grouping;
+    temporalAnchor = anchor;
+  };
+
+  const handleTimelineBucketActivate = (bucket: ActivatableTimelineBucket) => {
+    if (assetMultiSelectManager.selectionActive) {
+      return;
+    }
+
+    const result = getTimelineBucketZoomTarget(bucket);
+    if (!result) {
+      return;
+    }
+
+    timelineGrouping = result.grouping;
+    temporalAnchor = result.anchor;
+  };
+
+  const clearTemporalFilter = () => {
+    filters = clearTimelineTemporalFilter(filters);
+    temporalAnchor = undefined;
+  };
+
   const timelineBoundingBox = $derived(
     `${floor(bbox.west, 6)},${floor(bbox.south, 6)},${ceil(bbox.east, 6)},${ceil(bbox.north, 6)}`,
   );
 
   const timelineOptions = $derived.by(() => {
-    return buildMapTimelineOptions(filters, timelineBoundingBox, selectedClusterIds, spaceId, {
-      onlyFavorites: $mapSettings.onlyFavorites,
-      withPartners: $mapSettings.withPartners,
-    });
+    return {
+      ...buildMapTimelineOptions(filters, timelineBoundingBox, selectedClusterIds, spaceId, {
+        onlyFavorites: $mapSettings.onlyFavorites,
+        withPartners: $mapSettings.withPartners,
+      }),
+      grouping: timelineGrouping,
+    };
   });
 
   $effect.pre(() => {
@@ -107,6 +149,16 @@
     <CloseButton onclick={onClose} />
   </div>
 
+  <TimelineRouteGroupingBar
+    class="px-2 py-1 md:flex"
+    grouping={timelineGrouping}
+    {filters}
+    resultCount={assetCount}
+    hidden={assetMultiSelectManager.selectionActive}
+    onGroupingChange={handleTimelineGroupingChange}
+    onClearTemporalFilter={clearTemporalFilter}
+  />
+
   <div class="min-h-0 flex-1">
     <Timeline
       bind:timelineManager
@@ -115,6 +167,11 @@
       onEscape={handleEscape}
       assetInteraction={assetMultiSelectManager}
       showArchiveIcon
+      grouping={timelineGrouping}
+      onGroupingChange={assetMultiSelectManager.selectionActive ? undefined : handleTimelineGroupingChange}
+      onTimelineBucketActivate={handleTimelineBucketActivate}
+      {temporalAnchor}
+      onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
     />
   </div>
 </aside>
