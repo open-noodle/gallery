@@ -4,6 +4,8 @@ import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/filter_debounce.provider.dart';
+import 'package:immich_mobile/providers/timeline/temporal_scope.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 
 final timelineArgsProvider = Provider.autoDispose<TimelineArgs>(
@@ -18,9 +20,9 @@ final timelineServiceProvider = Provider<TimelineService>(
     ref.onDispose(timelineService.dispose);
     return timelineService;
   },
-  // Empty dependencies to inform the framework that this provider
-  // might be used in a ProviderScope
-  dependencies: const [],
+  // Route-local timeline scopes may override this provider with an
+  // implementation that watches the route's temporal scope.
+  dependencies: [photosTimelineFilterProvider, timelineTemporalScopeProvider],
 );
 
 final timelineFactoryProvider = Provider<TimelineFactory>(

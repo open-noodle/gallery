@@ -1,10 +1,11 @@
-import { getTimeBucket } from '@immich/sdk';
+import { TimeBucketSize, getTimeBucket } from '@immich/sdk';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { toISOYearMonthUTC } from '$lib/utils/timeline-util';
 import { TimelineManager } from '../timeline-manager.svelte';
 import type { TimelineMonth } from '../timeline-month.svelte';
 import type { TimelineManagerOptions } from '../types';
 import { getTimelineAlbumQueryOptions, mergeTimeBucketAssets } from './album-picker-support';
+import { toTimeBucketRequest } from './request-options';
 
 export async function loadFromTimeBuckets(
   timelineManager: TimelineManager,
@@ -17,12 +18,11 @@ export async function loadFromTimeBuckets(
   }
 
   const timeBucket = toISOYearMonthUTC(timelineMonth.yearMonth);
-  const albumQueryOptions = getTimelineAlbumQueryOptions(options);
+  const albumQueryOptions = getTimelineAlbumQueryOptions(options, TimeBucketSize.Month);
   const bucketResponse = await getTimeBucket(
     {
       ...authManager.params,
-      ...options,
-      timeBucket,
+      ...toTimeBucketRequest(options, timeBucket, TimeBucketSize.Month),
     },
     { signal },
   );
@@ -59,8 +59,14 @@ export async function loadFromTimeBuckets(
     const spaceAssets = await getTimeBucket(
       {
         ...authManager.params,
-        spaceId: options.timelineSpaceId,
-        timeBucket,
+        ...toTimeBucketRequest(
+          {
+            ...options,
+            spaceId: options.timelineSpaceId,
+          },
+          timeBucket,
+          TimeBucketSize.Month,
+        ),
       },
       { signal },
     );

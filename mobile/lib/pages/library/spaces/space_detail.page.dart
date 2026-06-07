@@ -6,9 +6,12 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/space_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_header_sliver.widget.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/background_sync.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
+import 'package:immich_mobile/providers/sync_status.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
@@ -26,6 +29,10 @@ class SpaceDetailPage extends ConsumerStatefulWidget {
   final String spaceId;
 
   const SpaceDetailPage({super.key, required this.spaceId});
+
+  static const timelineOverviewControlsEnabled = true;
+  static double timelineOverviewTopSliverHeight({required bool isRemoteSyncing}) =>
+      kTimelineGroupingHeaderSliverHeight + (isRemoteSyncing ? kSyncStatusBannerSliverHeight : 0);
 
   @override
   ConsumerState<SpaceDetailPage> createState() => _SpaceDetailPageState();
@@ -276,16 +283,14 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       );
     }
 
-    return ProviderScope(
-      overrides: [
-        timelineServiceProvider.overrideWith((ref) {
-          final timelineService = ref.watch(timelineFactoryProvider).sharedSpace(spaceId: widget.spaceId);
-          ref.onDispose(timelineService.dispose);
-          return timelineService;
-        }),
-      ],
+    final isRemoteSyncing = ref.watch(syncStatusProvider.select((s) => s.isRemoteSyncing));
+
+    return TimelineRouteScope(
+      timelineServiceBuilder: (ref, scope) =>
+          ref.watch(timelineFactoryProvider).sharedSpace(spaceId: widget.spaceId, temporalScope: scope),
       child: Timeline(
-        topSliverWidget: const SyncStatusBannerSliver(),
+        topSliverWidget: const SliverMainAxisGroup(slivers: [TimelineGroupingHeaderSliver(), SyncStatusBannerSliver()]),
+        topSliverWidgetHeight: SpaceDetailPage.timelineOverviewTopSliverHeight(isRemoteSyncing: isRemoteSyncing),
         appBar: SliverAppBar(
           title: Text(_space!.name),
           centerTitle: false,

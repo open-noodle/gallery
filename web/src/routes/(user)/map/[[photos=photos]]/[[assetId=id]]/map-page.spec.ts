@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
+import { timeToLoadTheMap } from '$lib/constants';
 import { SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
 import MapPage from './+page.svelte';
 
@@ -40,7 +41,7 @@ vi.mock('$lib/components/filter-panel/filter-panel.svelte', async () => {
 });
 
 vi.mock('./MapTimelinePanel.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('@test-data/mocks/map-timeline-panel-grouping.stub.svelte');
   return { default: MockComponent };
 });
 
@@ -62,7 +63,7 @@ vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
   featureFlagsManager: { value: { map: true } },
 }));
 
-vi.mock('$lib/utils/navigation', () => ({ navigate: vi.fn() }));
+vi.mock('$lib/utils/navigation', () => ({ navigate: () => Promise.resolve() }));
 
 function renderPage() {
   const props = {
@@ -81,6 +82,12 @@ async function flushQueryDebounce() {
   await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
 }
 
+async function flushMapLoad() {
+  await vi.dynamicImportSettled();
+  await vi.advanceTimersByTimeAsync(timeToLoadTheMap);
+  await vi.dynamicImportSettled();
+}
+
 describe('Map page query intersection', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -97,6 +104,7 @@ describe('Map page query intersection', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    Object.defineProperty(globalThis, 'innerWidth', { configurable: true, value: 1024 });
   });
 
   it('keeps the existing marker flow when q is absent', async () => {
@@ -202,5 +210,55 @@ describe('Map page query intersection', () => {
     expect(overlay?.className).toContain('inset-x-0');
     expect(overlay?.className).not.toContain('sm:left-[280px]');
     expect(contentColumn?.className).toContain('relative');
+  });
+
+  it('keeps map FilterPanel temporal state untouched when the timeline panel activates a bucket', async () => {
+    sdkMock.getFilteredMapMarkers.mockResolvedValue([{ id: 'asset-1', lat: 1, lon: 2 } as never]);
+
+    renderPage();
+    await flushQueryDebounce();
+    await flushMapLoad();
+    await fireEvent.click(screen.getByTestId('map-cluster-asset-1'));
+    await fireEvent.click(screen.getByTestId('map-panel-activate-year'));
+
+    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
+    expect(screen.getByTestId('map-timeline-panel-stub')).toHaveAttribute('data-bucket-activations', '1');
+    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+  });
+
+  it('keeps explicit map temporal filters synchronized with the FilterPanel and chips', async () => {
+    renderPage();
+    await fireEvent.click(screen.getByTestId('filter-panel-set-year'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
+      expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('2015');
+    });
+  });
+
+  it('clears explicit map temporal filter state from map chips and the FilterPanel', async () => {
+    renderPage();
+    await fireEvent.click(screen.getByTestId('filter-panel-set-year'));
+    await fireEvent.click(screen.getByTestId('clear-all-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
+      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+    });
+  });
+
+  it('does not leave explicit temporal state in the mobile filter overlay after clearing map chips', async () => {
+    Object.defineProperty(globalThis, 'innerWidth', { configurable: true, value: 390 });
+
+    renderPage();
+    await fireEvent.click(screen.getByTestId('map-mobile-filter-toggle'));
+    await fireEvent.click(screen.getByTestId('filter-panel-set-year'));
+    await fireEvent.click(screen.getByLabelText('Close filters'));
+    await fireEvent.click(screen.getByTestId('clear-all-btn'));
+    await fireEvent.click(screen.getByTestId('map-mobile-filter-toggle'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
+    });
   });
 });

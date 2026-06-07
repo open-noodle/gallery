@@ -1,17 +1,50 @@
+import 'package:drift/drift.dart' as drift;
+import 'package:drift/native.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/settings_key.dart';
+import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
+import 'package:immich_mobile/domain/models/timeline_zoom_anchor.model.dart';
+import 'package:immich_mobile/domain/services/store.service.dart';
+import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/active_filter_chip.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/match_count_label.widget.dart';
 import 'package:immich_mobile/presentation/widgets/photos_filter/filter_subheader.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
+import 'package:immich_mobile/providers/timeline/overview_drilldown.provider.dart';
+import 'package:immich_mobile/providers/timeline/temporal_scope.provider.dart';
+import 'package:immich_mobile/providers/timeline/zoom_anchor.provider.dart';
 
 import '../../../widget_tester_extensions.dart';
 
 Widget _scroll(Widget sliver) => CustomScrollView(slivers: [sliver]);
 
 void main() {
+  late Drift db;
+
+  setUpAll(() async {
+    db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
+    await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    await SettingsRepository.ensureInitialized(db);
+  });
+
+  setUp(() async {
+    await Store.clear();
+    await SettingsRepository.instance.clear(SettingsKey.values);
+  });
+
+  tearDownAll(() async {
+    await Store.clear();
+    await SettingsRepository.instance.clear(SettingsKey.values);
+    await db.close();
+  });
+
   group('PhotosFilterSubheader', () {
     testWidgets('renders nothing when filter is empty', (tester) async {
       await tester.pumpConsumerWidget(_scroll(const PhotosFilterSubheader()));
@@ -67,6 +100,106 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('clear_all'.tr()), findsOneWidget);
+    });
+
+    testWidgets('does not render a temporal chip from Photos year activation', (tester) async {
+      await tester.pumpConsumerWidget(_scroll(const PhotosFilterSubheader()));
+      await tester.pumpAndSettle();
+      final container = ProviderScope.containerOf(tester.element(find.byType(CustomScrollView)));
+
+      await container.read(photosTimelineOverviewDrilldownProvider)(
+        TimeBucket(date: DateTime(2025), assetCount: 4),
+        GroupAssetsBy.year,
+      );
+      await tester.pumpAndSettle();
+
+      expect(container.read(timelineTemporalScopeProvider), const TimelineTemporalScope.none());
+      expect(container.read(timelineZoomAnchorProvider), const TimelineZoomAnchor.year(2025));
+      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+      expect(find.byKey(const Key('photos-filter-subheader')), findsNothing);
+      expect(find.text('2025'), findsNothing);
+      expect(find.text('Mar 2025'), findsNothing);
+    });
+
+    testWidgets('keeps existing Photos filter chips without adding a temporal chip after activation', (tester) async {
+      await tester.pumpConsumerWidget(_scroll(const PhotosFilterSubheader()));
+      await tester.pumpAndSettle();
+      final container = ProviderScope.containerOf(tester.element(find.byType(CustomScrollView)));
+      container.read(photosFilterProvider.notifier).setText('paris');
+      await tester.pumpAndSettle();
+
+      await container.read(photosTimelineOverviewDrilldownProvider)(
+        TimeBucket(date: DateTime(2025), assetCount: 4),
+        GroupAssetsBy.year,
+      );
+      await tester.pumpAndSettle();
+
+      expect(container.read(photosFilterProvider).context, 'paris');
+      expect(container.read(timelineTemporalScopeProvider), const TimelineTemporalScope.none());
+      expect(find.byKey(const Key('photos-filter-subheader')), findsOneWidget);
+      expect(find.text('"paris"'), findsOneWidget);
+      expect(find.text('2025'), findsNothing);
+    });
+
+    testWidgets('explicit Photos date chips remain clearable after card activation', (tester) async {
+      await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.year);
+      await tester.pumpConsumerWidget(_scroll(const PhotosFilterSubheader()));
+      await tester.pumpAndSettle();
+      final container = ProviderScope.containerOf(tester.element(find.byType(CustomScrollView)));
+      container
+          .read(photosFilterProvider.notifier)
+          .setDateRange(start: DateTime(2025, 3), end: DateTime(2025, 3, 31, 23, 59, 59));
+      await tester.pumpAndSettle();
+
+      await container.read(photosTimelineOverviewDrilldownProvider)(
+        TimeBucket(date: DateTime(2025), assetCount: 4),
+        GroupAssetsBy.year,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mar 2025'), findsOneWidget);
+      expect(container.read(timelineTemporalScopeProvider), const TimelineTemporalScope.none());
+      expect(container.read(photosFilterProvider).date.takenAfter, DateTime(2025, 3));
+      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+
+      await tester.drag(find.byType(Scrollable).last, const Offset(-120, 0));
+      await tester.pumpAndSettle();
+      final dateChip = find.ancestor(of: find.text('Mar 2025'), matching: find.byType(ActiveFilterChip));
+      await tester.tap(find.descendant(of: dateChip, matching: find.byIcon(Icons.close_rounded)));
+      await tester.pumpAndSettle();
+
+      expect(container.read(photosFilterProvider).date.takenAfter, isNull);
+      expect(container.read(photosFilterProvider).date.takenBefore, isNull);
+      expect(container.read(timelineTemporalScopeProvider), const TimelineTemporalScope.none());
+      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+    });
+
+    testWidgets('temporal scope alone does not render as a filter chip', (tester) async {
+      await tester.pumpConsumerWidget(_scroll(const PhotosFilterSubheader()));
+      await tester.pumpAndSettle();
+      final container = ProviderScope.containerOf(tester.element(find.byType(CustomScrollView)));
+      container.read(timelineTemporalScopeProvider.notifier).setMonth(year: 2025, month: 3);
+      await tester.pumpAndSettle();
+
+      expect(container.read(timelineTemporalScopeProvider), TimelineTemporalScope.month(year: 2025, month: 3));
+      expect(find.byKey(const Key('photos-filter-subheader')), findsNothing);
+      expect(find.text('Mar 2025'), findsNothing);
+    });
+
+    testWidgets('Clear all resets normal filters without treating temporal scope as a chip', (tester) async {
+      await tester.pumpConsumerWidget(_scroll(const PhotosFilterSubheader()));
+      await tester.pumpAndSettle();
+      final container = ProviderScope.containerOf(tester.element(find.byType(CustomScrollView)));
+      container.read(photosFilterProvider.notifier).setText('paris');
+      container.read(timelineTemporalScopeProvider.notifier).setYear(2025);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('photos-filter-subheader-clear-all')));
+      await tester.pumpAndSettle();
+
+      expect(container.read(photosFilterProvider).isEmpty, isTrue);
+      expect(container.read(timelineTemporalScopeProvider), const TimelineTemporalScope.year(2025));
+      expect(find.byKey(const Key('photos-filter-subheader')), findsNothing);
     });
   });
 }
