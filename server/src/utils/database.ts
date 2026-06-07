@@ -40,6 +40,7 @@ import {
   DatabaseExtension,
   ExifOrientation,
   SearchOrderField,
+  TimeBucketSize,
 } from 'src/enum.js';
 import {
   AssetSearchBuilderOptions,
@@ -49,6 +50,7 @@ import {
 import { DB } from 'src/schema/index.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
 import { fromChecksum } from 'src/utils/request.js';
+import { dateTruncUnitForTimeBucketSize } from 'src/utils/timeline-bucket.js';
 
 export const getKyselyConfig = (connection: DatabaseConnectionParams): KyselyConfig => {
   return {
@@ -136,15 +138,10 @@ export function withExif<O>(qb: SelectQueryBuilder<DB, 'asset', O>) {
   return qb.leftJoin('asset_exif', 'asset.id', 'asset_exif.assetId').select(selectExifInfo);
 }
 
-const selectReturnedExifInfo = (eb: ExpressionBuilder<DB, 'asset'>) =>
-  jsonObjectFrom(eb.selectFrom('asset_exif').select(columns.exif).whereRef('asset_exif.assetId', '=', 'asset.id')).as(
-    'exifInfo',
-  );
-
 export function withExifInner<O>(qb: SelectQueryBuilder<DB, 'asset', O>) {
   return qb
     .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
-    .select(selectReturnedExifInfo)
+    .select((eb) => eb.fn.toJson(eb.table('asset_exif')).as('exifInfo'))
     .$narrowType<{ exifInfo: NotNull }>();
 }
 
@@ -563,8 +560,11 @@ export function withTags(eb: ExpressionBuilder<DB, 'asset'>) {
   ).as('tags');
 }
 
-export function truncatedDate<O>(order: AssetOrderBy = AssetOrderBy.TakenAt, size: 'DAY' | 'MONTH' = 'MONTH') {
-  return sql<O>`date_trunc(${sql.lit(size)}, ${sql.ref(order === AssetOrderBy.CreatedAt ? 'asset.createdAt' : 'localDateTime')} AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`;
+export function truncatedDate<O>(
+  order: AssetOrderBy = AssetOrderBy.TakenAt,
+  bucketSize: TimeBucketSize = TimeBucketSize.Month,
+) {
+  return sql<O>`date_trunc(${sql.lit(dateTruncUnitForTimeBucketSize(bucketSize))}, ${sql.ref(order === AssetOrderBy.CreatedAt ? 'asset.createdAt' : 'localDateTime')} AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`;
 }
 
 export function withTagId<O>(qb: SelectQueryBuilder<DB, 'asset', O>, tagId: string) {
@@ -1086,7 +1086,7 @@ export function searchAssetBuilder(kysely: Kysely<DB>, options: AssetSearchBuild
       .selectFrom('asset')
       // postgres eliminates the left join when no exif column is referenced, so unused joins are free
       .leftJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
-      .$if(!!options.withExif, (qb) => qb.select(selectReturnedExifInfo))
+      .$if(!!options.withExif, (qb) => qb.select(selectExifInfo))
       .$if(scopeGlobally, (qb) => qb.where(ownershipPredicate))
       .where((eb) =>
         eb.or([eb('asset.visibility', '!=', AssetVisibility.Locked), eb('asset.ownerId', '=', scope.lockedOwnerId)]),
@@ -1376,14 +1376,14 @@ export type ReindexVectorIndexOptions = { indexName: string; lists?: number };
 
 type VectorIndexQueryOptions = { table: string; vectorExtension: VectorExtension } & ReindexVectorIndexOptions;
 
-export function vectorIndexQuery({ vectorExtension, table, indexName, lists = 1 }: VectorIndexQueryOptions): string {
+export function vectorIndexQuery({ vectorExtension, table, indexName, lists }: VectorIndexQueryOptions): string {
   switch (vectorExtension) {
     case DatabaseExtension.VectorChord: {
       return `
         CREATE INDEX IF NOT EXISTS ${indexName} ON ${table} USING vchordrq (embedding vector_cosine_ops) WITH (options = $$
         residual_quantization = false
         [build.internal]
-        lists = [${lists}]
+        lists = [${lists ?? 1}]
         spherical_centroids = true
         build_threads = 4
         sampling_factor = 1024
