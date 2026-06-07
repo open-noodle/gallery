@@ -123,7 +123,12 @@ void main() {
     for (var i = 0; i < 30; i++) {
       await tester.pump(const Duration(milliseconds: 40));
     }
-    expect(container.read(photosFilterSearchProvider).assets.length, 100);
+    // The Photos timeline drives its live search through the route-scoped
+    // photosFilterSearchProvider (TimelineRouteScope), so observe the same scoped
+    // instance the page renders rather than the root container's.
+    ProviderContainer scoped() =>
+        ProviderScope.containerOf(tester.element(find.byType(CustomScrollView).last), listen: false);
+    expect(scoped().read(photosFilterSearchProvider).assets.length, 100);
 
     for (var c = 0; c < 4; c++) {
       await tester.fling(find.byType(CustomScrollView).last, const Offset(0, -3000), 4000);
@@ -131,8 +136,14 @@ void main() {
         await tester.pump(const Duration(milliseconds: 40));
       }
     }
-    expect(container.read(photosFilterSearchProvider).assets.length, greaterThan(100));
+    expect(scoped().read(photosFilterSearchProvider).assets.length, greaterThan(100));
     verify(() => search.search(any(), 2)).called(greaterThanOrEqualTo(1));
+
+    // Tear the tree down inside the test so the route ProviderScope's autoDispose
+    // scheduler timer (the search lives in TimelineRouteScope now) fires here rather
+    // than outliving the widget tree. Advance fake time so the 0-duration timer runs.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 1));
   });
 
   testWidgets('empty filter (library timeline) fires no search on scroll', (tester) async {

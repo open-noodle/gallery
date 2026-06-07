@@ -111,6 +111,7 @@
           showAssetName={true}
           pageHeaderOffset={54}
           onReload={triggerAssetUpdate}
+          enableGrouping
         />
       </div>
     {/if}

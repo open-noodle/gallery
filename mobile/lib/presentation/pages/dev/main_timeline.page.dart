@@ -9,9 +9,10 @@ import 'package:immich_mobile/presentation/widgets/filter_sheet/sort_icon_button
 import 'package:immich_mobile/presentation/widgets/memory/memory_lane.widget.dart';
 import 'package:immich_mobile/presentation/widgets/photos_filter/filter_subheader.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_selector.widget.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/feature_message.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter_search.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/timeline_query.provider.dart';
@@ -20,6 +21,8 @@ import 'package:immich_mobile/widgets/common/immich_sliver_app_bar.dart';
 @RoutePage()
 class MainTimelinePage extends ConsumerStatefulWidget {
   const MainTimelinePage({super.key});
+
+  static const timelineOverviewControlsEnabled = true;
 
   @override
   ConsumerState<MainTimelinePage> createState() => _MainTimelinePageState();
@@ -50,36 +53,36 @@ class _MainTimelinePageState extends ConsumerState<MainTimelinePage> {
   @override
   Widget build(BuildContext context) {
     final hasMemories = ref.watch(memoryLaneProvider.select((state) => state.value?.isNotEmpty ?? false));
-    return ProviderScope(
-      overrides: [timelineServiceProvider.overrideWith((ref) => ref.watch(photosTimelineQueryProvider))],
+    return TimelineRouteScope(
+      timelineServiceBuilder: buildPhotosTimelineRouteService,
       child: Stack(
         children: [
-          NotificationListener<ScrollUpdateNotification>(
-            onNotification: (n) {
-              final m = n.metrics;
-              if (m.axis != Axis.vertical) return false;
-              final isSheet = n.context?.findAncestorWidgetOfExactType<DraggableScrollableSheet>() != null;
-              if (!isSheet && m.maxScrollExtent - m.pixels < m.viewportDimension) {
-                ref.read(photosFilterSearchProvider.notifier).loadMore();
-              }
-              return false;
-            },
-            child: Timeline(
-              topSliverWidget: const SliverMainAxisGroup(
-                slivers: [
-                  PhotosFilterSubheader(),
-                  SliverToBoxAdapter(child: MemoryLane()),
-                ],
+          // Read photosFilterSearchProvider from inside the TimelineRouteScope so the
+          // paginating notifier driving load-more is the same scoped instance the
+          // timeline renders (the page's own ref lives outside the route scope).
+          Consumer(
+            builder: (context, scopedRef, _) => NotificationListener<ScrollUpdateNotification>(
+              onNotification: (n) {
+                final m = n.metrics;
+                if (m.axis != Axis.vertical) return false;
+                final isSheet = n.context?.findAncestorWidgetOfExactType<DraggableScrollableSheet>() != null;
+                if (!isSheet && m.maxScrollExtent - m.pixels < m.viewportDimension) {
+                  scopedRef.read(photosFilterSearchProvider.notifier).loadMore();
+                }
+                return false;
+              },
+              child: Timeline(
+                topSliverWidget: const SliverMainAxisGroup(
+                  slivers: [
+                    PhotosFilterSubheader(),
+                    SliverToBoxAdapter(child: MemoryLane()),
+                  ],
+                ),
+                topSliverWidgetHeight: hasMemories ? 200 : 0,
+                showStorageIndicator: true,
+                appBar: const PhotosTimelineAppBar(),
+                bottomSliverWidget: const _SearchLoadMoreFooter(),
               ),
-              topSliverWidgetHeight: hasMemories ? 200 : 0,
-              showStorageIndicator: true,
-              appBar: const ImmichSliverAppBar(
-                floating: true,
-                pinned: false,
-                snap: false,
-                actions: [SortIconButton(), FilterIconButton()],
-              ),
-              bottomSliverWidget: const _SearchLoadMoreFooter(),
             ),
           ),
           const FilterSheet(),
@@ -113,5 +116,16 @@ class _SearchLoadMoreFooter extends ConsumerWidget {
         child: Center(child: Text('search_no_more_result'.tr())),
       ),
     );
+  }
+}
+
+class PhotosTimelineAppBar extends StatelessWidget {
+  const PhotosTimelineAppBar({super.key});
+
+  static const actions = <Widget>[TimelineGroupingSelector.compact(), SortIconButton(), FilterIconButton()];
+
+  @override
+  Widget build(BuildContext context) {
+    return const ImmichSliverAppBar(floating: true, pinned: false, snap: false, actions: actions);
   }
 }
