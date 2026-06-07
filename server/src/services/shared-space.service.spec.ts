@@ -8196,6 +8196,35 @@ describe(SharedSpaceService.name, () => {
       );
     });
 
+    it('skips the initial pass when a dedup chain is already running for the space (prevents a 2nd chain)', async () => {
+      const spaceId = newUuid();
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.sharedSpace.getSpacePersonsWithEmbeddings.mockResolvedValue([]);
+      mocks.job.hasInFlightDedupChain.mockResolvedValue(true);
+
+      const result = await sut.handleSharedSpacePersonDedup({ spaceId });
+
+      expect(result).toBe(JobStatus.Skipped);
+      // Bails out before scanning persons and never starts a parallel chain.
+      expect(mocks.sharedSpace.getSpacePersonsWithEmbeddings).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.SharedSpacePersonDedup }),
+      );
+    });
+
+    it('does not gate follow-up passes (pass >= 2) even when a chain is reported in flight', async () => {
+      const spaceId = newUuid();
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.sharedSpace.getSpacePersonsWithEmbeddings.mockResolvedValue([]);
+      // A follow-up IS the running chain; gating it would stall dedup forever.
+      mocks.job.hasInFlightDedupChain.mockResolvedValue(true);
+
+      const result = await sut.handleSharedSpacePersonDedup({ spaceId, pass: 2 });
+
+      expect(result).toBe(JobStatus.Success);
+      expect(mocks.sharedSpace.getSpacePersonsWithEmbeddings).toHaveBeenCalled();
+    });
+
     it('should physically merge strict identity-backed space people before merging supporting identities', async () => {
       const spaceId = 'space-1';
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));

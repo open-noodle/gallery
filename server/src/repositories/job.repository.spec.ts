@@ -99,6 +99,29 @@ describe(JobRepository.name, () => {
     });
   });
 
+  describe('hasInFlightDedupChain', () => {
+    it('returns true when a pass-scoped follow-up exists for the space', async () => {
+      const { sut, queue } = setup();
+      queue.getJobs.mockResolvedValue([{ id: 'space-dedup-space-1-pass-5' }] as any);
+
+      await expect(sut.hasInFlightDedupChain('space-1')).resolves.toBe(true);
+    });
+
+    it('returns false when only the bare initial job exists (no follow-up yet)', async () => {
+      const { sut, queue } = setup();
+      queue.getJobs.mockResolvedValue([{ id: 'space-dedup-space-1' }] as any);
+
+      await expect(sut.hasInFlightDedupChain('space-1')).resolves.toBe(false);
+    });
+
+    it("does not match a different space's chain", async () => {
+      const { sut, queue } = setup();
+      queue.getJobs.mockResolvedValue([{ id: 'space-dedup-space-2-pass-3' }] as any);
+
+      await expect(sut.hasInFlightDedupChain('space-1')).resolves.toBe(false);
+    });
+  });
+
   describe('removeOrphanedActiveJobs', () => {
     it('removes active job ids whose hash is gone (orphans) and leaves real active jobs untouched', async () => {
       const { sut, queue } = setup();
