@@ -145,6 +145,7 @@ const setupSharedSpaceService = (db?: Kysely<DB>) => {
   });
 
   ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository).queue.mockResolvedValue();
+  ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository).hasInFlightDedupChain.mockResolvedValue(false);
   ctx
     .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
     .get.mockResolvedValue({
