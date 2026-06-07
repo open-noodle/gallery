@@ -23,8 +23,8 @@ class PhotosFilterSubheader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isEmpty = ref.watch(photosFilterProvider.select((f) => f.isEmpty));
-    if (isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+    final isFilterEmpty = ref.watch(photosFilterProvider.select((f) => f.isEmpty));
+    if (isFilterEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
 
     final filter = ref.watch(photosFilterProvider);
     final debounced = ref.watch(photosFilterDebouncedProvider);
@@ -53,7 +53,10 @@ class PhotosFilterSubheader extends ConsumerWidget {
                 itemCount: chips.length,
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (_, i) => Center(child: ActiveFilterChip(spec: chips[i])),
+                itemBuilder: (_, i) {
+                  final chip = chips[i];
+                  return Center(child: ActiveFilterChip(spec: chip));
+                },
               ),
             ),
             const SizedBox(width: 16),

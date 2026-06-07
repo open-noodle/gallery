@@ -9,13 +9,17 @@
   import SelectAllAssets from '#lib/components/timeline/actions/SelectAllAction.svelte';
   import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '#lib/components/timeline/Timeline.svelte';
+  import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
   import { AssetAction } from '#lib/constants.ts';
 
   import SetVisibilityAction from '#lib/components/timeline/actions/SetVisibilityAction.svelte';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { registerSelectionContext } from '#lib/managers/command-context-manager.svelte.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
+  import type { TimelineGrouping, TimelineTemporalAnchor } from '#lib/managers/timeline-manager/types.ts';
   import { getAssetBulkActions } from '#lib/services/asset.service.ts';
+  import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '#lib/utils/timeline-zoom-navigation.ts';
+  import { getTimelineTopVisibleAnchor } from '#lib/managers/timeline-manager/timeline-anchor.ts';
   import { AssetVisibility } from '@immich/sdk';
   import { ActionButton, CommandPaletteDefaultProvider } from '@immich/ui';
   import { mdiDotsVertical } from '@mdi/js';
@@ -28,7 +32,17 @@
 
   let { data }: Props = $props();
   let timelineManager = $state<TimelineManager>() as TimelineManager;
-  const options = { visibility: AssetVisibility.Archive };
+  let timelineGrouping = $state<TimelineGrouping>('day');
+  let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
+  const baseTimelineOptions = { visibility: AssetVisibility.Archive };
+  const options = $derived({
+    ...baseTimelineOptions,
+    grouping: timelineGrouping,
+  });
+  const hideGroupingControls = $derived(
+    assetMultiSelectManager.selectionActive ||
+      Boolean(timelineManager?.isInitialized && timelineManager.assetCount === 0),
+  );
 
   const handleEscape = () => {
     if (!assetMultiSelectManager.selectionActive) {
@@ -44,6 +58,26 @@
     assetMultiSelectManager.clear();
   };
 
+  function handleTimelineGroupingChange(grouping: TimelineGrouping) {
+    const anchor = getTimelineTopVisibleAnchor(timelineManager);
+    timelineGrouping = grouping;
+    temporalAnchor = anchor;
+  }
+
+  function handleTimelineBucketActivate(bucket: ActivatableTimelineBucket) {
+    if (assetMultiSelectManager.selectionActive) {
+      return;
+    }
+
+    const result = getTimelineBucketZoomTarget(bucket);
+    if (!result) {
+      return;
+    }
+
+    timelineGrouping = result.grouping;
+    temporalAnchor = result.anchor;
+  }
+
   registerSelectionContext({
     getAssets: () => assetMultiSelectManager.assets,
     clearSelection: () => assetMultiSelectManager.clear(),
@@ -57,6 +91,11 @@
 </script>
 
 <UserPageLayout hideNavbar={assetMultiSelectManager.selectionActive} title={data.meta.title} scrollbar={false}>
+  <TimelineRouteGroupingBar
+    grouping={timelineGrouping}
+    hidden={hideGroupingControls}
+    onGroupingChange={handleTimelineGroupingChange}
+  />
   <Timeline
     enableRouting={true}
     bind:timelineManager
@@ -64,6 +103,11 @@
     assetInteraction={assetMultiSelectManager}
     removeAction={AssetAction.UNARCHIVE}
     onEscape={handleEscape}
+    {temporalAnchor}
+    onTimelineBucketActivate={handleTimelineBucketActivate}
+    onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
+    grouping={timelineGrouping}
+    onGroupingChange={handleTimelineGroupingChange}
   >
     {#snippet empty()}
       <EmptyPlaceholder text={$t('no_archived_assets_message')} class="mx-auto mt-10" />
