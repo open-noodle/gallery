@@ -136,6 +136,10 @@ FROM
 				STRFTIME('%Y-%m', rae.local_date_time),
 				STRFTIME('%Y-%m', rae.created_at, 'localtime')
 			)
+			WHEN :group_by = 4 THEN COALESCE(
+				STRFTIME('%Y', rae.local_date_time),
+				STRFTIME('%Y', rae.created_at, 'localtime')
+			)
 		END as bucket_date
 	FROM
 		remote_asset_entity rae
@@ -170,6 +174,7 @@ FROM
 		CASE
 			WHEN :group_by = 0 THEN STRFTIME('%Y-%m-%d', lae.created_at, 'localtime')
 			WHEN :group_by = 1 THEN STRFTIME('%Y-%m', lae.created_at, 'localtime')
+			WHEN :group_by = 4 THEN STRFTIME('%Y', lae.created_at, 'localtime')
 		END as bucket_date
 	FROM
 		local_asset_entity lae

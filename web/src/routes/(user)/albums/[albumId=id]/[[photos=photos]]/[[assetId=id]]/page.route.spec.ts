@@ -9,6 +9,7 @@ import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { albumFactory } from '@test-data/factories/album-factory';
+import { timelineAssetFactory } from '@test-data/factories/asset-factory';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
 import AlbumPage from './+page.svelte';
@@ -251,6 +252,124 @@ describe('album detail filter panel route', () => {
 
     expect(screen.getByTestId('timeline-options').textContent).toContain('"timelineAlbumId"');
     expect(screen.getByTestId('mock-disabled-asset')).toHaveAttribute('data-disabled', 'true');
+  });
+
+  it('renders album browse grouping controls and passes mobile grouping props', async () => {
+    renderPage();
+
+    expect(await screen.findByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
+    expect(screen.getByTestId('timeline-grouping-day')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('timeline-mobile-grouping-props')).toHaveTextContent(
+      JSON.stringify({ grouping: 'day', hasHandler: true }),
+    );
+  });
+
+  it('changes album grouping without changing album filters or URL state', async () => {
+    renderPage();
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByTestId('people-item-person-view')).toBeInTheDocument());
+    await user.click(screen.getByTestId('people-item-person-view'));
+    await user.click(screen.getByTestId('timeline-grouping-year'));
+
+    expect(screen.getByTestId('timeline-options').textContent).toContain('"grouping":"year"');
+    expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('Album Person');
+    expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('null');
+  });
+
+  it('clicking album year and month buckets zooms without temporal chips', async () => {
+    renderPage();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByTestId('activate-year-bucket'));
+    await waitFor(() => expect(screen.getByTestId('timeline-options').textContent).toContain('"grouping":"month"'));
+    expect(screen.getByTestId('timeline-options').textContent).toContain('"albumId"');
+    expect(screen.getByTestId('timeline-options').textContent).not.toContain('"takenAfter"');
+    expect(screen.getByTestId('timeline-options').textContent).not.toContain('"takenBefore"');
+    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+    expect(screen.getByTestId('timeline-anchor')).toHaveTextContent(JSON.stringify({ year: 2015 }));
+
+    await user.click(screen.getByTestId('activate-month-bucket'));
+    await waitFor(() => expect(screen.getByTestId('timeline-options').textContent).toContain('"grouping":"day"'));
+    expect(screen.getByTestId('timeline-options').textContent).toContain('"albumId"');
+    expect(screen.getByTestId('timeline-options').textContent).not.toContain('"takenAfter"');
+    expect(screen.getByTestId('timeline-options').textContent).not.toContain('"takenBefore"');
+    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+    expect(screen.getByTestId('timeline-anchor')).toHaveTextContent(JSON.stringify({ year: 2015, month: 8 }));
+  });
+
+  it('album bucket activation preserves non-time album filters without adding temporal chips', async () => {
+    renderPage();
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByTestId('people-item-person-view')).toBeInTheDocument());
+    await user.click(screen.getByTestId('people-item-person-view'));
+    await user.click(screen.getByTestId('activate-year-bucket'));
+
+    await waitFor(() => expect(screen.getByTestId('timeline-options').textContent).toContain('"grouping":"month"'));
+    expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('Album Person');
+    expect(screen.getByTestId('active-filters-bar')).not.toHaveTextContent('2015');
+    expect(screen.getByTestId('timeline-options').textContent).toContain('"albumId"');
+    expect(screen.getByTestId('timeline-options').textContent).not.toContain('"takenAfter"');
+    expect(screen.getByTestId('timeline-options').textContent).not.toContain('"takenBefore"');
+    expect(screen.getByTestId('timeline-anchor')).toHaveTextContent(JSON.stringify({ year: 2015 }));
+  });
+
+  it('ignores album bucket activation while selection mode is active', async () => {
+    renderPage();
+    assetMultiSelectManager.selectAsset(timelineAssetFactory.build({ id: 'selected-asset' }));
+
+    await userEvent.setup().click(await screen.findByTestId('activate-year-bucket'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('timeline-options').textContent).toContain('"grouping":"day"');
+      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('null');
+    });
+    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+  });
+
+  it('explicit album timeline filters still show chips and clear without changing grouping', async () => {
+    renderPage();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByTestId('timeline-grouping-month'));
+    await user.click(await screen.findByTestId('year-btn-2024'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('2024');
+      expect(screen.getByTestId('timeline-options').textContent).toContain('"takenAfter":"2024-01-01T00:00:00.000Z"');
+      expect(screen.getByTestId('timeline-options').textContent).toContain('"takenBefore":"2025-01-01T00:00:00.000Z"');
+      expect(screen.getByTestId('timeline-options').textContent).toContain('"grouping":"month"');
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Remove 2024 filter' }));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+      expect(screen.getByTestId('timeline-options').textContent).not.toContain('"takenAfter"');
+      expect(screen.getByTestId('timeline-options').textContent).not.toContain('"takenBefore"');
+      expect(screen.getByTestId('timeline-options').textContent).toContain('"grouping":"month"');
+      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('null');
+    });
+  });
+
+  it('does not render browse grouping controls in album select-assets or select-thumbnail modes', async () => {
+    renderPage();
+    const user = userEvent.setup();
+
+    await fireEvent.click(screen.getByLabelText('add_photos'));
+    await waitFor(() => expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument());
+    expect(screen.getByTestId('timeline-options').textContent).not.toContain('"grouping"');
+
+    await fireEvent.click(screen.getByLabelText('Close'));
+    await user.click(screen.getByLabelText('album_options'));
+    await user.click(screen.getByText('select_album_cover'));
+
+    expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+    expect(screen.getByTestId('timeline-options').textContent).not.toContain('"grouping"');
+    expect(screen.getByTestId('timeline-mobile-grouping-props')).toHaveTextContent(
+      JSON.stringify({ grouping: 'day', hasHandler: false }),
+    );
   });
 
   it('resets both filter states and label caches when navigating to another album', async () => {

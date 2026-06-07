@@ -34,6 +34,7 @@ class FixedSegmentBuilder extends SegmentBuilder {
       final segmentLastIndex = firstIndex - 1;
 
       final timelineHeader = switch (groupBy) {
+        GroupAssetsBy.year => HeaderType.year,
         GroupAssetsBy.month => HeaderType.month,
         GroupAssetsBy.day || GroupAssetsBy.auto =>
           bucket is TimeBucket && bucket.date.month != previousDate?.month ? HeaderType.monthAndDay : HeaderType.day,

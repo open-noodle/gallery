@@ -90,10 +90,10 @@ describe('formatGroupTitle', () => {
 
 describe('toISOYearMonthUTC', () => {
   it('should prefix year with 0s', () => {
-    expect(toISOYearMonthUTC({ year: 28, month: 1 })).toBe('0028-01-01T00:00:00.000Z');
+    expect(toISOYearMonthUTC({ year: 28, month: 1 })).toBe('0028-01-01');
   });
 
   it('should prefix month with 0s', () => {
-    expect(toISOYearMonthUTC({ year: 2025, month: 1 })).toBe('2025-01-01T00:00:00.000Z');
+    expect(toISOYearMonthUTC({ year: 2025, month: 1 })).toBe('2025-01-01');
   });
 });

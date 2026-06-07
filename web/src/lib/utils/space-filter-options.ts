@@ -1,5 +1,6 @@
 import { AssetOrder, AssetTypeEnum } from '@immich/sdk';
 import { buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
+import { clearTimelineTemporalFilter } from '$lib/utils/timeline-temporal-filters';
 
 export function buildSpaceTimelineOptions(spaceId: string, filters: FilterState): Record<string, unknown> {
   const base: Record<string, unknown> = { spaceId, withStacked: true };
@@ -77,13 +78,7 @@ export function handleSpaceRemoveFilter(filters: FilterState, type: string, id?:
       return { ...filters, isNotInAlbum: undefined };
     }
     case 'timeline': {
-      return {
-        ...filters,
-        dateAfter: undefined,
-        dateBefore: undefined,
-        selectedYear: undefined,
-        selectedMonth: undefined,
-      };
+      return clearTimelineTemporalFilter(filters);
     }
     default: {
       return filters;

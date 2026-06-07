@@ -1,7 +1,7 @@
 import { Type, type PersonResponseDto, type PersonStatisticsResponseDto } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
 import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import type { Component } from 'svelte';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
@@ -114,7 +114,8 @@ vi.mock('$lib/components/OnEvents.svelte', async () => {
 });
 
 vi.mock('$lib/components/timeline/Timeline.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/bindable-timeline.stub.svelte');
+  const { default: MockComponent } =
+    await import('./../../../../spaces/[spaceId]/people/[personId]/[[photos=photos]]/[[assetId=id]]/mock-space-person-timeline.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
@@ -285,6 +286,105 @@ describe('Person detail page', () => {
         withSharedSpaces: true,
       }),
     );
+  });
+
+  it('renders person timeline grouping controls and passes mobile grouping props', async () => {
+    renderPage();
+
+    expect(await screen.findByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
+    expect(screen.getByTestId('timeline-grouping-day')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('timeline-mobile-grouping-props')).toHaveTextContent(
+      JSON.stringify({ grouping: 'day', hasHandler: true }),
+    );
+  });
+
+  it('keeps the grouping control outside the scrolling timeline so it stays visible while scrolling', async () => {
+    const { container } = renderPage();
+
+    const main = container.querySelector<HTMLElement>('main');
+    const timeline = screen.getByTestId('space-person-timeline');
+    const header = await screen.findByTestId('person-timeline-header');
+    const control = await screen.findByTestId('timeline-desktop-grouping-control');
+
+    // Regression guard for Hagen's report: the switcher must not scroll away with the photo
+    // grid, so it must live outside the timeline scroll container and the person header
+    // (both of which scroll) — pinned in the sticky page chrome instead, exactly like Tags.
+    expect(timeline).not.toContainElement(control);
+    expect(header).not.toContainElement(control);
+    expect(main).toContainElement(control);
+  });
+
+  it('changes person timeline grouping while preserving person scope without temporal chips', async () => {
+    renderPage();
+
+    await fireEvent.click(await screen.findByTestId('timeline-grouping-year'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"year"');
+    });
+    expect(screen.getByTestId('timeline-options')).toHaveTextContent('"personIds":["person-1"]');
+    expect(screen.getByTestId('timeline-options')).toHaveTextContent('"withSharedSpaces":true');
+    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+    expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('null');
+  });
+
+  it('activating person year and month buckets preserves person scope without temporal chips', async () => {
+    renderPage();
+
+    await fireEvent.click(await screen.findByTestId('activate-year-bucket'));
+    await waitFor(() => {
+      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"month"');
+      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"personIds":["person-1"]');
+      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"takenAfter"');
+      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"takenBefore"');
+      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('{"year":2015}');
+    });
+
+    await fireEvent.click(screen.getByTestId('activate-month-bucket'));
+    await waitFor(() => {
+      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
+      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"personIds":["person-1"]');
+      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"takenAfter"');
+      expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"takenBefore"');
+      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('{"year":2015,"month":8}');
+    });
+  });
+
+  it('person bucket activation keeps scope without rendering ActiveFiltersBar', async () => {
+    renderPage();
+
+    await fireEvent.click(await screen.findByTestId('activate-year-bucket'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"month"');
+      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"personIds":["person-1"]');
+      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"withSharedSpaces":true');
+      expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
+      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('{"year":2015}');
+    });
+  });
+
+  it('selection mode hides timeline grouping controls on the person page', () => {
+    mockAssetMultiSelectManager.selectionActive = true;
+
+    renderPage();
+
+    expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+  });
+
+  it('ignores person bucket activation while selection mode is active', async () => {
+    mockAssetMultiSelectManager.selectionActive = true;
+
+    renderPage();
+    await fireEvent.click(await screen.findByTestId('activate-year-bucket'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
+      expect(screen.getByTestId('timeline-anchor')).toHaveTextContent('null');
+    });
+    expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
   });
 
   it('uses the shared-space thumbnail for a space-primary identity-wide person page', () => {

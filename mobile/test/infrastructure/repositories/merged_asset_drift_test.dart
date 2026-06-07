@@ -598,4 +598,49 @@ void main() {
     expect(buckets.single.assetCount, 1);
     expect(buckets.single.bucketDate, isNotEmpty);
   });
+
+  test('mergedBucket groups timeline assets by year', () async {
+    const viewerId = 'viewer-1';
+
+    await db
+        .into(db.userEntity)
+        .insert(UserEntityCompanion.insert(id: viewerId, email: 'viewer@test.dev', name: 'Viewer'));
+
+    Future<void> insertAsset(String id, DateTime createdAt) {
+      return db
+          .into(db.remoteAssetEntity)
+          .insert(
+            RemoteAssetEntityCompanion.insert(
+              id: id,
+              name: '$id.jpg',
+              type: AssetType.image,
+              checksum: 'checksum-$id',
+              ownerId: viewerId,
+              visibility: AssetVisibility.timeline,
+              createdAt: Value(createdAt),
+              updatedAt: Value(createdAt),
+              localDateTime: Value(createdAt),
+            ),
+          );
+    }
+
+    await insertAsset('asset-2025-a', DateTime(2025, 1, 1, 12));
+    await insertAsset('asset-2025-b', DateTime(2025, 12, 31, 12));
+    await insertAsset('asset-2024-a', DateTime(2024, 6, 1, 12));
+
+    final buckets = await db.mergedAssetDrift
+        .mergedBucket(groupBy: GroupAssetsBy.year.index, userIds: [viewerId], currentUserId: viewerId)
+        .get();
+
+    expect(buckets.map((bucket) => bucket.bucketDate), ['2025', '2024']);
+    expect(buckets.map((bucket) => bucket.assetCount), [2, 1]);
+  });
+
+  test('GroupAssetsBy enum indexes used by mergedBucket stay stable', () {
+    expect(GroupAssetsBy.day.index, 0);
+    expect(GroupAssetsBy.month.index, 1);
+    expect(GroupAssetsBy.auto.index, 2);
+    expect(GroupAssetsBy.none.index, 3);
+    expect(GroupAssetsBy.year.index, 4);
+  });
 }

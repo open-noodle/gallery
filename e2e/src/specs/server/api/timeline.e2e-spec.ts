@@ -1,6 +1,7 @@
 import { AssetVisibility, type LoginResponseDto } from '@immich/sdk';
 import { type Actor, type SpaceContext, authHeaders, buildSpaceContext, forEachActor } from 'src/actors';
 import { createUserDto } from 'src/fixtures';
+import { errorDto } from 'src/responses';
 import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -17,9 +18,11 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // Helper for summing bucket counts. Pure, hoisted to file scope so all
 // describe blocks below can reference it (was duplicated 3× before).
 const total = (body: unknown) => (body as Array<{ count: number }>).reduce((acc, b) => acc + b.count, 0);
+type BucketSize = 'year' | 'month' | 'day';
 
 describe('/timeline', () => {
   let ctx: SpaceContext;
+  let fixtureBuckets: Record<BucketSize, string>;
   const anonActor: Actor = { id: 'anon' };
 
   beforeAll(async () => {
@@ -31,6 +34,14 @@ describe('/timeline', () => {
     // PNGs), wiping any tags a nested beforeAll applied. Same root cause as the
     // filter-suggestions and tag-suggestions ARM flakes.
     await utils.waitForQueueFinish(ctx.admin.token!, 'metadataExtraction');
+
+    fixtureBuckets = {} as Record<BucketSize, string>;
+    for (const bucketSize of ['year', 'month', 'day'] as const) {
+      const { body } = await request(app)
+        .get(`/timeline/buckets?bucketSize=${bucketSize}`)
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      fixtureBuckets[bucketSize] = (body as Array<{ timeBucket: string }>)[0].timeBucket;
+    }
   });
 
   describe('GET /timeline/buckets', () => {
@@ -50,6 +61,40 @@ describe('/timeline', () => {
       // Both are owned by spaceOwner, so the unfiltered timeline should sum to 2.
       const total = (body as Array<{ count: number }>).reduce((acc, b) => acc + b.count, 0);
       expect(total).toBe(2);
+    });
+
+    it('accepts year, month, and day bucket sizes and returns representative metadata keys', async () => {
+      for (const bucketSize of ['year', 'month', 'day']) {
+        const { status, body } = await request(app)
+          .get(`/timeline/buckets?bucketSize=${bucketSize}`)
+          .set(asBearerAuth(ctx.spaceOwner.token!));
+
+        expect(status, `bucketSize=${bucketSize}`).toBe(200);
+        expect(total(body)).toBe(2);
+        expect((body as unknown[]).length).toBeGreaterThan(0);
+        expect(body[0]).toEqual(
+          expect.objectContaining({
+            timeBucket: expect.any(String),
+            count: expect.any(Number),
+            representativeAssetId: expect.any(String),
+          }),
+        );
+        expect(body[0]).toHaveProperty('representativeThumbhash');
+        expect(body[0]).toHaveProperty('representativeRatio');
+      }
+    });
+
+    it('rejects an invalid bucket size', async () => {
+      const { status, body } = await request(app)
+        .get('/timeline/buckets?bucketSize=week')
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+
+      expect(status).toBe(400);
+      expect(body).toEqual(
+        errorDto.validationError([
+          { path: ['bucketSize'], message: 'Invalid option: expected one of "year"|"month"|"day"' },
+        ]),
+      );
     });
 
     it('spaceId access matrix returns the right status per actor', async () => {
@@ -94,19 +139,12 @@ describe('/timeline', () => {
 
   describe('GET /timeline/bucket', () => {
     // The bucket query needs a YYYY-MM-DD identifier corresponding to the start of the
-    // month. buildSpaceContext creates assets with fileCreatedAt = new Date() (now), so
-    // they all land in the current month bucket.
-    const currentMonthBucket = (() => {
-      const now = new Date();
-      const yyyy = now.getUTCFullYear();
-      const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
-      return `${yyyy}-${mm}-01`;
-    })();
-
+    // selected period. Derive it from /timeline/buckets so rollover timing cannot make
+    // this file ask for a period different from the actual fixture assets.
     it('requires authentication', async () => {
       await forEachActor(
         [anonActor, ctx.spaceOwner],
-        (actor) => request(app).get(`/timeline/bucket?timeBucket=${currentMonthBucket}`).set(authHeaders(actor)),
+        (actor) => request(app).get(`/timeline/bucket?timeBucket=${fixtureBuckets.month}`).set(authHeaders(actor)),
         { anon: 401, spaceOwner: 200 },
       );
     });
@@ -118,7 +156,7 @@ describe('/timeline', () => {
         [ctx.spaceOwner, ctx.spaceEditor, ctx.spaceViewer, ctx.spaceNonMember, anonActor],
         (actor) =>
           request(app)
-            .get(`/timeline/bucket?timeBucket=${currentMonthBucket}&spaceId=${ctx.spaceId}`)
+            .get(`/timeline/bucket?timeBucket=${fixtureBuckets.month}&spaceId=${ctx.spaceId}`)
             .set(authHeaders(actor)),
         { spaceOwner: 200, spaceEditor: 200, spaceViewer: 200, spaceNonMember: 400, anon: 401 },
       );
@@ -130,7 +168,7 @@ describe('/timeline', () => {
       // `WHERE asset.ownerId = auth.user.id`.
       for (const actor of [ctx.spaceEditor, ctx.spaceViewer]) {
         const { status, body } = await request(app)
-          .get(`/timeline/bucket?timeBucket=${currentMonthBucket}&spaceId=${ctx.spaceId}`)
+          .get(`/timeline/bucket?timeBucket=${fixtureBuckets.month}&spaceId=${ctx.spaceId}`)
           .set(asBearerAuth(actor.token!));
 
         expect(status, `actor=${actor.id}`).toBe(200);
@@ -144,7 +182,7 @@ describe('/timeline', () => {
       // Sanity check that /bucket and /buckets return distinct shapes — /buckets returns
       // [{timeBucket, count}], /bucket returns the parallel-array TimeBucketAssetResponseDto.
       const { status, body } = await request(app)
-        .get(`/timeline/bucket?timeBucket=${currentMonthBucket}`)
+        .get(`/timeline/bucket?timeBucket=${fixtureBuckets.month}`)
         .set(asBearerAuth(ctx.spaceOwner.token!));
 
       expect(status).toBe(200);
@@ -152,6 +190,33 @@ describe('/timeline', () => {
       expect(body).toHaveProperty('ownerId');
       expect(body).not.toHaveProperty('count');
       expect(Array.isArray((body as { id: string[] }).id)).toBe(true);
+    });
+
+    it('accepts year and day bucket sizes', async () => {
+      for (const [bucketSize, timeBucket] of [
+        ['year', fixtureBuckets.year],
+        ['day', fixtureBuckets.day],
+      ]) {
+        const { status, body } = await request(app)
+          .get(`/timeline/bucket?bucketSize=${bucketSize}&timeBucket=${timeBucket}`)
+          .set(asBearerAuth(ctx.spaceOwner.token!));
+
+        expect(status, `bucketSize=${bucketSize}`).toBe(200);
+        expect(body).toHaveProperty('id');
+        expect(Array.isArray((body as { id: string[] }).id)).toBe(true);
+      }
+    });
+
+    it('rejects mismatched and invalid timeBucket values deterministically', async () => {
+      const mismatched = await request(app)
+        .get('/timeline/bucket?bucketSize=year&timeBucket=2000-02-01')
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect(mismatched.status).toBe(400);
+
+      const invalid = await request(app)
+        .get('/timeline/bucket?bucketSize=day&timeBucket=not-a-date')
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect(invalid.status).toBe(400);
     });
   });
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { SelectionBBox } from '$lib/components/shared-components/map/types';
   import type { Snippet } from 'svelte';
 
   type Marker = {
@@ -13,10 +14,11 @@
   interface Props {
     mapMarkers?: Marker[];
     popup?: Snippet<[{ marker: Marker }]>;
+    onClusterSelect?: (assetIds: string[], bbox: SelectionBBox) => void;
     [key: string]: unknown;
   }
 
-  let { mapMarkers = [], popup, ...rest }: Props = $props();
+  let { mapMarkers = [], popup, onClusterSelect, ...rest }: Props = $props();
 </script>
 
 <div
@@ -29,5 +31,14 @@
     <div data-testid="map-popup">
       {@render popup({ marker: mapMarkers[0] })}
     </div>
+  {/if}
+  {#if onClusterSelect && mapMarkers[0]}
+    <button
+      type="button"
+      data-testid={`map-cluster-${mapMarkers[0].id}`}
+      onclick={() => onClusterSelect([mapMarkers[0].id], { west: 1, south: 2, east: 3, north: 4 })}
+    >
+      Open cluster
+    </button>
   {/if}
 </div>

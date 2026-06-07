@@ -16,7 +16,7 @@ export default defineConfig({
   test: {
     name: 'e2e:server',
     retry: process.env.CI ? 4 : 0,
-    include: ['src/specs/server/**/*.e2e-spec.ts'],
+    include: ['src/specs/server/**/*.e2e-spec.ts', 'src/ui/**/*.spec.ts'],
     globalSetup,
     testTimeout: 15_000,
     pool: 'threads',

@@ -5,6 +5,8 @@ import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/partner_detail_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_header_sliver.widget.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
@@ -18,20 +20,23 @@ class PartnerDetailPage extends StatelessWidget {
 
   const PartnerDetailPage({super.key, required this.partner});
 
+  static const timelineOverviewControlsEnabled = true;
+  static const timelineOverviewTopSliverHeight = kTimelineGroupingHeaderSliverHeight + 110;
+
   @override
   Widget build(BuildContext context) {
-    return ProviderScope(
-      overrides: [
-        timelineServiceProvider.overrideWith((ref) {
-          final timelineService = ref.watch(timelineFactoryProvider).remoteAssets(partner.id);
-          ref.onDispose(timelineService.dispose);
-          return timelineService;
-        }),
-      ],
+    return TimelineRouteScope(
+      timelineServiceBuilder: (ref, scope) =>
+          ref.watch(timelineFactoryProvider).remoteAssets(partner.id, temporalScope: scope),
       child: Timeline(
         appBar: MesmerizingSliverAppBar(title: partner.name, icon: Icons.person_outline),
-        topSliverWidget: _InfoBox(partner: partner),
-        topSliverWidgetHeight: 110,
+        topSliverWidget: SliverMainAxisGroup(
+          slivers: [
+            const TimelineGroupingHeaderSliver(),
+            _InfoBox(partner: partner),
+          ],
+        ),
+        topSliverWidgetHeight: DriftPartnerDetailPage.timelineOverviewTopSliverHeight,
         bottomSheet: const PartnerDetailBottomSheet(),
       ),
     );
