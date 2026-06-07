@@ -291,6 +291,26 @@ describe('handlePhotosRemoveFilter', () => {
     expect(result.selectedYear).toBeUndefined();
     expect(result.selectedMonth).toBeUndefined();
   });
+
+  it('clears only temporal filters through the timeline chip removal path', () => {
+    const filters = {
+      ...createFilterState(),
+      personIds: ['person-1'],
+      tagIds: ['tag-1'],
+      dateAfter: '2024-01-01',
+      dateBefore: '2024-12-31',
+      selectedYear: 2015,
+      selectedMonth: 8,
+    };
+
+    expect(handlePhotosRemoveFilter(filters, 'timeline')).toEqual({
+      ...filters,
+      dateAfter: undefined,
+      dateBefore: undefined,
+      selectedYear: undefined,
+      selectedMonth: undefined,
+    });
+  });
 });
 
 describe('getPhotosPersonFilterThumbnailUrl', () => {

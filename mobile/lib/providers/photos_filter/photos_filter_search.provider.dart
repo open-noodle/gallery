@@ -5,7 +5,7 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/services/search.service.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/infrastructure/search.provider.dart';
-import 'package:immich_mobile/providers/photos_filter/filter_debounce.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/timeline_temporal_filter.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 
 class PhotosFilterSearchState {
@@ -94,7 +94,11 @@ bool isSearchActive(String? userId, SearchFilter filter) => userId != null && !f
 
 final photosFilterSearchProvider =
     StateNotifierProvider.autoDispose<PhotosFilterSearchNotifier, PhotosFilterSearchState>((ref) {
-      final filter = ref.watch(photosTimelineFilterProvider);
+      // Source the temporal-scope-composed filter (#625) so a Years/Months zoom on
+      // the Photos timeline narrows the live search (#654) to the scoped date range.
+      // Depending on the effective filter (which is scoped on timelineTemporalScopeProvider)
+      // makes this notifier re-evaluate inside each TimelineRouteScope with that route's scope.
+      final filter = ref.watch(photosTimelineEffectiveFilterProvider);
       final userId = ref.watch(currentUserProvider.select((u) => u?.id));
       final search = ref.watch(searchServiceProvider);
       // StateNotifierProvider.autoDispose disposes the notifier itself; an explicit
@@ -103,4 +107,4 @@ final photosFilterSearchProvider =
         search: search,
         filter: isSearchActive(userId, filter) ? filter : SearchFilter.empty(),
       );
-    });
+    }, dependencies: [photosTimelineEffectiveFilterProvider]);

@@ -5,11 +5,11 @@
 //   people → tags → location → date → rating → media → favourite → archive
 //   → not-in-album → untagged → text.
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/photos_filter/chip_id.dart';
-import 'package:intl/intl.dart';
 import 'package:openapi/api.dart';
 
 enum ChipVisual { person, tag, location, when, rating, media, toggle, text }
@@ -21,6 +21,7 @@ class ActiveChipSpec {
   final List<String>? avatarPersonIds;
   final int? tagDotSeed;
   final IconData? icon;
+  final String? semanticsLabel;
 
   const ActiveChipSpec({
     required this.id,
@@ -29,6 +30,7 @@ class ActiveChipSpec {
     this.avatarPersonIds,
     this.tagDotSeed,
     this.icon,
+    this.semanticsLabel,
   });
 }
 

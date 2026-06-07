@@ -86,6 +86,10 @@
   data-country={filters?.country ?? ''}
   data-is-favorite={String(filters?.isFavorite)}
   data-is-not-in-album={String(filters?.isNotInAlbum)}
+  data-selected-year={filters?.selectedYear ?? ''}
+  data-selected-month={filters?.selectedMonth ?? ''}
+  data-date-after={filters?.dateAfter ?? ''}
+  data-date-before={filters?.dateBefore ?? ''}
   data-time-buckets={JSON.stringify(timeBuckets)}
   data-suggestions={suggestions}
   data-person-names={JSON.stringify([...(personNames?.entries() ?? [])])}
@@ -129,5 +133,73 @@
     }}
   >
     Sort ascending
+  </button>
+  <button
+    type="button"
+    data-testid="filter-panel-clear-timeline"
+    onclick={() => {
+      if (filters) {
+        updateFilters({
+          ...filters,
+          dateAfter: undefined,
+          dateBefore: undefined,
+          selectedYear: undefined,
+          selectedMonth: undefined,
+        });
+      }
+    }}
+  >
+    Clear timeline
+  </button>
+  <button
+    type="button"
+    data-testid="filter-panel-set-year"
+    onclick={() => {
+      if (filters) {
+        updateFilters({
+          ...filters,
+          dateAfter: undefined,
+          dateBefore: undefined,
+          selectedYear: 2015,
+          selectedMonth: undefined,
+        });
+      }
+    }}
+  >
+    Set year
+  </button>
+  <button
+    type="button"
+    data-testid="filter-panel-set-month"
+    onclick={() => {
+      if (filters) {
+        updateFilters({
+          ...filters,
+          dateAfter: undefined,
+          dateBefore: undefined,
+          selectedYear: 2015,
+          selectedMonth: 8,
+        });
+      }
+    }}
+  >
+    Set month
+  </button>
+  <button
+    type="button"
+    data-testid="filter-panel-set-custom-range"
+    onclick={() => {
+      if (filters) {
+        updateFilters({
+          ...filters,
+          dateAfter: '2024-01-01',
+          dateBefore: '2024-12-31',
+          selectedYear: undefined,
+          selectedMonth: undefined,
+        });
+      }
+    }}
+  >
+    Set custom date range
   </button>
 </div>
