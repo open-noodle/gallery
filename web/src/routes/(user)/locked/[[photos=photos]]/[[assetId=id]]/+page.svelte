@@ -1,25 +1,29 @@
 <script lang="ts">
-  import OnEvents from '#lib/components/OnEvents.svelte';
+  import { goto } from '$app/navigation';
   import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
-  import EmptyPlaceholder from '#lib/components/shared-components/EmptyPlaceholder.svelte';
+  import OnEvents from '#lib/components/OnEvents.svelte';
   import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
-  import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
-  import Timeline from '#lib/components/timeline/Timeline.svelte';
+  import EmptyPlaceholder from '#lib/components/shared-components/EmptyPlaceholder.svelte';
   import ChangeDate from '#lib/components/timeline/actions/ChangeDateAction.svelte';
   import ChangeLocation from '#lib/components/timeline/actions/ChangeLocationAction.svelte';
   import DeleteAssets from '#lib/components/timeline/actions/DeleteAssetsAction.svelte';
   import DownloadAction from '#lib/components/timeline/actions/DownloadAction.svelte';
   import SelectAllAssets from '#lib/components/timeline/actions/SelectAllAction.svelte';
   import SetVisibilityAction from '#lib/components/timeline/actions/SetVisibilityAction.svelte';
+  import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
+  import Timeline from '#lib/components/timeline/Timeline.svelte';
+  import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
   import { AssetAction } from '#lib/constants.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
+  import type { TimelineGrouping, TimelineTemporalAnchor } from '#lib/managers/timeline-manager/types.ts';
   import { Route } from '#lib/route.ts';
   import { getUserActions } from '#lib/services/user.service.ts';
+  import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '#lib/utils/timeline-zoom-navigation.ts';
+  import { getTimelineTopVisibleAnchor } from '#lib/managers/timeline-manager/timeline-anchor.ts';
   import { AssetVisibility } from '@immich/sdk';
   import { mdiDotsVertical } from '@mdi/js';
   import { t } from 'svelte-i18n';
-  import { goto } from '$app/navigation';
   import type { PageData } from './$types';
 
   interface Props {
@@ -29,7 +33,17 @@
   let { data }: Props = $props();
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
-  const options = { visibility: AssetVisibility.Locked };
+  let timelineGrouping = $state<TimelineGrouping>('day');
+  let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
+  const baseTimelineOptions = { visibility: AssetVisibility.Locked };
+  const options = $derived({
+    ...baseTimelineOptions,
+    grouping: timelineGrouping,
+  });
+  const hideGroupingControls = $derived(
+    assetMultiSelectManager.selectionActive ||
+      Boolean(timelineManager?.isInitialized && timelineManager.assetCount === 0),
+  );
 
   const handleEscape = () => {
     if (!assetMultiSelectManager.selectionActive) {
@@ -44,6 +58,26 @@
     assetMultiSelectManager.clear();
     timelineManager.removeAssets(assetIds);
   };
+
+  function handleTimelineGroupingChange(grouping: TimelineGrouping) {
+    const anchor = getTimelineTopVisibleAnchor(timelineManager);
+    timelineGrouping = grouping;
+    temporalAnchor = anchor;
+  }
+
+  function handleTimelineBucketActivate(bucket: ActivatableTimelineBucket) {
+    if (assetMultiSelectManager.selectionActive) {
+      return;
+    }
+
+    const result = getTimelineBucketZoomTarget(bucket);
+    if (!result) {
+      return;
+    }
+
+    timelineGrouping = result.grouping;
+    temporalAnchor = result.anchor;
+  }
 
   const { LockSession } = $derived(getUserActions($t));
 
@@ -60,6 +94,11 @@
   hideNavbar={assetMultiSelectManager.selectionActive}
   scrollbar={false}
 >
+  <TimelineRouteGroupingBar
+    grouping={timelineGrouping}
+    hidden={hideGroupingControls}
+    onGroupingChange={handleTimelineGroupingChange}
+  />
   <Timeline
     enableRouting={true}
     bind:timelineManager
@@ -67,6 +106,11 @@
     assetInteraction={assetMultiSelectManager}
     onEscape={handleEscape}
     removeAction={AssetAction.SET_VISIBILITY_TIMELINE}
+    {temporalAnchor}
+    onTimelineBucketActivate={handleTimelineBucketActivate}
+    onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
+    grouping={timelineGrouping}
+    onGroupingChange={handleTimelineGroupingChange}
   >
     {#snippet empty()}
       <EmptyPlaceholder text={$t('no_locked_photos_message')} title={$t('nothing_here_yet')} class="mx-auto mt-10" />
