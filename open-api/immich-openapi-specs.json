@@ -15747,6 +15747,16 @@
             }
           },
           {
+            "name": "bucketSize",
+            "required": false,
+            "in": "query",
+            "description": "Timeline bucket granularity. Defaults to month for backwards compatibility",
+            "schema": {
+              "default": "month",
+              "$ref": "#/components/schemas/TimeBucketSize"
+            }
+          },
+          {
             "name": "city",
             "required": false,
             "in": "query",
@@ -16073,6 +16083,16 @@
             "schema": {
               "example": "11.075683,49.416711,11.117589,49.454875",
               "type": "string"
+            }
+          },
+          {
+            "name": "bucketSize",
+            "required": false,
+            "in": "query",
+            "description": "Timeline bucket granularity. Defaults to month for backwards compatibility",
+            "schema": {
+              "default": "month",
+              "$ref": "#/components/schemas/TimeBucketSize"
             }
           },
           {
@@ -32807,6 +32827,15 @@
         ],
         "type": "object"
       },
+      "TimeBucketSize": {
+        "description": "Timeline bucket granularity",
+        "enum": [
+          "year",
+          "month",
+          "day"
+        ],
+        "type": "string"
+      },
       "TimeBucketsResponseDto": {
         "properties": {
           "count": {
@@ -32815,6 +32844,21 @@
             "maximum": 9007199254740991,
             "minimum": -9007199254740991,
             "type": "integer"
+          },
+          "representativeAssetId": {
+            "description": "Representative asset ID for this bucket",
+            "nullable": true,
+            "type": "string"
+          },
+          "representativeRatio": {
+            "description": "Representative asset width/height ratio",
+            "nullable": true,
+            "type": "number"
+          },
+          "representativeThumbhash": {
+            "description": "Representative asset thumbhash, base64 encoded",
+            "nullable": true,
+            "type": "string"
           },
           "timeBucket": {
             "description": "Time bucket identifier in YYYY-MM-DD format representing the start of the time period",

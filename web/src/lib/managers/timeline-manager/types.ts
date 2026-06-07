@@ -4,13 +4,21 @@ import type { TimelineDate, TimelineDateTime, TimelineYearMonth } from '$lib/uti
 export type ViewportTopMonth = TimelineYearMonth | undefined | 'lead-in' | 'lead-out';
 
 export type AssetApiGetTimeBucketsRequest = Parameters<typeof import('@immich/sdk').getTimeBuckets>[0];
+export type AssetApiGetTimeBucketRequest = Parameters<typeof import('@immich/sdk').getTimeBucket>[0];
 
-export type TimelineManagerOptions = Omit<AssetApiGetTimeBucketsRequest, 'size'> & {
+export type TimelineGrouping = 'year' | 'month' | 'day';
+export const DEFAULT_TIMELINE_GROUPING: TimelineGrouping = 'day';
+export type TimelineTemporalAnchor = { year: number; month?: number };
+
+export type TimelineManagerOptions = Omit<AssetApiGetTimeBucketsRequest, 'bucketSize' | 'size'> & {
+  grouping?: TimelineGrouping;
   timelineAlbumId?: string;
   timelineSpaceId?: string;
   deferInit?: boolean;
   assetFilter?: Set<string>;
 };
+
+export type TimelineBucketDate = { year: number; month?: number; day?: number };
 
 export type AssetDescriptor = { id: string };
 

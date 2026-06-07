@@ -5,6 +5,8 @@
   import Month from '$lib/components/timeline/Month.svelte';
   import Scrubber from '$lib/components/timeline/Scrubber.svelte';
   import TimelineAssetViewer from '$lib/components/timeline/TimelineAssetViewer.svelte';
+  import TimelineGroupingControl from '$lib/components/timeline/TimelineGroupingControl.svelte';
+  import TimelineRepresentativeBuckets from '$lib/components/timeline/TimelineRepresentativeBuckets.svelte';
   import TimelineKeyboardActions from '$lib/components/timeline/actions/TimelineKeyboardActions.svelte';
   import { focusAsset } from '$lib/components/timeline/actions/focus-actions';
   import { AssetAction } from '$lib/constants';
@@ -13,15 +15,24 @@
   import Skeleton from '$lib/elements/Skeleton.svelte';
   import type { AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
+  import { scrollTimelineToTemporalAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
   import type { TimelineDay } from '$lib/managers/timeline-manager/timeline-day.svelte';
   import { isIntersecting } from '$lib/managers/timeline-manager/internal/intersection-support.svelte';
   import type { TimelineMonth } from '$lib/managers/timeline-manager/timeline-month.svelte';
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-  import type { TimelineAsset, TimelineManagerOptions, ViewportTopMonth } from '$lib/managers/timeline-manager/types';
+  import type {
+    TimelineAsset,
+    TimelineGrouping,
+    TimelineManagerOptions,
+    TimelineTemporalAnchor,
+    ViewportTopMonth,
+  } from '$lib/managers/timeline-manager/types';
   import { assetsSnapshot } from '$lib/managers/timeline-manager/utils.svelte';
   import { keyboardManager } from '$lib/stores/keyboard-manager.svelte';
   import { mediaQueryManager } from '$lib/stores/media-query-manager.svelte';
+  import { lang } from '$lib/stores/preferences.store';
   import { isAssetViewerRoute, navigate } from '$lib/utils/navigation';
+  import type { ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
   import { getTimes, type ScrubberListener } from '$lib/utils/timeline-util';
   import { type AlbumResponseDto, type PersonResponseDto, type UserResponseDto } from '@immich/sdk';
   import { DateTime } from 'luxon';
@@ -48,6 +59,11 @@
     spaceId?: string;
     onSelect?: (asset: TimelineAsset) => void;
     onEscape?: () => void;
+    onTimelineBucketActivate?: (bucket: ActivatableTimelineBucket) => void;
+    grouping?: TimelineGrouping;
+    onGroupingChange?: (grouping: TimelineGrouping) => void;
+    temporalAnchor?: TimelineTemporalAnchor;
+    onTemporalAnchorResolved?: () => void;
     children?: Snippet;
     empty?: Snippet;
     customThumbnailLayout?: Snippet<[TimelineAsset]>;
@@ -81,6 +97,11 @@
     spaceId,
     onSelect = () => {},
     onEscape = () => {},
+    onTimelineBucketActivate,
+    grouping = 'day',
+    onGroupingChange,
+    temporalAnchor,
+    onTemporalAnchorResolved,
     children,
     empty,
     customThumbnailLayout,
@@ -103,9 +124,17 @@
   let timelineScrollPercent: number = $state(0);
   let scrubberWidth = $state(0);
 
-  const isEmpty = $derived(timelineManager.isInitialized && timelineManager.months.length === 0);
+  const isEmpty = $derived(timelineManager.isInitialized && timelineManager.assetCount === 0);
   const maxMd = $derived(mediaQueryManager.maxMd);
   const usingMobileDevice = $derived(mediaQueryManager.pointerCoarse);
+  const activeGrouping = $derived(options?.grouping ?? timelineManager.grouping ?? grouping);
+  const showMobileGroupingControl = $derived(
+    Boolean(onGroupingChange) &&
+      (maxMd || usingMobileDevice) &&
+      !isSelectionMode &&
+      !assetInteraction.selectionActive &&
+      !assetViewerManager.isViewing,
+  );
 
   $effect(() => {
     const layoutOptions = maxMd
@@ -122,6 +151,58 @@
 
   $effect(() => {
     timelineManager.scrollableElement = scrollableElement;
+  });
+
+  $effect(() => {
+    if (
+      !temporalAnchor ||
+      !timelineManager.isInitialized ||
+      timelineManager.grouping !== activeGrouping ||
+      timelineManager.hasEmptyViewport
+    ) {
+      return;
+    }
+
+    let frame: number | undefined;
+    let cancelled = false;
+    let attempts = 0;
+    const anchor = temporalAnchor;
+
+    const attemptScroll = () => {
+      void tick().then(() => {
+        if (
+          cancelled ||
+          temporalAnchor !== anchor ||
+          !timelineManager.isInitialized ||
+          timelineManager.grouping !== activeGrouping ||
+          timelineManager.hasEmptyViewport
+        ) {
+          return;
+        }
+
+        if (scrollTimelineToTemporalAnchor(timelineManager, anchor)) {
+          onTemporalAnchorResolved?.();
+          return;
+        }
+
+        if (attempts++ < 120) {
+          frame = requestAnimationFrame(attemptScroll);
+        }
+      });
+    };
+
+    frame = requestAnimationFrame(attemptScroll);
+
+    return () => {
+      cancelled = true;
+      if (frame !== undefined) {
+        cancelAnimationFrame(frame);
+      }
+    };
+  });
+
+  $effect(() => {
+    void onTimelineBucketActivate;
   });
 
   const getAssetPosition = (assetId: string, timelineMonth: TimelineMonth) =>
@@ -652,75 +733,86 @@
       {/if}
     </section>
 
-    {#each timelineManager.months as timelineMonth (timelineMonth.viewId)}
-      {@const isInOrNearViewport = timelineMonth.isInOrNearViewport}
-      {@const absoluteHeight = timelineMonth.top}
+    {#if activeGrouping !== 'day'}
+      <TimelineRepresentativeBuckets
+        grouping={activeGrouping}
+        buckets={timelineManager.timelineBuckets}
+        visibleWindow={timelineManager.visibleWindow}
+        locale={$lang}
+        disabled={isSelectionMode || assetInteraction.selectionActive}
+        {onTimelineBucketActivate}
+      />
+    {:else}
+      {#each timelineManager.months as timelineMonth (timelineMonth.viewId)}
+        {@const isInOrNearViewport = timelineMonth.isInOrNearViewport}
+        {@const absoluteHeight = timelineMonth.top}
 
-      {#if !timelineMonth.isLoaded}
-        <div
-          style:height={timelineMonth.height + 'px'}
-          style:position="absolute"
-          style:transform={`translate3d(0,${absoluteHeight}px,0)`}
-          style:width="100%"
-        >
-          <Skeleton {invisible} height={timelineMonth.height} title={timelineMonth.title} />
-        </div>
-      {:else if isInOrNearViewport}
-        <div
-          class="timeline-month"
-          style:height={timelineMonth.height + 'px'}
-          style:position="absolute"
-          style:transform={`translate3d(0,${absoluteHeight}px,0)`}
-          style:width="100%"
-        >
-          <Month
-            {assetInteraction}
-            {customThumbnailLayout}
-            {singleSelect}
-            {timelineMonth}
-            manager={timelineManager}
-            onTimelineDaySelect={handleGroupSelect}
+        {#if !timelineMonth.isLoaded}
+          <div
+            style:height={timelineMonth.height + 'px'}
+            style:position="absolute"
+            style:transform={`translate3d(0,${absoluteHeight}px,0)`}
+            style:width="100%"
           >
-            {#snippet thumbnail({ asset, position, timelineDay, groupIndex })}
-              {@const isAssetSelectionCandidate = assetInteraction.hasSelectionCandidate(asset.id)}
-              {@const isAssetSelected =
-                assetInteraction.hasSelectedAsset(asset.id) || timelineManager.albumAssets.has(asset.id)}
-              {@const isAssetDisabled = timelineManager.albumAssets.has(asset.id)}
-              <Thumbnail
-                showStackedIcon={withStacked}
-                {showArchiveIcon}
-                {asset}
-                {albumUsers}
-                {groupIndex}
-                onClick={(asset) => {
-                  if (typeof onThumbnailClick === 'function') {
-                    onThumbnailClick(asset, timelineManager, timelineDay, _onClick);
-                  } else {
-                    _onClick(timelineManager, timelineDay.getAssets(), timelineDay.groupTitle, asset);
-                  }
-                }}
-                onSelect={() => {
-                  if (isSelectionMode || assetInteraction.selectionActive) {
-                    assetSelectHandler(timelineManager, asset, timelineDay.getAssets(), timelineDay.groupTitle);
-                    return;
-                  }
-                  void onSelectAssets(asset);
-                }}
-                onMouseEvent={() => handleSelectAssetCandidates(asset)}
-                onPreview={isSelectionMode || assetInteraction.selectionActive
-                  ? (asset) => void navigate({ targetRoute: 'current', assetId: asset.id })
-                  : undefined}
-                selected={isAssetSelected}
-                selectionCandidate={isAssetSelectionCandidate}
-                disabled={isAssetDisabled}
-                thumbnailWidth={position.width}
-                thumbnailHeight={position.height}
-              />
-            {/snippet}
-          </Month>
-        </div>
-      {/if}
-    {/each}
+            <Skeleton {invisible} height={timelineMonth.height} title={timelineMonth.title} />
+          </div>
+        {:else if isInOrNearViewport}
+          <div
+            class="timeline-month"
+            style:height={timelineMonth.height + 'px'}
+            style:position="absolute"
+            style:transform={`translate3d(0,${absoluteHeight}px,0)`}
+            style:width="100%"
+          >
+            <Month
+              {assetInteraction}
+              {customThumbnailLayout}
+              {singleSelect}
+              {timelineMonth}
+              manager={timelineManager}
+              onTimelineDaySelect={handleGroupSelect}
+            >
+              {#snippet thumbnail({ asset, position, timelineDay, groupIndex })}
+                {@const isAssetSelectionCandidate = assetInteraction.hasSelectionCandidate(asset.id)}
+                {@const isAssetSelected =
+                  assetInteraction.hasSelectedAsset(asset.id) || timelineManager.albumAssets.has(asset.id)}
+                {@const isAssetDisabled = timelineManager.albumAssets.has(asset.id)}
+                <Thumbnail
+                  showStackedIcon={withStacked}
+                  {showArchiveIcon}
+                  {asset}
+                  {albumUsers}
+                  {groupIndex}
+                  onClick={(asset) => {
+                    if (typeof onThumbnailClick === 'function') {
+                      onThumbnailClick(asset, timelineManager, timelineDay, _onClick);
+                    } else {
+                      _onClick(timelineManager, timelineDay.getAssets(), timelineDay.groupTitle, asset);
+                    }
+                  }}
+                  onSelect={() => {
+                    if (isSelectionMode || assetInteraction.selectionActive) {
+                      assetSelectHandler(timelineManager, asset, timelineDay.getAssets(), timelineDay.groupTitle);
+                      return;
+                    }
+                    void onSelectAssets(asset);
+                  }}
+                  onMouseEvent={() => handleSelectAssetCandidates(asset)}
+                  onPreview={isSelectionMode || assetInteraction.selectionActive
+                    ? (asset) => void navigate({ targetRoute: 'current', assetId: asset.id })
+                    : undefined}
+                  selected={isAssetSelected}
+                  selectionCandidate={isAssetSelectionCandidate}
+                  disabled={isAssetDisabled}
+                  thumbnailWidth={position.width}
+                  thumbnailHeight={position.height}
+                />
+              {/snippet}
+            </Month>
+          </div>
+        {/if}
+      {/each}
+    {/if}
     <!-- spacer for leadout -->
     <div
       style:height={timelineManager.bottomSectionHeight + 'px'}
@@ -731,6 +823,20 @@
     ></div>
   </section>
 </section>
+
+{#if showMobileGroupingControl}
+  <div
+    class="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-20 flex justify-center px-4 md:hidden"
+    data-testid="timeline-mobile-grouping-control-shell"
+  >
+    <TimelineGroupingControl
+      class="pointer-events-auto"
+      variant="floating"
+      grouping={activeGrouping}
+      onGroupingChange={(nextGrouping) => onGroupingChange?.(nextGrouping)}
+    />
+  </div>
+{/if}
 
 <Portal target="body">
   {#if assetViewerManager.isViewing}
