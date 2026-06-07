@@ -3,4 +3,9 @@ source "https://rubygems.org"
 gem "fastlane"
 gem "cocoapods"
 gem "abbrev" # Required for Ruby 3.4+
+# representable/json (pulled in by fastlane -> google-apis-*) requires
+# multi_json but no longer declares it as a dependency, and newer
+# googleauth/signet dropped it too, so nothing else pulls it into the
+# bundle. Pin it directly or `bundle exec fastlane` dies with
+# "multi_json is not part of the bundle".
 gem "multi_json"
