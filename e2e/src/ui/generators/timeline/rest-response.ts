@@ -6,6 +6,7 @@ import {
   AlbumUserRole,
   AssetTypeEnum,
   AssetVisibility,
+  TimeBucketSize,
   UserAvatarColor,
   type AlbumResponseDto,
   type AssetResponseDto,
@@ -183,6 +184,25 @@ function shouldIncludeAsset(
  * Get summary for all buckets (mimics getTimeBuckets API)
  * When albumId is provided, only includes buckets that contain assets from that album
  */
+function getBucketKey(dateKey: string, bucketSize: TimeBucketSize) {
+  const [year, month, day = '01'] = dateKey.split('-');
+  if (bucketSize === TimeBucketSize.Year) {
+    return `${year}-01-01`;
+  }
+  if (bucketSize === TimeBucketSize.Month) {
+    return `${year}-${month.padStart(2, '0')}-01`;
+  }
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
+
+function isInsideTemporalRange(dateKey: string, range: { takenAfter?: string; takenBefore?: string }) {
+  const bucketDate = DateTime.fromISO(getBucketKey(dateKey, TimeBucketSize.Day), { zone: 'utc' });
+  return (
+    (!range.takenAfter || bucketDate >= DateTime.fromISO(range.takenAfter, { zone: 'utc' })) &&
+    (!range.takenBefore || bucketDate < DateTime.fromISO(range.takenBefore, { zone: 'utc' }))
+  );
+}
+
 export function getTimeBuckets(
   timelineData: MockTimelineData,
   isTrashed: boolean | undefined,
@@ -190,13 +210,33 @@ export function getTimeBuckets(
   isFavorite: boolean | undefined,
   albumId: string | undefined,
   changes: Changes,
+  bucketSize: TimeBucketSize = TimeBucketSize.Month,
+  temporalRange: { takenAfter?: string; takenBefore?: string } = {},
 ): TimeBucketsResponseDto[] {
-  const summary: TimeBucketsResponseDto[] = [];
+  const summaryByBucket = new Map<string, TimeBucketsResponseDto>();
 
   // Create sets for quick lookups
   const deletedAssetIds = new Set(changes.assetDeletions);
   const archivedAssetIds = new Set(changes.assetArchivals);
   const favoritedAssetIds = new Set(changes.assetFavorites);
+
+  function addAssetsToSummary(bucketKey: string, filteredAssets: MockTimelineAsset[]) {
+    if (filteredAssets.length === 0 || !isInsideTemporalRange(bucketKey, temporalRange)) {
+      return;
+    }
+
+    const timeBucket = getBucketKey(bucketKey, bucketSize);
+    const existing = summaryByBucket.get(timeBucket);
+    const representative = existing?.representativeAssetId ? undefined : filteredAssets[0];
+
+    summaryByBucket.set(timeBucket, {
+      timeBucket,
+      count: (existing?.count ?? 0) + filteredAssets.length,
+      representativeAssetId: existing?.representativeAssetId ?? representative?.id ?? null,
+      representativeThumbhash: existing?.representativeThumbhash ?? representative?.thumbhash ?? null,
+      representativeRatio: existing?.representativeRatio ?? representative?.ratio ?? null,
+    });
+  }
 
   // If no albumId is specified, return summary for all assets
   if (albumId) {
@@ -230,12 +270,7 @@ export function getTimeBuckets(
         );
       });
 
-      if (albumAssetsInBucket.length > 0) {
-        summary.push({
-          timeBucket: bucketKey,
-          count: albumAssetsInBucket.length,
-        });
-      }
+      addAssetsToSummary(bucketKey, albumAssetsInBucket);
     }
   } else {
     for (const [bucketKey, assets] of timelineData.buckets) {
@@ -252,14 +287,11 @@ export function getTimeBuckets(
         ),
       );
 
-      if (filteredAssets.length > 0) {
-        summary.push({
-          timeBucket: bucketKey,
-          count: filteredAssets.length,
-        });
-      }
+      addAssetsToSummary(bucketKey, filteredAssets);
     }
   }
+
+  const summary = [...summaryByBucket.values()];
 
   // Sort summary by date (newest first) using luxon
   summary.sort((a, b) => {

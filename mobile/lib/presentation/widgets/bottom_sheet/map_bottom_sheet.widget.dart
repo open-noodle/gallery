@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/events.model.dart';
 import 'package:immich_mobile/domain/models/map.model.dart';
+import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
@@ -15,6 +16,8 @@ import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 
 class MapBottomSheet extends StatelessWidget {
+  static const forcedTimelineGroupBy = GroupAssetsBy.day;
+
   final Key? sheetKey;
 
   const MapBottomSheet({super.key, this.sheetKey});
@@ -30,14 +33,14 @@ class MapBottomSheet extends StatelessWidget {
       actions: const [],
       backgroundColor: context.themeData.colorScheme.surface,
       slivers: const [
-        SliverFillRemaining(hasScrollBody: false, child: SizedBox(height: 0, child: _ScopedMapTimeline())),
+        SliverFillRemaining(hasScrollBody: false, child: SizedBox(height: 0, child: MapBottomSheetTimeline())),
       ],
     );
   }
 }
 
-class _ScopedMapTimeline extends StatelessWidget {
-  const _ScopedMapTimeline();
+class MapBottomSheetTimeline extends StatelessWidget {
+  const MapBottomSheetTimeline({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +67,13 @@ class _ScopedMapTimeline extends StatelessWidget {
 
           final timelineService = ref
               .watch(timelineFactoryProvider)
-              .geographicMap(users, user.id, () => currentOptions, optionsController.stream);
+              .geographicMap(
+                users,
+                user.id,
+                () => currentOptions,
+                optionsController.stream,
+                groupBy: MapBottomSheet.forcedTimelineGroupBy,
+              );
           ref.onDispose(timelineService.dispose);
 
           return timelineService;
@@ -74,7 +83,12 @@ class _ScopedMapTimeline extends StatelessWidget {
         children: [
           _MapAssetCount(),
           Expanded(
-            child: Timeline(appBar: null, bottomSheet: GeneralBottomSheet(minChildSize: 0.23), withScrubber: false),
+            child: Timeline(
+              appBar: null,
+              bottomSheet: GeneralBottomSheet(minChildSize: 0.23),
+              withScrubber: false,
+              groupBy: MapBottomSheet.forcedTimelineGroupBy,
+            ),
           ),
         ],
       ),

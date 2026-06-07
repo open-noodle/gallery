@@ -6,6 +6,8 @@ import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/base_action_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/trash_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_header_sliver.widget.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/infrastructure/action.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
@@ -17,21 +19,20 @@ import 'package:immich_mobile/widgets/common/immich_toast.dart';
 class TrashPage extends StatelessWidget {
   const TrashPage({super.key});
 
+  static const timelineOverviewControlsEnabled = true;
+  static const timelineOverviewTopSliverHeight = kTimelineGroupingHeaderSliverHeight + 24;
+
   @override
   Widget build(BuildContext context) {
-    return ProviderScope(
-      overrides: [
-        timelineServiceProvider.overrideWith((ref) {
-          final user = ref.watch(currentUserProvider);
-          if (user == null) {
-            throw Exception('User must be logged in to access trash');
-          }
+    return TimelineRouteScope(
+      timelineServiceBuilder: (ref, scope) {
+        final user = ref.watch(currentUserProvider);
+        if (user == null) {
+          throw Exception('User must be logged in to access trash');
+        }
 
-          final timelineService = ref.watch(timelineFactoryProvider).trash(user.id);
-          ref.onDispose(timelineService.dispose);
-          return timelineService;
-        }),
-      ],
+        return ref.watch(timelineFactoryProvider).trash(user.id, temporalScope: scope);
+      },
       child: Timeline(
         appBar: SliverAppBar(
           title: Text(context.t.trash),
@@ -42,16 +43,21 @@ class TrashPage extends StatelessWidget {
           elevation: 0,
           actions: const [_TrashKebabMenu()],
         ),
-        topSliverWidgetHeight: 24,
-        topSliverWidget: Consumer(
-          builder: (context, ref, child) {
-            final trashDays = ref.watch(serverInfoProvider.select((v) => v.serverConfig.trashDays));
+        topSliverWidgetHeight: DriftTrashPage.timelineOverviewTopSliverHeight,
+        topSliverWidget: SliverMainAxisGroup(
+          slivers: [
+            const TimelineGroupingHeaderSliver(),
+            Consumer(
+              builder: (context, ref, child) {
+                final trashDays = ref.watch(serverInfoProvider.select((v) => v.serverConfig.trashDays));
 
-            return SliverPadding(
-              padding: const EdgeInsets.all(16.0),
-              sliver: SliverToBoxAdapter(child: Text(context.t.trash_page_info(days: trashDays))),
-            );
-          },
+                return SliverPadding(
+                  padding: const EdgeInsets.all(16.0),
+                  sliver: SliverToBoxAdapter(child: Text(context.t.trash_page_info(days: trashDays))),
+                );
+              },
+            ),
+          ],
         ),
         bottomSheet: const TrashBottomBar(),
       ),

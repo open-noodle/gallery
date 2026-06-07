@@ -1,6 +1,51 @@
-import { TimeBucketDto } from 'src/dtos/time-bucket.dto';
+import { TimeBucketAssetDto, TimeBucketDto } from 'src/dtos/time-bucket.dto';
+import { TimeBucketSize } from 'src/enum';
 
 describe('TimeBucketDto', () => {
+  describe('bucketSize query param handling', () => {
+    it('defaults bucketSize to month', () => {
+      const result = TimeBucketDto.schema.safeParse({});
+
+      expect(result.success).toBe(true);
+      expect(result.data?.bucketSize).toBe(TimeBucketSize.Month);
+    });
+
+    it.each([TimeBucketSize.Year, TimeBucketSize.Month, TimeBucketSize.Day])('accepts bucketSize=%s', (bucketSize) => {
+      const result = TimeBucketDto.schema.safeParse({ bucketSize });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.bucketSize).toBe(bucketSize);
+    });
+
+    it('rejects invalid bucketSize', () => {
+      const result = TimeBucketDto.schema.safeParse({ bucketSize: 'week' });
+
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('asset bucketSize query param handling', () => {
+    it('defaults bucketSize to month', () => {
+      const result = TimeBucketAssetDto.schema.safeParse({ timeBucket: '2024-01-01' });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.bucketSize).toBe(TimeBucketSize.Month);
+    });
+
+    it.each([TimeBucketSize.Year, TimeBucketSize.Month, TimeBucketSize.Day])('accepts bucketSize=%s', (bucketSize) => {
+      const result = TimeBucketAssetDto.schema.safeParse({ bucketSize, timeBucket: '2024-01-01' });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.bucketSize).toBe(bucketSize);
+    });
+
+    it('rejects invalid bucketSize', () => {
+      const result = TimeBucketAssetDto.schema.safeParse({ bucketSize: 'week', timeBucket: '2024-01-01' });
+
+      expect(result.success).toBe(false);
+    });
+  });
+
   describe('spacePersonIds query param handling', () => {
     it('should accept an array of UUIDs', () => {
       const result = TimeBucketDto.schema.safeParse({
