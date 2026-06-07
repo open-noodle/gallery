@@ -19,12 +19,16 @@
   import SetVisibilityAction from '#lib/components/timeline/actions/SetVisibilityAction.svelte';
   import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '#lib/components/timeline/Timeline.svelte';
+  import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
   import { PersonPageViewMode, QueryParameter, SessionStorageKey } from '#lib/constants.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
-  import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
-  import PersonEditModal from '#lib/modals/PersonEditModal.svelte';
+  import type {
+    TimelineAsset,
+    TimelineGrouping,
+    TimelineTemporalAnchor,
+  } from '#lib/managers/timeline-manager/types.ts';
   import PersonMergeSuggestionModal from '#lib/modals/PersonMergeSuggestionModal.svelte';
   import RepresentativeFacePickerModal from '#lib/modals/RepresentativeFacePickerModal.svelte';
   import { Route } from '#lib/route.ts';
@@ -39,6 +43,9 @@
   import { normalizeSearchString } from '#lib/utils/string-utils.ts';
   import { afterNavigate, goto, refreshAll } from '$app/navigation';
   import { page } from '$app/state';
+  import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '#lib/utils/timeline-zoom-navigation.ts';
+  import { getTimelineTopVisibleAnchor } from '#lib/managers/timeline-manager/timeline-anchor.ts';
+
   import {
     AssetVisibility,
     detachScopedPerson,
@@ -88,12 +95,18 @@
   let thumbnailData = $derived(getScopedThumbnailUrl(person));
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
+  let timelineGrouping = $state<TimelineGrouping>('day');
+  let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
   let numberOfAssets = $derived(timelineManager?.isInitialized ? timelineManager.assetCount : data.statistics.assets);
-  const options = $derived({
+  const baseTimelineOptions = $derived({
     visibility: AssetVisibility.Timeline,
     personIds: [data.person.filterId ?? data.person.id],
     withPartners: true,
     withSharedSpaces: true,
+  });
+  const options = $derived({
+    ...baseTimelineOptions,
+    grouping: timelineGrouping,
   });
 
   let viewMode: PersonPageViewMode = $state(PersonPageViewMode.VIEW_ASSETS);
@@ -354,6 +367,26 @@
     assetMultiSelectManager.clear();
   };
 
+  function handleTimelineGroupingChange(grouping: TimelineGrouping) {
+    const anchor = getTimelineTopVisibleAnchor(timelineManager);
+    timelineGrouping = grouping;
+    temporalAnchor = anchor;
+  }
+
+  function handleTimelineBucketActivate(bucket: ActivatableTimelineBucket) {
+    if (assetMultiSelectManager.selectionActive) {
+      return;
+    }
+
+    const result = getTimelineBucketZoomTarget(bucket);
+    if (!result) {
+      return;
+    }
+
+    timelineGrouping = result.grouping;
+    temporalAnchor = result.anchor;
+  }
+
   const onPersonUpdate = async (response: PersonResponseDto) => {
     if (response.id !== person.id) {
       return;
@@ -439,7 +472,7 @@
 />
 
 <main
-  class="relative z-0 h-dvh overflow-hidden px-2 pt-(--navbar-height) md:px-6 md:pt-(--navbar-height-md)"
+  class="relative z-0 flex flex-col h-dvh overflow-hidden px-2 md:px-6 md:pt-(--navbar-height-md) pt-(--navbar-height)"
   use:scrollMemoryClearer={{
     routeStartsWith: Route.people(),
     beforeClear: () => {
@@ -447,155 +480,139 @@
     },
   }}
 >
-  {#key person.id}
-    <Timeline
-      enableRouting={true}
-      {person}
-      bind:timelineManager
-      {options}
-      assetInteraction={assetMultiSelectManager}
-      onEscape={handleEscape}
-    >
-      {#if viewMode === PersonPageViewMode.VIEW_ASSETS}
-        <!-- Person information block -->
-        <div
-          class="relative w-fit p-4 pt-12 sm:px-6"
-          use:clickOutside={{
-            onOutclick: handleCancelEditName,
-            onEscape: isEditingName ? handleCancelEditName : undefined,
-          }}
-          use:listNavigation={suggestionContainer}
-        >
-          <section class="flex w-64 place-items-center border-black sm:w-96">
-            {#if isEditingName}
-              <EditNameInput
-                {person}
-                bind:suggestedPeople
-                name={person.name}
-                bind:isSearchingPeople
-                onChange={handleNameChange}
-                {thumbnailData}
-              />
-            {:else}
-              <div class="relative">
-                <button
-                  type="button"
-                  class="flex items-center justify-center"
-                  title={$t('edit_name')}
-                  onclick={() => (isEditingName = true)}
-                >
-                  <ImageThumbnail
-                    circle
-                    shadow
-                    url={thumbnailData}
-                    altText={person.name}
-                    widthStyle="3.375rem"
-                    heightStyle="3.375rem"
+  <!-- Sticky grouping switcher: lives outside the scrolling timeline so it stays visible (see Tags).
+       mt-12 clears the taller ControlAppBar, which exceeds the --navbar-height padding reserve. -->
+  <TimelineRouteGroupingBar
+    grouping={timelineGrouping}
+    hidden={assetMultiSelectManager.selectionActive || viewMode !== PersonPageViewMode.VIEW_ASSETS}
+    class="shrink-0 mt-12"
+    onGroupingChange={handleTimelineGroupingChange}
+  />
+  <div class="relative flex-1 min-h-0">
+    {#key person.id}
+      <Timeline
+        enableRouting={true}
+        {person}
+        bind:timelineManager
+        {options}
+        assetInteraction={assetMultiSelectManager}
+        onEscape={handleEscape}
+        {temporalAnchor}
+        onTimelineBucketActivate={handleTimelineBucketActivate}
+        onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
+        grouping={timelineGrouping}
+        onGroupingChange={handleTimelineGroupingChange}
+      >
+        {#if viewMode === PersonPageViewMode.VIEW_ASSETS}
+          <!-- Person information block -->
+          <div
+            class="relative p-4 sm:px-6 pt-12"
+            use:clickOutside={{
+              onOutclick: handleCancelEditName,
+              onEscape: isEditingName ? handleCancelEditName : undefined,
+            }}
+            use:listNavigation={suggestionContainer}
+          >
+            <div class="flex flex-wrap items-center gap-4" data-testid="person-timeline-header">
+              <section class="flex w-fit place-items-center border-black" data-testid="person-timeline-identity">
+                {#if isEditingName}
+                  <EditNameInput
+                    {person}
+                    bind:suggestedPeople
+                    name={person.name}
+                    bind:isSearchingPeople
+                    onChange={handleNameChange}
+                    {thumbnailData}
                   />
-                  <div class="flex flex-col justify-center px-4 text-start text-primary">
-                    <p class="w-40 truncate font-medium sm:w-72">{person.name || $t('add_a_name')}</p>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">
-                      {$t('assets_count', { values: { count: numberOfAssets } })}
-                    </p>
-                    {#if featureFlagsManager.value.peopleStatistics}
-                      <p class="text-sm text-gray-500 dark:text-gray-400">
-                        {$t('faces_count', { values: { count: data.statistics.faces } })}
-                      </p>
-                    {/if}
-                    {#if person.birthDate}
-                      <p class="text-sm text-gray-500 dark:text-gray-400">
-                        {$t('person_birthdate', {
-                          values: {
-                            date: DateTime.fromISO(person.birthDate).toLocaleString(
-                              {
-                                month: 'numeric',
-                                day: 'numeric',
-                                year: 'numeric',
-                              },
-                              { locale: $locale },
-                            ),
-                          },
-                        })}
-                      </p>
-                    </button>
-                    <IconButton
-                      icon={mdiPencilOutline}
-                      shape="round"
-                      size="small"
-                      variant="ghost"
-                      onclick={() => modalManager.show(PersonEditModal, { person })}
-                      aria-label={$t('edit')}
-                    />
-                  </div>
-                  {#if altNames.length > 0}
-                    <p class="text-sm text-gray-500 dark:text-gray-400">
-                      {$t('also_known_as')}
-                      {new Intl.ListFormat($locale).format(altNames)}
-                    </p>
-                  {/if}
-                  <p class="text-sm text-gray-500 dark:text-gray-400">
-                    {$t('assets_count', { values: { count: numberOfAssets } })}
-                  </p>
-                  {#if person.birthDate}
-                    <p class="text-sm text-gray-500 dark:text-gray-400">
-                      {$t('person_birthdate', {
-                        values: {
-                          date: DateTime.fromISO(person.birthDate).toLocaleString(
-                            {
-                              month: 'numeric',
-                              day: 'numeric',
-                              year: 'numeric',
-                            },
-                            { locale: $locale },
-                          ),
-                        },
-                      })}
-                    </p>
-                  {/if}
-                </div>
-              </div>
-            {/if}
-          </section>
-          {#if isEditingName}
-            <div class="absolute z-1 w-64 sm:w-96">
-              {#if isSearchingPeople}
-                <div
-                  class="flex h-14 place-items-center rounded-b-lg border border-gray-400 bg-gray-200 p-2 dark:border-immich-dark-gray dark:bg-gray-700"
-                >
-                  <div class="flex w-full place-items-center">
-                    <LoadingSpinner />
-                  </div>
-                </div>
-              {:else}
-                <div bind:this={suggestionContainer}>
-                  {#each suggestedPeople as person, index (person.id)}
+                {:else}
+                  <div class="relative">
                     <button
                       type="button"
-                      class="flex h-14 w-full place-items-center border border-gray-200 bg-gray-100 p-2 hover:bg-gray-300 focus:bg-gray-300 dark:border-immich-dark-gray dark:bg-gray-700 hover:dark:bg-[#232932] focus:dark:bg-[#232932] {index ===
-                      suggestedPeople.length - 1
-                        ? 'rounded-b-lg border-b'
-                        : ''}"
-                      onclick={() => handleSuggestPeople(person)}
+                      class="flex items-center justify-center"
+                      title={$t('edit_name')}
+                      onclick={() => (isEditingName = true)}
                     >
                       <ImageThumbnail
                         circle
                         shadow
-                        url={getPeopleThumbnailUrl(person)}
+                        url={thumbnailData}
                         altText={person.name}
-                        widthStyle="2rem"
-                        heightStyle="2rem"
+                        widthStyle="3.375rem"
+                        heightStyle="3.375rem"
                       />
-                      <p class="ms-4 text-gray-700 dark:text-gray-100">{person.name}</p>
+                      <div class="flex flex-col justify-center text-start px-4 text-primary">
+                        <p class="w-40 font-medium truncate">{person.name || $t('add_a_name')}</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                          {$t('assets_count', { values: { count: numberOfAssets } })}
+                        </p>
+                        {#if featureFlagsManager.value.peopleStatistics}
+                          <p class="text-sm text-gray-500 dark:text-gray-400">
+                            {$t('faces_count', { values: { count: data.statistics.faces } })}
+                          </p>
+                        {/if}
+                        {#if person.birthDate}
+                          <p class="text-sm text-gray-500 dark:text-gray-400">
+                            {$t('person_birthdate', {
+                              values: {
+                                date: DateTime.fromISO(person.birthDate).toLocaleString(
+                                  {
+                                    month: 'numeric',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                  },
+                                  { locale: $locale },
+                                ),
+                              },
+                            })}
+                          </p>
+                        {/if}
+                      </div>
                     </button>
-                  {/each}
-                </div>
-              {/if}
+                  </div>
+                {/if}
+              </section>
             </div>
-          {/if}
-        </div>
-      {/if}
-    </Timeline>
-  {/key}
+            {#if isEditingName}
+              <div class="absolute w-64 sm:w-96 z-1">
+                {#if isSearchingPeople}
+                  <div
+                    class="flex border h-14 rounded-b-lg border-gray-400 dark:border-immich-dark-gray place-items-center bg-gray-200 p-2 dark:bg-gray-700"
+                  >
+                    <div class="flex w-full place-items-center">
+                      <LoadingSpinner />
+                    </div>
+                  </div>
+                {:else}
+                  <div bind:this={suggestionContainer}>
+                    {#each suggestedPeople as person, index (person.id)}
+                      <button
+                        type="button"
+                        class="flex w-full border border-gray-200 dark:border-immich-dark-gray h-14 place-items-center bg-gray-100 p-2 dark:bg-gray-700 hover:bg-gray-300 hover:dark:bg-[#232932] focus:bg-gray-300 focus:dark:bg-[#232932] {index ===
+                        suggestedPeople.length - 1
+                          ? 'rounded-b-lg border-b'
+                          : ''}"
+                        onclick={() => handleSuggestPeople(person)}
+                      >
+                        <ImageThumbnail
+                          circle
+                          shadow
+                          url={getPeopleThumbnailUrl(person)}
+                          altText={person.name}
+                          widthStyle="2rem"
+                          heightStyle="2rem"
+                        />
+                        <p class="ms-4 text-gray-700 dark:text-gray-100">{person.name}</p>
+                      </button>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+            {/if}
+          </div>
+        {/if}
+      </Timeline>
+    {/key}
+  </div>
 </main>
 
 <header>
