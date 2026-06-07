@@ -403,6 +403,23 @@ describe('ActiveFiltersBar', () => {
     expect(chips[0].textContent).toContain('Dec 2015');
   });
 
+  it('should reserve filter removal copy for explicit timeline filter chips', () => {
+    const filters = createFilterState();
+    filters.selectedYear = 2015;
+    filters.selectedMonth = 12;
+
+    const { getByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter: () => {},
+        onClearAll: () => {},
+      },
+    });
+
+    expect(getByTestId('active-chip')).toHaveTextContent('Dec 2015');
+    expect(getByTestId('chip-close')).toHaveAttribute('aria-label', 'Remove Dec 2015 filter');
+  });
+
   it('should render bounded custom date range as one timeline chip', () => {
     const filters = createFilterState();
     filters.dateAfter = '2024-01-01';

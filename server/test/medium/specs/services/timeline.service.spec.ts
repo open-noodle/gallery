@@ -1,12 +1,13 @@
 import { BadRequestException } from '@nestjs/common';
-import { Kysely } from 'kysely';
-import { AssetVisibility, SharedLinkType } from 'src/enum';
+import { Insertable, Kysely } from 'kysely';
+import { AssetOrder, AssetType, AssetVisibility, SharedLinkType, TimeBucketSize } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { PartnerRepository } from 'src/repositories/partner.repository';
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository';
 import { DB } from 'src/schema';
+import { AssetTable } from 'src/schema/tables/asset.table';
 import { TimelineService } from 'src/services/timeline.service';
 import { newMediumService } from 'test/medium.factory';
 import { factory } from 'test/small.factory';
@@ -20,6 +21,25 @@ const setup = (db?: Kysely<DB>) => {
     real: [AssetRepository, AccessRepository, PartnerRepository],
     mock: [LoggingRepository],
   });
+};
+
+const createTimelineAsset = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  ownerId: string,
+  localDateTime: Date,
+  options: Partial<Insertable<AssetTable>> = {},
+) => {
+  const { asset } = await ctx.newAsset({
+    ownerId,
+    fileCreatedAt: localDateTime,
+    localDateTime,
+    width: 400,
+    height: 200,
+    thumbhash: Buffer.from('thumbhash'),
+    ...options,
+  });
+  await ctx.newExif({ assetId: asset.id, make: 'Canon', timeZone: 'UTC' });
+  return asset;
 };
 
 beforeAll(async () => {
@@ -40,26 +60,195 @@ describe(TimelineService.name, () => {
 
       const response = sut.getTimeBuckets(auth, {});
       await expect(response).resolves.toEqual([
-        { count: 3, timeBucket: '1970-02-01' },
-        { count: 1, timeBucket: '1970-01-01' },
+        expect.objectContaining({ count: 3, timeBucket: '1970-02-01' }),
+        expect.objectContaining({ count: 1, timeBucket: '1970-01-01' }),
       ]);
     });
 
-    it('should return error if time bucket is requested with partners asset and archived', async () => {
-      const { sut } = setup();
-      const auth = factory.auth();
-      const response1 = sut.getTimeBuckets(auth, { withPartners: true, visibility: AssetVisibility.Archive });
-      await expect(response1).rejects.toBeInstanceOf(BadRequestException);
-      await expect(response1).rejects.toThrow(
-        'withPartners is only supported for non-archived, non-trashed, non-favorited, non-locked assets',
-      );
+    it('groups time buckets by requested year, month, and day granularity', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user });
 
-      const response2 = sut.getTimeBuckets(auth, { withPartners: true });
-      await expect(response2).rejects.toBeInstanceOf(BadRequestException);
-      await expect(response2).rejects.toThrow(
-        'withPartners is only supported for non-archived, non-trashed, non-favorited, non-locked assets',
+      await createTimelineAsset(ctx, user.id, new Date('2023-12-31T23:59:59.000Z'));
+      await createTimelineAsset(ctx, user.id, new Date('2024-01-01T00:00:00.000Z'));
+      await createTimelineAsset(ctx, user.id, new Date('2024-01-31T23:59:59.000Z'));
+      await createTimelineAsset(ctx, user.id, new Date('2024-02-01T00:00:00.000Z'));
+      await createTimelineAsset(ctx, user.id, new Date('2024-02-29T12:00:00.000Z'));
+
+      await expect(sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Year })).resolves.toEqual([
+        expect.objectContaining({ timeBucket: '2024-01-01', count: 4 }),
+        expect.objectContaining({ timeBucket: '2023-01-01', count: 1 }),
+      ]);
+
+      await expect(sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Month })).resolves.toEqual([
+        expect.objectContaining({ timeBucket: '2024-02-01', count: 2 }),
+        expect.objectContaining({ timeBucket: '2024-01-01', count: 2 }),
+        expect.objectContaining({ timeBucket: '2023-12-01', count: 1 }),
+      ]);
+
+      await expect(sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Day })).resolves.toEqual([
+        expect.objectContaining({ timeBucket: '2024-02-29', count: 1 }),
+        expect.objectContaining({ timeBucket: '2024-02-01', count: 1 }),
+        expect.objectContaining({ timeBucket: '2024-01-31', count: 1 }),
+        expect.objectContaining({ timeBucket: '2024-01-01', count: 1 }),
+        expect.objectContaining({ timeBucket: '2023-12-31', count: 1 }),
+      ]);
+    });
+
+    it('returns representative metadata from the filtered bucket query', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user });
+
+      const older = await createTimelineAsset(ctx, user.id, new Date('2024-01-01T12:00:00.000Z'), {
+        thumbhash: Buffer.from('older-thumbhash'),
+        width: 100,
+        height: 50,
+      });
+      const newer = await createTimelineAsset(ctx, user.id, new Date('2024-01-02T12:00:00.000Z'), {
+        thumbhash: Buffer.from('newer-thumbhash'),
+        width: 300,
+        height: 100,
+      });
+
+      await expect(sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Month })).resolves.toEqual([
+        expect.objectContaining({
+          timeBucket: '2024-01-01',
+          count: 2,
+          representativeAssetId: newer.id,
+          representativeThumbhash: Buffer.from('newer-thumbhash').toString('base64'),
+          representativeRatio: 3,
+        }),
+      ]);
+
+      await expect(
+        sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Month, order: AssetOrder.Asc }),
+      ).resolves.toEqual([
+        expect.objectContaining({
+          representativeAssetId: older.id,
+          representativeThumbhash: Buffer.from('older-thumbhash').toString('base64'),
+          representativeRatio: 2,
+        }),
+      ]);
+    });
+
+    it('falls back cleanly when representative thumbnail data is missing', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user });
+
+      const asset = await createTimelineAsset(ctx, user.id, new Date('2024-03-01T12:00:00.000Z'), {
+        thumbhash: null,
+        width: null,
+        height: null,
+      });
+
+      await expect(sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Month })).resolves.toEqual([
+        expect.objectContaining({
+          representativeAssetId: asset.id,
+          representativeThumbhash: null,
+          representativeRatio: 1,
+        }),
+      ]);
+    });
+
+    it('chooses representatives only from assets that match filters', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user });
+
+      const favorite = await createTimelineAsset(ctx, user.id, new Date('2024-04-02T12:00:00.000Z'), {
+        isFavorite: true,
+      });
+      await createTimelineAsset(ctx, user.id, new Date('2024-04-03T12:00:00.000Z'), {
+        isFavorite: false,
+      });
+
+      await expect(sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Month, isFavorite: true })).resolves.toEqual([
+        expect.objectContaining({ count: 1, representativeAssetId: favorite.id }),
+      ]);
+    });
+
+    it('applies EXIF and rating filters before selecting bucket representatives', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user });
+
+      const matching = await createTimelineAsset(ctx, user.id, new Date('2024-04-02T12:00:00.000Z'));
+      await ctx.newExif({
+        assetId: matching.id,
+        city: 'Berlin',
+        country: 'Germany',
+        make: 'Canon',
+        model: 'R5',
+        rating: 5,
+      });
+
+      const decoy = await createTimelineAsset(ctx, user.id, new Date('2024-04-03T12:00:00.000Z'));
+      await ctx.newExif({ assetId: decoy.id, city: 'Paris', country: 'France', make: 'Nikon', model: 'Z6', rating: 2 });
+
+      await expect(
+        sut.getTimeBuckets(auth, {
+          bucketSize: TimeBucketSize.Year,
+          city: 'Berlin',
+          country: 'Germany',
+          make: 'Canon',
+          model: 'R5',
+          rating: 5,
+        }),
+      ).resolves.toEqual([expect.objectContaining({ count: 1, representativeAssetId: matching.id })]);
+    });
+
+    it('returns an empty list when filters match no assets', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user });
+
+      await createTimelineAsset(ctx, user.id, new Date('2024-05-01T12:00:00.000Z'), { isFavorite: false });
+
+      await expect(sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Year, isFavorite: true })).resolves.toEqual(
+        [],
       );
     });
+
+    it('uses a video asset as the representative when a bucket contains only videos', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user });
+
+      const video = await createTimelineAsset(ctx, user.id, new Date('2024-06-01T12:00:00.000Z'), {
+        type: AssetType.Video,
+        originalPath: '/path/to/video.mp4',
+      });
+
+      await expect(
+        sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Month, type: AssetType.Video }),
+      ).resolves.toEqual([expect.objectContaining({ representativeAssetId: video.id, count: 1 })]);
+    });
+
+    it.each([TimeBucketSize.Year, TimeBucketSize.Month, TimeBucketSize.Day])(
+      'should return error for %s time buckets with partners asset and archived',
+      async (bucketSize) => {
+        const { sut } = setup();
+        const auth = factory.auth();
+        const response1 = sut.getTimeBuckets(auth, {
+          bucketSize,
+          withPartners: true,
+          visibility: AssetVisibility.Archive,
+        });
+        await expect(response1).rejects.toBeInstanceOf(BadRequestException);
+        await expect(response1).rejects.toThrow(
+          'withPartners is only supported for non-archived, non-trashed, non-favorited, non-locked assets',
+        );
+
+        const response2 = sut.getTimeBuckets(auth, { bucketSize, withPartners: true });
+        await expect(response2).rejects.toBeInstanceOf(BadRequestException);
+        await expect(response2).rejects.toThrow(
+          'withPartners is only supported for non-archived, non-trashed, non-favorited, non-locked assets',
+        );
+      },
+    );
 
     it('should return error if time bucket is requested with partners asset and favorite', async () => {
       const { sut } = setup();
@@ -77,15 +266,18 @@ describe(TimelineService.name, () => {
       );
     });
 
-    it('should return error if time bucket is requested with partners asset and trash', async () => {
-      const { sut } = setup();
-      const auth = factory.auth();
-      const response = sut.getTimeBuckets(auth, { withPartners: true, isTrashed: true });
-      await expect(response).rejects.toBeInstanceOf(BadRequestException);
-      await expect(response).rejects.toThrow(
-        'withPartners is only supported for non-archived, non-trashed, non-favorited, non-locked assets',
-      );
-    });
+    it.each([TimeBucketSize.Year, TimeBucketSize.Month, TimeBucketSize.Day])(
+      'should return error for %s time buckets with partners asset and trash',
+      async (bucketSize) => {
+        const { sut } = setup();
+        const auth = factory.auth();
+        const response = sut.getTimeBuckets(auth, { bucketSize, withPartners: true, isTrashed: true });
+        await expect(response).rejects.toBeInstanceOf(BadRequestException);
+        await expect(response).rejects.toThrow(
+          'withPartners is only supported for non-archived, non-trashed, non-favorited, non-locked assets',
+        );
+      },
+    );
 
     it('should return error if time bucket is requested with locked visibility for partner', async () => {
       const { sut, ctx } = setup();
@@ -109,6 +301,31 @@ describe(TimelineService.name, () => {
   });
 
   describe('getTimeBucket', () => {
+    it('returns assets only inside the requested bucket granularity', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user });
+
+      const jan1 = await createTimelineAsset(ctx, user.id, new Date('2024-01-01T00:00:00.000Z'));
+      const jan31 = await createTimelineAsset(ctx, user.id, new Date('2024-01-31T23:59:59.000Z'));
+      const feb1 = await createTimelineAsset(ctx, user.id, new Date('2024-02-01T00:00:00.000Z'));
+
+      const year = JSON.parse(
+        await sut.getTimeBucket(auth, { bucketSize: TimeBucketSize.Year, timeBucket: '2024-01-01' }),
+      );
+      expect(year.id).toEqual([feb1.id, jan31.id, jan1.id]);
+
+      const month = JSON.parse(
+        await sut.getTimeBucket(auth, { bucketSize: TimeBucketSize.Month, timeBucket: '2024-01-01' }),
+      );
+      expect(month.id).toEqual([jan31.id, jan1.id]);
+
+      const day = JSON.parse(
+        await sut.getTimeBucket(auth, { bucketSize: TimeBucketSize.Day, timeBucket: '2024-01-01' }),
+      );
+      expect(day.id).toEqual([jan1.id]);
+    });
+
     it('should return time bucket', async () => {
       const { sut, ctx } = setup();
       const { user } = await ctx.newUser();

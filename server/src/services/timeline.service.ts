@@ -1,31 +1,40 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { TimeBucketAssetDto, TimeBucketDto, TimeBucketsResponseDto } from 'src/dtos/time-bucket.dto';
-import { AssetVisibility, Permission } from 'src/enum';
+import { AssetVisibility, Permission, TimeBucketSize } from 'src/enum';
 import { TimeBucketOptions } from 'src/repositories/asset.repository';
 import { BaseService } from 'src/services/base.service';
 import { requireElevatedPermission } from 'src/utils/access';
 import { getMyPartnerIds } from 'src/utils/asset.util';
+import { normalizeTimeBucketForBucketSize } from 'src/utils/timeline-bucket';
 
 @Injectable()
 export class TimelineService extends BaseService {
-  async getTimeBuckets(auth: AuthDto, dto: TimeBucketDto): Promise<TimeBucketsResponseDto[]> {
+  async getTimeBuckets(auth: AuthDto, dto: Partial<TimeBucketDto>): Promise<TimeBucketsResponseDto[]> {
     await this.timeBucketChecks(auth, dto);
     const timeBucketOptions = await this.buildTimeBucketOptions(auth, dto);
     return await this.assetRepository.getTimeBuckets(timeBucketOptions, auth);
   }
 
   // pre-jsonified response
-  async getTimeBucket(auth: AuthDto, dto: TimeBucketAssetDto): Promise<string> {
+  async getTimeBucket(
+    auth: AuthDto,
+    dto: Partial<TimeBucketAssetDto> & Pick<TimeBucketAssetDto, 'timeBucket'>,
+  ): Promise<string> {
     await this.timeBucketChecks(auth, dto);
-    const timeBucketOptions = await this.buildTimeBucketOptions(auth, { ...dto });
+    const bucketSize = dto.bucketSize ?? TimeBucketSize.Month;
+    const timeBucket = normalizeTimeBucketForBucketSize(dto.timeBucket, bucketSize);
+    const timeBucketOptions = await this.buildTimeBucketOptions(auth, { ...dto, bucketSize, timeBucket });
 
     // TODO: use id cursor for pagination
-    const bucket = await this.assetRepository.getTimeBucket(dto.timeBucket, timeBucketOptions, auth);
+    const bucket = await this.assetRepository.getTimeBucket(timeBucket, timeBucketOptions, auth);
     return bucket.assets;
   }
 
-  private async buildTimeBucketOptions(auth: AuthDto, dto: TimeBucketDto): Promise<TimeBucketOptions> {
+  private async buildTimeBucketOptions(
+    auth: AuthDto,
+    dto: Partial<TimeBucketDto> & { timeBucket?: string },
+  ): Promise<TimeBucketOptions & { bucketSize: TimeBucketSize }> {
     const { userId, personId, spacePersonId, tagId, type, ...options } = dto;
 
     // Normalize deprecated single-value fields to arrays
@@ -67,7 +76,7 @@ export class TimelineService extends BaseService {
 
     const scopedOptions = await this.resolveScopedPersonFilters(auth, { ...options, timelineSpaceIds });
 
-    return { ...scopedOptions, userIds };
+    return { ...scopedOptions, bucketSize: dto.bucketSize ?? TimeBucketSize.Month, userIds };
   }
 
   private async resolveScopedPersonFilters(auth: AuthDto, options: TimeBucketOptions): Promise<TimeBucketOptions> {
@@ -98,7 +107,7 @@ export class TimelineService extends BaseService {
     };
   }
 
-  private async timeBucketChecks(auth: AuthDto, dto: TimeBucketDto) {
+  private async timeBucketChecks(auth: AuthDto, dto: Partial<TimeBucketDto>) {
     if (dto.visibility === AssetVisibility.Locked) {
       requireElevatedPermission(auth);
     }

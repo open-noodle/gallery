@@ -9,11 +9,11 @@ import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/theme_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/constants.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/scrubber_segments.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/utils/debounce.dart';
-import 'package:intl/intl.dart' hide TextDirection;
 
 part 'scrubber.widget.freezed.dart';
 
@@ -36,6 +36,8 @@ class Scrubber extends ConsumerStatefulWidget {
 
   final bool snapToMonth;
 
+  final GroupAssetsBy groupBy;
+
   /// Whether an app bar is present, affects coordinate calculations
   final bool hasAppBar;
 
@@ -47,6 +49,7 @@ class Scrubber extends ConsumerStatefulWidget {
     this.bottomPadding = 0,
     this.monthSegmentSnappingOffset,
     this.snapToMonth = true,
+    this.groupBy = GroupAssetsBy.day,
     this.hasAppBar = true,
     required this.child,
   }) : assert(child.scrollDirection == Axis.vertical);
@@ -55,42 +58,12 @@ class Scrubber extends ConsumerStatefulWidget {
   ConsumerState createState() => ScrubberState();
 }
 
-List<_Segment> _buildSegments({required List<Segment> layoutSegments, required double timelineHeight}) {
-  const double offsetThreshold = 40.0;
-
-  final segments = <_Segment>[];
-  if (layoutSegments.isEmpty || layoutSegments.first.bucket is! TimeBucket) {
-    return [];
-  }
-
-  final formatter = DateFormat.yMMM();
-  DateTime? lastDate;
-  double lastOffset = -offsetThreshold;
-  for (final layoutSegment in layoutSegments) {
-    final scrollPercentage = layoutSegment.startOffset / layoutSegments.last.endOffset;
-    final startOffset = scrollPercentage * timelineHeight;
-
-    final date = (layoutSegment.bucket as TimeBucket).date;
-    final label = formatter.format(date);
-
-    final showSegment = lastOffset + offsetThreshold <= startOffset && (lastDate == null || date.year != lastDate.year);
-
-    segments.add(_Segment(date: date, startOffset: startOffset, scrollLabel: label, showSegment: showSegment));
-    lastDate = date;
-    if (showSegment) {
-      lastOffset = startOffset;
-    }
-  }
-
-  return segments;
-}
-
 class ScrubberState extends ConsumerState<Scrubber> with TickerProviderStateMixin {
   String? _lastLabel;
   double _thumbTopOffset = 0.0;
   bool _isDragging = false;
-  List<_Segment> _segments = [];
-  int _monthCount = 0;
+  List<ScrubberSegment> _segments = [];
+  int _snapSegmentCount = 0;
   DateTime? _currentScrubberDate;
   Debouncer? _scrubberDebouncer;
 
@@ -117,11 +90,15 @@ class ScrubberState extends ConsumerState<Scrubber> with TickerProviderStateMixi
   void initState() {
     super.initState();
     _isDragging = false;
-    _segments = _buildSegments(layoutSegments: widget.layoutSegments, timelineHeight: _scrubberHeight);
+    _segments = buildScrubberSegments(
+      layoutSegments: widget.layoutSegments,
+      timelineHeight: _scrubberHeight,
+      groupBy: widget.groupBy,
+    );
     _thumbAnimationController = AnimationController(vsync: this, duration: kTimelineScrubberFadeInDuration);
     _thumbAnimation = CurvedAnimation(parent: _thumbAnimationController, curve: Curves.fastEaseInToSlowEaseOut);
     _labelAnimationController = AnimationController(vsync: this, duration: kTimelineScrubberFadeInDuration);
-    _monthCount = getMonthCount();
+    _snapSegmentCount = getSnapSegmentCount();
 
     _labelAnimation = CurvedAnimation(parent: _labelAnimationController, curve: Curves.fastOutSlowIn);
   }
@@ -136,9 +113,21 @@ class ScrubberState extends ConsumerState<Scrubber> with TickerProviderStateMixi
   void didUpdateWidget(covariant Scrubber oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.layoutSegments.lastOrNull?.endOffset != widget.layoutSegments.lastOrNull?.endOffset) {
-      _segments = _buildSegments(layoutSegments: widget.layoutSegments, timelineHeight: _scrubberHeight);
-      _monthCount = getMonthCount();
+    final oldScrubberHeight = oldWidget.timelineHeight - oldWidget.topPadding - oldWidget.bottomPadding;
+    if (shouldRebuildScrubberSegments(
+      oldLayoutSegments: oldWidget.layoutSegments,
+      layoutSegments: widget.layoutSegments,
+      oldGroupBy: oldWidget.groupBy,
+      groupBy: widget.groupBy,
+      oldScrubberHeight: oldScrubberHeight,
+      scrubberHeight: _scrubberHeight,
+    )) {
+      _segments = buildScrubberSegments(
+        layoutSegments: widget.layoutSegments,
+        timelineHeight: _scrubberHeight,
+        groupBy: widget.groupBy,
+      );
+      _snapSegmentCount = getSnapSegmentCount();
     }
   }
 
@@ -159,8 +148,8 @@ class ScrubberState extends ConsumerState<Scrubber> with TickerProviderStateMixi
     });
   }
 
-  int getMonthCount() {
-    return _segments.map((e) => "${e.date.month}_${e.date.year}").toSet().length;
+  int getSnapSegmentCount() {
+    return countScrubberSnapSegments(widget.layoutSegments, widget.groupBy);
   }
 
   bool _onScrollNotification(ScrollNotification notification) {
@@ -241,13 +230,13 @@ class ScrubberState extends ConsumerState<Scrubber> with TickerProviderStateMixi
         _lastLabel = label;
 
         // Notify timeline state of the new scrubber date position
-        if (_monthCount >= kMinMonthsToEnableScrubberSnap) {
+        if (_snapSegmentCount >= kMinMonthsToEnableScrubberSnap) {
           _onScrubberDateChanged(nearestMonthSegment.date);
         }
       }
     }
 
-    if (_monthCount < kMinMonthsToEnableScrubberSnap || !widget.snapToMonth) {
+    if (_snapSegmentCount < kMinMonthsToEnableScrubberSnap || !widget.snapToMonth) {
       // If there are less than kMinMonthsToEnableScrubberSnap months, we don't need to snap to segments
       setState(() {
         _thumbTopOffset = dragPosition;
@@ -299,8 +288,8 @@ class ScrubberState extends ConsumerState<Scrubber> with TickerProviderStateMixi
   }
 
   /// Find the segment closest to the given position
-  _Segment? _findNearestMonthSegment(double position) {
-    _Segment? nearestSegment;
+  ScrubberSegment? _findNearestMonthSegment(double position) {
+    ScrubberSegment? nearestSegment;
     double minDistance = double.infinity;
 
     for (final segment in _segments) {
@@ -315,7 +304,7 @@ class ScrubberState extends ConsumerState<Scrubber> with TickerProviderStateMixi
   }
 
   /// Snap the scrubber thumb and scroll view to the given segment
-  void _snapToSegment(_Segment segment) {
+  void _snapToSegment(ScrubberSegment segment) {
     setState(() {
       _thumbTopOffset = segment.startOffset;
 
@@ -327,11 +316,8 @@ class ScrubberState extends ConsumerState<Scrubber> with TickerProviderStateMixi
     });
   }
 
-  int _findLayoutSegmentIndex(_Segment segment) {
-    return widget.layoutSegments.indexWhere((layoutSegment) {
-      final bucket = layoutSegment.bucket as TimeBucket;
-      return bucket.date.year == segment.date.year && bucket.date.month == segment.date.month;
-    });
+  int _findLayoutSegmentIndex(ScrubberSegment segment) {
+    return findScrubberLayoutSegmentIndex(widget.layoutSegments, segment, widget.groupBy);
   }
 
   void _scrollToLayoutSegment(int layoutSegmentIndex) {
@@ -412,7 +398,7 @@ class ScrubberState extends ConsumerState<Scrubber> with TickerProviderStateMixi
 }
 
 class _SegmentsLayer extends StatelessWidget {
-  final List<_Segment> segments;
+  final List<ScrubberSegment> segments;
   final double topPadding;
   final bool isDragging;
 
@@ -440,7 +426,7 @@ class _SegmentsLayer extends StatelessWidget {
 }
 
 class _SegmentWidget extends StatelessWidget {
-  final _Segment _segment;
+  final ScrubberSegment _segment;
 
   const _SegmentWidget(this._segment);
 
@@ -597,14 +583,4 @@ class _SlideFadeTransition extends StatelessWidget {
       ),
     );
   }
-}
-
-@freezed
-abstract class _Segment with _$Segment {
-  const factory _Segment({
-    required DateTime date,
-    required double startOffset,
-    required String scrollLabel,
-    @Default(false) bool showSegment,
-  }) = __Segment;
 }
