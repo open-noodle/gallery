@@ -1768,6 +1768,18 @@ export class SharedSpaceService extends BaseService {
       return JobStatus.Skipped;
     }
 
+    // Single-flight: at most one dedup chain per space. Only the initial trigger (pass 1) is gated —
+    // a follow-up (pass >= 2) IS the running chain and must continue. The bare initial jobId only
+    // de-duplicates triggers while pass 1 is in flight; once a chain advances to pass-scoped
+    // follow-ups the bare id frees, so without this guard the next external trigger (e.g. a bulk
+    // face-assign run) starts a parallel chain — doubling the work and reviving the
+    // removeOnComplete/stalled-recovery orphan race on the shared pass-scoped jobIds.
+    const pass = job.pass ?? 1;
+    if (pass === 1 && (await this.jobRepository.hasInFlightDedupChain(job.spaceId))) {
+      this.logger.debug(`Dedup skipped for space ${job.spaceId}: a dedup chain is already running`);
+      return JobStatus.Skipped;
+    }
+
     const { machineLearning } = await this.getConfig({ withCache: true });
     const maxDistance = machineLearning.facialRecognition.maxDistance;
 
@@ -1783,7 +1795,6 @@ export class SharedSpaceService extends BaseService {
     // the whole concurrency-1 FacialRecognition queue (core face recognition included). Each
     // invocation now does exactly ONE pass and re-queues a fresh, short follow-up when a merge
     // happened, carrying a pass counter that is capped to prevent a runaway chain.
-    const pass = job.pass ?? 1;
     const affectedIdentityIds = new Set<string>();
     let mergedAny = false;
 
