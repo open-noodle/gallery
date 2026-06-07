@@ -1,3 +1,9 @@
 source "https://rubygems.org"
 
 gem "fastlane"
+# fastlane loads every default action on startup, including ones backed by
+# google-apis-* -> representable/json, which requires multi_json without
+# declaring it. Newer googleauth/signet dropped multi_json too, so nothing
+# pulls it into the bundle. Pin it directly or `bundle exec fastlane` dies
+# with "multi_json is not part of the bundle".
+gem "multi_json"
