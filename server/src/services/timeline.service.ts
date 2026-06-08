@@ -1,6 +1,12 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { AuthDto } from 'src/dtos/auth.dto.js';
-import { TimeBucketAssetDto, TimeBucketDto, TimeBucketsResponseDto } from 'src/dtos/time-bucket.dto.js';
+import {
+  TimeBucketAssetDto,
+  TimeBucketCoverDto,
+  TimeBucketCoverResponseDto,
+  TimeBucketDto,
+  TimeBucketsResponseDto,
+} from 'src/dtos/time-bucket.dto.js';
 import { AssetVisibility, Permission, TimeBucketSize } from 'src/enum.js';
 import { TimeBucketOptions } from 'src/repositories/asset.repository.js';
 import { BaseService } from 'src/services/base.service.js';
@@ -14,6 +20,12 @@ export class TimelineService extends BaseService {
     await this.timeBucketChecks(auth, dto);
     const timeBucketOptions = await this.buildTimeBucketOptions(auth, dto);
     return await this.assetRepository.getTimeBuckets(timeBucketOptions, auth);
+  }
+
+  async getTimeBucketCovers(auth: AuthDto, dto: TimeBucketCoverDto): Promise<TimeBucketCoverResponseDto[]> {
+    await this.timeBucketChecks(auth, dto as Partial<TimeBucketDto>);
+    const timeBucketOptions = await this.buildTimeBucketOptions(auth, dto as Partial<TimeBucketDto>);
+    return this.assetRepository.getTimeBucketCovers({ ...timeBucketOptions, timeBuckets: dto.timeBuckets });
   }
 
   // pre-jsonified response

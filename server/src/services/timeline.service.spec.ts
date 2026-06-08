@@ -855,6 +855,26 @@ describe(TimelineService.name, () => {
     });
   });
 
+  describe('getTimeBucketCovers', () => {
+    it('runs access checks and forwards resolved options + buckets to the repository', async () => {
+      mocks.asset.getTimeBucketCovers.mockResolvedValue([]);
+
+      await sut.getTimeBucketCovers(authStub.user1, {
+        userId: 'user-id',
+        bucketSize: TimeBucketSize.Year,
+        timeBuckets: ['2024-01-01'],
+      });
+
+      expect(mocks.asset.getTimeBucketCovers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timeBuckets: ['2024-01-01'],
+          bucketSize: TimeBucketSize.Year,
+          userIds: ['user-id'],
+        }),
+      );
+    });
+  });
+
   describe('takenAfter / takenBefore date range filtering', () => {
     it('should pass takenAfter to time bucket options for getTimeBuckets', async () => {
       mocks.asset.getTimeBuckets.mockResolvedValue([]);

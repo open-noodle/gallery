@@ -101,7 +101,7 @@ class TimelineGroupingSelector extends ConsumerWidget {
   }
 }
 
-class _TimelineGroupingCompactSelector extends StatelessWidget {
+class _TimelineGroupingCompactSelector extends StatefulWidget {
   const _TimelineGroupingCompactSelector({required this.selected, required this.enabled, required this.onSelected});
 
   final GroupAssetsBy selected;
@@ -109,67 +109,58 @@ class _TimelineGroupingCompactSelector extends StatelessWidget {
   final Future<void> Function(GroupAssetsBy groupBy) onSelected;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final label = _compactLabel(context, selected);
-    final foreground = enabled ? colors.onPrimary : colors.onSurface.withValues(alpha: 0.5);
+  State<_TimelineGroupingCompactSelector> createState() => _TimelineGroupingCompactSelectorState();
+}
 
-    return Semantics(
-      key: const Key('timeline-grouping-compact-selector'),
-      container: true,
-      button: true,
-      enabled: enabled,
-      label: _translated('timeline_grouping_selector', 'Timeline grouping'),
-      value: label,
-      onTap: enabled ? () => unawaited(_selectNext()) : null,
-      onLongPress: enabled ? () => unawaited(_showMenu(context)) : null,
-      child: ExcludeSemantics(
-        child: Opacity(
-          opacity: enabled ? 1 : 0.45,
-          child: SizedBox(
-            width: TimelineGroupingSelector._compactWidth,
-            height: TimelineGroupingSelector._compactHeight,
-            child: Material(
-              color: enabled ? colors.primary : colors.surfaceContainerHighest,
-              shape: StadiumBorder(
-                side: BorderSide(
-                  color: enabled
-                      ? colors.primary.withValues(alpha: 0.42)
-                      : colors.outlineVariant.withValues(alpha: 0.7),
-                ),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: enabled ? () => unawaited(_selectNext()) : null,
-                onLongPress: enabled ? () => unawaited(_showMenu(context)) : null,
-                borderRadius: BorderRadius.circular(999),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Center(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.clip,
-                      softWrap: false,
-                      style: theme.textTheme.labelLarge?.copyWith(color: foreground, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+class _TimelineGroupingCompactSelectorState extends State<_TimelineGroupingCompactSelector> {
+  // Direction the next tap moves: true = toward Day (zoom in), false = toward Year (zoom out).
+  bool _zoomingIn = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncDirectionAtExtreme(widget.selected);
+  }
+
+  @override
+  void didUpdateWidget(_TimelineGroupingCompactSelector oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selected != widget.selected) {
+      _syncDirectionAtExtreme(widget.selected);
+    }
+  }
+
+  // At the extremes the direction is forced; in the middle (Month) keep whatever it was.
+  void _syncDirectionAtExtreme(GroupAssetsBy selected) {
+    switch (selected) {
+      case GroupAssetsBy.year:
+        _zoomingIn = true;
+      case GroupAssetsBy.month:
+        break;
+      case GroupAssetsBy.day || GroupAssetsBy.auto || GroupAssetsBy.none:
+        _zoomingIn = false;
+    }
   }
 
   Future<void> _selectNext() async {
-    await onSelected(switch (selected) {
-      GroupAssetsBy.year => GroupAssetsBy.month,
-      GroupAssetsBy.month => GroupAssetsBy.day,
-      GroupAssetsBy.day || GroupAssetsBy.auto || GroupAssetsBy.none => GroupAssetsBy.year,
-    });
+    final GroupAssetsBy next;
+    switch (widget.selected) {
+      case GroupAssetsBy.year:
+        next = GroupAssetsBy.month;
+        _zoomingIn = true;
+      case GroupAssetsBy.month:
+        if (_zoomingIn) {
+          next = GroupAssetsBy.day;
+          _zoomingIn = false; // just arrived at the zoom-in extreme (Day)
+        } else {
+          next = GroupAssetsBy.year;
+          _zoomingIn = true; // just arrived at the zoom-out extreme (Year)
+        }
+      case GroupAssetsBy.day || GroupAssetsBy.auto || GroupAssetsBy.none:
+        next = GroupAssetsBy.month;
+        _zoomingIn = false;
+    }
+    await widget.onSelected(next);
   }
 
   Future<void> _showMenu(BuildContext context) async {
@@ -191,8 +182,64 @@ class _TimelineGroupingCompactSelector extends StatelessWidget {
     );
 
     if (selectedGroupBy != null && context.mounted) {
-      await onSelected(selectedGroupBy);
+      await widget.onSelected(selectedGroupBy);
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final label = _compactLabel(context, widget.selected);
+    final foreground = widget.enabled ? colors.onPrimary : colors.onSurface.withValues(alpha: 0.5);
+
+    return Semantics(
+      key: const Key('timeline-grouping-compact-selector'),
+      container: true,
+      button: true,
+      enabled: widget.enabled,
+      label: _translated('timeline_grouping_selector', 'Timeline grouping'),
+      value: label,
+      onTap: widget.enabled ? () => unawaited(_selectNext()) : null,
+      onLongPress: widget.enabled ? () => unawaited(_showMenu(context)) : null,
+      child: ExcludeSemantics(
+        child: Opacity(
+          opacity: widget.enabled ? 1 : 0.45,
+          child: SizedBox(
+            width: TimelineGroupingSelector._compactWidth,
+            height: TimelineGroupingSelector._compactHeight,
+            child: Material(
+              color: widget.enabled ? colors.primary : colors.surfaceContainerHighest,
+              shape: StadiumBorder(
+                side: BorderSide(
+                  color: widget.enabled
+                      ? colors.primary.withValues(alpha: 0.42)
+                      : colors.outlineVariant.withValues(alpha: 0.7),
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: widget.enabled ? () => unawaited(_selectNext()) : null,
+                onLongPress: widget.enabled ? () => unawaited(_showMenu(context)) : null,
+                borderRadius: BorderRadius.circular(999),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Center(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.clip,
+                      softWrap: false,
+                      style: theme.textTheme.labelLarge?.copyWith(color: foreground, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

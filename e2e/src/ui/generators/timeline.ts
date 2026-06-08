@@ -15,6 +15,7 @@ export {
   getAlbum,
   getAsset,
   getTimeBucket,
+  getTimeBucketCovers,
   getTimeBuckets,
   toAssetResponseDto,
   toColumnarFormat,
