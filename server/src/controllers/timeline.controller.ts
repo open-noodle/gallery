@@ -2,7 +2,13 @@ import { Controller, Get, Header, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
-import { TimeBucketAssetDto, TimeBucketAssetResponseDto, TimeBucketDto } from 'src/dtos/time-bucket.dto';
+import {
+  TimeBucketAssetDto,
+  TimeBucketAssetResponseDto,
+  TimeBucketCoverDto,
+  TimeBucketCoverResponseDto,
+  TimeBucketDto,
+} from 'src/dtos/time-bucket.dto';
 import { ApiTag, Permission } from 'src/enum';
 import { Auth, Authenticated } from 'src/middleware/auth.guard';
 import { TimelineService } from 'src/services/timeline.service';
@@ -34,5 +40,17 @@ export class TimelineController {
   })
   getTimeBucket(@Auth() auth: AuthDto, @Query() dto: TimeBucketAssetDto) {
     return this.service.getTimeBucket(auth, dto);
+  }
+
+  @Get('bucket-covers')
+  @Authenticated({ permission: Permission.AssetRead, sharedLink: true })
+  @ApiOkResponse({ type: [TimeBucketCoverResponseDto] })
+  @Endpoint({
+    summary: 'Get time bucket covers',
+    description: 'Resolve representative cover assets for the requested time buckets.',
+    history: new HistoryBuilder().added('v1').internal('v1'),
+  })
+  getTimeBucketCovers(@Auth() auth: AuthDto, @Query() dto: TimeBucketCoverDto) {
+    return this.service.getTimeBucketCovers(auth, dto);
   }
 }

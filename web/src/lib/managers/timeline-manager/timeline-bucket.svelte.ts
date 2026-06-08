@@ -51,13 +51,9 @@ export function aggregateDayBucketsByMonth(
   for (const bucket of timeBuckets) {
     const timeBucket = getMonthBucket(bucket.timeBucket);
     const existing = months.get(timeBucket);
-    const representativeSource = existing?.representativeAssetId ? existing : bucket;
     months.set(timeBucket, {
       timeBucket,
       count: (existing?.count ?? 0) + bucket.count,
-      representativeAssetId: representativeSource.representativeAssetId,
-      representativeThumbhash: representativeSource.representativeThumbhash,
-      representativeRatio: representativeSource.representativeRatio,
     });
   }
 
@@ -79,9 +75,9 @@ export class TimelineBucket {
   readonly grouping: TimelineGrouping;
   readonly timeBucket: string;
   readonly count: number;
-  readonly representativeAssetId: string | null;
-  readonly representativeThumbhash: string | null;
-  readonly representativeRatio: number | null;
+  representativeAssetId = $state<string | null>(null);
+  representativeThumbhash = $state<string | null>(null);
+  representativeRatio = $state<number | null>(null);
   readonly date: TimelineBucketDate;
   readonly isLoaded = true;
   readonly height = REPRESENTATIVE_TIMELINE_BUCKET_HEIGHT;
@@ -94,10 +90,17 @@ export class TimelineBucket {
     this.grouping = grouping;
     this.timeBucket = timeBucket.timeBucket;
     this.count = timeBucket.count;
-    this.representativeAssetId = timeBucket.representativeAssetId ?? null;
-    this.representativeThumbhash = timeBucket.representativeThumbhash ?? null;
-    this.representativeRatio = timeBucket.representativeRatio ?? null;
     this.date = getBucketDate(grouping, timeBucket.timeBucket);
+  }
+
+  setRepresentative(cover: {
+    representativeAssetId: string | null;
+    representativeThumbhash: string | null;
+    representativeRatio: number | null;
+  }) {
+    this.representativeAssetId = cover.representativeAssetId;
+    this.representativeThumbhash = cover.representativeThumbhash;
+    this.representativeRatio = cover.representativeRatio;
   }
 
   get viewId() {

@@ -3096,6 +3096,15 @@ export type TimeBucketAssetResponseDto = {
     /** Array of visibility statuses for each asset (e.g., ARCHIVE, TIMELINE, HIDDEN, LOCKED) */
     visibility: AssetVisibility[];
 };
+export type TimeBucketCoverResponseDto = {
+    /** Representative asset ID for this bucket */
+    representativeAssetId: string | null;
+    /** Representative asset width/height ratio */
+    representativeRatio: number | null;
+    /** Representative asset thumbhash, base64 encoded */
+    representativeThumbhash: string | null;
+    timeBucket: string;
+};
 export type TrashResponseDto = {
     /** Number of items in trash */
     count: number;
@@ -7398,6 +7407,83 @@ export function getTimeBucket({ albumId, bbox, city, country, isFavorite, isTras
         takenAfter,
         takenBefore,
         timeBucket,
+        "type": $type,
+        userId,
+        visibility,
+        withCoordinates,
+        withPartners,
+        withSharedSpaces,
+        withStacked
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Get time bucket covers
+ */
+export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, isFavorite, isNotInAlbum, isTrashed, key, make, model, order, orderBy, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, timeBuckets, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+    albumId?: string;
+    bbox?: string;
+    bucketSize?: TimeBucketSize;
+    city?: string;
+    country?: string;
+    isFavorite?: boolean;
+    isNotInAlbum?: boolean;
+    isTrashed?: boolean;
+    key?: string;
+    make?: string;
+    model?: string;
+    order?: AssetOrder;
+    orderBy?: AssetOrderBy;
+    personId?: string;
+    personIds?: string[];
+    rating?: number;
+    slug?: string;
+    spaceId?: string;
+    spacePersonId?: string;
+    spacePersonIds?: string[];
+    tagId?: string;
+    tagIds?: string[];
+    takenAfter?: string;
+    takenBefore?: string;
+    timeBuckets: string[];
+    $type?: AssetTypeEnum;
+    userId?: string;
+    visibility?: AssetVisibility;
+    withCoordinates?: boolean;
+    withPartners?: boolean;
+    withSharedSpaces?: boolean;
+    withStacked?: boolean;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: TimeBucketCoverResponseDto[];
+    }>(`/timeline/bucket-covers${QS.query(QS.explode({
+        albumId,
+        bbox,
+        bucketSize,
+        city,
+        country,
+        isFavorite,
+        isNotInAlbum,
+        isTrashed,
+        key,
+        make,
+        model,
+        order,
+        orderBy,
+        personId,
+        personIds,
+        rating,
+        slug,
+        spaceId,
+        spacePersonId,
+        spacePersonIds,
+        tagId,
+        tagIds,
+        takenAfter,
+        takenBefore,
+        timeBuckets,
         "type": $type,
         userId,
         visibility,
