@@ -170,6 +170,7 @@ vi.mock('$lib/managers/timeline-manager/timeline-manager.svelte', () => ({
         testState.scrollTop = top;
       }
     });
+    loadCoversForBuckets = vi.fn(() => Promise.resolve());
     loadTimelineMonth = vi.fn();
     getTimelineMonthByAssetId = vi.fn();
     findTimelineMonthForAsset = vi.fn();
