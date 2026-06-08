@@ -53,7 +53,11 @@ class SpaceCard extends StatelessWidget {
                     ),
                   // Member avatar stack
                   if ((space.members.value ?? const []).isNotEmpty)
-                    Positioned(bottom: 8, right: 8, child: _MemberAvatarStack(members: space.members.value ?? const [])),
+                    Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: _MemberAvatarStack(members: space.members.value ?? const []),
+                    ),
                 ],
               );
             },
