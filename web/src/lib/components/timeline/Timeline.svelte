@@ -743,6 +743,7 @@
         locale={$lang}
         disabled={isSelectionMode || assetInteraction.selectionActive}
         {onTimelineBucketActivate}
+        onRequestCovers={(timeBuckets) => void timelineManager.loadCoversForBuckets(timeBuckets)}
       />
     {:else}
       {#each timelineManager.months as timelineMonth (timelineMonth.viewId)}
