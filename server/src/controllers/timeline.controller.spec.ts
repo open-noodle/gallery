@@ -110,4 +110,35 @@ describe(TimelineController.name, () => {
       expect(body).toEqual(errorDto.badRequest('Invalid time bucket format'));
     });
   });
+
+  describe('GET /timeline/bucket-covers', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).get('/timeline/bucket-covers');
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('passes timeBuckets array to the service', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .get('/timeline/bucket-covers')
+        .query({ timeBuckets: ['2024-01-01', '2024-02-01'] });
+
+      expect(status).toBe(200);
+      expect(service.getTimeBucketCovers).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({ timeBuckets: ['2024-01-01', '2024-02-01'] }),
+      );
+    });
+
+    it('wraps a single timeBuckets value in an array', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .get('/timeline/bucket-covers')
+        .query({ timeBuckets: '2024-01-01' });
+
+      expect(status).toBe(200);
+      expect(service.getTimeBucketCovers).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({ timeBuckets: ['2024-01-01'] }),
+      );
+    });
+  });
 });

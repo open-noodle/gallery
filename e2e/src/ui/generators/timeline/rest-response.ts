@@ -12,6 +12,7 @@ import {
   type AssetResponseDto,
   type ExifResponseDto,
   type TimeBucketAssetResponseDto,
+  type TimeBucketCoverResponseDto,
   type TimeBucketsResponseDto,
   type UserResponseDto,
 } from '@immich/sdk';
@@ -227,14 +228,10 @@ export function getTimeBuckets(
 
     const timeBucket = getBucketKey(bucketKey, bucketSize);
     const existing = summaryByBucket.get(timeBucket);
-    const representative = existing?.representativeAssetId ? undefined : filteredAssets[0];
 
     summaryByBucket.set(timeBucket, {
       timeBucket,
       count: (existing?.count ?? 0) + filteredAssets.length,
-      representativeAssetId: existing?.representativeAssetId ?? representative?.id ?? null,
-      representativeThumbhash: existing?.representativeThumbhash ?? representative?.thumbhash ?? null,
-      representativeRatio: existing?.representativeRatio ?? representative?.ratio ?? null,
     });
   }
 
@@ -301,6 +298,59 @@ export function getTimeBuckets(
   });
 
   return summary;
+}
+
+/**
+ * Return representative cover metadata for the requested buckets (mimics GET /timeline/bucket-covers).
+ * Picks filteredAssets[0] per bucket as the representative, reusing the same asset-filter logic as
+ * getTimeBuckets so the cover is always drawn from the filtered scope.
+ */
+export function getTimeBucketCovers(
+  timelineData: MockTimelineData,
+  changes: Changes,
+  bucketSize: TimeBucketSize = TimeBucketSize.Month,
+  requestedBuckets: string[] = [],
+): TimeBucketCoverResponseDto[] {
+  if (requestedBuckets.length === 0) {
+    return [];
+  }
+
+  const requestedSet = new Set(requestedBuckets);
+  const deletedAssetIds = new Set(changes.assetDeletions);
+  const archivedAssetIds = new Set(changes.assetArchivals);
+  const favoritedAssetIds = new Set(changes.assetFavorites);
+
+  const coversByBucket = new Map<string, TimeBucketCoverResponseDto>();
+
+  for (const [bucketKey, assets] of timelineData.buckets) {
+    const timeBucket = getBucketKey(bucketKey, bucketSize);
+    if (!requestedSet.has(timeBucket)) {
+      continue;
+    }
+
+    if (coversByBucket.has(timeBucket)) {
+      // Cover already picked for this bucket (multiple raw buckets map to the same coarser key)
+      continue;
+    }
+
+    const filteredAssets = assets.filter((asset) =>
+      shouldIncludeAsset(asset, undefined, undefined, undefined, deletedAssetIds, archivedAssetIds, favoritedAssetIds),
+    );
+
+    if (filteredAssets.length === 0) {
+      continue;
+    }
+
+    const representative = filteredAssets[0];
+    coversByBucket.set(timeBucket, {
+      timeBucket,
+      representativeAssetId: representative.id,
+      representativeThumbhash: representative.thumbhash,
+      representativeRatio: representative.ratio,
+    });
+  }
+
+  return [...coversByBucket.values()];
 }
 
 const createDefaultOwner = (ownerId: string) => {
