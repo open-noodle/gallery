@@ -161,8 +161,8 @@ describe(AssetRepository.name, () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
 
-      const start = await createTimelineAsset(ctx, user.id, new Date('2024-01-10T00:00:00.000Z'));
-      const end = await createTimelineAsset(ctx, user.id, new Date('2024-01-20T00:00:00.000Z'));
+      await createTimelineAsset(ctx, user.id, new Date('2024-01-10T00:00:00.000Z'));
+      await createTimelineAsset(ctx, user.id, new Date('2024-01-20T00:00:00.000Z'));
       await createTimelineAsset(ctx, user.id, new Date('2024-01-20T00:00:01.000Z'));
 
       await expect(
@@ -174,23 +174,25 @@ describe(AssetRepository.name, () => {
           takenBefore: '2024-01-20T00:00:00.000Z',
           order: AssetOrder.Asc,
         }),
-      ).resolves.toEqual([expect.objectContaining({ count: 2, representativeAssetId: start.id })]);
+      ).resolves.toEqual([expect.objectContaining({ count: 2 })]);
 
-      await expect(
-        sut.getTimeBuckets({
-          userIds: [user.id],
-          visibility: AssetVisibility.Timeline,
-          bucketSize: TimeBucketSize.Day,
-          takenAfter: '2024-01-10T00:00:00.000Z',
-          takenBefore: '2024-01-20T00:00:00.000Z',
-        }),
-      ).resolves.toEqual([
-        expect.objectContaining({ timeBucket: '2024-01-20', count: 1, representativeAssetId: end.id }),
-        expect.objectContaining({ timeBucket: '2024-01-10', count: 1, representativeAssetId: start.id }),
+      const result = await sut.getTimeBuckets({
+        userIds: [user.id],
+        visibility: AssetVisibility.Timeline,
+        bucketSize: TimeBucketSize.Day,
+        takenAfter: '2024-01-10T00:00:00.000Z',
+        takenBefore: '2024-01-20T00:00:00.000Z',
+      });
+      expect(result).toEqual([
+        expect.objectContaining({ timeBucket: '2024-01-20', count: 1 }),
+        expect.objectContaining({ timeBucket: '2024-01-10', count: 1 }),
       ]);
+      expect(result[0]).not.toHaveProperty('representativeAssetId');
+      expect(result[0]).not.toHaveProperty('representativeThumbhash');
+      expect(result[0]).not.toHaveProperty('representativeRatio');
     });
 
-    it('selects representatives from the same filtered scope as the count', async () => {
+    it('scoped filters apply correctly to bucket counts', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
 
@@ -223,56 +225,47 @@ describe(AssetRepository.name, () => {
         rating: 2,
       });
 
-      await expect(
-        sut.getTimeBuckets({
-          userIds: [user.id],
-          visibility: AssetVisibility.Timeline,
-          bucketSize: TimeBucketSize.Year,
-          isFavorite: true,
-          city: 'Berlin',
-          country: 'Germany',
-          make: 'Canon',
-          model: 'R5',
-          rating: 4,
-        }),
-      ).resolves.toEqual([
-        expect.objectContaining({
-          count: 1,
-          representativeAssetId: matching.id,
-          representativeThumbhash: Buffer.from('favorite').toString('base64'),
-        }),
-      ]);
+      const result = await sut.getTimeBuckets({
+        userIds: [user.id],
+        visibility: AssetVisibility.Timeline,
+        bucketSize: TimeBucketSize.Year,
+        isFavorite: true,
+        city: 'Berlin',
+        country: 'Germany',
+        make: 'Canon',
+        model: 'R5',
+        rating: 4,
+      });
+      expect(result).toEqual([expect.objectContaining({ count: 1 })]);
+      // representative fields must not appear on getTimeBuckets results
+      expect(result[0]).not.toHaveProperty('representativeAssetId');
+      expect(result[0]).not.toHaveProperty('representativeThumbhash');
+      expect(result[0]).not.toHaveProperty('representativeRatio');
     });
 
-    it('uses the same representative ordering as the bucket asset endpoint', async () => {
+    it('returns only timeBucket and count fields (no representative fields)', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
-      const auth = factory.auth({ user: { id: user.id } });
 
-      const laterTimeEarlierCreated = await createTimelineAsset(ctx, user.id, new Date('2024-07-01T23:00:00.000Z'), {
+      await createTimelineAsset(ctx, user.id, new Date('2024-07-01T23:00:00.000Z'), {
         fileCreatedAt: new Date('2024-07-01T10:00:00.000Z'),
       });
-      const earlierTimeLaterCreated = await createTimelineAsset(ctx, user.id, new Date('2024-07-01T01:00:00.000Z'), {
+      await createTimelineAsset(ctx, user.id, new Date('2024-07-01T01:00:00.000Z'), {
         fileCreatedAt: new Date('2024-07-01T20:00:00.000Z'),
       });
 
-      await expect(
-        sut.getTimeBuckets({
-          userIds: [user.id],
-          visibility: AssetVisibility.Timeline,
-          bucketSize: TimeBucketSize.Month,
-        }),
-      ).resolves.toEqual([expect.objectContaining({ representativeAssetId: earlierTimeLaterCreated.id, count: 2 })]);
-
-      const bucket = await sut.getTimeBucket(
-        '2024-07-01',
-        { userIds: [user.id], visibility: AssetVisibility.Timeline, bucketSize: TimeBucketSize.Month },
-        auth,
-      );
-      expect(JSON.parse(bucket.assets).id).toEqual([earlierTimeLaterCreated.id, laterTimeEarlierCreated.id]);
+      const result = await sut.getTimeBuckets({
+        userIds: [user.id],
+        visibility: AssetVisibility.Timeline,
+        bucketSize: TimeBucketSize.Month,
+      });
+      expect(result).toEqual([expect.objectContaining({ timeBucket: '2024-07-01', count: 2 })]);
+      expect(result[0]).not.toHaveProperty('representativeAssetId');
+      expect(result[0]).not.toHaveProperty('representativeThumbhash');
+      expect(result[0]).not.toHaveProperty('representativeRatio');
     });
 
-    it('applies bbox filtering to counts and representative selection', async () => {
+    it('applies bbox filtering to counts', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
 
@@ -290,7 +283,7 @@ describe(AssetRepository.name, () => {
           bucketSize: TimeBucketSize.Year,
           bbox: { west: 13.3, south: 52.4, east: 13.5, north: 52.6 },
         }),
-      ).resolves.toEqual([expect.objectContaining({ count: 1, representativeAssetId: inside.id })]);
+      ).resolves.toEqual([expect.objectContaining({ count: 1 })]);
     });
 
     it('counts space assets from direct and library paths without double-counting', async () => {
@@ -302,7 +295,7 @@ describe(AssetRepository.name, () => {
       const directAndLibrary = await createTimelineAsset(ctx, user.id, new Date('2024-04-01T12:00:00.000Z'), {
         libraryId: library.id,
       });
-      const libraryOnly = await createTimelineAsset(ctx, user.id, new Date('2024-04-02T12:00:00.000Z'), {
+      await createTimelineAsset(ctx, user.id, new Date('2024-04-02T12:00:00.000Z'), {
         libraryId: library.id,
       });
       await createTimelineAsset(ctx, user.id, new Date('2024-04-03T12:00:00.000Z'));
@@ -320,8 +313,8 @@ describe(AssetRepository.name, () => {
       await expect(
         sut.getTimeBuckets({ spaceId: space.id, visibility: AssetVisibility.Timeline, bucketSize: TimeBucketSize.Day }),
       ).resolves.toEqual([
-        expect.objectContaining({ timeBucket: '2024-04-02', count: 1, representativeAssetId: libraryOnly.id }),
-        expect.objectContaining({ timeBucket: '2024-04-01', count: 1, representativeAssetId: directAndLibrary.id }),
+        expect.objectContaining({ timeBucket: '2024-04-02', count: 1 }),
+        expect.objectContaining({ timeBucket: '2024-04-01', count: 1 }),
       ]);
     });
 
@@ -329,13 +322,13 @@ describe(AssetRepository.name, () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
 
-      const archived = await createTimelineAsset(ctx, user.id, new Date('2024-05-01T12:00:00.000Z'), {
+      await createTimelineAsset(ctx, user.id, new Date('2024-05-01T12:00:00.000Z'), {
         visibility: AssetVisibility.Archive,
       });
-      const locked = await createTimelineAsset(ctx, user.id, new Date('2024-06-01T12:00:00.000Z'), {
+      await createTimelineAsset(ctx, user.id, new Date('2024-06-01T12:00:00.000Z'), {
         visibility: AssetVisibility.Locked,
       });
-      const trashed = await createTimelineAsset(ctx, user.id, new Date('2024-07-01T12:00:00.000Z'), {
+      await createTimelineAsset(ctx, user.id, new Date('2024-07-01T12:00:00.000Z'), {
         deletedAt: new Date('2024-07-02T00:00:00.000Z'),
       });
 
@@ -345,7 +338,7 @@ describe(AssetRepository.name, () => {
           visibility: AssetVisibility.Archive,
           bucketSize: TimeBucketSize.Year,
         }),
-      ).resolves.toEqual([expect.objectContaining({ representativeAssetId: archived.id, count: 1 })]);
+      ).resolves.toEqual([expect.objectContaining({ count: 1 })]);
 
       await expect(
         sut.getTimeBuckets({
@@ -353,7 +346,7 @@ describe(AssetRepository.name, () => {
           visibility: AssetVisibility.Locked,
           bucketSize: TimeBucketSize.Month,
         }),
-      ).resolves.toEqual([expect.objectContaining({ representativeAssetId: locked.id, count: 1 })]);
+      ).resolves.toEqual([expect.objectContaining({ count: 1 })]);
 
       await expect(
         sut.getTimeBuckets({
@@ -362,7 +355,7 @@ describe(AssetRepository.name, () => {
           bucketSize: TimeBucketSize.Day,
           isTrashed: true,
         }),
-      ).resolves.toEqual([expect.objectContaining({ representativeAssetId: trashed.id, count: 1 })]);
+      ).resolves.toEqual([expect.objectContaining({ count: 1 })]);
     });
 
     it('filters by video type, album, tag, and stacked state', async () => {
@@ -391,13 +384,13 @@ describe(AssetRepository.name, () => {
       };
 
       await expect(sut.getTimeBuckets({ ...commonOptions, assetType: AssetType.Video })).resolves.toEqual([
-        expect.objectContaining({ representativeAssetId: stacked.id, count: 2 }),
+        expect.objectContaining({ count: 2 }),
       ]);
       await expect(sut.getTimeBuckets({ ...commonOptions, albumId: album.id })).resolves.toEqual([
-        expect.objectContaining({ representativeAssetId: primary.id, count: 1 }),
+        expect.objectContaining({ count: 1 }),
       ]);
       await expect(sut.getTimeBuckets({ ...commonOptions, tagIds: [tag.id] })).resolves.toEqual([
-        expect.objectContaining({ representativeAssetId: primary.id, count: 1 }),
+        expect.objectContaining({ count: 1 }),
       ]);
       await expect(sut.getTimeBuckets({ ...commonOptions, withStacked: true })).resolves.toEqual([
         expect.objectContaining({ count: 2 }),
@@ -448,7 +441,7 @@ describe(AssetRepository.name, () => {
           bucketSize: TimeBucketSize.Year,
           personIds: [person.id],
         }),
-      ).resolves.toEqual([expect.objectContaining({ count: 2, representativeAssetId: identityAsset.id })]);
+      ).resolves.toEqual([expect.objectContaining({ count: 2 })]);
 
       await expect(
         sut.getTimeBuckets({
@@ -457,7 +450,7 @@ describe(AssetRepository.name, () => {
           bucketSize: TimeBucketSize.Month,
           identityIds: [identity.id],
         }),
-      ).resolves.toEqual([expect.objectContaining({ representativeAssetId: identityAsset.id, count: 1 })]);
+      ).resolves.toEqual([expect.objectContaining({ count: 1 })]);
 
       await expect(
         sut.getTimeBuckets({
@@ -466,7 +459,7 @@ describe(AssetRepository.name, () => {
           bucketSize: TimeBucketSize.Day,
           spacePersonIds: [spacePerson.id],
         }),
-      ).resolves.toEqual([expect.objectContaining({ representativeAssetId: spacePersonAsset.id, count: 1 })]);
+      ).resolves.toEqual([expect.objectContaining({ count: 1 })]);
     });
 
     it('includes owner and shared-space timeline assets when timeline space ids are supplied', async () => {
@@ -475,7 +468,7 @@ describe(AssetRepository.name, () => {
       const { user: otherUser } = await ctx.newUser();
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
 
-      const ownAsset = await createTimelineAsset(ctx, user.id, new Date('2024-12-01T12:00:00.000Z'));
+      await createTimelineAsset(ctx, user.id, new Date('2024-12-01T12:00:00.000Z'));
       const sharedAsset = await createTimelineAsset(ctx, otherUser.id, new Date('2024-12-02T12:00:00.000Z'));
       await createTimelineAsset(ctx, otherUser.id, new Date('2024-12-03T12:00:00.000Z'));
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: sharedAsset.id, addedById: user.id });
@@ -487,7 +480,7 @@ describe(AssetRepository.name, () => {
           visibility: AssetVisibility.Timeline,
           bucketSize: TimeBucketSize.Year,
         }),
-      ).resolves.toEqual([expect.objectContaining({ representativeAssetId: sharedAsset.id, count: 2 })]);
+      ).resolves.toEqual([expect.objectContaining({ count: 2 })]);
 
       await expect(
         sut.getTimeBuckets({
@@ -495,7 +488,7 @@ describe(AssetRepository.name, () => {
           visibility: AssetVisibility.Timeline,
           bucketSize: TimeBucketSize.Day,
         }),
-      ).resolves.toEqual([expect.objectContaining({ representativeAssetId: ownAsset.id, count: 1 })]);
+      ).resolves.toEqual([expect.objectContaining({ count: 1 })]);
     });
 
     it.each([TimeBucketSize.Year, TimeBucketSize.Month, TimeBucketSize.Day])(
@@ -518,6 +511,177 @@ describe(AssetRepository.name, () => {
         ).resolves.toEqual([]);
       },
     );
+  });
+
+  describe('getTimeBucketCovers', () => {
+    it('returns an empty list without querying when no buckets are requested', async () => {
+      const { sut } = setup();
+
+      await expect(sut.getTimeBucketCovers({ timeBuckets: [] })).resolves.toEqual([]);
+      await expect(sut.getTimeBucketCovers({})).resolves.toEqual([]);
+    });
+
+    it('picks the latest asset per requested year bucket for descending order', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      await createTimelineAsset(ctx, user.id, new Date('2023-02-01T12:00:00.000Z'), {
+        thumbhash: Buffer.from('older-2023'),
+      });
+      const newer2023 = await createTimelineAsset(ctx, user.id, new Date('2023-11-15T12:00:00.000Z'), {
+        thumbhash: Buffer.from('newer-2023'),
+      });
+      const only2024 = await createTimelineAsset(ctx, user.id, new Date('2024-06-01T12:00:00.000Z'), {
+        thumbhash: Buffer.from('only-2024'),
+      });
+
+      await expect(
+        sut.getTimeBucketCovers({
+          userIds: [user.id],
+          visibility: AssetVisibility.Timeline,
+          bucketSize: TimeBucketSize.Year,
+          order: AssetOrder.Desc,
+          timeBuckets: ['2023-01-01', '2024-01-01'],
+        }),
+      ).resolves.toEqual([
+        {
+          timeBucket: '2024-01-01',
+          representativeAssetId: only2024.id,
+          representativeThumbhash: Buffer.from('only-2024').toString('base64'),
+          representativeRatio: 2,
+        },
+        {
+          timeBucket: '2023-01-01',
+          representativeAssetId: newer2023.id,
+          representativeThumbhash: Buffer.from('newer-2023').toString('base64'),
+          representativeRatio: 2,
+        },
+      ]);
+    });
+
+    it('picks the earliest asset per requested year bucket for ascending order', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const older2023 = await createTimelineAsset(ctx, user.id, new Date('2023-02-01T12:00:00.000Z'), {
+        thumbhash: Buffer.from('older-2023'),
+      });
+      await createTimelineAsset(ctx, user.id, new Date('2023-11-15T12:00:00.000Z'), {
+        thumbhash: Buffer.from('newer-2023'),
+      });
+
+      await expect(
+        sut.getTimeBucketCovers({
+          userIds: [user.id],
+          visibility: AssetVisibility.Timeline,
+          bucketSize: TimeBucketSize.Year,
+          order: AssetOrder.Asc,
+          timeBuckets: ['2023-01-01'],
+        }),
+      ).resolves.toEqual([
+        {
+          timeBucket: '2023-01-01',
+          representativeAssetId: older2023.id,
+          representativeThumbhash: Buffer.from('older-2023').toString('base64'),
+          representativeRatio: 2,
+        },
+      ]);
+    });
+
+    it('uses fileCreatedAt as a tie-break, matching the bucket representative pick', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const laterTimeEarlierCreated = await createTimelineAsset(ctx, user.id, new Date('2024-07-01T23:00:00.000Z'), {
+        fileCreatedAt: new Date('2024-07-01T10:00:00.000Z'),
+      });
+      const earlierTimeLaterCreated = await createTimelineAsset(ctx, user.id, new Date('2024-07-01T01:00:00.000Z'), {
+        fileCreatedAt: new Date('2024-07-01T20:00:00.000Z'),
+      });
+
+      // Same day in DESC: latest localDate ties (both 2024-07-01), so latest fileCreatedAt wins.
+      await expect(
+        sut.getTimeBucketCovers({
+          userIds: [user.id],
+          visibility: AssetVisibility.Timeline,
+          bucketSize: TimeBucketSize.Day,
+          order: AssetOrder.Desc,
+          timeBuckets: ['2024-07-01'],
+        }),
+      ).resolves.toEqual([
+        expect.objectContaining({ timeBucket: '2024-07-01', representativeAssetId: earlierTimeLaterCreated.id }),
+      ]);
+
+      // ASC tie-break: earliest fileCreatedAt wins.
+      await expect(
+        sut.getTimeBucketCovers({
+          userIds: [user.id],
+          visibility: AssetVisibility.Timeline,
+          bucketSize: TimeBucketSize.Day,
+          order: AssetOrder.Asc,
+          timeBuckets: ['2024-07-01'],
+        }),
+      ).resolves.toEqual([
+        expect.objectContaining({ timeBucket: '2024-07-01', representativeAssetId: laterTimeEarlierCreated.id }),
+      ]);
+    });
+
+    it('omits requested buckets that have no matching assets', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const only2024 = await createTimelineAsset(ctx, user.id, new Date('2024-06-01T12:00:00.000Z'));
+
+      await expect(
+        sut.getTimeBucketCovers({
+          userIds: [user.id],
+          visibility: AssetVisibility.Timeline,
+          bucketSize: TimeBucketSize.Year,
+          order: AssetOrder.Desc,
+          timeBuckets: ['2023-01-01', '2024-01-01', '2025-01-01'],
+        }),
+      ).resolves.toEqual([expect.objectContaining({ timeBucket: '2024-01-01', representativeAssetId: only2024.id })]);
+    });
+
+    it('honours owner and visibility filters', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { user: otherUser } = await ctx.newUser();
+
+      const owned = await createTimelineAsset(ctx, user.id, new Date('2024-06-01T12:00:00.000Z'));
+      await createTimelineAsset(ctx, user.id, new Date('2024-07-01T12:00:00.000Z'), {
+        visibility: AssetVisibility.Archive,
+      });
+      await createTimelineAsset(ctx, otherUser.id, new Date('2024-08-01T12:00:00.000Z'));
+
+      await expect(
+        sut.getTimeBucketCovers({
+          userIds: [user.id],
+          visibility: AssetVisibility.Timeline,
+          bucketSize: TimeBucketSize.Year,
+          order: AssetOrder.Desc,
+          timeBuckets: ['2024-01-01'],
+        }),
+      ).resolves.toEqual([expect.objectContaining({ timeBucket: '2024-01-01', representativeAssetId: owned.id })]);
+    });
+
+    it('picks the representative for a month bucket spanning a year boundary', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const decAsset = await createTimelineAsset(ctx, user.id, new Date('2023-12-15T12:00:00.000Z'));
+      await createTimelineAsset(ctx, user.id, new Date('2024-01-10T12:00:00.000Z')); // must be excluded
+
+      await expect(
+        sut.getTimeBucketCovers({
+          userIds: [user.id],
+          visibility: AssetVisibility.Timeline,
+          bucketSize: TimeBucketSize.Month,
+          order: AssetOrder.Desc,
+          timeBuckets: ['2023-12-01'],
+        }),
+      ).resolves.toEqual([expect.objectContaining({ timeBucket: '2023-12-01', representativeAssetId: decAsset.id })]);
+    });
   });
 
   describe('getForThumbnail', () => {
