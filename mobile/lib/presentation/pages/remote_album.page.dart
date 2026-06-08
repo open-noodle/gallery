@@ -199,7 +199,10 @@ class _RemoteAlbumPageState extends ConsumerState<RemoteAlbumPage> {
       overrides: [currentRemoteAlbumScopedProvider.overrideWithValue(_album)],
       child: Timeline(
         topSliverWidget: SliverMainAxisGroup(
-          slivers: [const TimelineGroupingHeaderSliver(), PendingUploadsBanner(albumId: _album.id)],
+          slivers: [
+            const TimelineGroupingHeaderSliver(),
+            PendingUploadsBanner(albumId: _album.id),
+          ],
         ),
         topSliverWidgetHeight: RemoteAlbumPage.timelineOverviewTopSliverHeight,
         appBar: RemoteAlbumSliverAppBar(
