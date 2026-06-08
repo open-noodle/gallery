@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import { tick } from 'svelte';
 import TimelineRepresentativeBuckets from '$lib/components/timeline/TimelineRepresentativeBuckets.svelte';
 import type { TimelineGrouping } from '$lib/managers/timeline-manager/types';
 import type { ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
@@ -182,5 +183,49 @@ describe('TimelineRepresentativeBuckets', () => {
     });
 
     expect(screen.getAllByTestId('timeline-bucket-card').length).toBeLessThan(10);
+  });
+
+  it('calls onRequestCovers with visible bucket timeBuckets on mount', async () => {
+    const onRequestCovers = vi.fn();
+
+    render(TimelineRepresentativeBuckets, {
+      grouping: 'year',
+      buckets: [bucket(2016, 120), bucket(2015, 460), bucket(2001, 2000)],
+      visibleWindow: { top: 100, bottom: 600 },
+      onRequestCovers,
+    });
+    await tick();
+
+    // Only the two visible buckets (not the out-of-overscan bucket at top=2000)
+    expect(onRequestCovers).toHaveBeenCalledTimes(1);
+    expect(onRequestCovers).toHaveBeenCalledWith(['2016-01-01', '2015-01-01']);
+  });
+
+  it('does not call onRequestCovers in day mode', async () => {
+    const onRequestCovers = vi.fn();
+
+    render(TimelineRepresentativeBuckets, {
+      grouping: 'day',
+      buckets: [bucket(2016, 120, { grouping: 'day', date: { year: 2016, month: 1, day: 1 } })],
+      visibleWindow: { top: 0, bottom: 1000 },
+      onRequestCovers,
+    });
+    await tick();
+
+    expect(onRequestCovers).not.toHaveBeenCalled();
+  });
+
+  it('does not call onRequestCovers when no buckets are visible', async () => {
+    const onRequestCovers = vi.fn();
+
+    render(TimelineRepresentativeBuckets, {
+      grouping: 'year',
+      buckets: [bucket(2001, 2000)],
+      visibleWindow: { top: 0, bottom: 100 },
+      onRequestCovers,
+    });
+    await tick();
+
+    expect(onRequestCovers).not.toHaveBeenCalled();
   });
 });
