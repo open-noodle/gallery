@@ -302,7 +302,7 @@ void main() {
       expect(tester.getSize(find.byKey(const Key('timeline-grouping-compact-selector'))).width, lessThanOrEqualTo(92));
     });
 
-    testWidgets('compact mode cycles to the next grouping on tap', (tester) async {
+    testWidgets('compact mode tapping Day zooms out to Month', (tester) async {
       await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.day);
 
       await tester.pumpConsumerWidget(const TimelineGroupingSelector.compact());
@@ -311,9 +311,32 @@ void main() {
       await tester.tap(find.byKey(const Key('timeline-grouping-compact-selector')));
       await tester.pumpAndSettle();
 
+      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+      expect(find.text('Month'), findsOneWidget);
+    });
+
+    testWidgets('compact mode bounces between extremes', (tester) async {
+      await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.year);
+      await tester.pumpConsumerWidget(const TimelineGroupingSelector.compact());
+      await tester.pumpAndSettle();
+
+      final selector = find.byKey(const Key('timeline-grouping-compact-selector'));
+
+      // Year -> Month -> Day (heading down)
+      await tester.tap(selector);
+      await tester.pumpAndSettle();
+      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+      await tester.tap(selector);
+      await tester.pumpAndSettle();
+      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
+
+      // Day -> Month -> Year (direction inverted at Day; preserved through Month)
+      await tester.tap(selector);
+      await tester.pumpAndSettle();
+      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+      await tester.tap(selector);
+      await tester.pumpAndSettle();
       expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.year);
-      expect(find.text('Year'), findsOneWidget);
-      expect(find.text('Years'), findsNothing);
     });
 
     testWidgets('compact mode opens a direct selection menu on long press', (tester) async {
@@ -330,6 +353,29 @@ void main() {
       expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
       expect(find.text('Month'), findsOneWidget);
       expect(find.text('Months'), findsNothing);
+    });
+
+    testWidgets('compact mode resumes bouncing after a long-press menu selection', (tester) async {
+      await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.day);
+      await tester.pumpConsumerWidget(const TimelineGroupingSelector.compact());
+      await tester.pumpAndSettle();
+
+      final selector = find.byKey(const Key('timeline-grouping-compact-selector'));
+
+      // Pick Year directly via the long-press menu.
+      await tester.longPress(selector);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('timeline-grouping-menu-year')));
+      await tester.pumpAndSettle();
+      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.year);
+
+      // Subsequent taps bounce down: Year -> Month -> Day.
+      await tester.tap(selector);
+      await tester.pumpAndSettle();
+      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+      await tester.tap(selector);
+      await tester.pumpAndSettle();
+      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
     });
 
     testWidgets('compact mode fits Month without ellipsizing at large mobile text scale', (tester) async {

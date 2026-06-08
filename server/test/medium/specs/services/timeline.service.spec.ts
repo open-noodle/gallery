@@ -96,69 +96,51 @@ describe(TimelineService.name, () => {
       ]);
     });
 
-    it('returns representative metadata from the filtered bucket query', async () => {
+    it('returns only timeBucket and count — no representative fields', async () => {
       const { sut, ctx } = setup();
       const { user } = await ctx.newUser();
       const auth = factory.auth({ user });
 
-      const older = await createTimelineAsset(ctx, user.id, new Date('2024-01-01T12:00:00.000Z'), {
+      await createTimelineAsset(ctx, user.id, new Date('2024-01-01T12:00:00.000Z'), {
         thumbhash: Buffer.from('older-thumbhash'),
         width: 100,
         height: 50,
       });
-      const newer = await createTimelineAsset(ctx, user.id, new Date('2024-01-02T12:00:00.000Z'), {
+      await createTimelineAsset(ctx, user.id, new Date('2024-01-02T12:00:00.000Z'), {
         thumbhash: Buffer.from('newer-thumbhash'),
         width: 300,
         height: 100,
       });
 
-      await expect(sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Month })).resolves.toEqual([
-        expect.objectContaining({
-          timeBucket: '2024-01-01',
-          count: 2,
-          representativeAssetId: newer.id,
-          representativeThumbhash: Buffer.from('newer-thumbhash').toString('base64'),
-          representativeRatio: 3,
-        }),
-      ]);
+      const result = await sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Month });
+      expect(result).toEqual([expect.objectContaining({ timeBucket: '2024-01-01', count: 2 })]);
+      expect(result[0]).not.toHaveProperty('representativeAssetId');
+      expect(result[0]).not.toHaveProperty('representativeThumbhash');
+      expect(result[0]).not.toHaveProperty('representativeRatio');
+    });
 
+    it('count-only result is stable regardless of order option', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user });
+
+      await createTimelineAsset(ctx, user.id, new Date('2024-01-01T12:00:00.000Z'));
+      await createTimelineAsset(ctx, user.id, new Date('2024-01-02T12:00:00.000Z'));
+
+      await expect(sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Month })).resolves.toEqual([
+        expect.objectContaining({ timeBucket: '2024-01-01', count: 2 }),
+      ]);
       await expect(
         sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Month, order: AssetOrder.Asc }),
-      ).resolves.toEqual([
-        expect.objectContaining({
-          representativeAssetId: older.id,
-          representativeThumbhash: Buffer.from('older-thumbhash').toString('base64'),
-          representativeRatio: 2,
-        }),
-      ]);
+      ).resolves.toEqual([expect.objectContaining({ timeBucket: '2024-01-01', count: 2 })]);
     });
 
-    it('falls back cleanly when representative thumbnail data is missing', async () => {
+    it('filters correctly reduce bucket counts', async () => {
       const { sut, ctx } = setup();
       const { user } = await ctx.newUser();
       const auth = factory.auth({ user });
 
-      const asset = await createTimelineAsset(ctx, user.id, new Date('2024-03-01T12:00:00.000Z'), {
-        thumbhash: null,
-        width: null,
-        height: null,
-      });
-
-      await expect(sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Month })).resolves.toEqual([
-        expect.objectContaining({
-          representativeAssetId: asset.id,
-          representativeThumbhash: null,
-          representativeRatio: 1,
-        }),
-      ]);
-    });
-
-    it('chooses representatives only from assets that match filters', async () => {
-      const { sut, ctx } = setup();
-      const { user } = await ctx.newUser();
-      const auth = factory.auth({ user });
-
-      const favorite = await createTimelineAsset(ctx, user.id, new Date('2024-04-02T12:00:00.000Z'), {
+      await createTimelineAsset(ctx, user.id, new Date('2024-04-02T12:00:00.000Z'), {
         isFavorite: true,
       });
       await createTimelineAsset(ctx, user.id, new Date('2024-04-03T12:00:00.000Z'), {
@@ -166,15 +148,16 @@ describe(TimelineService.name, () => {
       });
 
       await expect(sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Month, isFavorite: true })).resolves.toEqual([
-        expect.objectContaining({ count: 1, representativeAssetId: favorite.id }),
+        expect.objectContaining({ count: 1 }),
       ]);
     });
 
-    it('applies EXIF and rating filters before selecting bucket representatives', async () => {
+    it('EXIF and rating filters reduce bucket counts', async () => {
       const { sut, ctx } = setup();
       const { user } = await ctx.newUser();
       const auth = factory.auth({ user });
 
+      await createTimelineAsset(ctx, user.id, new Date('2024-04-02T12:00:00.000Z'));
       const matching = await createTimelineAsset(ctx, user.id, new Date('2024-04-02T12:00:00.000Z'));
       await ctx.newExif({
         assetId: matching.id,
@@ -197,7 +180,7 @@ describe(TimelineService.name, () => {
           model: 'R5',
           rating: 5,
         }),
-      ).resolves.toEqual([expect.objectContaining({ count: 1, representativeAssetId: matching.id })]);
+      ).resolves.toEqual([expect.objectContaining({ count: 1 })]);
     });
 
     it('returns an empty list when filters match no assets', async () => {
@@ -212,19 +195,19 @@ describe(TimelineService.name, () => {
       );
     });
 
-    it('uses a video asset as the representative when a bucket contains only videos', async () => {
+    it('video-type filter reduces bucket count correctly', async () => {
       const { sut, ctx } = setup();
       const { user } = await ctx.newUser();
       const auth = factory.auth({ user });
 
-      const video = await createTimelineAsset(ctx, user.id, new Date('2024-06-01T12:00:00.000Z'), {
+      await createTimelineAsset(ctx, user.id, new Date('2024-06-01T12:00:00.000Z'), {
         type: AssetType.Video,
         originalPath: '/path/to/video.mp4',
       });
 
       await expect(
         sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Month, type: AssetType.Video }),
-      ).resolves.toEqual([expect.objectContaining({ representativeAssetId: video.id, count: 1 })]);
+      ).resolves.toEqual([expect.objectContaining({ count: 1 })]);
     });
 
     it.each([TimeBucketSize.Year, TimeBucketSize.Month, TimeBucketSize.Day])(

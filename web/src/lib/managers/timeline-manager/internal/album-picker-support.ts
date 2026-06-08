@@ -7,11 +7,6 @@ import {
 import type { AssetApiGetTimeBucketsRequest, TimelineManagerOptions } from '../types';
 import { toTimeBucketsRequest } from './request-options';
 
-type RepresentativeMetadata = Pick<
-  TimeBucketsResponseDto,
-  'representativeAssetId' | 'representativeThumbhash' | 'representativeRatio'
->;
-
 export function getTimelineAlbumQueryOptions(
   options: TimelineManagerOptions,
   bucketSize: TimeBucketSize,
@@ -26,23 +21,6 @@ export function getTimelineAlbumQueryOptions(
   ) as AssetApiGetTimeBucketsRequest;
 
   return { ...rest, albumId: options.timelineAlbumId };
-}
-
-function getRepresentativeMetadata(
-  preferred: TimeBucketsResponseDto | undefined,
-  fallback: TimeBucketsResponseDto,
-): Partial<RepresentativeMetadata> {
-  const bucket = preferred?.representativeAssetId == null ? fallback : preferred;
-
-  if (bucket.representativeAssetId == null) {
-    return {};
-  }
-
-  return {
-    representativeAssetId: bucket.representativeAssetId,
-    representativeThumbhash: bucket.representativeThumbhash,
-    representativeRatio: bucket.representativeRatio,
-  };
 }
 
 export function mergeTimeBuckets(
@@ -61,7 +39,6 @@ export function mergeTimeBuckets(
     merged.set(bucket.timeBucket, {
       timeBucket: bucket.timeBucket,
       count: (existing?.count ?? 0) + bucket.count,
-      ...getRepresentativeMetadata(existing, bucket),
     });
   }
 
