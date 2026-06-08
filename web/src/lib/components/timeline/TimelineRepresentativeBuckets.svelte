@@ -29,6 +29,7 @@
     locale?: string;
     disabled?: boolean;
     onTimelineBucketActivate?: (bucket: ActivatableTimelineBucket) => void;
+    onRequestCovers?: (timeBuckets: string[]) => void;
   }
 
   let {
@@ -38,12 +39,20 @@
     locale = 'en-US',
     disabled = false,
     onTimelineBucketActivate,
+    onRequestCovers,
   }: Props = $props();
 
   const intersectsVisibleWindow = (bucket: RepresentativeTimelineBucket, window: VisibleWindow) =>
     bucket.top + bucket.height >= window.top - OVERSCAN_PX && bucket.top <= window.bottom + OVERSCAN_PX;
 
   let visibleBuckets = $derived(buckets.filter((bucket) => intersectsVisibleWindow(bucket, visibleWindow)));
+  let visibleBucketKeys = $derived(visibleBuckets.map((b) => b.timeBucket));
+
+  $effect(() => {
+    if (grouping !== 'day' && visibleBucketKeys.length > 0) {
+      onRequestCovers?.(visibleBucketKeys);
+    }
+  });
 
   const activate = (bucket: ActivatableTimelineBucket) => {
     if (disabled) {
