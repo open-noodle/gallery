@@ -385,4 +385,24 @@ describe('TimelineBucketCard component', () => {
       expect.stringContaining('aspect-ratio'),
     );
   });
+
+  it('transitions from loading skeleton to cover image when representative is applied', async () => {
+    const { rerender } = render(TimelineBucketCard, {
+      bucket: makeBucket({ representativeAssetId: null, representativeThumbhash: null }),
+      loading: true,
+      onActivate: vi.fn(),
+    });
+
+    expect(screen.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'loading');
+    expect(screen.queryByTestId('timeline-bucket-card-image')).not.toBeInTheDocument();
+
+    await rerender({
+      bucket: makeBucket({ representativeAssetId: 'asset-2015', representativeThumbhash: 'thumbhash-2015' }),
+      loading: false,
+      onActivate: vi.fn(),
+    });
+
+    expect(screen.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'image');
+    expect(screen.getByTestId('timeline-bucket-card-image')).toHaveAttribute('src', '/thumbnail/asset-2015');
+  });
 });

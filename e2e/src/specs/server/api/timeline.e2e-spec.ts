@@ -63,7 +63,7 @@ describe('/timeline', () => {
       expect(total).toBe(2);
     });
 
-    it('accepts year, month, and day bucket sizes and returns representative metadata keys', async () => {
+    it('accepts year, month, and day bucket sizes and returns counts-only (no representative fields)', async () => {
       for (const bucketSize of ['year', 'month', 'day']) {
         const { status, body } = await request(app)
           .get(`/timeline/buckets?bucketSize=${bucketSize}`)
@@ -76,12 +76,57 @@ describe('/timeline', () => {
           expect.objectContaining({
             timeBucket: expect.any(String),
             count: expect.any(Number),
-            representativeAssetId: expect.any(String),
           }),
         );
-        expect(body[0]).toHaveProperty('representativeThumbhash');
-        expect(body[0]).toHaveProperty('representativeRatio');
+        // representative fields have moved to GET /timeline/bucket-covers
+        expect(body[0]).not.toHaveProperty('representativeAssetId');
+        expect(body[0]).not.toHaveProperty('representativeThumbhash');
+        expect(body[0]).not.toHaveProperty('representativeRatio');
       }
+    });
+
+    it('GET /timeline/bucket-covers returns representative metadata for requested buckets', async () => {
+      // Smoke-test: spaceOwner requests covers for the month bucket they own.
+      // The endpoint should return representativeAssetId (and optionally thumbhash/ratio).
+      const bucketsRes = await request(app)
+        .get('/timeline/buckets?bucketSize=month')
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect(bucketsRes.status).toBe(200);
+      const buckets = bucketsRes.body as Array<{ timeBucket: string }>;
+      expect(buckets.length).toBeGreaterThan(0);
+
+      const timeBuckets = buckets.map((b) => b.timeBucket).join('&timeBuckets=');
+      const { status, body } = await request(app)
+        .get(`/timeline/bucket-covers?bucketSize=month&timeBuckets=${timeBuckets}`)
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+
+      expect(status).toBe(200);
+      expect(Array.isArray(body)).toBe(true);
+      expect((body as unknown[]).length).toBeGreaterThan(0);
+      expect(body[0]).toHaveProperty('timeBucket');
+      expect(body[0]).toHaveProperty('representativeAssetId');
+      expect(body[0]).toHaveProperty('representativeThumbhash');
+      expect(body[0]).toHaveProperty('representativeRatio');
+    });
+
+    it('GET /timeline/bucket-covers scoped to another userId returns no covers', async () => {
+      // Access-control: requesting covers with someone else's userId should return
+      // no covers (the timeline access check gates it to the requesting user's own assets
+      // or assets they have access to). spaceEditor has no assets under spaceOwner's userId.
+      const bucketsRes = await request(app)
+        .get('/timeline/buckets?bucketSize=month')
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      const buckets = bucketsRes.body as Array<{ timeBucket: string }>;
+      const timeBuckets = buckets.map((b) => b.timeBucket).join('&timeBuckets=');
+
+      const { status } = await request(app)
+        .get(`/timeline/bucket-covers?bucketSize=month&userId=${ctx.spaceOwner.userId}&timeBuckets=${timeBuckets}`)
+        .set(asBearerAuth(ctx.spaceEditor.token!));
+
+      // Non-member querying another user's userId via timeline endpoint gets 400
+      // (timeline uses requireAccess → BadRequestException, same invariant as
+      // spaceId access-matrix tests above).
+      expect(status).toBe(400);
     });
 
     it('rejects an invalid bucket size', async () => {
