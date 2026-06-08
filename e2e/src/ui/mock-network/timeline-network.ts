@@ -6,6 +6,7 @@ import {
   getAlbum,
   getAsset,
   getTimeBucket,
+  getTimeBucketCovers,
   getTimeBuckets,
   randomPreview,
   randomThumbnail,
@@ -28,45 +29,61 @@ export const setupTimelineMockApiRoutes = async (
   await context.route('**/api/timeline**', async (route, request) => {
     const url = new URL(request.url());
     const pathname = url.pathname;
-    if (pathname === '/api/timeline/buckets') {
-      const albumId = url.searchParams.get('albumId') || undefined;
-      const isTrashed = url.searchParams.get('isTrashed') ? url.searchParams.get('isTrashed') === 'true' : undefined;
-      const isFavorite = url.searchParams.get('isFavorite') ? url.searchParams.get('isFavorite') === 'true' : undefined;
-      const isArchived = url.searchParams.get('visibility')
-        ? url.searchParams.get('visibility') === 'archive'
-        : undefined;
-      const bucketSize = (url.searchParams.get('bucketSize') as TimeBucketSize | null) ?? TimeBucketSize.Month;
-      const takenAfter = url.searchParams.get('takenAfter') ?? undefined;
-      const takenBefore = url.searchParams.get('takenBefore') ?? undefined;
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        json: getTimeBuckets(timelineRestData, isTrashed, isArchived, isFavorite, albumId, changes, bucketSize, {
-          takenAfter,
-          takenBefore,
-        }),
-      });
-    }
-    if (pathname === '/api/timeline/bucket') {
-      const timeBucket = url.searchParams.get('timeBucket');
-      if (!timeBucket) {
-        return route.continue();
+    switch (pathname) {
+      case '/api/timeline/buckets': {
+        const albumId = url.searchParams.get('albumId') || undefined;
+        const isTrashed = url.searchParams.get('isTrashed') ? url.searchParams.get('isTrashed') === 'true' : undefined;
+        const isFavorite = url.searchParams.get('isFavorite')
+          ? url.searchParams.get('isFavorite') === 'true'
+          : undefined;
+        const isArchived = url.searchParams.get('visibility')
+          ? url.searchParams.get('visibility') === 'archive'
+          : undefined;
+        const bucketSize = (url.searchParams.get('bucketSize') as TimeBucketSize | null) ?? TimeBucketSize.Month;
+        const takenAfter = url.searchParams.get('takenAfter') ?? undefined;
+        const takenBefore = url.searchParams.get('takenBefore') ?? undefined;
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          json: getTimeBuckets(timelineRestData, isTrashed, isArchived, isFavorite, albumId, changes, bucketSize, {
+            takenAfter,
+            takenBefore,
+          }),
+        });
       }
-      const isTrashed = url.searchParams.get('isTrashed') ? url.searchParams.get('isTrashed') === 'true' : undefined;
-      const isArchived = url.searchParams.get('visibility')
-        ? url.searchParams.get('visibility') === 'archive'
-        : undefined;
-      const isFavorite = url.searchParams.get('isFavorite') ? url.searchParams.get('isFavorite') === 'true' : undefined;
-      const albumId = url.searchParams.get('albumId') || undefined;
-      const assets = getTimeBucket(timelineRestData, timeBucket, isTrashed, isArchived, isFavorite, albumId, changes);
-      if (testContext.slowBucket) {
-        await sleep(5000);
+      case '/api/timeline/bucket': {
+        const timeBucket = url.searchParams.get('timeBucket');
+        if (!timeBucket) {
+          return route.continue();
+        }
+        const isTrashed = url.searchParams.get('isTrashed') ? url.searchParams.get('isTrashed') === 'true' : undefined;
+        const isArchived = url.searchParams.get('visibility')
+          ? url.searchParams.get('visibility') === 'archive'
+          : undefined;
+        const isFavorite = url.searchParams.get('isFavorite')
+          ? url.searchParams.get('isFavorite') === 'true'
+          : undefined;
+        const albumId = url.searchParams.get('albumId') || undefined;
+        const assets = getTimeBucket(timelineRestData, timeBucket, isTrashed, isArchived, isFavorite, albumId, changes);
+        if (testContext.slowBucket) {
+          await sleep(5000);
+        }
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          json: assets,
+        });
       }
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        json: assets,
-      });
+      case '/api/timeline/bucket-covers': {
+        const bucketSize = (url.searchParams.get('bucketSize') as TimeBucketSize | null) ?? TimeBucketSize.Month;
+        const requestedBuckets = url.searchParams.getAll('timeBuckets');
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          json: getTimeBucketCovers(timelineRestData, changes, bucketSize, requestedBuckets),
+        });
+      }
+      // No default
     }
     return route.continue();
   });
