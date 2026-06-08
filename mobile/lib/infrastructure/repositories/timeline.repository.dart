@@ -403,17 +403,18 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
         ..limit(1),
     );
 
-    final query = _db.remoteAssetEntity.select().addColumns([localId]).join([
-      innerJoin(
-        _db.remoteAlbumAssetEntity,
-        _db.remoteAlbumAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
-        useColumns: false,
-      ),
-    ])..where(
-      _db.remoteAssetEntity.deletedAt.isNull() &
-          _db.remoteAlbumAssetEntity.albumId.equals(albumId) &
-          _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope),
-    );
+    final query =
+        _db.remoteAssetEntity.select().addColumns([localId]).join([
+          innerJoin(
+            _db.remoteAlbumAssetEntity,
+            _db.remoteAlbumAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
+            useColumns: false,
+          ),
+        ])..where(
+          _db.remoteAssetEntity.deletedAt.isNull() &
+              _db.remoteAlbumAssetEntity.albumId.equals(albumId) &
+              _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope),
+        );
 
     query.orderBy(
       _assetDateOrder(groupBy, ascending: isAscending).map((order) => order(_db.remoteAssetEntity)).toList(),
@@ -886,7 +887,6 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
         _db.remoteAssetEntity.deletedAt.isNull() &
         _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline);
   }
-
 
     if (groupBy == GroupAssetsBy.none) {
       final query = _db.remoteAssetEntity.selectOnly()
