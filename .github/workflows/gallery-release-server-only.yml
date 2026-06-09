@@ -421,21 +421,17 @@ jobs:
     name: Publish Version Endpoint
     needs: [version, tag]
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     steps:
-      - name: Configure AWS credentials via OIDC
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
-        with:
-          role-to-assume: arn:aws:iam::660432264815:role/noodle-prod-gallery-release-version-upload
-          aws-region: eu-west-1
-
-      - name: Build and upload version.json
+      - name: Build and publish version.json to Bunny
         env:
           VERSION: ${{ needs.version.outputs.version }}
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          STORAGE_HOST: ${{ vars.NOODLEGALLERY_VERSION_STORAGE_HOST }}
+          STORAGE_ZONE: ${{ vars.NOODLEGALLERY_VERSION_STORAGE_ZONE_NAME }}
+          STORAGE_PW: ${{ secrets.NOODLEGALLERY_VERSION_STORAGE_PASSWORD }}
+          PULLZONE_ID: ${{ vars.NOODLEGALLERY_VERSION_PULLZONE_ID }}
+          BUNNY_API_KEY: ${{ secrets.BUNNY_API_KEY }}
         run: |
           if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::Invalid version tag: $VERSION"
@@ -458,6 +454,14 @@ jobs:
 
           printf '{"version":"%s","published_at":"%s"}' "$VERSION" "$published_at" > /tmp/gallery
 
-          aws s3 cp /tmp/gallery s3://noodle-prod-version/gallery \
-            --content-type "application/json; charset=utf-8" \
-            --cache-control "public, max-age=300"
+          # The version pull zone serves /gallery with edge rules forcing
+          # Content-Type: application/json; charset=utf-8, CORS, and max-age=300,
+          # so the stored object's content-type is irrelevant.
+          curl -fsS -X PUT "https://$STORAGE_HOST/$STORAGE_ZONE/gallery" \
+            -H "AccessKey: $STORAGE_PW" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @/tmp/gallery -w 'put %{http_code}\n'
+
+          curl -fsS -X POST "https://api.bunny.net/pullzone/$PULLZONE_ID/purgeCache" \
+            -H "AccessKey: $BUNNY_API_KEY" \
+            -H "Content-Length: 0" -w 'purge %{http_code}\n'
