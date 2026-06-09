@@ -144,8 +144,15 @@ class TimelineFactory {
   TimelineService fromAssets(List<BaseAsset> assets, TimelineOrigin type) =>
       TimelineService(_timelineRepository.fromAssets(assets, type));
 
-  TimelineService fromAssetStream(List<BaseAsset> Function() getAssets, Stream<int> assetCount, TimelineOrigin type) =>
-      TimelineService(_timelineRepository.fromAssetStream(getAssets, assetCount, type));
+  TimelineService fromAssetStream(
+    List<BaseAsset> Function() getAssets,
+    Stream<int> assetCount,
+    TimelineOrigin type, {
+    GroupAssetsBy groupBy = GroupAssetsBy.none,
+    bool descending = true,
+  }) => TimelineService(
+    _timelineRepository.fromAssetStream(getAssets, assetCount, type, groupBy: groupBy, descending: descending),
+  );
 
   TimelineService fromAssetsWithBuckets(List<BaseAsset> assets, TimelineOrigin type) =>
       TimelineService(_timelineRepository.fromAssetsWithBuckets(assets, type));
