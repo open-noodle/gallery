@@ -1,11 +1,13 @@
 // photosTimelineQueryProvider — overrides `timelineServiceProvider` inside
 // `MainTimelinePage`. Empty filter / pre-login → main library service.
 // Non-empty + logged-in → search-backed service driven by the paginating
-// `photosFilterSearchProvider` notifier. The effective provider composes
-// temporal scope through the 500 ms debounced Photos filter before consumers
-// watch the result here.
+// `photosFilterSearchProvider` notifier, with `groupBy`/`descending` derived from the
+// active filter's sort + smart-search state (relevance smart search stays flat). The
+// effective provider composes temporal scope through the 800 ms debounced Photos filter
+// before consumers watch the result here.
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
@@ -47,7 +49,17 @@ TimelineService buildPhotosTimelineQuery(Ref ref, SearchFilter filter) {
   }
 
   final notifier = ref.watch(photosFilterSearchProvider.notifier);
-  final svc = factory.fromAssetStream(notifier.getAssets, notifier.count, TimelineOrigin.search);
+  final isSmart = filter.context != null && filter.context!.isNotEmpty;
+  final isRelevance = isSmart && filter.sort == SearchSortOrder.relevance;
+  final groupBy = isRelevance ? GroupAssetsBy.none : factory.groupBy;
+  final descending = filter.sort != SearchSortOrder.oldest;
+  final svc = factory.fromAssetStream(
+    notifier.getAssets,
+    notifier.count,
+    TimelineOrigin.search,
+    groupBy: groupBy,
+    descending: descending,
+  );
   ref.onDispose(svc.dispose);
   return svc;
 }
