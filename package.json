@@ -2,7 +2,6 @@
   "name": "immich-monorepo",
   "version": "3.2.0-rc.0",
   "description": "Monorepo for Immich",
-  "type": "module",
   "private": true,
   "scripts": {
     "format": "prettier --cache --check i18n/",
