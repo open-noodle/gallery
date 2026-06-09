@@ -62,8 +62,12 @@ final timelineSegmentProvider = StreamProvider.autoDispose<List<Segment>>((ref) 
 
   final timelineService = ref.watch(timelineServiceProvider);
   yield* timelineService.watchBuckets().map((buckets) {
-    if (groupBy == GroupAssetsBy.year || groupBy == GroupAssetsBy.month) {
-      return TimelineOverviewSegmentBuilder(buckets: buckets, groupBy: groupBy).generate();
+    // A date-less bucket source (e.g. relevance-sorted search, or a `fromAssets` timeline) cannot
+    // render the year/month overview — fall back to the flat grid regardless of the grouping setting.
+    final isDateless = buckets.isNotEmpty && buckets.first is! TimeBucket;
+    final effectiveGroupBy = isDateless ? GroupAssetsBy.day : groupBy;
+    if (effectiveGroupBy == GroupAssetsBy.year || effectiveGroupBy == GroupAssetsBy.month) {
+      return TimelineOverviewSegmentBuilder(buckets: buckets, groupBy: effectiveGroupBy).generate();
     }
 
     return FixedSegmentBuilder(
@@ -71,7 +75,7 @@ final timelineSegmentProvider = StreamProvider.autoDispose<List<Segment>>((ref) 
       tileHeight: tileExtent,
       columnCount: columnCount,
       spacing: spacing,
-      groupBy: groupBy,
+      groupBy: effectiveGroupBy,
     ).generate();
   });
 }, dependencies: [timelineServiceProvider, timelineArgsProvider]);
