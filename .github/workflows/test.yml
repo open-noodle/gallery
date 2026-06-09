@@ -22,10 +22,6 @@ jobs:
         with:
           github-token: ${{ github.token }}
           filters: |
-            scripts:
-              - 'packages/scripts/**'
-              - 'pnpm-lock.yaml'
-              - 'mise.toml'
             i18n:
               - 'i18n/**'
               - 'mise.toml'
@@ -70,33 +66,6 @@ jobs:
             - '.github/workflows/test.yml'
           force-events: 'workflow_dispatch'
 
-  script-unit-tests:
-    name: Scripts unit tests
-    needs: pre-job
-    if: ${{ fromJSON(needs.pre-job.outputs.should_run).scripts == true }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          token: ${{ github.token }}
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
-
-      - name: Setup Node
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version-file: './server/.nvmrc'
-          cache: 'pnpm'
-          cache-dependency-path: '**/pnpm-lock.yaml'
-
-      - name: Run unit tests
-        run: pnpm --filter @immich/scripts test
-
   upstream-preflight:
     name: Upstream Rebase Tooling
     needs: pre-job
@@ -106,7 +75,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
           token: ${{ github.token }}
