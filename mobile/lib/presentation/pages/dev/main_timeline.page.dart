@@ -2,7 +2,6 @@ import 'package:auto_route/auto_route.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_icon_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/sort_icon_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/memory/memory_lane.widget.dart';
@@ -99,7 +98,9 @@ class _SearchLoadMoreFooter extends ConsumerWidget {
 class PhotosTimelineAppBar extends StatelessWidget {
   const PhotosTimelineAppBar({super.key});
 
-  static const actions = <Widget>[TimelineGroupingSelector.compact(), SortIconButton(), FilterIconButton()];
+  // Filter/search is reached from the bottom-nav search button (GallerySearchBlob), so the app bar
+  // keeps only the grouping chip and the sort control (the latter shows itself once a search is active).
+  static const actions = <Widget>[TimelineGroupingSelector.compact(), SortIconButton()];
 
   @override
   Widget build(BuildContext context) {
