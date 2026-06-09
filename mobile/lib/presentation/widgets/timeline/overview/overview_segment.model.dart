@@ -1,14 +1,12 @@
 import 'dart:async';
 
-import 'package:collection/collection.dart';
 import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/overview/overview_card.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
-import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/timeline/overview_drilldown.provider.dart';
+import 'package:immich_mobile/providers/timeline/overview_representative_cache.provider.dart';
 
 class TimelineOverviewSegment extends Segment {
   const TimelineOverviewSegment({
@@ -57,32 +55,28 @@ class _TimelineOverviewSegmentCard extends ConsumerWidget {
     final onTap = drilldown != null && bucket.assetCount > 0
         ? () => unawaited(drilldown(bucket, segment.groupBy))
         : null;
-    final timelineService = ref.read(timelineServiceProvider);
-    BaseAsset? representativeAsset;
-    if (timelineService.hasRange(segment.firstAssetIndex, 1)) {
-      representativeAsset = timelineService.getAssets(segment.firstAssetIndex, 1).firstOrNull;
+
+    final key = TimelineOverviewRepresentativeCacheNotifier.keyFor(segment.groupBy, bucket.date);
+
+    // Read the cached representative (null if not resolved yet).
+    final cachedAsset = ref.watch(timelineOverviewRepresentativeCacheProvider.select((m) => m[key]?.asset));
+
+    // Schedule a (re-)resolve post-frame so we never mutate provider state during build.
+    if (bucket.assetCount > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          ref
+              .read(timelineOverviewRepresentativeCacheProvider.notifier)
+              .ensure(key, segment.firstAssetIndex, bucket.assetCount);
+        }
+      });
     }
 
-    if (representativeAsset != null || bucket.assetCount <= 0) {
-      return TimelineOverviewCard(
-        bucket: bucket,
-        groupBy: segment.groupBy,
-        representativeAsset: representativeAsset,
-        onTap: onTap,
-      );
-    }
-
-    return FutureBuilder<List<BaseAsset>>(
-      future: timelineService.loadAssets(segment.firstAssetIndex, 1),
-      builder: (context, snapshot) {
-        final assets = snapshot.data ?? const <BaseAsset>[];
-        return TimelineOverviewCard(
-          bucket: bucket,
-          groupBy: segment.groupBy,
-          representativeAsset: assets.firstOrNull,
-          onTap: onTap,
-        );
-      },
+    return TimelineOverviewCard(
+      bucket: bucket,
+      groupBy: segment.groupBy,
+      representativeAsset: cachedAsset,
+      onTap: onTap,
     );
   }
 }
