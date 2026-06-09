@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
@@ -86,7 +86,7 @@ void main() {
         expect(tester.getSemantics(find.byKey(const Key('timeline-grouping-selector'))).label, 'Timeline grouping');
         expect(find.bySemanticsLabel('Years'), findsOneWidget);
         expect(find.bySemanticsLabel('Months'), findsOneWidget);
-        expect(find.bySemanticsLabel('Days'), findsOneWidget);
+        expect(find.bySemanticsLabel('All'), findsOneWidget);
 
         final years = tester.getSemantics(find.byKey(const Key('timeline-grouping-year')));
         final months = tester.getSemantics(find.byKey(const Key('timeline-grouping-month')));
@@ -108,7 +108,7 @@ void main() {
       }
     });
 
-    testWidgets('normalizes unsupported auto and none values to Days visually', (tester) async {
+    testWidgets('normalizes unsupported auto and none values to the All segment visually', (tester) async {
       await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.auto);
       await tester.pumpConsumerWidget(const TimelineGroupingSelector());
       await tester.pumpAndSettle();
@@ -177,8 +177,8 @@ void main() {
           final label = switch (groupBy) {
             GroupAssetsBy.year => 'Years',
             GroupAssetsBy.month => 'Months',
-            GroupAssetsBy.day => 'Days',
-            GroupAssetsBy.auto || GroupAssetsBy.none => 'Days',
+            GroupAssetsBy.day => 'All',
+            GroupAssetsBy.auto || GroupAssetsBy.none => 'All',
           };
           final node = tester.getSemantics(find.byKey(Key('timeline-grouping-${groupBy.name}')));
           expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isFalse, reason: label);
@@ -296,10 +296,11 @@ void main() {
       expect(find.byKey(const Key('timeline-grouping-year')), findsNothing);
       expect(find.byKey(const Key('timeline-grouping-month')), findsNothing);
       expect(find.byKey(const Key('timeline-grouping-day')), findsNothing);
-      expect(find.text('Day'), findsOneWidget);
+      expect(find.text('All'), findsOneWidget);
+      expect(find.text('Day'), findsNothing);
       expect(find.text('Days'), findsNothing);
       expect(find.byIcon(Icons.expand_more_rounded), findsNothing);
-      expect(tester.getSize(find.byKey(const Key('timeline-grouping-compact-selector'))).width, lessThanOrEqualTo(92));
+      expect(tester.getSize(find.byKey(const Key('timeline-grouping-compact-selector'))).width, lessThanOrEqualTo(120));
     });
 
     testWidgets('compact mode tapping Day zooms out to Month', (tester) async {
@@ -312,7 +313,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
-      expect(find.text('Month'), findsOneWidget);
+      expect(find.text('Months'), findsOneWidget);
     });
 
     testWidgets('compact mode bounces between extremes', (tester) async {
@@ -339,6 +340,46 @@ void main() {
       expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.year);
     });
 
+    testWidgets('compact mode keeps bouncing back to Years when the chip is recreated between taps', (tester) async {
+      // The timeline destroys and recreates the app-bar subtree whenever its segments reload
+      // (every grouping change flashes the timelineSegmentProvider loading state). The bounce
+      // direction must survive that recreation, otherwise the chip gets stuck oscillating
+      // Months <-> All and never returns to Years.
+      await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.year);
+
+      var generation = 0;
+      late StateSetter setOuter;
+      await tester.pumpConsumerWidget(
+        StatefulBuilder(
+          builder: (context, setState) {
+            setOuter = setState;
+            // A fresh key on every generation forces the selector's State to be disposed and
+            // rebuilt, exactly like the timeline swapping its loading/data slivers.
+            return TimelineGroupingSelector.compact(key: ValueKey(generation));
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final selector = find.byKey(const Key('timeline-grouping-compact-selector'));
+
+      Future<void> tapAndRecreate() async {
+        await tester.tap(selector);
+        await tester.pumpAndSettle();
+        setOuter(() => generation++);
+        await tester.pumpAndSettle();
+      }
+
+      await tapAndRecreate();
+      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month); // Years -> Months
+      await tapAndRecreate();
+      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day); // Months -> All
+      await tapAndRecreate();
+      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month); // All -> Months
+      await tapAndRecreate();
+      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.year); // Months -> Years (the bug)
+    });
+
     testWidgets('compact mode opens a direct selection menu on long press', (tester) async {
       await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.day);
 
@@ -351,8 +392,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
-      expect(find.text('Month'), findsOneWidget);
-      expect(find.text('Months'), findsNothing);
+      expect(find.text('Months'), findsOneWidget);
+      expect(find.text('Month'), findsNothing);
     });
 
     testWidgets('compact mode resumes bouncing after a long-press menu selection', (tester) async {
@@ -378,24 +419,42 @@ void main() {
       expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
     });
 
-    testWidgets('compact mode fits Month without ellipsizing at large mobile text scale', (tester) async {
+    testWidgets('compact mode shows the full "Months" label at normal size and never clips when enlarged', (
+      tester,
+    ) async {
+      // "Months" is the widest grouping label. At the default text scale it must render at full
+      // size inside the compact chip; when the OS enlarges text it may scale down to fit but must
+      // never clip (the old "Mo..." truncation).
       await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.month);
 
-      await tester.pumpConsumerWidget(
-        const MediaQuery(
-          data: MediaQueryData(textScaler: TextScaler.linear(1.25)),
-          child: CustomScrollView(
-            slivers: [
-              SliverAppBar(actions: [TimelineGroupingSelector.compact()]),
-            ],
+      Future<void> pumpAt(double scale) async {
+        await tester.pumpConsumerWidget(
+          MediaQuery(
+            data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+            child: const CustomScrollView(
+              slivers: [
+                SliverAppBar(actions: [TimelineGroupingSelector.compact()]),
+              ],
+            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
+      }
 
-      expect(find.text('Month'), findsOneWidget);
-      expect(find.textContaining('...'), findsNothing);
-      expect(tester.getSize(find.byKey(const Key('timeline-grouping-compact-selector'))).width, lessThanOrEqualTo(112));
+      // Default scale: the glyphs are painted at their full intrinsic width (not shrunk, not clipped).
+      await pumpAt(1.0);
+      expect(find.text('Months'), findsOneWidget);
+      expect(find.text('Month'), findsNothing);
+      final paragraph = tester.renderObject<RenderParagraph>(find.text('Months'));
+      final intrinsic = paragraph.getMaxIntrinsicWidth(double.infinity);
+      expect(tester.getRect(find.text('Months')).width, greaterThanOrEqualTo(intrinsic - 0.5));
+      expect(tester.takeException(), isNull);
+
+      // Enlarged text: the label still renders in full (scaled down to fit), bounded by the chip.
+      await pumpAt(2.0);
+      expect(find.text('Months'), findsOneWidget);
+      final chipWidth = tester.getSize(find.byKey(const Key('timeline-grouping-compact-selector'))).width;
+      expect(tester.getRect(find.text('Months')).width, lessThanOrEqualTo(chipWidth));
       expect(tester.takeException(), isNull);
     });
   });

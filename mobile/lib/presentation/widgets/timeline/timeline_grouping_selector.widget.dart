@@ -32,7 +32,9 @@ class TimelineGroupingSelector extends ConsumerWidget {
 
   static const double _maxWidth = 218;
   static const double _height = 48;
-  static const double _compactWidth = 84;
+  // Wide enough for the longest label ("Months") at the default text scale; larger text scales
+  // down via FittedBox rather than truncating.
+  static const double _compactWidth = 112;
   static const double _compactHeight = 40;
 
   final bool enabled;
@@ -101,66 +103,42 @@ class TimelineGroupingSelector extends ConsumerWidget {
   }
 }
 
-class _TimelineGroupingCompactSelector extends StatefulWidget {
+/// Bounce direction of the compact timeline-grouping chip: `true` means the next tap zooms in
+/// toward "All", `false` means it zooms out toward "Years". Kept in a provider rather than widget
+/// State because the timeline tears down and rebuilds the app-bar subtree on every segment reload
+/// (a grouping change flashes the loading state). Storing the direction in ephemeral State reset
+/// it on each reload, trapping the chip between "Months" and "All" so it never bounced back to
+/// "Years". The extremes are self-correcting (a tap on Years/All forces the direction), so only
+/// the ambiguous middle ("Months") relies on this surviving recreation.
+final timelineGroupingZoomingInProvider = StateProvider<bool>((ref) => true);
+
+class _TimelineGroupingCompactSelector extends ConsumerWidget {
   const _TimelineGroupingCompactSelector({required this.selected, required this.enabled, required this.onSelected});
 
   final GroupAssetsBy selected;
   final bool enabled;
   final Future<void> Function(GroupAssetsBy groupBy) onSelected;
 
-  @override
-  State<_TimelineGroupingCompactSelector> createState() => _TimelineGroupingCompactSelectorState();
-}
-
-class _TimelineGroupingCompactSelectorState extends State<_TimelineGroupingCompactSelector> {
-  // Direction the next tap moves: true = toward Day (zoom in), false = toward Year (zoom out).
-  bool _zoomingIn = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _syncDirectionAtExtreme(widget.selected);
-  }
-
-  @override
-  void didUpdateWidget(_TimelineGroupingCompactSelector oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.selected != widget.selected) {
-      _syncDirectionAtExtreme(widget.selected);
-    }
-  }
-
-  // At the extremes the direction is forced; in the middle (Month) keep whatever it was.
-  void _syncDirectionAtExtreme(GroupAssetsBy selected) {
+  Future<void> _selectNext(WidgetRef ref) async {
+    final direction = ref.read(timelineGroupingZoomingInProvider.notifier);
+    final GroupAssetsBy next;
     switch (selected) {
       case GroupAssetsBy.year:
-        _zoomingIn = true;
-      case GroupAssetsBy.month:
-        break;
-      case GroupAssetsBy.day || GroupAssetsBy.auto || GroupAssetsBy.none:
-        _zoomingIn = false;
-    }
-  }
-
-  Future<void> _selectNext() async {
-    final GroupAssetsBy next;
-    switch (widget.selected) {
-      case GroupAssetsBy.year:
         next = GroupAssetsBy.month;
-        _zoomingIn = true;
+        direction.state = true; // continue zooming in toward All
       case GroupAssetsBy.month:
-        if (_zoomingIn) {
+        if (direction.state) {
           next = GroupAssetsBy.day;
-          _zoomingIn = false; // just arrived at the zoom-in extreme (Day)
+          direction.state = false; // reached the zoom-in extreme (All); bounce back up next
         } else {
           next = GroupAssetsBy.year;
-          _zoomingIn = true; // just arrived at the zoom-out extreme (Year)
+          direction.state = true; // reached the zoom-out extreme (Years); bounce back down next
         }
       case GroupAssetsBy.day || GroupAssetsBy.auto || GroupAssetsBy.none:
         next = GroupAssetsBy.month;
-        _zoomingIn = false;
+        direction.state = false; // continue zooming out toward Years
     }
-    await widget.onSelected(next);
+    await onSelected(next);
   }
 
   Future<void> _showMenu(BuildContext context) async {
@@ -182,55 +160,57 @@ class _TimelineGroupingCompactSelectorState extends State<_TimelineGroupingCompa
     );
 
     if (selectedGroupBy != null && context.mounted) {
-      await widget.onSelected(selectedGroupBy);
+      await onSelected(selectedGroupBy);
     }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final label = _compactLabel(context, widget.selected);
-    final foreground = widget.enabled ? colors.onPrimary : colors.onSurface.withValues(alpha: 0.5);
+    final label = _label(context, selected);
+    final foreground = enabled ? colors.onPrimary : colors.onSurface.withValues(alpha: 0.5);
 
     return Semantics(
       key: const Key('timeline-grouping-compact-selector'),
       container: true,
       button: true,
-      enabled: widget.enabled,
+      enabled: enabled,
       label: _translated('timeline_grouping_selector', 'Timeline grouping'),
       value: label,
-      onTap: widget.enabled ? () => unawaited(_selectNext()) : null,
-      onLongPress: widget.enabled ? () => unawaited(_showMenu(context)) : null,
+      onTap: enabled ? () => unawaited(_selectNext(ref)) : null,
+      onLongPress: enabled ? () => unawaited(_showMenu(context)) : null,
       child: ExcludeSemantics(
         child: Opacity(
-          opacity: widget.enabled ? 1 : 0.45,
+          opacity: enabled ? 1 : 0.45,
           child: SizedBox(
             width: TimelineGroupingSelector._compactWidth,
             height: TimelineGroupingSelector._compactHeight,
             child: Material(
-              color: widget.enabled ? colors.primary : colors.surfaceContainerHighest,
+              color: enabled ? colors.primary : colors.surfaceContainerHighest,
               shape: StadiumBorder(
                 side: BorderSide(
-                  color: widget.enabled
+                  color: enabled
                       ? colors.primary.withValues(alpha: 0.42)
                       : colors.outlineVariant.withValues(alpha: 0.7),
                 ),
               ),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
-                onTap: widget.enabled ? () => unawaited(_selectNext()) : null,
-                onLongPress: widget.enabled ? () => unawaited(_showMenu(context)) : null,
+                onTap: enabled ? () => unawaited(_selectNext(ref)) : null,
+                onLongPress: enabled ? () => unawaited(_showMenu(context)) : null,
                 borderRadius: BorderRadius.circular(999),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   child: Center(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.clip,
-                      softWrap: false,
-                      style: theme.textTheme.labelLarge?.copyWith(color: foreground, fontWeight: FontWeight.w700),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        softWrap: false,
+                        style: theme.textTheme.labelLarge?.copyWith(color: foreground, fontWeight: FontWeight.w700),
+                      ),
                     ),
                   ),
                 ),
@@ -303,21 +283,15 @@ class _TimelineGroupingSegment extends StatelessWidget {
   }
 }
 
+// Labels mirror the web timeline grouping control (Years / Months / All) so the two
+// platforms read identically. Both the inline segments and the compact app-bar chip use
+// these; the chip is sized to fit the widest label ("Months") to avoid truncation.
 String _label(BuildContext context, GroupAssetsBy groupBy) {
   return switch (groupBy) {
     GroupAssetsBy.year => _translated('timeline_grouping_years', 'Years'),
     GroupAssetsBy.month => _translated('timeline_grouping_months', 'Months'),
-    GroupAssetsBy.day => _translated('timeline_grouping_days', 'Days'),
-    GroupAssetsBy.auto || GroupAssetsBy.none => _translated('timeline_grouping_days', 'Days'),
-  };
-}
-
-String _compactLabel(BuildContext context, GroupAssetsBy groupBy) {
-  return switch (groupBy) {
-    GroupAssetsBy.year => _translated('timeline_grouping_year', 'Year'),
-    GroupAssetsBy.month => _translated('timeline_grouping_month', 'Month'),
-    GroupAssetsBy.day => _translated('timeline_grouping_day', 'Day'),
-    GroupAssetsBy.auto || GroupAssetsBy.none => _translated('timeline_grouping_day', 'Day'),
+    GroupAssetsBy.day => _translated('timeline_grouping_all', 'All'),
+    GroupAssetsBy.auto || GroupAssetsBy.none => _translated('timeline_grouping_all', 'All'),
   };
 }
 

@@ -62,7 +62,9 @@ void main() {
 
       expect(find.byType(TimelineGroupingSelector), findsOneWidget);
       expect(find.byKey(const Key('timeline-grouping-compact-selector')), findsOneWidget);
-      expect(tester.getSize(find.byKey(const Key('timeline-grouping-compact-selector'))).width, lessThanOrEqualTo(92));
+      // The chip is sized to fit its widest label ("Months") without truncating, yet stays a
+      // compact app-bar action rather than sprawling across the bar.
+      expect(tester.getSize(find.byKey(const Key('timeline-grouping-compact-selector'))).width, lessThanOrEqualTo(120));
       expect(find.byType(SortIconButton), findsOneWidget);
       expect(find.byType(FilterIconButton), findsOneWidget);
     });

@@ -2664,7 +2664,7 @@
   "time_based_memories": "Time-based memories",
   "time_based_memories_duration": "Number of seconds to display each image.",
   "timeline": "Timeline",
-  "timeline_grouping_days": "Days",
+  "timeline_grouping_all": "All",
   "timeline_grouping_months": "Months",
   "timeline_grouping_selector": "Timeline grouping",
   "timeline_grouping_years": "Years",
