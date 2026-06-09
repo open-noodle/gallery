@@ -58,7 +58,9 @@ export async function uploadTakeoutItem(item: TakeoutMediaItem, options: ImportO
     formData.append('fileCreatedAt', fileCreatedAt);
     formData.append('fileModifiedAt', fileCreatedAt);
     formData.append('isFavorite', String(options.importFavorites && item.metadata?.isFavorite === true));
-    formData.append('duration', '0:00:00.000000');
+    // Do not send `duration`: upstream #28003 changed the server DTO to a numeric (ms) field
+    // (z.coerce.number().int()), which rejects the old "0:00:00.000000" string as NaN -> 400.
+    // The canonical file-uploader omits duration entirely; the server probes it during processing.
     formData.append('assetData', new File([file], item.name, { lastModified: item.lastModified }));
 
     // Upload
