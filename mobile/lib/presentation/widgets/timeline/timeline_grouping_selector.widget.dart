@@ -32,9 +32,10 @@ class TimelineGroupingSelector extends ConsumerWidget {
 
   static const double _maxWidth = 218;
   static const double _height = 48;
-  // Wide enough for the longest label ("Months") at the default text scale; larger text scales
-  // down via FittedBox rather than truncating.
-  static const double _compactWidth = 112;
+  // Kept just wide enough for the longest label ("Months") at the default text scale so the chip
+  // hugs its label instead of sprawling across the app bar; larger text scales down via FittedBox
+  // rather than truncating.
+  static const double _compactWidth = 98;
   static const double _compactHeight = 40;
 
   final bool enabled;
@@ -201,7 +202,7 @@ class _TimelineGroupingCompactSelector extends ConsumerWidget {
                 onLongPress: enabled ? () => unawaited(_showMenu(context)) : null,
                 borderRadius: BorderRadius.circular(999),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
                   child: Center(
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
