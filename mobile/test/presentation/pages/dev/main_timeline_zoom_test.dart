@@ -230,6 +230,127 @@ void main() {
     expect(find.bySemanticsLabel('June 2024, 30 photos, show days'), findsOneWidget);
     expect(find.bySemanticsLabel('February 2026, 30 photos, show days'), findsNothing);
   });
+
+  // Regression for Bug B: grouping round trip (All → Months → All) without
+  // tapping any card must return to the same day, not truncate to the 1st of
+  // the month.
+  testWidgets('Round-trip All → Months → All without card tap returns to the same day (not 1st of month)', (
+    tester,
+  ) async {
+    await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.day);
+
+    // Two day buckets for June: the 9th is the most-recent (top), the 1st is
+    // further down. We put older content below so there is room to scroll.
+    final factory = _factoryForServices(
+      yearService: _service([
+        TimeBucket(date: DateTime(2026), assetCount: 9),
+        TimeBucket(date: DateTime(2025), assetCount: 9),
+      ]),
+      monthService: _service([
+        TimeBucket(date: DateTime(2026, 6), assetCount: 9),
+        TimeBucket(date: DateTime(2026, 5), assetCount: 9),
+      ]),
+      dayService: _service([
+        TimeBucket(date: DateTime(2026, 6, 9), assetCount: 9),
+        TimeBucket(date: DateTime(2026, 6, 1), assetCount: 9),
+        TimeBucket(date: DateTime(2026, 5, 10), assetCount: 9),
+      ]),
+    );
+    addTearDown(factory.disposeServices);
+
+    await _pumpPhotosTimeline(tester, factory);
+    final ref = ProviderScope.containerOf(tester.element(find.byType(Timeline)));
+
+    // At this point the day timeline is loaded at the top — Jun 9 is visible.
+    // Step 1: switch to Months (no card tap — simulates the grouping selector).
+    await ref.read(settingsProvider).write(.timelineGroupAssetsBy, GroupAssetsBy.month);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pumpAndSettle();
+
+    expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+
+    // Step 2: switch back to All without tapping any card.
+    await ref.read(settingsProvider).write(.timelineGroupAssetsBy, GroupAssetsBy.day);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pumpAndSettle();
+
+    expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
+
+    // The timeline must have resolved back to the Jun 9 segment (not Jun 1).
+    // Both segments are in the day timeline, so the anchor date drives which one
+    // is scrolled to. Jun 9 is the first bucket (index 0, offset 0) so the
+    // scroll position stays near the top — the anchor was Jun 9, NOT Jun 1.
+    final notifier = ref.read(timelineZoomAnchorProvider.notifier);
+    // After the anchor is consumed (clear) the lastPositionDate is Jun 9 (not Jun 1).
+    expect(notifier.lastPositionDate, DateTime(2026, 6, 9));
+  });
+
+  // Scrolled-in-between variant: if the user actually scrolls while in Months
+  // (so a different month is on top), round-tripping back to All anchors to
+  // that other month's first day — not the original fine-grained date.
+  // We need enough month cards to exceed the test viewport (~600px) so that
+  // scrolling to maxScrollExtent actually moves the scroll position.
+  // Each overview card is 144 + 12 vertical padding (6 top + 6 bottom) = 156px; 5 cards = 780px > 600px.
+  testWidgets('Round-trip with scroll in month view uses the scrolled-to month', (tester) async {
+    await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.day);
+
+    final factory = _factoryForServices(
+      yearService: _service([
+        TimeBucket(date: DateTime(2026), assetCount: 9),
+        TimeBucket(date: DateTime(2025), assetCount: 9),
+      ]),
+      monthService: _service([
+        TimeBucket(date: DateTime(2026, 6), assetCount: 9),
+        TimeBucket(date: DateTime(2026, 5), assetCount: 9),
+        TimeBucket(date: DateTime(2026, 4), assetCount: 9),
+        TimeBucket(date: DateTime(2026, 3), assetCount: 9),
+        TimeBucket(date: DateTime(2026, 2), assetCount: 9),
+      ]),
+      dayService: _service([
+        TimeBucket(date: DateTime(2026, 6, 9), assetCount: 9),
+        TimeBucket(date: DateTime(2026, 5, 10), assetCount: 9),
+        TimeBucket(date: DateTime(2026, 4, 1), assetCount: 9),
+        TimeBucket(date: DateTime(2026, 3, 1), assetCount: 9),
+        TimeBucket(date: DateTime(2026, 2, 1), assetCount: 9),
+      ]),
+    );
+    addTearDown(factory.disposeServices);
+
+    await _pumpPhotosTimeline(tester, factory);
+    final ref = ProviderScope.containerOf(tester.element(find.byType(Timeline)));
+
+    // Switch to Months — Jun 9 remembered.
+    await ref.read(settingsProvider).write(.timelineGroupAssetsBy, GroupAssetsBy.month);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pumpAndSettle();
+
+    // Scroll to the bottom in month view — the top-visible month is no longer June.
+    final scrollable = tester.state<ScrollableState>(find.byType(Scrollable).first);
+    // Verify there is actually scroll room (5 cards × 156px = 780px > viewport).
+    expect(scrollable.position.maxScrollExtent, greaterThan(0));
+    scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    // Switch back to All. The top-visible month is no longer June (user scrolled
+    // past it), so the remembered Jun 9 is outside the top bucket's period and
+    // must be dropped in favour of the bucket's truncated date.
+    await ref.read(settingsProvider).write(.timelineGroupAssetsBy, GroupAssetsBy.day);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pumpAndSettle();
+
+    expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
+    // lastPositionDate was overwritten with the top-visible month's bucket date
+    // (NOT Jun 9, since the user scrolled away from June). A negative assertion is used
+    // deliberately: the exact top-visible month depends on viewport/card-extent layout math,
+    // so we assert only that the stale Jun 9 was dropped — the kept-vs-dropped logic itself is
+    // pinned by the pure-function tests in timeline_grouping_anchor_test.dart.
+    expect(ref.read(timelineZoomAnchorProvider.notifier).lastPositionDate, isNot(DateTime(2026, 6, 9)));
+  });
 }
 
 ({TimelineFactory factory, Future<void> Function() disposeServices}) _factoryForServices({
