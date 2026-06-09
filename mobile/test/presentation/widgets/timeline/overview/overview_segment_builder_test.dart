@@ -21,6 +21,7 @@ import 'package:immich_mobile/presentation/widgets/timeline/overview/overview_se
 import 'package:immich_mobile/presentation/widgets/timeline/overview/overview_segment_builder.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/timeline/overview_drilldown.provider.dart';
+import 'package:immich_mobile/providers/timeline/overview_representative_cache.provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
 // easy_localization initializes shared_preferences internally; tests need the mock initializer.
 // ignore: depend_on_referenced_packages
@@ -296,5 +297,178 @@ void main() {
     await tester.pump();
 
     expect(tapped, isEmpty);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Cache-based tests (Bug A regression guards)
+  // ---------------------------------------------------------------------------
+
+  Widget wrapWithScope(Widget child, {required TimelineService timelineService, List<Override> overrides = const []}) {
+    return EasyLocalization(
+      supportedLocales: const [Locale('en')],
+      path: '../i18n',
+      fallbackLocale: const Locale('en'),
+      child: ProviderScope(
+        overrides: [
+          timelineServiceProvider.overrideWithValue(timelineService),
+          timelineOverviewRepresentativeCacheProvider.overrideWith(TimelineOverviewRepresentativeCacheNotifier.new),
+          ...overrides,
+        ],
+        child: MaterialApp(
+          home: Scaffold(body: Center(child: child)),
+        ),
+      ),
+    );
+  }
+
+  testWidgets('card shows Thumbnail from cache even when buffer no longer covers firstAssetIndex', (tester) async {
+    // Bug A regression guard:
+    // 1. Pre-populate the cache with a representative for index 0.
+    // 2. Move the buffer far away (evicts index 0).
+    // 3. Replace the asset source with one that never resolves (so a FutureBuilder fallback
+    //    would stay gray forever).
+    // 4. Force a widget rebuild via setState — with the cache it shows the Thumbnail
+    //    immediately; without the cache it shows the gray fallback.
+    final representativeAsset = TestUtils.createRemoteAsset(id: 'representative', width: 200, height: 100);
+    final neverCompleter = Completer<List<BaseAsset>>();
+    var useNeverCompleter = false;
+
+    final pool = List.generate(2000, (i) => i == 0 ? representativeAsset : TestUtils.createRemoteAsset(id: 'asset-$i'));
+    final timelineService = TimelineService((
+      bucketSource: () => Stream.value([TimeBucket(date: DateTime(2025), assetCount: pool.length)]),
+      assetSource: (offset, count) async {
+        if (useNeverCompleter) return neverCompleter.future;
+        final end = (offset + count).clamp(0, pool.length);
+        final start = offset.clamp(0, end);
+        return pool.sublist(start, end);
+      },
+      origin: TimelineOrigin.main,
+    ));
+    addTearDown(timelineService.dispose);
+
+    final segment = TimelineOverviewSegment(
+      firstIndex: 0,
+      lastIndex: 0,
+      startOffset: 0,
+      endOffset: kTimelineOverviewSegmentExtent,
+      firstAssetIndex: 0,
+      bucket: TimeBucket(date: DateTime(2025), assetCount: pool.length),
+      groupBy: GroupAssetsBy.year,
+      header: HeaderType.year,
+    );
+
+    // Use a StatefulBuilder so we can force a rebuild.
+    late StateSetter forceRebuild;
+    await tester.pumpWidget(
+      wrapWithScope(
+        StatefulBuilder(
+          builder: (ctx, setState) {
+            forceRebuild = setState;
+            return segment.builder(ctx, segment.firstIndex);
+          },
+        ),
+        timelineService: timelineService,
+      ),
+    );
+    // Let the post-frame callback fire and ensure() resolve.
+    await tester.pumpAndSettle();
+
+    // Cache populated: card must show the thumbnail.
+    expect(find.byType(Thumbnail), findsOneWidget);
+
+    // Move the buffer far away (evicts index 0 — index 1500 is beyond the initial 1024-asset
+    // buffer window so this forces a reload that evicts index 0) and switch to the
+    // never-resolving source for subsequent loads.
+    await timelineService.loadAssets(1500, 1);
+    useNeverCompleter = true;
+
+    // Trigger a rebuild (simulates a TimelineReloadEvent → setState).
+    forceRebuild(() {});
+    await tester.pump();
+
+    // Must still show the thumbnail — cache hit, not the gray fallback from a FutureBuilder.
+    expect(find.byType(Thumbnail), findsOneWidget);
+    expect(find.byKey(const ValueKey('timeline-overview-card-fallback')), findsNothing);
+  });
+
+  testWidgets('uncached bucket shows fallback and schedules ensure on first build', (tester) async {
+    final asset = TestUtils.createRemoteAsset(id: 'asset-0', width: 200, height: 100);
+    // Delay the asset source resolution so we can observe the fallback state.
+    final assetCompleter = Completer<List<BaseAsset>>();
+    final timelineService = TimelineService((
+      bucketSource: () => Stream.value([TimeBucket(date: DateTime(2025), assetCount: 1)]),
+      assetSource: (_, _) async => assetCompleter.future,
+      origin: TimelineOrigin.main,
+    ));
+    addTearDown(timelineService.dispose);
+
+    final segment = TimelineOverviewSegment(
+      firstIndex: 0,
+      lastIndex: 0,
+      startOffset: 0,
+      endOffset: kTimelineOverviewSegmentExtent,
+      firstAssetIndex: 0,
+      bucket: TimeBucket(date: DateTime(2025), assetCount: 1),
+      groupBy: GroupAssetsBy.year,
+      header: HeaderType.year,
+    );
+
+    await tester.pumpWidget(
+      wrapWithScope(
+        Builder(builder: (ctx) => segment.builder(ctx, segment.firstIndex)),
+        timelineService: timelineService,
+      ),
+    );
+    await tester.pump(); // first frame + post-frame callback
+
+    // While loading: fallback is shown.
+    expect(find.byKey(const ValueKey('timeline-overview-card-fallback')), findsOneWidget);
+    expect(find.byType(Thumbnail), findsNothing);
+
+    // Complete the load — cache is populated, card rebuilds to show thumbnail.
+    assetCompleter.complete([asset]);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Thumbnail), findsOneWidget);
+    expect(find.byKey(const ValueKey('timeline-overview-card-fallback')), findsNothing);
+  });
+
+  testWidgets('zero-count bucket shows fallback and does not schedule ensure', (tester) async {
+    var assetSourceCallCount = 0;
+    final timelineService = TimelineService((
+      bucketSource: () => Stream.value([TimeBucket(date: DateTime(2025), assetCount: 0)]),
+      assetSource: (_, _) async {
+        assetSourceCallCount++;
+        return const <BaseAsset>[];
+      },
+      origin: TimelineOrigin.main,
+    ));
+    addTearDown(timelineService.dispose);
+
+    final segment = TimelineOverviewSegment(
+      firstIndex: 0,
+      lastIndex: 0,
+      startOffset: 0,
+      endOffset: kTimelineOverviewSegmentExtent,
+      firstAssetIndex: 0,
+      bucket: TimeBucket(date: DateTime(2025), assetCount: 0),
+      groupBy: GroupAssetsBy.year,
+      header: HeaderType.year,
+    );
+
+    await tester.pumpWidget(
+      wrapWithScope(
+        Builder(builder: (ctx) => segment.builder(ctx, segment.firstIndex)),
+        timelineService: timelineService,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Zero-count bucket: fallback shown, no ensure scheduled (assetSourceCallCount stays at 0
+    // since the bucket stream also has assetCount:0 so the service loads no assets).
+    expect(find.byKey(const ValueKey('timeline-overview-card-fallback')), findsOneWidget);
+    expect(find.byType(Thumbnail), findsNothing);
+    // The cache should have no entry for this bucket.
+    expect(assetSourceCallCount, 0);
   });
 }
