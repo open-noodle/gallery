@@ -8,13 +8,15 @@ import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart'
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 
 void main() {
-  ProviderContainer containerFor(GroupAssetsBy groupBy) {
+  ProviderContainer containerFor(GroupAssetsBy groupBy, {bool dateless = false}) {
     final service = TimelineService((
       assetSource: (offset, count) async => const [],
-      bucketSource: () => Stream.value([
-        TimeBucket(date: DateTime(2025), assetCount: 2),
-        TimeBucket(date: DateTime(2024), assetCount: 1),
-      ]),
+      bucketSource: dateless
+          ? () => Stream.value([const Bucket(assetCount: 3), const Bucket(assetCount: 2)])
+          : () => Stream.value([
+              TimeBucket(date: DateTime(2025), assetCount: 2),
+              TimeBucket(date: DateTime(2024), assetCount: 1),
+            ]),
       origin: TimelineOrigin.main,
     ));
 
@@ -57,5 +59,56 @@ void main() {
     final segments = await container.read(timelineSegmentProvider.future);
 
     expect(segments, everyElement(isA<FixedSegment>()));
+  });
+
+  // Slice 3: date-less bucket fallback tests
+
+  test('date-less buckets with month setting fall back to fixed grid segments', () async {
+    final container = containerFor(GroupAssetsBy.month, dateless: true);
+
+    final segments = await container.read(timelineSegmentProvider.future);
+
+    expect(segments, everyElement(isA<FixedSegment>()));
+  });
+
+  test('date-less buckets with year setting fall back to fixed grid segments', () async {
+    final container = containerFor(GroupAssetsBy.year, dateless: true);
+
+    final segments = await container.read(timelineSegmentProvider.future);
+
+    expect(segments, everyElement(isA<FixedSegment>()));
+  });
+
+  test('TimeBuckets with month setting still use overview segments', () async {
+    final container = containerFor(GroupAssetsBy.month);
+
+    final segments = await container.read(timelineSegmentProvider.future);
+
+    expect(segments, everyElement(isA<TimelineOverviewSegment>()));
+  });
+
+  test('empty bucket list with month setting produces no segments and no throw', () async {
+    final service = TimelineService((
+      assetSource: (offset, count) async => const [],
+      bucketSource: () => Stream.value(const <Bucket>[]),
+      origin: TimelineOrigin.main,
+    ));
+
+    final container = ProviderContainer(
+      overrides: [
+        timelineServiceProvider.overrideWithValue(service),
+        timelineArgsProvider.overrideWithValue(
+          const TimelineArgs(maxWidth: 390, maxHeight: 800, columnCount: 3, groupBy: GroupAssetsBy.month),
+        ),
+      ],
+    );
+    addTearDown(() async {
+      container.dispose();
+      await service.dispose();
+    });
+
+    final segments = await container.read(timelineSegmentProvider.future);
+
+    expect(segments, isEmpty);
   });
 }
