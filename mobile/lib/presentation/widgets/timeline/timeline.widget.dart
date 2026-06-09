@@ -20,6 +20,7 @@ import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/sliver_segmented_list.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_drag_selection.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_anchor.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_pinch_zoom.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_scroll_target.dart';
 import 'package:immich_mobile/providers/asset_viewer/scroll_to_date_notifier.provider.dart';
@@ -269,11 +270,17 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
     if (segments == null) {
       return;
     }
-    final date = _currentTopVisibleDate(segments);
-    if (date == null) {
+    final topBucketDate = _currentTopVisibleDate(segments);
+    if (topBucketDate == null) {
       return;
     }
-    ref.read(timelineZoomAnchorProvider.notifier).setDate(date);
+    final anchorNotifier = ref.read(timelineZoomAnchorProvider.notifier);
+    final resolved = resolveGroupingChangeAnchorDate(
+      topBucketDate: topBucketDate,
+      previousGroupBy: previous,
+      remembered: anchorNotifier.lastPositionDate,
+    );
+    anchorNotifier.setDate(resolved);
   }
 
   DateTime? _currentTopVisibleDate(List<Segment> segments) {
