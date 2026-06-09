@@ -10,12 +10,15 @@
 // but we want a test that proves it, so a future refactor can't silently
 // break reactivity.
 
+import 'dart:async';
+
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/map.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:immich_mobile/infrastructure/entities/exif.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.drift.dart';
@@ -849,5 +852,247 @@ void main() {
     expect(emissions.last, isEmpty);
 
     await sub.cancel();
+  });
+
+  // ---------------------------------------------------------------------------
+  // fromAssetStream grouped buckets (Slice 1 — data layer)
+  // ---------------------------------------------------------------------------
+
+  /// Builds a [RemoteAsset] with a specific [createdAt]; all other fields are
+  /// fixed to valid defaults so the constructor is satisfied.
+  RemoteAsset makeTestAsset(String id, DateTime createdAt) => RemoteAsset(
+    id: id,
+    checksum: 'cs-$id',
+    ownerId: 'owner',
+    name: '$id.jpg',
+    type: AssetType.image,
+    createdAt: createdAt,
+    updatedAt: createdAt,
+    durationMs: 0,
+    isFavorite: false,
+    isEdited: false,
+  );
+
+  group('DriftTimelineRepository.fromAssetStream() grouped buckets', () {
+    // Four test assets spanning three months / two years (all in local time).
+    late List<BaseAsset> assets;
+
+    setUp(() {
+      assets = [
+        makeTestAsset('a1', DateTime(2024, 3, 20)),
+        makeTestAsset('a2', DateTime(2024, 3, 5)),
+        makeTestAsset('a3', DateTime(2024, 1, 15)),
+        makeTestAsset('a4', DateTime(2023, 12, 31)),
+      ];
+    });
+
+    test('groupBy month → TimeBuckets newest-first', () async {
+      final query = sut.fromAssetStream(
+        () => assets,
+        const Stream<int>.empty(),
+        TimelineOrigin.search,
+        groupBy: GroupAssetsBy.month,
+      );
+      final buckets = await query.bucketSource().first;
+      expect(buckets, [
+        TimeBucket(date: DateTime(2024, 3), assetCount: 2),
+        TimeBucket(date: DateTime(2024, 1), assetCount: 1),
+        TimeBucket(date: DateTime(2023, 12), assetCount: 1),
+      ]);
+    });
+
+    test('groupBy year → TimeBuckets newest-first', () async {
+      final query = sut.fromAssetStream(
+        () => assets,
+        const Stream<int>.empty(),
+        TimelineOrigin.search,
+        groupBy: GroupAssetsBy.year,
+      );
+      final buckets = await query.bucketSource().first;
+      expect(buckets, [
+        TimeBucket(date: DateTime(2024), assetCount: 3),
+        TimeBucket(date: DateTime(2023), assetCount: 1),
+      ]);
+    });
+
+    test('groupBy day → day TimeBuckets newest-first', () async {
+      final query = sut.fromAssetStream(
+        () => assets,
+        const Stream<int>.empty(),
+        TimelineOrigin.search,
+        groupBy: GroupAssetsBy.day,
+      );
+      final buckets = await query.bucketSource().first;
+      expect(buckets, [
+        TimeBucket(date: DateTime(2024, 3, 20), assetCount: 1),
+        TimeBucket(date: DateTime(2024, 3, 5), assetCount: 1),
+        TimeBucket(date: DateTime(2024, 1, 15), assetCount: 1),
+        TimeBucket(date: DateTime(2023, 12, 31), assetCount: 1),
+      ]);
+    });
+
+    test('groupBy month, descending false → buckets ascending and assets oldest-first', () async {
+      final query = sut.fromAssetStream(
+        () => assets,
+        const Stream<int>.empty(),
+        TimelineOrigin.search,
+        groupBy: GroupAssetsBy.month,
+        descending: false,
+      );
+      final buckets = await query.bucketSource().first;
+      expect(buckets, [
+        TimeBucket(date: DateTime(2023, 12), assetCount: 1),
+        TimeBucket(date: DateTime(2024, 1), assetCount: 1),
+        TimeBucket(date: DateTime(2024, 3), assetCount: 2),
+      ]);
+      final fetchedAssets = await query.assetSource(0, assets.length);
+      // Oldest-first: 2023-12-31, 2024-01-15, 2024-03-05, 2024-03-20
+      expect(fetchedAssets.map((a) => a.createdAt), [
+        DateTime(2023, 12, 31),
+        DateTime(2024, 1, 15),
+        DateTime(2024, 3, 5),
+        DateTime(2024, 3, 20),
+      ]);
+    });
+
+    test('groupBy month, descending → assetSource is date-desc and bucket firstAssetIndex is consistent', () async {
+      final query = sut.fromAssetStream(
+        () => assets,
+        const Stream<int>.empty(),
+        TimelineOrigin.search,
+        groupBy: GroupAssetsBy.month,
+      );
+      final buckets = await query.bucketSource().first;
+      final fetchedAssets = await query.assetSource(0, assets.length);
+      // Assets should be date-desc: 2024-03-20, 2024-03-05, 2024-01-15, 2023-12-31
+      expect(fetchedAssets.map((a) => a.createdAt), [
+        DateTime(2024, 3, 20),
+        DateTime(2024, 3, 5),
+        DateTime(2024, 1, 15),
+        DateTime(2023, 12, 31),
+      ]);
+      // Verify each bucket's firstAssetIndex (cumulative) lands in the right bucket.
+      int offset = 0;
+      for (final bucket in buckets) {
+        final tb = bucket as TimeBucket;
+        final rep = fetchedAssets[offset];
+        final repDate = rep.createdAt.toLocal();
+        expect(repDate.year, tb.date.year, reason: 'Year mismatch at offset $offset');
+        expect(repDate.month, tb.date.month, reason: 'Month mismatch at offset $offset');
+        offset += bucket.assetCount;
+      }
+    });
+
+    test(
+      'groupBy none (default) → date-less Bucket segments unchanged and assetSource preserves input order',
+      () async {
+        final query = sut.fromAssetStream(() => assets, const Stream<int>.empty(), TimelineOrigin.search);
+        final buckets = await query.bucketSource().first;
+        // none uses _generateBuckets: date-less Bucket(assetCount: ≤200 per segment)
+        for (final bucket in buckets) {
+          expect(bucket, isA<Bucket>());
+          expect(bucket, isNot(isA<TimeBucket>()));
+        }
+        expect(buckets.fold<int>(0, (sum, b) => sum + b.assetCount), assets.length);
+        // assetSource preserves the original input order (no sorting for none)
+        final fetched = await query.assetSource(0, assets.length);
+        expect(fetched.map((a) => a.name), assets.map((a) => a.name));
+      },
+    );
+
+    test('empty asset list → bucketSource emits empty list; no throw', () async {
+      final query = sut.fromAssetStream(
+        () => [],
+        const Stream<int>.empty(),
+        TimelineOrigin.search,
+        groupBy: GroupAssetsBy.month,
+      );
+      final buckets = await query.bucketSource().first;
+      expect(buckets, isEmpty);
+    });
+
+    test('single bucket: all assets in one month → one TimeBucket', () async {
+      final singleMonth = [
+        makeTestAsset('s1', DateTime(2024, 5, 1)),
+        makeTestAsset('s2', DateTime(2024, 5, 15)),
+        makeTestAsset('s3', DateTime(2024, 5, 31)),
+      ];
+      final query = sut.fromAssetStream(
+        () => singleMonth,
+        const Stream<int>.empty(),
+        TimelineOrigin.search,
+        groupBy: GroupAssetsBy.month,
+      );
+      final buckets = await query.bucketSource().first;
+      expect(buckets, [TimeBucket(date: DateTime(2024, 5), assetCount: 3)]);
+    });
+
+    test('year boundary: 2023-12-31 and 2024-01-01 → correct month and year buckets', () async {
+      final boundary = [makeTestAsset('b1', DateTime(2023, 12, 31)), makeTestAsset('b2', DateTime(2024, 1, 1))];
+      // month grouping: two separate months (newest-first)
+      final monthQuery = sut.fromAssetStream(
+        () => boundary,
+        const Stream<int>.empty(),
+        TimelineOrigin.search,
+        groupBy: GroupAssetsBy.month,
+      );
+      final monthBuckets = await monthQuery.bucketSource().first;
+      expect(monthBuckets, [
+        TimeBucket(date: DateTime(2024, 1), assetCount: 1),
+        TimeBucket(date: DateTime(2023, 12), assetCount: 1),
+      ]);
+      // year grouping: two separate years (newest-first)
+      final yearQuery = sut.fromAssetStream(
+        () => boundary,
+        const Stream<int>.empty(),
+        TimelineOrigin.search,
+        groupBy: GroupAssetsBy.year,
+      );
+      final yearBuckets = await yearQuery.bucketSource().first;
+      expect(yearBuckets, [
+        TimeBucket(date: DateTime(2024), assetCount: 1),
+        TimeBucket(date: DateTime(2023), assetCount: 1),
+      ]);
+    });
+
+    test('re-emission: appending an asset triggers re-bucketing', () async {
+      final mutableAssets = <BaseAsset>[
+        makeTestAsset('r1', DateTime(2024, 3, 20)),
+        makeTestAsset('r2', DateTime(2024, 3, 5)),
+        makeTestAsset('r3', DateTime(2024, 1, 15)),
+        makeTestAsset('r4', DateTime(2023, 12, 31)),
+      ];
+      final controller = StreamController<int>();
+      final query = sut.fromAssetStream(
+        () => mutableAssets,
+        controller.stream,
+        TimelineOrigin.search,
+        groupBy: GroupAssetsBy.month,
+      );
+
+      final emissions = <List<Bucket>>[];
+      final sub = query.bucketSource().listen(emissions.add);
+
+      // First emission: 3 buckets
+      await Future<void>.delayed(Duration.zero);
+      expect(emissions, hasLength(1));
+      expect(emissions.first, hasLength(3));
+
+      // Add a new asset in a new month and signal via the stream
+      mutableAssets.add(makeTestAsset('r5', DateTime(2024, 6, 1)));
+      controller.add(mutableAssets.length);
+
+      await Future<void>.delayed(Duration.zero);
+      expect(emissions, hasLength(2));
+      expect(emissions.last, hasLength(4)); // new 2024-06 bucket added
+      expect(
+        emissions.last.first,
+        TimeBucket(date: DateTime(2024, 6), assetCount: 1),
+        reason: 'Newest bucket should be 2024-06',
+      );
+
+      await sub.cancel();
+      await controller.close();
+    });
   });
 }
