@@ -14,6 +14,7 @@ import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observe
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info-cache';
 import { authManager } from '$lib/managers/auth-manager.svelte';
+import { PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
 import SpacePeoplePage from './+page.svelte';
@@ -136,6 +137,7 @@ function renderPage(people: SharedSpacePersonResponseDto[], peopleStatistics?: S
 describe('Space people page', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount });
     clearPeopleFaceStatisticsInfoCache();
     authManager.setUser(userAdminFactory.build({ id: 'current-user-id' }));
     authManager.setPreferences(preferencesFactory.build());
@@ -146,7 +148,7 @@ describe('Space people page', () => {
     featureFlagsMock.value.peopleStatistics = true;
   });
 
-  it('renders named people alphabetically before unnamed people sorted by asset count', () => {
+  it('renders people by photo count by default, named before unnamed', () => {
     renderPage([
       makeSpacePerson({ id: 'space-person-unnamed-low', name: '', assetCount: 1 }),
       makeSpacePerson({ id: 'space-person-zoe', name: 'Zoe', assetCount: 99 }),
@@ -155,8 +157,8 @@ describe('Space people page', () => {
     ]);
 
     expect(screen.getAllByPlaceholderText('add_a_name').map((input) => (input as HTMLInputElement).value)).toEqual([
-      'Alice',
       'Zoe',
+      'Alice',
       '',
       '',
     ]);
@@ -166,10 +168,23 @@ describe('Space people page', () => {
         return url.pathname;
       }),
     ).toEqual([
-      '/spaces/space-1/people/space-person-alice',
       '/spaces/space-1/people/space-person-zoe',
+      '/spaces/space-1/people/space-person-alice',
       '/spaces/space-1/people/space-person-unnamed-high',
       '/spaces/space-1/people/space-person-unnamed-low',
+    ]);
+  });
+
+  it('orders people alphabetically when the people sort preference is Name', () => {
+    peopleViewSettings.set({ sortBy: PeopleSortBy.Name });
+    renderPage([
+      makeSpacePerson({ id: 'space-person-zoe', name: 'Zoe', assetCount: 99 }),
+      makeSpacePerson({ id: 'space-person-alice', name: 'Alice', assetCount: 1 }),
+    ]);
+
+    expect(screen.getAllByPlaceholderText('add_a_name').map((input) => (input as HTMLInputElement).value)).toEqual([
+      'Alice',
+      'Zoe',
     ]);
   });
 
