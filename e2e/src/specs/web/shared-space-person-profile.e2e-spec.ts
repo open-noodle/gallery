@@ -71,7 +71,11 @@ test.describe('Shared space person in the main People view', () => {
 
     await page.getByRole('button', { name: 'Open', exact: true }).click();
     await page.getByText('Set date of birth').click();
-    await page.locator('input[name="birthDate"]').fill('1953-04-12');
+    // The modal uses a bits-ui segmented date field (the named input is hidden);
+    // type month/day/year — segments auto-advance as each part completes.
+    await page.locator('[data-segment="month"]').click();
+    await page.keyboard.type('04121953');
+    await expect(page.locator('input[name="birthDate"]')).toHaveValue('1953-04-12');
     await page.getByRole('button', { name: 'Save' }).click();
 
     // The modal only closes when the save succeeds.
