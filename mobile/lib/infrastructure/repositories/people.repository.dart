@@ -32,10 +32,17 @@ class DriftPeopleRepository extends DriftDatabaseRepository {
     }).get();
   }
 
-  Future<List<DriftPerson>> getAllPeople() async {
+  Future<List<DriftPerson>> getAllPeople({PeopleSortBy sortBy = PeopleSortBy.photoCount}) async {
     final people = _db.personEntity;
     final faces = _db.assetFaceEntity;
     final assets = _db.remoteAssetEntity;
+
+    final favoritesFirst = OrderingTerm(expression: people.isFavorite, mode: OrderingMode.desc);
+    // BTRIM semantics: whitespace-only names belong to the unnamed tier.
+    final namedFirst = OrderingTerm(expression: people.name.trim().equals('').not(), mode: OrderingMode.desc);
+    final byFaceCount = OrderingTerm(expression: faces.id.count(), mode: OrderingMode.desc);
+    final byName = OrderingTerm(expression: people.name.trim().lower());
+    final byId = OrderingTerm(expression: people.id);
 
     final query =
         _db.select(people).join([
@@ -50,10 +57,10 @@ class DriftPeopleRepository extends DriftDatabaseRepository {
                 faces.deletedAt.isNull(),
           )
           ..groupBy([people.id], having: faces.id.count().isBiggerOrEqualValue(3) | people.name.equals('').not())
-          ..orderBy([
-            OrderingTerm(expression: people.name.equals('').not(), mode: OrderingMode.desc),
-            OrderingTerm(expression: faces.id.count(), mode: OrderingMode.desc),
-          ]);
+          ..orderBy(switch (sortBy) {
+            PeopleSortBy.photoCount => [favoritesFirst, namedFirst, byFaceCount, byName, byId],
+            PeopleSortBy.name => [favoritesFirst, namedFirst, byName, byFaceCount, byId],
+          });
 
     return query.map((row) {
       final person = row.readTable(people);

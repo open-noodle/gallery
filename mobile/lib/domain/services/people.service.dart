@@ -18,8 +18,8 @@ class DriftPeopleService {
     return _repository.getAssetPeople(assetId);
   }
 
-  Future<List<DriftPerson>> getAllPeople() {
-    return _repository.getAllPeople();
+  Future<List<DriftPerson>> getAllPeople({PeopleSortBy sortBy = PeopleSortBy.photoCount}) {
+    return _repository.getAllPeople(sortBy: sortBy);
   }
 
   Future<int> updateName(String personId, String name) async {

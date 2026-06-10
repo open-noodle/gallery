@@ -11,6 +11,8 @@ import 'package:immich_mobile/infrastructure/entities/local_album_asset.entity.d
 import 'package:immich_mobile/infrastructure/entities/local_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_album.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_album_asset.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/asset_face.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/person.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset_cloud_id.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/library.entity.drift.dart';
@@ -335,6 +337,53 @@ class MediumRepositoryContext {
             libraryId: Value(libraryId),
             addedById: Value(addedById),
             createdAt: Value(createdAt ?? DateTime.now()),
+          ),
+        );
+  }
+
+  Future<PersonEntityData> newPerson({
+    String? id,
+    required String ownerId,
+    String name = '',
+    bool isFavorite = false,
+    bool isHidden = false,
+  }) {
+    return db
+        .into(db.personEntity)
+        .insertReturning(
+          PersonEntityCompanion(
+            id: Value(id ?? const Uuid().v4()),
+            ownerId: Value(ownerId),
+            name: Value(name),
+            isFavorite: Value(isFavorite),
+            isHidden: Value(isHidden),
+          ),
+        );
+  }
+
+  Future<AssetFaceEntityData> newAssetFace({
+    String? id,
+    required String assetId,
+    String? personId,
+    bool isVisible = true,
+    DateTime? deletedAt,
+  }) {
+    return db
+        .into(db.assetFaceEntity)
+        .insertReturning(
+          AssetFaceEntityCompanion(
+            id: Value(id ?? const Uuid().v4()),
+            assetId: Value(assetId),
+            personId: Value(personId),
+            imageWidth: const Value(1000),
+            imageHeight: const Value(1000),
+            boundingBoxX1: const Value(0),
+            boundingBoxY1: const Value(0),
+            boundingBoxX2: const Value(100),
+            boundingBoxY2: const Value(100),
+            sourceType: const Value('machine-learning'),
+            isVisible: Value(isVisible),
+            deletedAt: Value(deletedAt),
           ),
         );
   }
