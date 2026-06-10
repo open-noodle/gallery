@@ -22,22 +22,22 @@ final photosTimelineQueryProvider = Provider<TimelineService>((ref) {
   return buildPhotosTimelineQuery(ref, filter);
 });
 
-TimelineService buildPhotosTimelineRouteService(Ref ref, TimelineTemporalScope temporalScope) {
+TimelineService buildPhotosTimelineRouteService(Ref ref, TimelineTemporalScope temporalScope, GroupAssetsBy groupBy) {
   final filter = ref.watch(photosTimelineFilterProvider);
   final userId = ref.watch(currentUserProvider.select((u) => u?.id));
   final timelineUsers = ref.watch(timelineUsersProvider).valueOrNull ?? const <String>[];
   final factory = ref.watch(timelineFactoryProvider);
 
   if (filter.isEmpty) {
-    final svc = factory.main(timelineUsers, userId ?? '', temporalScope: temporalScope);
+    final svc = factory.main(timelineUsers, userId ?? '', groupBy: groupBy, temporalScope: temporalScope);
     ref.onDispose(svc.dispose);
     return svc;
   }
 
-  return buildPhotosTimelineQuery(ref, applyTimelineTemporalScope(filter, temporalScope));
+  return buildPhotosTimelineQuery(ref, applyTimelineTemporalScope(filter, temporalScope), groupBy: groupBy);
 }
 
-TimelineService buildPhotosTimelineQuery(Ref ref, SearchFilter filter) {
+TimelineService buildPhotosTimelineQuery(Ref ref, SearchFilter filter, {GroupAssetsBy? groupBy}) {
   final userId = ref.watch(currentUserProvider.select((u) => u?.id));
   final timelineUsers = ref.watch(timelineUsersProvider).valueOrNull ?? const <String>[];
   final factory = ref.watch(timelineFactoryProvider);
@@ -51,13 +51,13 @@ TimelineService buildPhotosTimelineQuery(Ref ref, SearchFilter filter) {
   final notifier = ref.watch(photosFilterSearchProvider.notifier);
   final isSmart = filter.context != null && filter.context!.isNotEmpty;
   final isRelevance = isSmart && filter.sort == SearchSortOrder.relevance;
-  final groupBy = isRelevance ? GroupAssetsBy.none : factory.groupBy;
+  final effectiveGroupBy = isRelevance ? GroupAssetsBy.none : (groupBy ?? factory.groupBy);
   final descending = filter.sort != SearchSortOrder.oldest;
   final svc = factory.fromAssetStream(
     notifier.getAssets,
     notifier.count,
     TimelineOrigin.search,
-    groupBy: groupBy,
+    groupBy: effectiveGroupBy,
     descending: descending,
   );
   ref.onDispose(svc.dispose);
