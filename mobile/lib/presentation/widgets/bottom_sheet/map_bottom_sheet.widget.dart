@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
-import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/base_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/map/map.state.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 
 class MapBottomSheet extends StatelessWidget {
-  static const forcedTimelineGroupBy = GroupAssetsBy.day;
-
   const MapBottomSheet({super.key});
 
   @override
@@ -32,37 +30,24 @@ class MapBottomSheetTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // TODO: this causes the timeline to switch to flicker to "loading" state and back. This is both janky and inefficient.
-    return ProviderScope(
-      overrides: [
-        timelineServiceProvider.overrideWith((ref) {
-          final user = ref.watch(currentUserProvider);
-          if (user == null) {
-            throw Exception('User must be logged in to access archive');
-          }
+    // TODO: watching mapStateProvider rebuilds the service on every map move, flickering
+    // the timeline through its loading state. This is both janky and inefficient.
+    return TimelineRouteScope(
+      timelineServiceBuilder: (ref, scope, groupBy) {
+        final user = ref.watch(currentUserProvider);
+        if (user == null) {
+          throw Exception('User must be logged in to access the map timeline');
+        }
 
-          final users = ref.watch(mapStateProvider).withPartners
-              ? ref.watch(timelineUsersProvider).valueOrNull ?? [user.id]
-              : [user.id];
+        final users = ref.watch(mapStateProvider).withPartners
+            ? ref.watch(timelineUsersProvider).valueOrNull ?? [user.id]
+            : [user.id];
 
-          final timelineService = ref
-              .watch(timelineFactoryProvider)
-              .map(
-                users,
-                user.id,
-                ref.watch(mapStateProvider).toOptions(),
-                groupBy: MapBottomSheet.forcedTimelineGroupBy,
-              );
-          ref.onDispose(timelineService.dispose);
-          return timelineService;
-        }),
-      ],
-      child: const Timeline(
-        appBar: null,
-        bottomSheet: null,
-        withScrubber: false,
-        groupBy: MapBottomSheet.forcedTimelineGroupBy,
-      ),
+        return ref
+            .watch(timelineFactoryProvider)
+            .map(users, user.id, ref.watch(mapStateProvider).toOptions(), groupBy: groupBy, temporalScope: scope);
+      },
+      child: const Timeline(appBar: null, bottomSheet: null, withScrubber: false, withGroupingPill: true),
     );
   }
 }
