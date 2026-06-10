@@ -19,8 +19,13 @@ class PeopleService {
     return _repository.getAssetPeople(assetId);
   }
 
-  Stream<List<Person>> watch({int minFaces = 3}) {
-    return _repository.watch(minFaces: minFaces);
+  Stream<List<Person>> watch({int minFaces = 3, PeopleSortBy sortBy = PeopleSortBy.photoCount}) {
+    return _repository.watch(minFaces: minFaces, sortBy: sortBy);
+  }
+
+  /// Kept alongside [watch] as the offline-fallback path of [getAllPeopleWithSharedSpaces].
+  Future<List<Person>> getAllPeople({int minFaces = 3, PeopleSortBy sortBy = PeopleSortBy.photoCount}) {
+    return _repository.getAllPeople(minFaces: minFaces, sortBy: sortBy);
   }
 
   Future<int> updateName(String personId, String name) async {
