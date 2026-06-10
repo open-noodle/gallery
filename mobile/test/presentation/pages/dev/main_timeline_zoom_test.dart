@@ -58,6 +58,7 @@ void main() {
     await EasyLocalization.ensureInitialized();
     await initializeDateFormatting('en');
     registerFallbackValue(const TimelineTemporalScope.none());
+    registerFallbackValue(GroupAssetsBy.day);
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
     await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
     await SettingsRepository.ensureInitialized(db);
@@ -359,7 +360,14 @@ void main() {
   required TimelineService dayService,
 }) {
   final factory = _MockTimelineFactory();
-  when(() => factory.main(any(), any(), temporalScope: any(named: 'temporalScope'))).thenAnswer((_) {
+  when(
+    () => factory.main(
+      any(),
+      any(),
+      groupBy: any(named: 'groupBy'),
+      temporalScope: any(named: 'temporalScope'),
+    ),
+  ).thenAnswer((_) {
     final groupBy = SettingsRepository.instance.appConfig.timeline.groupAssetsBy;
     return switch (groupBy) {
       GroupAssetsBy.year => yearService,
@@ -396,7 +404,14 @@ void main() {
     return service;
   }
 
-  when(() => factory.main(any(), any(), temporalScope: any(named: 'temporalScope'))).thenAnswer((invocation) {
+  when(
+    () => factory.main(
+      any(),
+      any(),
+      groupBy: any(named: 'groupBy'),
+      temporalScope: any(named: 'temporalScope'),
+    ),
+  ).thenAnswer((invocation) {
     final scope =
         invocation.namedArguments[const Symbol('temporalScope')] as TimelineTemporalScope? ??
         const TimelineTemporalScope.none();
@@ -475,6 +490,9 @@ Future<void> _pumpPhotosTimeline(
         child: const MaterialApp(
           home: TimelineRouteScope(
             timelineServiceBuilder: buildPhotosTimelineRouteService,
+            // These tests pin the MAIN Photos page contract: grouping follows and
+            // writes the persisted setting.
+            persistGrouping: true,
             child: Timeline(appBar: null, bottomSheet: null, withScrubber: false),
           ),
         ),

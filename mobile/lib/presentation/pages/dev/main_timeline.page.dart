@@ -54,6 +54,10 @@ class _MainTimelinePageState extends ConsumerState<MainTimelinePage> {
     final hasMemories = ref.watch(memoryLaneProvider.select((state) => state.value?.isNotEmpty ?? false));
     return TimelineRouteScope(
       timelineServiceBuilder: buildPhotosTimelineRouteService,
+      // The main Photos timeline is the only route whose grouping follows and writes
+      // the persisted Setting.groupAssetsBy; detail routes open at "All" and keep
+      // grouping changes route-local.
+      persistGrouping: true,
       child: Stack(
         children: [
           // Read photosFilterSearchProvider from inside the TimelineRouteScope so the
