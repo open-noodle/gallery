@@ -8,7 +8,6 @@ import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/presentation/pages/cleanup_preview.page.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
-import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_header_sliver.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:mocktail/mocktail.dart';
@@ -41,6 +40,6 @@ void main() {
     final timeline = tester.widget<Timeline>(find.byType(Timeline));
     expect(timeline.groupBy, GroupAssetsBy.day);
     expect(timeline.readOnly, isTrue);
-    expect(find.byType(TimelineGroupingHeaderSliver), findsNothing);
+    expect(timeline.withGroupingPill, isFalse);
   });
 }

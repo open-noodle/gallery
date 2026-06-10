@@ -303,7 +303,8 @@ void main() {
   //
   // The drill-down handler lives in `sharedTimelineOverviewDrilldownProvider`
   // and is fully tested by `overview_drilldown_provider_test.dart`.  The handler
-  // calls `settingsProvider.write(SettingsKey.timelineGroupAssetsBy, ...)` and sets a
+  // calls `timelineGroupingProvider.notifier.set(...)` (persisted via the root
+  // notifier on the Photos page; route-local elsewhere) and sets a
   // zoom anchor — it does NOT inspect the timeline service at all, so the
   // filtered vs unfiltered distinction makes no difference to the handler logic.
   //
