@@ -74,6 +74,51 @@ export type DatabaseBackupUploadDto = {
     /** Database backup file */
     file?: Blob;
 };
+export type FaceRepairRequestDto = {
+    dryRun?: boolean;
+    maxAttributionDistance?: number;
+    maxDistance?: number;
+    maxFlaggedFraction?: number;
+    minFaces?: number;
+    ownerId?: string;
+    personId?: string;
+    voteMargin?: number;
+    voteWindow?: number;
+};
+export type FaceRepairResponseDto = {
+    dryRun: boolean;
+    executed?: {
+        requeued: number;
+        unassigned: number;
+    };
+    mutated: boolean;
+    report: {
+        persons: {
+            eligible: number;
+            flagged: number;
+            flaggedFraction: number;
+            personId: string;
+            reviewOnly: boolean;
+            suspectedOwners: {
+                count: number;
+                ownerPersonId: string;
+            }[];
+        }[];
+        totals: {
+            affectedPersons: number;
+            eligibleFaces: number;
+            flaggedFaces: number;
+            reviewOnlyByReason: {
+                badTarget: number;
+                overCap: number;
+                unAttributable: number;
+            };
+            reviewOnlyFaces: number;
+            reviewOnlyPersons: number;
+            toRepair: number;
+        };
+    };
+};
 export type IntegrityReportResponseDto = {
     items: {
         /** Integrity report item id */
@@ -559,6 +604,15 @@ export type AlbumsAddAssetsResponseDto = {
     /** Operation success */
     success: boolean;
 };
+export type AlbumNameDto = {
+    albumName: string;
+    albumThumbnailAssetId: string | null;
+    assetCount: number;
+    endDate?: string;
+    id: string;
+    shared: boolean;
+    startDate?: string;
+};
 export type AlbumStatisticsResponseDto = {
     /** Number of non-shared albums */
     notShared: number;
@@ -863,32 +917,18 @@ export type ExifResponseDto = {
     /** Time zone */
     timeZone?: string | null;
 };
-export type PersonOtherResponseDto = {
-    birthDate: string | null;
-    name: string;
-    role: PersonUserRole;
-    sharedById: string;
-};
-export type PeopleUserResponseDto = {
-    avatarColor: UserAvatarColor;
-    /** User email */
-    email: string;
-    /** User ID */
+export type ScopedPrimaryProfile = {
     id: string;
-    /** User name */
-    name: string;
-    /** Profile change date */
-    profileChangedAt: string;
-    /** Profile image path */
-    profileImagePath: string;
-    /** Access role */
-    role: PersonUserRole;
+    spaceId?: string;
+    "type": Type;
 };
 export type PersonResponseDto = {
     /** Person date of birth */
     birthDate: string | null;
     /** Person color (hex) */
     color?: string;
+    /** Scoped identity filter token */
+    filterId?: string;
     /** Person ID */
     id: string;
     /** Is favorite */
@@ -897,13 +937,18 @@ export type PersonResponseDto = {
     isHidden: boolean;
     /** Person name */
     name: string;
-    otherPeople: PersonOtherResponseDto[];
-    /** Users that gave the current user access to this person */
-    sharedBy: PeopleUserResponseDto[];
-    /** Users the current user gave access to this person */
-    sharedWith: PeopleUserResponseDto[];
+    /** Accessible asset count for this grouped person */
+    numberOfAssets?: number;
+    /** Accessible profile used for navigation */
+    primaryProfile?: ScopedPrimaryProfile;
+    /** Space person ID when viewed through a shared space */
+    spacePersonId?: string;
+    /** Pet species (e.g. dog, cat) */
+    species?: string | null;
     /** Thumbnail path */
     thumbnailPath: string;
+    /** Entity type (person or pet) */
+    "type"?: string;
     /** Last update date */
     updatedAt?: string;
 };
@@ -1036,7 +1081,7 @@ export type AssetEditActionItemResponseDto = {
     action: AssetEditAction;
     /** Asset edit ID */
     id: string;
-    /** List of edit actions to apply (crop, rotate, or mirror) */
+    /** List of edit actions to apply (crop, rotate, mirror, or trim) */
     parameters: CropParameters | RotateParameters | MirrorParameters | TrimParameters;
 };
 export type AssetEditsResponseDto = {
@@ -1047,11 +1092,11 @@ export type AssetEditsResponseDto = {
 };
 export type AssetEditActionItemDto = {
     action: AssetEditAction;
-    /** List of edit actions to apply (crop, rotate, or mirror) */
+    /** List of edit actions to apply (crop, rotate, mirror, or trim) */
     parameters: CropParameters | RotateParameters | MirrorParameters | TrimParameters;
 };
 export type AssetEditsCreateDto = {
-    /** List of edit actions to apply (crop, rotate, or mirror) */
+    /** List of edit actions to apply (crop, rotate, mirror, or trim) */
     edits: AssetEditActionItemDto[];
 };
 export type AssetMetadataResponseDto = {
@@ -1275,20 +1320,6 @@ export type FaceDto = {
     /** Face ID */
     id: string;
 };
-export type MapMarkerResponseDto = {
-    /** City name */
-    city: string | null;
-    /** Country name */
-    country: string | null;
-    /** Asset ID */
-    id: string;
-    /** Latitude */
-    lat: number;
-    /** Longitude */
-    lon: number;
-    /** State/Province name */
-    state: string | null;
-};
 export type QueueStatisticsDto = {
     /** Number of active jobs */
     active: number;
@@ -1316,6 +1347,7 @@ export type QueueResponseLegacyDto = {
 export type QueuesResponseLegacyDto = {
     backgroundTask: QueueResponseLegacyDto;
     backupDatabase: QueueResponseLegacyDto;
+    classification: QueueResponseLegacyDto;
     duplicateDetection: QueueResponseLegacyDto;
     editor: QueueResponseLegacyDto;
     faceDetection: QueueResponseLegacyDto;
@@ -1326,9 +1358,12 @@ export type QueuesResponseLegacyDto = {
     migration: QueueResponseLegacyDto;
     notifications: QueueResponseLegacyDto;
     ocr: QueueResponseLegacyDto;
+    peopleBackfill: QueueResponseLegacyDto;
+    petDetection: QueueResponseLegacyDto;
     search: QueueResponseLegacyDto;
     sidecar: QueueResponseLegacyDto;
     smartSearch: QueueResponseLegacyDto;
+    storageBackendMigration: QueueResponseLegacyDto;
     storageTemplateMigration: QueueResponseLegacyDto;
     thumbnailGeneration: QueueResponseLegacyDto;
     videoConversion: QueueResponseLegacyDto;
@@ -1592,39 +1627,43 @@ export type MergePersonDto = {
     /** Person IDs to merge */
     ids: string[];
 };
-export type PersonUsersDeleteDto = {
-    /** Person ID */
-    personId: string;
-    /** User ID of the user that gave access to the person */
-    sharedById?: string;
-    /** User ID of the user that was given access to the person */
-    sharedWithId: string;
-}[];
-export type PersonUsersResponseDto = {
-    /** Person ID */
-    personId: string;
-    /** Access role */
-    role: PersonUserRole;
-    /** The user that gave access to this person */
-    sharedBy: UserResponseDto;
-    /** User ID of the user that gave access to this person */
-    sharedById: string;
-    /** The user that was given access to this person */
-    sharedWith: UserResponseDto;
-    /** User ID of the user that was given access to this person */
-    sharedWithId: string;
-}[];
-export type PeopleUsersUpsertDto = {
-    /** Person IDs, required when type is omitted */
-    personIds?: string[];
-    /** Role that should be applied */
-    role: PersonUserRole;
-    /** User IDs that should be given access to the person */
-    sharedWithIds: string[];
-    "type"?: PeopleUsersUpsertType;
+export type ScopedPersonProfileRefDto = {
+    /** Scoped profile ID */
+    id: string;
+    /** Space ID for Space Person refs */
+    spaceId?: string;
+    /** Scoped profile type */
+    "type": Type2;
 };
-export type PersonDeleteDto = {
-    userId?: string;
+export type DetachScopedPersonDto = {
+    /** Scoped profile to detach */
+    profile: ScopedPersonProfileRefDto;
+};
+export type PeopleFaceStatisticsResponseDto = {
+    /** Number of detected faces assigned to hidden people */
+    assignedHiddenFaceCount: number;
+    /** Number of detected faces assigned to visible people */
+    assignedVisibleFaceCount: number;
+    /** Number of detected faces in the accessible people scope */
+    detectedFaceCount: number;
+    /** Number of named visible people in the accessible people scope */
+    namedVisiblePersonCount: number;
+    /** Number of detected faces not assigned to people in this scope */
+    unassignedFaceCount: number;
+};
+export type MergeScopedPeopleDto = {
+    /** Source scoped profiles */
+    sources: ScopedPersonProfileRefDto[];
+    /** Target scoped profile */
+    target: ScopedPersonProfileRefDto;
+};
+export type PeopleStatisticsResponseDto = {
+    /** Number of detected faces in the accessible people scope */
+    detectedFaceCount: number;
+    /** Number of hidden people */
+    hidden: number;
+    /** Total number of people */
+    total: number;
 };
 export type PersonUpdateDto = {
     /** Person date of birth */
@@ -1642,6 +1681,33 @@ export type PersonUpdateDto = {
     /** Restrict the update to the person record of this User ID */
     userId?: string;
 };
+export type PersonFaceResponseDto = {
+    /** Asset ID containing the face */
+    assetId: string;
+    /** Bounding box X1 coordinate */
+    boundingBoxX1: number;
+    /** Bounding box X2 coordinate */
+    boundingBoxX2: number;
+    /** Bounding box Y1 coordinate */
+    boundingBoxY1: number;
+    /** Bounding box Y2 coordinate */
+    boundingBoxY2: number;
+    /** Asset creation date */
+    fileCreatedAt?: string;
+    /** Face ID */
+    id: string;
+    /** Image height in pixels */
+    imageHeight: number;
+    /** Image width in pixels */
+    imageWidth: number;
+    /** Whether this face is the current representative face */
+    isRepresentative: boolean;
+    sourceType?: SourceType;
+};
+export type PersonFacePageResponseDto = {
+    faces: PersonFaceResponseDto[];
+    hasNextPage: boolean;
+};
 export type AssetFaceUpdateItem = {
     /** Asset ID */
     assetId: string;
@@ -1654,9 +1720,15 @@ export type AssetFaceUpdateDto = {
     /** Face update items */
     data: AssetFaceUpdateItem[];
 };
+export type RepresentativeFaceUpdateDto = {
+    /** Asset face ID used as the representative face */
+    assetFaceId: string;
+};
 export type PersonStatisticsResponseDto = {
     /** Number of assets */
     assets: number;
+    /** Number of faces assigned to this person in the current accessible scope */
+    faces: number;
 };
 export type PluginMethodResponseDto = {
     /** Description */
@@ -1987,6 +2059,10 @@ export type MetadataSearchDto = {
     rating?: number | null;
     /** Number of results to return */
     size?: number;
+    /** Shared space ID to filter by */
+    spaceId?: string;
+    /** Shared space person IDs to filter by */
+    spacePersonIds?: string[];
     /** Filter by state/province name */
     state?: string | null;
     /** Filter by tag IDs */
@@ -2013,6 +2089,8 @@ export type MetadataSearchDto = {
     withExif?: boolean;
     /** Include people data in response */
     withPeople?: boolean;
+    /** Include shared spaces the user is a member of */
+    withSharedSpaces?: boolean;
     /** Include stacked assets */
     withStacked?: boolean;
 };
@@ -2101,6 +2179,10 @@ export type RandomSearchDto = {
     rating?: number | null;
     /** Number of results to return */
     size?: number;
+    /** Shared space ID to filter by */
+    spaceId?: string;
+    /** Shared space person IDs to filter by */
+    spacePersonIds?: string[];
     /** Filter by state/province name */
     state?: string | null;
     /** Filter by tag IDs */
@@ -2125,6 +2207,8 @@ export type RandomSearchDto = {
     withExif?: boolean;
     /** Include people data in response */
     withPeople?: boolean;
+    /** Include shared spaces the user is a member of */
+    withSharedSpaces?: boolean;
     /** Include stacked assets */
     withStacked?: boolean;
 };
@@ -2176,6 +2260,10 @@ export type SmartSearchDto = {
     rating?: number | null;
     /** Number of results to return */
     size?: number;
+    /** Shared space ID to filter by */
+    spaceId?: string;
+    /** Shared space person IDs to filter by */
+    spacePersonIds?: string[];
     /** Filter by state/province name */
     state?: string | null;
     /** Filter by tag IDs */
@@ -2208,6 +2296,8 @@ export type SmartSearchFacetsDto = {
     country?: string | null;
     /** Filter by favorite status */
     isFavorite?: boolean;
+    /** Filter assets not in any album */
+    isNotInAlbum?: boolean;
     /** Search language code */
     language?: string;
     /** Filter by camera make */
@@ -2241,6 +2331,8 @@ export type FilterSuggestionsPersonDto = {
     id: string;
     /** Person name */
     name: string;
+    /** Accessible profile used for thumbnails */
+    primaryProfile?: ScopedPrimaryProfile;
 };
 export type FilterSuggestionsTagDto = {
     /** Tag ID */
@@ -2316,6 +2408,10 @@ export type StatisticsSearchDto = {
     personIds?: string[];
     /** Filter by rating [1-5], or null for unrated */
     rating?: number | null;
+    /** Shared space ID to filter by */
+    spaceId?: string;
+    /** Shared space person IDs to filter by */
+    spacePersonIds?: string[];
     /** Filter by state/province name */
     state?: string | null;
     /** Filter by tag IDs */
@@ -2334,6 +2430,8 @@ export type StatisticsSearchDto = {
     /** Filter by update date (before) */
     updatedBefore?: string;
     visibility?: AssetVisibility;
+    /** Include shared spaces the user is a member of */
+    withSharedSpaces?: boolean;
 };
 export type SearchStatisticsResponseDto = {
     /** Total number of matching assets */
@@ -2490,6 +2588,10 @@ export type ServerMediaTypesResponseDto = {
     sidecar: string[];
     /** Supported video MIME types */
     video: string[];
+};
+export type ServerMlHealthResponseDto = {
+    /** Whether the ML server is currently reachable and healthy for smart search */
+    smartSearchHealthy: boolean;
 };
 export type ServerPingResponse = {
     res: string;
@@ -2679,6 +2781,231 @@ export type AssetIdsResponseDto = {
     /** Whether operation succeeded */
     success: boolean;
 };
+export type SharedSpaceLinkedLibraryDto = {
+    addedById: string | null;
+    /** Link creation timestamp */
+    createdAt: string;
+    libraryId: string;
+    libraryName: string;
+};
+export type SharedSpaceMemberResponseDto = {
+    /** Avatar color */
+    avatarColor?: string;
+    /** Number of photos contributed by this member */
+    contributionCount?: number;
+    /** User email */
+    email: string;
+    /** Join date */
+    joinedAt: string;
+    /** Last time this member added a photo */
+    lastActiveAt?: string | null;
+    /** User name */
+    name: string;
+    /** Profile change date */
+    profileChangedAt?: string;
+    /** Profile image path */
+    profileImagePath?: string;
+    /** Most recently added asset ID by this member */
+    recentAssetId?: string | null;
+    /** Member role */
+    role: SharedSpaceRole;
+    /** Share person names and birth dates with this space */
+    sharePersonMetadata: boolean;
+    /** Show space assets in timeline */
+    showInTimeline: boolean;
+    /** User ID */
+    userId: string;
+};
+export type SharedSpaceResponseDto = {
+    /** Number of assets */
+    assetCount?: number;
+    /** Space color */
+    color?: (UserAvatarColor) | null;
+    /** Creation date */
+    createdAt: string;
+    /** Creator user ID */
+    createdById: string;
+    /** Space description */
+    description?: string | null;
+    /** Whether face recognition is enabled for this space */
+    faceRecognitionEnabled?: boolean;
+    /** Whether any pet-type persons exist in this space */
+    hasPets?: boolean;
+    /** Space ID */
+    id: string;
+    /** Last activity timestamp (most recent asset add) */
+    lastActivityAt?: string | null;
+    /** Last contributor since last viewed */
+    lastContributor?: {
+        id: string;
+        name: string;
+    } | null;
+    /** When the current user last viewed this space */
+    lastViewedAt?: string | null;
+    linkedLibraries?: SharedSpaceLinkedLibraryDto[];
+    /** Number of members */
+    memberCount?: number;
+    /** Space members (summary) */
+    members?: SharedSpaceMemberResponseDto[];
+    /** Space name */
+    name: string;
+    /** Number of new assets since last viewed */
+    newAssetCount?: number;
+    /** Whether pets are shown in space people list */
+    petsEnabled?: boolean;
+    /** Recent asset IDs for collage display (up to 4) */
+    recentAssetIds?: string[];
+    /** Thumbhashes for recent assets (parallel array) */
+    recentAssetThumbhashes?: string[];
+    /** Thumbnail asset ID */
+    thumbnailAssetId?: string | null;
+    /** Vertical crop position for cover photo (0-100) */
+    thumbnailCropY?: number | null;
+    /** Last update date */
+    updatedAt: string;
+};
+export type SharedSpaceCreateDto = {
+    /** Space color */
+    color?: UserAvatarColor;
+    /** Space description */
+    description?: string;
+    /** Space name */
+    name: string;
+};
+export type SharedSpaceUpdateDto = {
+    /** Space color */
+    color?: UserAvatarColor;
+    /** Space description */
+    description?: string;
+    /** Enable face recognition for this space */
+    faceRecognitionEnabled?: boolean;
+    /** Space name */
+    name?: string;
+    /** Show pets in space people list */
+    petsEnabled?: boolean;
+    /** Thumbnail asset ID */
+    thumbnailAssetId?: string | null;
+    /** Vertical crop position for cover photo (0-100) */
+    thumbnailCropY?: number | null;
+};
+export type SharedSpaceActivityResponseDto = {
+    /** When the event occurred */
+    createdAt: string;
+    /** Event-specific data */
+    data: {
+        [key: string]: any;
+    };
+    /** Activity ID */
+    id: string;
+    /** Activity type */
+    "type": string;
+    /** User avatar color */
+    userAvatarColor?: string | null;
+    /** User email */
+    userEmail?: string | null;
+    /** User ID who performed the action */
+    userId?: string | null;
+    /** User name */
+    userName?: string | null;
+    /** User profile image path */
+    userProfileImagePath?: string | null;
+};
+export type SharedSpaceAssetRemoveDto = {
+    /** Asset IDs */
+    assetIds: string[];
+};
+export type SharedSpaceAssetAddDto = {
+    /** Asset IDs */
+    assetIds: string[];
+};
+export type SharedSpaceLibraryLinkDto = {
+    /** Library ID */
+    libraryId: string;
+};
+export type SharedSpaceMemberCreateDto = {
+    /** Member role */
+    role?: SharedSpaceRole;
+    /** User ID */
+    userId: string;
+};
+export type SharedSpaceMemberPreferencesDto = {
+    /** Share person names and birth dates with this space */
+    sharePersonMetadata?: boolean;
+    /** Show space assets in personal timeline */
+    showInTimeline?: boolean;
+};
+export type SharedSpaceMemberTimelineDto = {
+    /** Show space assets in personal timeline */
+    showInTimeline: boolean;
+};
+export type SharedSpaceMemberUpdateDto = {
+    /** Member role */
+    role: SharedSpaceRole;
+};
+export type SharedSpaceMemberMetadataContributionDto = {
+    /** Disable person metadata contribution for this member */
+    sharePersonMetadata: false;
+};
+export type SharedSpacePersonResponseDto = {
+    /** User-specific alias for this person */
+    alias?: string | null;
+    /** Number of unique assets with this person */
+    assetCount: number;
+    /** Person date of birth */
+    birthDate?: string | null;
+    /** Creation date */
+    createdAt: string;
+    /** Number of faces assigned to this person */
+    faceCount: number;
+    /** Person ID */
+    id: string;
+    /** Is hidden */
+    isHidden: boolean;
+    /** Person name */
+    name: string;
+    /** Representative face ID */
+    representativeFaceId?: string | null;
+    /** Representative face source */
+    representativeFaceSource: RepresentativeFaceSource;
+    /** Space ID */
+    spaceId: string;
+    /** Thumbnail path */
+    thumbnailPath: string;
+    /** Person type (person or pet) */
+    "type"?: string;
+    /** Last update date */
+    updatedAt: string;
+};
+export type SharedSpacePeopleStatisticsResponseDto = {
+    /** Number of detected faces in the shared-space people scope */
+    detectedFaceCount: number;
+    /** Number of hidden people */
+    hidden: number;
+    /** Total number of people */
+    total: number;
+};
+export type SharedSpacePersonUpdateDto = {
+    /** Person date of birth */
+    birthDate?: string | null;
+    /** Person visibility (hidden) */
+    isHidden?: boolean;
+    /** Person name */
+    name?: string;
+    /** Representative face ID */
+    representativeFaceId?: string | null;
+};
+export type SharedSpacePersonAliasDto = {
+    /** Alias name for this person */
+    alias: string;
+};
+export type SharedSpacePersonMergeDto = {
+    /** Person IDs to merge into target */
+    ids: string[];
+};
+export type SpaceRepresentativeFaceUpdateDto = {
+    /** Asset face ID used as the space representative face */
+    assetFaceId: string | null;
+};
 export type StackResponseDto = {
     assets: AssetResponseDto[];
     /** Stack ID */
@@ -2693,6 +3020,34 @@ export type StackCreateDto = {
 export type StackUpdateDto = {
     /** Primary asset ID */
     primaryAssetId?: string;
+};
+export type StorageMigrationFileTypesDto = {
+    /** Include encoded video files */
+    encodedVideos?: boolean;
+    /** Include full-size files */
+    fullsize?: boolean;
+    /** Include original files */
+    originals?: boolean;
+    /** Include person thumbnail files */
+    personThumbnails?: boolean;
+    /** Include preview files */
+    previews?: boolean;
+    /** Include profile image files */
+    profileImages?: boolean;
+    /** Include sidecar files */
+    sidecars?: boolean;
+    /** Include thumbnail files */
+    thumbnails?: boolean;
+};
+export type StorageMigrationStartDto = {
+    /** Concurrency level */
+    concurrency?: number;
+    /** Delete source files after migration */
+    deleteSource?: boolean;
+    /** Migration direction */
+    direction: StorageMigrationDirection;
+    /** File types to migrate */
+    fileTypes: StorageMigrationFileTypesDto;
 };
 export type SyncAckDeleteDto = {
     /** Sync entity types to delete acks for */
@@ -2723,6 +3078,25 @@ export type DatabaseBackupConfig = {
 };
 export type SystemConfigBackupsDto = {
     database: DatabaseBackupConfig;
+};
+export type SystemConfigClassificationCategoryDto = {
+    /** Action to take when an asset matches */
+    action: Action;
+    /** Whether this category is enabled */
+    enabled: boolean;
+    faceExclusion?: ClassificationFaceExclusion;
+    /** Category name */
+    name: string;
+    /** CLIP text prompts for this category */
+    prompts: string[];
+    /** Cosine similarity threshold for matching this category */
+    similarity: number;
+};
+export type SystemConfigClassificationDto = {
+    /** Classification categories */
+    categories: SystemConfigClassificationCategoryDto[];
+    /** Enable classification globally */
+    enabled: boolean;
 };
 export type SystemConfigFFmpegRealtimeDto = {
     /** Enable real-time HLS transcoding (alpha) */
@@ -2824,6 +3198,7 @@ export type JobSettingsDto = {
 };
 export type SystemConfigJobDto = {
     backgroundTask: JobSettingsDto;
+    classification: JobSettingsDto;
     editor: JobSettingsDto;
     faceDetection: JobSettingsDto;
     integrityCheck: JobSettingsDto;
@@ -2832,6 +3207,8 @@ export type SystemConfigJobDto = {
     migration: JobSettingsDto;
     notifications: JobSettingsDto;
     ocr: JobSettingsDto;
+    peopleBackfill: JobSettingsDto;
+    petDetection: JobSettingsDto;
     search: JobSettingsDto;
     sidecar: JobSettingsDto;
     smartSearch: JobSettingsDto;
@@ -2902,6 +3279,14 @@ export type OcrConfig = {
     /** Name of the model to use */
     modelName: string;
 };
+export type PetDetectionConfig = {
+    /** Whether the task is enabled */
+    enabled: boolean;
+    /** Minimum confidence score for pet detection */
+    minScore: number;
+    /** Name of the model to use */
+    modelName: string;
+};
 export type SystemConfigMachineLearningDto = {
     availabilityChecks: MachineLearningAvailabilityChecksDto;
     clip: ClipConfig;
@@ -2910,6 +3295,7 @@ export type SystemConfigMachineLearningDto = {
     enabled: boolean;
     facialRecognition: FacialRecognitionConfig;
     ocr: OcrConfig;
+    petDetection: PetDetectionConfig;
     /** ML service URLs */
     urls: string[];
 };
@@ -3052,6 +3438,7 @@ export type SystemConfigUserDto = {
 };
 export type SystemConfigDto = {
     backup: SystemConfigBackupsDto;
+    classification: SystemConfigClassificationDto;
     ffmpeg: SystemConfigFFmpegDto;
     image: SystemConfigImageDto;
     integrityChecks: SystemConfigIntegrityChecks;
@@ -4108,6 +4495,21 @@ export function downloadDatabaseBackup({ filename }: {
     }));
 }
 /**
+ * Run face re-attribution repair
+ */
+export function runFaceRepair({ faceRepairRequestDto }: {
+    faceRepairRequestDto: FaceRepairRequestDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: FaceRepairResponseDto;
+    }>("/admin/face-repair", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: faceRepairRequestDto
+    })));
+}
+/**
  * Get integrity report by type
  */
 export function getIntegrityReport({ cursor, limit, $type }: {
@@ -4494,6 +4896,17 @@ export function addAssetsToAlbums({ albumsAddAssetsDto }: {
         method: "PUT",
         body: albumsAddAssetsDto
     })));
+}
+/**
+ * Retrieve album names
+ */
+export function getAlbumNames(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AlbumNameDto[];
+    }>("/albums/names", {
+        ...opts
+    }));
 }
 /**
  * Retrieve album statistics
@@ -4933,17 +5346,19 @@ export function getAssetStatistics({ isFavorite, isTrashed, visibility }: {
 /**
  * Retrieve an asset
  */
-export function getAssetInfo({ id, key, slug }: {
+export function getAssetInfo({ id, key, slug, spaceId }: {
     id: string;
     key?: string;
     slug?: string;
+    spaceId?: string;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
         data: AssetResponseDto;
     }>(`/assets/${encodeURIComponent(id)}${QS.query(QS.explode({
         key,
-        slug
+        slug,
+        spaceId
     }))}`, {
         ...opts
     }));
@@ -5356,6 +5771,15 @@ export function validateAccessToken(opts?: Oazapfts.RequestOpts) {
     }));
 }
 /**
+ * Scan all libraries for classification
+ */
+export function scanClassification(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText("/classification/scan", {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
  * Download asset archive
  */
 export function downloadArchive({ key, slug, downloadArchiveDto }: {
@@ -5503,8 +5927,11 @@ export function reassignFacesById({ id, faceDto }: {
 /**
  * Get filtered map markers
  */
-export function getFilteredMapMarkers({ isFavorite, make, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, $type }: {
+export function getFilteredMapMarkers({ city, country, isFavorite, isNotInAlbum, make, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }: {
+    city?: string;
+    country?: string;
     isFavorite?: boolean;
+    isNotInAlbum?: boolean;
     make?: string;
     model?: string;
     personIds?: string[];
@@ -5513,13 +5940,17 @@ export function getFilteredMapMarkers({ isFavorite, make, model, personIds, rati
     tagIds?: string[];
     takenAfter?: string;
     takenBefore?: string;
-    $type?: "IMAGE" | "VIDEO";
+    $type?: MapMediaType;
+    withSharedSpaces?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
         data: MapMarkerResponseDto[];
     }>(`/gallery/map/markers${QS.query(QS.explode({
+        city,
+        country,
         isFavorite,
+        isNotInAlbum,
         make,
         model,
         personIds,
@@ -5528,7 +5959,8 @@ export function getFilteredMapMarkers({ isFavorite, make, model, personIds, rati
         tagIds,
         takenAfter,
         takenBefore,
-        "type": $type
+        "type": $type,
+        withSharedSpaces
     }))}`, {
         ...opts
     }));
@@ -5681,13 +6113,14 @@ export function validate({ id, validateLibraryDto }: {
 /**
  * Retrieve map markers
  */
-export function getMapMarkers({ fileCreatedAfter, fileCreatedBefore, isArchived, isFavorite, withPartners, withSharedAlbums }: {
+export function getMapMarkers({ fileCreatedAfter, fileCreatedBefore, isArchived, isFavorite, withPartners, withSharedAlbums, withSharedSpaces }: {
     fileCreatedAfter?: string;
     fileCreatedBefore?: string;
     isArchived?: boolean;
     isFavorite?: boolean;
     withPartners?: boolean;
     withSharedAlbums?: boolean;
+    withSharedSpaces?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
@@ -5698,7 +6131,8 @@ export function getMapMarkers({ fileCreatedAfter, fileCreatedBefore, isArchived,
         isArchived,
         isFavorite,
         withPartners,
-        withSharedAlbums
+        withSharedAlbums,
+        withSharedSpaces
     }))}`, {
         ...opts
     }));
@@ -6117,7 +6551,7 @@ export function deletePeople({ peopleDeleteDto }: {
 /**
  * Get all people
  */
-export function getAllPeople({ closestAssetId, closestPersonId, isFavorite, isHidden, page, sharedById, sharedWithId, size, withHidden }: {
+export function getAllPeople({ closestAssetId, closestPersonId, page, size, withHidden, withSharedSpaces }: {
     closestAssetId?: string;
     closestPersonId?: string;
     isFavorite?: boolean;
@@ -6127,6 +6561,7 @@ export function getAllPeople({ closestAssetId, closestPersonId, isFavorite, isHi
     sharedWithId?: string;
     size?: number;
     withHidden?: boolean;
+    withSharedSpaces?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
@@ -6140,7 +6575,8 @@ export function getAllPeople({ closestAssetId, closestPersonId, isFavorite, isHi
         sharedById,
         sharedWithId,
         size,
-        withHidden
+        withHidden,
+        withSharedSpaces
     }))}`, {
         ...opts
     }));
@@ -6191,51 +6627,78 @@ export function mergePeople({ mergePersonDto }: {
     })));
 }
 /**
- * Remove users from people
+ * Detach a scoped person profile
  */
-export function removeUsersFromPeople({ personUsersDeleteDto }: {
-    personUsersDeleteDto: PersonUsersDeleteDto;
+export function detachScopedPerson({ detachScopedPersonDto }: {
+    detachScopedPersonDto: DetachScopedPersonDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/people/users", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchText("/people/detach-profile", oazapfts.json({
         ...opts,
-        method: "DELETE",
-        body: personUsersDeleteDto
+        method: "POST",
+        body: detachScopedPersonDto
     })));
 }
 /**
- * Get people access
+ * Get people face statistics
  */
-export function getUsersForPeople({ direction, personId, role, sharedById, sharedWithId }: {
-    direction?: SharingDirection;
-    personId?: string;
-    role?: PersonUserRole;
-    sharedById?: string;
-    sharedWithId?: string;
+export function getPeopleFaceStatistics({ closestAssetId, closestPersonId, page, size, withHidden, withSharedSpaces }: {
+    closestAssetId?: string;
+    closestPersonId?: string;
+    page?: number;
+    size?: number;
+    withHidden?: boolean;
+    withSharedSpaces?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
-        data: PersonUsersResponseDto;
-    }>(`/people/users${QS.query(QS.explode({
-        direction,
-        personId,
-        role,
-        sharedById,
-        sharedWithId
+        data: PeopleFaceStatisticsResponseDto;
+    }>(`/people/face-statistics${QS.query(QS.explode({
+        closestAssetId,
+        closestPersonId,
+        page,
+        size,
+        withHidden,
+        withSharedSpaces
     }))}`, {
         ...opts
     }));
 }
 /**
- * Upsert user access
+ * Merge scoped people by identity
  */
-export function upsertPeopleUsers({ peopleUsersUpsertDto }: {
-    peopleUsersUpsertDto: PeopleUsersUpsertDto;
+export function mergeScopedPeople({ mergeScopedPeopleDto }: {
+    mergeScopedPeopleDto: MergeScopedPeopleDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/people/users", oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchText("/people/same-person", oazapfts.json({
         ...opts,
-        method: "PUT",
-        body: peopleUsersUpsertDto
+        method: "POST",
+        body: mergeScopedPeopleDto
     })));
+}
+/**
+ * Get people statistics
+ */
+export function getPeopleStatistics({ closestAssetId, closestPersonId, page, size, withHidden, withSharedSpaces }: {
+    closestAssetId?: string;
+    closestPersonId?: string;
+    page?: number;
+    size?: number;
+    withHidden?: boolean;
+    withSharedSpaces?: boolean;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PeopleStatisticsResponseDto;
+    }>(`/people/statistics${QS.query(QS.explode({
+        closestAssetId,
+        closestPersonId,
+        page,
+        size,
+        withHidden,
+        withSharedSpaces
+    }))}`, {
+        ...opts
+    }));
 }
 /**
  * Delete person
@@ -6280,6 +6743,38 @@ export function updatePerson({ id, personUpdateDto }: {
     })));
 }
 /**
+ * Get person faces
+ */
+export function getPersonFaces({ id, page, size }: {
+    id: string;
+    page?: number;
+    size?: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PersonFacePageResponseDto;
+    }>(`/people/${encodeURIComponent(id)}/faces${QS.query(QS.explode({
+        page,
+        size
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Get person face thumbnail
+ */
+export function getPersonFaceThumbnail({ faceId, id }: {
+    faceId: string;
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchBlob<{
+        status: 200;
+        data: Blob;
+    }>(`/people/${encodeURIComponent(id)}/faces/${encodeURIComponent(faceId)}/thumbnail`, {
+        ...opts
+    }));
+}
+/**
  * Merge people
  */
 export function mergePersonLegacy({ id, mergePersonDto }: {
@@ -6309,6 +6804,22 @@ export function reassignFaces({ id, assetFaceUpdateDto }: {
         ...opts,
         method: "PUT",
         body: assetFaceUpdateDto
+    })));
+}
+/**
+ * Update representative face
+ */
+export function updateRepresentativeFace({ id, representativeFaceUpdateDto }: {
+    id: string;
+    representativeFaceUpdateDto: RepresentativeFaceUpdateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PersonResponseDto;
+    }>(`/people/${encodeURIComponent(id)}/representative-face`, oazapfts.json({
+        ...opts,
+        method: "PUT",
+        body: representativeFaceUpdateDto
     })));
 }
 /**
@@ -6511,7 +7022,7 @@ export function getExploreData(opts?: Oazapfts.RequestOpts) {
 /**
  * Search large assets
  */
-export function searchLargeAssets({ albumIds, city, country, createdAfter, createdBefore, isEncoded, isFavorite, isMotion, isNotInAlbum, isOffline, lensModel, libraryId, make, minFileSize, model, ocr, personIds, rating, size, state, tagIds, takenAfter, takenBefore, trashedAfter, trashedBefore, $type, updatedAfter, updatedBefore, visibility, withDeleted, withExif }: {
+export function searchLargeAssets({ albumIds, city, country, createdAfter, createdBefore, isEncoded, isFavorite, isMotion, isNotInAlbum, isOffline, lensModel, libraryId, make, minFileSize, model, ocr, personIds, rating, size, spaceId, spacePersonIds, state, tagIds, takenAfter, takenBefore, trashedAfter, trashedBefore, $type, updatedAfter, updatedBefore, visibility, withDeleted, withExif, withSharedSpaces }: {
     albumIds?: string[];
     city?: string | null;
     country?: string | null;
@@ -6531,6 +7042,8 @@ export function searchLargeAssets({ albumIds, city, country, createdAfter, creat
     personIds?: string[];
     rating?: number | null;
     size?: number;
+    spaceId?: string;
+    spacePersonIds?: string[];
     state?: string | null;
     tagIds?: string[] | null;
     takenAfter?: string;
@@ -6543,6 +7056,7 @@ export function searchLargeAssets({ albumIds, city, country, createdAfter, creat
     visibility?: AssetVisibility;
     withDeleted?: boolean;
     withExif?: boolean;
+    withSharedSpaces?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
@@ -6567,6 +7081,8 @@ export function searchLargeAssets({ albumIds, city, country, createdAfter, creat
         personIds,
         rating,
         size,
+        spaceId,
+        spacePersonIds,
         state,
         tagIds,
         takenAfter,
@@ -6578,7 +7094,8 @@ export function searchLargeAssets({ albumIds, city, country, createdAfter, creat
         updatedBefore,
         visibility,
         withDeleted,
-        withExif
+        withExif,
+        withSharedSpaces
     }))}`, {
         ...opts,
         method: "POST"
@@ -6607,16 +7124,18 @@ export function searchAssets({ key, slug, metadataSearchDto }: {
 /**
  * Search people
  */
-export function searchPerson({ name, withHidden }: {
+export function searchPerson({ name, withHidden, withSharedSpaces }: {
     name: string;
     withHidden?: boolean;
+    withSharedSpaces?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
         data: PersonResponseDto[];
     }>(`/search/person${QS.query(QS.explode({
         name,
-        withHidden
+        withHidden,
+        withSharedSpaces
     }))}`, {
         ...opts
     }));
@@ -6699,28 +7218,46 @@ export function searchAssetStatistics({ statisticsSearchDto }: {
 /**
  * Retrieve search suggestions
  */
-export function getSearchSuggestions({ country, includeNull, lensModel, make, model, spaceId, state, $type }: {
+export function getSearchSuggestions({ albumId, country, includeNull, isFavorite, isNotInAlbum, lensModel, make, model, personIds, rating, spaceId, state, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }: {
+    albumId?: string;
     country?: string;
     includeNull?: boolean;
+    isFavorite?: boolean;
+    isNotInAlbum?: boolean;
     lensModel?: string;
     make?: string;
     model?: string;
+    personIds?: string[];
+    rating?: number;
     spaceId?: string;
     state?: string;
+    tagIds?: string[];
+    takenAfter?: string;
+    takenBefore?: string;
     $type: SearchSuggestionType;
+    withSharedSpaces?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
         data: string[];
     }>(`/search/suggestions${QS.query(QS.explode({
+        albumId,
         country,
         includeNull,
+        isFavorite,
+        isNotInAlbum,
         lensModel,
         make,
         model,
+        personIds,
+        rating,
         spaceId,
         state,
-        "type": $type
+        tagIds,
+        takenAfter,
+        takenBefore,
+        "type": $type,
+        withSharedSpaces
     }))}`, {
         ...opts
     }));
@@ -6728,10 +7265,12 @@ export function getSearchSuggestions({ country, includeNull, lensModel, make, mo
 /**
  * Retrieve dynamic filter suggestions
  */
-export function getFilterSuggestions({ city, country, isFavorite, make, mediaType, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, withSharedSpaces }: {
+export function getFilterSuggestions({ albumId, city, country, isFavorite, isNotInAlbum, make, mediaType, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, withSharedSpaces }: {
+    albumId?: string;
     city?: string;
     country?: string;
     isFavorite?: boolean;
+    isNotInAlbum?: boolean;
     make?: string;
     mediaType?: AssetTypeEnum;
     model?: string;
@@ -6747,9 +7286,11 @@ export function getFilterSuggestions({ city, country, isFavorite, make, mediaTyp
         status: 200;
         data: FilterSuggestionsResponseDto;
     }>(`/search/suggestions/filters${QS.query(QS.explode({
+        albumId,
         city,
         country,
         isFavorite,
+        isNotInAlbum,
         make,
         mediaType,
         model,
@@ -6874,6 +7415,17 @@ export function getSupportedMediaTypes(opts?: Oazapfts.RequestOpts) {
         status: 200;
         data: ServerMediaTypesResponseDto;
     }>("/server/media-types", {
+        ...opts
+    }));
+}
+/**
+ * Smart search health
+ */
+export function getMlHealth(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: ServerMlHealthResponseDto;
+    }>("/server/ml-health", {
         ...opts
     }));
 }
@@ -7158,6 +7710,554 @@ export function addSharedLinkAssets({ id, assetIdsDto }: {
     })));
 }
 /**
+ * Get all shared spaces
+ */
+export function getAllSpaces(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceResponseDto[];
+    }>("/shared-spaces", {
+        ...opts
+    }));
+}
+/**
+ * Create a shared space
+ */
+export function createSpace({ sharedSpaceCreateDto }: {
+    sharedSpaceCreateDto: SharedSpaceCreateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: SharedSpaceResponseDto;
+    }>("/shared-spaces", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: sharedSpaceCreateDto
+    })));
+}
+/**
+ * Delete a shared space
+ */
+export function removeSpace({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Get a shared space
+ */
+export function getSpace({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}`, {
+        ...opts
+    }));
+}
+/**
+ * Update a shared space
+ */
+export function updateSpace({ id, sharedSpaceUpdateDto }: {
+    id: string;
+    sharedSpaceUpdateDto: SharedSpaceUpdateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}`, oazapfts.json({
+        ...opts,
+        method: "PATCH",
+        body: sharedSpaceUpdateDto
+    })));
+}
+/**
+ * Get space activity feed
+ */
+export function getSpaceActivities({ id, limit, offset }: {
+    id: string;
+    limit?: number;
+    offset?: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceActivityResponseDto[];
+    }>(`/shared-spaces/${encodeURIComponent(id)}/activities${QS.query(QS.explode({
+        limit,
+        offset
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Remove assets from a shared space
+ */
+export function removeAssets({ id, sharedSpaceAssetRemoveDto }: {
+    id: string;
+    sharedSpaceAssetRemoveDto: SharedSpaceAssetRemoveDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/assets`, oazapfts.json({
+        ...opts,
+        method: "DELETE",
+        body: sharedSpaceAssetRemoveDto
+    })));
+}
+/**
+ * Add assets to a shared space
+ */
+export function addAssets({ id, sharedSpaceAssetAddDto }: {
+    id: string;
+    sharedSpaceAssetAddDto: SharedSpaceAssetAddDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/assets`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: sharedSpaceAssetAddDto
+    })));
+}
+/**
+ * Add all user assets to a shared space
+ */
+export function bulkAddAssets({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/assets/bulk-add`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
+ * Link a library to a shared space
+ */
+export function linkLibrary({ id, sharedSpaceLibraryLinkDto }: {
+    id: string;
+    sharedSpaceLibraryLinkDto: SharedSpaceLibraryLinkDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/libraries`, oazapfts.json({
+        ...opts,
+        method: "PUT",
+        body: sharedSpaceLibraryLinkDto
+    })));
+}
+/**
+ * Unlink a library from a shared space
+ */
+export function unlinkLibrary({ id, libraryId }: {
+    id: string;
+    libraryId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/libraries/${encodeURIComponent(libraryId)}`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Get map markers for a shared space
+ */
+export function getSpaceMapMarkers({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: MapMarkerResponseDto[];
+    }>(`/shared-spaces/${encodeURIComponent(id)}/map-markers`, {
+        ...opts
+    }));
+}
+/**
+ * Get members of a shared space
+ */
+export function getMembers({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceMemberResponseDto[];
+    }>(`/shared-spaces/${encodeURIComponent(id)}/members`, {
+        ...opts
+    }));
+}
+/**
+ * Add a member to a shared space
+ */
+export function addMember({ id, sharedSpaceMemberCreateDto }: {
+    id: string;
+    sharedSpaceMemberCreateDto: SharedSpaceMemberCreateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: SharedSpaceMemberResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/members`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: sharedSpaceMemberCreateDto
+    })));
+}
+/**
+ * Update current member preferences
+ */
+export function updateMemberPreferences({ id, sharedSpaceMemberPreferencesDto }: {
+    id: string;
+    sharedSpaceMemberPreferencesDto: SharedSpaceMemberPreferencesDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceMemberResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/members/me/preferences`, oazapfts.json({
+        ...opts,
+        method: "PATCH",
+        body: sharedSpaceMemberPreferencesDto
+    })));
+}
+/**
+ * Update timeline visibility for current member
+ */
+export function updateMemberTimeline({ id, sharedSpaceMemberTimelineDto }: {
+    id: string;
+    sharedSpaceMemberTimelineDto: SharedSpaceMemberTimelineDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceMemberResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/members/me/timeline`, oazapfts.json({
+        ...opts,
+        method: "PATCH",
+        body: sharedSpaceMemberTimelineDto
+    })));
+}
+/**
+ * Remove a member from a shared space
+ */
+export function removeMember({ id, userId }: {
+    id: string;
+    userId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Update a member in a shared space
+ */
+export function updateMember({ id, userId, sharedSpaceMemberUpdateDto }: {
+    id: string;
+    userId: string;
+    sharedSpaceMemberUpdateDto: SharedSpaceMemberUpdateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceMemberResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, oazapfts.json({
+        ...opts,
+        method: "PATCH",
+        body: sharedSpaceMemberUpdateDto
+    })));
+}
+/**
+ * Disable member person metadata contribution
+ */
+export function updateMemberMetadataContribution({ id, userId, sharedSpaceMemberMetadataContributionDto }: {
+    id: string;
+    userId: string;
+    sharedSpaceMemberMetadataContributionDto: SharedSpaceMemberMetadataContributionDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceMemberResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}/metadata-contribution`, oazapfts.json({
+        ...opts,
+        method: "PATCH",
+        body: sharedSpaceMemberMetadataContributionDto
+    })));
+}
+/**
+ * Get people in a shared space
+ */
+export function getSpacePeople({ id, limit, name, named, offset, takenAfter, takenBefore, withHidden }: {
+    id: string;
+    limit?: number;
+    name?: string;
+    named?: boolean;
+    offset?: number;
+    takenAfter?: string;
+    takenBefore?: string;
+    withHidden?: boolean;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpacePersonResponseDto[];
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people${QS.query(QS.explode({
+        limit,
+        name,
+        named,
+        offset,
+        takenAfter,
+        takenBefore,
+        withHidden
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Deduplicate people in a shared space
+ */
+export function deduplicateSpacePeople({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/deduplicate`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
+ * Get people face statistics in a shared space
+ */
+export function getSpacePeopleFaceStatistics({ id, limit, name, named, offset, takenAfter, takenBefore, withHidden }: {
+    id: string;
+    limit?: number;
+    name?: string;
+    named?: boolean;
+    offset?: number;
+    takenAfter?: string;
+    takenBefore?: string;
+    withHidden?: boolean;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PeopleFaceStatisticsResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/face-statistics${QS.query(QS.explode({
+        limit,
+        name,
+        named,
+        offset,
+        takenAfter,
+        takenBefore,
+        withHidden
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Get people statistics in a shared space
+ */
+export function getSpacePeopleStatistics({ id, limit, name, named, offset, takenAfter, takenBefore, withHidden }: {
+    id: string;
+    limit?: number;
+    name?: string;
+    named?: boolean;
+    offset?: number;
+    takenAfter?: string;
+    takenBefore?: string;
+    withHidden?: boolean;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpacePeopleStatisticsResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/statistics${QS.query(QS.explode({
+        limit,
+        name,
+        named,
+        offset,
+        takenAfter,
+        takenBefore,
+        withHidden
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Delete a person from a shared space
+ */
+export function deleteSpacePerson({ id, personId }: {
+    id: string;
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Get a person in a shared space
+ */
+export function getSpacePerson({ id, personId }: {
+    id: string;
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpacePersonResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}`, {
+        ...opts
+    }));
+}
+/**
+ * Update a person in a shared space
+ */
+export function updateSpacePerson({ id, personId, sharedSpacePersonUpdateDto }: {
+    id: string;
+    personId: string;
+    sharedSpacePersonUpdateDto: SharedSpacePersonUpdateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpacePersonResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}`, oazapfts.json({
+        ...opts,
+        method: "PUT",
+        body: sharedSpacePersonUpdateDto
+    })));
+}
+/**
+ * Delete a person alias in a shared space
+ */
+export function deleteSpacePersonAlias({ id, personId }: {
+    id: string;
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/alias`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Set a person alias in a shared space
+ */
+export function setSpacePersonAlias({ id, personId, sharedSpacePersonAliasDto }: {
+    id: string;
+    personId: string;
+    sharedSpacePersonAliasDto: SharedSpacePersonAliasDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/alias`, oazapfts.json({
+        ...opts,
+        method: "PUT",
+        body: sharedSpacePersonAliasDto
+    })));
+}
+/**
+ * Get assets for a person in a shared space
+ */
+export function getSpacePersonAssets({ id, personId }: {
+    id: string;
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: string[];
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/assets`, {
+        ...opts
+    }));
+}
+/**
+ * Get space person faces
+ */
+export function getSpacePersonFaces({ id, page, personId, size }: {
+    id: string;
+    page?: number;
+    personId: string;
+    size?: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PersonFacePageResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/faces${QS.query(QS.explode({
+        page,
+        size
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Get space person face thumbnail
+ */
+export function getSpacePersonFaceThumbnail({ faceId, id, personId }: {
+    faceId: string;
+    id: string;
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchBlob<{
+        status: 200;
+        data: Blob;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/faces/${encodeURIComponent(faceId)}/thumbnail`, {
+        ...opts
+    }));
+}
+/**
+ * Merge people in a shared space
+ */
+export function mergeSpacePeople({ id, personId, sharedSpacePersonMergeDto }: {
+    id: string;
+    personId: string;
+    sharedSpacePersonMergeDto: SharedSpacePersonMergeDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/merge`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: sharedSpacePersonMergeDto
+    })));
+}
+/**
+ * Update space person representative face
+ */
+export function updateSpacePersonRepresentativeFace({ id, personId, spaceRepresentativeFaceUpdateDto }: {
+    id: string;
+    personId: string;
+    spaceRepresentativeFaceUpdateDto: SpaceRepresentativeFaceUpdateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpacePersonResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/representative-face`, oazapfts.json({
+        ...opts,
+        method: "PUT",
+        body: spaceRepresentativeFaceUpdateDto
+    })));
+}
+/**
+ * Get space person statistics
+ */
+export function getSpacePersonStatistics({ id, personId }: {
+    id: string;
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PersonStatisticsResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/statistics`, {
+        ...opts
+    }));
+}
+/**
+ * Get a space person thumbnail
+ */
+export function getSpacePersonThumbnail({ id, personId }: {
+    id: string;
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchBlob<{
+        status: 200;
+        data: Blob;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/thumbnail`, {
+        ...opts
+    }));
+}
+/**
+ * Mark space as viewed
+ */
+export function markSpaceViewed({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/view`, {
+        ...opts,
+        method: "PATCH"
+    }));
+}
+/**
  * Delete stacks
  */
 export function deleteStacks({ bulkIdsDto }: {
@@ -7249,6 +8349,49 @@ export function removeAssetFromStack({ assetId, id }: {
     return oazapfts.ok(oazapfts.fetchText(`/stacks/${encodeURIComponent(id)}/assets/${encodeURIComponent(assetId)}`, {
         ...opts,
         method: "DELETE"
+    }));
+}
+/**
+ * Get storage migration estimate
+ */
+export function getEstimate({ direction }: {
+    direction: StorageMigrationDirection;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/storage-migration/estimate${QS.query(QS.explode({
+        direction
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Rollback a storage migration batch
+ */
+export function rollback({ batchId }: {
+    batchId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/storage-migration/rollback/${encodeURIComponent(batchId)}`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
+ * Start storage migration
+ */
+export function start({ storageMigrationStartDto }: {
+    storageMigrationStartDto: StorageMigrationStartDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText("/storage-migration/start", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: storageMigrationStartDto
+    })));
+}
+/**
+ * Get storage migration status
+ */
+export function getStatus(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText("/storage-migration/status", {
+        ...opts
     }));
 }
 /**
@@ -7522,12 +8665,14 @@ export function tagAssets({ id, bulkIdsDto }: {
 /**
  * Get time bucket
  */
-export function getTimeBucket({ albumId, bbox, city, country, isFavorite, isTrashed, key, make, model, order, orderBy, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, timeBucket, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export function getTimeBucket({ albumId, bbox, bucketSize, city, country, isFavorite, isNotInAlbum, isTrashed, key, make, model, order, orderBy, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, timeBucket, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
+    bucketSize?: TimeBucketSize;
     city?: string;
     country?: string;
     isFavorite?: boolean;
+    isNotInAlbum?: boolean;
     isTrashed?: boolean;
     key?: string;
     make?: string;
@@ -7560,9 +8705,11 @@ export function getTimeBucket({ albumId, bbox, city, country, isFavorite, isTras
     }>(`/timeline/bucket${QS.query(QS.explode({
         albumId,
         bbox,
+        bucketSize,
         city,
         country,
         isFavorite,
+        isNotInAlbum,
         isTrashed,
         key,
         make,
@@ -7672,12 +8819,14 @@ export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, 
 /**
  * Get time buckets
  */
-export function getTimeBuckets({ albumId, bbox, city, country, isFavorite, isTrashed, key, make, model, order, orderBy, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export function getTimeBuckets({ albumId, bbox, bucketSize, city, country, isFavorite, isNotInAlbum, isTrashed, key, make, model, order, orderBy, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
+    bucketSize?: TimeBucketSize;
     city?: string;
     country?: string;
     isFavorite?: boolean;
+    isNotInAlbum?: boolean;
     isTrashed?: boolean;
     key?: string;
     make?: string;
@@ -7709,9 +8858,11 @@ export function getTimeBuckets({ albumId, bbox, city, country, isFavorite, isTra
     }>(`/timeline/buckets${QS.query(QS.explode({
         albumId,
         bbox,
+        bucketSize,
         city,
         country,
         isFavorite,
+        isNotInAlbum,
         isTrashed,
         key,
         make,
@@ -8392,6 +9543,8 @@ export enum Permission {
     SharedSpaceAssetCreate = "sharedSpaceAsset.create",
     SharedSpaceAssetRead = "sharedSpaceAsset.read",
     SharedSpaceAssetDelete = "sharedSpaceAsset.delete",
+    SharedSpaceLibraryCreate = "sharedSpaceLibrary.create",
+    SharedSpaceLibraryDelete = "sharedSpaceLibrary.delete",
     UserGroupCreate = "userGroup.create",
     UserGroupRead = "userGroup.read",
     UserGroupUpdate = "userGroup.update",
@@ -8502,10 +9655,9 @@ export enum AssetJobName {
     RegenerateThumbnail = "regenerate-thumbnail",
     TranscodeVideo = "transcode-video"
 }
-export enum PersonUserRole {
-    Read = "read",
-    Write = "write",
-    Admin = "admin"
+export enum Type {
+    UserPerson = "user-person",
+    SpacePerson = "space-person"
 }
 export enum AssetTypeEnum {
     Image = "IMAGE",
@@ -8534,6 +9686,10 @@ export enum SourceType {
     Exif = "exif",
     Manual = "manual"
 }
+export enum MapMediaType {
+    Image = "IMAGE",
+    Video = "VIDEO"
+}
 export enum ManualJobName {
     PersonCleanup = "person-cleanup",
     TagCleanup = "tag-cleanup",
@@ -8549,7 +9705,9 @@ export enum ManualJobName {
     IntegrityChecksumMismatchRefresh = "integrity-checksum-mismatch-refresh",
     IntegrityMissingFilesDeleteAll = "integrity-missing-files-delete-all",
     IntegrityUntrackedFilesDeleteAll = "integrity-untracked-files-delete-all",
-    IntegrityChecksumMismatchDeleteAll = "integrity-checksum-mismatch-delete-all"
+    IntegrityChecksumMismatchDeleteAll = "integrity-checksum-mismatch-delete-all",
+    FaceIdentityBackfill = "face-identity-backfill",
+    SharedSpacePersonMetadataBackfill = "shared-space-person-metadata-backfill"
 }
 export enum QueueName {
     ThumbnailGeneration = "thumbnailGeneration",
@@ -8560,6 +9718,7 @@ export enum QueueName {
     SmartSearch = "smartSearch",
     DuplicateDetection = "duplicateDetection",
     BackgroundTask = "backgroundTask",
+    PeopleBackfill = "peopleBackfill",
     StorageTemplateMigration = "storageTemplateMigration",
     Migration = "migration",
     Search = "search",
@@ -8568,9 +9727,12 @@ export enum QueueName {
     Notifications = "notifications",
     BackupDatabase = "backupDatabase",
     Ocr = "ocr",
+    PetDetection = "petDetection",
     Workflow = "workflow",
     IntegrityCheck = "integrityCheck",
-    Editor = "editor"
+    Editor = "editor",
+    StorageBackendMigration = "storageBackendMigration",
+    Classification = "classification"
 }
 export enum QueueCommand {
     Start = "start",
@@ -8592,9 +9754,9 @@ export enum PartnerDirection {
     SharedBy = "shared-by",
     SharedWith = "shared-with"
 }
-export enum SharingDirection {
-    SharedBy = "shared-by",
-    SharedWith = "shared-with"
+export enum Type2 {
+    Person = "person",
+    SpacePerson = "space-person"
 }
 export enum PeopleUsersUpsertType {
     Everyone = "everyone"
@@ -8627,6 +9789,8 @@ export enum JobName {
     DatabaseBackup = "DatabaseBackup",
     FacialRecognitionQueueAll = "FacialRecognitionQueueAll",
     FacialRecognition = "FacialRecognition",
+    FaceIdentityBackfill = "FaceIdentityBackfill",
+    FaceIdentityMaintenanceAfterRecognition = "FaceIdentityMaintenanceAfterRecognition",
     FileDelete = "FileDelete",
     FileMigrationQueueAll = "FileMigrationQueueAll",
     LibraryDeleteCheck = "LibraryDeleteCheck",
@@ -8663,6 +9827,8 @@ export enum JobName {
     VersionCheck = "VersionCheck",
     OcrQueueAll = "OcrQueueAll",
     Ocr = "Ocr",
+    PetDetectionQueueAll = "PetDetectionQueueAll",
+    PetDetection = "PetDetection",
     WorkflowAssetTrigger = "WorkflowAssetTrigger",
     IntegrityUntrackedFilesQueueAll = "IntegrityUntrackedFilesQueueAll",
     IntegrityUntrackedFiles = "IntegrityUntrackedFiles",
@@ -8673,7 +9839,20 @@ export enum JobName {
     IntegrityChecksumFiles = "IntegrityChecksumFiles",
     IntegrityChecksumFilesRefresh = "IntegrityChecksumFilesRefresh",
     IntegrityDeleteReportType = "IntegrityDeleteReportType",
-    IntegrityDeleteReports = "IntegrityDeleteReports"
+    IntegrityDeleteReports = "IntegrityDeleteReports",
+    StorageBackendMigrationQueueAll = "StorageBackendMigrationQueueAll",
+    StorageBackendMigrationSingle = "StorageBackendMigrationSingle",
+    SharedSpaceFaceMatch = "SharedSpaceFaceMatch",
+    SharedSpaceFaceMatchAll = "SharedSpaceFaceMatchAll",
+    SharedSpaceFaceMatchPage = "SharedSpaceFaceMatchPage",
+    SharedSpaceFaceMatchFromBackfill = "SharedSpaceFaceMatchFromBackfill",
+    SharedSpaceLibraryFaceSync = "SharedSpaceLibraryFaceSync",
+    SharedSpaceIdentityReconciliation = "SharedSpaceIdentityReconciliation",
+    SharedSpacePersonDedup = "SharedSpacePersonDedup",
+    SharedSpacePersonMetadataBackfill = "SharedSpacePersonMetadataBackfill",
+    SharedSpaceBulkAddAssets = "SharedSpaceBulkAddAssets",
+    AssetClassifyQueueAll = "AssetClassifyQueueAll",
+    AssetClassify = "AssetClassify"
 }
 export enum SearchOrderField {
     FileCreatedAt = "fileCreatedAt",
@@ -8704,6 +9883,19 @@ export enum AssetIdErrorReason {
     Duplicate = "duplicate",
     NoPermission = "no_permission",
     NotFound = "not_found"
+}
+export enum SharedSpaceRole {
+    Owner = "owner",
+    Editor = "editor",
+    Viewer = "viewer"
+}
+export enum RepresentativeFaceSource {
+    Auto = "auto",
+    Manual = "manual"
+}
+export enum StorageMigrationDirection {
+    ToS3 = "toS3",
+    ToDisk = "toDisk"
 }
 export enum SyncEntityType {
     AuthUserV1 = "AuthUserV1",
@@ -8830,6 +10022,16 @@ export enum SyncRequestType {
     LibraryAssetExifsV1 = "LibraryAssetExifsV1",
     SharedSpaceLibrariesV1 = "SharedSpaceLibrariesV1"
 }
+export enum Action {
+    Tag = "tag",
+    TagAndArchive = "tag_and_archive"
+}
+export enum ClassificationFaceExclusion {
+    Off = "off",
+    AnyAssignedFace = "any_assigned_face",
+    NamedPeople = "named_people",
+    NamedVisiblePeople = "named_visible_people"
+}
 export enum TranscodeHWAccel {
     Nvenc = "nvenc",
     Qsv = "qsv",
@@ -8903,6 +10105,11 @@ export enum ReleaseChannel {
 export enum OAuthTokenEndpointAuthMethod {
     ClientSecretPost = "client_secret_post",
     ClientSecretBasic = "client_secret_basic"
+}
+export enum TimeBucketSize {
+    Year = "year",
+    Month = "month",
+    Day = "day"
 }
 export enum AssetOrderBy {
     TakenAt = "takenAt",
