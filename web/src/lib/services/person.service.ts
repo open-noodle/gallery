@@ -17,6 +17,15 @@ import PersonEditModal from '$lib/modals/PersonEditModal.svelte';
 import { handleError } from '$lib/utils/handle-error';
 import { getFormatter } from '$lib/utils/i18n';
 
+// Members of a shared space see space-scoped people whose IDs do not exist in the person table;
+// writes for those must go to the shared space endpoint instead of person.update.
+const getSpaceProfile = (person: PersonResponseDto) => {
+  const profile = person.primaryProfile;
+  return profile?.type === Type.SpacePerson && profile.spaceId
+    ? { id: profile.id, spaceId: profile.spaceId }
+    : undefined;
+};
+
 export const getPersonActions = ($t: MessageFormatter, person: PersonResponseDto) => {
   const Edit: ActionItem = {
     title: $t('edit_person'),
@@ -24,17 +33,18 @@ export const getPersonActions = ($t: MessageFormatter, person: PersonResponseDto
     onAction: () => modalManager.show(PersonEditModal, { person }),
   };
 
+  // Shared space people have no favorite state, so don't offer it for them.
   const Favorite: ActionItem = {
     title: $t('to_favorite'),
     icon: mdiHeartOutline,
-    $if: () => !person.isFavorite,
+    $if: () => !getSpaceProfile(person) && !person.isFavorite,
     onAction: () => handleFavoritePerson(person),
   };
 
   const Unfavorite: ActionItem = {
     title: $t('unfavorite'),
     icon: mdiHeartMinusOutline,
-    $if: () => !!person.isFavorite,
+    $if: () => !getSpaceProfile(person) && !!person.isFavorite,
     onAction: () => handleUnfavoritePerson(person),
   };
 
@@ -95,11 +105,24 @@ const handleUnfavoritePerson = async (person: { id: string }) => {
   }
 };
 
-const handleHidePerson = async (person: { id: string }) => {
+const updatePersonVisibility = async (person: PersonResponseDto, isHidden: boolean): Promise<PersonResponseDto> => {
+  const profile = getSpaceProfile(person);
+  if (profile) {
+    const updated = await updateSpacePerson({
+      id: profile.spaceId,
+      personId: profile.id,
+      sharedSpacePersonUpdateDto: { isHidden },
+    });
+    return { ...person, isHidden: updated.isHidden };
+  }
+  return updatePerson({ id: person.id, personUpdateDto: { isHidden } });
+};
+
+const handleHidePerson = async (person: PersonResponseDto) => {
   const $t = await getFormatter();
 
   try {
-    const response = await updatePerson({ id: person.id, personUpdateDto: { isHidden: true } });
+    const response = await updatePersonVisibility(person, true);
     toastManager.primary($t('changed_visibility_successfully'));
     eventManager.emit('PersonUpdate', response);
   } catch (error) {
@@ -107,24 +130,11 @@ const handleHidePerson = async (person: { id: string }) => {
   }
 };
 
-export const handleUpdatePerson = async ({ id, ...personUpdateDto }: { id: string } & PersonUpdateDto) => {
+const handleShowPerson = async (person: PersonResponseDto) => {
   const $t = await getFormatter();
 
   try {
-    const response = await updatePerson({ id, personUpdateDto });
-    const isOtherUser = !!personUpdateDto.userId && personUpdateDto.userId !== authManager.user.id;
-    eventManager.emit('PersonUpdate', isOtherUser ? await getPerson({ id }) : response);
-    return response;
-  } catch (error) {
-    handleError(error, $t('errors.something_went_wrong'));
-  }
-};
-
-const handleShowPerson = async (person: { id: string }) => {
-  const $t = await getFormatter();
-
-  try {
-    const response = await updatePerson({ id: person.id, personUpdateDto: { isHidden: false } });
+    const response = await updatePersonVisibility(person, false);
     toastManager.primary($t('changed_visibility_successfully'));
     eventManager.emit('PersonUpdate', response);
   } catch (error) {
@@ -138,9 +148,9 @@ export const withUpdateStrategy = (dto: PersonUpdateDto): PersonUpdateDto =>
     : dto;
 
   try {
-    const profile = person.primaryProfile;
+    const profile = getSpaceProfile(person);
     let response: PersonResponseDto;
-    if (profile?.type === Type.SpacePerson && profile.spaceId) {
+    if (profile) {
       const updated = await updateSpacePerson({
         id: profile.spaceId,
         personId: profile.id,
