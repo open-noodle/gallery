@@ -18,7 +18,7 @@ DriftPerson _d(String id, String name, {bool isHidden = false}) => DriftPerson(
 PersonDto _p(String id, String name) => PersonDto(id: id, name: name, isHidden: false, thumbnailPath: '');
 
 ProviderContainer _containerWith(List<DriftPerson> people) {
-  return ProviderContainer(overrides: [driftGetAllPeopleProvider.overrideWith((ref) async => people)]);
+  return ProviderContainer(overrides: [driftGetAllPeopleProvider.overrideWith((ref, sortBy) async => people)]);
 }
 
 void main() {
@@ -45,6 +45,19 @@ void main() {
       expect(result.single.name, 'Alice');
       expect(result.single.thumbnailPath, '');
       expect(result.single.isHidden, false);
+    });
+
+    test('pins photoCount ordering regardless of the people sort preference', () async {
+      final c = ProviderContainer(
+        overrides: [
+          driftGetAllPeopleProvider.overrideWith(
+            (ref, sortBy) async => sortBy == PeopleSortBy.photoCount ? [_d('pinned', 'Alice')] : [_d('leaked', 'Bob')],
+          ),
+        ],
+      );
+      addTearDown(c.dispose);
+      final result = await c.read(peoplePickerAllProvider.future);
+      expect(result.map((p) => p.id), ['pinned']);
     });
   });
 
