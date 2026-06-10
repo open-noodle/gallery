@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:immich_mobile/constants/colors.dart';
 import 'package:immich_mobile/constants/enums.dart';
 import 'package:immich_mobile/domain/models/log.model.dart';
+import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/value_codec.dart';
 import 'package:immich_mobile/providers/album/album_sort_by_options.provider.dart';
@@ -35,6 +36,9 @@ enum SettingsKey<T> {
   albumSortMode<AlbumSortMode>(codec: EnumCodec(AlbumSortMode.values)),
   albumIsReverse<bool>(),
   albumIsGrid<bool>(),
+
+  // People
+  peopleSortBy<PeopleSortBy>(codec: _EnumCodec(PeopleSortBy.values)),
 
   // Backup
   backupEnabled<bool>(),
