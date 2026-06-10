@@ -95,10 +95,7 @@ describe('sortPeople', () => {
     });
 
     it('breaks equal-count ties among unnamed people by id, treating whitespace names as unnamed', () => {
-      const people = [
-        p({ id: 'u-b', name: '', numberOfAssets: 5 }),
-        p({ id: 'u-a', name: '  ', numberOfAssets: 5 }),
-      ];
+      const people = [p({ id: 'u-b', name: '', numberOfAssets: 5 }), p({ id: 'u-a', name: '  ', numberOfAssets: 5 })];
 
       expect(sortPeople(people, PeopleSortBy.PhotoCount).map((person) => person.id)).toEqual(['u-a', 'u-b']);
     });

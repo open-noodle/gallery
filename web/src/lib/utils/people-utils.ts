@@ -43,6 +43,10 @@ export function comparePeople(a: SortablePerson, b: SortablePerson, sortBy: Peop
     if (nameCompare !== 0) {
       return nameCompare;
     }
+    // Identical names fall back to count, matching the mobile ORDER BY.
+    if (countCompare !== 0) {
+      return countCompare;
+    }
   } else {
     if (countCompare !== 0) {
       return countCompare;

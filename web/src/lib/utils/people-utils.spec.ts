@@ -1,8 +1,8 @@
 import type { Faces } from '$lib/stores/people.store';
+import { PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
 import type { Size } from '$lib/utils/container-utils';
 import { getBoundingBox, sortPeople, sortPeopleForManagement, zoomImageToBase64 } from '$lib/utils/people-utils';
 import { AssetTypeEnum } from '@immich/sdk';
-import { PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
 import { get } from 'svelte/store';
 
 const makeFace = (overrides: Partial<Faces> = {}): Faces => ({
@@ -126,10 +126,7 @@ describe('sortPeople', () => {
     });
 
     it('breaks equal-count ties among unnamed people by id, treating whitespace names as unnamed', () => {
-      const people = [
-        p({ id: 'u-b', name: '', numberOfAssets: 5 }),
-        p({ id: 'u-a', name: '  ', numberOfAssets: 5 }),
-      ];
+      const people = [p({ id: 'u-b', name: '', numberOfAssets: 5 }), p({ id: 'u-a', name: '  ', numberOfAssets: 5 })];
 
       expect(sortPeople(people, PeopleSortBy.PhotoCount).map((person) => person.id)).toEqual(['u-a', 'u-b']);
     });
@@ -156,6 +153,15 @@ describe('sortPeople', () => {
       const people = [p({ id: 'u-zero', name: '' }), p({ id: 'u-five', name: '', numberOfAssets: 5 })];
 
       expect(sortPeople(people, PeopleSortBy.Name).map((person) => person.id)).toEqual(['u-five', 'u-zero']);
+    });
+
+    it('breaks identical-name ties by count then id, matching the mobile ordering', () => {
+      const people = [
+        p({ id: 'dup-a', name: 'Alex', numberOfAssets: 1 }),
+        p({ id: 'dup-b', name: 'alex', numberOfAssets: 9 }),
+      ];
+
+      expect(sortPeople(people, PeopleSortBy.Name).map((person) => person.id)).toEqual(['dup-b', 'dup-a']);
     });
   });
 
