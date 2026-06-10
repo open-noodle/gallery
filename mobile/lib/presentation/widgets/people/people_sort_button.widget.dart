@@ -51,10 +51,7 @@ class PeopleSortButton extends ConsumerWidget {
 
     return MenuItemButton(
       key: Key('people-sort-${mode.name}'),
-      leadingIcon: Icon(
-        Icons.check_rounded,
-        color: isSelected ? context.colorScheme.onPrimary : Colors.transparent,
-      ),
+      leadingIcon: Icon(Icons.check_rounded, color: isSelected ? context.colorScheme.onPrimary : Colors.transparent),
       onPressed: () async {
         await ref.read(settingsProvider.notifier).set(Setting.peopleSortBy, mode.index);
       },
