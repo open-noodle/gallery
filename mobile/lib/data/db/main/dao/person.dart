@@ -36,13 +36,19 @@ class PeopleRepository extends DatabaseAccessor<Drift> with $PeopleRepositoryMix
     return query.map((row) => row.toDto()).get();
   }
 
-  Stream<List<Person>> watch({int minFaces = 3}) {
+  JoinedSelectStatement _allPeopleQuery({required int minFaces, required PeopleSortBy sortBy}) {
     final people = _db.personEntity;
     final faces = _db.assetFaceEntity;
     final assets = _db.remoteAssetEntity;
 
-    final query =
-        _db.select(people).join([
+    final favoritesFirst = OrderingTerm(expression: people.isFavorite, mode: OrderingMode.desc);
+    // BTRIM semantics: whitespace-only names belong to the unnamed tier.
+    final namedFirst = OrderingTerm(expression: people.name.trim().equals('').not(), mode: OrderingMode.desc);
+    final byFaceCount = OrderingTerm(expression: faces.id.count(), mode: OrderingMode.desc);
+    final byName = OrderingTerm(expression: people.name.trim().lower());
+    final byId = OrderingTerm(expression: people.id);
+
+    return _db.select(people).join([
             innerJoin(faces, faces.personId.equalsExp(people.id)),
             innerJoin(assets, assets.id.equalsExp(faces.assetId)),
           ])
@@ -54,15 +60,22 @@ class PeopleRepository extends DatabaseAccessor<Drift> with $PeopleRepositoryMix
                 faces.deletedAt.isNull(),
           )
           ..groupBy([people.id], having: faces.id.count().isBiggerOrEqualValue(minFaces) | people.name.equals('').not())
-          ..orderBy([
-            OrderingTerm(expression: people.name.equals('').not(), mode: OrderingMode.desc),
-            OrderingTerm(expression: faces.id.count(), mode: OrderingMode.desc),
-          ]);
+          ..orderBy(switch (sortBy) {
+            PeopleSortBy.photoCount => [favoritesFirst, namedFirst, byFaceCount, byName, byId],
+            PeopleSortBy.name => [favoritesFirst, namedFirst, byName, byFaceCount, byId],
+          });
+  }
 
-    return query.map((row) {
-      final person = row.readTable(people);
-      return person.toDto();
-    }).watch();
+  Stream<List<Person>> watch({int minFaces = 3, PeopleSortBy sortBy = PeopleSortBy.photoCount}) {
+    final people = _db.personEntity;
+    return _allPeopleQuery(minFaces: minFaces, sortBy: sortBy).map((row) => row.readTable(people).toDto()).watch();
+  }
+
+  /// Kept alongside [watch] as the offline-fallback path of
+  /// `getAllPeopleWithSharedSpaces` — a one-shot read has no business being a stream.
+  Future<List<Person>> getAllPeople({int minFaces = 3, PeopleSortBy sortBy = PeopleSortBy.photoCount}) {
+    final people = _db.personEntity;
+    return _allPeopleQuery(minFaces: minFaces, sortBy: sortBy).map((row) => row.readTable(people).toDto()).get();
   }
 
   Future<int> updateName(String personId, String name) {
