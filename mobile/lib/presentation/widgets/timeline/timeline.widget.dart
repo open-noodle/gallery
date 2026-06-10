@@ -23,6 +23,7 @@ import 'package:immich_mobile/presentation/widgets/timeline/scroll_drain.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/scrubber.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_anchor.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_bottom_pill.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_drag_region.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_scroll_target.dart';
@@ -31,6 +32,7 @@ import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.da
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
+import 'package:immich_mobile/providers/timeline/timeline_grouping.provider.dart';
 import 'package:immich_mobile/providers/timeline/zoom_anchor.provider.dart';
 import 'package:immich_mobile/routing/app_navigation_observer.dart';
 import 'package:immich_mobile/widgets/common/immich_loading_indicator.dart';
@@ -42,7 +44,7 @@ double timelineScrubberSnappingOffset({required double? topSliverWidgetHeight, r
   return (topSliverWidgetHeight ?? 0) + appBarExpandedHeight;
 }
 
-class Timeline extends ConsumerWidget {
+class Timeline extends StatelessWidget {
   const Timeline({
     super.key,
     this.topSliverWidget,
@@ -58,6 +60,7 @@ class Timeline extends ConsumerWidget {
     this.readOnly = false,
     this.persistentBottomBar = false,
     this.loadingWidget,
+    this.withGroupingPill = false,
   });
 
   final Widget? topSliverWidget;
@@ -74,20 +77,35 @@ class Timeline extends ConsumerWidget {
   final bool persistentBottomBar;
   final Widget? loadingWidget;
 
+  /// Overlay the always-visible Years|Months|All bottom pill and reserve bottom
+  /// clearance for it. Detail timelines (album/space/person/...) opt in; the main
+  /// Photos page keeps its app-bar chip and stays off.
+  final bool withGroupingPill;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final columnCount = ref.watch(appConfigProvider.select((config) => config.timeline.tilesPerRow));
+  Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (_, constraints) {
+        final sliverTimeline = _SliverTimeline(
+          topSliverWidget: topSliverWidget,
+          topSliverWidgetHeight: topSliverWidgetHeight,
+          bottomSliverWidget: bottomSliverWidget,
+          appBar: appBar,
+          bottomSheet: bottomSheet,
+          withScrubber: withScrubber,
+          persistentBottomBar: persistentBottomBar,
+          snapToMonth: snapToMonth,
+          maxWidth: constraints.maxWidth,
+          loadingWidget: loadingWidget,
+          withGroupingPill: withGroupingPill,
+        );
         return ProviderScope(
           overrides: [
-            // overrideWithValue keeps the scoped args in sync with the latest constraints on rebuilds,
-            // a function override would stay locked to the first frame's constraints for the whole session
-            timelineArgsProvider.overrideWithValue(
-              TimelineArgs(
+            timelineArgsProvider.overrideWith(
+              (ref) => TimelineArgs(
                 maxWidth: constraints.maxWidth,
                 maxHeight: constraints.maxHeight,
-                columnCount: columnCount,
+                columnCount: ref.watch(appConfigProvider.select((config) => config.timeline.tilesPerRow)),
                 showStorageIndicator: showStorageIndicator,
                 withStack: withStack,
                 groupBy: groupBy,
@@ -95,18 +113,12 @@ class Timeline extends ConsumerWidget {
             ),
             if (readOnly) readonlyModeProvider.overrideWith(() => _AlwaysReadOnlyNotifier()),
           ],
-          child: _SliverTimeline(
-            topSliverWidget: topSliverWidget,
-            topSliverWidgetHeight: topSliverWidgetHeight,
-            bottomSliverWidget: bottomSliverWidget,
-            appBar: appBar,
-            bottomSheet: bottomSheet,
-            withScrubber: withScrubber,
-            persistentBottomBar: persistentBottomBar,
-            snapToMonth: snapToMonth,
-            maxWidth: constraints.maxWidth,
-            loadingWidget: loadingWidget,
-          ),
+          // The pill overlays the whole timeline body — including the loading state — by
+          // design: it is the always-visible grouping control, mirroring how the old top
+          // header was present while content loaded.
+          child: withGroupingPill
+              ? Stack(children: [sliverTimeline, const TimelineGroupingBottomPill()])
+              : sliverTimeline,
         );
       },
     );
@@ -136,6 +148,7 @@ class _SliverTimeline extends ConsumerStatefulWidget {
     this.snapToMonth = true,
     this.maxWidth,
     this.loadingWidget,
+    this.withGroupingPill = false,
   });
 
   final Widget? topSliverWidget;
@@ -148,12 +161,13 @@ class _SliverTimeline extends ConsumerStatefulWidget {
   final bool snapToMonth;
   final double? maxWidth;
   final Widget? loadingWidget;
+  final bool withGroupingPill;
 
   @override
   ConsumerState createState() => _SliverTimelineState();
 }
 
-class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBindingObserver {
+class _SliverTimelineState extends ConsumerState<_SliverTimeline> {
   late final ScrollController _scrollController;
   StreamSubscription? _eventSubscription;
 
@@ -174,7 +188,6 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _scrollController = ScrollController(onAttach: _restoreAssetPosition);
     _eventSubscription = EventStream.shared.listen(_onEvent);
 
@@ -195,18 +208,20 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
       if (mounted) _requestScrollDrain();
     });
 
-    ref.listenManual(appConfigProvider.select((config) => config.timeline.groupAssetsBy), _onGroupingChanged);
+    ref.listenManual(timelineGroupingProvider, _onGroupingChanged);
   }
 
   @override
   void didUpdateWidget(covariant _SliverTimeline oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.maxWidth != oldWidget.maxWidth) {
-      // The updated args already regenerate the segments, only remember the scroll position to restore it afterwards
-      final segments = ref.read(timelineSegmentProvider).valueOrNull;
-      if (segments != null && _scrollController.hasClients) {
-        _restoreAssetIndex = _getCurrentAssetIndex(segments);
-      }
+      final asyncSegments = ref.read(timelineSegmentProvider);
+      asyncSegments.whenData((segments) {
+        final index = _getCurrentAssetIndex(segments);
+        // Refresh to wait for new segments to be generated with the updated width before restoring the scroll position
+        final _ = ref.refresh(timelineArgsProvider);
+        _restoreAssetIndex = index;
+      });
     }
   }
 
@@ -232,7 +247,14 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
   void _onEvent(Event event) {
     switch (event) {
       case ScrollToTopEvent():
-        _scrollToTop();
+        {
+          final timelineState = ref.read(timelineStateProvider.notifier);
+          timelineState.setScrubbing(true);
+          _scrollController
+              .animateTo(0, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut)
+              .whenComplete(() => timelineState.setScrubbing(false));
+        }
+
       case TimelineReloadEvent():
         setState(() {});
       default:
@@ -327,25 +349,10 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     scrollToDateNotifierProvider.removeListener(_requestScrollDrain);
     _scrollController.dispose();
     unawaited(_eventSubscription?.cancel());
     super.dispose();
-  }
-
-  void _scrollToTop() {
-    if (!_scrollController.hasClients) {
-      return;
-    }
-
-    final timelineState = ref.read(timelineStateProvider.notifier);
-    timelineState.setScrubbing(true);
-    unawaited(
-      _scrollController
-          .animateTo(0, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut)
-          .whenComplete(() => timelineState.setScrubbing(false)),
-    );
   }
 
   bool _scrollDrainScheduled = false;
@@ -455,7 +462,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
       return;
     }
 
-    final activeGroupBy = ref.read(timelineArgsProvider).groupBy ?? ref.read(appConfigProvider).timeline.groupAssetsBy;
+    final GroupAssetsBy activeGroupBy = ref.read(timelineArgsProvider).groupBy ?? ref.read(timelineGroupingProvider);
     if (activeGroupBy != groupBy) {
       return;
     }
@@ -604,8 +611,8 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                   ),
               onData: (segments) {
                 _lastRenderedSegments = segments;
-                final activeGroupBy =
-                    ref.watch(timelineArgsProvider).groupBy ?? ref.watch(appConfigProvider).timeline.groupAssetsBy;
+                final GroupAssetsBy activeGroupBy =
+                    ref.watch(timelineArgsProvider).groupBy ?? ref.watch(timelineGroupingProvider);
                 final zoomAnchor = ref.watch(timelineZoomAnchorProvider);
                 _scheduleZoomAnchorResolution(anchor: zoomAnchor, groupBy: activeGroupBy, segments: segments);
                 final childCount = (segments.lastOrNull?.lastIndex ?? -1) + 1;
@@ -615,8 +622,11 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                 final topPadding = context.padding.top + (widget.appBar == null ? 0 : kToolbarHeight) + 10;
 
                 const bottomSheetOpenModifier = 120.0;
+                final pillClearance = widget.withGroupingPill
+                    ? TimelineGroupingBottomPill.pillHeight + TimelineGroupingBottomPill.bottomFloat
+                    : 0.0;
                 final contentBottomPadding =
-                    context.padding.bottom + (isMultiSelectEnabled ? bottomSheetOpenModifier : 0);
+                    context.padding.bottom + pillClearance + (isMultiSelectEnabled ? bottomSheetOpenModifier : 0);
                 final scrubberBottomPadding = contentBottomPadding + kScrubberThumbHeight;
 
                 final grid = CustomScrollView(
