@@ -68,13 +68,13 @@ describe(PluginService.name, () => {
 
   it('filters plugin methods by workflow trigger compatibility', async () => {
     const assetMethod = method({ name: 'asset-file', types: [WorkflowType.AssetV1] });
-    const personMethod = method({ name: 'person-file', types: [WorkflowType.AssetPersonV1] });
-    mocks.plugin.searchMethods.mockResolvedValue([assetMethod, personMethod] as any);
+    const incompatibleMethod = method({ name: 'untyped-file', types: [] });
+    mocks.plugin.searchMethods.mockResolvedValue([assetMethod, incompatibleMethod] as any);
 
-    await expect(sut.searchMethods({ trigger: WorkflowTrigger.PersonRecognized })).resolves.toEqual([
-      expect.objectContaining({ key: 'immich-core#person-file' }),
+    await expect(sut.searchMethods({ trigger: WorkflowTrigger.AssetCreate })).resolves.toEqual([
+      expect.objectContaining({ key: 'immich-core#asset-file' }),
     ]);
 
-    expect(mocks.plugin.searchMethods).toHaveBeenCalledWith({ trigger: WorkflowTrigger.PersonRecognized });
+    expect(mocks.plugin.searchMethods).toHaveBeenCalledWith({ trigger: WorkflowTrigger.AssetCreate });
   });
 });
