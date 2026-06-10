@@ -1,4 +1,10 @@
-import { Type, type PersonResponseDto, type PersonStatisticsResponseDto } from '@immich/sdk';
+import {
+  SharedSpaceRole,
+  Type,
+  type PersonResponseDto,
+  type PersonStatisticsResponseDto,
+  type SharedSpaceMemberResponseDto,
+} from '@immich/sdk';
 import { modalManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
@@ -147,6 +153,18 @@ function makePerson(overrides: Partial<PersonResponseDto> = {}): PersonResponseD
     type: 'person',
     species: null,
     ...overrides,
+  };
+}
+
+function makeMember(userId: string, role: SharedSpaceRole): SharedSpaceMemberResponseDto {
+  return {
+    userId,
+    role,
+    email: `${userId}@test.dev`,
+    name: userId,
+    joinedAt: '2026-01-01T00:00:00.000Z',
+    sharePersonMetadata: true,
+    showInTimeline: true,
   };
 }
 
@@ -399,6 +417,36 @@ describe('Person detail page', () => {
     expect(screen.getByRole('img', { name: 'Alice' }).getAttribute('src')).toContain(
       '/shared-spaces/space-1/people/space-person-1/thumbnail?updatedAt=2026-01-02T00%3A00%3A00.000Z',
     );
+  });
+
+  it('hides space-person write actions when the current user is a space viewer', async () => {
+    sdkMock.getMembers.mockResolvedValue([makeMember('current-user-id', SharedSpaceRole.Viewer)]);
+    renderPage({
+      person: makePerson({
+        id: 'space-person-1',
+        primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'viewer-space-detail' },
+      }),
+    });
+
+    await waitFor(() => expect(sdkMock.getMembers).toHaveBeenCalledWith({ id: 'viewer-space-detail' }));
+    await waitFor(() => expect(screen.queryByText('set_date_of_birth')).not.toBeInTheDocument());
+    expect(screen.queryByText('hide_person')).not.toBeInTheDocument();
+    expect(screen.queryByText('select_representative_face')).not.toBeInTheDocument();
+  });
+
+  it('keeps space-person write actions for space editors', async () => {
+    sdkMock.getMembers.mockResolvedValue([makeMember('current-user-id', SharedSpaceRole.Editor)]);
+    renderPage({
+      person: makePerson({
+        id: 'space-person-1',
+        primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'editor-space-detail' },
+      }),
+    });
+
+    await waitFor(() => expect(sdkMock.getMembers).toHaveBeenCalledWith({ id: 'editor-space-detail' }));
+    expect(screen.getByText('set_date_of_birth')).toBeInTheDocument();
+    expect(screen.getByText('hide_person')).toBeInTheDocument();
+    expect(screen.getByText('select_representative_face')).toBeInTheDocument();
   });
 
   it('opens the representative face picker from the person menu', async () => {
