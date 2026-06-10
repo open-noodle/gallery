@@ -14,8 +14,8 @@ final peopleAssetProvider = FutureProvider.family<List<Person>, String>((ref, as
   return service.getAssetPeople(assetId);
 });
 
-final getAllPeopleProvider = StreamProvider<List<Person>>((ref) async* {
+final getAllPeopleProvider = StreamProvider.family<List<Person>, PeopleSortBy>((ref, sortBy) async* {
   final service = ref.watch(peopleServiceProvider);
   final prefs = await ref.watch(userMetadataPreferencesProvider.future);
-  yield* service.watch(minFaces: prefs?.minimumFaces ?? 3);
+  yield* service.watch(minFaces: prefs?.minimumFaces ?? 3, sortBy: sortBy);
 });
