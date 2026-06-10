@@ -10,12 +10,14 @@ import 'package:immich_mobile/domain/models/config/feature_message_config.dart';
 import 'package:immich_mobile/domain/models/config/image_config.dart';
 import 'package:immich_mobile/domain/models/config/map_config.dart';
 import 'package:immich_mobile/domain/models/config/network_config.dart';
+import 'package:immich_mobile/domain/models/config/people_config.dart';
 import 'package:immich_mobile/domain/models/config/share_config.dart';
 import 'package:immich_mobile/domain/models/config/slideshow_config.dart';
 import 'package:immich_mobile/domain/models/config/theme_config.dart';
 import 'package:immich_mobile/domain/models/config/timeline_config.dart';
 import 'package:immich_mobile/domain/models/config/viewer_config.dart';
 import 'package:immich_mobile/domain/models/log.model.dart';
+import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/providers/album/album_sort_by_options.provider.dart';
@@ -39,6 +41,7 @@ abstract class AppConfig with _$AppConfig {
     @Default(ViewerConfig()) ViewerConfig viewer,
     @Default(SlideshowConfig()) SlideshowConfig slideshow,
     @Default(AlbumConfig()) AlbumConfig album,
+    @Default(PeopleConfig()) PeopleConfig people,
     @Default(BackupConfig()) BackupConfig backup,
     @Default(NetworkConfig()) NetworkConfig network,
     @Default(ShareConfig()) ShareConfig share,
@@ -66,6 +69,7 @@ abstract class AppConfig with _$AppConfig {
             .albumSortMode => album.sortMode,
             .albumIsReverse => album.isReverse,
             .albumIsGrid => album.isGrid,
+            .peopleSortBy => people.sortBy,
             .backupEnabled => backup.enabled,
             .backupUseCellularForVideos => backup.useCellularForVideos,
             .backupUseCellularForPhotos => backup.useCellularForPhotos,
@@ -122,6 +126,7 @@ abstract class AppConfig with _$AppConfig {
       .albumSortMode => copyWith(album: album.copyWith(sortMode: value as AlbumSortMode)),
       .albumIsReverse => copyWith(album: album.copyWith(isReverse: value as bool)),
       .albumIsGrid => copyWith(album: album.copyWith(isGrid: value as bool)),
+      .peopleSortBy => copyWith(people: people.copyWith(sortBy: value as PeopleSortBy)),
       .backupEnabled => copyWith(backup: backup.copyWith(enabled: value as bool)),
       .backupUseCellularForVideos => copyWith(backup: backup.copyWith(useCellularForVideos: value as bool)),
       .backupUseCellularForPhotos => copyWith(backup: backup.copyWith(useCellularForPhotos: value as bool)),
