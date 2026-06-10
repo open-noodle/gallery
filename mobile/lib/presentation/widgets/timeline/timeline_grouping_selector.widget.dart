@@ -6,29 +6,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
-import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
+import 'package:immich_mobile/providers/timeline/timeline_grouping.provider.dart';
 
 const timelineGroupingSelectorGroups = <GroupAssetsBy>[GroupAssetsBy.year, GroupAssetsBy.month, GroupAssetsBy.day];
 
-GroupAssetsBy normalizeTimelineGrouping(GroupAssetsBy groupBy) {
-  return switch (groupBy) {
-    GroupAssetsBy.year || GroupAssetsBy.month || GroupAssetsBy.day => groupBy,
-    GroupAssetsBy.auto || GroupAssetsBy.none => GroupAssetsBy.day,
-  };
-}
-
-GroupAssetsBy timelineGroupingFromSettingIndex(int index) {
-  if (index < 0 || index >= GroupAssetsBy.values.length) {
-    return GroupAssetsBy.day;
-  }
-
-  return normalizeTimelineGrouping(GroupAssetsBy.values[index]);
-}
-
 class TimelineGroupingSelector extends ConsumerWidget {
-  const TimelineGroupingSelector({super.key, this.enabled = true}) : compact = false;
+  const TimelineGroupingSelector({super.key, this.enabled = true, this.bare = false}) : compact = false;
 
-  const TimelineGroupingSelector.compact({super.key, this.enabled = true}) : compact = true;
+  /// Named constructor for the compact app-bar chip variant. Does not expose [bare] because the
+  /// chip always paints its own pill surface.
+  const TimelineGroupingSelector.compact({super.key, this.enabled = true}) : compact = true, bare = false;
 
   static const double _maxWidth = 218;
   static const double _height = 48;
@@ -41,11 +28,17 @@ class TimelineGroupingSelector extends ConsumerWidget {
   final bool enabled;
   final bool compact;
 
+  /// When true the full-variant selector renders with a transparent Material and no stadium side,
+  /// because the host widget (e.g. [TimelineGroupingBottomPill]) already paints the pill surface
+  /// and outline ring. Keeping both would produce a double border on device. Defaults to false so
+  /// the standalone app-bar usage retains its own surface and border. The transparent Material and
+  /// stadium shape must stay even when bare: the segments' InkWells need a Material ancestor, and
+  /// the shape clips their ripples to the pill.
+  final bool bare;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selected = ref.watch(
-      appConfigProvider.select((config) => normalizeTimelineGrouping(config.timeline.groupAssetsBy)),
-    );
+    final selected = ref.watch(timelineGroupingProvider);
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
@@ -55,7 +48,7 @@ class TimelineGroupingSelector extends ConsumerWidget {
         enabled: enabled,
         onSelected: (groupBy) async {
           unawaited(HapticFeedback.selectionClick());
-          await ref.read(settingsProvider).write(.timelineGroupAssetsBy, groupBy);
+          await ref.read(timelineGroupingProvider.notifier).set(groupBy);
         },
       );
     }
@@ -74,10 +67,14 @@ class TimelineGroupingSelector extends ConsumerWidget {
               width: width,
               height: _height,
               child: Material(
-                color: colors.surfaceContainerHighest.withValues(
-                  alpha: theme.brightness == Brightness.dark ? 0.74 : 0.9,
+                color: bare
+                    ? Colors.transparent
+                    : colors.surfaceContainerHighest.withValues(
+                        alpha: theme.brightness == Brightness.dark ? 0.74 : 0.9,
+                      ),
+                shape: StadiumBorder(
+                  side: bare ? BorderSide.none : BorderSide(color: colors.outlineVariant.withValues(alpha: 0.7)),
                 ),
-                shape: StadiumBorder(side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.7))),
                 clipBehavior: Clip.antiAlias,
                 child: Row(
                   children: [
@@ -89,7 +86,7 @@ class TimelineGroupingSelector extends ConsumerWidget {
                           enabled: enabled,
                           onTap: () async {
                             unawaited(HapticFeedback.selectionClick());
-                            await ref.read(settingsProvider).write(.timelineGroupAssetsBy, groupBy);
+                            await ref.read(timelineGroupingProvider.notifier).set(groupBy);
                           },
                         ),
                       ),
