@@ -1,5 +1,6 @@
 import { AssetTypeEnum } from '@immich/sdk';
 import type { Faces } from '$lib/managers/asset-viewer-manager.svelte';
+import { PeopleSortBy } from '$lib/stores/preferences.store';
 import { createUrl, getAssetMediaUrl } from '$lib/utils';
 import { mapNormalizedRectToContent, type Rect, type Size } from '$lib/utils/container-utils';
 
@@ -16,7 +17,7 @@ export type SortablePerson = {
 const getSortablePersonName = (person: SortablePerson) => person.name?.trim() ?? '';
 const getSortablePersonCount = (person: SortablePerson) => person.numberOfAssets ?? person.assetCount ?? 0;
 
-export function comparePeopleForManagement(a: SortablePerson, b: SortablePerson): number {
+export function comparePeople(a: SortablePerson, b: SortablePerson, sortBy: PeopleSortBy): number {
   if (!!a.isHidden !== !!b.isHidden) {
     return a.isHidden ? 1 : -1;
   }
@@ -33,25 +34,41 @@ export function comparePeopleForManagement(a: SortablePerson, b: SortablePerson)
     return aHasName ? -1 : 1;
   }
 
-  if (aHasName && bHasName) {
-    const nameCompare = aName.localeCompare(bName, undefined, { sensitivity: 'base' });
+  const nameCompare = aHasName ? aName.localeCompare(bName, undefined, { sensitivity: 'base' }) : 0;
+  const countCompare = getSortablePersonCount(b) - getSortablePersonCount(a);
+
+  // Unknown persisted values fall into the count branch, so a corrupt
+  // localStorage entry degrades to the default (Most photos) ordering.
+  if (aHasName && sortBy === PeopleSortBy.Name) {
     if (nameCompare !== 0) {
       return nameCompare;
     }
-  }
-
-  if (!aHasName && !bHasName) {
-    const countCompare = getSortablePersonCount(b) - getSortablePersonCount(a);
+    // Identical names fall back to count, matching the mobile ORDER BY.
     if (countCompare !== 0) {
       return countCompare;
+    }
+  } else {
+    if (countCompare !== 0) {
+      return countCompare;
+    }
+    if (nameCompare !== 0) {
+      return nameCompare;
     }
   }
 
   return a.id.localeCompare(b.id);
 }
 
+export function sortPeople<T extends SortablePerson>(people: T[], sortBy: PeopleSortBy): T[] {
+  return [...people].sort((a, b) => comparePeople(a, b, sortBy));
+}
+
+export function comparePeopleForManagement(a: SortablePerson, b: SortablePerson): number {
+  return comparePeople(a, b, PeopleSortBy.Name);
+}
+
 export function sortPeopleForManagement<T extends SortablePerson>(people: T[]): T[] {
-  return [...people].sort(comparePeopleForManagement);
+  return sortPeople(people, PeopleSortBy.Name);
 }
 
 export const comparePeopleByFavoriteAndName = comparePeopleForManagement;

@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { QueryParameter, timeBeforeShowLoadingSpinner } from '$lib/constants';
+  import Dropdown from '$lib/elements/Dropdown.svelte';
   import SearchBar from '$lib/elements/SearchBar.svelte';
   import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
   import PeopleFaceStatisticsInfo from '$lib/components/people/people-face-statistics-info.svelte';
@@ -14,11 +15,11 @@
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import PersonEditBirthDateModal from '$lib/modals/PersonEditBirthDateModal.svelte';
-  import { locale } from '$lib/stores/preferences.store';
+  import { locale, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
   import { createUrl, handlePromiseError } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
   import { clearQueryParam } from '$lib/utils/navigation';
-  import { sortPeopleForManagement } from '$lib/utils/people-utils';
+  import { sortPeople } from '$lib/utils/people-utils';
   import { formatPeopleHeaderDescription } from '$lib/utils/people-statistics';
   import {
     getSpacePeople,
@@ -41,6 +42,8 @@
     mdiDotsVertical,
     mdiEyeOffOutline,
     mdiEyeOutline,
+    mdiSortAlphabeticalAscending,
+    mdiSortNumericDescending,
   } from '@mdi/js';
   import { onMount } from 'svelte';
   import { fly } from 'svelte/transition';
@@ -70,7 +73,26 @@
   let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
   let selectHidden = $state(false);
-  const visiblePeople = $derived(sortPeopleForManagement(people.filter((p) => !p.isHidden)));
+  const peopleSortOptions = [PeopleSortBy.PhotoCount, PeopleSortBy.Name];
+  const peopleSortIcons: Record<PeopleSortBy, string> = {
+    [PeopleSortBy.PhotoCount]: mdiSortNumericDescending,
+    [PeopleSortBy.Name]: mdiSortAlphabeticalAscending,
+  };
+  let peopleSortByNames: Record<PeopleSortBy, string> = $derived({
+    [PeopleSortBy.PhotoCount]: $t('sort_people_most_photos'),
+    [PeopleSortBy.Name]: $t('name'),
+  });
+  let peopleSortBy = $derived(
+    Object.values(PeopleSortBy).includes($peopleViewSettings.sortBy)
+      ? $peopleViewSettings.sortBy
+      : PeopleSortBy.PhotoCount,
+  );
+  const visiblePeople = $derived(
+    sortPeople(
+      people.filter((p) => !p.isHidden),
+      peopleSortBy,
+    ),
+  );
   const countVisiblePeople = $derived(peopleStatistics ? peopleStatistics.total - peopleStatistics.hidden : 0);
   const hasSearchablePeople = $derived(countVisiblePeople > 0 || visiblePeople.length > 0 || !!searchName.trim());
   const activeSearchFilterName = $derived(
@@ -452,6 +474,13 @@
               />
             </div>
           </div>
+          <Dropdown
+            title={$t('sort_people_by')}
+            options={peopleSortOptions}
+            selectedOption={peopleSortBy}
+            onSelect={(sortBy) => ($peopleViewSettings.sortBy = sortBy)}
+            render={(sortBy) => ({ title: peopleSortByNames[sortBy], icon: peopleSortIcons[sortBy] })}
+          />
         {/if}
         {#if canManageVisibility}
           <Button
