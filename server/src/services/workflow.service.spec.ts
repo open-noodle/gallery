@@ -32,7 +32,6 @@ describe(WorkflowService.name, () => {
   it('returns available workflow triggers', () => {
     expect(sut.getTriggers()).toEqual([
       { trigger: WorkflowTrigger.AssetCreate, types: [WorkflowType.AssetV1] },
-      { trigger: WorkflowTrigger.PersonRecognized, types: [WorkflowType.AssetPersonV1] },
       { trigger: WorkflowTrigger.AssetMetadataExtraction, types: [WorkflowType.AssetV1] },
     ]);
   });
@@ -109,12 +108,12 @@ describe(WorkflowService.name, () => {
   it('rejects plugin methods incompatible with the workflow trigger', async () => {
     const auth = factory.auth();
     mocks.plugin.getForValidation.mockResolvedValue([
-      { id: newUuid(), pluginName: 'immich-core', name: 'asset-file', types: [WorkflowType.AssetV1] },
+      { id: newUuid(), pluginName: 'immich-core', name: 'asset-file', types: [] },
     ]);
 
     await expect(
       sut.create(auth, {
-        trigger: WorkflowTrigger.PersonRecognized,
+        trigger: WorkflowTrigger.AssetCreate,
         steps: [{ method: 'immich-core#asset-file', config: null }],
       }),
     ).rejects.toThrow(/incompatible with workflow trigger/);
