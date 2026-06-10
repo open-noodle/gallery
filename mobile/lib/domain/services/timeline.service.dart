@@ -48,7 +48,9 @@ class TimelineFactory {
 
   GroupAssetsBy get groupBy {
     final group = _settingsRepository.appConfig.timeline.groupAssetsBy;
-    // We do not support auto grouping in the new timeline yet, fallback to day grouping
+    // We do not support auto grouping in the new timeline yet, fallback to day grouping.
+    // Fallback only: timeline routes pass groupBy explicitly from timelineGroupingProvider,
+    // which is the canonical normalization (it additionally maps `none` to day).
     return group == GroupAssetsBy.auto ? GroupAssetsBy.day : group;
   }
 
