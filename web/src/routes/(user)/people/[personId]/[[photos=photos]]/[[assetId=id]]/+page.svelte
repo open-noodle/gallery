@@ -374,7 +374,6 @@
     }
   });
 
-
   const handleSetVisibility = (assetIds: string[]) => {
     timelineManager.removeAssets(assetIds);
     assetMultiSelectManager.clear();
