@@ -188,3 +188,13 @@ class DriftPerson {
         birthDate.hashCode;
   }
 }
+
+enum PeopleSortBy { photoCount, name }
+
+PeopleSortBy peopleSortByFromSettingIndex(int index) {
+  if (index < 0 || index >= PeopleSortBy.values.length) {
+    return PeopleSortBy.photoCount;
+  }
+
+  return PeopleSortBy.values[index];
+}

@@ -9,7 +9,8 @@ enum Setting<T> {
   autoPlayVideo<bool>(StoreKey.autoPlayVideo, true),
   preferRemoteImage<bool>(StoreKey.preferRemoteImage, false),
   advancedTroubleshooting<bool>(StoreKey.advancedTroubleshooting, false),
-  enableBackup<bool>(StoreKey.enableBackup, false);
+  enableBackup<bool>(StoreKey.enableBackup, false),
+  peopleSortBy<int>(StoreKey.peopleSortBy, 0);
 
   const Setting(this.storeKey, this.defaultValue);
 

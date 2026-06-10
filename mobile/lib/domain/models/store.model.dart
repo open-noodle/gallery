@@ -96,7 +96,9 @@ enum StoreKey<T> {
   cleanupDefaultsInitialized<bool>._(1012),
 
   syncMigrationStatus<String>._(1013),
-  backgroundBackupStatus<String>._(1014);
+  backgroundBackupStatus<String>._(1014),
+
+  peopleSortBy<int>._(1015);
 
   const StoreKey._(this.id);
   final int id;
