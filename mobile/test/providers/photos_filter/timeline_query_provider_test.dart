@@ -25,6 +25,7 @@ import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dar
 import 'package:immich_mobile/providers/photos_filter/timeline_query.provider.dart';
 import 'package:immich_mobile/providers/sync_status.provider.dart';
 import 'package:immich_mobile/providers/timeline/temporal_scope.provider.dart';
+import 'package:immich_mobile/providers/timeline/timeline_grouping.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:mocktail/mocktail.dart';
@@ -297,7 +298,14 @@ void main() {
       final factory = _MockFactory();
       final search = _MockSearch();
       final fake = _FakeService();
-      when(() => factory.main(any(), any(), temporalScope: any(named: 'temporalScope'))).thenReturn(fake);
+      when(
+        () => factory.main(
+          any(),
+          any(),
+          groupBy: any(named: 'groupBy'),
+          temporalScope: any(named: 'temporalScope'),
+        ),
+      ).thenReturn(fake);
 
       final parent = _container(factory: factory, search: search, user: _user('u1'));
       addTearDown(parent.dispose);
@@ -307,7 +315,7 @@ void main() {
           timelineTemporalScopeProvider.overrideWith(TimelineTemporalScopeNotifier.new),
           timelineServiceProvider.overrideWith((ref) {
             final temporalScope = ref.watch(timelineTemporalScopeProvider);
-            return buildPhotosTimelineRouteService(ref, temporalScope);
+            return buildPhotosTimelineRouteService(ref, temporalScope, ref.watch(timelineGroupingProvider));
           }),
         ],
       );
@@ -316,7 +324,14 @@ void main() {
       route.read(timelineTemporalScopeProvider.notifier).setYear(2025);
 
       expect(route.read(timelineServiceProvider), same(fake));
-      verify(() => factory.main(any(), 'u1', temporalScope: const TimelineTemporalScope.year(2025))).called(1);
+      verify(
+        () => factory.main(
+          any(),
+          'u1',
+          groupBy: any(named: 'groupBy'),
+          temporalScope: const TimelineTemporalScope.year(2025),
+        ),
+      ).called(1);
       verifyNever(() => search.search(any(), any()));
     });
 
@@ -348,7 +363,7 @@ void main() {
           timelineTemporalScopeProvider.overrideWith(TimelineTemporalScopeNotifier.new),
           timelineServiceProvider.overrideWith((ref) {
             final temporalScope = ref.watch(timelineTemporalScopeProvider);
-            return buildPhotosTimelineRouteService(ref, temporalScope);
+            return buildPhotosTimelineRouteService(ref, temporalScope, ref.watch(timelineGroupingProvider));
           }),
         ],
       );
@@ -370,7 +385,14 @@ void main() {
       final fake = _FakeService();
       final user = _user('u1');
       final mockUserSvc = _MockUserService();
-      when(() => factory.main(any(), any(), temporalScope: any(named: 'temporalScope'))).thenReturn(fake);
+      when(
+        () => factory.main(
+          any(),
+          any(),
+          groupBy: any(named: 'groupBy'),
+          temporalScope: any(named: 'temporalScope'),
+        ),
+      ).thenReturn(fake);
       when(() => mockUserSvc.tryGetMyUser()).thenReturn(user);
       when(() => mockUserSvc.watchMyUser()).thenAnswer((_) => const Stream<UserDto?>.empty());
 
@@ -385,6 +407,8 @@ void main() {
           ],
           child: TimelineRouteScope(
             timelineServiceBuilder: buildPhotosTimelineRouteService,
+            // Mirrors MainTimelinePage: the Photos route follows the persisted grouping.
+            persistGrouping: true,
             child: Directionality(
               textDirection: TextDirection.ltr,
               child: Consumer(builder: (context, ref, child) => Text(ref.watch(timelineServiceProvider).origin.name)),
