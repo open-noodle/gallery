@@ -39,6 +39,7 @@
     {
       title: $t('admin.maintenance_integrity_checksum_mismatch_refresh_job'),
       value: ManualJobName.IntegrityChecksumMismatchRefresh,
+    },
     { title: $t('admin.face_identity_backfill_job'), value: ManualJobName.FaceIdentityBackfill },
     {
       title: $t('admin.space_person_metadata_backfill_job'),
