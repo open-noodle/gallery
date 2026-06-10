@@ -1,4 +1,16 @@
-import { Type, updatePerson, updateSpacePerson, type PersonResponseDto } from '@immich/sdk';
+import {
+  getMembers,
+  getPersonFaces,
+  getSpacePersonFaces,
+  SharedSpaceRole,
+  Type,
+  updatePerson,
+  updateRepresentativeFace,
+  updateSpacePerson,
+  updateSpacePersonRepresentativeFace,
+  type PersonFacePageResponseDto,
+  type PersonResponseDto,
+} from '@immich/sdk';
 import { modalManager, toastManager, type ActionItem } from '@immich/ui';
 import {
   mdiCalendarEditOutline,
@@ -12,6 +24,7 @@ import { eventManager } from '$lib/managers/event-manager.svelte';
 import PersonEditBirthDateModal from '$lib/modals/PersonEditBirthDateModal.svelte';
 import { handleError } from '$lib/utils/handle-error';
 import { getFormatter } from '$lib/utils/i18n';
+import { getPersonFaceThumbnailUrl, getSpacePersonFaceThumbnailUrl } from '$lib/utils/people-utils';
 
 // Members of a shared space see space-scoped people whose IDs do not exist in the person table;
 // writes for those must go to the shared space endpoint instead of person.update.
@@ -22,10 +35,41 @@ const getSpaceProfile = (person: PersonResponseDto) => {
     : undefined;
 };
 
-export const getPersonActions = ($t: MessageFormatter, person: PersonResponseDto) => {
+// Resolved per space and cached for the session; the server enforces the role on every
+// write, so membership lookup failures fail open instead of hiding working actions.
+const spaceEditableCache = new Map<string, Promise<boolean>>();
+
+const resolveSpaceEditable = async (spaceId: string, userId: string): Promise<boolean> => {
+  try {
+    const members = await getMembers({ id: spaceId });
+    const role = members.find((member) => member.userId === userId)?.role;
+    return role === SharedSpaceRole.Owner || role === SharedSpaceRole.Editor;
+  } catch {
+    return true;
+  }
+};
+
+export const isSpaceEditor = (spaceId: string, userId: string): Promise<boolean> => {
+  const key = `${spaceId}:${userId}`;
+  let cached = spaceEditableCache.get(key);
+  if (!cached) {
+    cached = resolveSpaceEditable(spaceId, userId);
+    spaceEditableCache.set(key, cached);
+  }
+  return cached;
+};
+
+export const getPersonActions = (
+  $t: MessageFormatter,
+  person: PersonResponseDto,
+  { canEditSpacePerson = true }: { canEditSpacePerson?: boolean } = {},
+) => {
+  const canWrite = () => !getSpaceProfile(person) || canEditSpacePerson;
+
   const SetDateOfBirth: ActionItem = {
     title: $t('set_date_of_birth'),
     icon: mdiCalendarEditOutline,
+    $if: canWrite,
     onAction: () => modalManager.show(PersonEditBirthDateModal, { person }),
   };
 
@@ -47,14 +91,14 @@ export const getPersonActions = ($t: MessageFormatter, person: PersonResponseDto
   const HidePerson: ActionItem = {
     title: $t('hide_person'),
     icon: mdiEyeOffOutline,
-    $if: () => !person.isHidden,
+    $if: () => !person.isHidden && canWrite(),
     onAction: () => handleHidePerson(person),
   };
 
   const ShowPerson: ActionItem = {
     title: $t('unhide_person'),
     icon: mdiEyeOutline,
-    $if: () => !!person.isHidden,
+    $if: () => !!person.isHidden && canWrite(),
     onAction: () => handleShowPerson(person),
   };
 
@@ -120,6 +164,60 @@ const handleShowPerson = async (person: PersonResponseDto) => {
   } catch (error) {
     handleError(error, $t('errors.something_went_wrong'));
   }
+};
+
+export const getPersonFacesPage = (
+  person: PersonResponseDto,
+  { page, size }: { page: number; size: number },
+): Promise<PersonFacePageResponseDto> => {
+  const profile = getSpaceProfile(person);
+  return profile
+    ? getSpacePersonFaces({ id: profile.spaceId, personId: profile.id, page, size })
+    : getPersonFaces({ id: person.id, page, size });
+};
+
+export const updatePersonRepresentativeFace = async (
+  person: PersonResponseDto,
+  assetFaceId: string,
+): Promise<PersonResponseDto> => {
+  const profile = getSpaceProfile(person);
+  if (profile) {
+    const updated = await updateSpacePersonRepresentativeFace({
+      id: profile.spaceId,
+      personId: profile.id,
+      spaceRepresentativeFaceUpdateDto: { assetFaceId },
+    });
+    return { ...person, updatedAt: updated.updatedAt };
+  }
+  return updateRepresentativeFace({ id: person.id, representativeFaceUpdateDto: { assetFaceId } });
+};
+
+export const getPersonFaceThumbnail = (person: PersonResponseDto, faceId: string): string => {
+  const profile = getSpaceProfile(person);
+  return profile
+    ? getSpacePersonFaceThumbnailUrl(profile.spaceId, profile.id, faceId, person.updatedAt)
+    : getPersonFaceThumbnailUrl(person.id, faceId, person.updatedAt);
+};
+
+export const updatePersonName = async (person: PersonResponseDto, name: string): Promise<PersonResponseDto> => {
+  const profile = getSpaceProfile(person);
+  if (profile) {
+    const updated = await updateSpacePerson({
+      id: profile.spaceId,
+      personId: profile.id,
+      sharedSpacePersonUpdateDto: { name },
+    });
+    return {
+      ...person,
+      name: updated.name,
+      birthDate: updated.birthDate ?? person.birthDate,
+      isHidden: updated.isHidden,
+      updatedAt: updated.updatedAt,
+      type: updated.type ?? person.type,
+      numberOfAssets: updated.assetCount,
+    };
+  }
+  return updatePerson({ id: person.id, personUpdateDto: { name } });
 };
 
 export const handleUpdatePersonBirthDate = async (person: PersonResponseDto, birthDate: string | null) => {
