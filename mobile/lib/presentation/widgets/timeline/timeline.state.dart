@@ -8,8 +8,8 @@ import 'package:immich_mobile/presentation/widgets/timeline/constants.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment_builder.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/overview/overview_segment_builder.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
-import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
+import 'package:immich_mobile/providers/timeline/timeline_grouping.provider.dart';
 
 part 'timeline.state.freezed.dart';
 
@@ -69,14 +69,13 @@ class TimelineStateNotifier extends Notifier<TimelineState> {
 // This provider watches the buckets from the timeline service & args and serves the segments.
 // It should be used only after the timeline service and timeline args provider is overridden
 final timelineSegmentProvider = StreamProvider.autoDispose<List<Segment>>((ref) async* {
-  // maxHeight is left out on purpose, a height-only change must not restart the bucket stream
-  final (maxWidth, columnCount, spacing, groupByArg) = ref.watch(
-    timelineArgsProvider.select((args) => (args.maxWidth, args.columnCount, args.spacing, args.groupBy)),
-  );
-  final availableTileWidth = maxWidth - (spacing * (columnCount - 1));
+  final args = ref.watch(timelineArgsProvider);
+  final columnCount = args.columnCount;
+  final spacing = args.spacing;
+  final availableTileWidth = args.maxWidth - (spacing * (columnCount - 1));
   final tileExtent = math.max(0, availableTileWidth) / columnCount;
 
-  final groupBy = groupByArg ?? ref.watch(appConfigProvider.select((config) => config.timeline.groupAssetsBy));
+  final GroupAssetsBy groupBy = args.groupBy ?? ref.watch(timelineGroupingProvider);
 
   final timelineService = ref.watch(timelineServiceProvider);
   yield* timelineService.watchBuckets().map((buckets) {
@@ -96,6 +95,10 @@ final timelineSegmentProvider = StreamProvider.autoDispose<List<Segment>>((ref) 
       groupBy: effectiveGroupBy,
     ).generate();
   });
-}, dependencies: [timelineServiceProvider, timelineArgsProvider]);
+  // timelineGroupingProvider must be listed so the auto-scoped copy of this provider
+  // inside a TimelineRouteScope resolves the ROUTE-LOCAL grouping override; without it
+  // the copy reads the root (persisted) grouping and detail routes silently render
+  // the persisted grouping instead of their own.
+}, dependencies: [timelineServiceProvider, timelineArgsProvider, timelineGroupingProvider]);
 
 final timelineStateProvider = NotifierProvider<TimelineStateNotifier, TimelineState>(TimelineStateNotifier.new);
