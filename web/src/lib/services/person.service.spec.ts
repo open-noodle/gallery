@@ -9,8 +9,9 @@ import {
 } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
 import { personFactory } from '@test-data/factories/person-factory';
+import type { MessageFormatter } from 'svelte-i18n';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { handleUpdatePersonBirthDate } from './person.service';
+import { getPersonActions, handleUpdatePersonBirthDate } from './person.service';
 
 vi.mock('@immich/ui', async (orig) => {
   const actual = await orig<typeof import('@immich/ui')>();
@@ -123,5 +124,88 @@ describe('handleUpdatePersonBirthDate', () => {
     expect(handleErrorSpy).toHaveBeenCalledWith(error, expect.any(String));
     expect(emitSpy).not.toHaveBeenCalled();
     expect(toastManager.primary).not.toHaveBeenCalled();
+  });
+});
+
+describe('getPersonActions', () => {
+  const $t = ((key: string) => key) as unknown as MessageFormatter;
+
+  it('routes hiding a space-scoped person to the shared space endpoint', async () => {
+    const person = personFactory.build({
+      id: 'space-person-1',
+      isHidden: false,
+      primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' },
+    });
+    vi.mocked(updateSpacePerson).mockResolvedValue(spacePersonResponse({ isHidden: true }));
+
+    const { HidePerson } = getPersonActions($t, person);
+    await HidePerson.onAction(HidePerson);
+
+    expect(updateSpacePerson).toHaveBeenCalledWith({
+      id: 'space-1',
+      personId: 'space-person-1',
+      sharedSpacePersonUpdateDto: { isHidden: true },
+    });
+    expect(updatePerson).not.toHaveBeenCalled();
+    expect(emitSpy).toHaveBeenCalledWith('PersonUpdate', expect.objectContaining({ id: person.id, isHidden: true }));
+    expect(toastManager.primary).toHaveBeenCalledOnce();
+  });
+
+  it('routes unhiding a space-scoped person to the shared space endpoint', async () => {
+    const person = personFactory.build({
+      id: 'space-person-1',
+      isHidden: true,
+      primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' },
+    });
+    vi.mocked(updateSpacePerson).mockResolvedValue(spacePersonResponse({ isHidden: false }));
+
+    const { ShowPerson } = getPersonActions($t, person);
+    await ShowPerson.onAction(ShowPerson);
+
+    expect(updateSpacePerson).toHaveBeenCalledWith({
+      id: 'space-1',
+      personId: 'space-person-1',
+      sharedSpacePersonUpdateDto: { isHidden: false },
+    });
+    expect(emitSpy).toHaveBeenCalledWith('PersonUpdate', expect.objectContaining({ id: person.id, isHidden: false }));
+  });
+
+  it('keeps hiding an owned person on the person endpoint', async () => {
+    const person = personFactory.build({
+      isHidden: false,
+      primaryProfile: { type: Type.UserPerson, id: 'person-1' },
+    });
+    const updated = { ...person, isHidden: true };
+    vi.mocked(updatePerson).mockResolvedValue(updated);
+
+    const { HidePerson } = getPersonActions($t, person);
+    await HidePerson.onAction(HidePerson);
+
+    expect(updatePerson).toHaveBeenCalledWith({ id: person.id, personUpdateDto: { isHidden: true } });
+    expect(updateSpacePerson).not.toHaveBeenCalled();
+    expect(emitSpy).toHaveBeenCalledWith('PersonUpdate', updated);
+  });
+
+  it('does not offer favorite actions for a space-scoped person', () => {
+    const person = personFactory.build({
+      isFavorite: undefined,
+      primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' },
+    });
+
+    const { Favorite, Unfavorite } = getPersonActions($t, person);
+
+    expect(Favorite.$if?.()).toBe(false);
+    expect(Unfavorite.$if?.()).toBe(false);
+  });
+
+  it('offers favorite actions for an owned person', () => {
+    const person = personFactory.build({
+      isFavorite: false,
+      primaryProfile: { type: Type.UserPerson, id: 'person-1' },
+    });
+
+    const { Favorite } = getPersonActions($t, person);
+
+    expect(Favorite.$if?.()).toBe(true);
   });
 });
