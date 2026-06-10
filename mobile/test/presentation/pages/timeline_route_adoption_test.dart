@@ -27,7 +27,6 @@ import 'package:immich_mobile/presentation/pages/drift_remote_album.page.dart';
 import 'package:immich_mobile/presentation/pages/drift_trash.page.dart';
 import 'package:immich_mobile/presentation/pages/drift_video.page.dart';
 import 'package:immich_mobile/presentation/pages/local_timeline.page.dart';
-import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_header_sliver.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_selector.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
@@ -74,10 +73,6 @@ const _adoptedRouteCases = [
   _AdoptedRouteCase(label: 'local album', constraint: 'local-album:local-1', origin: TimelineOrigin.localAlbum),
 ];
 
-GroupAssetsBy _storedGroupBy() {
-  return SettingsRepository.instance.appConfig.timeline.groupAssetsBy;
-}
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -109,7 +104,7 @@ void main() {
       ProviderScope(
         child: MaterialApp(
           home: TimelineRouteScope(
-            timelineServiceBuilder: (ref, scope) {
+            timelineServiceBuilder: (ref, scope, groupBy) {
               seenScopes.add(scope);
               return TimelineService((
                 bucketSource: () => const Stream<List<Bucket>>.empty(),
@@ -117,15 +112,14 @@ void main() {
                 origin: TimelineOrigin.person,
               ));
             },
-            child: const CustomScrollView(slivers: [TimelineGroupingHeaderSliver()]),
+            child: const CustomScrollView(slivers: [SliverToBoxAdapter(child: TimelineGroupingSelector())]),
           ),
         ),
       ),
     );
 
-    expect(find.byType(TimelineGroupingHeaderSliver), findsOneWidget);
     expect(find.byType(TimelineGroupingSelector), findsOneWidget);
-    final ref = ProviderScope.containerOf(tester.element(find.byType(TimelineGroupingHeaderSliver)));
+    final ref = ProviderScope.containerOf(tester.element(find.byType(TimelineGroupingSelector)));
     ref.read(timelineServiceProvider);
     expect(seenScopes.last, const TimelineTemporalScope.none());
 
@@ -150,53 +144,35 @@ void main() {
       expect(PhotosTimelineAppBar.actions.first, isA<TimelineGroupingSelector>());
     });
 
-    test('routes expose expected top sliver heights', () {
+    test('all pill-adopting routes expose controls flag; composed pages expose extra-sliver heights', () {
+      // Simple pages: header sliver replaced by withGroupingPill; no extra top sliver.
       expect(DriftPersonPage.timelineOverviewControlsEnabled, isTrue);
-      expect(DriftPersonPage.timelineOverviewTopSliverHeight, kTimelineGroupingHeaderSliverHeight);
-
       expect(RemoteAlbumPage.timelineOverviewControlsEnabled, isTrue);
-      expect(RemoteAlbumPage.timelineOverviewTopSliverHeight, kTimelineGroupingHeaderSliverHeight);
-
       expect(LocalTimelinePage.timelineOverviewControlsEnabled, isTrue);
-      expect(LocalTimelinePage.timelineOverviewTopSliverHeight, kTimelineGroupingHeaderSliverHeight);
-
       expect(DriftFavoritePage.timelineOverviewControlsEnabled, isTrue);
-      expect(DriftFavoritePage.timelineOverviewTopSliverHeight, kTimelineGroupingHeaderSliverHeight);
-
       expect(DriftArchivePage.timelineOverviewControlsEnabled, isTrue);
-      expect(DriftArchivePage.timelineOverviewTopSliverHeight, kTimelineGroupingHeaderSliverHeight);
-
       expect(DriftLockedFolderPage.timelineOverviewControlsEnabled, isTrue);
-      expect(DriftLockedFolderPage.timelineOverviewTopSliverHeight, kTimelineGroupingHeaderSliverHeight);
-
       expect(DriftVideoPage.timelineOverviewControlsEnabled, isTrue);
-      expect(DriftVideoPage.timelineOverviewTopSliverHeight, kTimelineGroupingHeaderSliverHeight);
-
       expect(DriftRecentlyTakenPage.timelineOverviewControlsEnabled, isTrue);
-      expect(DriftRecentlyTakenPage.timelineOverviewTopSliverHeight, kTimelineGroupingHeaderSliverHeight);
-
       expect(DriftPlaceDetailPage.timelineOverviewControlsEnabled, isTrue);
-      expect(DriftPlaceDetailPage.timelineOverviewTopSliverHeight, kTimelineGroupingHeaderSliverHeight);
 
+      // Composed pages: keep a non-header extra sliver; the const now measures only that sliver.
       expect(DriftTrashPage.timelineOverviewControlsEnabled, isTrue);
-      expect(DriftTrashPage.timelineOverviewTopSliverHeight, kTimelineGroupingHeaderSliverHeight + 24);
+      expect(DriftTrashPage.trashInfoBannerTopSliverHeight, 24.0);
 
       expect(DriftPartnerDetailPage.timelineOverviewControlsEnabled, isTrue);
-      expect(DriftPartnerDetailPage.timelineOverviewTopSliverHeight, kTimelineGroupingHeaderSliverHeight + 110);
+      expect(DriftPartnerDetailPage.partnerInfoBoxTopSliverHeight, 110.0);
 
+      // Space detail: sync-banner height is dynamic; its contract is unchanged.
       expect(SpaceDetailPage.timelineOverviewControlsEnabled, isTrue);
-      expect(
-        SpaceDetailPage.timelineOverviewTopSliverHeight(isRemoteSyncing: false),
-        kTimelineGroupingHeaderSliverHeight,
-      );
-      expect(
-        SpaceDetailPage.timelineOverviewTopSliverHeight(isRemoteSyncing: true),
-        kTimelineGroupingHeaderSliverHeight + kSyncStatusBannerSliverHeight,
-      );
+      expect(SpaceDetailPage.syncBannerTopSliverHeight(isRemoteSyncing: false), 0.0);
+      expect(SpaceDetailPage.syncBannerTopSliverHeight(isRemoteSyncing: true), kSyncStatusBannerSliverHeight);
     });
 
     for (final route in _adoptedRouteCases) {
       testWidgets('${route.label} keeps route constraints during year and month zoom', (tester) async {
+        // The persisted grouping is seeded to Years to prove detail routes IGNORE it
+        // (they open at All) and never write it back.
         await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.year);
         final calls = <_ObservedRouteCall>[];
 
@@ -204,23 +180,33 @@ void main() {
           ProviderScope(
             child: MaterialApp(
               home: TimelineRouteScope(
-                timelineServiceBuilder: (ref, scope) {
-                  calls.add(_ObservedRouteCall(constraint: route.constraint, scope: scope, groupBy: _storedGroupBy()));
+                timelineServiceBuilder: (ref, scope, groupBy) {
+                  calls.add(_ObservedRouteCall(constraint: route.constraint, scope: scope, groupBy: groupBy));
                   return _emptyService(route.origin);
                 },
-                child: const CustomScrollView(slivers: [TimelineGroupingHeaderSliver()]),
+                child: const CustomScrollView(slivers: [SliverToBoxAdapter(child: TimelineGroupingSelector())]),
               ),
             ),
           ),
         );
 
-        final ref = ProviderScope.containerOf(tester.element(find.byType(TimelineGroupingHeaderSliver)));
+        final ref = ProviderScope.containerOf(tester.element(find.byType(TimelineGroupingSelector)));
+        ref.read(timelineServiceProvider);
+
+        expect(calls.single.constraint, route.constraint);
+        expect(calls.single.scope, const TimelineTemporalScope.none());
+        expect(calls.single.groupBy, GroupAssetsBy.day, reason: 'route opens at All regardless of the stored Years');
+        expect(find.byType(TimelineGroupingSelector), findsOneWidget);
+
+        // Drive the route to Years through the selector (route-local, never persisted).
+        calls.clear();
+        await tester.tap(find.byKey(const Key('timeline-grouping-year')));
+        await tester.pump();
         ref.read(timelineServiceProvider);
 
         expect(calls.single.constraint, route.constraint);
         expect(calls.single.scope, const TimelineTemporalScope.none());
         expect(calls.single.groupBy, GroupAssetsBy.year);
-        expect(find.byType(TimelineGroupingSelector), findsOneWidget);
 
         calls.clear();
         await tester.runAsync(
@@ -236,7 +222,6 @@ void main() {
         ref.read(timelineServiceProvider);
         await tester.pump();
 
-        expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
         expect(calls.single.constraint, route.constraint);
         expect(calls.single.scope, const TimelineTemporalScope.none());
         expect(calls.single.groupBy, GroupAssetsBy.month);
@@ -253,12 +238,14 @@ void main() {
         ref.read(timelineServiceProvider);
         await tester.pump();
 
-        expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
         expect(calls.single.constraint, route.constraint);
         expect(calls.single.scope, const TimelineTemporalScope.none());
         expect(calls.single.groupBy, GroupAssetsBy.day);
         expect(ref.read(timelineZoomAnchorProvider), TimelineZoomAnchor.month(year: 2025, month: 3));
         expect(find.text('Mar 2025'), findsNothing);
+
+        // The persisted setting was never written: it still holds the seeded Years.
+        expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.year);
       });
     }
   });

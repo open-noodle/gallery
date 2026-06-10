@@ -6,7 +6,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/space_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
-import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_header_sliver.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/background_sync.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
@@ -31,8 +30,8 @@ class SpaceDetailPage extends ConsumerStatefulWidget {
   const SpaceDetailPage({super.key, required this.spaceId});
 
   static const timelineOverviewControlsEnabled = true;
-  static double timelineOverviewTopSliverHeight({required bool isRemoteSyncing}) =>
-      kTimelineGroupingHeaderSliverHeight + (isRemoteSyncing ? kSyncStatusBannerSliverHeight : 0);
+  static double syncBannerTopSliverHeight({required bool isRemoteSyncing}) =>
+      isRemoteSyncing ? kSyncStatusBannerSliverHeight : 0;
 
   @override
   ConsumerState<SpaceDetailPage> createState() => _SpaceDetailPageState();
@@ -286,11 +285,13 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     final isRemoteSyncing = ref.watch(syncStatusProvider.select((s) => s.isRemoteSyncing));
 
     return TimelineRouteScope(
-      timelineServiceBuilder: (ref, scope) =>
-          ref.watch(timelineFactoryProvider).sharedSpace(spaceId: widget.spaceId, temporalScope: scope),
+      timelineServiceBuilder: (ref, scope, groupBy) => ref
+          .watch(timelineFactoryProvider)
+          .sharedSpace(spaceId: widget.spaceId, groupBy: groupBy, temporalScope: scope),
       child: Timeline(
-        topSliverWidget: const SliverMainAxisGroup(slivers: [TimelineGroupingHeaderSliver(), SyncStatusBannerSliver()]),
-        topSliverWidgetHeight: SpaceDetailPage.timelineOverviewTopSliverHeight(isRemoteSyncing: isRemoteSyncing),
+        withGroupingPill: true,
+        topSliverWidget: const SyncStatusBannerSliver(),
+        topSliverWidgetHeight: SpaceDetailPage.syncBannerTopSliverHeight(isRemoteSyncing: isRemoteSyncing),
         appBar: SliverAppBar(
           title: Text(_space!.name),
           centerTitle: false,

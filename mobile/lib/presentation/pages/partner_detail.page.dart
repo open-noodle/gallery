@@ -5,7 +5,6 @@ import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/partner_detail_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
-import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_header_sliver.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart';
@@ -21,22 +20,18 @@ class PartnerDetailPage extends StatelessWidget {
   const PartnerDetailPage({super.key, required this.partner});
 
   static const timelineOverviewControlsEnabled = true;
-  static const timelineOverviewTopSliverHeight = kTimelineGroupingHeaderSliverHeight + 110;
+  static const partnerInfoBoxTopSliverHeight = 110.0;
 
   @override
   Widget build(BuildContext context) {
     return TimelineRouteScope(
-      timelineServiceBuilder: (ref, scope) =>
-          ref.watch(timelineFactoryProvider).remoteAssets(partner.id, temporalScope: scope),
+      timelineServiceBuilder: (ref, scope, groupBy) =>
+          ref.watch(timelineFactoryProvider).remoteAssets(partner.id, groupBy: groupBy, temporalScope: scope),
       child: Timeline(
+        withGroupingPill: true,
         appBar: MesmerizingSliverAppBar(title: partner.name, icon: Icons.person_outline),
-        topSliverWidget: SliverMainAxisGroup(
-          slivers: [
-            const TimelineGroupingHeaderSliver(),
-            _InfoBox(partner: partner),
-          ],
-        ),
-        topSliverWidgetHeight: DriftPartnerDetailPage.timelineOverviewTopSliverHeight,
+        topSliverWidget: _InfoBox(partner: partner),
+        topSliverWidgetHeight: DriftPartnerDetailPage.partnerInfoBoxTopSliverHeight,
         bottomSheet: const PartnerDetailBottomSheet(),
       ),
     );
