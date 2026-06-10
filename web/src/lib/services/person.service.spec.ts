@@ -1,5 +1,3 @@
-import { eventManager } from '$lib/managers/event-manager.svelte';
-import * as handleErrorModule from '$lib/utils/handle-error';
 import {
   getMembers,
   getPersonFaces,
@@ -16,10 +14,12 @@ import {
   type SharedSpacePersonResponseDto,
 } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
-import { personFactory } from '@test-data/factories/person-factory';
 import type { MessageFormatter } from 'svelte-i18n';
-import { getPersonFaceThumbnailUrl, getSpacePersonFaceThumbnailUrl } from '$lib/utils/people-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { eventManager } from '$lib/managers/event-manager.svelte';
+import * as handleErrorModule from '$lib/utils/handle-error';
+import { getPersonFaceThumbnailUrl, getSpacePersonFaceThumbnailUrl } from '$lib/utils/people-utils';
+import { personFactory } from '@test-data/factories/person-factory';
 import {
   getPersonActions,
   getPersonFacesPage,
