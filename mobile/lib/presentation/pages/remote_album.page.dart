@@ -13,7 +13,6 @@ import 'package:immich_mobile/presentation/widgets/album/pending_uploads_banner.
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/remote_album_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/remote_album/album_option.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
-import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_header_sliver.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/current_album.provider.dart';
@@ -32,7 +31,6 @@ class RemoteAlbumPage extends ConsumerStatefulWidget {
   const RemoteAlbumPage({super.key, required this.album});
 
   static const timelineOverviewControlsEnabled = true;
-  static const timelineOverviewTopSliverHeight = kTimelineGroupingHeaderSliverHeight;
 
   @override
   ConsumerState<RemoteAlbumPage> createState() => _RemoteAlbumPageState();
@@ -199,17 +197,12 @@ class _RemoteAlbumPageState extends ConsumerState<RemoteAlbumPage> {
     );
 
     return TimelineRouteScope(
-      timelineServiceBuilder: (ref, scope) =>
-          ref.watch(timelineFactoryProvider).remoteAlbum(albumId: _album.id, temporalScope: scope),
+      timelineServiceBuilder: (ref, scope, groupBy) =>
+          ref.watch(timelineFactoryProvider).remoteAlbum(albumId: _album.id, groupBy: groupBy, temporalScope: scope),
       overrides: [currentRemoteAlbumScopedProvider.overrideWithValue(_album)],
       child: Timeline(
-        topSliverWidget: SliverMainAxisGroup(
-          slivers: [
-            const TimelineGroupingHeaderSliver(),
-            PendingUploadsBanner(albumId: _album.id),
-          ],
-        ),
-        topSliverWidgetHeight: RemoteAlbumPage.timelineOverviewTopSliverHeight,
+        withGroupingPill: true,
+        topSliverWidget: PendingUploadsBanner(albumId: _album.id),
         appBar: FutureBuilder<bool>(
           future: ref
               .watch(remoteAlbumServiceProvider)
