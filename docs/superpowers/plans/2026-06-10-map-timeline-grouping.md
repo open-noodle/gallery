@@ -193,8 +193,8 @@ class _MutableMapStateNotifier extends MapStateNotifier {
   @override
   MapState build() => _initial;
 
-  // NOTE: MapState.== compares bounds only, so an update must change bounds
-  // for dependents to be notified.
+  // NOTE: MapState.== compares bounds only; tests update with changed bounds
+  // so the service rebuild is attributable to the simulated pan.
   void update(MapState next) => state = next;
 }
 
