@@ -1,17 +1,4 @@
-import { authManager } from '#lib/managers/auth-manager.svelte.ts';
-import { eventManager } from '#lib/managers/event-manager.svelte.ts';
-import PersonEditAccessModal from '#lib/modals/PersonEditAccessModal.svelte';
-import PersonEditModal from '#lib/modals/PersonEditModal.svelte';
-import { handleError } from '#lib/utils/handle-error.ts';
-import { getFormatter } from '#lib/utils/i18n.ts';
-import {
-  getPerson,
-  PersonUpdateStrategy,
-  updatePerson,
-  type AssetResponseDto,
-  type PersonResponseDto,
-  type PersonUpdateDto,
-} from '@immich/sdk';
+import { Type, updatePerson, updateSpacePerson, type AssetResponseDto, type PersonResponseDto } from '@immich/sdk';
 import { modalManager, toastManager, type ActionItem } from '@immich/ui';
 import {
   mdiAccountMultipleOutline,
@@ -23,6 +10,12 @@ import {
   mdiPencilOutline,
 } from '@mdi/js';
 import type { MessageFormatter } from 'svelte-i18n';
+import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import { eventManager } from '#lib/managers/event-manager.svelte.ts';
+import PersonEditAccessModal from '#lib/modals/PersonEditAccessModal.svelte';
+import PersonEditModal from '#lib/modals/PersonEditModal.svelte';
+import { handleError } from '#lib/utils/handle-error.ts';
+import { getFormatter } from '#lib/utils/i18n.ts';
 
 export const getPersonActions = ($t: MessageFormatter, person: PersonResponseDto) => {
   const Edit: ActionItem = {
@@ -144,14 +137,24 @@ export const withUpdateStrategy = (dto: PersonUpdateDto): PersonUpdateDto =>
     ? { ...dto, userId: authManager.user.id }
     : dto;
 
-export const handleUpdatePersonName = async (
-  { id, name }: { id: string; name: string },
-  options?: { notify: boolean },
-) => {
-  const response = await handleUpdatePerson({ id, ...withUpdateStrategy({ name }) });
-  if (response && options?.notify) {
-    const $t = await getFormatter();
-    toastManager.primary($t('change_name_successfully'));
+  try {
+    const profile = person.primaryProfile;
+    let response: PersonResponseDto;
+    if (profile?.type === Type.SpacePerson && profile.spaceId) {
+      const updated = await updateSpacePerson({
+        id: profile.spaceId,
+        personId: profile.id,
+        sharedSpacePersonUpdateDto: { birthDate },
+      });
+      response = { ...person, birthDate: updated.birthDate ?? null };
+    } else {
+      response = await updatePerson({ id: person.id, personUpdateDto: { birthDate } });
+    }
+    toastManager.primary($t('date_of_birth_saved'));
+    eventManager.emit('PersonUpdate', response);
+    return true;
+  } catch (error) {
+    handleError(error, $t('errors.unable_to_save_date_of_birth'));
   }
 
   return response;
