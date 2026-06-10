@@ -16,7 +16,7 @@
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import PersonMergeSuggestionModal from '$lib/modals/PersonMergeSuggestionModal.svelte';
   import { Route } from '$lib/route';
-  import { getPersonActions } from '$lib/services/person.service';
+  import { getPersonActions, isSpaceEditor, updatePersonName } from '$lib/services/person.service';
   import Dropdown from '$lib/elements/Dropdown.svelte';
   import { locale, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
   import { websocketEvents } from '$lib/stores/websocket';
@@ -33,7 +33,6 @@
     getPerson,
     searchPerson,
     updatePerson,
-    updateSpacePerson,
     type PersonResponseDto,
   } from '@immich/sdk';
   import { Button, Icon, modalManager, toastManager } from '@immich/ui';
@@ -50,6 +49,7 @@
   } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
+  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import type { PageData } from './$types';
 
   interface Props {
@@ -293,7 +293,28 @@
     !person.primaryProfile || person.primaryProfile.type === 'user-person';
   const isSpacePrimary = (person: PersonResponseDto) =>
     person.primaryProfile?.type === 'space-person' && !!person.primaryProfile.spaceId;
-  const canEditName = (person: PersonResponseDto) => isPersonalPrimary(person) || isSpacePrimary(person);
+
+  // Space-person renames need the editor role; resolve it once per space as people load
+  // and default to allowing edits until known (the server enforces the role regardless).
+  const requestedSpaceRoles = new SvelteSet<string>();
+  const editableSpaces = new SvelteMap<string, boolean>();
+  $effect(() => {
+    for (const person of people) {
+      const spaceId = person.primaryProfile?.type === 'space-person' ? person.primaryProfile.spaceId : undefined;
+      if (spaceId && !requestedSpaceRoles.has(spaceId)) {
+        requestedSpaceRoles.add(spaceId);
+        void isSpaceEditor(spaceId, authManager.user.id).then((editable) => {
+          editableSpaces.set(spaceId, editable);
+        });
+      }
+    }
+  });
+  const canEditSpacePerson = (person: PersonResponseDto) => {
+    const spaceId = person.primaryProfile?.type === 'space-person' ? person.primaryProfile.spaceId : undefined;
+    return !spaceId || (editableSpaces.get(spaceId) ?? true);
+  };
+  const canEditName = (person: PersonResponseDto) =>
+    isPersonalPrimary(person) || (isSpacePrimary(person) && canEditSpacePerson(person));
 
   const toManagedPerson = (person: PersonResponseDto): ManagedPerson => ({
     id: person.id,
@@ -350,40 +371,8 @@
   };
 
   const updateName = async (targetPerson: PersonResponseDto, name: string) => {
-    const spaceId =
-      targetPerson.primaryProfile?.type === 'space-person' ? targetPerson.primaryProfile.spaceId : undefined;
-
-    if (spaceId) {
-      const updatedPerson = await updateSpacePerson({
-        id: spaceId,
-        personId: targetPerson.primaryProfile?.id ?? targetPerson.id,
-        sharedSpacePersonUpdateDto: { name },
-      });
-
-      people = people.map((person: PersonResponseDto) =>
-        person.id === targetPerson.id
-          ? {
-              ...person,
-              name: updatedPerson.name,
-              birthDate: updatedPerson.birthDate ?? person.birthDate,
-              isHidden: updatedPerson.isHidden,
-              updatedAt: updatedPerson.updatedAt,
-              type: updatedPerson.type ?? person.type,
-              numberOfAssets: updatedPerson.assetCount,
-            }
-          : person,
-      );
-      newName = '';
-      return;
-    }
-
-    const id = targetPerson.primaryProfile?.id ?? targetPerson.id;
-    const updatedPerson = await updatePerson({
-      id,
-      personUpdateDto: { name },
-    });
-
-    people = people.map((person: PersonResponseDto) => (person.id === id ? updatedPerson : person));
+    const updatedPerson = await updatePersonName(targetPerson, name);
+    people = people.map((person: PersonResponseDto) => (person.id === targetPerson.id ? updatedPerson : person));
     newName = '';
   };
 
