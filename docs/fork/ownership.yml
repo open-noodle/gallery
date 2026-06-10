@@ -119,8 +119,12 @@ features:
       - server/src/services/metadata.service.ts
       - server/src/services/auth.service.ts
       - server/src/services/user.service.ts
+      - server/src/services/integrity.service.ts
       - server/Dockerfile
       - e2e/docker-compose.yml
+    expected_symbols:
+      server/src/services/integrity.service.ts:
+        - skipIfS3Configured
     optional_paths:
       - e2e/**
       - server/src/backends/**
