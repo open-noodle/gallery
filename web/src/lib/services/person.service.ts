@@ -1,4 +1,4 @@
-import { updatePerson, type PersonResponseDto } from '@immich/sdk';
+import { Type, updatePerson, updateSpacePerson, type PersonResponseDto } from '@immich/sdk';
 import { modalManager, toastManager, type ActionItem } from '@immich/ui';
 import {
   mdiCalendarEditOutline,
@@ -103,7 +103,18 @@ export const handleUpdatePersonBirthDate = async (person: PersonResponseDto, bir
   const $t = await getFormatter();
 
   try {
-    const response = await updatePerson({ id: person.id, personUpdateDto: { birthDate } });
+    const profile = person.primaryProfile;
+    let response: PersonResponseDto;
+    if (profile?.type === Type.SpacePerson && profile.spaceId) {
+      const updated = await updateSpacePerson({
+        id: profile.spaceId,
+        personId: profile.id,
+        sharedSpacePersonUpdateDto: { birthDate },
+      });
+      response = { ...person, birthDate: updated.birthDate ?? null };
+    } else {
+      response = await updatePerson({ id: person.id, personUpdateDto: { birthDate } });
+    }
     toastManager.primary($t('date_of_birth_saved'));
     eventManager.emit('PersonUpdate', response);
     return true;
