@@ -1,7 +1,9 @@
 import type { Faces } from '$lib/stores/people.store';
 import type { Size } from '$lib/utils/container-utils';
-import { getBoundingBox, sortPeopleForManagement, zoomImageToBase64 } from '$lib/utils/people-utils';
+import { getBoundingBox, sortPeople, sortPeopleForManagement, zoomImageToBase64 } from '$lib/utils/people-utils';
 import { AssetTypeEnum } from '@immich/sdk';
+import { PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
+import { get } from 'svelte/store';
 
 const makeFace = (overrides: Partial<Faces> = {}): Faces => ({
   id: 'face-1',
@@ -72,6 +74,112 @@ describe('sortPeopleForManagement', () => {
       'unnamed-a',
       'unnamed-b',
     ]);
+  });
+});
+
+describe('sortPeople', () => {
+  it('defaults the people view preference to Most photos', () => {
+    // vitest isolates modules per spec file, so this reads the store's pristine default
+    expect(get(peopleViewSettings).sortBy).toBe(PeopleSortBy.PhotoCount);
+  });
+
+  const p = (overrides: {
+    id: string;
+    name?: string | null;
+    isFavorite?: boolean;
+    numberOfAssets?: number;
+    assetCount?: number;
+    isHidden?: boolean;
+  }) => overrides;
+
+  describe('PhotoCount mode', () => {
+    it('sorts named people by count descending with name then id tiebreaks, unnamed last', () => {
+      const people = [
+        p({ id: 'named-mid', name: 'Zoe', numberOfAssets: 50 }),
+        p({ id: 'unnamed-high', name: '', numberOfAssets: 999 }),
+        p({ id: 'named-top', name: 'Mara', numberOfAssets: 100 }),
+        p({ id: 'tie-b', name: 'bob', numberOfAssets: 10 }),
+        p({ id: 'tie-a', name: 'Alice', numberOfAssets: 10 }),
+      ];
+
+      expect(sortPeople(people, PeopleSortBy.PhotoCount).map((person) => person.id)).toEqual([
+        'named-top',
+        'named-mid',
+        'tie-a',
+        'tie-b',
+        'unnamed-high',
+      ]);
+    });
+
+    it('keeps favorites first, named favorites before unnamed favorites', () => {
+      const people = [
+        p({ id: 'named-big', name: 'Anna', numberOfAssets: 500 }),
+        p({ id: 'fav-unnamed', name: '', isFavorite: true, numberOfAssets: 3 }),
+        p({ id: 'fav-named', name: 'Zoe', isFavorite: true, numberOfAssets: 1 }),
+      ];
+
+      expect(sortPeople(people, PeopleSortBy.PhotoCount).map((person) => person.id)).toEqual([
+        'fav-named',
+        'fav-unnamed',
+        'named-big',
+      ]);
+    });
+
+    it('breaks equal-count ties among unnamed people by id, treating whitespace names as unnamed', () => {
+      const people = [
+        p({ id: 'u-b', name: '', numberOfAssets: 5 }),
+        p({ id: 'u-a', name: '  ', numberOfAssets: 5 }),
+      ];
+
+      expect(sortPeople(people, PeopleSortBy.PhotoCount).map((person) => person.id)).toEqual(['u-a', 'u-b']);
+    });
+  });
+
+  describe('Name mode', () => {
+    it('sorts named people A–Z case-insensitively ignoring counts, unnamed by count last', () => {
+      const people = [
+        p({ id: 'unnamed-low', name: '', numberOfAssets: 1 }),
+        p({ id: 'named-b', name: 'bob', numberOfAssets: 999 }),
+        p({ id: 'unnamed-high', name: '   ', numberOfAssets: 50 }),
+        p({ id: 'named-a', name: 'Alice', numberOfAssets: 1 }),
+      ];
+
+      expect(sortPeople(people, PeopleSortBy.Name).map((person) => person.id)).toEqual([
+        'named-a',
+        'named-b',
+        'unnamed-high',
+        'unnamed-low',
+      ]);
+    });
+
+    it('treats missing counts as zero', () => {
+      const people = [p({ id: 'u-zero', name: '' }), p({ id: 'u-five', name: '', numberOfAssets: 5 })];
+
+      expect(sortPeople(people, PeopleSortBy.Name).map((person) => person.id)).toEqual(['u-five', 'u-zero']);
+    });
+  });
+
+  it('treats an unknown persisted mode as the default (Most photos)', () => {
+    const people = [
+      p({ id: 'alpha-first', name: 'Alice', numberOfAssets: 1 }),
+      p({ id: 'count-first', name: 'Zoe', numberOfAssets: 99 }),
+    ];
+
+    expect(sortPeople(people, 'garbage' as PeopleSortBy).map((person) => person.id)).toEqual([
+      'count-first',
+      'alpha-first',
+    ]);
+  });
+
+  it('sorts hidden people last in both modes', () => {
+    const people = [
+      p({ id: 'hidden-fav', name: 'Aaa', isFavorite: true, isHidden: true, numberOfAssets: 999 }),
+      p({ id: 'visible', name: 'Zoe', numberOfAssets: 1 }),
+    ];
+
+    for (const mode of [PeopleSortBy.PhotoCount, PeopleSortBy.Name]) {
+      expect(sortPeople(people, mode).map((person) => person.id)).toEqual(['visible', 'hidden-fav']);
+    }
   });
 });
 

@@ -121,6 +121,19 @@ export const albumViewSettings = persisted<AlbumViewSettings>('album-view-settin
   collapsedGroups: {},
 });
 
+export enum PeopleSortBy {
+  PhotoCount = 'photoCount',
+  Name = 'name',
+}
+
+export interface PeopleViewSettings {
+  sortBy: PeopleSortBy;
+}
+
+export const peopleViewSettings = persistedObject<PeopleViewSettings>('people-view-settings', {
+  sortBy: PeopleSortBy.PhotoCount,
+});
+
 export enum PlacesGroupBy {
   None = 'None',
   Country = 'Country',
