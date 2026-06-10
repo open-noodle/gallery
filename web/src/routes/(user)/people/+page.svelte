@@ -17,14 +17,15 @@
   import PersonMergeSuggestionModal from '#lib/modals/PersonMergeSuggestionModal.svelte';
   import { Route } from '#lib/route.ts';
   import { getPersonActions } from '#lib/services/person.service.ts';
-  import { locale } from '#lib/stores/preferences.store.ts';
+  import Dropdown from '#lib/elements/Dropdown.svelte';
+  import { locale, PeopleSortBy, peopleViewSettings } from '#lib/stores/preferences.store.ts';
   import { websocketEvents } from '#lib/stores/websocket.ts';
   import { normalizeSearchString } from '#lib/utils/string-utils.ts';
   import { handlePromiseError } from '#lib/utils.ts';
   import { getGlobalPersonHref, getGlobalPersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { clearQueryParam } from '#lib/utils/navigation.ts';
-  import { sortPeopleForManagement } from '#lib/utils/people-utils.ts';
+  import { sortPeople } from '#lib/utils/people-utils.ts';
   import { formatPeopleHeaderDescription } from '#lib/utils/people-statistics.ts';
   import {
     getAllPeople,
@@ -44,6 +45,8 @@
     mdiEyeOutline,
     mdiHeartMinusOutline,
     mdiHeartOutline,
+    mdiSortAlphabeticalAscending,
+    mdiSortNumericDescending,
   } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
@@ -294,7 +297,21 @@
   );
   let globalFaceStatisticsCacheKey = $derived(`user:${authManager.user.id}:global:people:withSharedSpaces=true`);
   const loadGlobalFaceStatistics = () => getPeopleFaceStatistics({ withSharedSpaces: true });
-  let showPeople = $derived(sortPeopleForManagement(searchName ? searchedPeopleLocal : visiblePeople));
+  const peopleSortOptions = [PeopleSortBy.PhotoCount, PeopleSortBy.Name];
+  const peopleSortIcons: Record<PeopleSortBy, string> = {
+    [PeopleSortBy.PhotoCount]: mdiSortNumericDescending,
+    [PeopleSortBy.Name]: mdiSortAlphabeticalAscending,
+  };
+  let peopleSortByNames: Record<PeopleSortBy, string> = $derived({
+    [PeopleSortBy.PhotoCount]: $t('sort_people_most_photos'),
+    [PeopleSortBy.Name]: $t('name'),
+  });
+  let peopleSortBy = $derived(
+    Object.values(PeopleSortBy).includes($peopleViewSettings.sortBy)
+      ? $peopleViewSettings.sortBy
+      : PeopleSortBy.PhotoCount,
+  );
+  let showPeople = $derived(sortPeople(searchName ? searchedPeopleLocal : visiblePeople, peopleSortBy));
 
   const getPersonHref = (person: PersonResponseDto) => getGlobalPersonHref(person, Route.people());
 
@@ -462,6 +479,13 @@
             />
           </div>
         </div>
+        <Dropdown
+          title={$t('sort_people_by')}
+          options={peopleSortOptions}
+          selectedOption={peopleSortBy}
+          onSelect={(sortBy) => ($peopleViewSettings.sortBy = sortBy)}
+          render={(sortBy) => ({ title: peopleSortByNames[sortBy], icon: peopleSortIcons[sortBy] })}
+        />
         <Button
           leadingIcon={mdiEyeOutline}
           onclick={() => goto('/people/manage')}

@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>People sort — design mockup (issue #676)</title>
+    <style>
+      :root {
+        --web-primary: rgb(66 80 175);
+        --mobile-primary: #4150af;
+        --ink: #28282c;
+        --paper: #f4f3ef;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      body {
+        background: var(--paper);
+        background-image: radial-gradient(circle, #d9d7cf 1px, transparent 1px);
+        background-size: 22px 22px;
+        color: var(--ink);
+        font-family: 'Google Sans', Roboto, 'Segoe UI', system-ui, sans-serif;
+        min-height: 100vh;
+        padding: 40px 24px 64px;
+      }
+      .chrome {
+        font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      }
+      header.intro {
+        max-width: 1240px;
+        margin: 0 auto 28px;
+      }
+      header.intro h1 {
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      header.intro p {
+        margin-top: 6px;
+        font-size: 13px;
+        color: #6b6a64;
+      }
+      header.intro .hint {
+        display: inline-block;
+        margin-top: 10px;
+        font-size: 12px;
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 999px;
+        padding: 4px 12px;
+      }
+      main {
+        max-width: 1240px;
+        margin: 0 auto;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 36px;
+        align-items: flex-start;
+      }
+      .panel {
+        flex: 1 1 380px;
+      }
+      .panel > figcaption {
+        margin-top: 14px;
+        font-size: 12.5px;
+        line-height: 1.55;
+        color: #6b6a64;
+        max-width: 560px;
+      }
+      .panel > figcaption b {
+        color: var(--ink);
+      }
+
+      /* ============ WEB: browser frame ============ */
+      .browser {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow:
+          0 1px 2px rgb(0 0 0 / 0.08),
+          0 18px 48px -16px rgb(40 40 44 / 0.28);
+        overflow: hidden;
+        min-width: 660px;
+      }
+      .browser-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        background: #ececec;
+        border-bottom: 1px solid #ddd;
+      }
+      .traffic {
+        display: flex;
+        gap: 6px;
+      }
+      .traffic i {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+      }
+      .traffic i:nth-child(1) {
+        background: #ff5f57;
+      }
+      .traffic i:nth-child(2) {
+        background: #febc2e;
+      }
+      .traffic i:nth-child(3) {
+        background: #28c840;
+      }
+      .urlbar {
+        flex: 1;
+        background: #fff;
+        border-radius: 7px;
+        font-size: 11.5px;
+        color: #888;
+        padding: 5px 12px;
+      }
+      .web-app {
+        display: flex;
+        min-height: 520px;
+      }
+      .sidebar {
+        width: 56px;
+        border-right: 1px solid #eee;
+        padding: 14px 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+      }
+      .sidebar svg {
+        width: 22px;
+        height: 22px;
+        fill: #777;
+      }
+      .sidebar svg.active {
+        fill: var(--web-primary);
+      }
+      .web-content {
+        flex: 1;
+        padding: 22px 28px;
+      }
+      .web-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .web-header h2 {
+        font-size: 22px;
+        font-weight: 500;
+      }
+      .web-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        position: relative;
+      }
+      .searchpill {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #f1f1f4;
+        border-radius: 999px;
+        padding: 8px 16px;
+        width: 230px;
+        color: #888;
+        font-size: 13.5px;
+      }
+      .searchpill svg {
+        width: 17px;
+        height: 17px;
+        fill: #888;
+      }
+      .ghost-btn {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        border: 0;
+        background: transparent;
+        border-radius: 999px;
+        padding: 8px 14px;
+        font-size: 13.5px;
+        font-weight: 500;
+        font-family: inherit;
+        color: #3c3c43;
+        cursor: pointer;
+      }
+      .ghost-btn:hover {
+        background: #f1f1f4;
+      }
+      .ghost-btn svg {
+        width: 18px;
+        height: 18px;
+        fill: currentColor;
+      }
+      /* Dropdown menu — mirrors web/src/lib/elements/Dropdown.svelte:
+         rounded-2xl bg-gray-100 py-2 shadow-lg min-w-75, rows grid-cols-[36px_1fr] p-2,
+         selected row = primary check + primary text */
+      .web-menu {
+        position: absolute;
+        top: 42px;
+        left: 230px;
+        min-width: 230px;
+        background: #f3f4f6;
+        border-radius: 16px;
+        padding: 8px 0;
+        box-shadow:
+          0 10px 15px -3px rgb(0 0 0 / 0.1),
+          0 4px 6px -4px rgb(0 0 0 / 0.1);
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 5;
+        animation: flyIn 0.25s ease;
+      }
+      @keyframes flyIn {
+        from {
+          opacity: 0;
+          transform: translateY(-14px);
+        }
+      }
+      .web-menu button {
+        display: grid;
+        grid-template-columns: 36px 1fr;
+        align-items: center;
+        width: 100%;
+        padding: 8px;
+        border: 0;
+        background: transparent;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+        color: var(--ink);
+      }
+      .web-menu button:hover {
+        background: #d1d5db;
+      }
+      .web-menu button svg {
+        width: 18px;
+        height: 18px;
+        justify-self: center;
+        fill: var(--web-primary);
+      }
+      .web-menu button.selected span {
+        color: var(--web-primary);
+      }
+
+      /* ============ people grids ============ */
+      .grid {
+        display: grid;
+        gap: 18px 8px;
+        margin-top: 26px;
+      }
+      .grid.web-grid {
+        grid-template-columns: repeat(6, 1fr);
+      }
+      .grid.mobile-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 22px 4px;
+        margin-top: 10px;
+        padding: 18px 10px 28px;
+      }
+      .person {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .avatar {
+        position: relative;
+        border-radius: 50%;
+        width: 72px;
+        height: 72px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 22px;
+        font-weight: 600;
+        box-shadow: 0 2px 6px rgb(0 0 0 / 0.18);
+      }
+      .mobile-grid .avatar {
+        width: 88px;
+        height: 88px;
+        font-size: 26px;
+      }
+      .fav-badge {
+        position: absolute;
+        right: -2px;
+        bottom: -2px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+      }
+      .fav-badge svg {
+        width: 13px;
+        height: 13px;
+        fill: #e1306c;
+      }
+      .pname {
+        font-size: 12.5px;
+        font-weight: 500;
+        max-width: 90px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .pname.unnamed {
+        font-style: normal;
+        font-weight: 500;
+      }
+      .web-grid .pname.unnamed {
+        color: var(--web-primary);
+      }
+      .mobile-grid .pname.unnamed {
+        color: var(--mobile-primary);
+      }
+      .pcount {
+        font-size: 10px;
+        color: #9a9a93;
+        font-family: ui-monospace, Menlo, monospace;
+        margin-top: -4px;
+      }
+
+      /* ============ MOBILE: phone frame ============ */
+      .phone-wrap {
+        display: flex;
+        justify-content: center;
+      }
+      .phone {
+        width: 360px;
+        background: #fdfdfd;
+        border-radius: 42px;
+        border: 10px solid #1c1c1e;
+        box-shadow: 0 24px 56px -18px rgb(40 40 44 / 0.45);
+        overflow: hidden;
+        position: relative;
+      }
+      .statusbar {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 26px 4px;
+        font-size: 12.5px;
+        font-weight: 600;
+      }
+      .appbar {
+        display: flex;
+        align-items: center;
+        padding: 10px 8px 10px 16px;
+      }
+      .appbar .back {
+        width: 22px;
+        height: 22px;
+        fill: var(--ink);
+      }
+      .appbar h3 {
+        flex: 1;
+        font-size: 20px;
+        font-weight: 500;
+        margin-left: 18px;
+      }
+      .appbar .action {
+        width: 44px;
+        height: 44px;
+        border: 0;
+        background: transparent;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .appbar .action:hover {
+        background: #ededf2;
+      }
+      .appbar .action svg {
+        width: 23px;
+        height: 23px;
+        fill: var(--ink);
+      }
+      .appbar .action.active svg {
+        fill: var(--mobile-primary);
+      }
+      /* MenuAnchor — mirrors album_selector.widget.dart _SortButton:
+         elevation 1, radius 24, padding 4; items radius 12, LTRB(12,12,24,12);
+         selected = primary bg + onPrimary text; unselected labelLarge @ alpha 185 */
+      .m-menu {
+        position: absolute;
+        top: 96px;
+        right: 60px;
+        background: #fff;
+        border-radius: 24px;
+        padding: 4px;
+        box-shadow:
+          0 1px 3px rgb(0 0 0 / 0.2),
+          0 2px 8px rgb(0 0 0 / 0.14);
+        z-index: 6;
+        animation: menuPop 0.16s ease;
+        transform-origin: top right;
+      }
+      @keyframes menuPop {
+        from {
+          opacity: 0;
+          transform: scale(0.92);
+        }
+      }
+      .m-menu button {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        border: 0;
+        background: transparent;
+        border-radius: 12px;
+        padding: 12px 24px 12px 12px;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        letter-spacing: 0.1px;
+        color: rgb(28 28 30 / 0.73);
+        cursor: pointer;
+      }
+      .m-menu button svg {
+        width: 18px;
+        height: 18px;
+        fill: transparent;
+      }
+      .m-menu button.selected {
+        background: var(--mobile-primary);
+        color: #fff;
+      }
+      .m-menu button.selected svg {
+        fill: #fff;
+      }
+      .homebar {
+        width: 130px;
+        height: 5px;
+        border-radius: 99px;
+        background: #1c1c1e;
+        margin: 6px auto 8px;
+      }
+      footer {
+        max-width: 1240px;
+        margin: 36px auto 0;
+        font-size: 11.5px;
+        color: #8a897f;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="intro">
+      <h1>People view — sort option mockup</h1>
+      <p class="chrome">
+        issue #676 · spec 2026-06-10-people-sort-design.md · web Dropdown precedent: albums-controls · mobile MenuAnchor
+        precedent: album _SortButton
+      </p>
+      <span class="hint chrome"
+        >⌘ interactive — click “Name” / “Most photos” in either frame to watch the grid re-sort</span
+      >
+    </header>
+
+    <main>
+      <!-- ================= WEB ================= -->
+      <figure class="panel">
+        <div class="browser">
+          <div class="browser-bar">
+            <div class="traffic"><i></i><i></i><i></i></div>
+            <div class="urlbar chrome">gallery.local/people</div>
+          </div>
+          <div class="web-app">
+            <nav class="sidebar">
+              <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" /></svg>
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"
+                />
+              </svg>
+              <svg class="active" viewBox="0 0 24 24">
+                <path
+                  d="M16 17v2H2v-2s0-4 7-4 7 4 7 4m-3.5-9.5A3.5 3.5 0 1 0 9 11a3.5 3.5 0 0 0 3.5-3.5m3.44 5.5A5.32 5.32 0 0 1 18 17v2h4v-2s0-3.63-6.06-4M15 4a3.39 3.39 0 0 0-1.93.59 5 5 0 0 1 0 5.82A3.39 3.39 0 0 0 15 11a3.5 3.5 0 0 0 0-7z"
+                />
+              </svg>
+              <svg viewBox="0 0 24 24">
+                <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2m0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" />
+              </svg>
+            </nav>
+            <div class="web-content">
+              <div class="web-header">
+                <h2>People</h2>
+                <div class="web-controls">
+                  <div class="searchpill">
+                    <svg viewBox="0 0 24 24">
+                      <path
+                        d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"
+                      />
+                    </svg>
+                    Search people
+                  </div>
+                  <button class="ghost-btn" id="web-trigger" title="Sort people by...">
+                    <svg id="web-trigger-icon" viewBox="0 0 24 24"></svg>
+                    <span id="web-trigger-label"></span>
+                  </button>
+                  <button class="ghost-btn">
+                    <svg viewBox="0 0 24 24">
+                      <path
+                        d="M12 9a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3m0-4.5c5 0 9.27 3.11 11 7.5-1.73 4.39-6 7.5-11 7.5S2.73 16.39 1 12c1.73-4.39 6-7.5 11-7.5M3.18 12a9.821 9.821 0 0 0 17.64 0 9.821 9.821 0 0 0-17.64 0z"
+                      />
+                    </svg>
+                    Show &amp; hide people
+                  </button>
+                  <div class="web-menu" id="web-menu" role="menu"></div>
+                </div>
+              </div>
+              <div class="grid web-grid" id="web-grid"></div>
+            </div>
+          </div>
+        </div>
+        <figcaption>
+          <b>Web</b> — the existing <span class="chrome">Dropdown</span> element from the albums page, placed between
+          search and “Show &amp; hide people”. Trigger shows the active mode’s icon + label; the menu is the stock
+          rounded-2xl panel with the primary-colored check. Shown open. Counts under names are
+          <b>demo annotations only</b> — the real grid is unchanged apart from order.
+        </figcaption>
+      </figure>
+
+      <!-- ================= MOBILE ================= -->
+      <figure class="panel">
+        <div class="phone-wrap">
+          <div class="phone">
+            <div class="statusbar chrome"><span>9:41</span><span>𝄚 ⌁ ▮</span></div>
+            <div class="appbar">
+              <svg class="back" viewBox="0 0 24 24">
+                <path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z" />
+              </svg>
+              <h3>People</h3>
+              <button class="action active" id="m-trigger" title="Sort people by...">
+                <svg viewBox="0 0 24 24"><path d="M9 3 5 7h3v7h2V7h3L9 3m7 14v-7h-2v7h-3l4 4 4-4h-3z" /></svg>
+              </button>
+              <button class="action">
+                <svg viewBox="0 0 24 24">
+                  <path
+                    d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div class="m-menu" id="m-menu" role="menu"></div>
+            <div class="grid mobile-grid" id="m-grid"></div>
+            <div class="homebar"></div>
+          </div>
+        </div>
+        <figcaption>
+          <b>Mobile</b> — a new <span class="chrome">swap_vert</span> AppBar action before search, opening the exact
+          albums-sort <span class="chrome">MenuAnchor</span> recipe: radius-24 card, radius-12 items, selected item
+          filled with the brand primary + check, unselected at 73% on-surface. Shown open. Favorites (heart badge) now
+          sort first on mobile too.
+        </figcaption>
+      </figure>
+    </main>
+
+    <footer class="chrome">
+      Fidelity notes: web colors/typography from app.css (primary rgb(66 80 175), Google Sans); menu markup mirrors
+      Dropdown.svelte (rounded-2xl, 36px check column, fly-in). Mobile primary #4150AF (constants/colors.dart); menu
+      mirrors album_selector.widget.dart. Sort semantics per spec: favorites → named → unnamed in both modes.
+    </footer>
+
+    <script>
+      const ICONS = {
+        alpha:
+          'M9.25 5 12.5 1.75 15.75 5h-6.5M8.89 14.3H6L5.28 17H2.91L6 7h2l3.13 10H8.97l-.08-.3m-.55-2.07-.9-3.46-.9 3.46h1.8z',
+        numeric:
+          'M9.25 19 12.5 22.25 15.75 19h-6.5M7 7h2v10H7V7m4 0h6v2h-4v2h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-4v-2h4v-2h-4V7z',
+        check: 'M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7z',
+        heart:
+          'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z',
+      };
+      const PEOPLE = [
+        { name: 'Mara', count: 2418, fav: true, hue: [262, 21] },
+        { name: 'Anna', count: 1204, fav: false, hue: [340, 200] },
+        { name: 'Ben', count: 967, fav: false, hue: [205, 150] },
+        { name: '', count: 854, fav: false, hue: [28, 60] },
+        { name: 'Karina', count: 733, fav: true, hue: [165, 290] },
+        { name: 'Otto', count: 512, fav: false, hue: [90, 130] },
+        { name: 'Édith', count: 488, fav: false, hue: [310, 250] },
+        { name: 'Sam', count: 301, fav: false, hue: [50, 10] },
+        { name: '', count: 122, fav: false, hue: [220, 180] },
+        { name: 'Zoé', count: 87, fav: false, hue: [120, 330] },
+        { name: 'Liam', count: 41, fav: false, hue: [10, 280] },
+        { name: 'Ada', count: 9, fav: false, hue: [188, 45] },
+      ];
+      const cmpName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      function sorted(mode) {
+        return [...PEOPLE].sort((a, b) => {
+          if (a.fav !== b.fav) return a.fav ? -1 : 1;
+          const an = a.name.trim().length > 0,
+            bn = b.name.trim().length > 0;
+          if (an !== bn) return an ? -1 : 1;
+          if (an && mode === 'name') return cmpName(a, b) || a.count - b.count;
+          return b.count - a.count || (an ? cmpName(a, b) : 0);
+        });
+      }
+      function personEl(p) {
+        const el = document.createElement('div');
+        el.className = 'person';
+        el.dataset.key = p.name + p.count;
+        const initial = p.name ? p.name[0].toUpperCase() : '?';
+        el.innerHTML =
+          `<div class="avatar" style="background:linear-gradient(135deg,hsl(${p.hue[0]} 45% 62%),hsl(${p.hue[1]} 50% 48%))">${initial}` +
+          (p.fav ? `<span class="fav-badge"><svg viewBox="0 0 24 24"><path d="${ICONS.heart}"/></svg></span>` : '') +
+          `</div><span class="pname${p.name ? '' : ' unnamed'}">${p.name || 'Add a name'}</span>` +
+          `<span class="pcount">× ${p.count.toLocaleString()}</span>`;
+        return el;
+      }
+      // FLIP re-sort so the reorder is felt, not implied
+      function renderGrid(grid, mode) {
+        const prev = new Map([...grid.children].map((c) => [c.dataset.key, c.getBoundingClientRect()]));
+        grid.replaceChildren(...sorted(mode).map(personEl));
+        for (const c of grid.children) {
+          const old = prev.get(c.dataset.key);
+          if (!old) continue;
+          const now = c.getBoundingClientRect();
+          const dx = old.left - now.left,
+            dy = old.top - now.top;
+          if (dx || dy) {
+            c.style.transition = 'none';
+            c.style.transform = `translate(${dx}px,${dy}px)`;
+            requestAnimationFrame(() => {
+              c.style.transition = '';
+              c.style.transform = '';
+            });
+          }
+        }
+      }
+      const MODES = [
+        { id: 'photoCount', label: 'Most photos', icon: ICONS.numeric },
+        { id: 'name', label: 'Name', icon: ICONS.alpha },
+      ];
+      const state = { web: 'photoCount', m: 'photoCount' };
+      function renderWebMenu() {
+        const menu = document.getElementById('web-menu');
+        menu.replaceChildren(
+          ...MODES.map((m) => {
+            const b = document.createElement('button');
+            b.className = state.web === m.id ? 'selected' : '';
+            b.innerHTML =
+              (state.web === m.id ? `<svg viewBox="0 0 24 24"><path d="${ICONS.check}"/></svg>` : '<i></i>') +
+              `<span>${m.label}</span>`;
+            b.onclick = () => {
+              state.web = m.id;
+              renderWebMenu();
+              renderGrid(document.getElementById('web-grid'), m.id);
+            };
+            return b;
+          }),
+        );
+        const active = MODES.find((m) => m.id === state.web);
+        document.getElementById('web-trigger-label').textContent = active.label;
+        document.getElementById('web-trigger-icon').innerHTML = `<path d="${active.icon}"/>`;
+      }
+      function renderMobileMenu() {
+        const menu = document.getElementById('m-menu');
+        menu.replaceChildren(
+          ...MODES.map((m) => {
+            const b = document.createElement('button');
+            b.className = state.m === m.id ? 'selected' : '';
+            b.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS.check}"/></svg><span>${m.label}</span>`;
+            b.onclick = () => {
+              state.m = m.id;
+              renderMobileMenu();
+              renderGrid(document.getElementById('m-grid'), m.id);
+            };
+            return b;
+          }),
+        );
+      }
+      renderWebMenu();
+      renderMobileMenu();
+      renderGrid(document.getElementById('web-grid'), state.web);
+      renderGrid(document.getElementById('m-grid'), state.m);
+    </script>
+  </body>
+</html>
