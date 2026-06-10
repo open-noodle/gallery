@@ -1,7 +1,7 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/data/store.dart';
+import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/extensions/asyncvalue_extensions.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
@@ -13,6 +13,7 @@ import 'package:immich_mobile/presentation/widgets/people/partner_user_avatar.wi
 import 'package:immich_mobile/providers/gallery_nav/bottom_nav_height.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
@@ -246,7 +247,7 @@ class _PeopleCollectionCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final people = ref.watch(Store.people.all());
+    final people = ref.watch(getAllPeopleProvider(PeopleSortBy.photoCount));
 
     return LayoutBuilder(
       builder: (context, constraints) {

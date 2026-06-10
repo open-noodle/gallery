@@ -7,3 +7,5 @@ part 'person.model.freezed.dart';
 abstract class Person with _$Person {
   const factory Person({required String id, required String name, DateTime? updatedAt, DateTime? birthDate}) = _Person;
 }
+
+enum PeopleSortBy { photoCount, name }
