@@ -3,6 +3,7 @@ import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observe
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info-cache';
 import { authManager } from '$lib/managers/auth-manager.svelte';
+import { PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
 import {
   RepresentativeFaceSource,
   Type,
@@ -17,6 +18,7 @@ import { userAdminFactory } from '@test-data/factories/user-factory';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import { get } from 'svelte/store';
 import PeoplePage from './+page.svelte';
 
 const { gotoMock, pageStore, featureFlagsMock } = vi.hoisted(() => {
@@ -133,6 +135,7 @@ function renderPage(
 describe('Global people page', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount });
     clearPeopleFaceStatisticsInfoCache();
     authManager.setUser(userAdminFactory.build({ id: 'current-user-id' }));
     authManager.setPreferences(preferencesFactory.build());
@@ -164,7 +167,7 @@ describe('Global people page', () => {
     expect(screen.getByDisplayValue('Alice')).toHaveAttribute('placeholder', 'add_a_name');
   });
 
-  it('renders favorites first, named people alphabetically, then unnamed people by photo count', () => {
+  it('renders favorites first, then named and unnamed people by photo count by default', () => {
     renderPage([
       makePerson({ id: 'unnamed-low', name: '', isFavorite: false, numberOfAssets: 1 }),
       makePerson({ id: 'named-z', name: 'Zoe', isFavorite: false, numberOfAssets: 99 }),
@@ -177,8 +180,8 @@ describe('Global people page', () => {
     expect(screen.getAllByPlaceholderText('add_a_name').map((input) => (input as HTMLInputElement).value)).toEqual([
       'Anna',
       '',
-      'Alice',
       'Zoe',
+      'Alice',
       '',
       '',
     ]);
@@ -190,11 +193,74 @@ describe('Global people page', () => {
     ).toEqual([
       '/people/favorite-named?previousRoute=%2Fpeople',
       '/people/favorite-unnamed?previousRoute=%2Fpeople',
-      '/people/named-a?previousRoute=%2Fpeople',
       '/people/named-z?previousRoute=%2Fpeople',
+      '/people/named-a?previousRoute=%2Fpeople',
       '/people/unnamed-high?previousRoute=%2Fpeople',
       '/people/unnamed-low?previousRoute=%2Fpeople',
     ]);
+  });
+
+  it('switches to Name ordering via the sort dropdown and persists the choice', async () => {
+    const user = userEvent.setup();
+    renderPage([
+      makePerson({ id: 'named-z', name: 'Zoe', numberOfAssets: 99 }),
+      makePerson({ id: 'named-a', name: 'Alice', numberOfAssets: 1 }),
+    ]);
+
+    expect(screen.getAllByPlaceholderText('add_a_name').map((input) => (input as HTMLInputElement).value)).toEqual([
+      'Zoe',
+      'Alice',
+    ]);
+
+    // The trigger's accessible name is the selected option's label (@immich/ui Button
+    // turns `title` into a hover Tooltip, NOT a title attribute — do not use getByTitle).
+    await user.click(screen.getByRole('button', { name: 'sort_people_most_photos' }));
+    await user.click(screen.getByRole('button', { name: 'name' }));
+
+    await waitFor(() => {
+      expect(screen.getAllByPlaceholderText('add_a_name').map((input) => (input as HTMLInputElement).value)).toEqual([
+        'Alice',
+        'Zoe',
+      ]);
+    });
+    expect(get(peopleViewSettings).sortBy).toBe(PeopleSortBy.Name);
+  });
+
+  it('hides the sort control when there are no people', () => {
+    renderPage([]);
+
+    expect(screen.queryByRole('button', { name: 'sort_people_most_photos' })).toBeNull();
+  });
+
+  it('falls back to the default order when the stored preference is corrupt', () => {
+    peopleViewSettings.set({ sortBy: 'garbage' as PeopleSortBy });
+    renderPage([
+      makePerson({ id: 'named-a', name: 'Alice', numberOfAssets: 1 }),
+      makePerson({ id: 'named-z', name: 'Zoe', numberOfAssets: 99 }),
+    ]);
+
+    expect(screen.getAllByPlaceholderText('add_a_name').map((input) => (input as HTMLInputElement).value)).toEqual([
+      'Zoe',
+      'Alice',
+    ]);
+  });
+
+  it('sorts searched results by photo count in the default mode', async () => {
+    // URL-driven search activation — the same harness the existing global-name-search tests use
+    pageStore.setUrl('http://localhost/people?searchedPeople=Ali');
+    sdkMock.searchPerson.mockResolvedValue([
+      makePerson({ id: 'search-a', name: 'Alice', numberOfAssets: 1 }),
+      makePerson({ id: 'search-b', name: 'Alicia', numberOfAssets: 99 }),
+    ]);
+
+    renderPage([makePerson({ id: 'p1', name: 'Someone', numberOfAssets: 5 })]);
+
+    await waitFor(() => {
+      expect(screen.getAllByPlaceholderText('add_a_name').map((input) => (input as HTMLInputElement).value)).toEqual([
+        'Alicia',
+        'Alice',
+      ]);
+    });
   });
 
   it('shows visible people and detected faces in the heading', () => {
