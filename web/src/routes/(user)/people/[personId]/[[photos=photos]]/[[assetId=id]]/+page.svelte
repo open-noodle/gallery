@@ -33,12 +33,18 @@
   import RepresentativeFacePickerModal from '#lib/modals/RepresentativeFacePickerModal.svelte';
   import { Route } from '#lib/route.ts';
   import { getAssetBulkActions } from '#lib/services/asset.service.ts';
-  import { getPersonActions, handleUpdatePersonName } from '#lib/services/person.service.ts';
+  import {
+    getPersonActions,
+    getPersonFacesPage,
+    getPersonFaceThumbnail,
+    isSpaceEditor,
+    updatePersonName,
+    updatePersonRepresentativeFace,
+  } from '#lib/services/person.service.ts';
   import { locale } from '#lib/stores/preferences.store.ts';
   import { websocketEvents } from '#lib/stores/websocket.ts';
   import { createUrl, getPeopleThumbnailUrl } from '#lib/utils.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
-  import { getPersonFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
   import { isSpaceScopedPerson, toScopedPersonRef } from '#lib/utils/scoped-person-ref.ts';
   import { normalizeSearchString } from '#lib/utils/string-utils.ts';
   import { afterNavigate, goto, refreshAll } from '$app/navigation';
@@ -50,14 +56,11 @@
     AssetVisibility,
     detachScopedPerson,
     getAllPeople,
-    getPersonFaces,
     getPerson,
     mergePerson,
     mergeScopedPeople,
     searchPerson,
     Type2 as ScopedPersonProfileType,
-    updateRepresentativeFace,
-    updatePerson,
     type PersonFaceResponseDto,
     type PersonResponseDto,
   } from '@immich/sdk';
@@ -295,7 +298,12 @@
       return;
     }
 
-    person = (await handleUpdatePersonName({ id: person.id, name: personName }, { notify: true })) ?? person;
+    try {
+      person = await updatePersonName(person, personName);
+      toastManager.primary($t('change_name_successfully'));
+    } catch (error) {
+      handleError(error, $t('errors.unable_to_save_name'));
+    }
   };
 
   const handleCancelEditName = () => {
@@ -362,6 +370,22 @@
     await updateAssetCount();
   };
 
+  // Space-person writes need the editor role; default to offering the actions until the
+  // membership resolves (the server enforces the role on every write regardless).
+  let canEditSpacePerson = $state(true);
+  $effect(() => {
+    const profile = person.primaryProfile;
+    canEditSpacePerson = true;
+    if (profile?.type === 'space-person' && profile.spaceId) {
+      const spaceId = profile.spaceId;
+      void isSpaceEditor(spaceId, authManager.user.id).then((editable) => {
+        if (person.primaryProfile?.spaceId === spaceId) {
+          canEditSpacePerson = editable;
+        }
+      });
+    }
+  });
+
   const handleSetVisibility = (assetIds: string[]) => {
     timelineManager.removeAssets(assetIds);
     assetMultiSelectManager.clear();
@@ -408,22 +432,21 @@
     await updateAssetCount();
   };
 
-  const { SetDateOfBirth, Favorite, Unfavorite, HidePerson, ShowPerson } = $derived(getPersonActions($t, person));
+  const { SetDateOfBirth, Favorite, Unfavorite, HidePerson, ShowPerson } = $derived(
+    getPersonActions($t, person, { canEditSpacePerson }),
+  );
   const SelectRepresentativeFace: ActionItem = {
     title: $t('select_representative_face'),
     icon: mdiAccountBoxOutline,
+    $if: () => canEditSpacePerson,
     onAction: async () => {
       const updated = await modalManager.show(RepresentativeFacePickerModal, {
         title: $t('select_representative_face'),
-        loadFaces: ({ page, size }: { page: number; size: number }) => getPersonFaces({ id: person.id, page, size }),
+        loadFaces: ({ page, size }: { page: number; size: number }) => getPersonFacesPage(person, { page, size }),
         updateFace: async (faceId: string) => {
-          person = await updateRepresentativeFace({
-            id: person.id,
-            representativeFaceUpdateDto: { assetFaceId: faceId },
-          });
+          person = await updatePersonRepresentativeFace(person, faceId);
         },
-        getThumbnailUrl: (face: PersonFaceResponseDto) =>
-          getPersonFaceThumbnailUrl(person.id, face.id, person.updatedAt),
+        getThumbnailUrl: (face: PersonFaceResponseDto) => getPersonFaceThumbnail(person, face.id),
         canUpdate: true,
       });
 
@@ -529,8 +552,8 @@
                     <button
                       type="button"
                       class="flex items-center justify-center"
-                      title={$t('edit_name')}
-                      onclick={() => (isEditingName = true)}
+                      title={canEditSpacePerson ? $t('edit_name') : undefined}
+                      onclick={() => (isEditingName = canEditSpacePerson)}
                     >
                       <ImageThumbnail
                         circle
