@@ -578,6 +578,56 @@ void main() {
 
       await sub.cancel();
     });
+
+    Future<void> insertImageAt(String id, String ownerId, DateTime createdAt) => db
+        .into(db.remoteAssetEntity)
+        .insert(
+          RemoteAssetEntityCompanion.insert(
+            id: id,
+            name: '$id.jpg',
+            type: AssetType.image,
+            checksum: 'c-$id',
+            ownerId: ownerId,
+            visibility: AssetVisibility.timeline,
+            createdAt: Value(createdAt),
+            updatedAt: Value(createdAt),
+            localDateTime: Value(createdAt),
+          ),
+        );
+
+    test('map() groups buckets by month and year', () async {
+      await insertUser('viewer');
+      // Mid-day times: drift stores DateTimes as UTC text and the bucketing
+      // strftime sees the UTC representation, so naive midnight values shift
+      // into the previous month/year in non-UTC zones (same precedent as
+      // shared_space_repository_test.dart).
+      await insertImageAt('jan1', 'viewer', DateTime(2024, 1, 10, 12));
+      await insertImageAt('jan2', 'viewer', DateTime(2024, 1, 20, 12));
+      await insertImageAt('mar1', 'viewer', DateTime(2024, 3, 5, 12));
+      await insertImageAt('prev1', 'viewer', DateTime(2023, 7, 1, 12));
+      for (final id in ['jan1', 'jan2', 'mar1', 'prev1']) {
+        await insertExifAt(id, 48.85, 2.35); // Paris — inside europeBounds()
+      }
+
+      final monthBuckets = await sut
+          .map(['viewer'], 'viewer', TimelineMapOptions(bounds: europeBounds()), GroupAssetsBy.month)
+          .bucketSource()
+          .first;
+      expect(monthBuckets, [
+        TimeBucket(date: DateTime(2024, 3), assetCount: 1),
+        TimeBucket(date: DateTime(2024, 1), assetCount: 2),
+        TimeBucket(date: DateTime(2023, 7), assetCount: 1),
+      ]);
+
+      final yearBuckets = await sut
+          .map(['viewer'], 'viewer', TimelineMapOptions(bounds: europeBounds()), GroupAssetsBy.year)
+          .bucketSource()
+          .first;
+      expect(yearBuckets, [
+        TimeBucket(date: DateTime(2024), assetCount: 3),
+        TimeBucket(date: DateTime(2023), assetCount: 1),
+      ]);
+    });
   });
 
   group('Cross-method permission matrix — video()', () {
