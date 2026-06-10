@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/events.model.dart';
 import 'package:immich_mobile/domain/models/map.model.dart';
-import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
@@ -12,12 +11,11 @@ import 'package:immich_mobile/presentation/widgets/bottom_sheet/base_bottom_shee
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/general_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/map/map.state.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 
 class MapBottomSheet extends StatelessWidget {
-  static const forcedTimelineGroupBy = GroupAssetsBy.day;
-
   final Key? sheetKey;
 
   const MapBottomSheet({super.key, this.sheetKey});
@@ -44,41 +42,37 @@ class MapBottomSheetTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ProviderScope(
-      overrides: [
-        timelineServiceProvider.overrideWith((ref) {
-          final user = ref.watch(currentUserProvider);
-          if (user == null) {
-            throw Exception('User must be logged in to access archive');
-          }
+    return TimelineRouteScope(
+      timelineServiceBuilder: (ref, scope, groupBy) {
+        final user = ref.watch(currentUserProvider);
+        if (user == null) {
+          throw Exception('User must be logged in to access the map timeline');
+        }
 
-          final withPartners = ref.watch(mapStateProvider.select((s) => s.withPartners));
-          final users = withPartners ? ref.watch(timelineUsersProvider).valueOrNull ?? [user.id] : [user.id];
+        final withPartners = ref.watch(mapStateProvider.select((s) => s.withPartners));
+        final users = withPartners ? ref.watch(timelineUsersProvider).valueOrNull ?? [user.id] : [user.id];
 
-          final optionsController = StreamController<TimelineMapOptions>.broadcast();
-          ref.onDispose(optionsController.close);
+        final optionsController = StreamController<TimelineMapOptions>.broadcast();
+        ref.onDispose(optionsController.close);
 
-          var currentOptions = ref.read(mapStateProvider).toOptions();
+        var currentOptions = ref.read(mapStateProvider).toOptions();
 
-          ref.listen(mapStateProvider.select((state) => state.toOptions()), (_, newOptions) {
-            currentOptions = newOptions;
-            optionsController.add(newOptions);
-          });
+        ref.listen(mapStateProvider.select((state) => state.toOptions()), (_, newOptions) {
+          currentOptions = newOptions;
+          optionsController.add(newOptions);
+        });
 
-          final timelineService = ref
-              .watch(timelineFactoryProvider)
-              .geographicMap(
-                users,
-                user.id,
-                () => currentOptions,
-                optionsController.stream,
-                groupBy: MapBottomSheet.forcedTimelineGroupBy,
-              );
-          ref.onDispose(timelineService.dispose);
-
-          return timelineService;
-        }),
-      ],
+        return ref
+            .watch(timelineFactoryProvider)
+            .geographicMap(
+              users,
+              user.id,
+              () => currentOptions,
+              optionsController.stream,
+              groupBy: groupBy,
+              temporalScope: scope,
+            );
+      },
       child: const Column(
         children: [
           _MapAssetCount(),
@@ -87,7 +81,7 @@ class MapBottomSheetTimeline extends StatelessWidget {
               appBar: null,
               bottomSheet: GeneralBottomSheet(minChildSize: 0.23),
               withScrubber: false,
-              groupBy: MapBottomSheet.forcedTimelineGroupBy,
+              withGroupingPill: true,
             ),
           ),
         ],
