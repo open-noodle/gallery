@@ -1172,6 +1172,19 @@ export class FaceIdentityRepository {
     return people[0];
   }
 
+  /**
+   * Resolve the identity-wide person view for a viewer who already holds a person row for that
+   * identity (typically the library owner accessing their own person). Mirrors the read-time
+   * name/birthday resolution used by {@link getAccessiblePersonByProfileId}, so an owner viewing a
+   * single person sees a birthday set on a sibling shared-space profile of the same identity rather
+   * than the raw (often empty) `person.birthDate`. Not decorated with `@GenerateSql`: it issues the
+   * exact `hydrateAccessiblePeople` query already documented under that method.
+   */
+  async getResolvedPersonByIdentityId(userId: string, identityId: string): Promise<PersonResponseDto | undefined> {
+    const people = await this.hydrateAccessiblePeople({ userId, identityIds: [identityId], withHidden: false });
+    return people[0];
+  }
+
   async resolveRepairRefs(actorUserId: string, dto: MergeScopedPeopleDto): Promise<RepairRefsResolution> {
     const refs = [dto.target, ...dto.sources];
     const profiles: RepairProfile[] = [];
