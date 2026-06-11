@@ -286,7 +286,22 @@ export class PersonService extends BaseService {
   async getById(auth: AuthDto, id: string): Promise<PersonResponseDto> {
     const allowedIds = await this.checkAccess({ auth, permission: Permission.PersonRead, ids: [id] });
     if (allowedIds.has(id)) {
-      return mapPerson(await this.findOrFail(auth, id));
+      const person = await this.findOrFail(auth, id);
+      const response = mapPerson(person);
+      // Name and birthday set in a shared space are resolved at read time (never written back to
+      // `person`). The owner accessing their own person short-circuits the resolver, so overlay the
+      // identity-wide resolution here — otherwise they see the raw, often-empty `person.birthDate`.
+      if (person.identityId) {
+        const resolved = await this.faceIdentityRepository.getResolvedPersonByIdentityId(
+          auth.user.id,
+          person.identityId,
+        );
+        if (resolved) {
+          response.name = resolved.name;
+          response.birthDate = resolved.birthDate;
+        }
+      }
+      return response;
     }
 
     const accessiblePerson = await this.faceIdentityRepository.getAccessiblePersonByProfileId(auth.user.id, id);
