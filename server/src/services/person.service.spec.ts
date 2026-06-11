@@ -18,7 +18,7 @@ import {
   AssetVisibility,
 } from 'src/enum.js';
 import { FaceSearchResult } from 'src/repositories/search.repository.js';
-import { PersonService } from 'src/services/person.service.js';
+import { FACE_IDENTITY_BACKFILL_MAX_CONTINUATIONS, PersonService } from 'src/services/person.service.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { ImmichFileResponse, ImmichStreamResponse } from 'src/utils/file.js';
 import { AssetFaceFactory } from 'test/factories/asset-face.factory.js';
@@ -2823,7 +2823,7 @@ describe(PersonService.name, () => {
 
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.FaceIdentityBackfill,
-        data: { continuationId: expect.any(String) },
+        data: expect.objectContaining({ continuationId: expect.any(String) }),
       });
       expect((mocks.faceIdentity as any).getSharedSpaceFaceMatchBackfillTargets).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
@@ -2851,7 +2851,7 @@ describe(PersonService.name, () => {
       expect(mocks.job.queue).toHaveBeenCalledTimes(1);
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.FaceIdentityBackfill,
-        data: { continuationId: expect.any(String) },
+        data: expect.objectContaining({ continuationId: expect.any(String) }),
       });
       expect((mocks.faceIdentity as any).getSharedSpaceFaceMatchBackfillTargets).not.toHaveBeenCalled();
       expect((mocks.faceIdentity as any).getPendingSharedSpaceFaceMatchBackfillTargets).not.toHaveBeenCalled();
@@ -2877,7 +2877,7 @@ describe(PersonService.name, () => {
       await expect(sut.handleFaceIdentityBackfill({ stage: 'person' })).resolves.toBe(JobStatus.Success);
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.FaceIdentityBackfill,
-        data: { continuationId: 'a' },
+        data: expect.objectContaining({ continuationId: 'a' }),
       });
 
       mocks.job.queue.mockClear();
@@ -2887,8 +2887,67 @@ describe(PersonService.name, () => {
 
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.FaceIdentityBackfill,
-        data: { continuationId: 'b' },
+        data: expect.objectContaining({ continuationId: 'b' }),
       });
+    });
+
+    it('increments the continuation pass count on each re-queue', async () => {
+      mocks.faceIdentity.backfillPersonalIdentities.mockResolvedValue({ processed: 0 });
+      mocks.faceIdentity.backfillSpacePersonIdentities.mockResolvedValue({ processed: 0, conflictCount: 0 });
+      (mocks.faceIdentity as any).getBackfillWork.mockResolvedValue({
+        hasPersonalIdentityWork: true,
+        hasSpacePersonIdentityWork: false,
+        hasSharedSpaceProjectionWork: false,
+      });
+
+      await expect(
+        sut.handleFaceIdentityBackfill({ stage: 'person', continuationId: 'a', continuationCount: 2 }),
+      ).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.FaceIdentityBackfill,
+        data: { continuationId: 'b', continuationCount: 3 },
+      });
+    });
+
+    it('threads the continuation pass count through stage pagination requeues', async () => {
+      mocks.faceIdentity.backfillPersonalIdentities.mockResolvedValue({
+        processed: 1000,
+        nextCursor: 'person-cursor',
+      });
+
+      await expect(
+        sut.handleFaceIdentityBackfill({ stage: 'person', continuationId: 'a', continuationCount: 2 }),
+      ).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.FaceIdentityBackfill,
+        data: { stage: 'person', cursor: 'person-cursor', continuationCount: 2 },
+      });
+    });
+
+    it('stops re-queueing when identity work persists at the continuation pass cap', async () => {
+      // A repair pass that cannot clear getBackfillWork() would otherwise re-queue itself forever —
+      // full table scans rewriting shared_space_person rows every ~30 minutes, indefinitely.
+      mocks.faceIdentity.backfillPersonalIdentities.mockResolvedValue({ processed: 0 });
+      mocks.faceIdentity.backfillSpacePersonIdentities.mockResolvedValue({ processed: 0, conflictCount: 0 });
+      (mocks.faceIdentity as any).getBackfillWork.mockResolvedValue({
+        hasPersonalIdentityWork: true,
+        hasSpacePersonIdentityWork: false,
+        hasSharedSpaceProjectionWork: false,
+      });
+
+      await expect(
+        sut.handleFaceIdentityBackfill({
+          stage: 'person',
+          continuationId: 'a',
+          continuationCount: FACE_IDENTITY_BACKFILL_MAX_CONTINUATIONS,
+        }),
+      ).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.FaceIdentityBackfill }));
+      expect((mocks.faceIdentity as any).getPendingSharedSpaceFaceMatchBackfillTargets).not.toHaveBeenCalled();
+      expect(mocks.logger.error).toHaveBeenCalledWith(expect.stringContaining('continuation'));
     });
 
     it('does not discover projection targets until paginated personal backfill is complete', async () => {
@@ -3271,7 +3330,7 @@ describe(PersonService.name, () => {
 
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.FaceIdentityBackfill,
-        data: { continuationId: expect.any(String) },
+        data: expect.objectContaining({ continuationId: expect.any(String) }),
       });
       expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
         expect.arrayContaining([expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll })]),

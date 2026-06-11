@@ -2445,11 +2445,23 @@ export class SharedSpaceService extends BaseService {
     );
 
     if ((person.nameSource === 'none' || person.nameSource === 'inherited') && nameCandidate) {
-      updates.name = nameCandidate.value;
-      updates.nameSource = 'inherited';
-      updates.nameSourceProfileType = nameCandidate.candidate.sourceProfileType ?? 'user-person';
-      updates.nameSourceProfileId = nameCandidate.candidate.sourceProfileId ?? nameCandidate.candidate.personId;
-      updates.nameSourceUpdatedAt = now;
+      const nameSourceProfileType = nameCandidate.candidate.sourceProfileType ?? 'user-person';
+      const nameSourceProfileId = nameCandidate.candidate.sourceProfileId ?? nameCandidate.candidate.personId;
+      // Skip when the inherited value and its provenance are unchanged — the metadata backfill scans
+      // every space person, and re-stamping nameSourceUpdatedAt rewrites the row (updatedAt trigger)
+      // on every pass even though nothing changed.
+      const nameUnchanged =
+        person.nameSource === 'inherited' &&
+        person.name === nameCandidate.value &&
+        person.nameSourceProfileType === nameSourceProfileType &&
+        person.nameSourceProfileId === nameSourceProfileId;
+      if (!nameUnchanged) {
+        updates.name = nameCandidate.value;
+        updates.nameSource = 'inherited';
+        updates.nameSourceProfileType = nameSourceProfileType;
+        updates.nameSourceProfileId = nameSourceProfileId;
+        updates.nameSourceUpdatedAt = now;
+      }
     } else if (person.nameSource === 'inherited' && nameCandidates.length === 0) {
       updates.name = '';
       updates.nameSource = 'none';
@@ -2459,12 +2471,21 @@ export class SharedSpaceService extends BaseService {
     }
 
     if ((person.birthDateSource === 'none' || person.birthDateSource === 'inherited') && birthDateCandidate) {
-      updates.birthDate = birthDateCandidate.value;
-      updates.birthDateSource = 'inherited';
-      updates.birthDateSourceProfileType = birthDateCandidate.candidate.sourceProfileType ?? 'user-person';
-      updates.birthDateSourceProfileId =
+      const birthDateSourceProfileType = birthDateCandidate.candidate.sourceProfileType ?? 'user-person';
+      const birthDateSourceProfileId =
         birthDateCandidate.candidate.sourceProfileId ?? birthDateCandidate.candidate.personId;
-      updates.birthDateSourceUpdatedAt = now;
+      const birthDateUnchanged =
+        person.birthDateSource === 'inherited' &&
+        asBirthDateString(person.birthDate) === birthDateCandidate.value &&
+        person.birthDateSourceProfileType === birthDateSourceProfileType &&
+        person.birthDateSourceProfileId === birthDateSourceProfileId;
+      if (!birthDateUnchanged) {
+        updates.birthDate = birthDateCandidate.value;
+        updates.birthDateSource = 'inherited';
+        updates.birthDateSourceProfileType = birthDateSourceProfileType;
+        updates.birthDateSourceProfileId = birthDateSourceProfileId;
+        updates.birthDateSourceUpdatedAt = now;
+      }
     } else if (person.birthDateSource === 'inherited' && birthDateCandidates.length === 0) {
       updates.birthDate = null;
       updates.birthDateSource = 'none';
