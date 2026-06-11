@@ -2476,7 +2476,7 @@ export class SharedSpaceService extends BaseService {
         birthDateCandidate.candidate.sourceProfileId ?? birthDateCandidate.candidate.personId;
       const birthDateUnchanged =
         person.birthDateSource === 'inherited' &&
-        asBirthDateString(person.birthDate) === birthDateCandidate.value &&
+        asDateString(person.birthDate) === birthDateCandidate.value &&
         person.birthDateSourceProfileType === birthDateSourceProfileType &&
         person.birthDateSourceProfileId === birthDateSourceProfileId;
       if (!birthDateUnchanged) {
