@@ -10,7 +10,7 @@
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
   import { locale } from '#lib/stores/preferences.store.ts';
-  import { getAssetMediaUrl, truncateMiddle } from '#lib/utils.ts';
+  import { getAssetMediaUrl } from '#lib/utils.ts';
   import { delay, getDimensions } from '#lib/utils/asset-utils.ts';
   import { getByteUnitString } from '#lib/utils/byte-units.ts';
   import { getMapProviderLinks } from '#lib/utils/exif-utils.ts';
@@ -159,14 +159,13 @@
       <div class="flex gap-4 py-4" data-testid="detail-panel-filename">
         <div><Icon icon={mdiImageOutline} size="24" /></div>
 
-        <div class="w-full">
-          <div class="flex place-items-start justify-between gap-2 break-all whitespace-pre-wrap">
-            <Text title={asset.originalFileName}>{truncateMiddle(asset.originalFileName)}</Text>
-            {#if isOwner}
+        <div>
+          <p class="flex place-items-center gap-2 break-all whitespace-pre-wrap">
+            {asset.originalFileName}
+            {#if asset.originalPath}
               <IconButton
                 icon={mdiInformationOutline}
                 aria-label={$t('show_file_location')}
-                class="-my-1 shrink-0"
                 size="small"
                 shape="round"
                 color="secondary"
@@ -174,7 +173,7 @@
                 onclick={() => assetViewerManager.toggleAssetPath()}
               />
             {/if}
-          </div>
+          </p>
           {#if assetViewerManager.isShowAssetPath}
             <p class="pb-2 text-xs break-all opacity-50 hover:text-primary" transition:slide={{ duration: 250 }}>
               <!-- eslint-disable-next-line svelte/no-navigation-without-resolve this is supposed to be treated as an absolute/external link -->
