@@ -125,7 +125,7 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     await expect(page.locator('[data-testid="detail-panel-filename"]')).toContainText('rebase-smoke.jpg');
   });
 
-  test('Test 5 — editor detail panel: edit controls hidden, file path hidden', async ({ context, page }) => {
+  test('Test 5 — editor detail panel: edit controls hidden, file path revealable', async ({ context, page }) => {
     await utils.setAuthCookies(context, editor.accessToken);
     await page.goto(`/spaces/${space.id}/photos/${asset.id}`);
     await page.waitForSelector('#immich-asset-viewer');
@@ -135,10 +135,12 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     // the pencil indicator is omitted, and the title attribute is empty. Assert on the title
     // (locale-proof via empty string) as the owner-only gate.
     await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).toHaveAttribute('title', '');
-    await expect(page.getByLabel('Show file location')).toHaveCount(0);
+    // Since #688 the "Show file location" toggle is gated on asset.originalPath (which the
+    // server sends to space members), not on ownership — so editors can reveal the path too.
+    await expect(page.getByLabel('Show file location')).toBeVisible();
   });
 
-  test('Test 6 — viewer detail panel: edit controls hidden, file path hidden', async ({ context, page }) => {
+  test('Test 6 — viewer detail panel: edit controls hidden, file path revealable', async ({ context, page }) => {
     await utils.setAuthCookies(context, viewer.accessToken);
     await page.goto(`/spaces/${space.id}/photos/${asset.id}`);
     await page.waitForSelector('#immich-asset-viewer');
@@ -146,7 +148,8 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     await expect(page.locator('#detail-panel')).toBeVisible();
     // Viewer has same UI gating as editor for these owner-only controls.
     await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).toHaveAttribute('title', '');
-    await expect(page.getByLabel('Show file location')).toHaveCount(0);
+    // Since #688 the file-path toggle follows asset.originalPath, not ownership (see Test 5).
+    await expect(page.getByLabel('Show file location')).toBeVisible();
   });
 
   test('Test 7 — stranger: blocked on /spaces/:id direct URL', async ({ context, page }) => {
