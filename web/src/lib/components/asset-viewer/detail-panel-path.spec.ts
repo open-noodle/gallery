@@ -1,7 +1,7 @@
-import { renderWithTooltips } from '$tests/helpers';
 import { AssetTypeEnum, AssetVisibility, type AssetResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { screen, waitFor } from '@testing-library/svelte';
+import { renderWithTooltips } from '$tests/helpers';
 import DetailPanel from './DetailPanel.svelte';
 
 // Regression probe for "file storage path no longer displayed below the filename in rc4".
