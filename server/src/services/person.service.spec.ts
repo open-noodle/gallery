@@ -67,6 +67,7 @@ describe(PersonService.name, () => {
     faceIdentityMock.getAccessiblePeopleStatistics ??= vi.fn();
     faceIdentityMock.getAccessiblePeopleFaceStatistics ??= vi.fn();
     faceIdentityMock.getAccessiblePersonByProfileId ??= vi.fn();
+    faceIdentityMock.getResolvedPersonByIdentityId ??= vi.fn();
     faceIdentityMock.getAccessiblePersonStatistics ??= vi.fn();
     faceIdentityMock.getAccessibleProfileIdentityId ??= vi.fn();
     faceIdentityMock.hasBackfillWork ??= vi.fn();
@@ -601,6 +602,63 @@ describe(PersonService.name, () => {
 
       expect((mocks.faceIdentity as any).getAccessiblePersonByProfileId).toHaveBeenCalledWith(auth.user.id, profileId);
       expect(mocks.person.getById).not.toHaveBeenCalled();
+    });
+
+    it("should resolve the identity-wide birthday and name for the owner's own person", async () => {
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create({
+        ownerId: auth.user.id,
+        identityId: newUuid(),
+        name: 'Owner Local Name',
+        birthDate: null,
+      });
+
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      (mocks.faceIdentity as any).getResolvedPersonByIdentityId.mockResolvedValue({
+        id: person.id,
+        name: 'Karolin',
+        birthDate: '2014-02-14',
+      });
+
+      await expect(sut.getById(auth, person.id)).resolves.toEqual(
+        expect.objectContaining({ id: person.id, name: 'Karolin', birthDate: '2014-02-14' }),
+      );
+      expect((mocks.faceIdentity as any).getResolvedPersonByIdentityId).toHaveBeenCalledWith(
+        auth.user.id,
+        person.identityId,
+      );
+    });
+
+    it('should not resolve via identity when the owned person has no identity', async () => {
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create({ ownerId: auth.user.id, identityId: null, birthDate: null });
+
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+
+      await expect(sut.getById(auth, person.id)).resolves.toEqual(
+        expect.objectContaining({ id: person.id, birthDate: null }),
+      );
+      expect((mocks.faceIdentity as any).getResolvedPersonByIdentityId).not.toHaveBeenCalled();
+    });
+
+    it('should fall back to the raw person when identity resolution finds nothing', async () => {
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create({
+        ownerId: auth.user.id,
+        identityId: newUuid(),
+        name: 'Owner Local Name',
+        birthDate: null,
+      });
+
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      (mocks.faceIdentity as any).getResolvedPersonByIdentityId.mockResolvedValue(void 0);
+
+      await expect(sut.getById(auth, person.id)).resolves.toEqual(
+        expect.objectContaining({ id: person.id, name: 'Owner Local Name', birthDate: null }),
+      );
     });
   });
 
