@@ -271,6 +271,8 @@ export interface IFaceIdentityBackfillJob extends IBaseJob {
   stage?: 'person' | 'space-person';
   cursor?: string;
   continuationId?: string;
+  /** Number of full re-scan passes this chain has already taken; capped to prevent endless loops. */
+  continuationCount?: number;
 }
 
 export interface ISharedSpaceFaceMatchJob extends IBaseJob {
