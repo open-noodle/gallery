@@ -28,6 +28,15 @@ jobs:
           ref: ${{ inputs.branch || 'main' }}
           persist-credentials: false
           submodules: 'recursive'
+      - name: Free disk space
+        working-directory: ./
+        # The job builds the full server image and runs a MinIO container on the same
+        # runner; when the runner image ships with little free disk, MinIO hits its
+        # minimum-free-drive threshold and rejects every migration upload.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h /
       - name: Setup pnpm
         uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
       - name: Setup Node
