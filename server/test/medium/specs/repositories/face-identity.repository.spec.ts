@@ -853,6 +853,49 @@ describe(FaceIdentityRepository.name, () => {
     }
   });
 
+  it('does not rewrite already-consistent space people on repeated identity backfill passes', async () => {
+    const { ctx, sut } = setup(await getKyselyDB());
+    const { user } = await ctx.newUser();
+    try {
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+      const { person } = await ctx.newPerson({ ownerId: user.id });
+      const identity = await sut.ensurePersonIdentity(person.id);
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'backfill' });
+      const spacePerson = await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: space.id, identityId: identity.id, representativeFaceId: assetFace.id })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      await linkSpaceFace(ctx, spacePerson.id, assetFace.id);
+
+      // The first pass settles the derived counts (and may legitimately bump updatedAt doing so).
+      await sut.backfillSpacePersonIdentities({ limit: 100 });
+      const settled = await ctx.database
+        .selectFrom('shared_space_person')
+        .select(['faceCount', 'assetCount', 'updatedAt'])
+        .where('id', '=', spacePerson.id)
+        .executeTakeFirstOrThrow();
+      expect(settled.faceCount).toBe(1);
+
+      // A person whose identity and counts already match its faces must not be rewritten by the
+      // next pass. The unconditional recount UPDATE fires the updatedAt trigger for every scanned
+      // row, which on a real library rewrites the entire shared_space_person table once per pass —
+      // constant write load and updatedAt churn for sync watchers.
+      await sut.backfillSpacePersonIdentities({ limit: 100 });
+      const afterSecondPass = await ctx.database
+        .selectFrom('shared_space_person')
+        .select(['faceCount', 'assetCount', 'updatedAt'])
+        .where('id', '=', spacePerson.id)
+        .executeTakeFirstOrThrow();
+      expect(afterSecondPass).toEqual(settled);
+    } finally {
+      await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+    }
+  });
+
   it('preserves manual space representative faces during space identity backfill', async () => {
     const { ctx, sut } = setup();
     const { user } = await ctx.newUser();
@@ -1153,7 +1196,7 @@ describe(FaceIdentityRepository.name, () => {
       const { asset } = await ctx.newAsset({ ownerId: sourceOwner.id });
       const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: sourcePerson.id });
       const targetIdentity = await sut.ensurePersonIdentity(otherOwnerTargetPerson.id);
-      await sut.ensurePersonIdentity(sourcePerson.id);
+      const sourceIdentity = await sut.ensurePersonIdentity(sourcePerson.id);
       await sut.linkFace({
         assetFaceId: assetFace.id,
         identityId: targetIdentity.id,
@@ -1169,9 +1212,18 @@ describe(FaceIdentityRepository.name, () => {
         .executeTakeFirstOrThrow();
 
       expect(updatedFace.personId).toBe(sourcePerson.id);
-      expect(await getPersonalIdentityMismatchRows(ctx, [assetFace.id])).toHaveLength(1);
+      // The source owner has no person referencing the other owner's identity, so the face cannot
+      // move anywhere. The mismatch must still be resolved — by realigning the link to the face's
+      // current person — because leftover work makes handleFaceIdentityBackfill re-queue forever.
+      const link = await ctx.database
+        .selectFrom('face_identity_face')
+        .select('identityId')
+        .where('assetFaceId', '=', assetFace.id)
+        .executeTakeFirstOrThrow();
+      expect(link.identityId).toBe(sourceIdentity.id);
+      expect(await getPersonalIdentityMismatchRows(ctx, [assetFace.id])).toEqual([]);
       await expect(sut.getBackfillWork()).resolves.toEqual({
-        hasPersonalIdentityWork: true,
+        hasPersonalIdentityWork: false,
         hasSpacePersonIdentityWork: false,
         hasSharedSpaceProjectionWork: false,
       });
@@ -4070,6 +4122,54 @@ describe(FaceIdentityRepository.name, () => {
           .where('assetFaceId', '=', corruptFace.id)
           .executeTakeFirstOrThrow();
         expect(link.identityId).toBe(identityB.id);
+        const backfillWork = await sut.getBackfillWork();
+        expect(backfillWork.hasPersonalIdentityWork).toBe(false);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    it('realigns a face whose linked identity has no person for the owner', async () => {
+      const { ctx, sut } = setup(await getKyselyDB());
+      const { user } = await ctx.newUser();
+      try {
+        // A face on person B is (corruptly) linked to an identity that NO person of this owner
+        // references — the leftover state a scoped/cross-user merge can produce. There is no target
+        // person to move the face onto, so repair must realign the link to the face's current person.
+        // Skipping it leaves person.identityId DISTINCT FROM face_identity_face.identityId, so
+        // getBackfillWork() reports work forever and handleFaceIdentityBackfill re-queues in an
+        // endless loop of full-table passes.
+        const { person } = await ctx.newPerson({ ownerId: user.id });
+        const personIdentity = await sut.ensurePersonIdentity(person.id);
+        const foreignIdentity = await ctx.database
+          .insertInto('face_identity')
+          .values({ type: 'person' })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+        await sut.linkFace({
+          assetFaceId: assetFace.id,
+          identityId: foreignIdentity.id,
+          source: 'shared-space-evidence',
+        });
+
+        await sut.backfillPersonalIdentities({ limit: 100 });
+
+        const row = await ctx.database
+          .selectFrom('asset_face')
+          .select('personId')
+          .where('id', '=', assetFace.id)
+          .executeTakeFirstOrThrow();
+        expect(row.personId).toBe(person.id);
+
+        const link = await ctx.database
+          .selectFrom('face_identity_face')
+          .select('identityId')
+          .where('assetFaceId', '=', assetFace.id)
+          .executeTakeFirstOrThrow();
+        expect(link.identityId).toBe(personIdentity.id);
+
         const backfillWork = await sut.getBackfillWork();
         expect(backfillWork.hasPersonalIdentityWork).toBe(false);
       } finally {
