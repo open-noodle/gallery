@@ -82,7 +82,6 @@ const buildAsset = (overrides: Partial<AssetResponseDto> = {}): AssetResponseDto
   height: 3000,
   isEdited: false,
   people: [],
-  unassignedFaces: [],
   ...overrides,
 });
 
