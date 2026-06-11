@@ -1829,6 +1829,8 @@ export class FaceIdentityRepository {
           person."identityId",
           person.name,
           person."birthDate",
+          CASE WHEN person."birthDate" IS NOT NULL THEN 'manual' ELSE 'none' END AS "birthDateSource",
+          person."updatedAt" AS "birthDateSourceUpdatedAt",
           person."thumbnailPath",
           person."isHidden",
           person."isFavorite",
@@ -1849,6 +1851,8 @@ export class FaceIdentityRepository {
           shared_space_person."identityId",
           COALESCE(NULLIF(shared_space_person_alias.alias, ''), shared_space_person.name, '') AS name,
           shared_space_person."birthDate",
+          shared_space_person."birthDateSource",
+          shared_space_person."birthDateSourceUpdatedAt",
           ''::text AS "thumbnailPath",
           shared_space_person."isHidden",
           NULL::boolean AS "isFavorite",
@@ -1897,7 +1901,21 @@ export class FaceIdentityRepository {
               lower(profiles.name),
               profiles."updatedAt" DESC,
               profiles."profileId"
-          ) AS primary_rn
+          ) AS primary_rn,
+          row_number() OVER (
+            PARTITION BY profiles."identityId"
+            ORDER BY
+              profiles."birthDate" IS NULL,
+              CASE WHEN profiles."profileType" = 'user-person' THEN 0 ELSE 1 END,
+              CASE profiles."birthDateSource"
+                WHEN 'manual' THEN 0
+                WHEN 'inherited' THEN 1
+                ELSE 2
+              END,
+              profiles."birthDateSourceUpdatedAt" DESC NULLS LAST,
+              profiles."updatedAt" DESC,
+              profiles."profileId"
+          ) AS birthdate_rn
         FROM profiles
         WHERE EXISTS (SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = profiles."identityId")
       )
@@ -1906,7 +1924,7 @@ export class FaceIdentityRepository {
         primary_profiles."profileId",
         primary_profiles."spaceId",
         COALESCE(NULLIF(display_profiles.name, ''), primary_profiles.name, '') AS name,
-        COALESCE(display_profiles."birthDate", primary_profiles."birthDate") AS "birthDate",
+        COALESCE(birthdate_profiles."birthDate", primary_profiles."birthDate") AS "birthDate",
         primary_profiles."thumbnailPath",
         primary_profiles."isHidden",
         primary_profiles."isFavorite",
@@ -1922,6 +1940,9 @@ export class FaceIdentityRepository {
       INNER JOIN ranked_profiles AS display_profiles
         ON display_profiles."identityId" = requested_identities."identityId"
         AND display_profiles.display_rn = 1
+      INNER JOIN ranked_profiles AS birthdate_profiles
+        ON birthdate_profiles."identityId" = requested_identities."identityId"
+        AND birthdate_profiles.birthdate_rn = 1
       LEFT JOIN asset_counts ON asset_counts."identityId" = requested_identities."identityId"
       ORDER BY requested_identities.ord
     `.execute(this.db);
