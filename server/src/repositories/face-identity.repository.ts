@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Insertable, Kysely, RawBuilder, Selectable, sql, Transaction } from 'kysely';
+import { ExpressionBuilder, Insertable, Kysely, RawBuilder, Selectable, sql, Transaction } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators';
 import {
@@ -2328,6 +2328,12 @@ export class FaceIdentityRepository {
     for (const group of groups) {
       const targetPerson = await this.getPersonByIdentity(person.ownerId, group.identityId, person.id);
       if (!targetPerson) {
+        // No person of this owner references the linked identity, so there is nowhere to move the
+        // faces. Trust the person they are already on and realign the link — otherwise
+        // person.identityId stays DISTINCT FROM face_identity_face.identityId, getBackfillWork()
+        // reports work forever, and handleFaceIdentityBackfill re-queues in a loop.
+        const strandedAssetFaceIds = await this.getPersonalBackfillAssetFaceIdsForIdentity(person.id, group.identityId);
+        await this.realignFacesToPersonIdentity(person.id, strandedAssetFaceIds);
         continue;
       }
 
@@ -2657,6 +2663,37 @@ export class FaceIdentityRepository {
       .execute();
   }
 
+  private spacePersonFaceCount(eb: ExpressionBuilder<DB, 'shared_space_person'>) {
+    return eb
+      .selectFrom('shared_space_person_face')
+      .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
+      .select((eb2) => eb2.fn.countAll().$castTo<number>().as('count'))
+      .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id');
+  }
+
+  private spacePersonAssetCount(eb: ExpressionBuilder<DB, 'shared_space_person'>) {
+    return eb
+      .selectFrom('shared_space_person_face')
+      .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
+      .select((eb2) =>
+        eb2.fn
+          .count(eb2.fn('distinct', ['asset_face.assetId']))
+          .$castTo<number>()
+          .as('count'),
+      )
+      .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id');
+  }
+
   private async recountSpacePersons(personIds: string[]): Promise<void> {
     if (personIds.length === 0) {
       return;
@@ -2665,33 +2702,19 @@ export class FaceIdentityRepository {
     await this.db
       .updateTable('shared_space_person')
       .set((eb) => ({
-        faceCount: eb
-          .selectFrom('shared_space_person_face')
-          .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
-          .innerJoin('asset', 'asset.id', 'asset_face.assetId')
-          .where('asset_face.deletedAt', 'is', null)
-          .where('asset_face.isVisible', 'is', true)
-          .where('asset.deletedAt', 'is', null)
-          .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
-          .select((eb2) => eb2.fn.countAll().$castTo<number>().as('count'))
-          .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id'),
-        assetCount: eb
-          .selectFrom('shared_space_person_face')
-          .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
-          .innerJoin('asset', 'asset.id', 'asset_face.assetId')
-          .where('asset_face.deletedAt', 'is', null)
-          .where('asset_face.isVisible', 'is', true)
-          .where('asset.deletedAt', 'is', null)
-          .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
-          .select((eb2) =>
-            eb2.fn
-              .count(eb2.fn('distinct', ['asset_face.assetId']))
-              .$castTo<number>()
-              .as('count'),
-          )
-          .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id'),
+        faceCount: this.spacePersonFaceCount(eb),
+        assetCount: this.spacePersonAssetCount(eb),
       }))
       .where('id', 'in', personIds)
+      // Recount runs for every person an identity backfill pass scans. Skip rows whose counts are
+      // already correct — an unconditional UPDATE fires the updatedAt trigger for the whole table
+      // once per pass, generating constant write load and updatedAt churn for sync watchers.
+      .where((eb) =>
+        eb.or([
+          eb('shared_space_person.faceCount', 'is distinct from', this.spacePersonFaceCount(eb)),
+          eb('shared_space_person.assetCount', 'is distinct from', this.spacePersonAssetCount(eb)),
+        ]),
+      )
       .execute();
   }
 
