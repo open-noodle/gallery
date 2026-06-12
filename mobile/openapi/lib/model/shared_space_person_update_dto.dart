@@ -65,7 +65,7 @@ class SharedSpacePersonUpdateDto {
     final json = <String, dynamic>{};
     if (this.birthDate.isPresent) {
       final value = this.birthDate.value;
-      json[r'birthDate'] = value == null ? null : _dateFormatter.format(value.toUtc());
+      json[r'birthDate'] = value == null ? null : _dateFormatter.format(value);
     }
     if (this.isHidden.isPresent) {
       final value = this.isHidden.value;
