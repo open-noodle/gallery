@@ -514,7 +514,7 @@
         <div class="flex flex-1 flex-col overflow-hidden pl-4">
           {#if isBrowseTimeline && !assetMultiSelectManager.selectionActive}
             <div
-              class="hidden shrink-0 items-center gap-2 border-b border-gray-200 bg-gray-50 px-4 py-2 dark:border-gray-700 dark:bg-gray-900 md:flex"
+              class="mb-2 hidden shrink-0 items-center gap-2 bg-transparent px-4 py-2 dark:bg-transparent md:flex"
               data-testid="timeline-desktop-grouping-control"
             >
               <TimelineGroupingControl grouping={timelineGrouping} onGroupingChange={handleTimelineGroupingChange} />
