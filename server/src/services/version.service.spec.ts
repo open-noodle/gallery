@@ -76,7 +76,7 @@ describe(VersionService.name, () => {
 
       await expect(sut.onBootstrap()).resolves.toBeUndefined();
 
-      expect(mocks.versionHistory.create).toHaveBeenCalledWith({ version: serverVersion.toString() });
+      expect(mocks.versionHistory.create).toHaveBeenCalledWith({ version: '3.0.0' });
       expect(mocks.logger.log).toHaveBeenCalledWith(expect.stringContaining('upgrade history'));
       // Previous version is >= 1.129.0, so no MemoryGenerate job
       expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.MemoryGenerate });
@@ -92,7 +92,7 @@ describe(VersionService.name, () => {
 
       await expect(sut.onBootstrap()).resolves.toBeUndefined();
 
-      expect(mocks.versionHistory.create).toHaveBeenCalledWith({ version: serverVersion.toString() });
+      expect(mocks.versionHistory.create).toHaveBeenCalledWith({ version: '3.0.0' });
       expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.MemoryGenerate });
     });
   });
