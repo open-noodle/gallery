@@ -56,7 +56,8 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
     date: SearchDateFilter(takenAfter: start, takenBefore: end),
   );
 
-  void setRating(int? rating) => state = state.copyWith(rating: SearchRatingFilter(rating: rating.toOption()));
+  void setRating(int? rating) =>
+      state = state.copyWith(rating: SearchRatingFilter(rating: Option.fromNullable(rating)));
 
   void setMediaType(AssetType? type) => state = state.copyWith(mediaType: type ?? AssetType.other);
 
