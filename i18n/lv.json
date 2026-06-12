@@ -574,7 +574,7 @@
   "back": "Atpakaļ",
   "back_close_deselect": "Atpakaļ, aizvēršana vai atlases atcelšana",
   "background_location_permission": "Atrašanās vietas fona atļauja",
-  "background_location_permission_content": "Lai pārslēgtu tīklus, darbojoties fonā, Immich * vienmēr * jābūt precīzai atrašanās vietas piekļuvei, lai lietotne varētu nolasīt Wi-Fi tīkla nosaukumu",
+  "background_location_permission_content": "Noodle Gallery izmanto fona atrašanās vietas atļauju, lai turpinātu nolasīt Wi-Fi tīkla nosaukumu, kamēr automātiskā servera pārslēgšana darbojas fonā. Wi-Fi tīkla nosaukums tiek saglabāts šajā ierīcē salīdzināšanai; precīzā ierīces atrašanās vieta netiek glabāta vai kopīgota.",
   "background_options": "Fona opcijas",
   "backup": "Dublēšana",
   "backup_album_selection_page_albums_tap": "Pieskarieties, lai iekļautu, veiciet dubultskārienu, lai izslēgtu",
