@@ -124,7 +124,7 @@ class SharedSpacePersonResponseDto {
       json[r'assetCount'] = this.assetCount;
     if (this.birthDate.isPresent) {
       final value = this.birthDate.value;
-      json[r'birthDate'] = value == null ? null : _dateFormatter.format(value.toUtc());
+      json[r'birthDate'] = value == null ? null : _dateFormatter.format(value);
     }
       json[r'createdAt'] = this.createdAt;
       json[r'faceCount'] = this.faceCount;
