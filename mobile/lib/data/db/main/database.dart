@@ -171,7 +171,7 @@ class Drift extends $Drift {
   }
 
   @override
-  int get schemaVersion => 33;
+  int get schemaVersion => 34;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -380,6 +380,12 @@ class Drift extends $Drift {
           from32To33: (m, v33) async {
             await m.createTable(v33.assetOcrEntity);
             await m.createIndex(v33.idxAssetOcrAssetId);
+          },
+          // gallery-fork: upstream #28988 made settings.value nullable at its
+          // drift v30, which collides with the fork's v30; re-applied here as
+          // v34 (next after the fork's v33).
+          from33To34: (m, v34) async {
+            await m.alterTable(TableMigration(v34.settings));
           },
         ),
       );
