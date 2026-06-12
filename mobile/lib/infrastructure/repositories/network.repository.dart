@@ -120,7 +120,16 @@ class NetworkRepository {
   static Future<void> shutdown({Duration timeout = const Duration(milliseconds: 1500)}) async {
     final draining = _draining;
     _draining = null;
-    await draining?.shutdown(timeout: timeout);
+    if (draining == null) {
+      return;
+    }
+    await draining.shutdown(timeout: timeout);
+    // The client is now closed. A pooled worker isolate may be reused for
+    // another task, where [init] would otherwise short-circuit on the unchanged
+    // native session pointer and hand back this dead client. Clear both so the
+    // next [init] rebuilds a live client.
+    _client = null;
+    _clientPointer = null;
   }
 
   static Future<void> setHeaders(Map<String, String> headers, List<String> serverUrls, {String? token}) async {

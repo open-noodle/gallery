@@ -7,6 +7,7 @@ import 'package:immich_mobile/data/store.dart';
 import 'package:immich_mobile/domain/services/log.service.dart';
 // ignore: library_prefixes
 import 'package:immich_mobile/entities/store.entity.dart' as dbStore;
+import 'package:immich_mobile/infrastructure/repositories/network.repository.dart';
 import 'package:immich_mobile/providers/infrastructure/cancel.provider.dart';
 import 'package:immich_mobile/utils/bootstrap.dart';
 import 'package:immich_mobile/wm_executor.dart';
@@ -34,6 +35,14 @@ Cancelable<T?> runInIsolateGentle<T>({
     BackgroundIsolateBinaryMessenger.ensureInitialized(token);
     DartPluginRegistrant.ensureInitialized();
 
+    // iOS shares one native URLSession across isolates via cupertino_http.
+    // If this isolate is torn down while a request is in flight, the
+    // request's delegate later fires into the now-dead isolate and aborts
+    // the process (SIGABRT in a Dart FFI callback). Track in-flight requests
+    // so they can be drained before teardown. Must run before initDomain
+    // (which calls NetworkRepository.init). See [DrainingHttpClient].
+    NetworkRepository.enableShutdownTracking();
+
     final log = Logger("IsolateLogger");
     final (dataController, apiService) = await Bootstrap.initDomain(
       shouldBufferLogs: false,
@@ -52,6 +61,11 @@ Cancelable<T?> runInIsolateGentle<T>({
       log.severe("Error in runInIsolateGentle${debugLabel == null ? '' : ' for $debugLabel'}", error, stack);
       return null;
     } finally {
+      // Abort and drain in-flight HTTP requests while this isolate is
+      // still alive, so no cupertino_http delegate can call back into it
+      // after teardown. No-op unless shutdown tracking was enabled above.
+      await NetworkRepository.shutdown();
+
       ref.dispose();
       await dbStore.Store.dispose();
       await LogService.I.dispose();
