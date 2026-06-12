@@ -111,4 +111,43 @@ void main() {
 
     expect(NetworkRepository.client, isA<DrainingHttpClient>());
   });
+
+  // Guards the contract the gentle-isolate teardown relies on: when tracking is
+  // enabled, shutdown must drain and close the underlying client so no in-flight
+  // request can call back into a dead isolate. See [DrainingHttpClient].
+  test('shutdown drains and closes the tracked client', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    NetworkRepository.enableShutdownTracking();
+    await NetworkRepository.init();
+
+    await NetworkRepository.shutdown();
+
+    expect(built.single.closed, isTrue);
+  });
+
+  // Gentle isolates call shutdown unconditionally at teardown, including on
+  // platforms / runs where tracking was never enabled. That must be harmless.
+  test('shutdown is a safe no-op when tracking is disabled', () async {
+    await NetworkRepository.init();
+
+    await NetworkRepository.shutdown();
+
+    expect(built.single.closed, isFalse);
+  });
+
+  // A gentle worker isolate can be reused for another task after it drained and
+  // closed its client. The shared native session pointer is unchanged, so init
+  // must NOT short-circuit — it has to rebuild a live client, or the reused
+  // isolate would keep using a closed one.
+  test('init rebuilds after shutdown even when the pointer is unchanged', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    NetworkRepository.enableShutdownTracking();
+    await NetworkRepository.init();
+
+    await NetworkRepository.shutdown();
+    await NetworkRepository.init();
+
+    expect(factoryCalls, 2);
+    expect(NetworkRepository.client, isA<DrainingHttpClient>());
+  });
 }
