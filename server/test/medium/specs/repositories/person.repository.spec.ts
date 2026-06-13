@@ -890,4 +890,36 @@ describe(PersonRepository.name, () => {
       );
     });
   });
+
+  describe('deleteAllPets', () => {
+    it('deletes pet people and their faces while preserving human people and faces', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+
+      // Pet detection result: a 'pet'-typed person with a detected face.
+      const { person: pet } = await ctx.newPerson({ ownerId: user.id, name: 'dog', type: 'pet', species: 'dog' });
+      await ctx.newAssetFace({ assetId: asset.id, personId: pet.id });
+
+      // Human face/person from facial recognition — must survive a pet reset.
+      const { person: human } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
+      const { result: humanFaceId } = await ctx.newAssetFace({ assetId: asset.id, personId: human.id });
+
+      await sut.deleteAllPets();
+
+      const people = await ctx.database
+        .selectFrom('person')
+        .select(['id', 'type'])
+        .where('ownerId', '=', user.id)
+        .execute();
+      const faces = await ctx.database
+        .selectFrom('asset_face')
+        .select(['id', 'personId'])
+        .where('assetId', '=', asset.id)
+        .execute();
+
+      expect(people).toEqual([expect.objectContaining({ id: human.id })]);
+      expect(faces).toEqual([expect.objectContaining({ id: humanFaceId, personId: human.id })]);
+    });
+  });
 });
