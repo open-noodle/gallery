@@ -15,6 +15,12 @@ export class PetDetectionService extends BaseService {
       return JobStatus.Skipped;
     }
 
+    if (force) {
+      // A reset must clear existing pet people/faces so stale labels disappear immediately,
+      // rather than lingering throughout the reprocessing window (and duplicating on re-detect).
+      await this.personRepository.deleteAllPets();
+    }
+
     let jobs: JobItem[] = [];
     const assets = this.assetJobRepository.streamForPetDetectionJob(force);
 
