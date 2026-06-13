@@ -361,6 +361,15 @@ jobs:
           flutter-version-file: ./mobile/pubspec.yaml
           cache: true
 
+      # Resolve Flutter plugins via CocoaPods (which honors the Podfile's
+      # `platform :ios, '14.0'`) instead of Swift Package Manager. Flutter's
+      # SPM integration pins the generated FlutterGeneratedPluginSwiftPackage
+      # to the framework's default iOS floor (13.0) and only raises it during
+      # `flutter build`; fastlane archives via `xcodebuild` directly, so the
+      # floor stays at 13.0 and SwiftPM rejects background_downloader (iOS 14+).
+      - name: Use CocoaPods for Flutter plugins (disable SwiftPM)
+        run: flutter config --no-enable-swift-package-manager
+
       - name: Install Flutter dependencies
         working-directory: ./mobile
         run: flutter pub get
