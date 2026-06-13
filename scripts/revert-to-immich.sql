@@ -542,7 +542,13 @@ DROP INDEX IF EXISTS "asset_ocr_updateId_idx";
 ALTER TABLE "asset_ocr" DROP COLUMN IF EXISTS "updateId";
 DROP TABLE IF EXISTS "asset_ocr_audit";
 DROP FUNCTION IF EXISTS asset_ocr_delete_audit;
-UPDATE "migration_overrides" SET "value" = '{"sql":"CREATE OR REPLACE FUNCTION asset_edit_delete()\n  RETURNS TRIGGER\n  LANGUAGE PLPGSQL\n  AS $$\n    BEGIN\n      UPDATE asset\n      SET \"isEdited\" = false\n      FROM deleted_edit\n      WHERE asset.id = deleted_edit.\"assetId\" AND asset.\"isEdited\" \n        AND NOT EXISTS (SELECT FROM asset_edit edit WHERE edit.\"assetId\" = asset.id);\n      RETURN NULL;\n    END\n  $$;","name":"asset_edit_delete","type":"function"}'::jsonb WHERE "name" = 'function_asset_edit_delete';
+-- NOTE: AssetOcrSync.down() also re-asserts the unrelated fork override
+-- "function_asset_edit_delete". We deliberately do NOT port that here — the
+-- asset_edit (image-editing) feature is fork-only and is torn down by the fork
+-- cleanup sections, so re-asserting its override against the tagged image (which
+-- never ran AssetOcrSync) introduces "function asset_edit_delete missing /
+-- override needs update" schema drift. Only AssetOcrSync's own net-new objects
+-- are reversed above.
 DELETE FROM "migration_overrides" WHERE "name" = 'function_asset_ocr_delete_audit';
 DELETE FROM "migration_overrides" WHERE "name" = 'trigger_asset_ocr_delete_audit';
 
