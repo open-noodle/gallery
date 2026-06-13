@@ -526,6 +526,31 @@ INSERT INTO "migration_overrides" ("name", "value") VALUES ('index_plugin_filter
 INSERT INTO "migration_overrides" ("name", "value") VALUES ('index_plugin_action_supportedContexts_idx', '{"type":"index","name":"plugin_action_supportedContexts_idx","sql":"CREATE INDEX \"plugin_action_supportedContexts_idx\" ON \"plugin_action\" (\"supportedContexts\") USING gin;"}'::jsonb)
   ON CONFLICT ("name") DO UPDATE SET "value" = EXCLUDED."value";
 
+-- 1780435471692-DeleteMismatchedAssetFaces only deleted unauthorized
+-- cross-owner asset_face rows; no schema rollback is required.
+
+-- 1780592070031-ConvertNegativeRatingToNull is a no-op in Gallery (its up()
+-- is commented out so the fork can keep -1 ratings); nothing to reverse.
+
+-- 1780592071031-AssetOcrSync layered an audit table, an "updateId" column, and
+-- a delete-audit trigger/function on top of the OCR tables that v2.7.5 already
+-- ships (CreateAssetOCRTable predates v2.7.5). Reverse exactly those additions
+-- — ported from the migration's down() with IF EXISTS guards so this is a
+-- no-op against the tagged image that never ran AssetOcrSync.
+DROP TRIGGER IF EXISTS "asset_ocr_delete_audit" ON "asset_ocr";
+DROP INDEX IF EXISTS "asset_ocr_updateId_idx";
+ALTER TABLE "asset_ocr" DROP COLUMN IF EXISTS "updateId";
+DROP TABLE IF EXISTS "asset_ocr_audit";
+DROP FUNCTION IF EXISTS asset_ocr_delete_audit;
+UPDATE "migration_overrides" SET "value" = '{"sql":"CREATE OR REPLACE FUNCTION asset_edit_delete()\n  RETURNS TRIGGER\n  LANGUAGE PLPGSQL\n  AS $$\n    BEGIN\n      UPDATE asset\n      SET \"isEdited\" = false\n      FROM deleted_edit\n      WHERE asset.id = deleted_edit.\"assetId\" AND asset.\"isEdited\" \n        AND NOT EXISTS (SELECT FROM asset_edit edit WHERE edit.\"assetId\" = asset.id);\n      RETURN NULL;\n    END\n  $$;","name":"asset_edit_delete","type":"function"}'::jsonb WHERE "name" = 'function_asset_edit_delete';
+DELETE FROM "migration_overrides" WHERE "name" = 'function_asset_ocr_delete_audit';
+DELETE FROM "migration_overrides" WHERE "name" = 'trigger_asset_ocr_delete_audit';
+
+-- 1781089983296-CreateIntegrityReportTable added the integrity_report table
+-- and an asset."createdAt" index that v2.7.5 does not have.
+DROP TABLE IF EXISTS "integrity_report";
+DROP INDEX IF EXISTS "asset_createdAt_idx";
+
 -- -----------------------------------------------------------------------------
 -- 8. Delete Gallery + post-v<branding upstream.version> upstream migration rows
 --    from kysely_migrations.
@@ -585,7 +610,11 @@ DELETE FROM "kysely_migrations"
    '1777667825574-ChangeDurationToInteger',
    '1777897107000-PartnerAssetSyncReset',
    '1778614946174-UpdateWorkflowTables',
-   '1779806699547-AddPluginTemplates'
+   '1779806699547-AddPluginTemplates',
+   '1780435471692-DeleteMismatchedAssetFaces',
+   '1780592070031-ConvertNegativeRatingToNull',
+   '1780592071031-AssetOcrSync',
+   '1781089983296-CreateIntegrityReportTable'
  );
 
 -- -----------------------------------------------------------------------------
