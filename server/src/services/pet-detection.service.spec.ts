@@ -117,6 +117,34 @@ describe(PetDetectionService.name, () => {
       expect(mocks.job.queueAll).toHaveBeenCalledWith([{ name: JobName.PetDetection, data: { id: asset.id } }]);
       expectNoQueuedJobNames(mocks, petFaceIsolationJobNames);
     });
+
+    it('should clear existing pet detections before requeuing when force is true', async () => {
+      const asset = AssetFactory.create();
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { enabled: true, petDetection: { enabled: true } },
+      });
+      mocks.assetJob.streamForPetDetectionJob.mockReturnValue(makeStream([asset]));
+
+      expect(await sut.handleQueuePetDetection({ force: true })).toEqual(JobStatus.Success);
+
+      expect(mocks.person.deleteAllPets).toHaveBeenCalledTimes(1);
+      // Existing pet labels must be gone before any reprocessing job is queued.
+      expect(mocks.person.deleteAllPets.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.job.queueAll.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('should not clear existing pet detections when force is false', async () => {
+      const asset = AssetFactory.create();
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { enabled: true, petDetection: { enabled: true } },
+      });
+      mocks.assetJob.streamForPetDetectionJob.mockReturnValue(makeStream([asset]));
+
+      expect(await sut.handleQueuePetDetection({ force: false })).toEqual(JobStatus.Success);
+
+      expect(mocks.person.deleteAllPets).not.toHaveBeenCalled();
+    });
   });
 
   describe('handlePetDetection', () => {
