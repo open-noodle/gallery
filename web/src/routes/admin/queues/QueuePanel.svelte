@@ -81,7 +81,7 @@
       disabled: !machineLearning.ocr.enabled,
     },
     [QueueName.PetDetection]: {
-      allText: $t('all'),
+      allText: $t('reset'),
       missingText: $t('missing'),
     },
     [QueueName.Classification]: {
@@ -114,8 +114,18 @@
           if (!confirmed) {
             return;
           }
-          break;
         }
+        break;
+      }
+
+      case QueueName.PetDetection: {
+        if (dto.force) {
+          const confirmed = await modalManager.showDialog({ prompt: $t('admin.confirm_reprocess_all_pets') });
+          if (!confirmed) {
+            return;
+          }
+        }
+        break;
       }
       // no default
     }
