@@ -112,6 +112,7 @@ describe(MapService.name, () => {
 
       expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(auth.user.id);
       expect(mocks.map.getMapMarkers).toHaveBeenCalledWith(
+        auth.user.id,
         [auth.user.id],
         [],
         expect.objectContaining({ timelineSpaceIds: [spaceId] }),
