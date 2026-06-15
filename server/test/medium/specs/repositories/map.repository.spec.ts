@@ -45,7 +45,7 @@ describe(MapRepository.name, () => {
         .execute();
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
-      const results = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [space.id] });
+      const results = await sut.getMapMarkers(member.id, [member.id], [], { timelineSpaceIds: [space.id] });
 
       expect(results).toHaveLength(1);
       expect(results[0]).toMatchObject({ id: asset.id, lat: 48.8566, lon: 2.3522 });
@@ -70,7 +70,7 @@ describe(MapRepository.name, () => {
         .values({ assetId: asset.id, latitude: 40.7128, longitude: -74.006 })
         .execute();
 
-      const results = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [space.id] });
+      const results = await sut.getMapMarkers(member.id, [member.id], [], { timelineSpaceIds: [space.id] });
 
       expect(results).toHaveLength(1);
       expect(results[0].id).toBe(asset.id);
@@ -86,7 +86,7 @@ describe(MapRepository.name, () => {
       await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 1, longitude: 1 }).execute();
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
-      const results = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [space.id] });
+      const results = await sut.getMapMarkers(member.id, [member.id], [], { timelineSpaceIds: [space.id] });
 
       expect(results.find((r) => r.id === asset.id)).toBeUndefined();
     });
@@ -101,7 +101,10 @@ describe(MapRepository.name, () => {
       await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 2, longitude: 2 }).execute();
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
-      const results = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [space.id], isArchived: true });
+      const results = await sut.getMapMarkers(member.id, [member.id], [], {
+        timelineSpaceIds: [space.id],
+        isArchived: true,
+      });
 
       expect(results.find((r) => r.id === asset.id)).toBeUndefined();
     });
@@ -116,7 +119,7 @@ describe(MapRepository.name, () => {
       // no asset_exif row — asset has no GPS
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
-      const results = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [space.id] });
+      const results = await sut.getMapMarkers(member.id, [member.id], [], { timelineSpaceIds: [space.id] });
 
       expect(results.find((r) => r.id === asset.id)).toBeUndefined();
     });
@@ -135,7 +138,7 @@ describe(MapRepository.name, () => {
       await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 3, longitude: 3 }).execute();
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
-      const results = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [space.id] });
+      const results = await sut.getMapMarkers(member.id, [member.id], [], { timelineSpaceIds: [space.id] });
 
       expect(results.find((r) => r.id === asset.id)).toBeUndefined();
     });
@@ -150,7 +153,7 @@ describe(MapRepository.name, () => {
       await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 4, longitude: 4 }).execute();
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
-      const results = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [space.id] });
+      const results = await sut.getMapMarkers(member.id, [member.id], [], { timelineSpaceIds: [space.id] });
 
       expect(results.find((r) => r.id === asset.id)).toBeUndefined();
     });
@@ -173,10 +176,10 @@ describe(MapRepository.name, () => {
       });
       await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 5, longitude: 5 }).execute();
 
-      const viaA = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [spaceA.id] });
+      const viaA = await sut.getMapMarkers(member.id, [member.id], [], { timelineSpaceIds: [spaceA.id] });
       expect(viaA.find((r) => r.id === asset.id)).toBeDefined();
 
-      const none = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [] });
+      const none = await sut.getMapMarkers(member.id, [member.id], [], { timelineSpaceIds: [] });
       expect(none.find((r) => r.id === asset.id)).toBeUndefined();
     });
 
@@ -193,7 +196,7 @@ describe(MapRepository.name, () => {
       await ctx.newSharedSpaceAsset({ spaceId: spaceA.id, assetId: asset.id });
       await ctx.newSharedSpaceAsset({ spaceId: spaceB.id, assetId: asset.id });
 
-      const viaA = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [spaceA.id] });
+      const viaA = await sut.getMapMarkers(member.id, [member.id], [], { timelineSpaceIds: [spaceA.id] });
       expect(viaA.find((r) => r.id === asset.id)).toBeDefined();
     });
 
@@ -210,8 +213,8 @@ describe(MapRepository.name, () => {
       const { album } = await ctx.newAlbum({ ownerId: member.id });
       await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
 
-      const hidden = await sut.getMapMarkers([member.id], [album.id]);
-      const visible = await sut.getMapMarkers([member.id], [album.id], { timelineSpaceIds: [space.id] });
+      const hidden = await sut.getMapMarkers(member.id, [member.id], [album.id]);
+      const visible = await sut.getMapMarkers(member.id, [member.id], [album.id], { timelineSpaceIds: [space.id] });
 
       expect(hidden.find((marker) => marker.id === asset.id)).toBeUndefined();
       expect(visible.find((marker) => marker.id === asset.id)).toBeDefined();
@@ -235,8 +238,8 @@ describe(MapRepository.name, () => {
       const { album } = await ctx.newAlbum({ ownerId: member.id });
       await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
 
-      const hidden = await sut.getMapMarkers([member.id], [album.id]);
-      const visible = await sut.getMapMarkers([member.id], [album.id], { timelineSpaceIds: [space.id] });
+      const hidden = await sut.getMapMarkers(member.id, [member.id], [album.id]);
+      const visible = await sut.getMapMarkers(member.id, [member.id], [album.id], { timelineSpaceIds: [space.id] });
 
       expect(hidden.find((marker) => marker.id === asset.id)).toBeUndefined();
       expect(visible.find((marker) => marker.id === asset.id)).toBeDefined();
