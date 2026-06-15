@@ -49,16 +49,52 @@ jobs:
           mkdir -p build
           unzip docs-build-output.zip -d build
 
-      - name: Deploy to S3
+      - name: Deploy to Bunny Storage
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: eu-central-1
-        run: aws s3 sync build/ s3://noodle-prod-docs/ --delete
+          STORAGE_HOST: ${{ vars.NOODLEGALLERY_DOCS_STORAGE_HOST }}
+          STORAGE_ZONE: ${{ vars.NOODLEGALLERY_DOCS_STORAGE_ZONE_NAME }}
+          STORAGE_PW: ${{ secrets.NOODLEGALLERY_DOCS_STORAGE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          base="https://$STORAGE_HOST/$STORAGE_ZONE"
 
-      - name: Invalidate CloudFront cache
+          # True-sync semantics (parity with the old `aws s3 sync --delete`):
+          # wipe the zone's current contents, re-upload the fresh build, then
+          # purge LAST (next step). Because the purge only fires after a fully
+          # successful upload, the Bunny edge keeps serving the previous build
+          # throughout — the wipe window is invisible to visitors, and removed
+          # or renamed pages never linger. Deleting a directory entry (trailing
+          # slash) removes its contents recursively, so wiping the top level
+          # clears the whole zone.
+          echo "Listing existing storage zone contents..."
+          status=$(curl -sS -o /tmp/listing.json -w '%{http_code}' \
+            -H "AccessKey: $STORAGE_PW" -H 'Accept: application/json' "$base/")
+          if [ "$status" = "200" ]; then
+            jq -r '.[] | .ObjectName + (if .IsDirectory then "/" else "" end)' /tmp/listing.json \
+            | while IFS= read -r entry; do
+                [ -z "$entry" ] && continue
+                echo "  delete $entry"
+                curl -fsS -X DELETE -H "AccessKey: $STORAGE_PW" "$base/$entry" -o /dev/null
+              done
+          elif [ "$status" = "404" ]; then
+            echo "Zone is empty (404) — nothing to wipe."
+          else
+            echo "::error::Unexpected list status $status"; cat /tmp/listing.json; exit 1
+          fi
+
+          echo "Uploading build/ ..."
+          cd build
+          while IFS= read -r f; do
+            curl -fsS -X PUT -H "AccessKey: $STORAGE_PW" \
+              --data-binary @"$f" "$base/$f" -o /dev/null
+          done < <(find . -type f | sed 's|^\./||')
+          echo "Upload complete."
+
+      - name: Purge Bunny cache
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: eu-central-1
-        run: aws cloudfront create-invalidation --distribution-id ${{ secrets.DOCS_CLOUDFRONT_DISTRIBUTION_ID }} --paths '/*'
+          PULLZONE_ID: ${{ vars.NOODLEGALLERY_DOCS_PULLZONE_ID }}
+          BUNNY_API_KEY: ${{ secrets.BUNNY_API_KEY }}
+        run: |
+          curl -fsS -X POST "https://api.bunny.net/pullzone/$PULLZONE_ID/purgeCache" \
+            -H "AccessKey: $BUNNY_API_KEY" \
+            -H "Content-Length: 0" -w 'purge %{http_code}\n'
