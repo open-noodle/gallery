@@ -19,6 +19,7 @@ import { FaceController } from 'src/controllers/face.controller.js';
 import { GalleryMapController } from 'src/controllers/gallery-map.controller.js';
 import { IntegrityAdminController } from 'src/controllers/integrity-admin.controller.js';
 import { JobController } from 'src/controllers/job.controller.js';
+import { LibraryManifestController } from 'src/controllers/library-manifest.controller.js';
 import { LibraryController } from 'src/controllers/library.controller.js';
 import { MaintenanceController } from 'src/controllers/maintenance.controller.js';
 import { MapController } from 'src/controllers/map.controller.js';
@@ -74,6 +75,7 @@ export const controllers = [
   GalleryMapController,
   IntegrityAdminController,
   JobController,
+  LibraryManifestController,
   LibraryController,
   MaintenanceController,
   MapController,
