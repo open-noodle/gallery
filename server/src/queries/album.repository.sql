@@ -305,6 +305,20 @@ where
   )
   and "album"."deletedAt" is null
 
+-- AlbumRepository.getOwnedAlbumIdsForAssets
+select
+  "album_asset"."assetId" as "assetId",
+  array_agg("album_asset"."albumId") as "albumIds"
+from
+  "album_asset"
+  inner join "album" on "album"."id" = "album_asset"."albumId"
+where
+  "album"."ownerId" = $1
+  and "album"."deletedAt" is null
+  and "album_asset"."assetId" in ($2)
+group by
+  "album_asset"."assetId"
+
 -- AlbumRepository.getSharedNames
 select
   "album"."id",
