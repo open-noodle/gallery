@@ -258,6 +258,32 @@ where
 order by
   "asset"."localDateTime" asc
 
+-- AssetRepository.getOwnedManifestAssets
+select
+  "asset"."id",
+  "asset"."originalPath",
+  "asset"."originalFileName",
+  "asset"."checksum",
+  "asset"."checksumAlgorithm",
+  "asset"."type",
+  "asset"."fileCreatedAt",
+  "asset"."fileModifiedAt",
+  "asset_exif"."fileSizeInByte" as "size"
+from
+  "asset"
+  left join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
+where
+  "asset"."ownerId" = $1::uuid
+  and "asset"."deletedAt" is null
+  and "asset"."status" = $2
+  and "asset"."libraryId" is null
+  and "asset"."isExternal" = $3
+  and "asset"."id" > $4::uuid
+order by
+  "asset"."id"
+limit
+  $5
+
 -- AssetRepository.getByIds
 select
   "asset".*
