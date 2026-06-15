@@ -272,6 +272,24 @@ export class AlbumRepository {
       .execute();
   }
 
+  @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
+  async getOwnedAlbumIdsForAssets(ownerId: string, assetIds: string[]) {
+    if (assetIds.length === 0) {
+      return [];
+    }
+
+    return this.db
+      .selectFrom('album_asset')
+      .innerJoin('album', 'album.id', 'album_asset.albumId')
+      .where('album.ownerId', '=', ownerId)
+      .where('album.deletedAt', 'is', null)
+      .where('album_asset.assetId', 'in', assetIds)
+      .select('album_asset.assetId as assetId')
+      .select((eb) => eb.fn<string[]>('array_agg', ['album_asset.albumId']).as('albumIds'))
+      .groupBy('album_asset.assetId')
+      .execute();
+  }
+
   /**
    * Lightweight projection for the command palette: returns only the fields
    * needed to render an album entry (name, thumbnail, asset count, date range)

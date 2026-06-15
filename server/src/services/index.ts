@@ -17,6 +17,7 @@ import { DuplicateService } from 'src/services/duplicate.service.js';
 import { HlsService } from 'src/services/hls.service.js';
 import { IntegrityService } from 'src/services/integrity.service.js';
 import { JobService } from 'src/services/job.service.js';
+import { LibraryManifestService } from 'src/services/library-manifest.service.js';
 import { LibraryService } from 'src/services/library.service.js';
 import { MaintenanceService } from 'src/services/maintenance.service.js';
 import { MapService } from 'src/services/map.service.js';
@@ -80,6 +81,7 @@ export const services = [
   IntegrityService,
   HlsService,
   JobService,
+  LibraryManifestService,
   LibraryService,
   MaintenanceService,
   MapService,
