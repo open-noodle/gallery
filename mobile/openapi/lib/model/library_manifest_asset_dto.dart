@@ -38,10 +38,10 @@ class LibraryManifestAssetDto {
   LibraryManifestAssetDtoChecksumAlgorithmEnum checksumAlgorithm;
 
   /// File creation time
-  DateTime fileCreatedAt;
+  DateTime? fileCreatedAt;
 
   /// File modification time
-  DateTime fileModifiedAt;
+  DateTime? fileModifiedAt;
 
   /// Object-storage key (asset.originalPath)
   String objectKey;
@@ -77,8 +77,8 @@ class LibraryManifestAssetDto {
     (assetId.hashCode) +
     (checksum.hashCode) +
     (checksumAlgorithm.hashCode) +
-    (fileCreatedAt.hashCode) +
-    (fileModifiedAt.hashCode) +
+    (fileCreatedAt == null ? 0 : fileCreatedAt!.hashCode) +
+    (fileModifiedAt == null ? 0 : fileModifiedAt!.hashCode) +
     (objectKey.hashCode) +
     (originalFileName.hashCode) +
     (size == null ? 0 : size!.hashCode) +
@@ -93,8 +93,16 @@ class LibraryManifestAssetDto {
       json[r'assetId'] = this.assetId;
       json[r'checksum'] = this.checksum;
       json[r'checksumAlgorithm'] = this.checksumAlgorithm;
-      json[r'fileCreatedAt'] = this.fileCreatedAt.toUtc().toIso8601String();
-      json[r'fileModifiedAt'] = this.fileModifiedAt.toUtc().toIso8601String();
+    if (this.fileCreatedAt != null) {
+      json[r'fileCreatedAt'] = this.fileCreatedAt!.toUtc().toIso8601String();
+    } else {
+    //  json[r'fileCreatedAt'] = null;
+    }
+    if (this.fileModifiedAt != null) {
+      json[r'fileModifiedAt'] = this.fileModifiedAt!.toUtc().toIso8601String();
+    } else {
+    //  json[r'fileModifiedAt'] = null;
+    }
       json[r'objectKey'] = this.objectKey;
       json[r'originalFileName'] = this.originalFileName;
     if (this.size != null) {
@@ -121,8 +129,8 @@ class LibraryManifestAssetDto {
         assetId: mapValueOfType<String>(json, r'assetId')!,
         checksum: mapValueOfType<String>(json, r'checksum')!,
         checksumAlgorithm: LibraryManifestAssetDtoChecksumAlgorithmEnum.fromJson(json[r'checksumAlgorithm'])!,
-        fileCreatedAt: mapDateTime(json, r'fileCreatedAt', r'')!,
-        fileModifiedAt: mapDateTime(json, r'fileModifiedAt', r'')!,
+        fileCreatedAt: mapDateTime(json, r'fileCreatedAt', r''),
+        fileModifiedAt: mapDateTime(json, r'fileModifiedAt', r''),
         objectKey: mapValueOfType<String>(json, r'objectKey')!,
         originalFileName: mapValueOfType<String>(json, r'originalFileName')!,
         size: mapValueOfType<int>(json, r'size'),

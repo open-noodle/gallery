@@ -22559,11 +22559,13 @@
           "fileCreatedAt": {
             "description": "File creation time",
             "format": "date-time",
+            "nullable": true,
             "type": "string"
           },
           "fileModifiedAt": {
             "description": "File modification time",
             "format": "date-time",
+            "nullable": true,
             "type": "string"
           },
           "objectKey": {
