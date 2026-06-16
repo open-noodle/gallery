@@ -464,6 +464,49 @@ describe(AssetService.name, () => {
       expect((result as any).people.length).toBeGreaterThan(0);
     });
 
+    it('should overlay identity-resolved birthday for owner viewing their own asset', async () => {
+      // A birthday set in a shared space is resolved at read time against the face identity and is
+      // never written back to `person.birthDate`. When the owner views their own asset (no space
+      // context), the raw person row has a null birthDate, so the detail view shows no age unless
+      // the identity-wide resolution is overlaid here (mirroring PersonService.getById).
+      const asset = AssetFactory.from({ ownerId: authStub.admin.user.id })
+        .exif()
+        .face({}, (f) => f.person({ id: 'person-1', name: 'Raw Name', identityId: 'identity-1', birthDate: null }))
+        .build();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+      mocks.faceIdentity.getResolvedPersonByIdentityId.mockResolvedValue({
+        id: 'person-1',
+        name: 'Resolved Name',
+        birthDate: '1990-05-15',
+      } as any);
+
+      const result = await sut.get(authStub.admin, asset.id);
+
+      expect(mocks.faceIdentity.getResolvedPersonByIdentityId).toHaveBeenCalledWith(
+        authStub.admin.user.id,
+        'identity-1',
+      );
+      expect((result as any).people).toHaveLength(1);
+      // Mirrors PersonService.getById: both name and birthday are taken from the identity resolution.
+      expect((result as any).people[0].birthDate).toBe('1990-05-15');
+      expect((result as any).people[0].name).toBe('Resolved Name');
+    });
+
+    it('should not resolve identity metadata for an owner person without an identity', async () => {
+      const asset = AssetFactory.from({ ownerId: authStub.admin.user.id })
+        .exif()
+        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person', identityId: null, birthDate: null }))
+        .build();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+
+      const result = await sut.get(authStub.admin, asset.id);
+
+      expect(mocks.faceIdentity.getResolvedPersonByIdentityId).not.toHaveBeenCalled();
+      expect((result as any).people[0].birthDate).toBeNull();
+    });
+
     it('should strip people when asset is not in the specified space', async () => {
       const asset = AssetFactory.from()
         .exif()
