@@ -249,7 +249,7 @@ describe('Timeline representative grouping integration', () => {
     renderTimeline({ onGroupingChange: () => {} });
 
     expect(await screen.findByTestId('timeline-representative-buckets')).toHaveAttribute('data-grouping', 'year');
-    expect(screen.getByRole('button', { name: /2015, 1 photo/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'timeline_overview_card_semantics' })).toBeInTheDocument();
   });
 
   it('shows the mobile grouping control only when a handler exists and overlays are inactive', async () => {
@@ -411,10 +411,13 @@ describe('Timeline representative grouping integration', () => {
     });
 
     const shell = await screen.findByTestId('timeline-mobile-grouping-control-shell');
-    expect(within(shell).getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(shell).getByTestId('timeline-grouping-day')).toHaveTextContent('All');
+    expect(within(shell).getByRole('button', { name: 'timeline_grouping_all' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(within(shell).getByTestId('timeline-grouping-day')).toHaveTextContent('timeline_grouping_all');
 
-    await fireEvent.click(within(shell).getByRole('button', { name: 'Years' }));
+    await fireEvent.click(within(shell).getByRole('button', { name: 'timeline_grouping_years' }));
 
     expect(changes).toEqual(['year']);
   });

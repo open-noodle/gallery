@@ -14,6 +14,7 @@
   } from '@immich/ui';
   import { mdiCodeJson } from '@mdi/js';
   import { JSONEditor, Mode, type Content, type OnChangeStatus } from 'svelte-jsoneditor';
+  import { t } from 'svelte-i18n';
 
   type Props = {
     jsonContent: WorkflowPayload;
@@ -57,11 +58,11 @@
         <div class="flex items-start gap-3">
           <Icon icon={mdiCodeJson} size="20" class="mt-1" />
           <div class="flex flex-col">
-            <CardTitle>Workflow JSON</CardTitle>
-            <CardDescription>Edit the workflow configuration directly in JSON format</CardDescription>
+            <CardTitle>{$t('workflow_json')}</CardTitle>
+            <CardDescription>{$t('workflow_json_help')}</CardDescription>
           </div>
         </div>
-        <Button size="small" color="primary" onclick={handleApply} disabled={!canApply}>Apply Changes</Button>
+        <Button size="small" color="primary" onclick={handleApply} disabled={!canApply}>{$t('apply_changes')}</Button>
       </div>
     </CardHeader>
     <CardBody>

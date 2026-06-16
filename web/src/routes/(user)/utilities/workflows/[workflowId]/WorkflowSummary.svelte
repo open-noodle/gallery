@@ -98,8 +98,8 @@
             size="small"
             variant="ghost"
             color="secondary"
-            title="Close summary"
-            aria-label="Close summary"
+            title={$t('workflow_close_summary')}
+            aria-label={$t('workflow_close_summary')}
             onclick={(e: MouseEvent) => {
               e.stopPropagation();
               isOpen = false;

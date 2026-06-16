@@ -3,6 +3,7 @@ import type { SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immi
 import { SharedSpaceRole } from '@immich/sdk';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import { init, register, waitLocale } from 'svelte-i18n';
 
 const makeMember = (overrides: Partial<SharedSpaceMemberResponseDto> = {}): SharedSpaceMemberResponseDto => ({
   userId: 'user-1',
@@ -34,6 +35,12 @@ const makeSpace = (overrides: Partial<SharedSpaceResponseDto> = {}): SharedSpace
 });
 
 describe('SpaceCard component', () => {
+  beforeAll(async () => {
+    register('en-US', () => import('$i18n/en.json'));
+    await init({ fallbackLocale: 'en-US' });
+    await waitLocale('en-US');
+  });
+
   it('should render space name', () => {
     render(SpaceCard, { space: makeSpace() });
     expect(screen.getByTestId('space-name')).toHaveTextContent('Family Photos');
@@ -133,7 +140,7 @@ describe('SpaceCard component', () => {
       const card = screen.getByTestId('space-card');
       await user.hover(card);
       await user.click(screen.getByTestId('space-menu-button'));
-      expect(screen.getByText('spaces_pin_to_top')).toBeInTheDocument();
+      expect(screen.getByText('Pin to top')).toBeInTheDocument();
     });
 
     it('should show "Unpin" when pinned after hovering and clicking menu', async () => {
@@ -142,7 +149,7 @@ describe('SpaceCard component', () => {
       const card = screen.getByTestId('space-card');
       await user.hover(card);
       await user.click(screen.getByTestId('space-menu-button'));
-      expect(screen.getByText('spaces_unpin')).toBeInTheDocument();
+      expect(screen.getByText('Unpin')).toBeInTheDocument();
     });
 
     it('should call onTogglePin with space id when clicking "Pin to top"', async () => {
@@ -152,7 +159,7 @@ describe('SpaceCard component', () => {
       const card = screen.getByTestId('space-card');
       await user.hover(card);
       await user.click(screen.getByTestId('space-menu-button'));
-      await user.click(screen.getByText('spaces_pin_to_top'));
+      await user.click(screen.getByText('Pin to top'));
       expect(onTogglePin).toHaveBeenCalledWith('space-42');
     });
 

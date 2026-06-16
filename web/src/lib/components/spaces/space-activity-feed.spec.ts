@@ -2,6 +2,7 @@ import TestWrapper from '$lib/components/TestWrapper.svelte';
 import SpaceActivityFeed from '$lib/components/spaces/space-activity-feed.svelte';
 import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import { init, register, waitLocale } from 'svelte-i18n';
 
 function renderFeed(props: Record<string, unknown>) {
   return render(TestWrapper as Component<{ component: typeof SpaceActivityFeed; componentProps: typeof props }>, {
@@ -24,6 +25,12 @@ const makeActivity = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('SpaceActivityFeed', () => {
+  beforeAll(async () => {
+    register('en-US', () => import('$i18n/en.json'));
+    await init({ fallbackLocale: 'en-US' });
+    await waitLocale('en-US');
+  });
+
   it('should show empty state when no activities', () => {
     renderFeed({ activities: [], spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
     expect(screen.getByTestId('activity-empty-state')).toBeInTheDocument();
@@ -33,7 +40,7 @@ describe('SpaceActivityFeed', () => {
     const activities = [makeActivity({ type: 'asset_add', data: { count: 5, assetIds: ['a1', 'a2'] } })];
     renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
     expect(screen.getByTestId('activity-item-act-1')).toBeInTheDocument();
-    expect(screen.getByTestId('activity-item-act-1')).toHaveTextContent('Pierre');
+    expect(screen.getByTestId('activity-item-act-1')).toHaveTextContent('Pierre added 5 photos');
   });
 
   it('should render member_join event', () => {

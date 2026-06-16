@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getComponentDefaultValue, getComponentFromSchema } from '$lib/utils/workflow';
   import { Field, Input, MultiSelect, Select, Switch, Text } from '@immich/ui';
+  import { t } from 'svelte-i18n';
   import WorkflowPickerField from './WorkflowPickerField.svelte';
 
   type Props = {
@@ -157,5 +158,5 @@
     {/each}
   </div>
 {:else}
-  <Text size="small" color="muted">No configuration required</Text>
+  <Text size="small" color="muted">{$t('no_configuration_needed')}</Text>
 {/if}

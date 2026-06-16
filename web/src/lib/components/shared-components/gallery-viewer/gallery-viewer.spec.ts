@@ -4,6 +4,7 @@ import { AssetTypeEnum, AssetVisibility, type AssetResponseDto } from '@immich/s
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import { init, register, waitLocale } from 'svelte-i18n';
 
 import GalleryViewer from './gallery-viewer.svelte';
 
@@ -241,6 +242,17 @@ function assetsWithOffscreenAugustTarget() {
 }
 
 describe('GalleryViewer grouping', () => {
+  beforeAll(async () => {
+    // Load the real en bundle so the TimelineBucketCard accessible names
+    // (`$t('timeline_overview_card_semantics', { values: { period, countLabel, action } })`)
+    // resolve to English text ("2015, 2 photos, show months") instead of the raw key.
+    // The grouping tests target individual cards by their period + photo-count label, so
+    // the interpolated output is load-bearing (the global setup's `dev` locale returns keys).
+    register('en-US', () => import('$i18n/en.json'));
+    await init({ fallbackLocale: 'en-US' });
+    await waitLocale('en-US');
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockAssetInteraction.selectionActive = false;
