@@ -150,7 +150,7 @@
     <section id="merge-face-selector relative">
       {#if selectedPerson !== null}
         <div class="mb-10 h-50 place-content-center place-items-center">
-          <p class="mb-4 text-center uppercase dark:text-white">Choose matching faces to re assign</p>
+          <p class="mb-4 text-center uppercase dark:text-white">{$t('choose_matching_faces_to_reassign')}</p>
 
           <div class="grid grid-flow-col-dense place-content-center place-items-center gap-4">
             <FaceThumbnail
