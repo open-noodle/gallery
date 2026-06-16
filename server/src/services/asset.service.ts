@@ -1,9 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import type { ShallowDehydrateObject } from 'kysely';
 import { isUndefined, omitBy } from 'lodash-es';
 import { DateTime, Duration } from 'luxon';
 import { isAbsolute } from 'node:path';
 import { StorageCore } from 'src/cores/storage.core.js';
-import type { AssetFile } from 'src/database.js';
+import type { AssetFace, AssetFile } from 'src/database.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
 import type { JobItem, JobOf } from 'src/types.js';
 import { OnJob } from 'src/decorators.js';
@@ -31,6 +32,7 @@ import {
   type TrimParameters,
 } from 'src/dtos/editing.dto.js';
 import { AssetOcrResponseDto } from 'src/dtos/ocr.dto.js';
+import type { PersonResponseDto } from 'src/dtos/person.dto.js';
 import {
   AssetFileType,
   AssetStatus,
@@ -119,7 +121,13 @@ export class AssetService extends BaseService {
         this.applySpacePeople(data, spacePersonMap);
         data.people = data.people.filter((p) => p.spacePersonId && !spacePersonMap.get(p.id)?.isHidden);
       }
-    } else if (data.ownerId !== auth.user.id) {
+    } else if (data.ownerId === auth.user.id) {
+      // The owner is viewing their own asset with no space context. A name or birthday set in a
+      // shared space is resolved at read time against the face identity and is never written back
+      // to `person` (see PersonService.getById). Without overlaying that resolution here, the raw
+      // person row carries a null birthDate and the asset detail view shows no age.
+      await this.applyResolvedPersonMetadata(auth, data, asset.faces ?? []);
+    } else {
       // No spaceId — try to find a space containing this asset for this user
       const spaceForAsset = await this.sharedSpaceRepository.findSpaceForAssetAndUser(id, auth.user.id);
       if (spaceForAsset) {
@@ -137,6 +145,47 @@ export class AssetService extends BaseService {
     }
 
     return data;
+  }
+
+  private async applyResolvedPersonMetadata(
+    auth: AuthDto,
+    data: AssetResponseDto,
+    faces: ShallowDehydrateObject<AssetFace>[],
+  ) {
+    const people = data.people;
+    if (!people?.length) {
+      return;
+    }
+
+    const identityByPersonId = new Map<string, string>();
+    for (const face of faces) {
+      if (face.person?.id && face.person.identityId) {
+        identityByPersonId.set(face.person.id, face.person.identityId);
+      }
+    }
+    if (identityByPersonId.size === 0) {
+      return;
+    }
+
+    const uniqueIdentityIds = [...new Set(identityByPersonId.values())];
+    const resolvedByIdentity = new Map<string, PersonResponseDto>();
+    await Promise.all(
+      uniqueIdentityIds.map(async (identityId) => {
+        const resolved = await this.faceIdentityRepository.getResolvedPersonByIdentityId(auth.user.id, identityId);
+        if (resolved) {
+          resolvedByIdentity.set(identityId, resolved);
+        }
+      }),
+    );
+
+    for (const person of people) {
+      const identityId = identityByPersonId.get(person.id);
+      const resolved = identityId ? resolvedByIdentity.get(identityId) : undefined;
+      if (resolved) {
+        person.name = resolved.name;
+        person.birthDate = resolved.birthDate;
+      }
+    }
   }
 
   private applySpacePeople(data: AssetResponseDto, spacePersonMap: Map<string, LinkedSpacePerson>) {
