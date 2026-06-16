@@ -5,6 +5,7 @@
   import { UserAvatarColor, type SharedSpaceActivityResponseDto } from '@immich/sdk';
   import { Button } from '@immich/ui';
   import { mdiChevronDown } from '@mdi/js';
+  import { t, type MessageFormatter } from 'svelte-i18n';
 
   interface Props {
     activities: SharedSpaceActivityResponseDto[];
@@ -18,7 +19,7 @@
   const HIGH_IMPACT_TYPES = new Set(['asset_add', 'asset_remove']);
   const MEDIUM_TYPES = new Set(['member_join', 'member_leave', 'member_remove', 'member_role_change']);
 
-  function getDayLabel(isoString: string): string {
+  function getDayLabel(isoString: string, $t: MessageFormatter): string {
     const date = new Date(isoString);
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -26,48 +27,53 @@
     const diffDays = Math.floor((today.getTime() - targetDay.getTime()) / 86_400_000);
 
     if (diffDays === 0) {
-      return 'Today';
+      return $t('spaces_activity_today');
     }
     if (diffDays === 1) {
-      return 'Yesterday';
+      return $t('spaces_activity_yesterday');
     }
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  function getDescription(activity: SharedSpaceActivityResponseDto): string {
+  function getDescription(activity: SharedSpaceActivityResponseDto, $t: MessageFormatter): string {
     const data = activity.data as Record<string, unknown>;
-    const name = activity.userName ?? 'Someone';
+    const name = activity.userName ?? $t('spaces_activity_someone');
+    const count = Number(data.count ?? 0);
 
     switch (activity.type) {
       case 'asset_add': {
-        return `${name} added ${data.count ?? 0} photos`;
+        return $t('spaces_activity_added_photos', { values: { name, count } });
       }
       case 'asset_remove': {
-        return `${name} removed ${data.count ?? 0} photos`;
+        return $t('spaces_activity_removed_photos', { values: { name, count } });
       }
       case 'member_join': {
-        return `${name} joined as ${data.role ?? 'member'}`;
+        return $t('spaces_activity_joined_as', {
+          values: { name, role: String(data.role ?? $t('spaces_role_member')) },
+        });
       }
       case 'member_leave': {
-        return `${name} left the space`;
+        return $t('spaces_activity_left_space', { values: { name } });
       }
       case 'member_remove': {
-        return `${name} was removed`;
+        return $t('spaces_activity_was_removed', { values: { name } });
       }
       case 'member_role_change': {
-        return `${name} changed role to ${data.newRole ?? 'member'}`;
+        return $t('spaces_activity_changed_role', {
+          values: { name, role: String(data.newRole ?? $t('spaces_role_member')) },
+        });
       }
       case 'cover_change': {
-        return `${name} set a new cover photo`;
+        return $t('spaces_activity_set_cover', { values: { name } });
       }
       case 'space_rename': {
-        return `Renamed from "${data.oldName}" to "${data.newName}"`;
+        return $t('spaces_renamed', { values: { oldName: String(data.oldName), newName: String(data.newName) } });
       }
       case 'space_color_change': {
-        return 'Space color changed';
+        return $t('spaces_changed_color');
       }
       default: {
-        return `${name} performed an action`;
+        return $t('spaces_activity_default', { values: { name } });
       }
     }
   }
@@ -94,7 +100,7 @@
     let currentGroup: SharedSpaceActivityResponseDto[] = [];
 
     for (const activity of activities) {
-      const label = getDayLabel(activity.createdAt);
+      const label = getDayLabel(activity.createdAt, $t);
       if (label === currentLabel) {
         currentGroup.push(activity);
       } else {
@@ -144,9 +150,9 @@
 
 {#if activities.length === 0}
   <div class="flex flex-col items-center justify-center px-6 py-12 text-center" data-testid="activity-empty-state">
-    <p class="text-sm text-gray-500 dark:text-gray-400">No activity yet</p>
+    <p class="text-sm text-gray-500 dark:text-gray-400">{$t('spaces_activity_none')}</p>
     <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">
-      Activity will appear here as members interact with the space
+      {$t('spaces_activity_none_description')}
     </p>
   </div>
 {:else}
@@ -172,7 +178,7 @@
                 <UserAvatar user={toAvatarUser(activity)} size="sm" />
               </div>
               <div class="min-w-0 flex-1">
-                <p class="text-sm">{getDescription(activity)}</p>
+                <p class="text-sm">{getDescription(activity, $t)}</p>
                 <p class="mt-0.5 text-xs text-gray-400">{formatTimeAgo(activity.createdAt)}</p>
               </div>
             </div>
@@ -210,7 +216,7 @@
               <UserAvatar user={toAvatarUser(activity)} size="sm" />
             </div>
             <div class="min-w-0 flex-1">
-              <p class="text-sm">{getDescription(activity)}</p>
+              <p class="text-sm">{getDescription(activity, $t)}</p>
               <p class="mt-0.5 text-xs text-gray-400">{formatTimeAgo(activity.createdAt)}</p>
             </div>
           </div>
@@ -219,7 +225,7 @@
           <div class="mx-3 mb-1 flex items-center gap-2 px-2 py-1.5" data-testid="activity-item-{activity.id}">
             <div class="h-2 w-2 shrink-0 rounded-full {dotColorClass}"></div>
             <p class="flex-1 truncate text-xs text-gray-500 dark:text-gray-400">
-              {getDescription(activity)}
+              {getDescription(activity, $t)}
             </p>
             <span class="shrink-0 text-xs text-gray-400">{formatTimeAgo(activity.createdAt)}</span>
           </div>
@@ -230,7 +236,7 @@
     {#if hasMore}
       <div class="flex justify-center px-4 py-3" data-testid="load-more-button">
         <Button size="small" variant="ghost" color="secondary" leadingIcon={mdiChevronDown} onclick={onLoadMore}>
-          Load more
+          {$t('spaces_load_more')}
         </Button>
       </div>
     {/if}
