@@ -155,7 +155,7 @@
         onclick={() => (activeTab = 'activity')}
         data-testid="tab-activity"
       >
-        Activity
+        {$t('spaces_activity')}
       </button>
       <button
         type="button"
@@ -165,7 +165,7 @@
         onclick={() => (activeTab = 'members')}
         data-testid="tab-members"
       >
-        Members ({members.length})
+        {$t('members')} ({members.length})
       </button>
     </div>
 
@@ -239,15 +239,15 @@
                   />
                 {/if}
                 <div class="text-xs text-gray-500">
-                  <span>{member.contributionCount} photos added</span>
+                  <span>{$t('spaces_member_photos_added', { values: { count: member.contributionCount } })}</span>
                   {#if member.lastActiveAt}
                     <span class="mx-0.5">·</span>
-                    <span>Active {formatTimeAgo(member.lastActiveAt)}</span>
+                    <span>{$t('spaces_member_active', { values: { ago: formatTimeAgo(member.lastActiveAt) } })}</span>
                   {/if}
                 </div>
               </div>
             {:else}
-              <p class="mt-1 text-xs italic text-gray-400">No photos added yet</p>
+              <p class="mt-1 text-xs italic text-gray-400">{$t('spaces_member_no_photos')}</p>
             {/if}
           </div>
         {/each}

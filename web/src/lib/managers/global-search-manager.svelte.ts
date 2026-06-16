@@ -2137,27 +2137,28 @@ export class GlobalSearchManager {
     // be noise on unscoped queries.
     const scopeCue = this.scope === 'all' ? '' : get(t)(`cmdk_announce_scoped_${this.scope}` as Translations);
     const parts: string[] = [];
+    const translate = get(t);
     const count = (st: ProviderStatus) => (st.status === 'ok' ? st.total : 0);
     if (count(s.photos) > 0) {
-      parts.push(`${count(s.photos)} photos`);
+      parts.push(translate('cmdk_preview_photo_count', { values: { count: count(s.photos) } }));
     }
     if (count(s.people) > 0) {
-      parts.push(`${count(s.people)} people`);
+      parts.push(translate('cmdk_count_people' as Translations, { values: { count: count(s.people) } }));
     }
     if (count(s.places) > 0) {
-      parts.push(`${count(s.places)} places`);
+      parts.push(translate('places_count', { values: { count: count(s.places) } }));
     }
     if (count(s.tags) > 0) {
-      parts.push(`${count(s.tags)} tags`);
+      parts.push(translate('cmdk_count_tags' as Translations, { values: { count: count(s.tags) } }));
     }
     if (count(s.albums) > 0) {
-      parts.push(`${count(s.albums)} albums`);
+      parts.push(translate('albums_count', { values: { count: count(s.albums) } }));
     }
     if (count(s.spaces) > 0) {
-      parts.push(`${count(s.spaces)} spaces`);
+      parts.push(translate('cmdk_count_spaces' as Translations, { values: { count: count(s.spaces) } }));
     }
     if (count(s.navigation) > 0) {
-      parts.push(`${count(s.navigation)} pages`);
+      parts.push(translate('cmdk_count_pages' as Translations, { values: { count: count(s.navigation) } }));
     }
     const counts = parts.join(', ');
     if (scopeCue && counts) {

@@ -59,7 +59,7 @@ describe('SpaceLinkedLibrariesModal', () => {
 
   it('should render modal with "Connected Libraries" title', () => {
     render(SpaceLinkedLibrariesModal, { space: makeSpace(), onClose });
-    const elements = screen.getAllByText('Connected Libraries');
+    const elements = screen.getAllByText('spaces_connected_libraries');
     expect(elements.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -70,7 +70,7 @@ describe('SpaceLinkedLibrariesModal', () => {
 
   it('should show empty state when no libraries are linked', () => {
     render(SpaceLinkedLibrariesModal, { space: makeSpace(), onClose });
-    expect(screen.getByText('No libraries connected yet')).toBeInTheDocument();
+    expect(screen.getByText('spaces_no_libraries_connected')).toBeInTheDocument();
   });
 
   it('should show linked libraries when present', () => {

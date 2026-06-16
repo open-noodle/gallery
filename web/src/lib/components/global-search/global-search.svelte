@@ -683,7 +683,7 @@
                 <Command.GroupHeading
                   class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
                 >
-                  Search filters
+                  {$t('cmdk_typed_search_issues_heading')}
                 </Command.GroupHeading>
                 <div class="space-y-1 px-3">
                   {#each manager.typedSearchIssues as issue (`${issue.raw}:${issue.code}`)}
@@ -701,7 +701,7 @@
                 <Command.GroupHeading
                   class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
                 >
-                  Choose filter value
+                  {$t('cmdk_typed_search_choices_heading')}
                 </Command.GroupHeading>
                 <div class="space-y-1 px-3">
                   {#each manager.typedSearchChoices as choice (`${choice.tokenRaw}:${choice.key}:${choice.id ?? choice.field ?? choice.label}`)}
@@ -1067,7 +1067,7 @@
                   <Command.GroupHeading
                     class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
                   >
-                    Search filters
+                    {$t('cmdk_typed_search_issues_heading')}
                   </Command.GroupHeading>
                   <div class="space-y-1 px-3">
                     {#each manager.typedSearchIssues as issue (`${issue.raw}:${issue.code}`)}
@@ -1085,7 +1085,7 @@
                   <Command.GroupHeading
                     class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
                   >
-                    Choose filter value
+                    {$t('cmdk_typed_search_choices_heading')}
                   </Command.GroupHeading>
                   <div class="space-y-1 px-3">
                     {#each manager.typedSearchChoices as choice (`${choice.tokenRaw}:${choice.key}:${choice.id ?? choice.field ?? choice.label}`)}
