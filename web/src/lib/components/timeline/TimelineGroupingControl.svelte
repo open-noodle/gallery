@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { TimelineGrouping } from '$lib/managers/timeline-manager/types';
+  import { t, type Translations } from 'svelte-i18n';
   import { twMerge } from 'tailwind-merge';
 
   type TimelineGroupingControlVariant = 'inline' | 'floating';
@@ -12,10 +13,10 @@
     onGroupingChange: (grouping: TimelineGrouping) => void;
   };
 
-  const modes: { grouping: TimelineGrouping; label: string }[] = [
-    { grouping: 'year', label: 'Years' },
-    { grouping: 'month', label: 'Months' },
-    { grouping: 'day', label: 'All' },
+  const modes: { grouping: TimelineGrouping; labelKey: Translations }[] = [
+    { grouping: 'year', labelKey: 'timeline_grouping_years' },
+    { grouping: 'month', labelKey: 'timeline_grouping_months' },
+    { grouping: 'day', labelKey: 'timeline_grouping_all' },
   ];
 
   let { grouping, variant = 'inline', disabled = false, class: className = '', onGroupingChange }: Props = $props();
@@ -59,7 +60,7 @@
   data-testid="timeline-grouping-control"
   data-variant={variant}
   role="group"
-  aria-label="Timeline grouping"
+  aria-label={$t('timeline_grouping_selector')}
 >
   {#each modes as mode (mode.grouping)}
     <button
@@ -71,7 +72,7 @@
       onclick={() => selectGrouping(mode.grouping)}
       onkeydown={onModeKeyDown}
     >
-      {mode.label}
+      {$t(mode.labelKey)}
     </button>
   {/each}
 </div>

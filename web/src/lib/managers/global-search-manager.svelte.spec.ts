@@ -2930,7 +2930,7 @@ describe('announcementText', () => {
       navigation: { status: 'empty' },
       commands: { status: 'empty' },
     };
-    expect(m.announcementText).toBe('42 photos, 5 people, 3 tags');
+    expect(m.announcementText).toBe('cmdk_preview_photo_count, cmdk_count_people, cmdk_count_tags');
   });
 
   it('returns "" if all settled sections are empty', () => {
@@ -3234,7 +3234,7 @@ describe('navigation section scaffolding', () => {
       navigation: { status: 'ok', items: [{ id: 'nav:userPages:photos' }] as never[], total: 5 },
       commands: { status: 'empty' },
     };
-    expect(m.announcementText).toBe('5 pages');
+    expect(m.announcementText).toBe('cmdk_count_pages');
   });
 
   it('reconcileCursor falls through to navigation when entity sections are empty', () => {
