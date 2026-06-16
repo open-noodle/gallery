@@ -1,6 +1,13 @@
 import { fireEvent, render } from '@testing-library/svelte';
+import { init, register, waitLocale } from 'svelte-i18n';
 import ActiveFiltersBar from '../active-filters-bar.svelte';
 import { createFilterState } from '../filter-panel';
+
+beforeAll(async () => {
+  register('en-US', () => import('$i18n/en.json'));
+  await init({ fallbackLocale: 'en-US' });
+  await waitLocale('en-US');
+});
 
 describe('ActiveFiltersBar', () => {
   it('should render chip for person filter with name', () => {

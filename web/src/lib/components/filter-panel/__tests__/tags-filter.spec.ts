@@ -1,6 +1,13 @@
 import { fireEvent, render } from '@testing-library/svelte';
+import { init, register, waitLocale } from 'svelte-i18n';
 import type { TagOption } from '../filter-panel';
 import TagsFilter from '../tags-filter.svelte';
+
+beforeAll(async () => {
+  register('en-US', () => import('$i18n/en.json'));
+  await init({ fallbackLocale: 'en-US' });
+  await waitLocale('en-US');
+});
 
 function makeTags(count: number): TagOption[] {
   return Array.from({ length: count }, (_, i) => ({ id: `t${i + 1}`, name: `Tag ${i + 1}` }));
