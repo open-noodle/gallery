@@ -11,6 +11,7 @@ NAME=$(jq -r '.name' "$CONFIG")
 NAME_SHORT=$(jq -r '.name_short' "$CONFIG")
 NAME_SLUG=$(jq -r '.name_slug' "$CONFIG")
 DESCRIPTION=$(jq -r '.description' "$CONFIG")
+UPSTREAM_NAME=$(jq -r '.upstream_name' "$CONFIG")
 
 # Mobile
 BUNDLE_ID=$(jq -r '.mobile.bundle_id' "$CONFIG")
@@ -57,18 +58,61 @@ fi
 #
 patch_i18n() {
   echo "--- Patching i18n strings ---"
-  local overrides="$BRANDING_DIR/i18n/overrides-en.json"
-  local target="$REPO_ROOT/i18n/en.json"
+  local i18n_dir="$REPO_ROOT/i18n"
+  local en_overrides="$BRANDING_DIR/i18n/overrides-en.json"
+  local en_target="$i18n_dir/en.json"
+  local tmp
 
-  if [[ -f "$overrides" ]]; then
-    # Merge overrides into en.json (overrides take precedence)
-    local tmp
+  # 1. Merge English overrides into en.json — the canonical branded fallback
+  #    every other locale resolves to for any key it doesn't define.
+  if [[ -f "$en_overrides" && -f "$en_target" ]]; then
     tmp=$(mktemp)
-    jq -s '.[0] * .[1]' "$target" "$overrides" > "$tmp"
+    jq -s '.[0] * .[1]' "$en_target" "$en_overrides" > "$tmp"
     chmod 644 "$tmp"
-    mv "$tmp" "$target"
-    echo "  Merged $(jq 'length' "$overrides") override keys into en.json"
+    mv "$tmp" "$en_target"
+    echo "  Merged $(jq 'length' "$en_overrides") override keys into en.json"
   fi
+
+  # The non-English locale files (i18n/de.json, fr.json, ...) are upstream
+  # Immich translations crowdsourced via Weblate, which the fork doesn't run.
+  # They carry their own translations of the keys the fork rebrands, so the
+  # upstream name leaks in every translated language (issue #703 — "Immich
+  # kaufen") and re-leaks on each Weblate sync. Patch them at build time so the
+  # leak can't regress in source:
+  #   - merge a per-locale branded override (overrides-<lang>.json) when present
+  #     so that language keeps a proper localized translation;
+  #   - then drop any remaining overridden key whose localized value still
+  #     contains the upstream name, so it falls back to the branded en.json.
+  [[ -f "$en_overrides" ]] || return 0
+
+  local locale_file lang lang_overrides
+  for locale_file in "$i18n_dir"/*.json; do
+    lang="$(basename "$locale_file" .json)"
+    [[ "$lang" == "en" ]] && continue
+
+    # 2. Apply a per-locale branded override file when one exists (de, fr, ...).
+    lang_overrides="$BRANDING_DIR/i18n/overrides-${lang}.json"
+    if [[ -f "$lang_overrides" ]]; then
+      tmp=$(mktemp)
+      jq -s '.[0] * .[1]' "$locale_file" "$lang_overrides" > "$tmp"
+      chmod 644 "$tmp"
+      mv "$tmp" "$locale_file"
+      echo "  Merged $(jq 'length' "$lang_overrides") override keys into ${lang}.json"
+    fi
+
+    # 3. Drop overridden keys that still leak the upstream name -> en fallback.
+    tmp=$(mktemp)
+    jq --slurpfile ov "$en_overrides" --arg upstream "$UPSTREAM_NAME" '
+      ($ov[0] | keys) as $ks
+      | reduce $ks[] as $k (.;
+          if ((.[$k]? | type) == "string") and (.[$k] | contains($upstream))
+          then del(.[$k])
+          else . end)
+    ' "$locale_file" > "$tmp"
+    chmod 644 "$tmp"
+    mv "$tmp" "$locale_file"
+  done
+  echo "  Stripped upstream-brand leaks from non-English locales (fallback to en.json)"
 }
 
 #
