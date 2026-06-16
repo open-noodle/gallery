@@ -422,7 +422,7 @@ patches:
   - id: immich-ui-command-patch
     package: '@immich/ui'
     version_source: pnpm-workspace.yaml
-    expected_patch: patches/@immich__ui@0.80.0.patch
+    expected_patch: patches/@immich__ui@0.81.1.patch
     required_check: fork-patches-check
 
 risk_patterns:
