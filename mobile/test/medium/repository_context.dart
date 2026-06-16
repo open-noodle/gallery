@@ -390,7 +390,7 @@ class MediumRepositoryContext {
             id: .new(id),
             ownerId: .new(TestUtils.uuid(ownerId)),
             type: .new(type ?? MemoryTypeEnum.onThisDay),
-            data: .new(MemoryData(year: year ?? 2020, personName: personName).toJson()),
+            data: .new(MemoryData({'year': year ?? 2020, 'personName': ?personName}).toJson()),
             isSaved: .new(isSaved ?? false),
             memoryAt: .new(TestUtils.date(memoryAt)),
             showAt: .new(showAt),
