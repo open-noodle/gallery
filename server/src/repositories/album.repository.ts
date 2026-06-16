@@ -281,7 +281,15 @@ export class AlbumRepository {
     return this.db
       .selectFrom('album_asset')
       .innerJoin('album', 'album.id', 'album_asset.albumId')
-      .where('album.ownerId', '=', ownerId)
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('album_user')
+            .whereRef('album_user.albumId', '=', 'album.id')
+            .where('album_user.role', '=', AlbumUserRole.Owner)
+            .where('album_user.userId', '=', ownerId),
+        ),
+      )
       .where('album.deletedAt', 'is', null)
       .where('album_asset.assetId', 'in', assetIds)
       .select('album_asset.assetId as assetId')
