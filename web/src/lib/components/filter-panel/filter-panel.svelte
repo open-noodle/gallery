@@ -2,6 +2,7 @@
   import { Icon } from '@immich/ui';
   import { browser } from '$app/environment';
   import { SvelteSet } from 'svelte/reactivity';
+  import { t } from 'svelte-i18n';
   import {
     mdiChevronLeft,
     mdiChevronRight,
@@ -337,23 +338,23 @@
     albums: mdiImageAlbum,
   };
 
-  const sectionTitles: Record<string, string> = {
-    timeline: 'Timeline',
-    people: 'People',
-    location: 'Location',
-    camera: 'Camera',
-    tags: 'Tags',
-    rating: 'Rating',
-    media: 'Media Type',
-    favorites: 'Favorites',
-    albums: 'Albums',
-  };
+  let sectionTitles = $derived<Record<string, string>>({
+    timeline: $t('timeline'),
+    people: $t('people'),
+    location: $t('location'),
+    camera: $t('camera'),
+    tags: $t('tags'),
+    rating: $t('rating'),
+    media: $t('media_type'),
+    favorites: $t('favorites'),
+    albums: $t('albums'),
+  });
 
-  const sectionToggleLabels: Record<string, string> = {
+  let sectionToggleLabels = $derived<Record<string, string>>({
     ...sectionTitles,
     // Avoid colliding with asset action buttons labeled "Favorite" in browser automation.
-    favorites: 'Starred filter section',
-  };
+    favorites: $t('filter_favorites_section'),
+  });
 
   type StoredSectionSet = string[] | { selected?: string[]; known?: string[] };
 
@@ -692,7 +693,7 @@
     <div
       class="sticky top-0 z-5 flex items-center justify-between border-b border-gray-200 bg-light px-4 py-2.5 dark:border-gray-700"
     >
-      <span class="text-sm font-medium">Filters</span>
+      <span class="text-sm font-medium">{$t('filters')}</span>
       <button
         type="button"
         class="flex h-6 w-6 items-center justify-center rounded-full text-gray-500 hover:bg-subtle dark:text-gray-400"
@@ -771,7 +772,7 @@
                 selectedIds={filters.personIds}
                 selectedNames={personNames}
                 onSelectionChange={handlePeopleChange}
-                emptyText={hasUnnamedPeople ? 'Name people to use this filter' : undefined}
+                emptyText={hasUnnamedPeople ? $t('filter_name_people_hint') : undefined}
               />
             {:else if section === 'location'}
               <LocationFilter
@@ -837,14 +838,14 @@
 
       {#if visibleSections.size === 0}
         <div class="flex flex-col items-center gap-2 px-4 py-8 text-center">
-          <p class="text-xs text-gray-500 dark:text-gray-400">Click an icon above to show filters</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">{$t('filter_show_sections_hint')}</p>
           <button
             type="button"
             class="text-xs font-medium text-primary hover:underline"
             onclick={showAllSections}
             data-testid="show-all-sections"
           >
-            Show all
+            {$t('filter_show_all_sections')}
           </button>
         </div>
       {/if}
