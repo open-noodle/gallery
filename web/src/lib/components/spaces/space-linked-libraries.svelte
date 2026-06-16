@@ -9,6 +9,7 @@
   } from '@immich/sdk';
   import { Button, Field, Icon, modalManager, Select, type SelectOption } from '@immich/ui';
   import { mdiBookshelf, mdiLinkVariantOff, mdiLinkVariantPlus } from '@mdi/js';
+  import { t } from 'svelte-i18n';
 
   interface Props {
     space: SharedSpaceResponseDto;
@@ -38,7 +39,7 @@
         .map((lib) => ({ label: lib.name, value: lib.id }));
       selectedLibraryId = '';
     } catch (error) {
-      handleError(error, 'Failed to load libraries');
+      handleError(error, $t('spaces_error_loading_libraries'));
     } finally {
       loadingLibraries = false;
     }
@@ -56,7 +57,7 @@
       });
       onChanged();
     } catch (error) {
-      handleError(error, 'Failed to link library');
+      handleError(error, $t('spaces_error_linking_library'));
     } finally {
       linking = false;
     }
@@ -64,8 +65,8 @@
 
   async function handleUnlink(libraryId: string, libraryName: string) {
     const confirmed = await modalManager.showDialog({
-      prompt: `Remove "${libraryName}" from this space? Assets from this library will no longer appear in the space.`,
-      title: 'Unlink library',
+      prompt: $t('spaces_unlink_library_confirmation', { values: { name: libraryName } }),
+      title: $t('spaces_unlink_library'),
     });
     if (!confirmed) {
       return;
@@ -74,7 +75,7 @@
       await unlinkLibrary({ id: space.id, libraryId });
       onChanged();
     } catch (error) {
-      handleError(error, 'Failed to unlink library');
+      handleError(error, $t('spaces_error_unlinking_library'));
     }
   }
 </script>
@@ -83,12 +84,12 @@
   <!-- Header -->
   <div class="flex items-center gap-2">
     <Icon icon={mdiBookshelf} size="20" class="text-gray-500" />
-    <h3 class="text-sm font-semibold">Connected Libraries</h3>
+    <h3 class="text-sm font-semibold">{$t('spaces_connected_libraries')}</h3>
   </div>
 
   <!-- Linked libraries list -->
   {#if linkedLibraries.length === 0}
-    <p class="text-sm italic text-gray-400">No libraries connected yet</p>
+    <p class="text-sm italic text-gray-400">{$t('spaces_no_libraries_connected')}</p>
   {:else}
     <div class="flex flex-col gap-2" data-testid="linked-library-list">
       {#each linkedLibraries as lib (lib.libraryId)}
@@ -103,7 +104,7 @@
             leadingIcon={mdiLinkVariantOff}
             onclick={() => handleUnlink(lib.libraryId, lib.libraryName)}
           >
-            Unlink
+            {$t('spaces_unlink')}
           </Button>
         </div>
       {/each}
@@ -112,10 +113,10 @@
 
   <!-- Link new library -->
   {#if loadingLibraries}
-    <p class="text-xs text-gray-400">Loading libraries...</p>
+    <p class="text-xs text-gray-400">{$t('spaces_loading_libraries')}</p>
   {:else if availableLibraries.length > 0}
     <div class="flex items-end gap-2">
-      <Field label="Add library" class="flex-1">
+      <Field label={$t('spaces_add_library')} class="flex-1">
         <Select options={availableLibraries} value={selectedLibraryId} onChange={(v) => (selectedLibraryId = v)} />
       </Field>
       <Button
@@ -124,10 +125,10 @@
         onclick={handleLink}
         disabled={!selectedLibraryId || linking}
       >
-        Link
+        {$t('link')}
       </Button>
     </div>
   {:else if linkedLibraries.length > 0}
-    <p class="text-xs text-gray-400">All libraries are already connected</p>
+    <p class="text-xs text-gray-400">{$t('spaces_all_libraries_connected')}</p>
   {/if}
 </div>
