@@ -1,7 +1,14 @@
 import { fireEvent, render } from '@testing-library/svelte';
+import { init, register, waitLocale } from 'svelte-i18n';
 import { describe, expect, it, vi } from 'vitest';
 import TemporalPicker from '../temporal-picker.svelte';
 import { aggregateYears, getMonthsForYear } from '../temporal-utils';
+
+beforeAll(async () => {
+  register('en-US', () => import('$i18n/en.json'));
+  await init({ fallbackLocale: 'en-US' });
+  await waitLocale('en-US');
+});
 
 describe('temporal-utils', () => {
   const buckets = [

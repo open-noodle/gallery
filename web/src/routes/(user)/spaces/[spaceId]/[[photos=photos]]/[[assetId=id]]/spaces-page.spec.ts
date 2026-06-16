@@ -895,7 +895,7 @@ describe('Spaces page search URL state', () => {
 
     renderPage();
 
-    expect(screen.getByTestId('empty-state-message')).toHaveTextContent('No photos match your filters');
+    expect(screen.getByTestId('empty-state-message')).toHaveTextContent('spaces_no_filtered_assets');
     expect(screen.queryByTestId('timeline-stub')).not.toBeInTheDocument();
   });
 

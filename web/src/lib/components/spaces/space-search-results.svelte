@@ -95,7 +95,7 @@
       if (!group) {
         const label = date
           ? date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', timeZone: 'UTC' })
-          : 'Unknown date';
+          : $t('unknown_date');
         group = { key, label, assets: [] };
         map.set(key, group);
       }
@@ -122,11 +122,17 @@
     <div class="mb-4 flex items-center gap-2">
       <span class="text-sm text-gray-500 dark:text-gray-400" data-testid="result-count">
         {#if hasExactTotal}
-          {resultCount} result{resultCount === 1 ? '' : 's'}
+          {$t('spaces_search_result_count', { values: { count: resultCount } })}
         {:else if sortMode === 'relevance'}
-          {totalLoaded}{hasMore ? '+' : ''} result{totalLoaded === 1 && !hasMore ? '' : 's'}
+          {#if hasMore}
+            {$t('spaces_search_result_count_more', { values: { count: totalLoaded } })}
+          {:else}
+            {$t('spaces_search_result_count', { values: { count: totalLoaded } })}
+          {/if}
+        {:else if hasMore}
+          {$t('spaces_search_result_count_capped', { values: { count: totalLoaded, total: 500 } })}
         {:else}
-          {totalLoaded}{hasMore ? ' of up to 500' : ''} result{totalLoaded === 1 && !hasMore ? '' : 's'}
+          {$t('spaces_search_result_count', { values: { count: totalLoaded } })}
         {/if}
       </span>
       {#if isLoading}

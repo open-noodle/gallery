@@ -5,7 +5,9 @@
   import type { ScanResult } from '$lib/utils/google-takeout-scanner';
   import { createImportAlbums, uploadTakeoutItem } from '$lib/utils/google-takeout-uploader';
   import { Container } from '@immich/ui';
+  import { t } from 'svelte-i18n';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+  import { get } from 'svelte/store';
   import ImportFilesStep from './import-files-step.svelte';
   import ImportProgressStep from './import-progress-step.svelte';
   import ImportReviewStep from './import-review-step.svelte';
@@ -93,7 +95,7 @@
           assetIdMap.set(item.path, result.assetId);
         }
       } else {
-        manager.trackError(item.name, result.error ?? 'Unknown error');
+        manager.trackError(item.name, result.error ?? get(t)('import_unknown_error'));
       }
     }
 

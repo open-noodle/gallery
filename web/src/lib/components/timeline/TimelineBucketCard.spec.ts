@@ -49,9 +49,9 @@ describe('TimelineBucketCard component', () => {
       onActivate: vi.fn(),
     });
 
-    expect(screen.getByRole('button', { name: /2015, 438 photos/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'timeline_overview_card_semantics' })).toBeInTheDocument();
     expect(screen.getByText('2015')).toBeInTheDocument();
-    expect(screen.getByText('438 photos')).toBeInTheDocument();
+    expect(screen.getByText('timeline_overview_photo_count')).toBeInTheDocument();
     expect(screen.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'image');
     const image = screen.getByTestId('timeline-bucket-card-image');
     expect(image).toHaveAttribute('src', '/thumbnail/asset-2015');
@@ -73,7 +73,9 @@ describe('TimelineBucketCard component', () => {
     const overlay = screen.getByTestId('timeline-bucket-card-overlay');
     expect(overlay).toHaveClass('absolute', 'inset-x-0', 'bottom-0');
     expect(within(overlay).getByTestId('timeline-bucket-card-title')).toHaveTextContent('2015');
-    expect(within(overlay).getByTestId('timeline-bucket-card-count')).toHaveTextContent('438 photos');
+    expect(within(overlay).getByTestId('timeline-bucket-card-count')).toHaveTextContent(
+      'timeline_overview_photo_count',
+    );
   });
 
   it('renders a month bucket with a locale-specific title', () => {
@@ -88,9 +90,9 @@ describe('TimelineBucketCard component', () => {
       onActivate: vi.fn(),
     });
 
-    expect(screen.getByRole('button', { name: /Aug 2015, 23 photos/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'timeline_overview_card_semantics' })).toBeInTheDocument();
     expect(screen.getByText('Aug 2015')).toBeInTheDocument();
-    expect(screen.getByText('23 photos')).toBeInTheDocument();
+    expect(screen.getByText('timeline_overview_photo_count')).toBeInTheDocument();
   });
 
   it('keeps month labels in the representative card overlay', () => {
@@ -107,7 +109,9 @@ describe('TimelineBucketCard component', () => {
 
     const overlay = screen.getByTestId('timeline-bucket-card-overlay');
     expect(within(overlay).getByTestId('timeline-bucket-card-title')).toHaveTextContent('Aug 2015');
-    expect(within(overlay).getByTestId('timeline-bucket-card-count')).toHaveTextContent('23 photos');
+    expect(within(overlay).getByTestId('timeline-bucket-card-count')).toHaveTextContent(
+      'timeline_overview_photo_count',
+    );
   });
 
   it('crops portrait representatives inside fixed bucket geometry', () => {
@@ -131,8 +135,8 @@ describe('TimelineBucketCard component', () => {
       onActivate: vi.fn(),
     });
 
-    expect(screen.getByRole('button', { name: /2015, 1 photo/i })).toBeInTheDocument();
-    expect(screen.getByText('1 photo')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'timeline_overview_card_semantics' })).toBeInTheDocument();
+    expect(screen.getByText('timeline_overview_photo_count')).toBeInTheDocument();
   });
 
   it('announces representative bucket activation as timeline zoom navigation, not filtering', async () => {
@@ -141,7 +145,7 @@ describe('TimelineBucketCard component', () => {
       onActivate: vi.fn(),
     });
 
-    const yearCard = screen.getByRole('button', { name: '2015, 438 photos, show months' });
+    const yearCard = screen.getByRole('button', { name: 'timeline_overview_card_semantics' });
     expect(yearCard).toBeInTheDocument();
     expect(yearCard).not.toHaveAccessibleName(/filter/i);
 
@@ -157,7 +161,7 @@ describe('TimelineBucketCard component', () => {
     });
 
     const monthCard = screen.getByRole('button', {
-      name: 'Aug 2015, 23 photos, show all photos from this point',
+      name: 'timeline_overview_card_semantics',
     });
     expect(monthCard).toBeInTheDocument();
     expect(monthCard).not.toHaveAccessibleName(/filter/i);
@@ -229,7 +233,7 @@ describe('TimelineBucketCard component', () => {
     await fireEvent.error(screen.getByTestId('timeline-bucket-card-image'));
     await tick();
 
-    const card = screen.getByRole('button', { name: '2015, 438 photos, show months' });
+    const card = screen.getByRole('button', { name: 'timeline_overview_card_semantics' });
     expect(card).toHaveAttribute('data-state', 'fallback');
 
     await user.click(card);

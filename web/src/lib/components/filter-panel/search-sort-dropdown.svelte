@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Icon } from '@immich/ui';
   import { mdiChevronDown, mdiMagnify, mdiSortCalendarAscending, mdiSortCalendarDescending } from '@mdi/js';
+  import { t } from 'svelte-i18n';
 
   type SortMode = 'relevance' | 'asc' | 'desc';
 
@@ -14,11 +15,11 @@
   let { sortOrder, onSelect, compact = false, showRelevance = true }: Props = $props();
   let open = $state(false);
 
-  const allOptions: { value: SortMode; label: string; icon: string }[] = [
-    { value: 'relevance', label: 'Relevance', icon: mdiMagnify },
-    { value: 'desc', label: 'Newest first', icon: mdiSortCalendarDescending },
-    { value: 'asc', label: 'Oldest first', icon: mdiSortCalendarAscending },
-  ];
+  let allOptions = $derived<{ value: SortMode; label: string; icon: string }[]>([
+    { value: 'relevance', label: $t('search_sort_relevance'), icon: mdiMagnify },
+    { value: 'desc', label: $t('search_sort_newest'), icon: mdiSortCalendarDescending },
+    { value: 'asc', label: $t('search_sort_oldest'), icon: mdiSortCalendarAscending },
+  ]);
 
   let options = $derived(showRelevance ? allOptions : allOptions.filter((option) => option.value !== 'relevance'));
   let currentOption = $derived(options.find((o) => o.value === sortOrder) ?? options[0]);

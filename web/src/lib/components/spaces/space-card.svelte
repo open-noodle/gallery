@@ -50,9 +50,11 @@
     const count = space.newAssetCount ?? 0;
     const displayCount = count > 99 ? '99+' : String(count);
     if (space.lastContributor) {
-      return `${space.lastContributor.name} added ${displayCount} new`;
+      return $t('spaces_card_contributor_new', {
+        values: { name: space.lastContributor.name, count: displayCount },
+      });
     }
-    return `${displayCount} new photos`;
+    return $t('spaces_card_new_photos', { values: { count: displayCount } });
   });
 </script>
 
