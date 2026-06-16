@@ -25,7 +25,7 @@ describe('person-preview', () => {
       },
     });
     expect(screen.getByText('Alice')).toBeInTheDocument();
-    expect(screen.getByText(/42 photos/)).toBeInTheDocument();
+    expect(screen.getByText('cmdk_preview_photo_count')).toBeInTheDocument();
   });
 
   it('defers searchAssets by 300ms after mount', async () => {
