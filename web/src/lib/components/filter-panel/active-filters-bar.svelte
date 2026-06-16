@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, type Translations } from 'svelte-i18n';
   import type { FilterState } from './filter-panel';
 
   const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -34,22 +35,27 @@
   interface Chip {
     type: string;
     id?: string;
-    label: string;
+    label?: string;
+    labelKey?: Translations;
+    labelValues?: Record<string, string>;
   }
 
   function formatDateOnly(value: string): string {
     return DATE_FORMATTER.format(new Date(`${value}T00:00:00.000Z`));
   }
 
-  function buildCustomDateLabel(dateAfter: string | undefined, dateBefore: string | undefined): string | undefined {
+  function buildCustomDateLabel(
+    dateAfter: string | undefined,
+    dateBefore: string | undefined,
+  ): Pick<Chip, 'label' | 'labelKey' | 'labelValues'> | undefined {
     if (dateAfter && dateBefore) {
-      return `${formatDateOnly(dateAfter)} - ${formatDateOnly(dateBefore)}`;
+      return { label: `${formatDateOnly(dateAfter)} - ${formatDateOnly(dateBefore)}` };
     }
     if (dateAfter) {
-      return `After ${formatDateOnly(dateAfter)}`;
+      return { labelKey: 'filter_chip_after', labelValues: { date: formatDateOnly(dateAfter) } };
     }
     if (dateBefore) {
-      return `Before ${formatDateOnly(dateBefore)}`;
+      return { labelKey: 'filter_chip_before', labelValues: { date: formatDateOnly(dateBefore) } };
     }
   }
 
@@ -91,25 +97,25 @@
 
     // Media type chip
     if (filters.mediaType === 'image') {
-      result.push({ type: 'mediaType', label: 'Photos only' });
+      result.push({ type: 'mediaType', labelKey: 'photos_only' });
     } else if (filters.mediaType === 'video') {
-      result.push({ type: 'mediaType', label: 'Videos only' });
+      result.push({ type: 'mediaType', labelKey: 'videos_only' });
     }
 
     // Favorites chip
     if (filters.isFavorite === true) {
-      result.push({ type: 'favorites', label: 'Favorites' });
+      result.push({ type: 'favorites', labelKey: 'favorites' });
     }
 
     // Albums chip
     if (filters.isNotInAlbum === true) {
-      result.push({ type: 'albums', label: 'Has no album' });
+      result.push({ type: 'albums', labelKey: 'filter_has_no_album' });
     }
 
     // Timeline chip
     const customDateLabel = buildCustomDateLabel(filters.dateAfter, filters.dateBefore);
     if (customDateLabel) {
-      result.push({ type: 'timeline', label: customDateLabel });
+      result.push({ type: 'timeline', ...customDateLabel });
     } else if (filters.selectedYear !== undefined) {
       const label =
         filters.selectedMonth === undefined
@@ -130,7 +136,7 @@
 >
   {#if resultCount !== undefined}
     <span class="text-xs text-gray-400 dark:text-gray-500" data-testid="result-count">
-      {resultCount.toLocaleString()} result{resultCount === 1 ? '' : 's'}
+      {$t('filter_result_count', { values: { count: resultCount } })}
     </span>
   {/if}
 
@@ -144,7 +150,7 @@
         type="button"
         class="flex h-4 w-4 items-center justify-center rounded-full text-immich-primary/60 hover:text-immich-primary dark:text-immich-dark-primary/60 dark:hover:text-immich-dark-primary"
         onclick={() => onClearSearch?.()}
-        aria-label="Clear search"
+        aria-label={$t('filter_sheet_picker_clear_search')}
         data-testid="search-chip-close"
       >
         &times;
@@ -152,17 +158,18 @@
     </span>
   {/if}
 
-  {#each chips as chip (`${chip.type}-${chip.id ?? chip.label}`)}
+  {#each chips as chip (`${chip.type}-${chip.id ?? chip.labelKey ?? chip.label}`)}
+    {@const chipLabel = chip.labelKey ? $t(chip.labelKey, { values: chip.labelValues }) : (chip.label ?? '')}
     <span
       class="inline-flex items-center gap-1 rounded-full bg-gray-200 px-2.5 py-0.5 text-xs dark:bg-gray-700"
       data-testid="active-chip"
     >
-      <span>{chip.label}</span>
+      <span>{chipLabel}</span>
       <button
         type="button"
         class="flex h-4 w-4 items-center justify-center rounded-full text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
         onclick={() => onRemoveFilter(chip.type, chip.id)}
-        aria-label="Remove {chip.label} filter"
+        aria-label={$t('filter_remove_chip', { values: { label: chipLabel } })}
         data-testid="chip-close"
       >
         &times;
@@ -182,7 +189,7 @@
       }}
       data-testid="clear-all-btn"
     >
-      Clear all
+      {$t('clear_all')}
     </button>
   {/if}
 </div>
