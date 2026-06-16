@@ -1,9 +1,16 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { init, register, waitLocale } from 'svelte-i18n';
 import CameraFilter from '../camera-filter.svelte';
 import type { PersonOption } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
 import LocationFilter from '../location-filter.svelte';
 import PeopleFilter from '../people-filter.svelte';
+
+beforeAll(async () => {
+  register('en-US', () => import('$i18n/en.json'));
+  await init({ fallbackLocale: 'en-US' });
+  await waitLocale('en-US');
+});
 
 const mockPeople: PersonOption[] = [
   { id: 'p1', name: 'Sarah Chen' },

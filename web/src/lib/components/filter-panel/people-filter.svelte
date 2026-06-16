@@ -2,6 +2,7 @@
   import { Icon } from '@immich/ui';
   import { mdiMagnify } from '@mdi/js';
   import { SvelteMap } from 'svelte/reactivity';
+  import { t } from 'svelte-i18n';
   import type { PersonOption } from './filter-panel';
 
   interface Props {
@@ -12,7 +13,7 @@
     emptyText?: string;
   }
 
-  let { people, selectedIds, selectedNames, onSelectionChange, emptyText = 'No people found' }: Props = $props();
+  let { people, selectedIds, selectedNames, onSelectionChange, emptyText }: Props = $props();
 
   let searchQuery = $state('');
   let showAll = $state(false);
@@ -83,7 +84,9 @@
 
 <div data-testid="people-filter">
   {#if people.length === 0 && orphanedPeople.length === 0}
-    <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="people-empty">{emptyText}</p>
+    <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="people-empty">
+      {emptyText ?? $t('spaces_no_people')}
+    </p>
   {:else}
     <!-- Search input -->
     <div class="relative mb-2">
@@ -93,7 +96,7 @@
       <input
         type="text"
         class="immich-form-input h-8 w-full rounded-lg pl-7 pr-2 text-sm"
-        placeholder="Search people..."
+        placeholder={$t('filter_search_people')}
         bind:value={searchQuery}
         oninput={() => {
           showAll = false;
@@ -215,7 +218,7 @@
         onclick={() => (showAll = true)}
         data-testid="people-show-more"
       >
-        Show {remainingCount} more
+        {$t('filter_show_more', { values: { count: remainingCount } })}
       </button>
     {/if}
   {/if}
