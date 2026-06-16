@@ -91,6 +91,66 @@ const createAccessibleSpaceIdentity = async (
   return { space, spacePerson, identity };
 };
 
+// One real-life person (identity I) appears in three places: Alice's library person (no birthday),
+// space S where Bob set the birthday, and Dave's own library person (no birthday, never shared into
+// S). Used by the birthday-visibility permission matrix to prove who may read the space-set birthday
+// via `getResolvedPersonByIdentityId` — the resolver the owner asset-detail view
+// (`AssetService.applyResolvedPersonMetadata`) relies on.
+const seedBirthdayPermissionWorld = async (ctx: ReturnType<typeof setup>['ctx'], sut: FaceIdentityRepository) => {
+  const { user: alice } = await ctx.newUser();
+  const { user: bob } = await ctx.newUser();
+  const { user: carol } = await ctx.newUser();
+  const { user: dave } = await ctx.newUser();
+
+  // Alice owns the global person + asset; this face anchors the shared identity.
+  const { person: alicePerson } = await ctx.newPerson({ ownerId: alice.id, name: 'Ina' });
+  const { asset: aliceAsset } = await ctx.newAsset({ ownerId: alice.id, visibility: AssetVisibility.Timeline });
+  const { assetFace: aliceFace } = await ctx.newAssetFace({ assetId: aliceAsset.id, personId: alicePerson.id });
+  const identity = await sut.ensurePersonIdentity(alicePerson.id);
+  await sut.linkFace({ assetFaceId: aliceFace.id, identityId: identity.id, source: 'owner-person' });
+
+  // Space S: Alice (owner) + Bob (viewer, timeline on). The birthday is set here.
+  const { space: spaceS } = await ctx.newSharedSpace({ createdById: alice.id });
+  await ctx.newSharedSpaceMember({ spaceId: spaceS.id, userId: alice.id, role: SharedSpaceRole.Owner });
+  await ctx.newSharedSpaceMember({ spaceId: spaceS.id, userId: bob.id, role: SharedSpaceRole.Viewer });
+  await ctx.newSharedSpaceAsset({ spaceId: spaceS.id, assetId: aliceAsset.id, addedById: alice.id });
+  const spacePerson = await ctx.database
+    .insertInto('shared_space_person')
+    .values({
+      spaceId: spaceS.id,
+      identityId: identity.id,
+      name: '',
+      representativeFaceId: aliceFace.id,
+      type: 'person',
+      birthDate: '2014-02-14',
+      birthDateSource: 'manual',
+      birthDateSourceUpdatedAt: new Date('2026-06-10T20:41:12.000Z'),
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+  await linkSpaceFace(ctx, spacePerson.id, aliceFace.id);
+
+  // Dave has the SAME person in his own library (same identity) via his own asset, but is not a
+  // member of space S and never set a birthday — he must never inherit Bob's space-set birthday.
+  const { person: davePerson } = await ctx.newPerson({ ownerId: dave.id, name: 'Ina' });
+  await ctx.database.updateTable('person').set({ identityId: identity.id }).where('id', '=', davePerson.id).execute();
+  const { asset: daveAsset } = await ctx.newAsset({ ownerId: dave.id, visibility: AssetVisibility.Timeline });
+  const { assetFace: daveFace } = await ctx.newAssetFace({ assetId: daveAsset.id, personId: davePerson.id });
+  await sut.linkFace({ assetFaceId: daveFace.id, identityId: identity.id, source: 'owner-person' });
+
+  // Carol is a registered user with no person, asset, or space membership touching this identity.
+  return {
+    identity,
+    spaceS,
+    expectedBirthDate: '2014-02-14',
+    userIds: [alice.id, bob.id, carol.id, dave.id],
+    alice,
+    bob,
+    carol,
+    dave,
+  };
+};
+
 const newIdentityFace = async (
   ctx: ReturnType<typeof setup>['ctx'],
   sut: FaceIdentityRepository,
@@ -2031,6 +2091,76 @@ describe(FaceIdentityRepository.name, () => {
     } finally {
       await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
     }
+  });
+
+  // Matrix: who may read a birthday set inside a shared space. The resolver here
+  // (getResolvedPersonByIdentityId) is the same one AssetService uses to overlay the birthday on the
+  // owner's asset-detail view, so this guards against leaking a space-set birthday to users who are
+  // not entitled to it.
+  describe('birthday visibility permission matrix', () => {
+    it('shows the space-set birthday to the asset owner who is a member of the space', async () => {
+      const { ctx, sut } = setup();
+      const world = await seedBirthdayPermissionWorld(ctx, sut);
+
+      try {
+        const result = await sut.getResolvedPersonByIdentityId(world.alice.id, world.identity.id);
+        expect(result?.birthDate).toBe(world.expectedBirthDate);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', 'in', world.userIds).execute();
+      }
+    });
+
+    it('shows the space-set birthday to a fellow space member with the space in their timeline', async () => {
+      const { ctx, sut } = setup();
+      const world = await seedBirthdayPermissionWorld(ctx, sut);
+
+      try {
+        const result = await sut.getResolvedPersonByIdentityId(world.bob.id, world.identity.id);
+        expect(result?.birthDate).toBe(world.expectedBirthDate);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', 'in', world.userIds).execute();
+      }
+    });
+
+    it('hides the birthday from a member who has removed the space from their timeline', async () => {
+      const { ctx, sut } = setup();
+      const world = await seedBirthdayPermissionWorld(ctx, sut);
+      await setMemberTimeline(ctx, { spaceId: world.spaceS.id, userId: world.bob.id, showInTimeline: false });
+
+      try {
+        const result = await sut.getResolvedPersonByIdentityId(world.bob.id, world.identity.id);
+        expect(result).toBeUndefined();
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', 'in', world.userIds).execute();
+      }
+    });
+
+    it('does not leak the birthday to a user who shares the identity but not the space', async () => {
+      const { ctx, sut } = setup();
+      const world = await seedBirthdayPermissionWorld(ctx, sut);
+
+      try {
+        const result = await sut.getResolvedPersonByIdentityId(world.dave.id, world.identity.id);
+        // Dave resolves the same person (he shares the identity via his own library) but must never
+        // inherit the birthday that was only set inside a space he does not belong to.
+        expect(result).toBeDefined();
+        expect(result?.birthDate).toBeNull();
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', 'in', world.userIds).execute();
+      }
+    });
+
+    it('returns nothing to a user with no access to the identity', async () => {
+      const { ctx, sut } = setup();
+      const world = await seedBirthdayPermissionWorld(ctx, sut);
+
+      try {
+        const result = await sut.getResolvedPersonByIdentityId(world.carol.id, world.identity.id);
+        expect(result).toBeUndefined();
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', 'in', world.userIds).execute();
+      }
+    });
   });
 
   it('filters unnamed identity-grouped people below the configured minimum face count', async () => {
