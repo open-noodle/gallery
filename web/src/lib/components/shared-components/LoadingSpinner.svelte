@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Theme, themeManager } from '@immich/ui';
+  import { t } from 'svelte-i18n';
 
   interface Props {
     size?: 'tiny' | 'small' | 'medium' | 'large' | 'giant';
@@ -24,7 +25,7 @@
     role="status"
     class={[sizeClasses[size], className].filter(Boolean).join(' ')}
     {src}
-    alt="Loading"
+    alt={$t('loading')}
     data-testid="loading-spinner"
   />
 </div>
