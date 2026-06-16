@@ -57,6 +57,28 @@ if [[ -f "$overrides_file" && -f "$i18n_file" ]]; then
     fi
   done
   echo "  i18n: $((override_count - leaked))/$override_count keys patched"
+
+  # Issue #703: the upstream name must not leak through *any* locale for a key
+  # the fork rebrands. Non-English locales carry upstream Weblate translations
+  # of these keys; patch_i18n() either replaces them with a per-locale override
+  # or drops them so they fall back to the branded en.json. Verify every locale.
+  locale_leaks=0
+  for locale_file in "$REPO_ROOT"/i18n/*.json; do
+    [[ -f "$locale_file" ]] || continue
+    lang=$(basename "$locale_file" .json)
+    for key in $(jq -r --slurpfile ov "$overrides_file" --arg up "$UPSTREAM_NAME" '
+      . as $loc
+      | ($ov[0] | keys)
+      | map(select((($loc[.]?) | type) == "string" and ($loc[.] | contains($up))))
+      | .[]' "$locale_file"); do
+      echo "  WARN: i18n locale '$lang' leaks '$UPSTREAM_NAME' in rebranded key '$key'"
+      locale_leaks=$((locale_leaks + 1))
+      EXIT_CODE=1
+    done
+  done
+  if [[ $locale_leaks -eq 0 ]]; then
+    echo "  i18n: no '$UPSTREAM_NAME' leaks across rebranded keys in any locale"
+  fi
 fi
 
 # Check iOS bundle ID
