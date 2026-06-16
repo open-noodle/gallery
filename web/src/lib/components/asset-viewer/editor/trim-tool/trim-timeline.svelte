@@ -1,5 +1,6 @@
 <script lang="ts">
   import { TrimManager } from '$lib/managers/edit/trim-manager.svelte';
+  import { t } from 'svelte-i18n';
 
   interface Props {
     trimManager: TrimManager;
@@ -154,7 +155,7 @@
   class="relative h-12 rounded-md bg-gray-800 cursor-pointer select-none"
   role="slider"
   tabindex="-1"
-  aria-label="Video timeline"
+  aria-label={$t('editor_trim_timeline_label')}
   aria-valuenow={Math.round(trimManager.currentTime)}
   aria-valuemin={0}
   aria-valuemax={Math.round(trimManager.duration)}
@@ -192,7 +193,7 @@
     style:height="calc(100% + 4px)"
     role="slider"
     tabindex={0}
-    aria-label="Trim start"
+    aria-label={$t('editor_trim_handle_start')}
     aria-valuenow={Math.round(trimManager.startTime * 10) / 10}
     aria-valuemin={0}
     aria-valuemax={Math.round(trimManager.endTime * 10) / 10}
@@ -213,7 +214,7 @@
     style:height="calc(100% + 4px)"
     role="slider"
     tabindex={0}
-    aria-label="Trim end"
+    aria-label={$t('editor_trim_handle_end')}
     aria-valuenow={Math.round(trimManager.endTime * 10) / 10}
     aria-valuemin={Math.round(trimManager.startTime * 10) / 10}
     aria-valuemax={Math.round(trimManager.duration * 10) / 10}

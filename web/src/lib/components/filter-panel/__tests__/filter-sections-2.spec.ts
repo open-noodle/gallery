@@ -1,8 +1,15 @@
 import { fireEvent, render } from '@testing-library/svelte';
+import { init, register, waitLocale } from 'svelte-i18n';
 import type { TagOption } from '../filter-panel';
 import MediaTypeFilter from '../media-type-filter.svelte';
 import RatingFilter from '../rating-filter.svelte';
 import TagsFilter from '../tags-filter.svelte';
+
+beforeAll(async () => {
+  register('en-US', () => import('$i18n/en.json'));
+  await init({ fallbackLocale: 'en-US' });
+  await waitLocale('en-US');
+});
 
 const mockTags: TagOption[] = [
   { id: 't1', name: 'Vacation' },
