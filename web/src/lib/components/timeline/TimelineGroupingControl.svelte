@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { TimelineGrouping } from '$lib/managers/timeline-manager/types';
-  import { t } from 'svelte-i18n';
+  import { t, type Translations } from 'svelte-i18n';
   import { twMerge } from 'tailwind-merge';
 
   type TimelineGroupingControlVariant = 'inline' | 'floating';
@@ -13,7 +13,7 @@
     onGroupingChange: (grouping: TimelineGrouping) => void;
   };
 
-  const modes: { grouping: TimelineGrouping; labelKey: string }[] = [
+  const modes: { grouping: TimelineGrouping; labelKey: Translations }[] = [
     { grouping: 'year', labelKey: 'timeline_grouping_years' },
     { grouping: 'month', labelKey: 'timeline_grouping_months' },
     { grouping: 'day', labelKey: 'timeline_grouping_all' },

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { t } from 'svelte-i18n';
+  import { t, type Translations } from 'svelte-i18n';
   import type { FilterState } from './filter-panel';
 
   const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -36,7 +36,7 @@
     type: string;
     id?: string;
     label?: string;
-    labelKey?: string;
+    labelKey?: Translations;
     labelValues?: Record<string, string>;
   }
 
