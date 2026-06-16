@@ -3,6 +3,7 @@
   import { getSpace, type SharedSpaceResponseDto } from '@immich/sdk';
   import { Modal, ModalBody } from '@immich/ui';
   import { mdiBookshelf } from '@mdi/js';
+  import { t } from 'svelte-i18n';
 
   interface Props {
     space: SharedSpaceResponseDto;
@@ -24,7 +25,7 @@
   };
 </script>
 
-<Modal title="Connected Libraries" icon={mdiBookshelf} onClose={() => onClose(changed)}>
+<Modal title={$t('spaces_connected_libraries')} icon={mdiBookshelf} onClose={() => onClose(changed)}>
   <ModalBody>
     <SpaceLinkedLibraries space={spaceData} onChanged={handleChanged} />
   </ModalBody>
