@@ -10,7 +10,8 @@ import { modalManager, toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { init, register, waitLocale } from 'svelte-i18n';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import ClassificationSettings from './ClassificationSettings.svelte';
 
 vi.mock('@immich/sdk', () => ({
@@ -66,6 +67,16 @@ const makeCategory = (
 });
 
 describe('ClassificationSettings', () => {
+  beforeAll(async () => {
+    // Load the real en bundle so the component's `$t('admin.classification_*')` / `$t('name')` etc.
+    // resolve to English text. This spec asserts on the user-facing labels, button text, dialog
+    // titles, toast copy and summary badges, so the translated output is load-bearing
+    // (the global setup's `dev` locale returns raw keys).
+    register('en-US', () => import('$i18n/en.json'));
+    await init({ fallbackLocale: 'en-US' });
+    await waitLocale('en-US');
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockFeatureFlags.configFile = false;
