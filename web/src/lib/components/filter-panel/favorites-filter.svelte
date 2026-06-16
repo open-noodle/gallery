@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Icon } from '@immich/ui';
   import { mdiHeart, mdiHeartOutline } from '@mdi/js';
+  import { t } from 'svelte-i18n';
 
   interface Props {
     selected?: boolean;
@@ -19,7 +20,7 @@
     onclick={() => onToggle(undefined)}
     data-testid="favorites-all"
   >
-    All
+    {$t('all')}
   </button>
   <button
     type="button"
@@ -30,6 +31,6 @@
     data-testid="favorites-only"
   >
     <Icon icon={selected === true ? mdiHeart : mdiHeartOutline} size="14" />
-    Favorites
+    {$t('favorites')}
   </button>
 </div>

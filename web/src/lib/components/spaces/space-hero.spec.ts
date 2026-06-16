@@ -48,7 +48,7 @@ describe('SpaceHero component', () => {
 
   it('should display role badge when currentRole is provided', () => {
     render(SpaceHero, { space: makeSpace(), memberCount: 1, assetCount: 0, currentRole: 'editor' });
-    expect(screen.getByTestId('hero-role-badge')).toHaveTextContent('Editor');
+    expect(screen.getByTestId('hero-role-badge')).toHaveTextContent('role_editor');
   });
 
   it('should not display role badge when currentRole is not provided', () => {
@@ -294,7 +294,7 @@ describe('SpaceHero component', () => {
       onToggleCollapse: vi.fn(),
       currentRole: 'editor',
     });
-    expect(screen.getByTestId('hero-collapsed-role')).toHaveTextContent('Editor');
+    expect(screen.getByTestId('hero-collapsed-role')).toHaveTextContent('role_editor');
   });
 
   it('should show cover image behind collapsed bar when cover exists', () => {

@@ -56,11 +56,11 @@
   );
   let showFullDescription = $state(false);
 
-  const roleLabels: Record<string, string> = {
-    owner: 'Owner',
-    editor: 'Editor',
-    viewer: 'Viewer',
-  };
+  let roleLabels: Record<string, string> = $derived({
+    owner: $t('owner'),
+    editor: $t('role_editor'),
+    viewer: $t('role_viewer'),
+  });
 
   // Drag-to-reposition state
   let dragCropY = $state(50);
@@ -182,7 +182,7 @@
           class="rounded-full bg-white/20 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-white/30"
           onclick={onToggleCollapse}
           aria-expanded="false"
-          aria-label="Expand space header"
+          aria-label={$t('spaces_expand_header')}
           data-testid="hero-expand-toggle"
         >
           <Icon icon={mdiChevronDown} size="16" />
@@ -324,7 +324,7 @@
             class="inline-flex items-center rounded-full bg-white/20 p-1 backdrop-blur-sm transition-colors hover:bg-white/30"
             onclick={onToggleCollapse}
             aria-expanded="true"
-            aria-label="Collapse space header"
+            aria-label={$t('spaces_collapse_header')}
             data-testid="hero-collapse-toggle"
           >
             <Icon icon={mdiChevronUp} size="16" />

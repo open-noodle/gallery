@@ -2,6 +2,7 @@
   import { Icon } from '@immich/ui';
   import { mdiMagnify } from '@mdi/js';
   import { SvelteMap } from 'svelte/reactivity';
+  import { t } from 'svelte-i18n';
   import type { TagOption } from './filter-panel';
 
   interface Props {
@@ -65,7 +66,7 @@
 
 <div data-testid="tags-filter">
   {#if tags.length === 0 && orphanedTags.length === 0}
-    <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="tags-empty">No tags available</p>
+    <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="tags-empty">{$t('filter_no_tags_available')}</p>
   {:else}
     <!-- Search input -->
     <div class="relative mb-2">
@@ -75,7 +76,7 @@
       <input
         type="text"
         class="immich-form-input h-8 w-full rounded-lg pl-7 pr-2 text-sm"
-        placeholder="Search tags..."
+        placeholder={$t('search_tags')}
         bind:value={searchQuery}
         oninput={() => {
           showAll = false;
@@ -109,7 +110,9 @@
 
     <!-- Empty search results -->
     {#if filteredTags.length === 0 && searchQuery.trim()}
-      <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="tags-no-results">No matching tags</p>
+      <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="tags-no-results">
+        {$t('filter_no_matching_tags')}
+      </p>
     {/if}
 
     <!-- Tags list -->
@@ -150,7 +153,7 @@
         onclick={() => (showAll = true)}
         data-testid="tags-show-more"
       >
-        Show {remainingCount} more
+        {$t('filter_show_more', { values: { count: remainingCount } })}
       </button>
     {/if}
   {/if}

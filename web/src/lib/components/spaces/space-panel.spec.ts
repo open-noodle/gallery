@@ -116,7 +116,7 @@ describe('SpacePanel', () => {
   it('should show member count in Members tab label', () => {
     renderPanel(defaultProps);
     const membersTab = screen.getByTestId('tab-members');
-    expect(membersTab).toHaveTextContent('Members (2)');
+    expect(membersTab).toHaveTextContent('members (2)');
   });
 
   it('should only render Activity and Members tabs for admin users', () => {
@@ -126,8 +126,8 @@ describe('SpacePanel', () => {
     const tabSwitcher = screen.getByTestId('tab-switcher');
     const tabs = tabSwitcher.querySelectorAll('button');
     expect(tabs).toHaveLength(2);
-    expect(tabs[0]).toHaveTextContent('Activity');
-    expect(tabs[1]).toHaveTextContent(/^Members/);
+    expect(tabs[0]).toHaveTextContent('spaces_activity');
+    expect(tabs[1]).toHaveTextContent(/^members/);
   });
 
   it('should not render a Libraries tab', () => {

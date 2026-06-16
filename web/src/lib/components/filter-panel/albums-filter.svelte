@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Icon } from '@immich/ui';
   import { mdiImageAlbum, mdiImageOffOutline } from '@mdi/js';
+  import { t } from 'svelte-i18n';
 
   interface Props {
     selected?: boolean;
@@ -20,7 +21,7 @@
     data-testid="albums-all"
   >
     <Icon icon={mdiImageAlbum} size="14" />
-    All
+    {$t('all')}
   </button>
   <button
     type="button"
@@ -31,6 +32,6 @@
     data-testid="albums-none"
   >
     <Icon icon={mdiImageOffOutline} size="14" />
-    Has no album
+    {$t('filter_has_no_album')}
   </button>
 </div>

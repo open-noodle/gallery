@@ -254,7 +254,7 @@ describe('SmartSearchResults', () => {
     const { getByTestId } = render(SmartSearchResults, { props: { ...baseProps, total: 42 } });
     await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
 
-    expect(getByTestId('result-count')).toHaveTextContent('42 results');
+    expect(getByTestId('result-count')).toHaveTextContent('spaces_search_result_count');
   });
 
   // Test 57 — render assertion for isShared on the dumb grid
