@@ -12,6 +12,8 @@
   import { Button, IconButton, modalManager, Switch, Text, toastManager } from '@immich/ui';
   import { mdiContentSave, mdiDelete, mdiPencil, mdiPlus, mdiUndoVariant } from '@mdi/js';
   import { onMount } from 'svelte';
+  import { t } from 'svelte-i18n';
+  import { get } from 'svelte/store';
 
   type Category = SystemConfigDto['classification']['categories'][number];
   type FaceExclusion = NonNullable<Category['faceExclusion']>;
@@ -32,29 +34,29 @@
   let formFaceExclusion: FaceExclusion = $state(ClassificationFaceExclusion.Off);
   let formEnabled = $state(true);
 
-  const actionLabels: Record<string, string> = {
-    tag: 'Tag only',
-    tag_and_archive: 'Tag and archive',
-  };
+  const actionLabels: Record<string, string> = $derived({
+    tag: $t('admin.classification_action_tag'),
+    tag_and_archive: $t('admin.classification_action_tag_and_archive'),
+  });
 
-  const faceExclusionLabels: Record<FaceExclusion, string> = {
-    [ClassificationFaceExclusion.Off]: 'Off',
-    [ClassificationFaceExclusion.AnyAssignedFace]: 'Any assigned face',
-    [ClassificationFaceExclusion.NamedPeople]: 'Named people',
-    [ClassificationFaceExclusion.NamedVisiblePeople]: 'Named, visible people',
-  };
+  const faceExclusionLabels: Record<FaceExclusion, string> = $derived({
+    [ClassificationFaceExclusion.Off]: $t('admin.classification_face_exclusion_off'),
+    [ClassificationFaceExclusion.AnyAssignedFace]: $t('admin.classification_face_exclusion_any_face'),
+    [ClassificationFaceExclusion.NamedPeople]: $t('admin.classification_face_exclusion_named_people'),
+    [ClassificationFaceExclusion.NamedVisiblePeople]: $t('admin.classification_face_exclusion_named_visible'),
+  });
 
   const getFaceExclusion = (category: Partial<Category>): FaceExclusion =>
     category.faceExclusion ?? ClassificationFaceExclusion.Off;
 
   const getSimilarityLabel = (value: number): string => {
     if (value < 0.22) {
-      return 'Loose';
+      return get(t)('admin.classification_similarity_loose');
     }
     if (value > 0.35) {
-      return 'Strict';
+      return get(t)('admin.classification_similarity_strict');
     }
-    return 'Normal';
+    return get(t)('admin.classification_similarity_normal');
   };
 
   onMount(async () => {
@@ -66,7 +68,7 @@
       config = await getConfig();
       categories = config.classification.categories;
     } catch (error) {
-      handleError(error, 'Unable to load classification config');
+      handleError(error, get(t)('admin.classification_load_failed'));
     }
   };
 
@@ -129,32 +131,31 @@
       let isStricter = false;
       if (isCreating) {
         updated.push(category);
-        toastManager.primary(`Category "${formName}" created`);
+        toastManager.primary(get(t)('admin.classification_category_created', { values: { name: formName } }));
       } else if (editingIndex !== null) {
         isStricter = formSimilarity > categories[editingIndex].similarity;
         updated[editingIndex] = category;
-        toastManager.primary(`Category "${formName}" updated`);
+        toastManager.primary(get(t)('admin.classification_category_updated', { values: { name: formName } }));
       }
 
       await saveConfig(updated);
 
       if (isStricter) {
         const shouldRescan = await modalManager.showDialog({
-          title: 'Rescan photos?',
-          prompt:
-            'This category is now stricter. Would you like to remove existing auto-tags that may no longer match, unarchive affected photos, and rescan all photos?',
-          confirmText: 'Yes',
+          title: get(t)('admin.classification_rescan_title'),
+          prompt: get(t)('admin.classification_rescan_prompt'),
+          confirmText: get(t)('yes'),
         });
 
         if (shouldRescan) {
           await scanClassification();
-          toastManager.primary('Rescan started — existing auto-tags will be re-evaluated');
+          toastManager.primary(get(t)('admin.classification_rescan_started'));
         }
       }
 
       cancelEdit();
     } catch (error) {
-      handleError(error, 'Unable to save category');
+      handleError(error, get(t)('admin.classification_save_failed'));
     } finally {
       isSaving = false;
     }
@@ -165,9 +166,9 @@
     try {
       const updated = categories.filter((_, i) => i !== index);
       await saveConfig(updated);
-      toastManager.primary(`Category "${category.name}" deleted`);
+      toastManager.primary(get(t)('admin.classification_category_deleted', { values: { name: category.name } }));
     } catch (error) {
-      handleError(error, 'Unable to delete category');
+      handleError(error, get(t)('admin.classification_delete_failed'));
     }
   };
 
@@ -176,13 +177,13 @@
       const updated = categories.map((c, i) => (i === index ? { ...c, enabled: !c.enabled } : c));
       await saveConfig(updated);
     } catch (error) {
-      handleError(error, 'Unable to toggle category');
+      handleError(error, get(t)('admin.classification_toggle_failed'));
     }
   };
 
   const handleScan = async () => {
     const confirmed = await modalManager.showDialog({
-      prompt: 'This will reclassify all assets across all users. Continue?',
+      prompt: get(t)('admin.classification_scan_confirm'),
     });
     if (!confirmed) {
       return;
@@ -190,9 +191,9 @@
     isScanning = true;
     try {
       await scanClassification();
-      toastManager.primary('Library scan started');
+      toastManager.primary(get(t)('admin.classification_scan_started'));
     } catch (error) {
-      handleError(error, 'Unable to start library scan');
+      handleError(error, get(t)('admin.classification_scan_failed'));
     } finally {
       isScanning = false;
     }
@@ -202,42 +203,47 @@
 <section class="my-4">
   {#if isCreating || editingIndex !== null}
     <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-slate-50 dark:bg-gray-900 p-5">
-      <Text fontWeight="semi-bold" class="mb-4">{isCreating ? 'New Category' : 'Edit Category'}</Text>
+      <Text fontWeight="semi-bold" class="mb-4"
+        >{isCreating ? $t('admin.classification_new_category') : $t('admin.classification_edit_category')}</Text
+      >
 
       <div class="flex flex-col gap-4">
         <div>
-          <label for="category-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label
+          <label for="category-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >{$t('name')}</label
           >
           <input
             id="category-name"
             type="text"
             bind:value={formName}
             {disabled}
-            placeholder="e.g. Screenshots, Receipts, Memes"
+            placeholder={$t('admin.classification_name_placeholder')}
             class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-immich-primary focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
           />
         </div>
 
         <div>
           <label for="category-prompts" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Prompts (one per line)
+            {$t('admin.classification_prompts_label')}
           </label>
           <textarea
             id="category-prompts"
             bind:value={formPrompts}
             {disabled}
             rows="4"
-            placeholder="a screenshot of a phone&#10;a screenshot of a computer&#10;a screen capture"
+            placeholder={$t('admin.classification_prompts_placeholder')}
             class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-immich-primary focus:outline-none resize-y disabled:opacity-50 disabled:cursor-not-allowed"
           ></textarea>
         </div>
 
         <div>
           <label for="category-similarity" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Similarity: {formSimilarity.toFixed(2)} ({getSimilarityLabel(formSimilarity)})
+            {$t('admin.classification_similarity_label', {
+              values: { value: formSimilarity.toFixed(2), label: getSimilarityLabel(formSimilarity) },
+            })}
           </label>
           <div class="flex items-center gap-3">
-            <span class="text-xs text-gray-500 dark:text-gray-400">Loose</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">{$t('admin.classification_similarity_loose')}</span>
             <input
               id="category-similarity"
               type="range"
@@ -248,16 +254,16 @@
               {disabled}
               class="flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
             />
-            <span class="text-xs text-gray-500 dark:text-gray-400">Strict</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">{$t('admin.classification_similarity_strict')}</span>
           </div>
           <Text size="tiny" color="muted" class="mt-1">
-            Start around 0.15-0.30, then lower for broader matches or raise for stricter matches.
+            {$t('admin.classification_similarity_help')}
           </Text>
         </div>
 
         <div>
           <label for="category-action" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Action
+            {$t('action')}
           </label>
           <select
             id="category-action"
@@ -272,7 +278,7 @@
 
         <div>
           <label for="category-face-exclusion" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Face exclusion
+            {$t('admin.classification_face_exclusion')}
           </label>
           <select
             id="category-face-exclusion"
@@ -298,13 +304,13 @@
         {#if editingIndex !== null}
           <div class="flex items-center gap-2">
             <Switch bind:checked={formEnabled} {disabled} />
-            <Text size="small">{formEnabled ? 'Enabled' : 'Disabled'}</Text>
+            <Text size="small">{formEnabled ? $t('enabled') : $t('disabled')}</Text>
           </div>
         {/if}
 
         <div class="flex justify-end gap-2">
           <Button shape="round" size="small" color="secondary" onclick={cancelEdit} leadingIcon={mdiUndoVariant}>
-            Cancel
+            {$t('cancel')}
           </Button>
           <Button
             shape="round"
@@ -313,7 +319,7 @@
             disabled={disabled || isSaving || !formName.trim() || !formPrompts.trim()}
             leadingIcon={mdiContentSave}
           >
-            {isSaving ? 'Saving...' : 'Save'}
+            {isSaving ? $t('admin.classification_saving') : $t('save')}
           </Button>
         </div>
       </div>
@@ -350,7 +356,7 @@
                 {/if}
               </div>
               <Text size="tiny" color="muted">
-                {category.prompts.length} prompt{category.prompts.length === 1 ? '' : 's'} &middot; {getSimilarityLabel(
+                {$t('admin.classification_prompt_count', { values: { count: category.prompts.length } })} &middot; {getSimilarityLabel(
                   category.similarity,
                 )}
                 ({category.similarity.toFixed(2)})
@@ -367,7 +373,7 @@
               icon={mdiPencil}
               size="small"
               onclick={() => startEdit(index)}
-              aria-label="Edit"
+              aria-label={$t('edit')}
               {disabled}
             />
             <IconButton
@@ -377,7 +383,7 @@
               icon={mdiDelete}
               size="small"
               onclick={() => handleDelete(index)}
-              aria-label="Delete"
+              aria-label={$t('delete')}
               {disabled}
             />
           </div>
@@ -385,15 +391,17 @@
       </div>
     {/each}
   {:else if !isCreating}
-    <Text class="py-4" color="muted">No classification categories yet. Add one to get started.</Text>
+    <Text class="py-4" color="muted">{$t('admin.classification_empty')}</Text>
   {/if}
 
   <div class="flex justify-end gap-2 mt-5">
     <Button shape="round" size="small" color="secondary" onclick={handleScan} disabled={disabled || isScanning}>
-      {isScanning ? 'Scanning...' : 'Scan All Libraries'}
+      {isScanning ? $t('admin.classification_scanning') : $t('admin.classification_scan_button')}
     </Button>
     {#if !isCreating && editingIndex === null}
-      <Button shape="round" size="small" onclick={startCreate} leadingIcon={mdiPlus} {disabled}>Add Category</Button>
+      <Button shape="round" size="small" onclick={startCreate} leadingIcon={mdiPlus} {disabled}
+        >{$t('admin.classification_add_category')}</Button
+      >
     {/if}
   </div>
 </section>

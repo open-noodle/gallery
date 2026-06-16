@@ -200,7 +200,7 @@ describe('MapTimelinePanel grouping', () => {
       expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
     });
 
-    await fireEvent.click(screen.getByRole('button', { name: 'Remove 2015 filter' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'filter_remove_chip' }));
 
     await waitFor(() => {
       expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();

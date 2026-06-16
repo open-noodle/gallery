@@ -41,7 +41,9 @@
   <div class="min-w-0 flex-1">
     <div class="truncate text-sm font-medium">{item.name || $t('cmdk_unnamed_person')}</div>
     {#if item.numberOfAssets !== undefined}
-      <div class="text-xs text-gray-500 dark:text-gray-400">{item.numberOfAssets} photos</div>
+      <div class="text-xs text-gray-500 dark:text-gray-400">
+        {$t('cmdk_preview_photo_count', { values: { count: item.numberOfAssets } })}
+      </div>
     {/if}
   </div>
 </div>

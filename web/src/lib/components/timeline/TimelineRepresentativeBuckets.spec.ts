@@ -122,7 +122,7 @@ describe('TimelineRepresentativeBuckets', () => {
       onTimelineBucketActivate: (activation: ActivatableTimelineBucket) => activations.push(activation),
     });
 
-    expect(screen.getByRole('button', { name: /2016, .+ photos, show months/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'timeline_overview_card_semantics' })).toBeInTheDocument();
 
     await user.click(screen.getByTestId('timeline-bucket-card'));
 
@@ -148,9 +148,7 @@ describe('TimelineRepresentativeBuckets', () => {
     });
 
     expect(screen.getByText('Aug. 2015')).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /Aug\. 2015, 80 photos, show all photos from this point/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'timeline_overview_card_semantics' })).toBeInTheDocument();
   });
 
   it('disables cards without forwarding activation', async () => {

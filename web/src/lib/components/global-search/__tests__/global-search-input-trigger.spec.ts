@@ -192,7 +192,7 @@ describe('global-search-input-trigger', () => {
 
     render(GlobalSearchInputTrigger);
 
-    expect(screen.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'Oldest first');
+    expect(screen.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'search_sort_oldest');
   });
 
   it('shows the sort dropdown on the photos page before a query exists', () => {
@@ -200,7 +200,7 @@ describe('global-search-input-trigger', () => {
 
     render(GlobalSearchInputTrigger);
 
-    expect(screen.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'Newest first');
+    expect(screen.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'search_sort_newest');
   });
 
   it('shows the sort dropdown on a space detail page before a query exists', () => {
@@ -208,7 +208,7 @@ describe('global-search-input-trigger', () => {
 
     render(GlobalSearchInputTrigger);
 
-    expect(screen.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'Newest first');
+    expect(screen.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'search_sort_newest');
   });
 
   it('shows relevance on searchable pages with an active query', () => {
@@ -216,7 +216,7 @@ describe('global-search-input-trigger', () => {
 
     render(GlobalSearchInputTrigger);
 
-    expect(screen.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'Relevance');
+    expect(screen.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'search_sort_relevance');
   });
 
   it('hides the sort dropdown on non-searchable pages', () => {
@@ -235,7 +235,7 @@ describe('global-search-input-trigger', () => {
     render(GlobalSearchInputTrigger);
 
     await user.click(screen.getByTestId('search-sort-btn'));
-    await user.click(screen.getByText('Newest first'));
+    await user.click(screen.getByText('search_sort_newest'));
 
     expect(applySortSpy).toHaveBeenCalledWith('desc', 'mountain');
   });
@@ -248,7 +248,7 @@ describe('global-search-input-trigger', () => {
     render(GlobalSearchInputTrigger);
 
     await user.click(screen.getByTestId('search-sort-btn'));
-    await user.click(screen.getByText('Oldest first'));
+    await user.click(screen.getByText('search_sort_oldest'));
 
     expect(applySortSpy).toHaveBeenCalledWith('asc', '');
   });

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { t } from 'svelte-i18n';
+  import { get } from 'svelte/store';
   import { aggregateYears, getMonthsForYear } from './temporal-utils';
 
   const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -73,20 +75,20 @@
   function validateAndEmitCustomRange() {
     const parsedFrom = parseDateOnly(fromValue);
     if (!parsedFrom.valid) {
-      customRangeError = 'Enter a valid From date';
+      customRangeError = get(t)('filter_invalid_from_date');
       customRangeErrorTarget = 'from';
       return;
     }
 
     const parsedTo = parseDateOnly(toValue);
     if (!parsedTo.valid) {
-      customRangeError = 'Enter a valid To date';
+      customRangeError = get(t)('filter_invalid_to_date');
       customRangeErrorTarget = 'to';
       return;
     }
 
     if (parsedFrom.value && parsedTo.value && parsedFrom.value > parsedTo.value) {
-      customRangeError = 'From date must be on or before To date';
+      customRangeError = get(t)('filter_from_after_to_error');
       customRangeErrorTarget = 'range';
       return;
     }
@@ -126,7 +128,7 @@
   <div class="mb-4 space-y-2" data-testid="custom-date-range">
     <div class="grid grid-cols-2 gap-2.5">
       <label class="flex flex-col gap-1.5 text-[11px] font-medium leading-none text-gray-600 dark:text-gray-300">
-        <span class="px-0.5">From</span>
+        <span class="px-0.5">{$t('filter_from')}</span>
         <input
           bind:value={fromValue}
           oninput={validateAndEmitCustomRange}
@@ -144,7 +146,7 @@
         />
       </label>
       <label class="flex flex-col gap-1.5 text-[11px] font-medium leading-none text-gray-600 dark:text-gray-300">
-        <span class="px-0.5">To</span>
+        <span class="px-0.5">{$t('filter_to')}</span>
         <input
           bind:value={toValue}
           oninput={validateAndEmitCustomRange}
@@ -176,7 +178,7 @@
         onclick={handleBackToAll}
         data-testid="temporal-breadcrumb-all"
       >
-        All
+        {$t('all')}
       </button>
       <span class="opacity-50">/</span>
       <span class="font-semibold">{selectedYear}</span>
