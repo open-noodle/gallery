@@ -4,7 +4,6 @@ import { AuthDto } from 'src/dtos/auth.dto';
 import { LibraryManifestAssetDto, LibraryManifestResponseDto } from 'src/dtos/library-manifest.dto';
 import { BaseService } from 'src/services/base.service';
 import { hexOrBufferToBase64 } from 'src/utils/bytes';
-import { asDateString } from 'src/utils/date';
 
 @Injectable()
 export class LibraryManifestService extends BaseService {
@@ -38,8 +37,8 @@ export class LibraryManifestService extends BaseService {
       checksumAlgorithm: row.checksumAlgorithm,
       size: row.size ?? null,
       type: row.type,
-      fileCreatedAt: asDateString(row.fileCreatedAt),
-      fileModifiedAt: asDateString(row.fileModifiedAt),
+      fileCreatedAt: row.fileCreatedAt ? new Date(row.fileCreatedAt).toISOString() : null,
+      fileModifiedAt: row.fileModifiedAt ? new Date(row.fileModifiedAt).toISOString() : null,
       albumIds: albumIdsByAsset.get(row.id) ?? [],
     }));
 
