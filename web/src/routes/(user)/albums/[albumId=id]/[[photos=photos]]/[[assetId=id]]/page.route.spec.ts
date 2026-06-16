@@ -208,7 +208,7 @@ describe('album detail filter panel route', () => {
     await waitFor(() => expect(screen.getByTestId('favorites-only')).toBeInTheDocument());
     await user.click(screen.getByTestId('favorites-only'));
 
-    expect(screen.getByTestId('active-chip')).toHaveTextContent('Favorites');
+    expect(screen.getByTestId('active-chip')).toHaveTextContent('favorites');
     expect(screen.getByTestId('timeline-options').textContent).toContain('"isFavorite":true');
 
     await fireEvent.click(screen.getByLabelText('add_photos'));
@@ -217,7 +217,7 @@ describe('album detail filter panel route', () => {
 
     await user.click(screen.getByTestId('favorites-only'));
 
-    expect(screen.getByTestId('active-chip')).toHaveTextContent('Favorites');
+    expect(screen.getByTestId('active-chip')).toHaveTextContent('favorites');
     expect(screen.getByTestId('timeline-options').textContent).toContain('"timelineAlbumId":"');
     expect(screen.getByTestId('timeline-options').textContent).toContain('"isFavorite":true');
     expect(screen.getByTestId('timeline-options').textContent).not.toContain('"withPartners":true');
@@ -342,7 +342,7 @@ describe('album detail filter panel route', () => {
       expect(screen.getByTestId('timeline-options').textContent).toContain('"grouping":"month"');
     });
 
-    await user.click(screen.getByRole('button', { name: 'Remove 2024 filter' }));
+    await user.click(screen.getByRole('button', { name: 'filter_remove_chip' }));
 
     await waitFor(() => {
       expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();

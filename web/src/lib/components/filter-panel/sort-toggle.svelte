@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Icon } from '@immich/ui';
   import { mdiSortCalendarAscending, mdiSortCalendarDescending } from '@mdi/js';
+  import { t } from 'svelte-i18n';
 
   interface Props {
     sortOrder: 'asc' | 'desc';
@@ -14,7 +15,7 @@
   }
 
   let icon = $derived(sortOrder === 'asc' ? mdiSortCalendarAscending : mdiSortCalendarDescending);
-  let title = $derived(sortOrder === 'asc' ? 'Sort: oldest first' : 'Sort: newest first');
+  let title = $derived(sortOrder === 'asc' ? $t('filter_sort_oldest_first') : $t('filter_sort_newest_first'));
 </script>
 
 <button
