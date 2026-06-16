@@ -1,5 +1,7 @@
 import type { AssetResponseDto } from '@immich/sdk';
 import { fireEvent, render, screen } from '@testing-library/svelte';
+import { init, register, waitLocale } from 'svelte-i18n';
+
 import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
 import SpaceSearchResults from '$lib/components/spaces/space-search-results.svelte';
 
@@ -34,6 +36,12 @@ const mockAssetsWithDates = [
 ] as AssetResponseDto[];
 
 describe('SpaceSearchResults', () => {
+  beforeAll(async () => {
+    register('en-US', () => import('$i18n/en.json'));
+    await init({ fallbackLocale: 'en-US' });
+    await waitLocale('en-US');
+  });
+
   beforeEach(() => {
     vi.stubGlobal('IntersectionObserver', getIntersectionObserverMock());
     getAssetInfoMock.mockReset();

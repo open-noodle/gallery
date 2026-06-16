@@ -15,8 +15,8 @@ describe('TimelineRouteGroupingBar', () => {
     expect(screen.getByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
     expect(screen.getByTestId('timeline-grouping-control')).toHaveAttribute('data-variant', 'inline');
     expect(screen.getByTestId('timeline-grouping-month')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('timeline-grouping-day')).toHaveTextContent('All');
-    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('timeline-grouping-day')).toHaveTextContent('timeline_grouping_all');
+    expect(screen.getByRole('button', { name: 'timeline_grouping_all' })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('keeps the route grouping surface transparent instead of drawing a full-width toolbar', () => {
@@ -64,7 +64,7 @@ describe('TimelineRouteGroupingBar', () => {
       },
     });
 
-    expect(screen.getByTestId('result-count')).toHaveTextContent('12 results');
+    expect(screen.getByTestId('result-count')).toHaveTextContent('filter_result_count');
     expect(screen.getByTestId('active-chip')).toHaveTextContent('2024');
 
     await fireEvent.click(screen.getByTestId('chip-close'));
