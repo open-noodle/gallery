@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from 'svelte-i18n';
   import type { FilterContext } from './filter-panel';
 
   interface Props {
@@ -11,15 +12,7 @@
     emptyText?: string;
   }
 
-  let {
-    makes,
-    selectedMake,
-    selectedModel,
-    context,
-    onModelFetch,
-    onSelectionChange,
-    emptyText = 'No cameras found',
-  }: Props = $props();
+  let { makes, selectedMake, selectedModel, context, onModelFetch, onSelectionChange, emptyText }: Props = $props();
 
   let expandedMake = $state<string | undefined>(undefined);
   let models = $state<string[]>([]);
@@ -71,7 +64,9 @@
 
 <div data-testid="camera-filter">
   {#if makes.length === 0 && !orphanedMake}
-    <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="camera-empty">{emptyText}</p>
+    <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="camera-empty">
+      {emptyText ?? $t('filter_no_cameras_found')}
+    </p>
   {:else}
     <!-- Orphaned make (selected but no longer in suggestions) -->
     {#if orphanedMake}

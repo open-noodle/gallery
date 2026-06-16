@@ -7,7 +7,7 @@ describe('LoadingSpinner Component', () => {
     const { container } = render(LoadingSpinner);
     const img = container.querySelector('[data-testid="loading-spinner"]');
     expect(img).toBeDefined();
-    expect(img?.getAttribute('alt')).toBe('Loading');
+    expect(img?.getAttribute('alt')).toBe('loading');
   });
 
   it('should have role="status" for accessibility', () => {

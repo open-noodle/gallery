@@ -12,11 +12,11 @@ describe('TimelineGroupingControl', () => {
     });
 
     expect(screen.getByTestId('timeline-grouping-control')).toHaveAttribute('data-variant', 'inline');
-    expect(screen.getByTestId('timeline-grouping-year')).toHaveTextContent('Years');
-    expect(screen.getByTestId('timeline-grouping-month')).toHaveTextContent('Months');
-    expect(screen.getByTestId('timeline-grouping-day')).toHaveTextContent('All');
-    expect(screen.getByRole('group', { name: 'Timeline grouping' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('timeline-grouping-year')).toHaveTextContent('timeline_grouping_years');
+    expect(screen.getByTestId('timeline-grouping-month')).toHaveTextContent('timeline_grouping_months');
+    expect(screen.getByTestId('timeline-grouping-day')).toHaveTextContent('timeline_grouping_all');
+    expect(screen.getByRole('group', { name: 'timeline_grouping_selector' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'timeline_grouping_all' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByTestId('timeline-grouping-month')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('timeline-grouping-year')).toHaveAttribute('aria-pressed', 'false');
   });
@@ -44,9 +44,9 @@ describe('TimelineGroupingControl', () => {
       },
     });
 
-    await fireEvent.click(screen.getByRole('button', { name: 'All' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'timeline_grouping_all' }));
 
-    expect(screen.getByTestId('timeline-grouping-day')).toHaveTextContent('All');
+    expect(screen.getByTestId('timeline-grouping-day')).toHaveTextContent('timeline_grouping_all');
     expect(changes).toEqual(['day']);
   });
 

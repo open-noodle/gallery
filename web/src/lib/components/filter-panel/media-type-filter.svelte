@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { t } from 'svelte-i18n';
+
   interface Props {
     selected: 'all' | 'image' | 'video';
     availableMediaTypes?: string[];
@@ -7,11 +9,11 @@
 
   let { selected, availableMediaTypes, onTypeChange }: Props = $props();
 
-  const allOptions: Array<{ value: 'all' | 'image' | 'video'; label: string; assetType?: string }> = [
-    { value: 'all', label: 'All' },
-    { value: 'image', label: 'Photos', assetType: 'IMAGE' },
-    { value: 'video', label: 'Videos', assetType: 'VIDEO' },
-  ];
+  let allOptions = $derived<Array<{ value: 'all' | 'image' | 'video'; label: string; assetType?: string }>>([
+    { value: 'all', label: $t('all') },
+    { value: 'image', label: $t('photos'), assetType: 'IMAGE' },
+    { value: 'video', label: $t('videos'), assetType: 'VIDEO' },
+  ]);
 
   let options = $derived(
     availableMediaTypes && availableMediaTypes.length > 0
