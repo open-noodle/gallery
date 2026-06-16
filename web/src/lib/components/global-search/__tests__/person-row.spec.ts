@@ -10,7 +10,7 @@ describe('person-row', () => {
       },
     });
     expect(screen.getByText('Alice')).toBeInTheDocument();
-    expect(screen.getByText(/42 photos/)).toBeInTheDocument();
+    expect(screen.getByText('cmdk_preview_photo_count')).toBeInTheDocument();
   });
 
   it('falls back to "Unnamed person" label when name is empty', () => {
