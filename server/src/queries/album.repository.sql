@@ -313,9 +313,17 @@ from
   "album_asset"
   inner join "album" on "album"."id" = "album_asset"."albumId"
 where
-  "album"."ownerId" = $1
+  exists (
+    select
+    from
+      "album_user"
+    where
+      "album_user"."albumId" = "album"."id"
+      and "album_user"."role" = $1
+      and "album_user"."userId" = $2
+  )
   and "album"."deletedAt" is null
-  and "album_asset"."assetId" in ($2)
+  and "album_asset"."assetId" in ($3)
 group by
   "album_asset"."assetId"
 
