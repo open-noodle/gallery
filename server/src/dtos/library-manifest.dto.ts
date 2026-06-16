@@ -25,8 +25,8 @@ const LibraryManifestAssetSchema = z
     checksumAlgorithm: z.enum(ChecksumAlgorithm).describe('Checksum algorithm'),
     size: z.int().min(0).nullable().describe('Original file size in bytes; null if unknown'),
     type: AssetTypeSchema,
-    fileCreatedAt: z.string().meta({ format: 'date-time' }).describe('File creation time'),
-    fileModifiedAt: z.string().meta({ format: 'date-time' }).describe('File modification time'),
+    fileCreatedAt: z.string().meta({ format: 'date-time' }).nullable().describe('File creation time'),
+    fileModifiedAt: z.string().meta({ format: 'date-time' }).nullable().describe('File modification time'),
     albumIds: z.array(z.uuidv4()).describe('IDs of the owner-owned albums this asset belongs to'),
   })
   .meta({ id: 'LibraryManifestAssetDto' });
