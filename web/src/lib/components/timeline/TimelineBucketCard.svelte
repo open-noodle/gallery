@@ -3,6 +3,7 @@
   import { getAssetMediaUrl } from '$lib/utils';
   import type { ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
   import { AssetMediaSize } from '@immich/sdk';
+  import { t } from 'svelte-i18n';
 
   type TimelineBucketCardBucket = ActivatableTimelineBucket & {
     timeBucket: string;
@@ -38,22 +39,23 @@
     return String(bucket.date.year);
   });
 
-  let countLabel = $derived.by(() => {
-    const count = new Intl.NumberFormat(locale).format(bucket.count);
-    return `${count} ${bucket.count === 1 ? 'photo' : 'photos'}`;
-  });
+  let countLabel = $derived($t('timeline_overview_photo_count', { values: { count: bucket.count } }));
 
   let actionLabel = $derived.by(() => {
     if (bucket.grouping === 'year') {
-      return 'show months';
+      return $t('timeline_overview_show_months');
     }
 
     if (bucket.grouping === 'month') {
-      return 'show all photos from this point';
+      return $t('timeline_overview_show_all_photos');
     }
   });
 
-  let accessibleLabel = $derived(`${title}, ${countLabel}${actionLabel ? `, ${actionLabel}` : ''}`);
+  let accessibleLabel = $derived(
+    actionLabel
+      ? $t('timeline_overview_card_semantics', { values: { period: title, countLabel, action: actionLabel } })
+      : `${title}, ${countLabel}`,
+  );
 
   let hasImage: boolean = $derived(Boolean(bucket.representativeAssetId) && !loading && !imageFailed);
   let imageUrl = $derived.by(() => {

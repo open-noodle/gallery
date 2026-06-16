@@ -11,6 +11,7 @@
   } from '@immich/sdk';
   import { Button, Container } from '@immich/ui';
   import { onMount } from 'svelte';
+  import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
 
   type Props = {
@@ -75,16 +76,16 @@
   // Rollback
   let rollbackBatchId = $state('');
 
-  const FILE_TYPE_LABELS: Record<string, string> = {
-    originals: 'Originals',
-    thumbnails: 'Thumbnails',
-    previews: 'Previews',
-    fullsize: 'Full-size',
-    encodedVideos: 'Encoded Videos',
-    sidecars: 'Sidecars',
-    personThumbnails: 'Person Thumbnails',
-    profileImages: 'Profile Images',
-  };
+  const fileTypeLabels = $derived<Record<string, string>>({
+    originals: $t('admin.storage_migration_file_type_originals'),
+    thumbnails: $t('admin.storage_migration_file_type_thumbnails'),
+    previews: $t('admin.storage_migration_file_type_previews'),
+    fullsize: $t('admin.storage_migration_file_type_full_size'),
+    encodedVideos: $t('admin.storage_migration_file_type_encoded_videos'),
+    sidecars: $t('admin.storage_migration_file_type_sidecars'),
+    personThumbnails: $t('admin.storage_migration_file_type_person_thumbnails'),
+    profileImages: $t('admin.storage_migration_file_type_profile_images'),
+  });
 
   function formatBytes(bytes: number): string {
     if (bytes === 0) {
@@ -102,7 +103,7 @@
       const text = await getEstimateRaw({ direction });
       estimate = JSON.parse(text) as EstimateResponse;
     } catch (error) {
-      handleError(error, 'Failed to fetch estimate');
+      handleError(error, $t('admin.storage_migration_fetch_estimate_failed'));
     } finally {
       loadingEstimate = false;
     }
@@ -114,7 +115,7 @@
       const text = await getStatusRaw();
       status = JSON.parse(text) as StatusResponse;
     } catch (error) {
-      handleError(error, 'Failed to fetch status');
+      handleError(error, $t('admin.storage_migration_fetch_status_failed'));
     } finally {
       loadingStatus = false;
     }
@@ -141,7 +142,7 @@
       await startMigrationRaw({ storageMigrationStartDto: dto });
       await fetchStatus();
     } catch (error) {
-      handleError(error, 'Failed to start migration');
+      handleError(error, $t('admin.storage_migration_start_failed'));
     } finally {
       starting = false;
     }
@@ -157,7 +158,7 @@
       rollbackBatchId = '';
       await fetchStatus();
     } catch (error) {
-      handleError(error, 'Failed to rollback batch');
+      handleError(error, $t('admin.storage_migration_rollback_failed'));
     } finally {
       rollingBack = false;
     }
@@ -186,13 +187,13 @@
 <AdminPageLayout breadcrumbs={[{ title: data.meta.title }]}>
   <Container size="medium" center>
     <div class="flex flex-col gap-8 pb-28">
-      <!-- StorageMigrationDirection -->
+      <!-- Migration direction -->
       <section class="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-        <h2 class="mb-4 text-lg font-semibold">Migration StorageMigrationDirection</h2>
+        <h2 class="mb-4 text-lg font-semibold">{$t('admin.storage_migration_direction')}</h2>
         <div class="flex gap-6">
           <label class="flex cursor-pointer items-center gap-2">
             <input type="radio" bind:group={direction} value={StorageMigrationDirection.ToS3} class="accent-primary" />
-            <span>Disk &rarr; S3</span>
+            <span>{$t('admin.storage_migration_disk_to_s3')}</span>
           </label>
           <label class="flex cursor-pointer items-center gap-2">
             <input
@@ -201,58 +202,58 @@
               value={StorageMigrationDirection.ToDisk}
               class="accent-primary"
             />
-            <span>S3 &rarr; Disk</span>
+            <span>{$t('admin.storage_migration_s3_to_disk')}</span>
           </label>
         </div>
       </section>
 
       <!-- File Types -->
       <section class="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-        <h2 class="mb-4 text-lg font-semibold">File Types</h2>
+        <h2 class="mb-4 text-lg font-semibold">{$t('admin.storage_migration_file_types')}</h2>
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <label class="flex cursor-pointer items-center gap-2">
             <input type="checkbox" bind:checked={originals} />
-            <span>Originals</span>
+            <span>{$t('admin.storage_migration_file_type_originals')}</span>
           </label>
           <label class="flex cursor-pointer items-center gap-2">
             <input type="checkbox" bind:checked={thumbnails} />
-            <span>Thumbnails</span>
+            <span>{$t('admin.storage_migration_file_type_thumbnails')}</span>
           </label>
           <label class="flex cursor-pointer items-center gap-2">
             <input type="checkbox" bind:checked={previews} />
-            <span>Previews</span>
+            <span>{$t('admin.storage_migration_file_type_previews')}</span>
           </label>
           <label class="flex cursor-pointer items-center gap-2">
             <input type="checkbox" bind:checked={fullsize} />
-            <span>Full-size</span>
+            <span>{$t('admin.storage_migration_file_type_full_size')}</span>
           </label>
           <label class="flex cursor-pointer items-center gap-2">
             <input type="checkbox" bind:checked={encodedVideos} />
-            <span>Encoded Videos</span>
+            <span>{$t('admin.storage_migration_file_type_encoded_videos')}</span>
           </label>
           <label class="flex cursor-pointer items-center gap-2">
             <input type="checkbox" bind:checked={sidecars} />
-            <span>Sidecars</span>
+            <span>{$t('admin.storage_migration_file_type_sidecars')}</span>
           </label>
           <label class="flex cursor-pointer items-center gap-2">
             <input type="checkbox" bind:checked={personThumbnails} />
-            <span>Person Thumbnails</span>
+            <span>{$t('admin.storage_migration_file_type_person_thumbnails')}</span>
           </label>
           <label class="flex cursor-pointer items-center gap-2">
             <input type="checkbox" bind:checked={profileImages} />
-            <span>Profile Images</span>
+            <span>{$t('admin.storage_migration_file_type_profile_images')}</span>
           </label>
         </div>
       </section>
 
       <!-- Estimate -->
       <section class="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-        <h2 class="mb-4 text-lg font-semibold">Estimate</h2>
+        <h2 class="mb-4 text-lg font-semibold">{$t('admin.storage_migration_estimate')}</h2>
         {#if loadingEstimate}
-          <p class="text-sm text-gray-500 dark:text-gray-400">Loading estimate...</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400">{$t('admin.storage_migration_loading_estimate')}</p>
         {:else if estimate}
           <div class="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-            {#each Object.entries(FILE_TYPE_LABELS) as [key, label] (key)}
+            {#each Object.entries(fileTypeLabels) as [key, label] (key)}
               <div class="flex flex-col">
                 <span class="text-gray-500 dark:text-gray-400">{label}</span>
                 <span class="font-medium"
@@ -261,30 +262,32 @@
               </div>
             {/each}
             <div class="flex flex-col">
-              <span class="text-gray-500 dark:text-gray-400">Total Files</span>
+              <span class="text-gray-500 dark:text-gray-400">{$t('admin.storage_migration_total_files')}</span>
               <span class="font-bold">{estimate.fileCounts.total.toLocaleString()}</span>
             </div>
             <div class="flex flex-col">
-              <span class="text-gray-500 dark:text-gray-400">Estimated Size</span>
+              <span class="text-gray-500 dark:text-gray-400">{$t('admin.storage_migration_estimated_size')}</span>
               <span class="font-bold">{formatBytes(estimate.estimatedSizeBytes)}</span>
             </div>
           </div>
         {:else}
-          <p class="text-sm text-gray-500 dark:text-gray-400">No estimate available</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400">{$t('admin.storage_migration_no_estimate')}</p>
         {/if}
       </section>
 
       <!-- Options -->
       <section class="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-        <h2 class="mb-4 text-lg font-semibold">Options</h2>
+        <h2 class="mb-4 text-lg font-semibold">{$t('options')}</h2>
         <div class="flex flex-col gap-4">
           <label class="flex cursor-pointer items-center gap-2">
             <input type="checkbox" bind:checked={deleteSource} />
-            <span>Delete source files after migration</span>
+            <span>{$t('admin.storage_migration_delete_source')}</span>
           </label>
 
           <div class="flex flex-col gap-1">
-            <label for="concurrency-slider" class="text-sm font-medium">Concurrency: {concurrency}</label>
+            <label for="concurrency-slider" class="text-sm font-medium"
+              >{$t('admin.storage_migration_concurrency', { values: { value: concurrency } })}</label
+            >
             <input
               id="concurrency-slider"
               type="range"
@@ -293,75 +296,79 @@
               bind:value={concurrency}
               class="w-full max-w-xs accent-primary"
             />
-            <span class="text-xs text-gray-500 dark:text-gray-400">1 - 20 parallel workers</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400"
+              >{$t('admin.storage_migration_concurrency_help')}</span
+            >
           </div>
         </div>
       </section>
 
       <!-- Start -->
       <section class="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-        <h2 class="mb-4 text-lg font-semibold">Start Migration</h2>
+        <h2 class="mb-4 text-lg font-semibold">{$t('admin.storage_migration_start_heading')}</h2>
         <div class="flex items-center gap-4">
           <Button
             onclick={handleStart}
             disabled={starting || (status?.isActive ?? false) || (estimate?.fileCounts.total ?? 0) === 0}
           >
-            {starting ? 'Starting...' : 'Start Migration'}
+            {starting ? $t('admin.storage_migration_starting') : $t('admin.storage_migration_start_heading')}
           </Button>
           {#if status?.isActive}
-            <span class="text-sm font-medium text-yellow-600 dark:text-yellow-400">Migration is currently active</span>
+            <span class="text-sm font-medium text-yellow-600 dark:text-yellow-400"
+              >{$t('admin.storage_migration_active')}</span
+            >
           {:else if (estimate?.fileCounts.total ?? 0) === 0}
-            <span class="text-sm text-gray-500 dark:text-gray-400">No files to migrate</span>
+            <span class="text-sm text-gray-500 dark:text-gray-400">{$t('admin.storage_migration_no_files')}</span>
           {/if}
         </div>
       </section>
 
       <!-- Status -->
       <section class="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-        <h2 class="mb-4 text-lg font-semibold">Status</h2>
+        <h2 class="mb-4 text-lg font-semibold">{$t('status')}</h2>
         {#if loadingStatus && !status}
-          <p class="text-sm text-gray-500 dark:text-gray-400">Loading status...</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400">{$t('admin.storage_migration_loading_status')}</p>
         {:else if status}
           <div class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
             <div class="flex flex-col">
-              <span class="text-gray-500 dark:text-gray-400">Active</span>
-              <span class="font-medium">{status.isActive ? 'Yes' : 'No'}</span>
+              <span class="text-gray-500 dark:text-gray-400">{$t('active')}</span>
+              <span class="font-medium">{status.isActive ? $t('yes') : $t('no')}</span>
             </div>
             <div class="flex flex-col">
-              <span class="text-gray-500 dark:text-gray-400">Active Jobs</span>
+              <span class="text-gray-500 dark:text-gray-400">{$t('admin.storage_migration_active_jobs')}</span>
               <span class="font-medium">{status.active}</span>
             </div>
             <div class="flex flex-col">
-              <span class="text-gray-500 dark:text-gray-400">Waiting</span>
+              <span class="text-gray-500 dark:text-gray-400">{$t('waiting')}</span>
               <span class="font-medium">{status.waiting}</span>
             </div>
             <div class="flex flex-col">
-              <span class="text-gray-500 dark:text-gray-400">Completed</span>
+              <span class="text-gray-500 dark:text-gray-400">{$t('completed')}</span>
               <span class="font-medium">{status.completed}</span>
             </div>
             <div class="flex flex-col">
-              <span class="text-gray-500 dark:text-gray-400">Failed</span>
+              <span class="text-gray-500 dark:text-gray-400">{$t('failed')}</span>
               <span class="font-medium">{status.failed}</span>
             </div>
             <div class="flex flex-col">
-              <span class="text-gray-500 dark:text-gray-400">Delayed</span>
+              <span class="text-gray-500 dark:text-gray-400">{$t('admin.storage_migration_delayed')}</span>
               <span class="font-medium">{status.delayed}</span>
             </div>
           </div>
         {:else}
-          <p class="text-sm text-gray-500 dark:text-gray-400">No status available</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400">{$t('admin.storage_migration_no_status')}</p>
         {/if}
       </section>
 
       <!-- Rollback -->
       <section class="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-        <h2 class="mb-4 text-lg font-semibold">Rollback</h2>
+        <h2 class="mb-4 text-lg font-semibold">{$t('admin.storage_migration_rollback')}</h2>
         <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">
-          Enter the batch ID returned when the migration was started to rollback all database path changes.
+          {$t('admin.storage_migration_rollback_description')}
         </p>
         <div class="flex items-end gap-3">
           <div class="flex flex-col gap-1">
-            <label for="batch-id-input" class="text-sm font-medium">Batch ID</label>
+            <label for="batch-id-input" class="text-sm font-medium">{$t('admin.storage_migration_batch_id')}</label>
             <input
               id="batch-id-input"
               type="text"
@@ -371,7 +378,7 @@
             />
           </div>
           <Button onclick={handleRollback} disabled={rollingBack || !rollbackBatchId.trim()}>
-            {rollingBack ? 'Rolling back...' : 'Rollback'}
+            {rollingBack ? $t('admin.storage_migration_rolling_back') : $t('admin.storage_migration_rollback')}
           </Button>
         </div>
       </section>
