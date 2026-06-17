@@ -3,7 +3,6 @@ import { SharedSpaceRole } from '@immich/sdk';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { init, register, waitLocale } from 'svelte-i18n';
-
 import SpaceCard from '$lib/components/spaces/space-card.svelte';
 
 const makeMember = (overrides: Partial<SharedSpaceMemberResponseDto> = {}): SharedSpaceMemberResponseDto => ({
