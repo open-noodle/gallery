@@ -14,3 +14,9 @@ packages/sdk/fetch-client.ts -diff -merge
 packages/sdk/fetch-client.ts linguist-generated=true
 
 *.sh text eol=lf
+
+# Branding scripts are hand-maintained source and must always render as a textual
+# diff, even though a historical revision of test-i18n-branding.sh carried stray
+# NUL bytes in a sentinel string (now removed — see issue #672) that tripped git's
+# binary-content heuristic against the older blob.
+branding/scripts/*.sh diff
