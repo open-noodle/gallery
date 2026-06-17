@@ -46,6 +46,10 @@ export class AppMetricsService {
         this.registerQueueGauges();
         break;
       }
+      default: {
+        // Maintenance worker (and undefined) register no metrics gauges.
+        break;
+      }
     }
   }
 
