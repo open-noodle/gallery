@@ -11,7 +11,7 @@ Second sync of the day, on top of `2026-06-17-upstream-sync.md` (batches 255–2
 - **Post-rebase fixes**: 1 — `app-metrics.service.ts` switch made exhaustive for #29029 (`87721313`)
 - **New migrations**: 0 — Gallery migration count steady at **33**, mobile Drift unchanged
 - **Risk level**: LOW–MEDIUM
-- **Recommendation**: PROCEED — server build + lint + unit suite (4652) green locally; structural audits green.
+- **Recommendation**: DONE — full relevant CI suite GREEN first pass (Test, Docker, Static Analysis, Revert-to-Immich); server build + lint + unit suite (4652) green locally; structural audits green.
 
 > **Scope note:** held rolling branch — not pushed to `main`, no `branding.upstream.version` bump (stays `v2.7.5`).
 
@@ -55,7 +55,21 @@ Upstream #29029 added `@typescript-eslint/switch-exhaustiveness-check` (`conside
 | Server unit tests                           | GREEN     | 4652 passed, 9 skipped, 0 failed                                                                            |
 | Web / mobile                                | N/A local | zero web/mobile code changes this batch — CI gate                                                           |
 
+## Remote CI verification
+
+Dispatched on `rebase/upstream-batch-265` the subset relevant to a server-only batch (mobile/storage/rebase-smoke have no relevant changes this batch and were green on 255–261):
+
+| Workflow                            | First pass | Validates                                            |
+| ----------------------------------- | ---------- | ---------------------------------------------------- |
+| Test                                | GREEN      | server lint (#29029) + tests (#29140) + 20-job suite |
+| Docker                              | GREEN      | #29163 ML Dockerfile + #29153 mise tags              |
+| Static Code Analysis                | GREEN      | dart analyze + generated-file freshness              |
+| Gallery Revert-to-Immich Validation | GREEN      | migration coverage (0 new migrations)                |
+
+All 4 GREEN first pass — no flakes.
+
 ## Post-rebase state
 
 - Upstream base: `3f2e51c5d4` (`c9aa9ba711..3f2e51c5d4`); fork commits ahead: 767; behind: 0.
 - `integratedForkHead`: `c1387721`; `upstreamTargetHead`: `3f2e51c5d4`.
+- Canonical `rebase/upstream-rolling-20260509-active` updated to the rebased tip; not pushed to `main` (held for v3 cutover).
