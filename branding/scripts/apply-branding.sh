@@ -70,7 +70,7 @@ patch_i18n() {
     jq -s '.[0] * .[1]' "$en_target" "$en_overrides" > "$tmp"
     chmod 644 "$tmp"
     mv "$tmp" "$en_target"
-    echo "  Merged $(jq 'length' "$en_overrides") override keys into en.json"
+    echo "  Merged $(jq '[paths(scalars)] | length' "$en_overrides") override keys into en.json"
   fi
 
   # The non-English locale files (i18n/de.json, fr.json, ...) are upstream
@@ -101,13 +101,18 @@ patch_i18n() {
     fi
 
     # 3. Drop overridden keys that still leak the upstream name -> en fallback.
+    #    Overrides may nest (e.g. the admin.* descriptions — issue #672), so walk
+    #    the override's leaf paths and delete the leaking ones at any depth rather
+    #    than only inspecting top-level keys.
     tmp=$(mktemp)
     jq --slurpfile ov "$en_overrides" --arg upstream "$UPSTREAM_NAME" '
-      ($ov[0] | keys) as $ks
-      | reduce $ks[] as $k (.;
-          if ((.[$k]? | type) == "string") and (.[$k] | contains($upstream))
-          then del(.[$k])
-          else . end)
+      . as $loc
+      | [ $ov[0] | paths(scalars) as $p
+          | select(($loc | getpath($p)) as $v
+                   | ($v | type) == "string" and ($v | contains($upstream)))
+          | $p ]
+      | . as $leaking
+      | $loc | delpaths($leaking)
     ' "$locale_file" > "$tmp"
     chmod 644 "$tmp"
     mv "$tmp" "$locale_file"
