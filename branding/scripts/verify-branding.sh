@@ -46,16 +46,19 @@ done
 i18n_file="$REPO_ROOT/i18n/en.json"
 overrides_file="$BRANDING_DIR/i18n/overrides-en.json"
 if [[ -f "$overrides_file" && -f "$i18n_file" ]]; then
-  override_count=$(jq 'length' "$overrides_file")
+  # Overrides may nest (e.g. admin.* — issue #672), so iterate the override's leaf
+  # paths and resolve each as a dot-path in en.json. A top-level-only lookup would
+  # return null for nested keys and report a false "patched" for an unbranded value.
+  override_count=$(jq '[paths(scalars)] | length' "$overrides_file")
   leaked=0
-  for key in $(jq -r 'keys[]' "$overrides_file"); do
-    value=$(jq -r --arg k "$key" '.[$k]' "$i18n_file")
+  while IFS= read -r keypath; do
+    value=$(jq -r --arg p "$keypath" 'getpath($p | split(".")) // ""' "$i18n_file")
     if echo "$value" | grep -q "$UPSTREAM_NAME"; then
-      echo "  WARN: i18n key '$key' still contains '$UPSTREAM_NAME'"
+      echo "  WARN: i18n key '$keypath' still contains '$UPSTREAM_NAME'"
       leaked=$((leaked + 1))
       EXIT_CODE=1
     fi
-  done
+  done < <(jq -r '[paths(scalars)] | .[] | join(".")' "$overrides_file")
   echo "  i18n: $((override_count - leaked))/$override_count keys patched"
 
   # Issue #703: the upstream name must not leak through *any* locale for a key
@@ -68,9 +71,11 @@ if [[ -f "$overrides_file" && -f "$i18n_file" ]]; then
     lang=$(basename "$locale_file" .json)
     for key in $(jq -r --slurpfile ov "$overrides_file" --arg up "$UPSTREAM_NAME" '
       . as $loc
-      | ($ov[0] | keys)
-      | map(select((($loc[.]?) | type) == "string" and ($loc[.] | contains($up))))
-      | .[]' "$locale_file"); do
+      | [$ov[0] | paths(scalars) as $p
+          | select(($loc | getpath($p)) as $v | ($v | type) == "string" and ($v | contains($up)))
+          | $p]
+      | .[]
+      | join(".")' "$locale_file"); do
       echo "  WARN: i18n locale '$lang' leaks '$UPSTREAM_NAME' in rebranded key '$key'"
       locale_leaks=$((locale_leaks + 1))
       EXIT_CODE=1
