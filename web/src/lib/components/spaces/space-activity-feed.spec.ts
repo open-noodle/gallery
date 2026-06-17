@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
-
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import SpaceActivityFeed from '$lib/components/spaces/space-activity-feed.svelte';
 
