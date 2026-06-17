@@ -6,10 +6,10 @@
 - **Fork commits synced** (origin/main `ca3c09c2..c1387721`): 3 (#699, #704, #705)
 - **Upstream commits pulled** (`0f49bcbd27..c9aa9ba711`): 10 (batches 255–261), tip is upstream **`v3.0.0-rc.1`**
 - **Conflicts resolved**: 12 distinct sites (1 server, 2 mobile code, 2 mobile/test, 1 i18n, 5 CI workflows, 1 mobile pubspec, generated SDK)
-- **Post-rebase fixes**: 1 — adapted #29158's `newMemory` medium-test helper to the fork's `MemoryData(raw)` API (`08a20ac8`); OpenAPI/SDK/Dart regen (no diff — already consistent)
+- **Post-rebase fixes**: 3 — adapted #29158's `newMemory` helper to the fork's `MemoryData(raw)` API (`08a20ac8`); web-format on the 4 #705 spec import merges + dropped unbranded location-disclosure keys from `en_GB.json` (`3e5ee01e`); OpenAPI/SDK/Dart regen (no diff — already consistent)
 - **New migrations this batch**: 0 (server and mobile) — Gallery migration count steady at **33**, mobile Drift schemaVersion unchanged
 - **Risk level**: LOW–MEDIUM (no migrations, no broad refactors, no API breaks; two genuine code reconciliations: mobile timeline scroll-to-date vs unmount-safety, and a cross-feature test-helper merge)
-- **Recommendation**: PROCEED — 0 behind upstream; server (4652) and web (3164) unit suites green locally; all structural audits green. Mobile gated on CI (correct flutter toolchain).
+- **Recommendation**: DONE — full CI suite GREEN (all 8 workflows); 0 behind upstream; server (4652) and web (3164) unit suites green locally; all structural audits green.
 
 > **Scope note (held rolling branch):** Not force-pushed to `main`; pushed to its own remote (`origin/rebase/upstream-rolling-20260509-active`, the staging-deployed branch). The skill's force-push-to-main and `branding.upstream.version` bump steps are intentionally skipped — the revert-to-immich baseline stays at the tagged `v2.7.5`, and the v3 version story (including the `v3.0.0-rc.1` upstream label) is handled at cutover/release time. `branding/config.json` and `README.md` deliberately remain at `Immich v2.7.5` (matching prior rolling batches; setting an RC string would destabilise the release + revert-to-immich tooling).
 
@@ -125,8 +125,39 @@ One additive collision: upstream #29036's `uploads_count` vs fork #697's `upstre
 
 > Batch-261 `postrebase-audit` flagged `open-api/immich-openapi-specs.json` + `mobile/openapi/README.md` for review — expected (v3 spec-version bump + #700 endpoint); satisfied by the no-diff regen.
 
+## Remote CI Verification
+
+Pushed to `rebase/upstream-batch-261` (= canonical rolling branch); dispatched the full suite.
+
+| Workflow                            | First pass | Notes                                                     |
+| ----------------------------------- | ---------- | --------------------------------------------------------- |
+| Docker                              | GREEN      | builds server/web/cli/ml images (covers ml-smoke)         |
+| Static Code Analysis                | GREEN      | dart analyze + generated-file freshness + dart format     |
+| Gallery Build Mobile                | GREEN      | iOS + Android compile (validates timeline reconciliation) |
+| Gallery Rebase Smoke                | GREEN      |                                                           |
+| Storage Migration Tests             | GREEN      |                                                           |
+| Storage Migration E2E               | GREEN      |                                                           |
+| Gallery Revert-to-Immich Validation | GREEN      | migration coverage unchanged (0 new migrations)           |
+| Test                                | GREEN\*    | green after 2 real fixes + flake re-run (see below)       |
+
+**ALL 8 workflows GREEN.** `Test` needed two rounds:
+
+**Round 1 — two real first-pass failures, both from this batch's hand-resolutions, fixed in `3e5ee01e`:**
+
+1. **Test Web (`//web:format`)** — the 4 #705 spec files resolved by hand had a stray blank line between the `svelte-i18n` import and the `$lib` import that `prettier-plugin-organize-imports` removes. `prettier --write` applied.
+2. **Unit Test Mobile (`location_disclosure_copy_test.dart`, 4 failures)** — upstream #29036 (batch 260, Weblate) added `map_no_location_permission_content`, `map_location_service_disabled_content`, `location_permission_content`, `background_location_permission_content` to `i18n/en_GB.json` with **unbranded** upstream English ("Immich"/generic). These keys were absent from en*GB at the pre-rebase tip (en_GB falls back to en.json's branded policy copy). The fork policy test scans every i18n file and requires location-disclosure copy to be branded; removed the 4 keys from en_GB.json to restore the fall-back. `codegen_loader.g.dart` regen produced no diff. **Recurs on any future Weblate sync that re-adds these to en_GB.** *(Confirmed fixed: all 4 policy tests pass round 2.)\_
+
+**Round 2 — three flake/infra failures, cleared by re-running the failed jobs (no code change):**
+
+- `Medium Tests (Server)` + `E2E (Server/CLI)` + `E2E (Web)`: transient testcontainers image-pull `404 no such image: ghcr.io/immich-app/postgres:14-vectorchord…` (CI registry/network hiccup).
+- `Unit Test Mobile` (1 test, `people_repository_test`): `RangeError … randInt(0)` in the **unchanged** `newFace` test helper (`repository_context.dart:228` — `imageWidth ??= randInt(999)+1` can be 1 → `randInt(imageWidth-1)=randInt(0)`). Pre-existing intermittent flake (passed round 1 + on re-run with a different seed); not introduced by this batch. **Follow-up:** harden `newFace` to floor random dimensions at ≥2.
+
+`gh run rerun --failed` → all green. (Mobile can only be authoritatively verified by CI — local flutter 3.41.6 < required 3.44.1.)
+
+\* green via re-run of flake-failed jobs on the same commit (`3e5ee01e`); no code change between the flake failure and the pass.
+
 ## Post-Rebase State
 
-- Upstream base: `c9aa9ba711` (v3.0.0-rc.1); fork commits ahead: 762; behind upstream: 0.
+- Upstream base: `c9aa9ba711` (v3.0.0-rc.1); fork commits ahead: 764; behind upstream: 0.
 - `integratedForkHead`: `c1387721` (= origin/main); `upstreamTargetHead`: `c9aa9ba711`.
-- Remaining gate: full CI suite on the test branch (Docker, static_analysis, build-mobile, rebase-smoke, storage-migration, revert-to-immich) — mobile is the primary thing local verification could not cover.
+- Canonical `rebase/upstream-rolling-20260509-active` updated to the rebased tip; not force-pushed to `main` (held for v3 cutover).
