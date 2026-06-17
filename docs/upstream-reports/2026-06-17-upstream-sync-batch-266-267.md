@@ -11,7 +11,7 @@ Third sync of the day, on top of `2026-06-17-upstream-sync-batch-262-265.md` (ba
 - **Post-rebase fixes**: 0
 - **New migrations**: 0 — Gallery migration count steady at **33**, mobile Drift unchanged
 - **Risk level**: LOW–MEDIUM
-- **Recommendation**: PROCEED — local gate fully green (server 4653 + web 3166 unit tests, `tsc`/`svelte-check`, structural audits); remote CI pending dispatch on the batch branches.
+- **Recommendation**: DONE — local gate fully green (server 4653 + web 3166 unit tests, `tsc`/`svelte-check`, structural audits); all 7 dispatched CI workflows GREEN (two transient flakes cleared on re-run — see below).
 
 > **Scope note:** held rolling branch — not pushed to `main`, no `branding.upstream.version` bump (stays `v2.7.5`).
 
@@ -77,14 +77,23 @@ Preserves both the fork grouping feature and upstream's range-select fix; consis
 
 ## Remote CI verification
 
-_Pending dispatch on `rebase/upstream-batch-266` / `rebase/upstream-batch-267`. To record after green._
+Dispatched on `rebase/upstream-batch-267`. All 7 GREEN (Test + Storage Migration Tests after a one-shot re-run of confirmed flakes; the rest first pass).
 
-| Workflow             | Result  | Validates                                               |
-| -------------------- | ------- | ------------------------------------------------------- |
-| Test                 | PENDING | web lint/tests (#29022, #29102, #29172, #29175) + suite |
-| Docker               | PENDING | #29154 build-mobile action bump + Dockerfiles           |
-| Static Code Analysis | PENDING | dart analyze + generated-file freshness                 |
-| Gallery Build Mobile | PENDING | iOS + Android compile (#29154 / #29168 mobile docs)     |
+| Workflow                            | Result         | Validates                                               |
+| ----------------------------------- | -------------- | ------------------------------------------------------- |
+| Test                                | GREEN (re-run) | web lint/tests (#29022, #29102, #29172, #29175) + suite |
+| Docker                              | GREEN          | #29154 build-mobile action bump + Dockerfiles           |
+| Static Code Analysis                | GREEN          | dart analyze + dart format + generated-file freshness   |
+| Gallery Build Mobile                | GREEN          | iOS + Android compile (#29154 / #29168 mobile docs)     |
+| Gallery Rebase Smoke                | GREEN          | rebased server/web boot + e2e smoke                     |
+| Storage Migration Tests             | GREEN (re-run) | storage-migration unit + E2E                            |
+| Gallery Revert-to-Immich Validation | GREEN          | migration coverage (0 new migrations; verified locally) |
+
+### Confirmed flakes (cleared on re-run, no code change)
+
+- **Test → Medium Tests (Server)**: `pnpm install` aborted on a slow npm tarball download (`zod-4.3.6.tgz`, 24 KiB/s) during `//server:install` — `TimeoutError`, no test executed. Network/infra flake.
+- **Storage Migration Tests → Storage Migration E2E (migrate-to-s3)**: migration polled `active=0 waiting=0` immediately after enqueue, so the validator asserted on un-migrated local paths (`originalPath should be relative`). Timing race — zero storage-code changes this batch; the same workflow was GREEN on `rebase/upstream-batch-261` earlier the same day and the standalone `storage-migration-e2e.yml` is GREEN on sibling rolling branches. Both passed on a one-shot re-run.
+- **Gallery Revert-to-Immich Validation (first dispatch)**: cancelled by its global `concurrency: gallery-revert-to-immich-validation` group (other branches' PR runs queued behind it); not a code failure. Re-dispatch ran GREEN.
 
 ## Post-rebase state
 
