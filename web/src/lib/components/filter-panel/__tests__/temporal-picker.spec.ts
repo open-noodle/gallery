@@ -41,6 +41,36 @@ describe('temporal-utils', () => {
     expect(months[1]).toEqual({ month: 2, label: 'Feb', count: 0 });
   });
 
+  it('should sum day-granularity buckets that fall within the same month', () => {
+    // The photos timeline feeds day-granularity buckets (many per month).
+    // getMonthsForYear must accumulate them, not overwrite — otherwise month
+    // totals collapse to a single day's count while year totals stay correct.
+    const dayBuckets = [
+      { timeBucket: '2024-01-05', count: 10 },
+      { timeBucket: '2024-01-12', count: 7 },
+      { timeBucket: '2024-01-20', count: 3 },
+      { timeBucket: '2024-03-02', count: 8 },
+      { timeBucket: '2023-01-15', count: 999 },
+    ];
+    const months = getMonthsForYear(dayBuckets, 2024);
+    expect(months[0]).toEqual({ month: 1, label: 'Jan', count: 20 });
+    expect(months[2]).toEqual({ month: 3, label: 'Mar', count: 8 });
+    expect(months[1]).toEqual({ month: 2, label: 'Feb', count: 0 });
+  });
+
+  it('should keep month totals consistent with the year total for day buckets', () => {
+    const dayBuckets = [
+      { timeBucket: '2024-06-01', count: 5 },
+      { timeBucket: '2024-06-15', count: 25 },
+      { timeBucket: '2024-06-30', count: 8 },
+    ];
+    const [year2024] = aggregateYears(dayBuckets);
+    const months = getMonthsForYear(dayBuckets, 2024);
+    const monthTotal = months.reduce((sum, m) => sum + m.count, 0);
+    expect(monthTotal).toBe(year2024.count);
+    expect(year2024.count).toBe(38);
+  });
+
   it('should handle empty buckets', () => {
     const years = aggregateYears([]);
     expect(years).toHaveLength(0);
