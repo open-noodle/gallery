@@ -55,6 +55,9 @@ branding/scripts/test-email-branding.sh
 echo "--- Checking app download branding transform ---"
 branding/scripts/test-app-download-branding.sh
 
+echo "--- Checking i18n branding overrides (issues #703, #672) ---"
+branding/scripts/test-i18n-branding.sh
+
 echo "--- Applying branding overlay ---"
 branding/scripts/apply-branding.sh
 
