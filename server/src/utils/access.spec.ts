@@ -418,6 +418,79 @@ describe('library-linked space asset access', () => {
   });
 });
 
+describe('space person access via checkOtherAccess', () => {
+  describe('PersonRead', () => {
+    it('should grant access when the person is visible through a shared space', async () => {
+      const accessMock = newAccessRepositoryMock();
+      const auth = makeAuth();
+      const personId = newUuid();
+
+      accessMock.person.checkSharedSpaceAccess.mockResolvedValue(new Set([personId]));
+
+      const result = await checkAccess(accessMock as any, {
+        auth,
+        permission: Permission.PersonRead,
+        ids: new Set([personId]),
+      });
+
+      expect(result).toEqual(new Set([personId]));
+      expect(accessMock.person.checkSharedSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set([personId]));
+    });
+
+    it('should not consult shared-space access when owner access is already granted', async () => {
+      const accessMock = newAccessRepositoryMock();
+      const auth = makeAuth();
+      const personId = newUuid();
+
+      accessMock.person.checkOwnerAccess.mockResolvedValue(new Set([personId]));
+
+      const result = await checkAccess(accessMock as any, {
+        auth,
+        permission: Permission.PersonRead,
+        ids: new Set([personId]),
+      });
+
+      expect(result).toEqual(new Set([personId]));
+      expect(accessMock.person.checkSharedSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set());
+    });
+
+    it('should deny access when the user is neither owner nor shared-space member', async () => {
+      const accessMock = newAccessRepositoryMock();
+      const auth = makeAuth();
+      const personId = newUuid();
+
+      const result = await checkAccess(accessMock as any, {
+        auth,
+        permission: Permission.PersonRead,
+        ids: new Set([personId]),
+      });
+
+      expect(result).toEqual(new Set());
+    });
+  });
+
+  describe('PersonUpdate / PersonDelete / PersonMerge (owner-only, space should NOT grant)', () => {
+    for (const permission of [Permission.PersonUpdate, Permission.PersonDelete, Permission.PersonMerge]) {
+      it(`should not grant ${permission} via shared-space membership`, async () => {
+        const accessMock = newAccessRepositoryMock();
+        const auth = makeAuth();
+        const personId = newUuid();
+
+        accessMock.person.checkSharedSpaceAccess.mockResolvedValue(new Set([personId]));
+
+        const result = await checkAccess(accessMock as any, {
+          auth,
+          permission,
+          ids: new Set([personId]),
+        });
+
+        expect(result).toEqual(new Set());
+        expect(accessMock.person.checkSharedSpaceAccess).not.toHaveBeenCalled();
+      });
+    }
+  });
+});
+
 describe('checkOtherAccess default case', () => {
   it('should return an empty set for an unhandled permission', async () => {
     const accessMock = newAccessRepositoryMock();
