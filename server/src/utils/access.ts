@@ -362,6 +362,21 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
       return access.person.checkFaceOwnerAccess(auth.user.id, ids);
     }
 
+    case Permission.PersonRead: {
+      // Owners always have access; shared-space members may also read a person (e.g. the
+      // representative-face picker and thumbnails) when the person's faces appear on assets
+      // shared with them. Mutations (update/delete/merge) stay owner-only below.
+      const isOwner = await access.person.checkOwnerAccess(auth.user.id, ids);
+      const isShared = await access.person.checkSharedSpaceAccess(auth.user.id, setDifference(ids, isOwner));
+      return setUnion(isOwner, isShared);
+    }
+
+    case Permission.PersonUpdate:
+    case Permission.PersonDelete:
+    case Permission.PersonMerge: {
+      return await access.person.checkOwnerAccess(auth.user.id, ids);
+    }
+
     case Permission.PersonReassign: {
       return access.person.checkFaceOwnerAccess(auth.user.id, ids);
     }
