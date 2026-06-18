@@ -20,45 +20,6 @@ where
 order by
   "fileCreatedAt" desc
 
--- MapRepository.getAlbumMapMarkers (scoped)
-select
-  "id",
-  "asset_exif"."latitude" as "lat",
-  "asset_exif"."longitude" as "lon",
-  "asset_exif"."city",
-  "asset_exif"."state",
-  "asset_exif"."country"
-from
-  "asset"
-  inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
-  and "asset_exif"."latitude" is not null
-  and "asset_exif"."longitude" is not null
-  inner join "album_asset" on "asset"."id" = "album_asset"."assetId"
-where
-  "asset"."deletedAt" is null
-  and "album_asset"."albumId" = $1
-  and (
-    "asset"."ownerId" in ($2)
-    or exists (
-      select
-      from
-        "shared_space_asset"
-      where
-        "asset"."id" = "shared_space_asset"."assetId"
-        and "shared_space_asset"."spaceId" in ($3)
-    )
-    or exists (
-      select
-      from
-        "shared_space_library"
-      where
-        "asset"."libraryId" = "shared_space_library"."libraryId"
-        and "shared_space_library"."spaceId" in ($4)
-    )
-  )
-order by
-  "fileCreatedAt" desc
-
 -- MapRepository.getMapMarkers
 select
   "id",
