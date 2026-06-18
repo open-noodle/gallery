@@ -844,6 +844,65 @@ describe(PersonService.name, () => {
         result.stream.destroy();
       }
     });
+
+    it('lists picker face crops for a shared-space member who does not own the person', async () => {
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create({ faceAssetId: 'face-1' });
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.person.checkSharedSpaceAccess.mockResolvedValue(new Set([person.id]));
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.person.getRepresentativeFaces.mockResolvedValue([
+        {
+          ...AssetFaceFactory.create({ id: 'face-1', assetId: 'asset-1', personId: person.id }),
+          fileCreatedAt: new Date('2024-01-01T00:00:00.000Z'),
+          representativeFaceId: person.faceAssetId,
+        },
+      ]);
+
+      await expect(sut.getFacesForPicker(auth, person.id, { page: 1, size: 10 })).resolves.toEqual({
+        faces: [expect.objectContaining({ id: 'face-1', assetId: 'asset-1', isRepresentative: true })],
+        hasNextPage: false,
+      });
+      expect(mocks.access.person.checkSharedSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.id]));
+    });
+
+    it('updates the representative face for a shared-space member who does not own the person', async () => {
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create({ identityId: 'identity-1' });
+      const face = AssetFaceFactory.create({ id: 'face-1', assetId: 'asset-1', personId: person.id });
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.person.checkSharedSpaceAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([face.assetId]));
+      mocks.person.getRepresentativeFaceForUpdate.mockResolvedValue(face);
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.person.update.mockResolvedValue({ ...person, faceAssetId: face.id });
+
+      await expect(sut.updateRepresentativeFace(auth, person.id, { assetFaceId: face.id })).resolves.toEqual(
+        expect.objectContaining({ id: person.id }),
+      );
+
+      expect(mocks.person.update).toHaveBeenCalledWith({ id: person.id, faceAssetId: face.id });
+      expect(mocks.access.person.checkSharedSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.id]));
+    });
+
+    it('rejects a representative face update when the actor cannot read the chosen face asset', async () => {
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create();
+      const face = AssetFaceFactory.create({ id: 'face-1', assetId: 'asset-1', personId: person.id });
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.person.checkSharedSpaceAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set());
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.person.getRepresentativeFaceForUpdate.mockResolvedValue(face);
+
+      await expect(sut.updateRepresentativeFace(auth, person.id, { assetFaceId: face.id })).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(mocks.person.update).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
   });
 
   describe('update', () => {
@@ -857,6 +916,18 @@ describe(PersonService.name, () => {
       );
       expect(mocks.person.update).not.toHaveBeenCalled();
       expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+    });
+
+    it('does not let a shared-space member rename a person they do not own', async () => {
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create();
+
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.person.checkSharedSpaceAccess.mockResolvedValue(new Set([person.id]));
+
+      await expect(sut.update(auth, person.id, { name: 'Renamed' })).rejects.toBeInstanceOf(BadRequestException);
+      expect(mocks.person.update).not.toHaveBeenCalled();
     });
 
     it('should throw an error when personId is invalid', async () => {
