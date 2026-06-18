@@ -18,7 +18,7 @@ import { MapMarkerResponseDto } from 'src/dtos/map.dto';
 import { AlbumUserRole, Permission } from 'src/enum';
 import { AlbumAssetCount, AlbumInfoOptions } from 'src/repositories/album.repository';
 import { BaseService } from 'src/services/base.service';
-import { addAssets, getMyPartnerIds, removeAssets } from 'src/utils/asset.util';
+import { addAssets, removeAssets } from 'src/utils/asset.util';
 import { asDateTimeString } from 'src/utils/date';
 import { findOrFail } from 'src/utils/misc';
 import { getPreferences } from 'src/utils/preferences';
@@ -117,21 +117,11 @@ export class AlbumService extends BaseService {
       return [];
     }
 
-    if (auth.sharedLink) {
-      return this.mapRepository.getAlbumMapMarkers(id);
-    }
-
-    const partnerIds = await getMyPartnerIds({
-      userId: auth.user.id,
-      repository: this.partnerRepository,
-      timelineEnabled: true,
-    });
-    const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
-
-    return this.mapRepository.getAlbumMapMarkers(id, {
-      ownerIds: [auth.user.id, ...partnerIds],
-      timelineSpaceIds: spaceRows.length > 0 ? spaceRows.map((row) => row.spaceId) : undefined,
-    });
+    // Album membership (verified above via AlbumRead) is the access boundary: every reader of the
+    // album — owner, editor, or viewer — sees pins for all geotagged assets in it, just like the
+    // album grid does. Do not scope by asset owner here; doing so hid the owner's pins from
+    // viewers of a shared album (#656).
+    return this.mapRepository.getAlbumMapMarkers(id);
   }
 
   async create(auth: AuthDto, dto: CreateAlbumDto): Promise<AlbumResponseDto> {
