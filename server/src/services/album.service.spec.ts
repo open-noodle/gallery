@@ -6,10 +6,9 @@ import { AlbumUserFactory } from 'test/factories/album-user.factory';
 import { AlbumFactory } from 'test/factories/album.factory';
 import { AssetFactory } from 'test/factories/asset.factory';
 import { AuthFactory } from 'test/factories/auth.factory';
-import { PartnerFactory } from 'test/factories/partner.factory';
 import { UserFactory } from 'test/factories/user.factory';
 import { authStub } from 'test/fixtures/auth.stub';
-import { getForAlbum, getForPartner } from 'test/mappers';
+import { getForAlbum } from 'test/mappers';
 import { newUuid } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
 
@@ -110,33 +109,75 @@ describe(AlbumService.name, () => {
   });
 
   describe('getMapMarkers', () => {
-    it('passes owner, partner, and timeline-enabled spaces to album map lookup', async () => {
+    const albumMarkers = [
+      {
+        id: '0a8b6c1d-0000-4000-8000-000000000001',
+        lat: 48.2082,
+        lon: 16.3738,
+        city: 'Vienna',
+        state: 'Vienna',
+        country: 'Austria',
+      },
+    ];
+
+    // Regression test for #656: a Viewer-role member of a shared album must see
+    // pins for every geotagged asset in the album, even though those assets are
+    // owned by the album owner (a different user), not the viewer.
+    it('returns all album markers for a viewer regardless of asset owner', async () => {
       const auth = AuthFactory.create();
       const albumId = newUuid();
-      const partnerId = newUuid();
-      const spaceId = newUuid();
-      const partner = PartnerFactory.create({ sharedById: partnerId, sharedWithId: auth.user.id, inTimeline: true });
-      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([albumId]));
-      mocks.partner.getAll.mockResolvedValue([getForPartner(partner)]);
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-      mocks.map.getAlbumMapMarkers.mockResolvedValue([]);
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([albumId]));
+      mocks.map.getAlbumMapMarkers.mockResolvedValue(albumMarkers);
 
-      await sut.getMapMarkers(auth, albumId);
+      await expect(sut.getMapMarkers(auth, albumId)).resolves.toEqual(albumMarkers);
 
-      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(auth.user.id);
-      expect(mocks.map.getAlbumMapMarkers).toHaveBeenCalledWith(albumId, {
-        ownerIds: [auth.user.id, partnerId],
-        timelineSpaceIds: [spaceId],
-      });
+      expect(mocks.map.getAlbumMapMarkers).toHaveBeenCalledWith(albumId);
+      expect(mocks.partner.getAll).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
     });
 
-    it('keeps shared-link album map lookup on the existing album-link path', async () => {
+    it('returns all album markers for the album owner', async () => {
+      const auth = AuthFactory.create();
+      const albumId = newUuid();
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([albumId]));
+      mocks.map.getAlbumMapMarkers.mockResolvedValue(albumMarkers);
+
+      await expect(sut.getMapMarkers(auth, albumId)).resolves.toEqual(albumMarkers);
+
+      expect(mocks.map.getAlbumMapMarkers).toHaveBeenCalledWith(albumId);
+      expect(mocks.partner.getAll).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
+    });
+
+    it('throws when the user has no album read access', async () => {
+      const auth = AuthFactory.create();
+      const albumId = newUuid();
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set());
+
+      await expect(sut.getMapMarkers(auth, albumId)).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(mocks.map.getAlbumMapMarkers).not.toHaveBeenCalled();
+    });
+
+    it('returns an empty list for shared links without showExif', async () => {
+      const auth = AuthFactory.from().sharedLink({ showExif: false }).build();
+      const albumId = newUuid();
+      mocks.access.album.checkSharedLinkAccess.mockResolvedValue(new Set([albumId]));
+
+      await expect(sut.getMapMarkers(auth, albumId)).resolves.toEqual([]);
+
+      expect(mocks.map.getAlbumMapMarkers).not.toHaveBeenCalled();
+    });
+
+    it('returns all album markers for shared links with showExif', async () => {
       const auth = AuthFactory.from().sharedLink({ showExif: true }).build();
       const albumId = newUuid();
       mocks.access.album.checkSharedLinkAccess.mockResolvedValue(new Set([albumId]));
-      mocks.map.getAlbumMapMarkers.mockResolvedValue([]);
+      mocks.map.getAlbumMapMarkers.mockResolvedValue(albumMarkers);
 
-      await sut.getMapMarkers(auth, albumId);
+      await expect(sut.getMapMarkers(auth, albumId)).resolves.toEqual(albumMarkers);
 
       expect(mocks.partner.getAll).not.toHaveBeenCalled();
       expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
