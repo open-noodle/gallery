@@ -361,7 +361,10 @@ export class PersonService extends BaseService {
     id: string,
     dto: RepresentativeFaceUpdateDto,
   ): Promise<PersonResponseDto> {
-    await this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [id] });
+    // Setting the representative face manages the person's thumbnail, which shared-space members
+    // can also do — so gate on person.read (owner | shared space) rather than owner-only
+    // person.update. The chosen face is still gated on asset.read below.
+    await this.requireAccess({ auth, permission: Permission.PersonRead, ids: [id] });
     const current = await this.findOrFail(id);
     const face = await this.personRepository.getRepresentativeFaceForUpdate({
       personId: id,
