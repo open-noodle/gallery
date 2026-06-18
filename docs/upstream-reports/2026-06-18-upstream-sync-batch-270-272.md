@@ -11,7 +11,7 @@ Second sync of the day, on top of `2026-06-18-upstream-sync.md` (batches 268–2
 - **Post-rebase fixes**: 1 — OpenAPI regeneration (`e3581e88`)
 - **New migrations**: 0 — Gallery migration count steady at **33**, mobile Drift unchanged
 - **Risk level**: MEDIUM (driven by the `validation.ts` reconciliation + the wide datetime spec change)
-- **Recommendation**: PROCEED — local gate fully green (server 4659 unit tests + web; `tsc`/`svelte-check`; SDK build; structural audits); remote CI pending dispatch.
+- **Recommendation**: DONE — local gate fully green (server 4659 + web 3166 unit tests; `tsc`/`svelte-check`; SDK build; structural audits); all 7 dispatched CI workflows GREEN first pass.
 
 > **Scope note:** held rolling branch — not pushed to `main`, no `branding.upstream.version` bump (stays `v2.7.5`).
 
@@ -57,7 +57,17 @@ All three server commits touch `server/src/validation.ts`, which the fork also m
 
 ## Remote CI verification
 
-_Pending dispatch on `rebase/upstream-batch-272`. To record after green._
+Dispatched on `rebase/upstream-batch-272`. **All 7 GREEN first pass — no flakes, no re-runs.**
+
+| Workflow                            | Result | Validates                                                     |
+| ----------------------------------- | ------ | ------------------------------------------------------------- |
+| Test                                | GREEN  | server (#29186/#29189/#29191) + web + OpenAPI Clients job     |
+| Docker                              | GREEN  | server/web/ml image builds                                    |
+| Static Code Analysis                | GREEN  | dart analyze + format + generated-file freshness (regen DTOs) |
+| Gallery Build Mobile                | GREEN  | iOS + Android compile (25 regenerated DTOs)                   |
+| Gallery Rebase Smoke                | GREEN  | rebased server/web boot + e2e smoke                           |
+| Storage Migration Tests             | GREEN  | storage-migration suites                                      |
+| Gallery Revert-to-Immich Validation | GREEN  | migration coverage (0 new migrations; also verified locally)  |
 
 ## Post-rebase state
 
