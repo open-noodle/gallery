@@ -12,7 +12,7 @@ First sync of the day, on top of `2026-06-17-upstream-sync-batch-266-267.md`.
 - **Post-rebase fixes**: 1 — OpenAPI client regeneration (`1885a72e`)
 - **New migrations**: 0 — Gallery migration count steady at **33**, mobile Drift unchanged
 - **Risk level**: LOW–MEDIUM
-- **Recommendation**: PROCEED — local gate fully green (server 4657 + web 3166 unit tests, `tsc`/`svelte-check`, SDK build, structural audits); remote CI pending dispatch.
+- **Recommendation**: DONE — local gate fully green (server 4657 + web 3166 unit tests, `tsc`/`svelte-check`, SDK build, structural audits); all 7 dispatched CI workflows GREEN first pass.
 
 > **Scope note:** held rolling branch — not pushed to `main`, no `branding.upstream.version` bump (stays `v2.7.5`).
 
@@ -62,17 +62,17 @@ Ran `mise //:open-api` to regenerate all clients from the final merged spec. **T
 
 ## Remote CI verification
 
-_Pending dispatch on `rebase/upstream-batch-269`. To record after green._
+Dispatched on `rebase/upstream-batch-269`. **All 7 GREEN first pass — no flakes, no re-runs.**
 
-| Workflow                            | Result  | Validates                                               |
-| ----------------------------------- | ------- | ------------------------------------------------------- |
-| Test                                | PENDING | server (#29150 hls.service) + web + OpenAPI Clients job |
-| Docker                              | PENDING | server/web/ml image builds                              |
-| Static Code Analysis                | PENDING | dart analyze + format + generated-file freshness        |
-| Gallery Build Mobile                | PENDING | iOS + Android compile (regenerated `assets_api.dart`)   |
-| Gallery Rebase Smoke                | PENDING | rebased server/web boot + e2e smoke                     |
-| Storage Migration Tests             | PENDING | storage-migration suites                                |
-| Gallery Revert-to-Immich Validation | PENDING | migration coverage (0 new migrations; verify locally)   |
+| Workflow                            | Result | Validates                                                    |
+| ----------------------------------- | ------ | ------------------------------------------------------------ |
+| Test                                | GREEN  | server (#29150 hls.service) + web + OpenAPI Clients job      |
+| Docker                              | GREEN  | server/web/ml image builds                                   |
+| Static Code Analysis                | GREEN  | dart analyze + format + generated-file freshness             |
+| Gallery Build Mobile                | GREEN  | iOS + Android compile (regenerated `assets_api.dart`)        |
+| Gallery Rebase Smoke                | GREEN  | rebased server/web boot + e2e smoke                          |
+| Storage Migration Tests             | GREEN  | storage-migration suites (no migrate-to-s3 flake this time)  |
+| Gallery Revert-to-Immich Validation | GREEN  | migration coverage (0 new migrations; also verified locally) |
 
 ## Post-rebase state
 
