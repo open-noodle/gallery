@@ -23,11 +23,6 @@ export interface MapMarkerSearchOptions {
   timelineSpaceIds?: string[];
 }
 
-export interface AlbumMapMarkerSearchOptions {
-  ownerIds: string[];
-  timelineSpaceIds?: string[];
-}
-
 export interface GeoPoint {
   latitude: number;
   longitude: number;
@@ -76,42 +71,11 @@ export class MapRepository {
     this.logger.log('Geodata import completed');
   }
 
-  @GenerateSql(
-    { params: [DummyValue.UUID] },
-    { name: 'scoped', params: [DummyValue.UUID, { ownerIds: [DummyValue.UUID], timelineSpaceIds: [DummyValue.UUID] }] },
-  )
-  getAlbumMapMarkers(albumId: string, options?: AlbumMapMarkerSearchOptions) {
-    const query = this.mapMarkersQuery()
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getAlbumMapMarkers(albumId: string) {
+    return this.mapMarkersQuery()
       .innerJoin('album_asset', 'asset.id', 'album_asset.assetId')
-      .where('album_asset.albumId', '=', albumId);
-
-    if (!options) {
-      return query.execute();
-    }
-
-    return query
-      .where((eb) => {
-        const expression: Expression<SqlBool>[] = [eb('asset.ownerId', 'in', options.ownerIds)];
-
-        if (options.timelineSpaceIds?.length) {
-          expression.push(
-            eb.exists((eb) =>
-              eb
-                .selectFrom('shared_space_asset')
-                .whereRef('asset.id', '=', 'shared_space_asset.assetId')
-                .where('shared_space_asset.spaceId', 'in', options.timelineSpaceIds!),
-            ),
-            eb.exists((eb) =>
-              eb
-                .selectFrom('shared_space_library')
-                .whereRef('asset.libraryId', '=', 'shared_space_library.libraryId')
-                .where('shared_space_library.spaceId', 'in', options.timelineSpaceIds!),
-            ),
-          );
-        }
-
-        return eb.or(expression);
-      })
+      .where('album_asset.albumId', '=', albumId)
       .execute();
   }
 
