@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import { AssetType } from 'src/enum';
+import { AlbumUserRole, AssetType } from 'src/enum';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
@@ -454,6 +454,35 @@ describe(SearchRepository.name, () => {
         },
       ]);
       expect(result.hasUnnamedPeople).toBe(false);
+    });
+  });
+
+  describe('getFilterSuggestions', () => {
+    it('returns album facets for a viewer who owns none of the shared album assets', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newExif({ assetId: asset.id, country: 'Germany', city: 'Berlin', make: 'Sony', model: 'A7' });
+
+      const [travel] = await upsertTags(ctx.get(TagRepository), { userId: owner.id, tags: ['Travel'] });
+      await ctx.newTagAsset({ tagIds: [travel.id], assetIds: [asset.id] });
+
+      const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'Ada' });
+      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+
+      const { album } = await ctx.newAlbum({ ownerId: owner.id }, [asset.id]);
+      await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id, role: AlbumUserRole.Viewer });
+
+      // A viewer owns none of the album's assets and is in no shared space, so the
+      // service calls the repository with the viewer's own id and no timelineSpaceIds.
+      const result = await sut.getFilterSuggestions([viewer.id], { albumId: album.id });
+
+      expect(result.countries).toContain('Germany');
+      expect(result.cameraMakes).toContain('Sony');
+      expect(result.tags.map((tag) => tag.value)).toContain('Travel');
+      expect(result.people.map((p) => p.name)).toContain('Ada');
     });
   });
 });
