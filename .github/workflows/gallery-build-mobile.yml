@@ -192,13 +192,24 @@ jobs:
         working-directory: ./mobile
         run: |
           version_name=$(awk -F'[ +]' '/^version:/ {print $2}' pubspec.yaml)
-          # Monotonic, trigger-independent version code: commit count on the
-          # current ref, plus an attempt offset so re-runs at the same SHA
-          # don't collide with Play Store / TestFlight versionCodes already
-          # uploaded on a previous attempt. First attempt is unchanged from
-          # the previous behavior; retries get +1, +2, etc.
-          base_count=$(git -C .. rev-list --count HEAD)
-          version_code=$((base_count + GITHUB_RUN_ATTEMPT - 1))
+          # Globally-monotonic versionCode: minutes since the Unix epoch at
+          # build time, plus an attempt offset.
+          #
+          # The previous scheme (`git rev-list --count HEAD`) was branch-relative.
+          # Every branch publishes to the SAME de.opennoodle.gallery Play Store /
+          # TestFlight tracks, but the rolling upstream-rebase branches carry
+          # ~700+ more commits than main. An RC mobile build dispatched from one
+          # of those branches therefore uploaded a HIGHER versionCode than a
+          # later main release could produce, and Play rejected the main rollout
+          # with "does not allow any existing users to upgrade to the newly added
+          # APKs" (existing internal testers were already on the higher RC code).
+          #
+          # Wall-clock minutes are monotonic across every branch and trigger:
+          # whatever is built last always gets the highest code. ~29.7M today —
+          # far above any commit count and far below Android's 2.1e9 ceiling
+          # (good past the year 5000). Minute granularity plus the per-attempt
+          # offset keeps same-run re-runs collision-free.
+          version_code=$(( $(date +%s) / 60 + GITHUB_RUN_ATTEMPT - 1 ))
           echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
           echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
           echo "Building $version_name ($version_code) attempt=$GITHUB_RUN_ATTEMPT"
