@@ -48,7 +48,10 @@ RUN --mount=type=cache,id=pnpm,target=/buildcache/pnpm-store \
 FROM sdk AS web
 
 COPY ./web/package.json ./web/package.json
-RUN --mount=type=cache,id=pnpm,target=/buildcache/pnpm-store pnpm --filter immich-web install --frozen-lockfile
+# Gallery keeps sharp off the base image's global libvips for the web install; building against it
+# has broken this stage before.
+RUN --mount=type=cache,id=pnpm,target=/buildcache/pnpm-store \
+  SHARP_IGNORE_GLOBAL_LIBVIPS=true pnpm --filter immich-web install --frozen-lockfile
 
 COPY ./i18n ./i18n/
 COPY ./web ./web/
