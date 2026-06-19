@@ -464,7 +464,13 @@ describe(SearchRepository.name, () => {
   });
 
   describe('album-scoped suggestions', () => {
-    it('buildFilteredAssetIds intersects album_asset with viewer-owned assets when no timeline spaces are enabled', () => {
+    // Album facets cover assets the user may legitimately see in the album: those
+    // contributed by an album participant (owner or shared user), owned by the user, or
+    // reachable via a timeline-opted-in shared space. The participant cases are what let
+    // viewers see facets for the album owner's assets (issue #655); the shared-space
+    // union is gated on timeline opt-in so a space asset that landed in an album never
+    // leaks to non-members.
+    it('buildFilteredAssetIds widens album scope to album participants, no spaces without timeline opt-in', () => {
       const sql = compileFilteredAssetIds(sut, {
         albumId: '11111111-1111-1111-1111-111111111111',
         tagIds: ['22222222-2222-2222-2222-222222222222'],
@@ -473,12 +479,13 @@ describe(SearchRepository.name, () => {
       expect(sql).toContain('"album_asset"');
       expect(sql).toContain('"album_asset"."albumId"');
       expect(sql).toContain('"album_asset"."assetId" = "asset"."id"');
-      expect(sql).toContain('"asset"."ownerId" = any(');
+      expect(sql).toContain('"album"."ownerId" = "asset"."ownerId"');
+      expect(sql).toContain('"album_user"."userId" = "asset"."ownerId"');
       expect(sql).not.toContain('"shared_space_asset"');
       expect(sql).not.toContain('"shared_space_library"');
     });
 
-    it('getExifField intersects album_asset with viewer-owned assets when no timeline spaces are enabled', () => {
+    it('getExifField widens album scope to album participants, no spaces without timeline opt-in', () => {
       const sql = compileExifField(sut, 'country', {
         albumId: '11111111-1111-1111-1111-111111111111',
       });
@@ -486,33 +493,36 @@ describe(SearchRepository.name, () => {
       expect(sql).toContain('"album_asset"');
       expect(sql).toContain('"album_asset"."albumId"');
       expect(sql).toContain('"album_asset"."assetId" = "asset"."id"');
-      expect(sql).toContain('"asset"."ownerId" = any(');
+      expect(sql).toContain('"album"."ownerId" = "asset"."ownerId"');
+      expect(sql).toContain('"album_user"."userId" = "asset"."ownerId"');
       expect(sql).not.toContain('"shared_space_asset"');
       expect(sql).not.toContain('"shared_space_library"');
     });
 
-    it('buildFilteredAssetIds allows album assets from timeline-enabled direct and linked-library spaces', () => {
+    it('buildFilteredAssetIds adds timeline-enabled direct and linked-library spaces to album participants', () => {
       const sql = compileFilteredAssetIds(sut, {
         albumId: '11111111-1111-1111-1111-111111111111',
         timelineSpaceIds: ['33333333-3333-3333-3333-333333333333'],
       });
 
       expect(sql).toContain('"album_asset"');
-      expect(sql).toContain('"asset"."ownerId" = any(');
+      expect(sql).toContain('"album"."ownerId" = "asset"."ownerId"');
+      expect(sql).toContain('"album_user"."userId" = "asset"."ownerId"');
       expect(sql).toContain('"shared_space_asset"');
       expect(sql).toContain('"shared_space_asset"."spaceId"');
       expect(sql).toContain('"shared_space_library"');
       expect(sql).toContain('"shared_space_library"."spaceId"');
     });
 
-    it('getExifField allows album assets from timeline-enabled direct and linked-library spaces', () => {
+    it('getExifField adds timeline-enabled direct and linked-library spaces to album participants', () => {
       const sql = compileExifField(sut, 'country', {
         albumId: '11111111-1111-1111-1111-111111111111',
         timelineSpaceIds: ['33333333-3333-3333-3333-333333333333'],
       });
 
       expect(sql).toContain('"album_asset"');
-      expect(sql).toContain('"asset"."ownerId" = any(');
+      expect(sql).toContain('"album"."ownerId" = "asset"."ownerId"');
+      expect(sql).toContain('"album_user"."userId" = "asset"."ownerId"');
       expect(sql).toContain('"shared_space_asset"');
       expect(sql).toContain('"shared_space_asset"."spaceId"');
       expect(sql).toContain('"shared_space_library"');
