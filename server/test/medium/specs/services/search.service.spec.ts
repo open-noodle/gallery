@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import { SearchSuggestionType } from 'src/dtos/search.dto';
+import { FilterSuggestionsResponseDto, SearchSuggestionType } from 'src/dtos/search.dto';
 import { AlbumUserRole, AssetOrder, AssetVisibility, SearchOrderField } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
@@ -9,8 +9,10 @@ import { PartnerRepository } from 'src/repositories/partner.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
 import { SearchRepository } from 'src/repositories/search.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
+import { TagRepository } from 'src/repositories/tag.repository';
 import { DB } from 'src/schema';
 import { SearchService } from 'src/services/search.service';
+import { upsertTags } from 'src/utils/tag';
 import { newMediumService } from 'test/medium.factory';
 import { factory } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
@@ -30,9 +32,47 @@ const setup = (db?: Kysely<DB>) => {
       SharedSpaceRepository,
       PartnerRepository,
       PersonRepository,
+      TagRepository,
     ],
     mock: [LoggingRepository],
   });
+};
+
+type SearchCtx = ReturnType<typeof setup>['ctx'];
+
+// Seed one asset, owned by `ownerId`, carrying a distinct value for every facet type so
+// presence/absence of `${marker}-...` strings in a suggestions response is unambiguous.
+const seedFacetAsset = async (ctx: SearchCtx, ownerId: string, marker: string) => {
+  const { asset } = await ctx.newAsset({ ownerId, visibility: AssetVisibility.Timeline });
+  await ctx.newExif({
+    assetId: asset.id,
+    country: `${marker}-Country`,
+    city: `${marker}-City`,
+    make: `${marker}-Make`,
+    model: `${marker}-Model`,
+    rating: 5,
+  });
+  const [tag] = await upsertTags(ctx.get(TagRepository), { userId: ownerId, tags: [`${marker}-Tag`] });
+  await ctx.newTagAsset({ tagIds: [tag.id], assetIds: [asset.id] });
+  const { person } = await ctx.newPerson({ ownerId, name: `${marker}-Person` });
+  await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  return asset;
+};
+
+const expectFacetsPresent = (result: FilterSuggestionsResponseDto, marker: string) => {
+  expect(result.countries).toContain(`${marker}-Country`);
+  expect(result.cameraMakes).toContain(`${marker}-Make`);
+  expect(result.tags.map((tag) => tag.value)).toContain(`${marker}-Tag`);
+  expect(result.people.map((person) => person.name)).toContain(`${marker}-Person`);
+};
+
+const expectFacetsAbsent = (result: FilterSuggestionsResponseDto, marker: string) => {
+  expect(result.countries).not.toContain(`${marker}-Country`);
+  expect(result.cameraMakes).not.toContain(`${marker}-Make`);
+  expect(result.tags.map((tag) => tag.value)).not.toContain(`${marker}-Tag`);
+  expect(result.people.map((person) => person.name)).not.toContain(`${marker}-Person`);
+  // Catch-all: no facet category (city/model/etc.) may surface the marker either.
+  expect(JSON.stringify(result)).not.toContain(`${marker}-`);
 };
 
 beforeAll(async () => {
@@ -692,6 +732,164 @@ describe(SearchService.name, () => {
       const result = await sut.getFilterSuggestions(auth, { spaceId: space.id });
 
       expect(result.people.map((p) => p.name)).toEqual(['Alice Space', 'Zelda Space']);
+    });
+
+    it('returns album facets for a viewer-role user who owns none of the shared album assets (issue #655)', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newExif({ assetId: asset.id, country: 'Germany', make: 'Sony' });
+      const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'Ada' });
+      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+
+      const { album } = await ctx.newAlbum({ ownerId: owner.id }, [asset.id]);
+      await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id, role: AlbumUserRole.Viewer });
+
+      const auth = factory.auth({ user: { id: viewer.id } });
+      const result = await sut.getFilterSuggestions(auth, { albumId: album.id });
+
+      expect(result.countries).toContain('Germany');
+      expect(result.cameraMakes).toContain('Sony');
+      expect(result.people.map((p) => p.name)).toContain('Ada');
+    });
+  });
+
+  describe('getFilterSuggestions album permission boundaries', () => {
+    it('exposes every facet type of the album owner assets to a shared viewer', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const asset = await seedFacetAsset(ctx, owner.id, 'Owner');
+      const { album } = await ctx.newAlbum({ ownerId: owner.id }, [asset.id]);
+      await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id, role: AlbumUserRole.Viewer });
+
+      const result = await sut.getFilterSuggestions(factory.auth({ user: { id: viewer.id } }), { albumId: album.id });
+
+      expectFacetsPresent(result, 'Owner');
+      expect(result.ratings).toContain(5);
+      expect(result.mediaTypes.length).toBeGreaterThan(0);
+    });
+
+    it('exposes assets contributed by a shared editor to other album members', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: editor } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const ownerAsset = await seedFacetAsset(ctx, owner.id, 'Owner');
+      const editorAsset = await seedFacetAsset(ctx, editor.id, 'Editor');
+      const { album } = await ctx.newAlbum({ ownerId: owner.id }, [ownerAsset.id]);
+      await ctx.newAlbumUser({ albumId: album.id, userId: editor.id, role: AlbumUserRole.Editor });
+      await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id, role: AlbumUserRole.Viewer });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: editorAsset.id });
+
+      const result = await sut.getFilterSuggestions(factory.auth({ user: { id: viewer.id } }), { albumId: album.id });
+
+      expectFacetsPresent(result, 'Owner');
+      expectFacetsPresent(result, 'Editor');
+    });
+
+    it('does not leak a non-participant asset that was placed in the album', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { user: stranger } = await ctx.newUser();
+      const ownerAsset = await seedFacetAsset(ctx, owner.id, 'Owner');
+      const strangerAsset = await seedFacetAsset(ctx, stranger.id, 'Stranger');
+      const { album } = await ctx.newAlbum({ ownerId: owner.id }, [ownerAsset.id]);
+      await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id, role: AlbumUserRole.Viewer });
+      // The stranger is neither the album owner nor a shared user, yet their asset is
+      // referenced by the album — it must never surface in the album facets.
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: strangerAsset.id });
+
+      const result = await sut.getFilterSuggestions(factory.auth({ user: { id: viewer.id } }), { albumId: album.id });
+
+      expectFacetsPresent(result, 'Owner');
+      expectFacetsAbsent(result, 'Stranger');
+    });
+
+    it('exposes a timeline-sharing partner asset to the album viewer', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { user: partner } = await ctx.newUser();
+      await ctx.newPartner({ sharedById: partner.id, sharedWithId: viewer.id, inTimeline: true });
+      const ownerAsset = await seedFacetAsset(ctx, owner.id, 'Owner');
+      const partnerAsset = await seedFacetAsset(ctx, partner.id, 'Partner');
+      const { album } = await ctx.newAlbum({ ownerId: owner.id }, [ownerAsset.id]);
+      await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id, role: AlbumUserRole.Viewer });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: partnerAsset.id });
+
+      const result = await sut.getFilterSuggestions(factory.auth({ user: { id: viewer.id } }), { albumId: album.id });
+
+      expectFacetsPresent(result, 'Partner');
+    });
+
+    it('does not leak an asset from a partner who is not sharing their timeline', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { user: partner } = await ctx.newUser();
+      await ctx.newPartner({ sharedById: partner.id, sharedWithId: viewer.id, inTimeline: false });
+      const ownerAsset = await seedFacetAsset(ctx, owner.id, 'Owner');
+      const partnerAsset = await seedFacetAsset(ctx, partner.id, 'Partner');
+      const { album } = await ctx.newAlbum({ ownerId: owner.id }, [ownerAsset.id]);
+      await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id, role: AlbumUserRole.Viewer });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: partnerAsset.id });
+
+      const result = await sut.getFilterSuggestions(factory.auth({ user: { id: viewer.id } }), { albumId: album.id });
+
+      expectFacetsPresent(result, 'Owner');
+      expectFacetsAbsent(result, 'Partner');
+    });
+
+    it('denies filter suggestions to a user without album access', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: outsider } = await ctx.newUser();
+      const ownerAsset = await seedFacetAsset(ctx, owner.id, 'Owner');
+      const { album } = await ctx.newAlbum({ ownerId: owner.id }, [ownerAsset.id]);
+
+      await expect(
+        sut.getFilterSuggestions(factory.auth({ user: { id: outsider.id } }), { albumId: album.id }),
+      ).rejects.toThrow();
+    });
+
+    it('scopes facets to the requested album and not the owner other albums', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const sharedAsset = await seedFacetAsset(ctx, owner.id, 'Shared');
+      const otherAsset = await seedFacetAsset(ctx, owner.id, 'Other');
+      const { album: shared } = await ctx.newAlbum({ ownerId: owner.id }, [sharedAsset.id]);
+      await ctx.newAlbum({ ownerId: owner.id }, [otherAsset.id]);
+      await ctx.newAlbumUser({ albumId: shared.id, userId: viewer.id, role: AlbumUserRole.Viewer });
+
+      const result = await sut.getFilterSuggestions(factory.auth({ user: { id: viewer.id } }), { albumId: shared.id });
+
+      expectFacetsPresent(result, 'Shared');
+      expectFacetsAbsent(result, 'Other');
+    });
+
+    it('does not leak a non-participant asset city into album city drill-down suggestions', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { user: stranger } = await ctx.newUser();
+      const ownerAsset = await seedFacetAsset(ctx, owner.id, 'Owner');
+      const strangerAsset = await seedFacetAsset(ctx, stranger.id, 'Stranger');
+      const { album } = await ctx.newAlbum({ ownerId: owner.id }, [ownerAsset.id]);
+      await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id, role: AlbumUserRole.Viewer });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: strangerAsset.id });
+
+      const cities = await sut.getSearchSuggestions(factory.auth({ user: { id: viewer.id } }), {
+        type: SearchSuggestionType.CITY,
+        albumId: album.id,
+      });
+
+      expect(cities).toContain('Owner-City');
+      expect(cities).not.toContain('Stranger-City');
     });
   });
 });
