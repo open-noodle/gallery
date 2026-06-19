@@ -11,7 +11,7 @@ Routine sync on top of `2026-06-18-upstream-sync-batch-273.md`. Clean batch — 
 - **New migrations**: 0 — Gallery migration count steady at **33**, mobile Drift unchanged.
 - **OpenAPI regen**: none — no endpoint/DTO shape changes (only repo-internal logic + version strings).
 - **Risk level**: LOW-MEDIUM (no build-infra changes; the two server changes applied cleanly).
-- **Recommendation**: PROCEED — all local checks + 4 audits GREEN; CI dispatched.
+- **Recommendation**: DONE — all local checks + 4 audits GREEN; all 7 dispatched CI workflows GREEN on first pass.
 
 > **Scope note:** held rolling branch — not pushed to `main`, no `branding.upstream.version` bump (stays `v2.7.5`). Now **0 behind / 789 ahead** of `upstream/main`.
 
@@ -54,7 +54,17 @@ Routine sync on top of `2026-06-18-upstream-sync-batch-273.md`. Clean batch — 
 
 ## Remote CI verification
 
-Dispatched on `rebase/upstream-batch-274`. (Results recorded on completion.)
+Dispatched on `rebase/upstream-batch-274`. **All 7 GREEN — first pass** (no build-infra changes, so the batch-273 cold-build saga did not recur).
+
+| Workflow                            | Result |
+| ----------------------------------- | ------ |
+| Test                                | GREEN  |
+| Docker                              | GREEN  |
+| Static Code Analysis                | GREEN  |
+| Gallery Build Mobile                | GREEN  |
+| Gallery Rebase Smoke                | GREEN  |
+| Storage Migration Tests             | GREEN  |
+| Gallery Revert-to-Immich Validation | GREEN  |
 
 ## Post-rebase state
 
