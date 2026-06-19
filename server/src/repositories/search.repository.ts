@@ -1279,79 +1279,100 @@ export class SearchRepository {
     userIds: string[],
     options?: ExifSuggestionScopeOptions,
   ) {
-    return qb
-      .$if(!!options?.albumId, (qb) =>
-        qb.where((eb) =>
-          eb.exists(
-            eb
-              .selectFrom('album_asset')
-              .whereRef('album_asset.assetId', '=', 'asset.id')
-              .where('album_asset.albumId', '=', asUuid(options!.albumId!)),
+    return (
+      qb
+        // Album scope. An asset feeds the album's filter facets only when it (a) belongs
+        // to the album and (b) is one the user may legitimately see there. (b) holds when
+        // the asset was contributed by an album participant (the album owner or a shared
+        // user), is owned by the user or their partners, or is reachable through a shared
+        // space they currently show in their timeline. Dropping the participant cases would
+        // give viewers empty People/Location/Camera/Tag facets for assets owned by the
+        // album owner (issue #655); dropping the access check entirely would leak a
+        // shared-space asset that merely landed in an album to non-space-members.
+        .$if(!!options?.albumId, (qb) =>
+          qb.where((eb) =>
+            eb.and([
+              eb.exists(
+                eb
+                  .selectFrom('album_asset')
+                  .whereRef('album_asset.assetId', '=', 'asset.id')
+                  .where('album_asset.albumId', '=', asUuid(options!.albumId!)),
+              ),
+              eb.or([
+                eb('asset.ownerId', '=', anyUuid(userIds)),
+                eb.exists(
+                  eb
+                    .selectFrom('album')
+                    .whereRef('album.ownerId', '=', 'asset.ownerId')
+                    .where('album.id', '=', asUuid(options!.albumId!)),
+                ),
+                eb.exists(
+                  eb
+                    .selectFrom('album_user')
+                    .whereRef('album_user.userId', '=', 'asset.ownerId')
+                    .where('album_user.albumId', '=', asUuid(options!.albumId!)),
+                ),
+                ...(options?.timelineSpaceIds?.length
+                  ? [
+                      eb.exists(
+                        eb
+                          .selectFrom('shared_space_asset')
+                          .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                          .where('shared_space_asset.spaceId', '=', anyUuid(options.timelineSpaceIds)),
+                      ),
+                      eb.exists(
+                        eb
+                          .selectFrom('shared_space_library')
+                          .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                          .where('shared_space_library.spaceId', '=', anyUuid(options.timelineSpaceIds)),
+                      ),
+                    ]
+                  : []),
+              ]),
+            ]),
           ),
-        ),
-      )
-      .$if(!!options?.albumId && !!options?.timelineSpaceIds?.length, (qb) =>
-        qb.where((eb) =>
-          eb.or([
-            eb('asset.ownerId', '=', anyUuid(userIds)),
-            eb.exists(
-              eb
-                .selectFrom('shared_space_asset')
-                .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-                .where('shared_space_asset.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
-            ),
-            eb.exists(
-              eb
-                .selectFrom('shared_space_library')
-                .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                .where('shared_space_library.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
-            ),
-          ]),
-        ),
-      )
-      .$if(!!options?.albumId && !options?.timelineSpaceIds?.length, (qb) =>
-        qb.where('asset.ownerId', '=', anyUuid(userIds)),
-      )
-      .$if(!options?.albumId && !options?.spaceId && !options?.timelineSpaceIds, (qb) =>
-        qb.where('asset.ownerId', '=', anyUuid(userIds)),
-      )
-      .$if(!!options?.spaceId && !options?.timelineSpaceIds && !options?.albumId, (qb) =>
-        qb.where((eb) =>
-          eb.or([
-            eb.exists(
-              eb
-                .selectFrom('shared_space_asset')
-                .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-                .where('shared_space_asset.spaceId', '=', asUuid(options!.spaceId!)),
-            ),
-            eb.exists(
-              eb
-                .selectFrom('shared_space_library')
-                .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                .where('shared_space_library.spaceId', '=', asUuid(options!.spaceId!)),
-            ),
-          ]),
-        ),
-      )
-      .$if(!!options?.timelineSpaceIds && !options?.albumId, (qb) =>
-        qb.where((eb) =>
-          eb.or([
-            eb('asset.ownerId', '=', anyUuid(userIds)),
-            eb.exists(
-              eb
-                .selectFrom('shared_space_asset')
-                .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-                .where('shared_space_asset.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
-            ),
-            eb.exists(
-              eb
-                .selectFrom('shared_space_library')
-                .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                .where('shared_space_library.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
-            ),
-          ]),
-        ),
-      );
+        )
+        .$if(!options?.albumId && !options?.spaceId && !options?.timelineSpaceIds, (qb) =>
+          qb.where('asset.ownerId', '=', anyUuid(userIds)),
+        )
+        .$if(!!options?.spaceId && !options?.timelineSpaceIds && !options?.albumId, (qb) =>
+          qb.where((eb) =>
+            eb.or([
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_asset')
+                  .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                  .where('shared_space_asset.spaceId', '=', asUuid(options!.spaceId!)),
+              ),
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_library')
+                  .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                  .where('shared_space_library.spaceId', '=', asUuid(options!.spaceId!)),
+              ),
+            ]),
+          ),
+        )
+        .$if(!!options?.timelineSpaceIds && !options?.albumId, (qb) =>
+          qb.where((eb) =>
+            eb.or([
+              eb('asset.ownerId', '=', anyUuid(userIds)),
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_asset')
+                  .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                  .where('shared_space_asset.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
+              ),
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_library')
+                  .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                  .where('shared_space_library.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
+              ),
+            ]),
+          ),
+        )
+    );
   }
 
   private getExifField<K extends 'city' | 'state' | 'country' | 'make' | 'model' | 'lensModel'>(
