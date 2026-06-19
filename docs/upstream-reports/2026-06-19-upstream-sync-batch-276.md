@@ -12,7 +12,7 @@ Fourth same-day sync, on top of `2026-06-19-upstream-sync-batch-275.md`. Single 
 - **OpenAPI/SDK**: none — web service refactor, no controller/DTO/spec change.
 - **Net content change vs batch 275**: exactly #29211's 5 files (web-only). No server/mobile-Dart/ML source touched.
 - **Risk level**: LOW-MEDIUM (web refactor across 3 fork-modified asset-viewer files; clean once imports merged).
-- **Recommendation**: PROCEED — local checks GREEN; targeted CI (Test + Docker) dispatched.
+- **Recommendation**: DONE — local checks GREEN; targeted CI (Test + Docker) both GREEN.
 
 > **Scope note:** held rolling branch — not pushed to `main`, no `branding.upstream.version` bump (stays `v2.7.5`). Now **0 behind / 794 ahead** of `upstream/main`.
 
@@ -67,12 +67,12 @@ Upstream **removed** `mdiPresentationPlay` from this file (slideshow MenuOption 
 
 ## Remote CI verification
 
-Dispatched on `rebase/upstream-batch-276` — targeted to the web surface this batch touches:
+Dispatched on `rebase/upstream-batch-276` — targeted to the web surface this batch touches. **Both GREEN.**
 
-- **Test** — web unit + Web E2E (exercises the asset viewer) + Lint Web + OpenAPI Clients
-- **Docker** — builds the web image (validates the SvelteKit build with the changes)
-
-(Results recorded on completion.)
+| Workflow | Result | Notes                                                                        |
+| -------- | ------ | ---------------------------------------------------------------------------- |
+| Test     | GREEN  | web unit + Web E2E (exercises the asset viewer) + Lint Web + OpenAPI Clients |
+| Docker   | GREEN  | builds the web image (validates the SvelteKit build with the changes)        |
 
 ## Post-rebase state
 
