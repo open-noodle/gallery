@@ -10,8 +10,8 @@ Third sync of the day, on top of `2026-06-18-upstream-sync-batch-270-272.md`. (T
 - **Conflicts resolved**: 3 — `pnpm-lock.yaml` (regen), `app_life_cycle.provider.dart` (mobile lifecycle), `Timeline.svelte` (keyboard refactor × fork grouping)
 - **Post-rebase fixes**: 1 — `pnpm-lock.yaml` regeneration (`2d5c225b`)
 - **New migrations**: 0 — Gallery migration count steady at **33**, mobile Drift unchanged
-- **Risk level**: MEDIUM
-- **Recommendation**: PROCEED — local gate green (server + web unit tests; `tsc`/`svelte-check`; SDK build; structural audits; lockfile regen + faker verified stable); remote CI pending dispatch.
+- **Risk level**: MEDIUM (elevated by a multi-layer cold-build CI fix — see saga below)
+- **Recommendation**: DONE — all 7 dispatched CI workflows GREEN after fixing the pnpm-11.6.0 cold-build cascade (build-before-inject reorder, mise.lock + lockfile restoration, web non-pruning install, mobile midnight-timer test). Each build stage verified via local `docker build` before re-dispatch.
 
 > **Scope note:** held rolling branch — not pushed to `main`, no `branding.upstream.version` bump (stays `v2.7.5`). No OpenAPI regen (no spec change this batch).
 
@@ -72,7 +72,31 @@ Fork S3 deps vs upstream's typescript/opentelemetry/multer/nodemailer bumps. `se
 
 ## Remote CI verification
 
-_Pending dispatch on `rebase/upstream-batch-273`. To record after green._
+Dispatched on `rebase/upstream-batch-273`. **All 7 GREEN** — but only after fixing a multi-layered, pre-existing **cold-build** fragility that #29130's pnpm 11.5.2→11.6.0 bump unmasked (the version change busted the warm CI pnpm-store/build cache that had been hiding it). Each layer below was diagnosed, fixed, and (for the build stages) **verified by local `docker build` per stage** before re-dispatch.
+
+| Workflow                            | Result | Notes                                                                |
+| ----------------------------------- | ------ | -------------------------------------------------------------------- |
+| Test                                | GREEN  | incl. Unit Test Mobile after the C5 fix below                        |
+| Docker                              | GREEN  | server/web/cli/plugins images (C2–C4)                                |
+| Static Code Analysis                | GREEN  | first pass                                                           |
+| Gallery Build Mobile                | GREEN  | first pass                                                           |
+| Gallery Rebase Smoke                | GREEN  | after C2–C4 (stack builds the server image)                          |
+| Storage Migration Tests             | GREEN  | after C2–C4                                                          |
+| Gallery Revert-to-Immich Validation | GREEN  | (its first-dispatch "cancelled" was the global-concurrency eviction) |
+
+### Post-rebase CI-fix saga (pnpm 11.6.0 + `injectWorkspacePackages` cold-build)
+
+Root cause: `injectWorkspacePackages: true` hard-copies `@immich/sdk` into consumers' `node_modules` at **install** time; pnpm does not re-sync that copy after the SDK's `build`, so on a **cold** cache the SDK is built _after_ it's injected and consumers bundle a build-less `@immich/sdk`. Upstream is masked by an always-warm CI cache; the fork's cache went cold when the pnpm version (cache key) changed. Pinning pnpm back did **not** help (cold build fails on 11.5.2 too — confirmed by clean local repro), so the fix had to make cold builds correct. Fork modifications applied (see Fork-CI-Modifications):
+
+- **CA — build-before-inject reorder** (`mise.toml` `//:plugins` + `server/Dockerfile` server/web/cli/plugins stages): install the SDK, build it, _then_ run the inject-install for consumers, then build consumers. Verified each Docker stage builds clean on a cold cache via local `docker build --target`.
+- **CB — `mise.lock`**: a stray local (macOS) `mise install` during the abandoned pin had stripped `java`/`jellyfin-ffmpeg` platform entries → CI `mise install --locked` failed at "Setup Mise". Restored the full-platform lock.
+- **CC — `pnpm-lock.yaml`**: the batch's dep-bump regen had dropped `nanoid@3.3.12` (postcss's CJS dep for `nanoid/non-secure`), breaking the web vite build. Regenerated from the known-good base → restored `nanoid@3.3.12` while keeping the multer/nodemailer/typescript bumps + faker@10.3.0.
+- **CD — web stage** uses a non-pruning install (install sdk+web together both times) so web's transitive `nanoid` is never pruned.
+- **C5 — mobile test** (`main_timeline_infinite_scroll_test.dart`): upstream #28983 added a midnight-refresh `Timer` to the memory provider; the fork test mounts `MainTimelinePage` (→ arms it) and left it pending at body end (`!timersPending`). Fixed by disposing the container inside the test body (cancels the provider timer) before the pending-timer check.
+
+Fix commits: `544f87dd` / `6ea911803f` (CA), `6ea911803f` (CB), `9d9600ced5` (CC/CD), `d2608594` (C5). (The abandoned pnpm-pin commits `74550b04`→`6ea911803f` net out to upstream 11.6.0.)
+
+> **Follow-up:** CA/CD are fork modifications to upstream-owned build files (`mise.toml`, `server/Dockerfile`) — add to the skill's Fork-CI-Modifications table; revisit if upstream fixes the injected-workspace build-order at source.
 
 ## Post-rebase state
 
