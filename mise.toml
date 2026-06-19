@@ -48,7 +48,15 @@ run = [
 ]
 
 [tasks.plugins]
+# Fork: build @immich/sdk BEFORE the workspace-inject install so the injected copies
+# capture its ./build output. With injectWorkspacePackages=true, pnpm hard-copies the
+# SDK into consumers' node_modules at install time and does NOT re-sync after the SDK's
+# build, so plugin-sdk/plugin-core esbuild would otherwise fail to resolve
+# "@immich/sdk" -> ./build/index.js on a cold build. (Upstream is masked by a warm CI
+# pnpm-store cache; the fork's cache is cold. Verified fix.)
 run = [
+  "pnpm --filter @immich/sdk install --frozen-lockfile",
+  "pnpm --filter @immich/sdk build",
   "pnpm --filter @immich/sdk --filter @immich/plugin-sdk --filter @immich/plugin-core install --frozen-lockfile",
   "pnpm --filter @immich/sdk --filter @immich/plugin-sdk --filter @immich/plugin-core build",
 ]
