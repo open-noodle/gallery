@@ -12,7 +12,7 @@ Small same-day sync on top of `2026-06-19-upstream-sync-batch-274.md`. Docs + on
 - **OpenAPI/SDK**: none — no endpoint/DTO/source change.
 - **Net content change vs batch 274**: exactly 2 files — `.github/workflows/gallery-build-mobile.yml` + `docs/docs/features/duplicates-utility.md`. **No server/web/mobile-Dart/ML source touched.**
 - **Risk level**: LOW.
-- **Recommendation**: PROCEED — 4 audits GREEN; targeted CI (Docs Build, Gallery Build Mobile, Static Analysis) dispatched.
+- **Recommendation**: DONE — 4 audits GREEN; targeted CI (Gallery Build Mobile + Static Analysis GREEN, Docs Build GREEN locally) all pass.
 
 > **Scope note:** held rolling branch — not pushed to `main`, no `branding.upstream.version` bump (stays `v2.7.5`). Now **0 behind / 792 ahead** of `upstream/main`.
 
@@ -57,11 +57,11 @@ Fork #333 **added** a "Shared Space" row to the metadata table. **Resolution:** 
 
 Dispatched on `rebase/upstream-batch-275` — **targeted** to what this batch exercises (the heavy server/web/migration suites would re-run identically to batch 274's green run, since no such source changed):
 
-- **Docs Build** — validates the `duplicates-utility.md` change
-- **Gallery Build Mobile** — exercises the #714 versionCode computation + confirms mobile still builds
-- **Static Code Analysis** — cheap full-tree safety net
-
-(Results recorded on completion.)
+| Workflow             | Result        | Notes                                                                                                                                  |
+| -------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Gallery Build Mobile | GREEN         | exercises the #714 versionCode computation + confirms mobile still builds                                                              |
+| Static Code Analysis | GREEN         | full-tree safety net                                                                                                                   |
+| Docs Build           | GREEN (local) | not push/PR-triggered on a held branch; validated via local `docusaurus build` (`[SUCCESS] Generated static files`; links/MDX resolve) |
 
 ## Post-rebase state
 
