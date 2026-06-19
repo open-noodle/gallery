@@ -110,7 +110,9 @@ void main() {
     ).thenAnswer((_) async => SearchResult(assets: _assets(40, 'p3'), nextPage: null));
 
     final container = _makeContainer(search: search, db: db, user: _testUser);
-    addTearDown(container.dispose);
+    // NB: disposed explicitly at the end of the body (not via addTearDown) so the
+    // memory provider's midnight-refresh Timer (upstream #28983) is cancelled before
+    // testWidgets' pending-timer check, which runs before tearDowns.
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -144,6 +146,10 @@ void main() {
     // than outliving the widget tree. Advance fake time so the 0-duration timer runs.
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 1));
+    // Dispose the container so provider timers — incl. the memory provider's
+    // midnight-refresh Timer (upstream #28983) — are cancelled before the
+    // pending-timer check rather than outliving the test via addTearDown.
+    container.dispose();
   });
 
   testWidgets('empty filter (library timeline) fires no search on scroll', (tester) async {
