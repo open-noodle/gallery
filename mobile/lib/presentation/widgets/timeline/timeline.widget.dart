@@ -61,6 +61,7 @@ class Timeline extends StatelessWidget {
     this.readOnly = false,
     this.persistentBottomBar = false,
     this.loadingWidget,
+    this.emptyWidget,
     this.withGroupingPill = false,
   });
 
@@ -77,6 +78,11 @@ class Timeline extends StatelessWidget {
   final bool readOnly;
   final bool persistentBottomBar;
   final Widget? loadingWidget;
+
+  /// Rendered in place of the grid when the timeline resolves to zero assets.
+  /// The main Photos page passes a first-run/empty-results state here; detail
+  /// timelines that omit it keep the previous (blank) behaviour.
+  final Widget? emptyWidget;
 
   /// Overlay the always-visible Years|Months|All bottom pill and reserve bottom
   /// clearance for it. Detail timelines (album/space/person/...) opt in; the main
@@ -98,6 +104,7 @@ class Timeline extends StatelessWidget {
           snapToMonth: snapToMonth,
           maxWidth: constraints.maxWidth,
           loadingWidget: loadingWidget,
+          emptyWidget: emptyWidget,
           withGroupingPill: withGroupingPill,
         );
         return ProviderScope(
@@ -149,6 +156,7 @@ class _SliverTimeline extends ConsumerStatefulWidget {
     this.snapToMonth = true,
     this.maxWidth,
     this.loadingWidget,
+    this.emptyWidget,
     this.withGroupingPill = false,
   });
 
@@ -162,6 +170,7 @@ class _SliverTimeline extends ConsumerStatefulWidget {
   final bool snapToMonth;
   final double? maxWidth;
   final Widget? loadingWidget;
+  final Widget? emptyWidget;
   final bool withGroupingPill;
 
   @override
@@ -632,6 +641,19 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> {
                 final zoomAnchor = ref.watch(timelineZoomAnchorProvider);
                 _scheduleZoomAnchorResolution(anchor: zoomAnchor, groupBy: activeGroupBy, segments: segments);
                 final childCount = (segments.lastOrNull?.lastIndex ?? -1) + 1;
+
+                // Zero assets: render the caller's empty state (first-run / no-results)
+                // instead of a blank grid. The app bar stays so backup/profile remain
+                // reachable; the scrubber and grouping pill are naturally skipped.
+                if (childCount == 0 && widget.emptyWidget != null && !isSelectionMode) {
+                  return CustomScrollView(
+                    slivers: [
+                      if (widget.appBar != null) widget.appBar!,
+                      if (widget.topSliverWidget != null) widget.topSliverWidget!,
+                      SliverFillRemaining(hasScrollBody: false, child: widget.emptyWidget!),
+                    ],
+                  );
+                }
                 final double appBarExpandedHeight = widget.appBar != null && widget.appBar is MesmerizingSliverAppBar
                     ? 200
                     : 0;
