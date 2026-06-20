@@ -47,6 +47,7 @@ export interface SearchStatusOptions {
   isMotion?: boolean;
   isOffline?: boolean;
   isNotInAlbum?: boolean;
+  isInAlbum?: boolean;
   type?: AssetType;
   status?: AssetStatus;
   withArchived?: boolean;
@@ -244,6 +245,7 @@ export interface SuggestionScopeOptions {
 
 interface ExifSuggestionScopeOptions extends SuggestionScopeOptions {
   isNotInAlbum?: boolean;
+  isInAlbum?: boolean;
 }
 
 interface FilterSuggestionFilterOptions {
@@ -259,6 +261,7 @@ interface FilterSuggestionFilterOptions {
   mediaType?: AssetType;
   isFavorite?: boolean;
   isNotInAlbum?: boolean;
+  isInAlbum?: boolean;
 }
 
 export interface GetStatesOptions extends ExifSuggestionScopeOptions {
@@ -1398,6 +1401,11 @@ export class SearchRepository {
           eb.not(eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id'))),
         ),
       )
+      .$if(!!options?.isInAlbum && !options?.albumId, (qb) =>
+        qb.where((eb) =>
+          eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id')),
+        ),
+      )
       .$if(!!options?.takenAfter, (qb) => qb.where('asset.fileCreatedAt', '>=', options!.takenAfter!))
       .$if(!!options?.takenBefore, (qb) => qb.where('asset.fileCreatedAt', '<', options!.takenBefore!));
   }
@@ -1418,6 +1426,11 @@ export class SearchRepository {
       .$if(!!options.isNotInAlbum && !options.albumId, (qb) =>
         qb.where((eb) =>
           eb.not(eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id'))),
+        ),
+      )
+      .$if(!!options.isInAlbum && !options.albumId, (qb) =>
+        qb.where((eb) =>
+          eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id')),
         ),
       )
       .$if(!!options.takenAfter, (qb) => qb.where('asset.fileCreatedAt', '>=', options.takenAfter!))
