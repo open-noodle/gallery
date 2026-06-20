@@ -6,8 +6,7 @@ import { MAX_SPACE_ASSETS_PER_REQUEST } from '$lib/constants';
 import type { CommandContext, SelectionCommandContext } from '$lib/managers/command-context-manager.svelte';
 import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
 import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
-import AssetAddToAlbumModal from '$lib/modals/AssetAddToAlbumModal.svelte';
-import AssetAddToSpaceModal from '$lib/modals/AssetAddToSpaceModal.svelte';
+import AssetAddToCollectionModal from '$lib/modals/AssetAddToCollectionModal.svelte';
 import AssetDeleteConfirmModal from '$lib/modals/AssetDeleteConfirmModal.svelte';
 import { showDeleteModal } from '$lib/stores/preferences.store';
 import type { OnUndoDelete } from '$lib/utils/actions';
@@ -60,7 +59,7 @@ export function handleAddSelectedToAlbum(ctx?: CommandContext) {
   if (!selection?.canAddToAlbum) {
     return;
   }
-  return modalManager.show(AssetAddToAlbumModal, { assetIds: selection.selectedAssetIds });
+  return modalManager.show(AssetAddToCollectionModal, { assetIds: selection.selectedAssetIds });
 }
 
 export function handleAddSelectedToSpace(ctx?: CommandContext) {
@@ -68,7 +67,7 @@ export function handleAddSelectedToSpace(ctx?: CommandContext) {
   if (!selection?.canAddToSpace) {
     return;
   }
-  return modalManager.show(AssetAddToSpaceModal, { assetIds: selection.selectedAssetIds });
+  return modalManager.show(AssetAddToCollectionModal, { assetIds: selection.selectedAssetIds });
 }
 
 export async function handleAddSelectedToCurrentSpace(ctx?: CommandContext) {
