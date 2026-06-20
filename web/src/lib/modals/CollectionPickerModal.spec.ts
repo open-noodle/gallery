@@ -1,11 +1,12 @@
 // CollectionPickerModal.spec.ts — follows the house pattern (sdk.mock + Modal global stubs)
+import { type AlbumResponseDto, type SharedSpaceResponseDto } from '@immich/sdk';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
 import '$lib/__mocks__/sdk.mock';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { getVisualViewportMock } from '$lib/__mocks__/visual-viewport.mock';
-import { type AlbumResponseDto, type SharedSpaceResponseDto } from '@immich/sdk';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
+import CollectionPickerModal from './CollectionPickerModal.svelte';
 
 const { mockUser, mockHandleError } = vi.hoisted(() => ({
   mockUser: { current: { id: 'me', isAdmin: false } },
@@ -22,8 +23,6 @@ vi.mock('$lib/managers/auth-manager.svelte', () => ({
   },
 }));
 vi.mock('$lib/utils/handle-error', () => ({ handleError: mockHandleError }));
-
-import CollectionPickerModal from './CollectionPickerModal.svelte';
 
 const album = (id: string, name: string): AlbumResponseDto =>
   ({
