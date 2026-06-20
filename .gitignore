@@ -45,3 +45,4 @@ vite.config.js.timestamp-*
 *.tsbuildInfo
 .worktrees
 .codex
+.superpowers
