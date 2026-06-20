@@ -281,7 +281,7 @@
       {/if}
       <div class="relative flex min-h-0 min-w-0 flex-1 flex-col sm:flex-row">
         {#if hasActiveFilters}
-          <div class="absolute inset-x-0 top-0 z-10">
+          <div class="absolute inset-x-0 top-0 z-10 bg-light/95 backdrop-blur-sm">
             <ActiveFiltersBar
               {filters}
               resultCount={mapMarkers.length}
