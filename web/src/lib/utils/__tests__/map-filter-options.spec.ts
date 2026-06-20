@@ -29,6 +29,18 @@ describe('buildMapMarkerOptions', () => {
 
     expect(buildMapMarkerOptions(filters)).not.toHaveProperty('isNotInAlbum');
   });
+
+  it('includes has-album in map marker options', () => {
+    const filters = { ...createFilterState(), isInAlbum: true };
+
+    expect(buildMapMarkerOptions(filters)).toEqual(expect.objectContaining({ isInAlbum: true }));
+  });
+
+  it('omits has-album from map marker options when false', () => {
+    const filters = { ...createFilterState(), isInAlbum: false };
+
+    expect(buildMapMarkerOptions(filters)).not.toHaveProperty('isInAlbum');
+  });
 });
 
 describe('buildMapTimeBucketOptions', () => {

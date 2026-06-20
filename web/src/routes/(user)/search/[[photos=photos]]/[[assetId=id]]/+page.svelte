@@ -218,6 +218,7 @@
       visibility: $t('in_archive'),
       isFavorite: $t('favorite'),
       isNotInAlbum: $t('not_in_any_album'),
+      isInAlbum: $t('in_any_album'),
       type: $t('media_type'),
       query: $t('context'),
       city: $t('city'),
