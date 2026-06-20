@@ -33,6 +33,7 @@
   data-is-favorite={String(filters?.isFavorite)}
   data-filter-favorite={String(filters?.isFavorite)}
   data-filter-not-in-album={String(filters?.isNotInAlbum)}
+  data-filter-in-album={String(filters?.isInAlbum)}
   data-filter-person-ids={filters?.personIds.join(',') ?? ''}
   data-filter-tag-ids={filters?.tagIds.join(',') ?? ''}
   data-filter-media-type={filters?.mediaType ?? ''}
