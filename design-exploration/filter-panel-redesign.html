@@ -1,0 +1,1339 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Filter Panel — Redesign Exploration</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Hanken Grotesk: a warm, characterful grotesque for UI — distinct from Inter/Roboto, with proper tabular figures for the year counts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ============================================================
+     DESIGN TOKENS
+     ============================================================ */
+      :root {
+        --d-panel: 420ms;
+        --d-section: 300ms;
+        --d-hover: 150ms;
+        --d-stagger: 45ms;
+        /* decelerating "settle" curve — the heart of the calmer feel */
+        --ease: cubic-bezier(0.22, 1, 0.36, 1);
+        --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+
+        --primary: #6472ff;
+        --primary-strong: #5360ff;
+        --primary-tint: color-mix(in srgb, var(--primary) 16%, transparent);
+        --primary-tint-soft: color-mix(in srgb, var(--primary) 9%, transparent);
+        --font: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+
+        --rail-w: 56px;
+        --panel-w: 268px;
+        --radius: 14px;
+      }
+
+      html[data-theme="dark"] {
+        --app-bg: #0b0c0f;
+        --app-bg-glow: #14161d;
+        --panel: #15171c;
+        --surface: #1c1f26;
+        --surface-2: #21242c;
+        --hairline: rgba(255, 255, 255, 0.065);
+        --hairline-strong: rgba(255, 255, 255, 0.1);
+        --text: #e8eaef;
+        --text-muted: #9aa1ad;
+        --text-faint: #686f7b;
+        --surface-hover: rgba(255, 255, 255, 0.05);
+        --tile-shade: rgba(0, 0, 0, 0.25);
+        --shadow:
+          0 18px 40px -22px rgba(0, 0, 0, 0.85),
+          0 2px 8px -4px rgba(0, 0, 0, 0.6);
+        --inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      }
+      html[data-theme="light"] {
+        --app-bg: #e9ebf1;
+        --app-bg-glow: #f3f4f9;
+        --panel: #ffffff;
+        --surface: #f4f5f9;
+        --surface-2: #eceef4;
+        --hairline: rgba(17, 20, 28, 0.08);
+        --hairline-strong: rgba(17, 20, 28, 0.13);
+        --text: #1a1d24;
+        --text-muted: #59616e;
+        --text-faint: #8b929e;
+        --surface-hover: rgba(17, 20, 28, 0.04);
+        --tile-shade: rgba(0, 0, 0, 0.06);
+        --shadow:
+          0 18px 40px -24px rgba(20, 24, 40, 0.4),
+          0 2px 6px -3px rgba(20, 24, 40, 0.18);
+        --inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        font-family: var(--font);
+        color: var(--text);
+        background:
+          radial-gradient(
+            1200px 700px at 78% -10%,
+            var(--app-bg-glow),
+            transparent 60%
+          ),
+          var(--app-bg);
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        transition:
+          background 0.4s var(--ease-soft),
+          color 0.3s var(--ease-soft);
+      }
+
+      /* reduced motion — both the OS setting and the in-page simulate toggle */
+      body.reduce-motion *,
+      body.reduce-motion *::before,
+      body.reduce-motion *::after {
+        transition-duration: 1ms !important;
+        animation-duration: 1ms !important;
+        animation-delay: 0ms !important;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          transition-duration: 1ms !important;
+          animation-duration: 1ms !important;
+          animation-delay: 0ms !important;
+        }
+      }
+
+      /* ============================================================
+     PAGE CHROME ("the lab")
+     ============================================================ */
+      .lab-head {
+        max-width: 1320px;
+        margin: 0 auto;
+        padding: 30px 28px 14px;
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 24px;
+        flex-wrap: wrap;
+      }
+      .lab-title {
+        margin: 0;
+        font-size: 13px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        font-weight: 600;
+      }
+      .lab-sub {
+        margin: 6px 0 0;
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .lab-sub span {
+        color: var(--primary);
+      }
+
+      .lab-controls {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .seg {
+        display: inline-flex;
+        background: var(--surface);
+        border: 1px solid var(--hairline);
+        border-radius: 11px;
+        padding: 3px;
+        gap: 2px;
+      }
+      .seg button {
+        appearance: none;
+        border: 0;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--text-muted);
+        padding: 7px 13px;
+        border-radius: 8px;
+        background: transparent;
+        transition:
+          color var(--d-hover) var(--ease-soft),
+          background var(--d-hover) var(--ease-soft);
+      }
+      .seg button[aria-pressed="true"] {
+        color: #fff;
+        background: var(--primary);
+      }
+      html[data-theme="light"] .seg button[aria-pressed="true"] {
+        color: #fff;
+      }
+      .seg button:not([aria-pressed="true"]):hover {
+        color: var(--text);
+        background: var(--surface-hover);
+      }
+
+      .stages {
+        max-width: 1320px;
+        margin: 14px auto 60px;
+        padding: 0 28px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 26px;
+      }
+      @media (max-width: 1080px) {
+        .stages {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .stage__label {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 13px;
+        color: var(--text-muted);
+        margin: 0 0 11px 2px;
+      }
+      .stage__label b {
+        color: var(--text);
+        font-weight: 600;
+        font-size: 13.5px;
+      }
+      .stage__label .pip {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--primary);
+        box-shadow: 0 0 0 4px var(--primary-tint);
+      }
+
+      /* the viewport mimics the app: panel on the left, photo grid filling the rest */
+      .viewport {
+        position: relative;
+        height: 552px;
+        border-radius: 18px;
+        border: 1px solid var(--hairline);
+        background:
+          radial-gradient(
+            800px 400px at 100% 0,
+            var(--app-bg-glow),
+            transparent 55%
+          ),
+          var(--app-bg);
+        box-shadow: var(--shadow);
+        display: flex;
+        overflow: hidden;
+      }
+
+      /* ============================================================
+     THE FILTER PANEL
+     ============================================================ */
+      .panel {
+        position: relative;
+        flex: 0 0 auto;
+        width: var(--panel-w);
+        height: 100%;
+        background: var(--panel);
+        border-right: 1px solid var(--hairline);
+        box-shadow: var(--inset-top);
+        overflow: hidden;
+        transition:
+          width var(--d-panel) var(--ease),
+          transform var(--d-panel) var(--ease),
+          opacity var(--d-panel) var(--ease);
+      }
+
+      /* --- Collapse style A: width eases down to an icon rail --- */
+      .stage--rail.collapsed .panel {
+        width: var(--rail-w);
+      }
+
+      /* --- Collapse style B: panel slides off; grid reclaims the space --- */
+      .stage--drawer.collapsed .panel {
+        width: 0;
+        transform: translateX(-16px);
+        opacity: 0;
+        border-right-color: transparent;
+      }
+
+      /* full content + rail are stacked; they cross-fade */
+      .panel__full,
+      .panel__rail {
+        position: absolute;
+        inset: 0;
+        transition:
+          opacity var(--d-panel) var(--ease),
+          transform var(--d-panel) var(--ease);
+      }
+      .panel__full {
+        display: flex;
+        flex-direction: column;
+        width: var(--panel-w);
+      }
+      .panel__rail {
+        width: var(--rail-w);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding-top: 11px;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateX(-6px);
+      }
+      .stage--rail.collapsed .panel__full {
+        opacity: 0;
+        transform: translateX(-10px);
+        pointer-events: none;
+      }
+      .stage--rail.collapsed .panel__rail {
+        opacity: 1;
+        transform: none;
+        pointer-events: auto;
+      }
+
+      /* panel header */
+      .panel__head {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 8px 0 16px;
+        height: 48px;
+        border-bottom: 1px solid var(--hairline);
+      }
+      .panel__title {
+        font-size: 13.5px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      .iconbtn {
+        appearance: none;
+        border: 0;
+        background: transparent;
+        cursor: pointer;
+        color: var(--text-muted);
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        display: inline-grid;
+        place-items: center;
+        transition:
+          background var(--d-hover) var(--ease-soft),
+          color var(--d-hover) var(--ease-soft),
+          transform var(--d-hover) var(--ease);
+      }
+      .iconbtn:hover {
+        background: var(--surface-hover);
+        color: var(--text);
+      }
+      .iconbtn:active {
+        transform: scale(0.9);
+      }
+
+      /* the icon toggle row — softened pills replace hard squares */
+      .toggle-row {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        padding: 9px 8px;
+        border-bottom: 1px solid var(--hairline);
+      }
+      .toggle {
+        position: relative;
+        appearance: none;
+        border: 0;
+        cursor: pointer;
+        background: transparent;
+        width: 31px;
+        height: 31px;
+        border-radius: 10px;
+        display: inline-grid;
+        place-items: center;
+        color: var(--text-faint);
+        transition:
+          background var(--d-hover) var(--ease-soft),
+          color var(--d-hover) var(--ease-soft),
+          transform var(--d-hover) var(--ease);
+      }
+      .toggle:hover {
+        color: var(--text-muted);
+        background: var(--surface-hover);
+      }
+      .toggle:active {
+        transform: scale(0.88);
+      }
+      .toggle[aria-pressed="true"] {
+        color: var(--primary);
+        background: var(--primary-tint);
+      }
+      .toggle .dot {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--primary);
+        border: 1.5px solid var(--panel);
+        transform: scale(0);
+        transition: transform var(--d-hover) var(--ease);
+      }
+      .toggle.has-active .dot {
+        transform: scale(1);
+      }
+
+      /* sections list */
+      .sections {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 6px 0 18px;
+      }
+      .sections::-webkit-scrollbar {
+        width: 9px;
+      }
+      .sections::-webkit-scrollbar-thumb {
+        background: var(--hairline-strong);
+        border-radius: 9px;
+        border: 3px solid transparent;
+        background-clip: content-box;
+      }
+
+      .section {
+        margin: 0 9px;
+        border-radius: var(--radius);
+      }
+      /* active/open section lifts onto a soft surface — no more hard full-width rules */
+      .section[aria-expanded="true"] {
+        background: var(--surface);
+        box-shadow: var(--inset-top);
+      }
+      .section + .section {
+        margin-top: 2px;
+      }
+
+      .section__head {
+        appearance: none;
+        width: 100%;
+        border: 0;
+        background: transparent;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 11px 12px;
+        border-radius: var(--radius);
+        color: var(--text);
+        font-family: inherit;
+        text-align: left;
+        transition: background var(--d-hover) var(--ease-soft);
+      }
+      .section:not([aria-expanded="true"]) .section__head:hover {
+        background: var(--surface-hover);
+      }
+      .section__icon {
+        color: var(--text-faint);
+        display: inline-grid;
+        place-items: center;
+        transition: color var(--d-hover) var(--ease-soft);
+      }
+      .section[aria-expanded="true"] .section__icon {
+        color: var(--primary);
+      }
+      .section__name {
+        flex: 1 1 auto;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .section__count {
+        font-size: 11px;
+        color: var(--text-faint);
+        font-variant-numeric: tabular-nums;
+        background: var(--surface-2);
+        padding: 1px 7px;
+        border-radius: 999px;
+        opacity: 0;
+        transform: scale(0.8);
+        transition:
+          opacity var(--d-hover),
+          transform var(--d-hover) var(--ease);
+      }
+      .section.has-count .section__count {
+        opacity: 1;
+        transform: none;
+      }
+      .section__chev {
+        color: var(--text-faint);
+        transform: rotate(-90deg);
+        transition: transform var(--d-section) var(--ease);
+      }
+      .section[aria-expanded="true"] .section__chev {
+        transform: rotate(0);
+      }
+
+      /* the smooth height slide — grid-rows 0fr→1fr, no JS measuring */
+      .section__body {
+        display: grid;
+        grid-template-rows: 0fr;
+        transition:
+          grid-template-rows var(--d-section) var(--ease),
+          opacity var(--d-section) var(--ease-soft);
+        opacity: 0;
+      }
+      .section[aria-expanded="true"] .section__body {
+        grid-template-rows: 1fr;
+        opacity: 1;
+      }
+      .section__body > .clip {
+        overflow: hidden;
+        min-height: 0;
+      }
+      .section__inner {
+        padding: 2px 12px 14px;
+      }
+
+      /* ---- Timeline content ---- */
+      .date-range {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 9px;
+        margin-bottom: 13px;
+      }
+      .field label {
+        display: block;
+        font-size: 10.5px;
+        font-weight: 600;
+        color: var(--text-muted);
+        margin: 0 0 5px 2px;
+      }
+      .field input {
+        width: 100%;
+        height: 33px;
+        border-radius: 9px;
+        border: 1px solid var(--hairline-strong);
+        background: var(--surface-2);
+        color: var(--text);
+        font-family: inherit;
+        font-size: 12px;
+        padding: 0 10px;
+        outline: none;
+        transition:
+          border-color var(--d-hover) var(--ease-soft),
+          box-shadow var(--d-hover) var(--ease-soft);
+      }
+      .field input::placeholder {
+        color: var(--text-faint);
+      }
+      .field input:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--primary-tint);
+      }
+
+      .year-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 7px;
+      }
+      .year-chip {
+        appearance: none;
+        cursor: pointer;
+        text-align: left;
+        font-family: inherit;
+        border: 1px solid var(--hairline);
+        background: var(--surface-2);
+        border-radius: 11px;
+        padding: 8px 9px 9px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        transition:
+          border-color var(--d-hover) var(--ease-soft),
+          background var(--d-hover) var(--ease-soft),
+          transform var(--d-hover) var(--ease);
+        animation: rise 0.5s var(--ease) both;
+      }
+      .year-chip:hover {
+        transform: translateY(-2px);
+        border-color: color-mix(in srgb, var(--primary) 45%, var(--hairline));
+        background: var(--primary-tint-soft);
+      }
+      .year-chip:active {
+        transform: translateY(0);
+      }
+      .year-chip[data-selected="true"] {
+        background: linear-gradient(
+          180deg,
+          var(--primary),
+          var(--primary-strong)
+        );
+        border-color: transparent;
+        color: #fff;
+        box-shadow: 0 8px 18px -8px var(--primary);
+      }
+      .year-chip .yr {
+        font-size: 12.5px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        font-variant-numeric: tabular-nums;
+      }
+      .year-chip .ct {
+        font-size: 10.5px;
+        color: var(--text-faint);
+        font-variant-numeric: tabular-nums;
+      }
+      .year-chip[data-selected="true"] .ct {
+        color: rgba(255, 255, 255, 0.8);
+      }
+      .bar {
+        height: 3px;
+        border-radius: 3px;
+        background: var(--hairline-strong);
+        overflow: hidden;
+        margin-top: 2px;
+      }
+      .bar__fill {
+        height: 100%;
+        border-radius: 3px;
+        background: var(--primary);
+        transform-origin: left;
+        animation: growx 0.9s var(--ease) both;
+      }
+      .year-chip[data-selected="true"] .bar {
+        background: rgba(255, 255, 255, 0.28);
+      }
+      .year-chip[data-selected="true"] .bar__fill {
+        background: #fff;
+      }
+
+      /* ---- People / Location content ---- */
+      .search {
+        position: relative;
+        margin-bottom: 9px;
+      }
+      .search svg {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-faint);
+      }
+      .search input {
+        width: 100%;
+        height: 33px;
+        border-radius: 9px;
+        border: 1px solid var(--hairline-strong);
+        background: var(--surface-2);
+        color: var(--text);
+        font-family: inherit;
+        font-size: 12px;
+        padding: 0 10px 0 31px;
+        outline: none;
+        transition:
+          border-color var(--d-hover) var(--ease-soft),
+          box-shadow var(--d-hover) var(--ease-soft);
+      }
+      .search input:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--primary-tint);
+      }
+      .search input::placeholder {
+        color: var(--text-faint);
+      }
+
+      .opt {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 8px;
+        border-radius: 9px;
+        cursor: pointer;
+        transition: background var(--d-hover) var(--ease-soft);
+      }
+      .opt:hover {
+        background: var(--surface-hover);
+      }
+      .opt .box {
+        width: 17px;
+        height: 17px;
+        border-radius: 5px;
+        border: 1.5px solid var(--hairline-strong);
+        display: inline-grid;
+        place-items: center;
+        flex: 0 0 auto;
+        transition:
+          background var(--d-hover) var(--ease),
+          border-color var(--d-hover) var(--ease);
+      }
+      .opt .box svg {
+        opacity: 0;
+        transform: scale(0.5);
+        transition:
+          opacity var(--d-hover),
+          transform var(--d-hover) var(--ease);
+        color: #fff;
+      }
+      .opt[data-on="true"] .box {
+        background: var(--primary);
+        border-color: var(--primary);
+      }
+      .opt[data-on="true"] .box svg {
+        opacity: 1;
+        transform: none;
+      }
+      .avatar {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        flex: 0 0 auto;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+      }
+      .opt .nm {
+        font-size: 12.5px;
+        color: var(--text);
+      }
+      .more {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--primary);
+        padding: 8px 8px 2px;
+        cursor: pointer;
+      }
+      .more:hover {
+        text-decoration: underline;
+      }
+
+      /* rail icons */
+      .rail-icon {
+        position: relative;
+        appearance: none;
+        border: 0;
+        background: transparent;
+        cursor: pointer;
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        color: var(--text-faint);
+        transition:
+          background var(--d-hover) var(--ease-soft),
+          color var(--d-hover) var(--ease-soft);
+      }
+      .rail-icon:hover {
+        background: var(--surface-hover);
+        color: var(--text);
+      }
+      .rail-icon.has-active {
+        color: var(--primary);
+      }
+      .rail-icon .dot {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--primary);
+        border: 1.5px solid var(--panel);
+      }
+      .rail-divider {
+        width: 22px;
+        height: 1px;
+        background: var(--hairline);
+        margin: 5px 0;
+      }
+
+      /* reopen tab for the drawer style */
+      .reopen {
+        position: absolute;
+        left: 0;
+        top: 16px;
+        z-index: 5;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--hairline);
+        border-left: 0;
+        border-radius: 0 11px 11px 0;
+        padding: 9px 11px 9px 9px;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        box-shadow: var(--shadow);
+        opacity: 0;
+        transform: translateX(-100%);
+        pointer-events: none;
+        transition:
+          opacity var(--d-panel) var(--ease),
+          transform var(--d-panel) var(--ease);
+      }
+      .reopen svg {
+        color: var(--primary);
+      }
+      .stage--drawer.collapsed .reopen {
+        opacity: 1;
+        transform: none;
+        pointer-events: auto;
+        transition-delay: 120ms;
+      }
+
+      /* ============================================================
+     FAUX PHOTO GRID (so collapse motion is legible)
+     ============================================================ */
+      .grid {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 14px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        grid-auto-rows: 78px;
+        gap: 9px;
+        align-content: start;
+        transition: padding var(--d-panel) var(--ease);
+      }
+      .tile {
+        border-radius: 11px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: var(--inset-top);
+        animation: rise 0.6s var(--ease) both;
+      }
+      .tile::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, transparent 55%, var(--tile-shade));
+      }
+      .tile.tall {
+        grid-row: span 2;
+      }
+      .g1 {
+        background: linear-gradient(150deg, #3f6f4a, #6ba06a 60%, #a9c98a);
+      }
+      .g2 {
+        background: linear-gradient(150deg, #6f8fb0, #cdb7c7 70%, #e9c6d0);
+      }
+      .g3 {
+        background: linear-gradient(150deg, #2c3a4f, #4a5b73);
+      }
+      .g4 {
+        background: linear-gradient(150deg, #b98a6a, #e6b98c 70%, #f3d9b5);
+      }
+      .g5 {
+        background: linear-gradient(150deg, #3b5d52, #6fae8e);
+      }
+      .g6 {
+        background: linear-gradient(150deg, #7a8aa3, #b9c4d6);
+      }
+      .g7 {
+        background: linear-gradient(150deg, #44617a, #7fa0bd 70%, #c4d6e6);
+      }
+      .g8 {
+        background: linear-gradient(150deg, #5a4f6b, #9b8fb0);
+      }
+
+      /* ============================================================
+     KEYFRAMES
+     ============================================================ */
+      @keyframes growx {
+        from {
+          transform: scaleX(0);
+        }
+        to {
+          transform: scaleX(1);
+        }
+      }
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(7px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      .footnote {
+        max-width: 1320px;
+        margin: 0 auto 50px;
+        padding: 0 30px;
+        color: var(--text-faint);
+        font-size: 12.5px;
+        line-height: 1.7;
+      }
+      .footnote b {
+        color: var(--text-muted);
+        font-weight: 600;
+      }
+      .kbd {
+        font-family: ui-monospace, monospace;
+        font-size: 11px;
+        background: var(--surface);
+        border: 1px solid var(--hairline);
+        border-radius: 5px;
+        padding: 1px 6px;
+        color: var(--text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ===== icon library ===== -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <symbol id="i-cal" viewBox="0 0 24 24">
+          <path
+            fill="currentColor"
+            d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2m0 16H5V10h14zm0-12H5V6h14z"
+          />
+        </symbol>
+        <symbol id="i-account" viewBox="0 0 24 24">
+          <path
+            fill="currentColor"
+            d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5m0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5"
+          />
+        </symbol>
+        <symbol id="i-pin" viewBox="0 0 24 24">
+          <path
+            fill="currentColor"
+            d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7m0 9.5A2.5 2.5 0 1 1 14.5 9 2.5 2.5 0 0 1 12 11.5"
+          />
+        </symbol>
+        <symbol id="i-cam" viewBox="0 0 24 24">
+          <path
+            fill="currentColor"
+            d="M9 3 7.2 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.2L15 3zm3 5a5 5 0 1 1 0 10 5 5 0 0 1 0-10m0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6"
+          />
+        </symbol>
+        <symbol id="i-tag" viewBox="0 0 24 24">
+          <path
+            fill="currentColor"
+            d="M21.4 11.6 12.4 2.6A2 2 0 0 0 11 2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 .6 1.4l9 9a2 2 0 0 0 2.8 0l7-7a2 2 0 0 0 0-2.8M6.5 8A1.5 1.5 0 1 1 8 6.5 1.5 1.5 0 0 1 6.5 8"
+          />
+        </symbol>
+        <symbol id="i-star" viewBox="0 0 24 24">
+          <path
+            fill="currentColor"
+            d="m12 17.3 6.2 3.7-1.6-7 5.4-4.7-7.1-.6L12 2 9.1 8.7l-7.1.6 5.4 4.7-1.6 7z"
+          />
+        </symbol>
+        <symbol id="i-image" viewBox="0 0 24 24">
+          <path
+            fill="currentColor"
+            d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2M8.5 13.5l2.5 3 3.5-4.5 4.5 6H5z"
+          />
+        </symbol>
+        <symbol id="i-heart" viewBox="0 0 24 24">
+          <path
+            fill="currentColor"
+            d="m12 21-1.5-1.3C5.4 15 2 11.9 2 8.1A4.6 4.6 0 0 1 6.6 3.5 5 5 0 0 1 12 6a5 5 0 0 1 5.4-2.5A4.6 4.6 0 0 1 22 8.1c0 3.8-3.4 6.9-8.5 11.6z"
+          />
+        </symbol>
+        <symbol id="i-album" viewBox="0 0 24 24">
+          <path
+            fill="currentColor"
+            d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2m-7 13-2.5-3L6 18h12l-4.5-6z"
+          />
+        </symbol>
+        <symbol id="i-chev-l" viewBox="0 0 24 24">
+          <path
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="m15 6-6 6 6 6"
+          />
+        </symbol>
+        <symbol id="i-chev-r" viewBox="0 0 24 24">
+          <path
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="m9 6 6 6-6 6"
+          />
+        </symbol>
+        <symbol id="i-chev-d" viewBox="0 0 24 24">
+          <path
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="m6 9 6 6 6-6"
+          />
+        </symbol>
+        <symbol id="i-search" viewBox="0 0 24 24">
+          <path
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            d="M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16m6-2 4 4"
+          />
+        </symbol>
+        <symbol id="i-check" viewBox="0 0 24 24">
+          <path
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="m5 12 5 5 9-10"
+          />
+        </symbol>
+      </defs>
+    </svg>
+
+    <header class="lab-head">
+      <div>
+        <p class="lab-title">Gallery · Design Exploration</p>
+        <h1 class="lab-sub">Filter panel — <span>motion &amp; polish</span></h1>
+      </div>
+      <div class="lab-controls">
+        <div class="seg" role="group" aria-label="Theme">
+          <button id="th-dark" aria-pressed="true">Dark</button>
+          <button id="th-light" aria-pressed="false">Light</button>
+        </div>
+        <div class="seg" role="group" aria-label="Motion">
+          <button id="mo-full" aria-pressed="true">Full motion</button>
+          <button id="mo-reduce" aria-pressed="false">Reduced</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="stages">
+      <section class="stage stage--rail" id="stageA">
+        <p class="stage__label">
+          <span class="pip"></span><b>Option A — Width-eased rail</b> · shrinks
+          to an always-visible icon rail
+        </p>
+        <div class="viewport"></div>
+      </section>
+
+      <section class="stage stage--drawer" id="stageB">
+        <p class="stage__label">
+          <span class="pip"></span><b>Option B — Slide-off drawer</b> · slides
+          away; a tab brings it back
+        </p>
+        <div class="viewport"></div>
+      </section>
+    </main>
+
+    <p class="footnote">
+      <b>Try it:</b> click the <span class="kbd">‹</span> in each panel header
+      to collapse — Option A eases its width down to the icon rail, Option B
+      slides the whole panel away and the photo grid reclaims the space (use the
+      <b>Filters</b> tab to reopen). Click any section header to feel the
+      height-slide; click year chips and people to see selection states. Toggle
+      <b>Reduced</b> motion to verify the accessibility path (it also follows
+      your OS setting automatically). <br />Same features as today — softer
+      surfaces, hairline dividers, a year grid that breathes, and motion that
+      settles instead of snapping.
+    </p>
+
+    <script>
+      /* ---------- data ---------- */
+      const YEARS = [
+        [2009, 266],
+        [2010, 1831],
+        [2011, 1874],
+        [2012, 523],
+        [2013, 316],
+        [2014, 11],
+        [2015, 482],
+        [2016, 4132],
+        [2017, 4597],
+        [2018, 4331],
+        [2019, 4410],
+        [2020, 3067],
+        [2021, 4134],
+        [2022, 4264],
+        [2023, 4392],
+        [2024, 10849],
+        [2025, 12452],
+        [2026, 2724],
+      ];
+      const MAXY = Math.max(...YEARS.map((y) => y[1]));
+      const PEOPLE = [
+        ["Aurelia", "#c2683f"],
+        ["Claire", "#3f73c2"],
+        ["Gabusz", "#4a9e6a"],
+        ["Gudrin", "#a14fb0"],
+        ["Heiko", "#b0934f"],
+      ];
+      const PLACES = [
+        "Austria",
+        "Croatia",
+        "Czech Republic",
+        "France",
+        "Germany",
+        "Hungary",
+        "Italy",
+      ];
+      const TOGGLES = [
+        ["i-cal", "Timeline", true],
+        ["i-account", "People", true],
+        ["i-pin", "Location", false],
+        ["i-cam", "Camera", false],
+        ["i-tag", "Tags", true],
+        ["i-star", "Rating", false],
+        ["i-image", "Media", false],
+        ["i-heart", "Favorites", false],
+        ["i-album", "Albums", false],
+      ];
+      const RAIL = TOGGLES;
+
+      const use = (id) =>
+        `<svg width="17" height="17" aria-hidden="true"><use href="#${id}"/></svg>`;
+
+      /* ---------- builders ---------- */
+      function yearGrid() {
+        return YEARS.map(([yr, ct], i) => {
+          const pct = Math.max(4, Math.round((ct / MAXY) * 100));
+          const sel = yr === 2024;
+          return `<button class="year-chip" data-selected="${sel}" style="animation-delay:${i * 22}ms" data-yr="${yr}">
+        <span class="yr">${yr}</span>
+        <span class="ct">${ct.toLocaleString()}</span>
+        <span class="bar"><span class="bar__fill" style="width:${pct}%;animation-delay:${120 + i * 22}ms"></span></span>
+      </button>`;
+        }).join("");
+      }
+      function peopleList() {
+        return (
+          PEOPLE.map(
+            (p, i) => `<div class="opt" data-on="${i === 0}">
+        <span class="box">${use("i-check")}</span>
+        <span class="avatar" style="background:${p[1]}">${p[0][0]}</span>
+        <span class="nm">${p[0]}</span>
+      </div>`,
+          ).join("") + `<div class="more">3 more</div>`
+        );
+      }
+      function placeList() {
+        return PLACES.map(
+          (p, i) => `<div class="opt" data-on="${i === 4}">
+        <span class="box">${use("i-check")}</span>
+        <span class="nm">${p}</span>
+      </div>`,
+        ).join("");
+      }
+
+      function section({ icon, name, count, open, body }) {
+        return `<div class="section ${count ? "has-count" : ""}" aria-expanded="${open}">
+      <button class="section__head" type="button">
+        <span class="section__icon">${use(icon)}</span>
+        <span class="section__name">${name}</span>
+        ${count ? `<span class="section__count">${count}</span>` : ""}
+        <span class="section__chev"><svg width="15" height="15" aria-hidden="true"><use href="#i-chev-d"/></svg></span>
+      </button>
+      <div class="section__body"><div class="clip"><div class="section__inner">${body}</div></div></div>
+    </div>`;
+      }
+
+      function toggleRow() {
+        return (
+          `<div class="toggle-row">` +
+          TOGGLES.map(
+            ([icon, name, active]) =>
+              `<button class="toggle ${active ? "has-active" : ""}" type="button" aria-pressed="${active}" title="${name}" aria-label="${name}">
+        ${use(icon)}<span class="dot"></span>
+      </button>`,
+          ).join("") +
+          `</div>`
+        );
+      }
+
+      function railCol() {
+        const top = `<button class="iconbtn" data-act="expand" title="Expand"><svg width="17" height="17"><use href="#i-chev-r"/></svg></button>`;
+        const icons = RAIL.map(
+          ([icon, name, active]) =>
+            `<button class="rail-icon ${active ? "has-active" : ""}" data-act="expand" title="${name}">${use(icon)}<span class="dot" style="${active ? "" : "display:none"}"></span></button>`,
+        ).join("");
+        return `<div class="panel__rail">${top}<div class="rail-divider"></div>${icons}</div>`;
+      }
+
+      function panelMarkup() {
+        const timeline = `<div class="date-range">
+        <div class="field"><label>From</label><input placeholder="YYYY-MM-DD" /></div>
+        <div class="field"><label>To</label><input placeholder="YYYY-MM-DD" /></div>
+      </div><div class="year-grid">${yearGrid()}</div>`;
+        const people = `<div class="search">${use("i-search")}<input placeholder="Search people…" /></div>${peopleList()}`;
+        const places = `<div class="search">${use("i-search")}<input placeholder="Search locations…" /></div>${placeList()}`;
+        const sections =
+          section({
+            icon: "i-cal",
+            name: "Timeline",
+            count: "",
+            open: true,
+            body: timeline,
+          }) +
+          section({
+            icon: "i-account",
+            name: "People",
+            count: "5",
+            open: true,
+            body: people,
+          }) +
+          section({
+            icon: "i-pin",
+            name: "Location",
+            count: "7",
+            open: false,
+            body: places,
+          }) +
+          section({
+            icon: "i-cam",
+            name: "Camera",
+            count: "12",
+            open: false,
+            body: '<div style="color:var(--text-faint);font-size:12px">Apple · Sony · Canon…</div>',
+          }) +
+          section({
+            icon: "i-tag",
+            name: "Tags",
+            count: "34",
+            open: false,
+            body: '<div style="color:var(--text-faint);font-size:12px">Holiday · Family · Pets…</div>',
+          }) +
+          section({
+            icon: "i-star",
+            name: "Rating",
+            count: "",
+            open: false,
+            body: '<div style="color:var(--text-faint);font-size:12px">★★★★★</div>',
+          });
+        return `${railCol()}<div class="panel__full">
+        <div class="panel__head">
+          <span class="panel__title">Filters</span>
+          <button class="iconbtn" data-act="collapse" title="Collapse"><svg width="17" height="17"><use href="#i-chev-l"/></svg></button>
+        </div>
+        ${toggleRow()}
+        <div class="sections">${sections}</div>
+      </div>`;
+      }
+
+      const GRID_TILES = [
+        "g1 tall",
+        "g2",
+        "g3",
+        "g4",
+        "g5",
+        "g6 tall",
+        "g7",
+        "g2",
+        "g8",
+        "g1",
+        "g4 tall",
+        "g5",
+        "g7",
+        "g3",
+        "g6",
+        "g2 tall",
+        "g8",
+        "g1",
+      ];
+      function gridMarkup() {
+        return (
+          `<div class="grid">` +
+          GRID_TILES.map(
+            (c, i) =>
+              `<div class="tile ${c}" style="animation-delay:${i * 28}ms"></div>`,
+          ).join("") +
+          `</div>`
+        );
+      }
+
+      function reopenTab() {
+        return `<button class="reopen" data-act="expand"><svg width="15" height="15"><use href="#i-chev-r"/></svg>Filters</button>`;
+      }
+
+      /* ---------- mount ---------- */
+      document.querySelectorAll(".stage .viewport").forEach((vp) => {
+        vp.innerHTML = `<div class="panel">${panelMarkup()}</div>${gridMarkup()}${reopenTab()}`;
+      });
+
+      /* ---------- interactions ---------- */
+      document.addEventListener("click", (e) => {
+        const act = e.target.closest("[data-act]");
+        if (act) {
+          const stage = act.closest(".stage");
+          if (act.dataset.act === "collapse") stage.classList.add("collapsed");
+          if (act.dataset.act === "expand") stage.classList.remove("collapsed");
+          return;
+        }
+        const head = e.target.closest(".section__head");
+        if (head) {
+          const sec = head.closest(".section");
+          sec.setAttribute(
+            "aria-expanded",
+            sec.getAttribute("aria-expanded") === "true" ? "false" : "true",
+          );
+          return;
+        }
+        const tog = e.target.closest(".toggle");
+        if (tog) {
+          const on = tog.getAttribute("aria-pressed") === "true";
+          tog.setAttribute("aria-pressed", String(!on));
+          return;
+        }
+        const chip = e.target.closest(".year-chip");
+        if (chip) {
+          const grid = chip.closest(".year-grid");
+          grid
+            .querySelectorAll(".year-chip")
+            .forEach((c) => (c.dataset.selected = "false"));
+          chip.dataset.selected = "true";
+          return;
+        }
+        const opt = e.target.closest(".opt");
+        if (opt) {
+          opt.dataset.on = opt.dataset.on === "true" ? "false" : "true";
+        }
+      });
+
+      /* ---------- lab controls ---------- */
+      const setTheme = (t) => {
+        document.documentElement.dataset.theme = t;
+        th_dark.setAttribute("aria-pressed", String(t === "dark"));
+        th_light.setAttribute("aria-pressed", String(t === "light"));
+      };
+      th_dark.onclick = () => setTheme("dark");
+      th_light.onclick = () => setTheme("light");
+
+      const setMotion = (reduce) => {
+        document.body.classList.toggle("reduce-motion", reduce);
+        mo_full.setAttribute("aria-pressed", String(!reduce));
+        mo_reduce.setAttribute("aria-pressed", String(reduce));
+      };
+      mo_full.onclick = () => setMotion(false);
+      mo_reduce.onclick = () => setMotion(true);
+    </script>
+  </body>
+</html>

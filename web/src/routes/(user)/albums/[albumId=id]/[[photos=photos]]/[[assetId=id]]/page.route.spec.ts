@@ -402,4 +402,18 @@ describe('album detail filter panel route', () => {
     expect(screen.getByTestId('active-chip')).toHaveTextContent('Second Album Person');
     expect(screen.queryByText('First Album Person')).not.toBeInTheDocument();
   });
+
+  it('merges grouping and the filter bar into one toolbar row in browse mode', async () => {
+    renderPage();
+    const user = userEvent.setup();
+
+    // activate a filter so the bar renders
+    await waitFor(() => expect(screen.getByTestId('people-item-person-view')).toBeInTheDocument());
+    await user.click(screen.getByTestId('people-item-person-view'));
+
+    const grouping = await screen.findByTestId('timeline-desktop-grouping-control');
+    const bar = screen.getByTestId('active-filters-bar');
+    // grouping wrapper and the bar's flex-1 column share the FilterToolbar root
+    expect(grouping.parentElement).toBe(bar.parentElement?.parentElement);
+  });
 });
