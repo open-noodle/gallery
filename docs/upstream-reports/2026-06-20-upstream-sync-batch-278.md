@@ -43,7 +43,7 @@ v3 had refactored the timeline widget (dropped the `Scaffold`/FAB wrapper, switc
 
 ### C4 — `mobile/ios/Runner/Info.plist` (batch-278 rebase, fork #372)
 
-Upstream re-serialized the whole file tabs→spaces; fork #372 brands the 9 `NS*UsageDescription` strings. **Adopted upstream's space-indented file (`--ours`) and re-applied the 9 branded "Noodle Gallery…" strings key-anchored** — a one-time absorption of upstream's reformatting so the file stops re-conflicting on indentation every future rebase.
+Upstream re-serialized the whole file tabs→spaces; fork #372 brands the 9 `NS*UsageDescription` strings. First attempt adopted upstream's space-indented file + re-applied the branded strings, but **CI Build Mobile rejected it**: `apply-branding.sh` (inserts the `noodle-gallery` URL scheme) and `verify-branding.sh` (checks the legacy `immich` + `noodle-gallery` schemes) are both **hard-anchored to 4-tab `CFBundleURLSchemes` indentation**, so the space-reformatted file broke the scheme insertion. **Final resolution: kept the fork's tab-formatted Info.plist** (branded strings intact; `#29215`'s Info.plist delta was purely cosmetic + a build number the fork stamps itself). Adopting upstream's spaces would require rewriting both branding scripts — out of scope for a routine batch; the tabs↔spaces conflict on Info.plist will recur until that's done.
 
 ### Auto-dropped commit (convergence)
 
@@ -83,9 +83,19 @@ Surfaced by the local gate, not by the cherry-pick:
 
 > **svelte-check note:** the `mise //web:check-svelte` task runs `svelte-check --no-tsconfig`, which reports `0 FILES` in the worktree (documented local quirk; CI tolerates it). Run with `--tsconfig`, svelte-check surfaces ~32 pre-existing latent prop-type mismatches in spec files — 3 of the 4 affected source files are **byte-identical to the pre-sync tip** (not regressions from this batch), and `tsc --noEmit` (the real type gate) is clean.
 
-## Remote CI verification
+## Remote CI round 1 + post-CI reconciliation
 
-To be dispatched on `rebase/upstream-batch-278`: Test, Docker, static_analysis, gallery-build-mobile, gallery-rebase-smoke, storage-migration-tests/e2e, gallery-revert-to-immich-validation. (Results appended once green.)
+First dispatch on `rebase/upstream-batch-278`: 5 green (Docker, Storage-Migration Tests + E2E, Rebase Smoke, **Revert-to-Immich Validation**), 3 red (Test, Static Code Analysis, Gallery Build Mobile). All 3 reds were further v2.7.5→v3 drift in the synced PRs that the local tsc/unit gate couldn't catch (real DB, dart analyze, branding, prettier) — fixed in commit `fix(rolling): resolve v3 CI failures for fork-sync batch 278`:
+
+| Red job                            | Root cause                                                                                                                              | Fix                                                                                                                                                                        |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Medium Tests (Server)              | `#716`/`#717` query used `album.ownerId`; v3 `MigrateAlbumOwnerIdToAlbumUser` dropped that column (ownership → `album_user` role=owner) | Removed the redundant owner branch — the existing `album_user` participant check covers the owner on v3                                                                    |
+| Static Analysis + Unit Test Mobile | `#720` test used `StoreKey.tilesPerRow`; v3 moved it to `appConfigProvider`                                                             | `appConfigProvider.overrideWithValue(AppConfig(timeline: TimelineConfig(tilesPerRow: 3)))`                                                                                 |
+| Build Mobile (iOS+Android)         | space-reformatted Info.plist broke apply/verify-branding's 4-tab `CFBundleURLSchemes` anchor                                            | Restored tab-formatted Info.plist (see C4)                                                                                                                                 |
+| Test Web                           | `#708` files not formatted for v3 prettier                                                                                              | `prettier --write`                                                                                                                                                         |
+| Lint Web                           | `#708` switch over `CollectionModalRowType` non-exhaustive (v3 enables `switch-exhaustiveness-check`)                                   | Added `SECTION`/`MESSAGE` no-op cases. (The 84 `better-tailwindcss` _warnings_ are non-fatal — `eslint .` has no `--max-warnings 0` — so left untouched, as in batch 276.) |
+
+Re-dispatched Test / Static Code Analysis / Gallery Build Mobile on the updated branch. (Final results appended once green.)
 
 ## Post-rebase state
 
