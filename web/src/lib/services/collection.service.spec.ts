@@ -1,5 +1,7 @@
 // collection.service.spec.ts
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { PickerCollection } from '$lib/components/shared-components/collection-selection/collection-selection-utils';
+import { addAssetsToCollections } from './collection.service';
 
 const addAssetsToAlbums = vi.fn();
 const addAssetsToSpace = vi.fn();
@@ -12,10 +14,6 @@ vi.mock('$lib/utils/i18n', () => ({
   getFormatter: () =>
     Promise.resolve((key: string, opts?: { values?: { count?: number } }) => `${key}:${opts?.values?.count ?? ''}`),
 }));
-
-import { addAssetsToCollections } from './collection.service';
-
-import type { PickerCollection } from '$lib/components/shared-components/collection-selection/collection-selection-utils';
 
 const albumCol = (id: string): PickerCollection =>
   ({ kind: 'album', id, name: id, album: { id } }) as unknown as PickerCollection;
