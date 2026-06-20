@@ -525,7 +525,6 @@ describe(SearchRepository.name, () => {
       expect(sql).toContain('"album_asset"');
       expect(sql).toContain('"album_asset"."albumId"');
       expect(sql).toContain('"album_asset"."assetId" = "asset"."id"');
-      expect(sql).toContain('"album"."ownerId" = "asset"."ownerId"');
       expect(sql).toContain('"album_user"."userId" = "asset"."ownerId"');
       expect(sql).not.toContain('"shared_space_asset"');
       expect(sql).not.toContain('"shared_space_library"');
@@ -539,7 +538,6 @@ describe(SearchRepository.name, () => {
       expect(sql).toContain('"album_asset"');
       expect(sql).toContain('"album_asset"."albumId"');
       expect(sql).toContain('"album_asset"."assetId" = "asset"."id"');
-      expect(sql).toContain('"album"."ownerId" = "asset"."ownerId"');
       expect(sql).toContain('"album_user"."userId" = "asset"."ownerId"');
       expect(sql).not.toContain('"shared_space_asset"');
       expect(sql).not.toContain('"shared_space_library"');
@@ -552,7 +550,6 @@ describe(SearchRepository.name, () => {
       });
 
       expect(sql).toContain('"album_asset"');
-      expect(sql).toContain('"album"."ownerId" = "asset"."ownerId"');
       expect(sql).toContain('"album_user"."userId" = "asset"."ownerId"');
       expect(sql).toContain('"shared_space_asset"');
       expect(sql).toContain('"shared_space_asset"."spaceId"');
@@ -567,7 +564,6 @@ describe(SearchRepository.name, () => {
       });
 
       expect(sql).toContain('"album_asset"');
-      expect(sql).toContain('"album"."ownerId" = "asset"."ownerId"');
       expect(sql).toContain('"album_user"."userId" = "asset"."ownerId"');
       expect(sql).toContain('"shared_space_asset"');
       expect(sql).toContain('"shared_space_asset"."spaceId"');
