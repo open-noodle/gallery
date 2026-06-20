@@ -1,7 +1,7 @@
 <script lang="ts">
   import { initInput } from '$lib/actions/focus';
-  import AlbumListItem from '$lib/components/asset-viewer/album-list-item.svelte';
-  import NewAlbumListItem from '$lib/components/shared-components/album-selection/new-album-list-item.svelte';
+  import AlbumListItem from '$lib/components/asset-viewer/AlbumListItem.svelte';
+  import NewAlbumListItem from '$lib/components/shared-components/album-selection/NewAlbumListItem.svelte';
   import {
     albumToCollection,
     CollectionModalRowConverter,
@@ -79,8 +79,8 @@
   });
 
   const loadAlbums = async () => {
-    const owned = await getAllAlbums({ shared: false });
-    owned.push(...(await getAllAlbums({ shared: true })));
+    const owned = await getAllAlbums({ isOwned: true });
+    owned.push(...(await getAllAlbums({ isShared: true })));
     albums = owned;
   };
 
