@@ -16,6 +16,15 @@ describe('FilterPanel', () => {
     localStorage.clear();
   });
 
+  it('renders an expanded section with no surface fill or hard divider', () => {
+    const { getByTestId } = render(FilterPanel, {
+      props: { config: { sections: ['timeline'], providers: {} }, timeBuckets: [] },
+    });
+    const section = getByTestId('filter-section-timeline');
+    expect(section.className).not.toContain('bg-subtle');
+    expect(section.className).not.toContain('border-b');
+  });
+
   it('should render configured sections only', () => {
     const { queryByTestId } = render(FilterPanel, {
       props: {
@@ -274,6 +283,29 @@ describe('FilterPanel', () => {
       // But nothing written to localStorage
       expect(localStorage.getItem(COLLAPSED_KEY)).toBeNull();
     });
+  });
+
+  it('animates the panel width via a persistent shell with a reduced-motion guard', async () => {
+    const { getByTestId } = render(FilterPanel, {
+      props: { config: { sections: ['timeline'], providers: {} }, timeBuckets: [] },
+    });
+    const shell = getByTestId('filter-panel-shell');
+    expect(shell.className).toContain('transition-[width]');
+    expect(shell.className).toContain('motion-reduce:transition-none');
+    expect(shell.className).toContain('w-64');
+
+    await fireEvent.click(getByTestId('collapse-panel-btn'));
+    expect(shell.className).toContain('w-14');
+    expect(shell.className).not.toContain('w-64');
+  });
+
+  it('gives the toggle-row pills a press-scale and a reduced-motion guard', () => {
+    const { getByTestId } = render(FilterPanel, {
+      props: { config: { sections: ['timeline'], providers: {} }, timeBuckets: [] },
+    });
+    const toggle = getByTestId('section-toggle-timeline');
+    expect(toggle.className).toContain('active:scale-90');
+    expect(toggle.className).toContain('motion-reduce:transition-none');
   });
 
   describe('emptyText prop', () => {
