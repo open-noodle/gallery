@@ -1861,6 +1861,15 @@ export class SharedSpaceRepository {
     await this.db.deleteFrom('shared_space_person').execute();
   }
 
+  @GenerateSql({ params: [] })
+  async deleteAllPets() {
+    // Mirror PersonRepository.deleteAllPets() for the shared-space copies: a pet-detection
+    // reset must clear propagated pet people from every space's People view too. Deleting the
+    // shared_space_person row cascades to its shared_space_person_face and _alias children, so
+    // only pet-typed rows are removed and human people are left untouched.
+    await this.db.deleteFrom('shared_space_person').where('type', '=', 'pet').execute();
+  }
+
   @GenerateSql({ params: [[DummyValue.UUID]] })
   async recountPersons(personIds: string[], db: Kysely<DB> | Transaction<DB> = this.db) {
     if (personIds.length === 0) {
