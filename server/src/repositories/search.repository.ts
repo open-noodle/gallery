@@ -1292,6 +1292,9 @@ export class SearchRepository {
         // give viewers empty People/Location/Camera/Tag facets for assets owned by the
         // album owner (issue #655); dropping the access check entirely would leak a
         // shared-space asset that merely landed in an album to non-space-members.
+        // Note: on this upstream base album ownership lives in `album_user` (the creator is
+        // an `album_user` row with role=owner), so the album_user participant check below
+        // covers both the album owner and shared users in one branch.
         .$if(!!options?.albumId, (qb) =>
           qb.where((eb) =>
             eb.and([
@@ -1303,12 +1306,6 @@ export class SearchRepository {
               ),
               eb.or([
                 eb('asset.ownerId', '=', anyUuid(userIds)),
-                eb.exists(
-                  eb
-                    .selectFrom('album')
-                    .whereRef('album.ownerId', '=', 'asset.ownerId')
-                    .where('album.id', '=', asUuid(options!.albumId!)),
-                ),
                 eb.exists(
                   eb
                     .selectFrom('album_user')
