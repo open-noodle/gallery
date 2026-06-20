@@ -657,198 +657,205 @@
 
 {#if hidden}
   <!-- FilterPanel hidden: no assets to filter -->
-{:else if collapsed}
-  <div
-    class="flex h-full w-8 flex-shrink-0 flex-col items-center gap-3 border-r border-gray-200 bg-light py-2 dark:border-gray-700"
-    data-testid="collapsed-icon-strip"
-  >
-    <button
-      type="button"
-      class="flex h-6 w-6 items-center justify-center rounded-full text-gray-500 hover:bg-subtle dark:text-gray-400"
-      onclick={() => (collapsed = false)}
-      data-testid="expand-panel-btn"
-    >
-      <Icon icon={mdiChevronRight} size="16" />
-    </button>
-    {#each config.sections as section (section)}
-      <button
-        type="button"
-        class="relative flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:bg-subtle dark:text-gray-400"
-        onclick={() => (collapsed = false)}
-      >
-        <Icon icon={sectionIcons[section]} size="16" />
-        {#if hasActiveFilter(section)}
-          <span
-            class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border-[1.5px] border-light bg-immich-primary dark:bg-immich-dark-primary"
-          ></span>
-        {/if}
-      </button>
-    {/each}
-  </div>
 {:else}
   <div
-    class="immich-scrollbar flex w-64 flex-col overflow-y-auto border-r border-gray-200 bg-light dark:border-gray-700"
-    data-testid="discovery-panel"
+    class="flex h-full flex-shrink-0 overflow-hidden border-r border-gray-200/60 bg-light transition-[width] duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none dark:border-white/5 {collapsed
+      ? 'w-14'
+      : 'w-64'}"
+    data-testid="filter-panel-shell"
   >
-    <div
-      class="sticky top-0 z-5 flex items-center justify-between border-b border-gray-200 bg-light px-4 py-2.5 dark:border-gray-700"
-    >
-      <span class="text-sm font-medium">{$t('filters')}</span>
-      <button
-        type="button"
-        class="flex h-6 w-6 items-center justify-center rounded-full text-gray-500 hover:bg-subtle dark:text-gray-400"
-        onclick={() => (collapsed = true)}
-        data-testid="collapse-panel-btn"
-      >
-        <Icon icon={mdiChevronLeft} size="14" />
-      </button>
-    </div>
-
-    {#if config.sections.length > 0}
-      <div
-        class="flex items-center justify-center gap-0.5 border-b border-gray-200 px-3 py-2 dark:border-gray-700"
-        data-testid="section-toggle-row"
-      >
+    {#if collapsed}
+      <div class="flex h-full w-full flex-shrink-0 flex-col items-center gap-3 py-2" data-testid="collapsed-icon-strip">
+        <button
+          type="button"
+          class="flex h-6 w-6 items-center justify-center rounded-full text-gray-500 hover:bg-subtle dark:text-gray-400"
+          onclick={() => (collapsed = false)}
+          data-testid="expand-panel-btn"
+        >
+          <Icon icon={mdiChevronRight} size="16" />
+        </button>
         {#each config.sections as section (section)}
           <button
             type="button"
-            class="relative flex h-[30px] w-[30px] items-center justify-center rounded-lg transition-colors
-              {visibleSections.has(section)
-              ? 'bg-primary/10 text-primary'
-              : 'text-gray-400 hover:bg-subtle hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400'}"
-            onclick={() => toggleSection(section)}
-            aria-label={sectionToggleLabels[section]}
-            aria-pressed={visibleSections.has(section)}
-            title={sectionTitles[section]}
-            data-testid="section-toggle-{section}"
+            class="relative flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:bg-subtle dark:text-gray-400"
+            onclick={() => (collapsed = false)}
           >
             <Icon icon={sectionIcons[section]} size="16" />
-            {#if !visibleSections.has(section) && hasActiveFilter(section)}
+            {#if hasActiveFilter(section)}
               <span
                 class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border-[1.5px] border-light bg-immich-primary dark:bg-immich-dark-primary"
-                data-testid="section-toggle-dot-{section}"
               ></span>
             {/if}
           </button>
         {/each}
       </div>
-    {/if}
-
-    <div class="pt-4">
-      {#each config.sections as section (section)}
-        {#if visibleSections.has(section)}
-          <FilterSection
-            title={sectionTitles[section]}
-            testId={section}
-            refetching={isRefetching && section !== 'timeline'}
-            expanded={expandedSections.has(section)}
-            onToggleExpanded={() => toggleSectionExpanded(section)}
-            count={filterContext
-              ? section === 'people'
-                ? people.length
-                : section === 'location'
-                  ? countries.length
-                  : section === 'camera'
-                    ? cameraMakes.length
-                    : section === 'tags'
-                      ? tags.length
-                      : undefined
-              : undefined}
-          >
-            {#if section === 'timeline'}
-              <TemporalPicker
-                {timeBuckets}
-                dateAfter={filters.dateAfter}
-                dateBefore={filters.dateBefore}
-                selectedYear={filters.selectedYear}
-                selectedMonth={filters.selectedMonth}
-                onCustomRangeChange={handleCustomDateRangeChange}
-                onYearSelect={handleYearSelect}
-                onMonthSelect={handleMonthSelect}
-              />
-            {:else if section === 'people'}
-              <PeopleFilter
-                {people}
-                selectedIds={filters.personIds}
-                selectedNames={personNames}
-                onSelectionChange={handlePeopleChange}
-                emptyText={hasUnnamedPeople ? $t('filter_name_people_hint') : undefined}
-              />
-            {:else if section === 'location'}
-              <LocationFilter
-                {countries}
-                selectedCity={filters.city}
-                selectedCountry={filters.country}
-                context={locationFilterContext}
-                onCityFetch={async (country, ctx) => {
-                  if (providers.cities) {
-                    return providers.cities(country, ctx);
-                  }
-                  return [];
-                }}
-                onSelectionChange={handleLocationChange}
-              />
-            {:else if section === 'camera'}
-              <CameraFilter
-                makes={cameraMakes}
-                selectedMake={filters.make}
-                selectedModel={filters.model}
-                context={cameraFilterContext}
-                onModelFetch={async (make, ctx) => {
-                  if (providers.cameraModels) {
-                    return providers.cameraModels(make, ctx);
-                  }
-                  return [];
-                }}
-                onSelectionChange={handleCameraChange}
-              />
-            {:else if section === 'tags'}
-              <TagsFilter
-                {tags}
-                selectedIds={filters.tagIds}
-                selectedNames={tagNames}
-                onSelectionChange={handleTagsChange}
-              />
-            {:else if section === 'rating'}
-              <RatingFilter selectedRating={filters.rating} {availableRatings} onRatingChange={handleRatingChange} />
-            {:else if section === 'media'}
-              <MediaTypeFilter
-                selected={filters.mediaType}
-                {availableMediaTypes}
-                onTypeChange={handleMediaTypeChange}
-              />
-            {:else if section === 'favorites'}
-              <FavoritesFilter
-                selected={filters.isFavorite}
-                onToggle={(value) => {
-                  updateFilters({ ...filters, isFavorite: value });
-                }}
-              />
-            {:else if section === 'albums'}
-              <AlbumsFilter
-                selected={filters.isNotInAlbum}
-                onToggle={(value) => {
-                  updateFilters({ ...filters, isNotInAlbum: value });
-                }}
-              />
-            {/if}
-          </FilterSection>
-        {/if}
-      {/each}
-
-      {#if visibleSections.size === 0}
-        <div class="flex flex-col items-center gap-2 px-4 py-8 text-center">
-          <p class="text-xs text-gray-500 dark:text-gray-400">{$t('filter_show_sections_hint')}</p>
+    {:else}
+      <div class="immich-scrollbar flex h-full w-64 flex-col overflow-y-auto bg-light" data-testid="discovery-panel">
+        <div
+          class="sticky top-0 z-5 flex items-center justify-between border-b border-gray-200 bg-light px-4 py-2.5 dark:border-gray-700"
+        >
+          <span class="text-sm font-medium">{$t('filters')}</span>
           <button
             type="button"
-            class="text-xs font-medium text-primary hover:underline"
-            onclick={showAllSections}
-            data-testid="show-all-sections"
+            class="flex h-6 w-6 items-center justify-center rounded-full text-gray-500 hover:bg-subtle dark:text-gray-400"
+            onclick={() => (collapsed = true)}
+            data-testid="collapse-panel-btn"
           >
-            {$t('filter_show_all_sections')}
+            <Icon icon={mdiChevronLeft} size="14" />
           </button>
         </div>
-      {/if}
-    </div>
+
+        {#if config.sections.length > 0}
+          <div
+            class="flex items-center justify-center gap-0.5 border-b border-gray-200 px-3 py-2 dark:border-gray-700"
+            data-testid="section-toggle-row"
+          >
+            {#each config.sections as section (section)}
+              <button
+                type="button"
+                class="relative flex h-[30px] w-[30px] items-center justify-center rounded-[10px] transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-90 motion-reduce:transition-none motion-reduce:active:scale-100
+              {visibleSections.has(section)
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-gray-400 hover:bg-subtle hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400'}"
+                onclick={() => toggleSection(section)}
+                aria-label={sectionToggleLabels[section]}
+                aria-pressed={visibleSections.has(section)}
+                title={sectionTitles[section]}
+                data-testid="section-toggle-{section}"
+              >
+                <Icon icon={sectionIcons[section]} size="16" />
+                {#if !visibleSections.has(section) && hasActiveFilter(section)}
+                  <span
+                    class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border-[1.5px] border-light bg-immich-primary dark:bg-immich-dark-primary"
+                    data-testid="section-toggle-dot-{section}"
+                  ></span>
+                {/if}
+              </button>
+            {/each}
+          </div>
+        {/if}
+
+        <div class="pt-4">
+          {#each config.sections as section (section)}
+            {#if visibleSections.has(section)}
+              <FilterSection
+                title={sectionTitles[section]}
+                testId={section}
+                refetching={isRefetching && section !== 'timeline'}
+                expanded={expandedSections.has(section)}
+                onToggleExpanded={() => toggleSectionExpanded(section)}
+                count={filterContext
+                  ? section === 'people'
+                    ? people.length
+                    : section === 'location'
+                      ? countries.length
+                      : section === 'camera'
+                        ? cameraMakes.length
+                        : section === 'tags'
+                          ? tags.length
+                          : undefined
+                  : undefined}
+              >
+                {#if section === 'timeline'}
+                  <TemporalPicker
+                    {timeBuckets}
+                    dateAfter={filters.dateAfter}
+                    dateBefore={filters.dateBefore}
+                    selectedYear={filters.selectedYear}
+                    selectedMonth={filters.selectedMonth}
+                    onCustomRangeChange={handleCustomDateRangeChange}
+                    onYearSelect={handleYearSelect}
+                    onMonthSelect={handleMonthSelect}
+                  />
+                {:else if section === 'people'}
+                  <PeopleFilter
+                    {people}
+                    selectedIds={filters.personIds}
+                    selectedNames={personNames}
+                    onSelectionChange={handlePeopleChange}
+                    emptyText={hasUnnamedPeople ? $t('filter_name_people_hint') : undefined}
+                  />
+                {:else if section === 'location'}
+                  <LocationFilter
+                    {countries}
+                    selectedCity={filters.city}
+                    selectedCountry={filters.country}
+                    context={locationFilterContext}
+                    onCityFetch={async (country, ctx) => {
+                      if (providers.cities) {
+                        return providers.cities(country, ctx);
+                      }
+                      return [];
+                    }}
+                    onSelectionChange={handleLocationChange}
+                  />
+                {:else if section === 'camera'}
+                  <CameraFilter
+                    makes={cameraMakes}
+                    selectedMake={filters.make}
+                    selectedModel={filters.model}
+                    context={cameraFilterContext}
+                    onModelFetch={async (make, ctx) => {
+                      if (providers.cameraModels) {
+                        return providers.cameraModels(make, ctx);
+                      }
+                      return [];
+                    }}
+                    onSelectionChange={handleCameraChange}
+                  />
+                {:else if section === 'tags'}
+                  <TagsFilter
+                    {tags}
+                    selectedIds={filters.tagIds}
+                    selectedNames={tagNames}
+                    onSelectionChange={handleTagsChange}
+                  />
+                {:else if section === 'rating'}
+                  <RatingFilter
+                    selectedRating={filters.rating}
+                    {availableRatings}
+                    onRatingChange={handleRatingChange}
+                  />
+                {:else if section === 'media'}
+                  <MediaTypeFilter
+                    selected={filters.mediaType}
+                    {availableMediaTypes}
+                    onTypeChange={handleMediaTypeChange}
+                  />
+                {:else if section === 'favorites'}
+                  <FavoritesFilter
+                    selected={filters.isFavorite}
+                    onToggle={(value) => {
+                      updateFilters({ ...filters, isFavorite: value });
+                    }}
+                  />
+                {:else if section === 'albums'}
+                  <AlbumsFilter
+                    selected={filters.isNotInAlbum}
+                    onToggle={(value) => {
+                      updateFilters({ ...filters, isNotInAlbum: value });
+                    }}
+                  />
+                {/if}
+              </FilterSection>
+            {/if}
+          {/each}
+
+          {#if visibleSections.size === 0}
+            <div class="flex flex-col items-center gap-2 px-4 py-8 text-center">
+              <p class="text-xs text-gray-500 dark:text-gray-400">{$t('filter_show_sections_hint')}</p>
+              <button
+                type="button"
+                class="text-xs font-medium text-primary hover:underline"
+                onclick={showAllSections}
+                data-testid="show-all-sections"
+              >
+                {$t('filter_show_all_sections')}
+              </button>
+            </div>
+          {/if}
+        </div>
+      </div>
+    {/if}
   </div>
 {/if}
