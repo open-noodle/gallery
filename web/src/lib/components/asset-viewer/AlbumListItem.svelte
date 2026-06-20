@@ -16,6 +16,8 @@
     multiSelected?: boolean;
     onAlbumClick: () => void;
     onMultiSelect: () => void;
+    badgeIcon?: string;
+    badgeClass?: string;
   }
 
   let {
@@ -25,6 +27,8 @@
     multiSelected = false,
     onAlbumClick,
     onMultiSelect,
+    badgeIcon = undefined,
+    badgeClass = undefined,
   }: Props = $props();
 
   const scrollIntoViewIfSelected: Action = (node) => {
@@ -134,7 +138,7 @@
     class:dark:bg-gray-700={selected}
     use:longPress={{ onLongPress: () => handleMultiSelectClicked() }}
   >
-    <span class="size-16 shrink-0 rounded-xl bg-slate-300">
+    <span class="relative size-16 shrink-0 rounded-xl bg-slate-300">
       {#if album.albumThumbnailAssetId}
         <img
           src={getAssetMediaUrl({ id: album.albumThumbnailAssetId })}
@@ -143,6 +147,18 @@
           data-testid="album-image"
           draggable="false"
         />
+      {/if}
+      {#if badgeIcon}
+        <span
+          class="absolute -bottom-1.5 -end-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-immich-bg ring-2 ring-immich-bg dark:bg-immich-dark-gray dark:ring-immich-dark-gray"
+          data-testid="collection-row-badge"
+        >
+          <Icon
+            icon={badgeIcon}
+            size="0.9rem"
+            class={badgeClass ?? 'text-immich-primary dark:text-immich-dark-primary'}
+          />
+        </span>
       {/if}
     </span>
     <span class="flex h-full flex-col items-start justify-center overflow-hidden">

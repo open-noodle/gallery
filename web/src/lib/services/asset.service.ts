@@ -3,8 +3,7 @@ import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manage
 import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
-import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
-import AssetAddToAlbumModal from '#lib/modals/AssetAddToAlbumModal.svelte';
+import AssetAddToCollectionModal from '#lib/modals/AssetAddToCollectionModal.svelte';
 import AssetTagModal from '#lib/modals/AssetTagModal.svelte';
 import ProfileImageCropperModal from '#lib/modals/ProfileImageCropperModal.svelte';
 import SharedLinkCreateModal from '#lib/modals/SharedLinkCreateModal.svelte';
@@ -31,7 +30,6 @@ import {
   removeAssetEdits,
   runAssetJobs,
   updateAsset,
-  updateAssets,
   type AlbumResponseDto,
   type AssetEditActionItemDto,
   type AssetJobsDto,
@@ -41,8 +39,6 @@ import { modalManager, toastManager, type ActionItem } from '@immich/ui';
 import {
   mdiAccountCircleOutline,
   mdiAlertOutline,
-  mdiArchiveArrowDownOutline,
-  mdiArchiveArrowUpOutline,
   mdiCogRefreshOutline,
   mdiCompare,
   mdiContentCopy,
@@ -84,23 +80,10 @@ export const getAssetBulkActions = ($t: MessageFormatter, album?: AlbumResponseD
   };
 
   const AddToAlbum: ActionItem = {
-    title: $t('add_to_album'),
+    title: $t('add_to_album_or_space'),
     icon: mdiPlus,
     shortcuts: [{ key: 'l' }],
-    onAction: () => modalManager.show(AssetAddToAlbumModal, { assetIds }),
-  };
-
-  const Archive: ActionItem = {
-    title: $t('to_archive'),
-    icon: mdiArchiveArrowDownOutline,
-    shortcuts: [{ key: 'a', shift: true }],
-    $if: () => assetMultiSelectManager.isAllUserOwned && !assetMultiSelectManager.isAllArchived,
-    onAction: async () => {
-      const assets = ownedAssets.filter((asset) => asset.visibility !== AssetVisibility.Archive);
-      if (await handleSetVisibility(assets, AssetVisibility.Archive)) {
-        assetMultiSelectManager.clear();
-      }
-    },
+    onAction: () => modalManager.show(AssetAddToCollectionModal, { assetIds }),
   };
 
   const CreateSharedLink: ActionItem = {
@@ -127,18 +110,6 @@ export const getAssetBulkActions = ($t: MessageFormatter, album?: AlbumResponseD
       }
     },
     shortcuts: { key: 't' },
-  };
-
-  const Unarchive: ActionItem = {
-    title: $t('unarchive'),
-    icon: mdiArchiveArrowUpOutline,
-    shortcuts: [{ key: 'a', shift: true }],
-    $if: () => assetMultiSelectManager.isAllUserOwned && assetMultiSelectManager.isAllArchived,
-    onAction: async () => {
-      if (await handleSetVisibility(ownedAssets, AssetVisibility.Timeline)) {
-        assetMultiSelectManager.clear();
-      }
-    },
   };
 
   const RefreshFacesJob: ActionItem = {
@@ -168,11 +139,9 @@ export const getAssetBulkActions = ($t: MessageFormatter, album?: AlbumResponseD
 
   return {
     AddToAlbum,
-    Archive,
     CreateSharedLink,
     RemoveFromAlbum,
     Tag,
-    Unarchive,
     RefreshFacesJob,
     RefreshMetadataJob,
     RegenerateThumbnailJob,
@@ -268,11 +237,11 @@ export const getAssetActions = (
   };
 
   const AddToAlbum: ActionItem = {
-    title: $t('add_to_album'),
+    title: $t('add_to_album_or_space'),
     icon: mdiPlus,
     shortcuts: [{ key: 'l' }],
     $if: () => asset.visibility !== AssetVisibility.Locked && !asset.isTrashed,
-    onAction: () => modalManager.show(AssetAddToAlbumModal, { assetIds: [asset.id] }),
+    onAction: () => modalManager.show(AssetAddToCollectionModal, { assetIds: [asset.id] }),
   };
 
   const RemoveFromAlbum: ActionItem = {
@@ -575,60 +544,6 @@ export const handleTagAssets = async (assetIds: string[], tagIds: string[]) => {
   } catch (error) {
     handleError(error, $t('errors.failed_to_tag_assets'));
     return false;
-  }
-};
-
-const handleSetVisibility = async (assets: TimelineAsset[], visibility: AssetVisibility) => {
-  const $t = await getFormatter();
-  const ids = assets.map((asset) => asset.id);
-
-  try {
-    await updateAssets({ assetBulkUpdateDto: { ids, visibility } });
-
-    if (visibility === AssetVisibility.Archive) {
-      toastManager.primary({
-        description: $t('archived_count', { values: { count: assets.length } }),
-        button: (close) => ({
-          label: $t('undo'),
-          onclick: () => {
-            close();
-            void undoArchiveAssets(assets);
-          },
-        }),
-      });
-      eventManager.emit('AssetsArchive', ids);
-    } else {
-      // Timeline
-      toastManager.primary($t('unarchived_count', { values: { count: assets.length } }));
-      eventManager.emit('AssetsUnarchive', assets);
-    }
-  } catch (error) {
-    handleError(
-      error,
-      $t('errors.unable_to_archive_unarchive', { values: { archived: visibility === AssetVisibility.Archive } }),
-    );
-    return false;
-  }
-
-  return true;
-};
-
-const undoArchiveAssets = async (assets: TimelineAsset[]) => {
-  const $t = await getFormatter();
-  try {
-    const ids = assets.map((a) => a.id);
-    await updateAssets({
-      assetBulkUpdateDto: { ids, visibility: AssetVisibility.Timeline },
-    });
-
-    for (const asset of assets) {
-      asset.visibility = AssetVisibility.Timeline;
-    }
-    toastManager.success($t('unarchived_count', { values: { count: assets.length } }));
-    eventManager.emit('AssetsUnarchive', assets);
-    eventManager.emit('AssetsUndoArchive', assets);
-  } catch (error) {
-    handleError(error, $t('errors.unable_to_archive_unarchive', { values: { archived: false } }));
   }
 };
 
