@@ -139,6 +139,16 @@ describe('Map page query intersection', () => {
     });
   });
 
+  it('passes has-album to filtered map markers when selected', async () => {
+    renderPage();
+    await fireEvent.click(screen.getByTestId('select-has-album-filter'));
+    await flushQueryDebounce();
+
+    await waitFor(() => {
+      expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(expect.objectContaining({ isInAlbum: true }));
+    });
+  });
+
   it('intersects map markers with paginated searchSmart ids when q is present', async () => {
     mockPage.url = new URL('https://gallery.test/map?q=beach');
     sdkMock.getFilteredMapMarkers.mockResolvedValue([
