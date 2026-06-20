@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Active Filters Bar — Redesign Exploration</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Hanken Grotesk to match the filter-panel-redesign prototype -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ease: cubic-bezier(0.22, 1, 0.36, 1);
+        --d-hover: 150ms;
+        --primary: #6472ff;
+        --primary-strong: #5360ff;
+        --font: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+        --radius: 14px;
+      }
+      html[data-theme="dark"] {
+        --app-bg: #0b0c0f;
+        --app-bg-glow: #14161d;
+        --panel: #15171c;
+        --surface: #1c1f26;
+        --hairline: rgba(255, 255, 255, 0.065);
+        --hairline-strong: rgba(255, 255, 255, 0.1);
+        --text: #e8eaef;
+        --text-muted: #9aa1ad;
+        --text-faint: #686f7b;
+        --surface-hover: rgba(255, 255, 255, 0.06);
+        --chip-fill: rgba(255, 255, 255, 0.06);
+        --chip-fill-hover: rgba(255, 255, 255, 0.1);
+        --chip-border: rgba(255, 255, 255, 0.1);
+        --primary-tint: color-mix(in srgb, var(--primary) 18%, transparent);
+        --primary-on: color-mix(in srgb, var(--primary) 80%, white);
+        /* legacy "before" tailwind-ish greys */
+        --legacy-band: #0f1117;
+        --legacy-border: #2a2f3a;
+        --legacy-chip: #374151;
+        --legacy-chip-text: #e5e7eb;
+        --legacy-faint: #6b7280;
+      }
+      html[data-theme="light"] {
+        --app-bg: #e9ebf1;
+        --app-bg-glow: #f3f4f9;
+        --panel: #ffffff;
+        --surface: #f4f5f9;
+        --hairline: rgba(17, 20, 28, 0.09);
+        --hairline-strong: rgba(17, 20, 28, 0.14);
+        --text: #1a1d24;
+        --text-muted: #59616e;
+        --text-faint: #8b929e;
+        --surface-hover: rgba(17, 20, 28, 0.05);
+        --chip-fill: rgba(17, 20, 28, 0.05);
+        --chip-fill-hover: rgba(17, 20, 28, 0.09);
+        --chip-border: rgba(17, 20, 28, 0.12);
+        --primary-tint: color-mix(in srgb, var(--primary) 14%, transparent);
+        --primary-on: var(--primary-strong);
+        --legacy-band: #f9fafb;
+        --legacy-border: #e5e7eb;
+        --legacy-chip: #e5e7eb;
+        --legacy-chip-text: #1f2937;
+        --legacy-faint: #9ca3af;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        font-family: var(--font);
+        color: var(--text);
+        background:
+          radial-gradient(1200px 700px at 78% -10%, var(--app-bg-glow), transparent 60%),
+          var(--app-bg);
+        -webkit-font-smoothing: antialiased;
+        padding: 40px clamp(16px, 5vw, 72px) 96px;
+      }
+
+      header.page {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 24px;
+        max-width: 1080px;
+        margin: 0 auto 36px;
+        flex-wrap: wrap;
+      }
+      h1 {
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        margin: 0 0 6px;
+      }
+      header.page p {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 14px;
+        max-width: 56ch;
+        line-height: 1.5;
+      }
+      .theme-toggle {
+        appearance: none;
+        border: 1px solid var(--hairline-strong);
+        background: var(--surface);
+        color: var(--text);
+        font: 600 13px var(--font);
+        padding: 8px 14px;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: background var(--d-hover) var(--ease);
+      }
+      .theme-toggle:hover {
+        background: var(--surface-hover);
+      }
+
+      main {
+        max-width: 1080px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+      }
+
+      .block {
+        border: 1px solid var(--hairline);
+        border-radius: var(--radius);
+        overflow: hidden;
+        background:
+          linear-gradient(180deg, color-mix(in srgb, var(--panel) 60%, transparent), transparent 120px),
+          var(--app-bg);
+      }
+      .block > .label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 13px 18px;
+        border-bottom: 1px solid var(--hairline);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      .label .tag {
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        padding: 2px 7px;
+        border-radius: 999px;
+      }
+      .tag.before {
+        color: #f0a3a3;
+        background: color-mix(in srgb, #f0a3a3 16%, transparent);
+      }
+      .tag.after {
+        color: var(--primary-on);
+        background: var(--primary-tint);
+      }
+      .label .note {
+        margin-left: auto;
+        text-transform: none;
+        letter-spacing: 0;
+        font-weight: 500;
+        color: var(--text-faint);
+      }
+
+      /* The realistic layout shell: faux rail + content with the bar on top */
+      .shell {
+        display: flex;
+        min-height: 132px;
+      }
+      .rail {
+        width: 52px;
+        flex: none;
+        border-right: 1px solid var(--hairline);
+        background: var(--panel);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 0;
+        color: var(--text-faint);
+      }
+      .rail svg {
+        width: 16px;
+        height: 16px;
+      }
+      .content {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .grid {
+        flex: 1;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+        gap: 4px;
+        padding: 12px 16px;
+      }
+      .grid i {
+        display: block;
+        aspect-ratio: 1;
+        border-radius: 6px;
+        background: linear-gradient(135deg, #1f2230, #14161d);
+      }
+      html[data-theme="light"] .grid i {
+        background: linear-gradient(135deg, #d8dbe6, #eef0f6);
+      }
+
+      /* ============ THE BAR ============ */
+      .bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+      }
+
+      /* --- BEFORE (current) --- */
+      .bar.legacy {
+        background: var(--legacy-band);
+        border-bottom: 1px solid var(--legacy-border);
+        gap: 6px;
+        padding: 8px 16px;
+      }
+      .legacy .count {
+        font-size: 12px;
+        color: var(--legacy-faint);
+      }
+      .legacy .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: var(--legacy-chip);
+        color: var(--legacy-chip-text);
+        border-radius: 999px;
+        padding: 2px 10px;
+        font-size: 12px;
+      }
+      .legacy .chip .x {
+        color: var(--legacy-faint);
+        font-size: 14px;
+        line-height: 1;
+        cursor: pointer;
+      }
+      .legacy .clear {
+        margin-left: auto;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--primary-on);
+      }
+
+      /* --- AFTER (proposed) --- */
+      .count {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 5px;
+        font-size: 12.5px;
+        font-weight: 500;
+        color: var(--text-muted);
+        white-space: nowrap;
+      }
+      .count b {
+        color: var(--text);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+      .sep {
+        width: 3px;
+        height: 3px;
+        border-radius: 50%;
+        background: var(--text-faint);
+        opacity: 0.55;
+        flex: none;
+      }
+      .sep.line {
+        width: 1px;
+        height: 16px;
+        border-radius: 0;
+        background: var(--hairline-strong);
+        opacity: 1;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 5px 4px 9px;
+        border-radius: 999px;
+        background: var(--chip-fill);
+        border: 1px solid var(--chip-border);
+        font-size: 12.5px;
+        font-weight: 500;
+        color: var(--text);
+        line-height: 1;
+        transition:
+          background var(--d-hover) var(--ease),
+          border-color var(--d-hover) var(--ease);
+      }
+      .chip:hover {
+        background: var(--chip-fill-hover);
+      }
+      .chip > svg.lead {
+        width: 14px;
+        height: 14px;
+        color: var(--text-muted);
+        flex: none;
+      }
+      .chip .close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 17px;
+        height: 17px;
+        border-radius: 50%;
+        color: var(--text-faint);
+        cursor: pointer;
+        transition:
+          background var(--d-hover) var(--ease),
+          color var(--d-hover) var(--ease);
+      }
+      .chip .close svg {
+        width: 12px;
+        height: 12px;
+      }
+      .chip .close:hover {
+        background: var(--surface-hover);
+        color: var(--text);
+      }
+
+      /* search chip = primary tinted (special) */
+      .chip.search {
+        background: var(--primary-tint);
+        border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+        color: var(--primary-on);
+      }
+      .chip.search > svg.lead,
+      .chip.search .close {
+        color: color-mix(in srgb, var(--primary-on) 75%, transparent);
+      }
+      .chip.search .close:hover {
+        color: var(--primary-on);
+        background: color-mix(in srgb, var(--primary) 18%, transparent);
+      }
+
+      /* variant: outlined ghost */
+      .chip.ghost {
+        background: transparent;
+      }
+      /* variant: rounded-lg instead of pill */
+      .chip.rl {
+        border-radius: 9px;
+      }
+      /* variant: reveal close on hover */
+      .chip.reveal .close {
+        width: 0;
+        opacity: 0;
+        margin-left: -6px;
+        overflow: hidden;
+        transition:
+          width var(--d-hover) var(--ease),
+          opacity var(--d-hover) var(--ease),
+          margin var(--d-hover) var(--ease);
+      }
+      .chip.reveal:hover .close {
+        width: 17px;
+        opacity: 1;
+        margin-left: 0;
+      }
+
+      .clear {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--primary-on);
+        background: transparent;
+        border: none;
+        border-radius: 999px;
+        padding: 5px 6px;
+        cursor: pointer;
+        font-family: var(--font);
+        transition: background var(--d-hover) var(--ease);
+      }
+      .clear svg {
+        width: 13px;
+        height: 13px;
+      }
+      .clear.pill {
+        padding: 5px 11px;
+      }
+      .clear.pill:hover {
+        background: var(--primary-tint);
+      }
+      .clear.linkish:hover {
+        text-decoration: underline;
+      }
+
+      /* Years / Months / All segmented control (faithful to TimelineGroupingControl) */
+      .group-ctl {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 3px;
+        border-radius: 999px;
+        background: var(--surface);
+        box-shadow: inset 0 0 0 1px var(--hairline-strong);
+        flex: none;
+      }
+      .group-ctl button {
+        appearance: none;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        font: 600 13px var(--font);
+        padding: 5px 13px;
+        border-radius: 999px;
+        cursor: pointer;
+        transition:
+          background var(--d-hover) var(--ease),
+          color var(--d-hover) var(--ease);
+      }
+      .group-ctl button:hover {
+        background: var(--surface-hover);
+        color: var(--text);
+      }
+      .group-ctl button[aria-pressed="true"] {
+        background: var(--primary);
+        color: #fff;
+      }
+
+      /* small variant chooser rows */
+      .variant {
+        display: flex;
+        flex-direction: column;
+      }
+      .variant > .vlabel {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        color: var(--text-faint);
+        padding: 10px 16px 0;
+        text-transform: uppercase;
+      }
+      .variant + .variant {
+        border-top: 1px solid var(--hairline);
+      }
+      .legend {
+        max-width: 1080px;
+        margin: 4px auto 0;
+        color: var(--text-faint);
+        font-size: 12.5px;
+        line-height: 1.6;
+      }
+      .legend code {
+        font-family: ui-monospace, monospace;
+        font-size: 11.5px;
+        color: var(--text-muted);
+        background: var(--surface-hover);
+        padding: 1px 5px;
+        border-radius: 5px;
+      }
+      section.group > h2 {
+        max-width: 1080px;
+        margin: 18px auto 2px;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page">
+      <div>
+        <h1>Active Filters Bar</h1>
+        <p>
+          Rendered in context — faux filter rail on the left, photo grid behind. Compare the current bar against the
+          proposed soft-filled-pill direction, then pick the open details below.
+        </p>
+      </div>
+      <button class="theme-toggle" id="themeToggle">◑ Toggle theme</button>
+    </header>
+
+    <main id="main"></main>
+
+    <p class="legend" id="legend"></p>
+
+    <script>
+      const P = {
+        timeline:
+          "M19,19H5V8H19M16,1V3H8V1H6V3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3H18V1M17,12H12V17H17V12Z",
+        person:
+          "M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z",
+        location:
+          "M12,11.5A2.5,2.5 0 0,1 9.5,9A2.5,2.5 0 0,1 12,6.5A2.5,2.5 0 0,1 14.5,9A2.5,2.5 0 0,1 12,11.5M12,2A7,7 0 0,0 5,9C5,14.25 12,22 12,22C12,22 19,14.25 19,9A7,7 0 0,0 12,2Z",
+        camera:
+          "M4,4H7L9,2H15L17,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9Z",
+        tag: "M5.5,7A1.5,1.5 0 0,1 4,5.5A1.5,1.5 0 0,1 5.5,4A1.5,1.5 0 0,1 7,5.5A1.5,1.5 0 0,1 5.5,7M21.41,11.58L12.41,2.58C12.05,2.22 11.55,2 11,2H4C2.89,2 2,2.89 2,4V11C2,11.55 2.22,12.05 2.59,12.41L11.58,21.41C11.95,21.77 12.45,22 13,22C13.55,22 14.05,21.77 14.41,21.41L21.41,14.41C21.78,14.05 22,13.55 22,13C22,12.44 21.77,11.94 21.41,11.58Z",
+        rating: "M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.62L12,2L9.19,8.62L2,9.24L7.45,13.97L5.82,21L12,17.27Z",
+        media:
+          "M8.5,13.5L11,16.5L14.5,12L19,18H5M21,19V5C21,3.89 20.1,3 19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19Z",
+        favorites:
+          "M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5C2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z",
+        albums:
+          "M6,19L9,15.14L11.14,17.72L14.14,13.86L18,19H6M6,4H11V12L8.5,10.5L6,12M18,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V4A2,2 0 0,0 18,2Z",
+        close:
+          "M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z",
+        search:
+          "M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z",
+      };
+      const RAIL = ["timeline", "person", "location", "camera", "tag", "rating", "media", "favorites", "albums"];
+      const svg = (name, cls = "") =>
+        `<svg viewBox="0 0 24 24" class="${cls}" fill="currentColor" aria-hidden="true"><path d="${P[name]}"/></svg>`;
+
+      // a proposed chip
+      const chip = (icon, label, extra = "") =>
+        `<span class="chip ${extra}">${svg(icon, "lead")}<span>${label}</span>` +
+        `<span class="close" role="button" aria-label="Remove ${label}">${svg("close")}</span></span>`;
+
+      const railHtml = `<div class="rail">${RAIL.map((n) => svg(n)).join("")}</div>`;
+      const gridHtml = `<div class="grid">${Array.from({ length: 24 }, () => "<i></i>").join("")}</div>`;
+
+      // shell wraps a bar (top) + photo grid (below), with rail on the left
+      const shell = (barHtml) =>
+        `<div class="shell">${railHtml}<div class="content">${barHtml}${gridHtml}</div></div>`;
+
+      const block = (labelHtml, body) => `<div class="block">${labelHtml}${body}</div>`;
+
+      // ----- BEFORE -----
+      const legacyBar = `
+        <div class="bar legacy">
+          <span class="count">2 results</span>
+          <span class="chip">Australia <span class="x">&times;</span></span>
+          <span class="chip">Aurelia <span class="x">&times;</span></span>
+          <span class="chip">★ 4+ <span class="x">&times;</span></span>
+          <span class="clear">Clear all</span>
+        </div>`;
+
+      // ----- AFTER (recommended baseline): transparent bar + hairline, dot sep, filled pills, ghost-pill clear -----
+      const afterBar = (opts = {}) => {
+        const { sep = "dot", chipExtra = "", clear = "pill", search = false } = opts;
+        const sepHtml = sep === "none" ? "" : `<span class="sep ${sep === "line" ? "line" : ""}"></span>`;
+        const searchChip = search
+          ? `<span class="chip search">${svg("search", "lead")}<span>mountain sunset</span><span class="close">${svg("close")}</span></span>`
+          : "";
+        const clearCls = clear === "pill" ? "pill" : clear === "icon" ? "pill" : "linkish";
+        const clearInner = clear === "icon" ? `${svg("close")}Clear all` : "Clear all";
+        return `
+        <div class="bar" style="border-bottom:1px solid var(--hairline)">
+          <span class="count"><b>2</b> results</span>
+          ${sepHtml}
+          ${searchChip}
+          ${chip("location", "Australia", chipExtra)}
+          ${chip("person", "Aurelia", chipExtra)}
+          ${chip("rating", "★ 4+", chipExtra)}
+          <button class="clear ${clearCls}">${clearInner}</button>
+        </div>`;
+      };
+
+      // Years / Months / All segmented control
+      const groupCtl = (active = "all") => `
+        <div class="group-ctl" role="group" aria-label="Timeline grouping">
+          <button ${active === "year" ? 'aria-pressed="true"' : ""}>Years</button>
+          <button ${active === "month" ? 'aria-pressed="true"' : ""}>Months</button>
+          <button ${active === "all" ? 'aria-pressed="true"' : ""}>All</button>
+        </div>`;
+
+      // Merged toolbar: grouping (left) · chips · count + clear (right)
+      const mergedBar = (opts = {}) => {
+        const { filtered = true } = opts;
+        if (!filtered) {
+          return `<div class="bar" style="border-bottom:1px solid var(--hairline)">${groupCtl()}</div>`;
+        }
+        return `
+        <div class="bar" style="border-bottom:1px solid var(--hairline)">
+          ${groupCtl()}
+          <span class="sep line"></span>
+          <span class="count"><b>2</b> results</span>
+          <span class="sep"></span>
+          ${chip("location", "Australia")}
+          ${chip("person", "Aurelia")}
+          ${chip("rating", "★ 4+")}
+          <button class="clear pill" style="margin-left:auto">Clear all</button>
+        </div>`;
+      };
+
+      // Stacked toolbar: grouping row on top, filters bar below
+      const stackedBars = (opts = {}) => {
+        const { filtered = true } = opts;
+        const groupRow = `<div class="bar" style="padding-bottom:2px">${groupCtl()}</div>`;
+        return groupRow + (filtered ? afterBar(opts) : "");
+      };
+
+      const lbl = (kind, text, note = "") =>
+        `<div class="label"><span class="tag ${kind}">${kind.toUpperCase()}</span>${text}${
+          note ? `<span class="note">${note}</span>` : ""
+        }</div>`;
+
+      const main = document.getElementById("main");
+
+      // Headline comparison
+      main.innerHTML = `
+        <section class="group">
+          <h2>Toolbar layout — where does “Years / Months / All” go?</h2>
+          ${block(
+            lbl("before", "Current — two stacked rows", "grouping row, then a separate filters band below"),
+            shell(
+              `<div class="bar" style="padding-bottom:2px">${groupCtl()}</div>` + legacyBar,
+            ),
+          )}
+          ${block(
+            lbl("after", "Option A — stacked, both restyled", "grouping stays its own row; filters bar below"),
+            shell(stackedBars({ filtered: true })),
+          )}
+          ${block(
+            lbl("after", "Option B — merged single toolbar", "grouping · chips · count + clear (saves a row)"),
+            shell(mergedBar({ filtered: true })),
+          )}
+          ${block(
+            lbl("after", "Option B with no active filters", "degrades to just the grouping control"),
+            shell(mergedBar({ filtered: false })),
+          )}
+        </section>
+
+        <section class="group">
+          <h2>Headline comparison (filters bar only)</h2>
+          ${block(lbl("before", "Current", "gray band · hard rule · flat chips · raw ×"), shell(legacyBar))}
+          ${block(
+            lbl("after", "Proposed — soft filled pills", "transparent · hairline · type icons · real close"),
+            shell(afterBar({ search: true })),
+          )}
+        </section>
+
+        <section class="group">
+          <h2>Open decision 1 — chip fill</h2>
+          ${block(
+            lbl("after", "Filled (recommended)"),
+            `<div class="variant"><div class="bar">${chip("location", "Australia")}${chip("person", "Aurelia")}${chip("camera", "Canon EOS R5")}</div></div>`,
+          )}
+          ${block(
+            lbl("after", "Outlined ghost"),
+            `<div class="variant"><div class="bar">${chip("location", "Australia", "ghost")}${chip("person", "Aurelia", "ghost")}${chip("camera", "Canon EOS R5", "ghost")}</div></div>`,
+          )}
+        </section>
+
+        <section class="group">
+          <h2>Open decision 2 — chip shape</h2>
+          ${block(
+            lbl("after", "Full pill (recommended)"),
+            `<div class="bar">${chip("location", "Australia")}${chip("tag", "Vacation")}</div>`,
+          )}
+          ${block(
+            lbl("after", "Rounded-rect"),
+            `<div class="bar">${chip("location", "Australia", "rl")}${chip("tag", "Vacation", "rl")}</div>`,
+          )}
+        </section>
+
+        <section class="group">
+          <h2>Open decision 3 — close button</h2>
+          ${block(
+            lbl("after", "Always visible (recommended)"),
+            `<div class="bar">${chip("location", "Australia")}${chip("person", "Aurelia")}</div>`,
+          )}
+          ${block(
+            lbl("after", "Reveal on hover", "hover a chip"),
+            `<div class="bar">${chip("location", "Australia", "reveal")}${chip("person", "Aurelia", "reveal")}</div>`,
+          )}
+        </section>
+
+        <section class="group">
+          <h2>Open decision 4 — count separator</h2>
+          ${block(lbl("after", "Dot (recommended)"), shell(afterBar({ sep: "dot" })))}
+          ${block(lbl("after", "Vertical hairline"), shell(afterBar({ sep: "line" })))}
+          ${block(lbl("after", "None"), shell(afterBar({ sep: "none" })))}
+        </section>
+
+        <section class="group">
+          <h2>Open decision 5 — “Clear all”</h2>
+          ${block(lbl("after", "Hover pill (recommended)"), shell(afterBar({ clear: "pill" })))}
+          ${block(lbl("after", "With leading × icon"), shell(afterBar({ clear: "icon" })))}
+          ${block(lbl("after", "Underline link"), shell(afterBar({ clear: "link" })))}
+        </section>
+      `;
+
+      document.getElementById("legend").innerHTML =
+        `All tokens map to the real theme: chip fill <code>bg-gray-100 / dark:bg-white/6</code>, ` +
+        `hairline <code>border-gray-200/60 / dark:border-white/10</code>, primary <code>immich-primary</code>. ` +
+        `Icons are the exact <code>@mdi/js</code> paths used by the filter panel’s <code>sectionIcons</code>.`;
+
+      const tog = document.getElementById("themeToggle");
+      tog.addEventListener("click", () => {
+        const h = document.documentElement;
+        h.dataset.theme = h.dataset.theme === "dark" ? "light" : "dark";
+      });
+    </script>
+  </body>
+</html>
