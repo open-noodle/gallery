@@ -11,6 +11,7 @@ import {
   sortByNameAsc,
   spaceToCollection,
 } from './collection-selection-utils';
+import { CollectionModalRowConverter, CollectionModalRowType, isSelectableRowType } from './collection-selection-utils';
 
 const album = (id: string, name: string, updatedAt = '2024-01-01T00:00:00Z') =>
   ({ id, albumName: name, updatedAt, assetCount: 0, shared: false }) as unknown as AlbumResponseDto;
@@ -80,8 +81,6 @@ describe('collection helpers', () => {
     expect(isValidNewSpaceName('x'.repeat(100))).toBe(true);
   });
 });
-
-import { CollectionModalRowConverter, CollectionModalRowType, isSelectableRowType } from './collection-selection-utils';
 
 describe('CollectionModalRowConverter', () => {
   const conv = new CollectionModalRowConverter();
