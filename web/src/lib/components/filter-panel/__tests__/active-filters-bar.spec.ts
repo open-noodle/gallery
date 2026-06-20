@@ -201,6 +201,40 @@ describe('ActiveFiltersBar', () => {
     expect(removedType).toBe('albums');
   });
 
+  it('should render chip for has-album filter', () => {
+    const filters = { ...createFilterState(), isInAlbum: true };
+
+    const { getAllByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter: () => {},
+        onClearAll: () => {},
+      },
+    });
+
+    const chips = getAllByTestId('active-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain('Has album');
+  });
+
+  it('should remove has-album filter on chip close', async () => {
+    let removedType: string | undefined;
+    const filters = { ...createFilterState(), isInAlbum: true };
+
+    const { getByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter: (type: string) => {
+          removedType = type;
+        },
+        onClearAll: () => {},
+      },
+    });
+
+    await fireEvent.click(getByTestId('chip-close'));
+    expect(removedType).toBe('albums');
+  });
+
   it('should not render a favorites chip for isFavorite false', () => {
     const filters = { ...createFilterState(), isFavorite: false };
 

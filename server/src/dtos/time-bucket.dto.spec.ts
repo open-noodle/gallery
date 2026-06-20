@@ -112,4 +112,20 @@ describe('TimeBucketDto', () => {
       expect(result.data?.isNotInAlbum).toBe(false);
     });
   });
+
+  describe('isInAlbum query param handling', () => {
+    it('should coerce true string to boolean', () => {
+      const result = TimeBucketDto.schema.safeParse({ isInAlbum: 'true' });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.isInAlbum).toBe(true);
+    });
+
+    it('should coerce false string to boolean', () => {
+      const result = TimeBucketDto.schema.safeParse({ isInAlbum: 'false' });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.isInAlbum).toBe(false);
+    });
+  });
 });
