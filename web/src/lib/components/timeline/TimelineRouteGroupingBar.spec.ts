@@ -19,7 +19,7 @@ describe('TimelineRouteGroupingBar', () => {
     expect(screen.getByRole('button', { name: 'timeline_grouping_all' })).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('keeps the route grouping surface transparent instead of drawing a full-width toolbar', () => {
+  it('keeps the toolbar surface transparent (no gray band)', () => {
     render(TimelineRouteGroupingBar, {
       props: {
         grouping: 'year',
