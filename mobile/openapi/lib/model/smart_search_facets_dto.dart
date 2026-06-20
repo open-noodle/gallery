@@ -16,6 +16,7 @@ class SmartSearchFacetsDto {
     this.city = const Optional.absent(),
     this.country = const Optional.absent(),
     this.isFavorite = const Optional.absent(),
+    this.isInAlbum = const Optional.absent(),
     this.isNotInAlbum = const Optional.absent(),
     this.language = const Optional.absent(),
     this.make = const Optional.absent(),
@@ -47,6 +48,15 @@ class SmartSearchFacetsDto {
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
   Optional<bool?> isFavorite;
+
+  /// Filter assets in at least one album
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  Optional<bool?> isInAlbum;
 
   /// Filter assets not in any album
   ///
@@ -154,6 +164,7 @@ class SmartSearchFacetsDto {
     other.city == city &&
     other.country == country &&
     other.isFavorite == isFavorite &&
+    other.isInAlbum == isInAlbum &&
     other.isNotInAlbum == isNotInAlbum &&
     other.language == language &&
     other.make == make &&
@@ -176,6 +187,7 @@ class SmartSearchFacetsDto {
     (city == null ? 0 : city!.hashCode) +
     (country == null ? 0 : country!.hashCode) +
     (isFavorite == null ? 0 : isFavorite!.hashCode) +
+    (isInAlbum == null ? 0 : isInAlbum!.hashCode) +
     (isNotInAlbum == null ? 0 : isNotInAlbum!.hashCode) +
     (language == null ? 0 : language!.hashCode) +
     (make == null ? 0 : make!.hashCode) +
@@ -193,7 +205,7 @@ class SmartSearchFacetsDto {
     (withSharedSpaces == null ? 0 : withSharedSpaces!.hashCode);
 
   @override
-  String toString() => 'SmartSearchFacetsDto[city=$city, country=$country, isFavorite=$isFavorite, isNotInAlbum=$isNotInAlbum, language=$language, make=$make, model=$model, personIds=$personIds, query=$query, queryAssetId=$queryAssetId, rating=$rating, spaceId=$spaceId, spacePersonIds=$spacePersonIds, tagIds=$tagIds, takenAfter=$takenAfter, takenBefore=$takenBefore, type=$type, withSharedSpaces=$withSharedSpaces]';
+  String toString() => 'SmartSearchFacetsDto[city=$city, country=$country, isFavorite=$isFavorite, isInAlbum=$isInAlbum, isNotInAlbum=$isNotInAlbum, language=$language, make=$make, model=$model, personIds=$personIds, query=$query, queryAssetId=$queryAssetId, rating=$rating, spaceId=$spaceId, spacePersonIds=$spacePersonIds, tagIds=$tagIds, takenAfter=$takenAfter, takenBefore=$takenBefore, type=$type, withSharedSpaces=$withSharedSpaces]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -208,6 +220,10 @@ class SmartSearchFacetsDto {
     if (this.isFavorite.isPresent) {
       final value = this.isFavorite.value;
       json[r'isFavorite'] = value;
+    }
+    if (this.isInAlbum.isPresent) {
+      final value = this.isInAlbum.value;
+      json[r'isInAlbum'] = value;
     }
     if (this.isNotInAlbum.isPresent) {
       final value = this.isNotInAlbum.value;
@@ -288,6 +304,7 @@ class SmartSearchFacetsDto {
         city: json.containsKey(r'city') ? Optional.present(mapValueOfType<String>(json, r'city')) : const Optional.absent(),
         country: json.containsKey(r'country') ? Optional.present(mapValueOfType<String>(json, r'country')) : const Optional.absent(),
         isFavorite: json.containsKey(r'isFavorite') ? Optional.present(mapValueOfType<bool>(json, r'isFavorite')) : const Optional.absent(),
+        isInAlbum: json.containsKey(r'isInAlbum') ? Optional.present(mapValueOfType<bool>(json, r'isInAlbum')) : const Optional.absent(),
         isNotInAlbum: json.containsKey(r'isNotInAlbum') ? Optional.present(mapValueOfType<bool>(json, r'isNotInAlbum')) : const Optional.absent(),
         language: json.containsKey(r'language') ? Optional.present(mapValueOfType<String>(json, r'language')) : const Optional.absent(),
         make: json.containsKey(r'make') ? Optional.present(mapValueOfType<String>(json, r'make')) : const Optional.absent(),
