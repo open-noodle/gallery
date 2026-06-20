@@ -354,6 +354,16 @@ describe('Photos page search URL state', () => {
     });
   });
 
+  it('passes has-album into photos timeline options when hydrated from the URL', async () => {
+    mockPage.url = new URL('https://gallery.test/photos?album=has');
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(buildPhotosTimelineOptions).toHaveBeenCalledWith(expect.objectContaining({ isInAlbum: true }));
+    });
+  });
+
   it('registers current photos filters for global sort changes', async () => {
     mockPage.url = new URL('https://gallery.test/photos');
 
@@ -440,6 +450,35 @@ describe('Photos page search URL state', () => {
         expect.objectContaining({ make: 'Sony', isNotInAlbum: true }),
       );
     });
+  });
+
+  it('narrows photos suggestions and dependent providers to has-album when selected', async () => {
+    mockPage.url = new URL('https://gallery.test/photos');
+
+    renderPage();
+    await fireEvent.click(screen.getByTestId('select-has-album-filter'));
+    await fireEvent.click(screen.getByTestId('load-city-suggestions'));
+    await fireEvent.click(screen.getByTestId('load-camera-model-suggestions'));
+
+    await waitFor(() => {
+      expect(sdkMock.getFilterSuggestions).toHaveBeenCalledWith(
+        expect.objectContaining({ isInAlbum: true, withSharedSpaces: true }),
+      );
+      expect(sdkMock.getSearchSuggestions).toHaveBeenCalledWith(
+        expect.objectContaining({ country: 'Germany', isInAlbum: true }),
+      );
+      expect(sdkMock.getSearchSuggestions).toHaveBeenCalledWith(
+        expect.objectContaining({ make: 'Sony', isInAlbum: true }),
+      );
+    });
+  });
+
+  it('hydrates has-album from the URL into search results', () => {
+    mockPage.url = new URL('https://gallery.test/photos?q=beach&album=has');
+
+    renderPage();
+
+    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-in-album', 'true');
   });
 
   it('fetches smart facets for committed photos search and passes exact total to results', async () => {
