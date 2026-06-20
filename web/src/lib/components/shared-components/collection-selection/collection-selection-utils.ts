@@ -1,8 +1,8 @@
 // collection-selection-utils.ts
-import { normalizeSearchString } from '$lib/utils/string-utils';
 import { SharedSpaceRole, type AlbumResponseDto, type SharedSpaceResponseDto } from '@immich/sdk';
 import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
+import { normalizeSearchString } from '$lib/utils/string-utils';
 
 export type PickerCollection =
   | { kind: 'album'; id: string; name: string; album: AlbumResponseDto }
