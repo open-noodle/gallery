@@ -1,10 +1,9 @@
 <script lang="ts">
   import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
+  import FilterToolbar from '$lib/components/filter-panel/filter-toolbar.svelte';
   import { buildFilterContext, createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
   import type { TimelineGrouping } from '$lib/managers/timeline-manager/types';
   import { twMerge } from 'tailwind-merge';
-
-  import TimelineGroupingControl from './TimelineGroupingControl.svelte';
 
   interface Props {
     grouping: TimelineGrouping;
@@ -44,18 +43,20 @@
 </script>
 
 {#if !hidden}
-  <div class={twMerge('hidden flex-col gap-2 bg-transparent px-4 py-2 dark:bg-transparent md:flex', className)}>
-    <div class="flex items-center justify-end" data-testid="timeline-desktop-grouping-control">
-      <TimelineGroupingControl {grouping} {onGroupingChange} />
-    </div>
-
-    {#if hasActiveTemporalFilters}
+  <FilterToolbar
+    {grouping}
+    {onGroupingChange}
+    showFilters={hasActiveTemporalFilters}
+    class={twMerge('hidden md:flex', className)}
+  >
+    {#snippet filters()}
       <ActiveFiltersBar
+        embedded
         filters={temporalFilters}
         {resultCount}
         onRemoveFilter={removeTemporalFilter}
         onClearAll={() => onClearTemporalFilter?.()}
       />
-    {/if}
-  </div>
+    {/snippet}
+  </FilterToolbar>
 {/if}
