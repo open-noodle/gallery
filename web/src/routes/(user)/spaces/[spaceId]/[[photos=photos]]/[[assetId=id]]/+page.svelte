@@ -3,6 +3,7 @@
   import { page } from '$app/state';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
   import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
+  import FilterToolbar from '$lib/components/filter-panel/filter-toolbar.svelte';
   import {
     buildFilterContext,
     createFilterState,
@@ -36,7 +37,6 @@
   import TagAction from '$lib/components/timeline/actions/TagAction.svelte';
   import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '$lib/components/timeline/Timeline.svelte';
-  import TimelineGroupingControl from '$lib/components/timeline/TimelineGroupingControl.svelte';
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
   import type { TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
   import { registerSelectionContext, registerSpaceContext } from '$lib/managers/command-context-manager.svelte';
@@ -1058,29 +1058,28 @@
 
     <!-- Main Content — pl-4 adds breathing room between filter panel and content -->
     <div class="flex flex-1 flex-col overflow-hidden pl-4">
-      {#if viewMode === 'view' && !showSearchResults && !assetMultiSelectManager.selectionActive}
-        <div
-          class="mb-2 hidden shrink-0 items-center gap-2 bg-transparent px-4 py-2 dark:bg-transparent md:flex"
-          data-testid="timeline-desktop-grouping-control"
-        >
-          <TimelineGroupingControl grouping={timelineGrouping} onGroupingChange={handleTimelineGroupingChange} />
-        </div>
-      {/if}
-
-      <!-- Active filter chips -->
-      {#if viewMode === 'view' && (getActiveFilterCount(filters) > 0 || committedSearchQuery.trim().length > 0)}
-        <div class="mb-4 shrink-0" data-testid="space-active-filters-bar-spacing">
-          <ActiveFiltersBar
-            {filters}
-            resultCount={showSearchResults ? smartFacetTotal : totalAssetCount}
-            {personNames}
-            {tagNames}
-            onRemoveFilter={handleRemoveFilter}
-            onClearAll={handleClearAllFilters}
-            searchQuery={committedSearchQuery}
-            onClearSearch={clearSearch}
-          />
-        </div>
+      {#snippet spaceFiltersBar()}
+        <ActiveFiltersBar
+          embedded
+          {filters}
+          resultCount={showSearchResults ? smartFacetTotal : totalAssetCount}
+          {personNames}
+          {tagNames}
+          onRemoveFilter={handleRemoveFilter}
+          onClearAll={handleClearAllFilters}
+          searchQuery={committedSearchQuery}
+          onClearSearch={clearSearch}
+        />
+      {/snippet}
+      {#if viewMode === 'view'}
+        <FilterToolbar
+          class="mb-2"
+          grouping={timelineGrouping}
+          onGroupingChange={handleTimelineGroupingChange}
+          showGrouping={!showSearchResults && !assetMultiSelectManager.selectionActive}
+          showFilters={getActiveFilterCount(filters) > 0 || committedSearchQuery.trim().length > 0}
+          filters={spaceFiltersBar}
+        />
       {/if}
 
       {#if showSearchResults}

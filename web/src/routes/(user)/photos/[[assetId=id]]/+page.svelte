@@ -4,6 +4,7 @@
   import ActionMenuItem from '$lib/components/ActionMenuItem.svelte';
   import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
+  import FilterToolbar from '$lib/components/filter-panel/filter-toolbar.svelte';
   import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
   import {
     buildFilterContext,
@@ -32,7 +33,6 @@
   import TagAction from '$lib/components/timeline/actions/TagAction.svelte';
   import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '$lib/components/timeline/Timeline.svelte';
-  import TimelineGroupingControl from '$lib/components/timeline/TimelineGroupingControl.svelte';
   import { AssetAction } from '$lib/constants';
   import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
@@ -540,28 +540,27 @@
       />
     {/key}
     <div class="flex flex-1 flex-col overflow-hidden pl-4">
-      {#if !showSearchResults && !assetMultiSelectManager.selectionActive}
-        <div
-          class="mb-2 hidden shrink-0 items-center gap-2 bg-transparent px-4 py-2 dark:bg-transparent md:flex"
-          data-testid="timeline-desktop-grouping-control"
-        >
-          <TimelineGroupingControl grouping={timelineGrouping} onGroupingChange={handleTimelineGroupingChange} />
-        </div>
-      {/if}
-      {#if hasActiveFilters}
-        <div class="mb-4 shrink-0" data-testid="photos-active-filters-bar-spacing">
-          <ActiveFiltersBar
-            {filters}
-            searchQuery={committedQuery}
-            onClearSearch={clearSearch}
-            resultCount={showSearchResults ? smartFacetTotal : totalAssetCount}
-            {personNames}
-            {tagNames}
-            onRemoveFilter={handleRemoveActiveFilter}
-            onClearAll={handleClearAllFilters}
-          />
-        </div>
-      {/if}
+      {#snippet photoFiltersBar()}
+        <ActiveFiltersBar
+          embedded
+          {filters}
+          searchQuery={committedQuery}
+          onClearSearch={clearSearch}
+          resultCount={showSearchResults ? smartFacetTotal : totalAssetCount}
+          {personNames}
+          {tagNames}
+          onRemoveFilter={handleRemoveActiveFilter}
+          onClearAll={handleClearAllFilters}
+        />
+      {/snippet}
+      <FilterToolbar
+        class="mb-2"
+        grouping={timelineGrouping}
+        onGroupingChange={handleTimelineGroupingChange}
+        showGrouping={!showSearchResults && !assetMultiSelectManager.selectionActive}
+        showFilters={hasActiveFilters}
+        filters={photoFiltersBar}
+      />
       {#if showSearchResults}
         <SmartSearchResults
           bind:isLoading
