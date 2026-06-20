@@ -11,7 +11,7 @@ On top of `2026-06-19-upstream-sync-batch-276.md`. One upstream mobile-build bum
 - **New migrations**: 0 — Gallery migration count steady at **33**, mobile Drift schemaVersion unchanged.
 - **OpenAPI/SDK**: regenerated — #717 adds the `isInAlbum` search query param. Spec was already consistent (no `sync-open-api` diff); only the TS SDK + Dart clients needed regen (cherry-pick took `--ours`).
 - **Risk level**: MEDIUM (large fork-sync — two feature PRs needed genuine v3 reconciliation; the upstream commit collided with mobile branding/version files).
-- **Recommendation**: PROCEED — local checks GREEN (server tsc + full server unit 4696; web tsc + full web unit 3262); audits GREEN. Remote CI dispatch pending.
+- **Recommendation**: DONE — local checks GREEN (server tsc + full server unit 4696; web tsc + full web unit 3262); audits GREEN; **all 8 remote CI workflows GREEN** (after 4 reconciliation rounds — see below). Canonical rolling branch updated; held off `main`.
 
 > **Scope note:** held rolling branch — not pushed to `main`, no `branding.upstream.version` bump. Now **0 behind / ahead** of `upstream/main` (includes #29215).
 
@@ -95,7 +95,22 @@ First dispatch on `rebase/upstream-batch-278`: 5 green (Docker, Storage-Migratio
 | Test Web                           | `#708` files not formatted for v3 prettier                                                                                              | `prettier --write`                                                                                                                                                         |
 | Lint Web                           | `#708` switch over `CollectionModalRowType` non-exhaustive (v3 enables `switch-exhaustiveness-check`)                                   | Added `SECTION`/`MESSAGE` no-op cases. (The 84 `better-tailwindcss` _warnings_ are non-fatal — `eslint .` has no `--max-warnings 0` — so left untouched, as in batch 276.) |
 
-Re-dispatched Test / Static Code Analysis / Gallery Build Mobile on the updated branch. (Final results appended once green.)
+Re-runs surfaced two more drift points the first round masked, each fixed in turn:
+
+- **Static Analysis** (round 3): the `tilesPerRow` fix imported `app_config.dart`, but `TimelineConfig` lives in `timeline_config.dart` (only imported, not re-exported there) — added the explicit import, matching the other v3 tests.
+- **Test & Lint Server** (round 4): `#717`'s own album-scope unit tests asserted the removed `"album"."ownerId" = "asset"."ownerId"` SQL — dropped the 4 stale assertions, kept the `album_user` ones (re-confirmed the full 4696 server suite + server lint green locally).
+
+**Final result — all 8 workflows GREEN** (latest run per workflow; runs span the fix commits but each is green on a commit whose relevant inputs match the final tip `fa7fac5b`):
+
+| Workflow                            | Result | Commit                                                                      |
+| ----------------------------------- | ------ | --------------------------------------------------------------------------- |
+| Test                                | ✅     | `fa7fac5b` (final — web/server/mobile unit + lint, Medium real-DB, E2E Web) |
+| Static Code Analysis                | ✅     | `02146f39` (dart; final adds only a server spec)                            |
+| Docker                              | ✅     | `30b05702` (album-query src fix included; later commits are test-only)      |
+| Gallery Build Mobile                | ✅     | `30b05702` (iOS + Android compile + branding)                               |
+| Gallery Rebase Smoke                | ✅     | `1e70aed0` (unaffected by the CI fixes)                                     |
+| Storage Migration Tests / E2E       | ✅     | `1e70aed0` (unaffected)                                                     |
+| Gallery Revert-to-Immich Validation | ✅     | `1e70aed0` (unaffected)                                                     |
 
 ## Post-rebase state
 
