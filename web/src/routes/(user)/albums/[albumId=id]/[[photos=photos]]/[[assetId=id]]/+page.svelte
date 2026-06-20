@@ -8,6 +8,7 @@
   import ActivityViewer from '$lib/components/asset-viewer/ActivityViewer.svelte';
   import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
+  import FilterToolbar from '$lib/components/filter-panel/filter-toolbar.svelte';
   import { clearTimelineTemporalFilter } from '$lib/utils/timeline-temporal-filters';
   import {
     clearFilters,
@@ -36,7 +37,6 @@
   import TagAction from '$lib/components/timeline/actions/TagAction.svelte';
   import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '$lib/components/timeline/Timeline.svelte';
-  import TimelineGroupingControl from '$lib/components/timeline/TimelineGroupingControl.svelte';
   import { AlbumPageViewMode } from '$lib/constants';
   import { activityManager } from '$lib/managers/activity-manager.svelte';
   import { assetMultiSelectManager, AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
@@ -512,15 +512,6 @@
         {/if}
 
         <div class="flex flex-1 flex-col overflow-hidden pl-4">
-          {#if isBrowseTimeline && !assetMultiSelectManager.selectionActive}
-            <div
-              class="mb-2 hidden shrink-0 items-center gap-2 bg-transparent px-4 py-2 dark:bg-transparent md:flex"
-              data-testid="timeline-desktop-grouping-control"
-            >
-              <TimelineGroupingControl grouping={timelineGrouping} onGroupingChange={handleTimelineGroupingChange} />
-            </div>
-          {/if}
-
           {#if viewMode === AlbumPageViewMode.SELECT_ASSETS && getActiveFilterCount(pickerFilters) > 0}
             <ActiveFiltersBar
               filters={pickerFilters}
@@ -534,23 +525,34 @@
                 pickerFilters = clearFilters(pickerFilters);
               }}
             />
-          {:else if viewMode !== AlbumPageViewMode.SELECT_ASSETS && getActiveFilterCount(albumFilters) > 0}
-            <ActiveFiltersBar
-              filters={albumFilters}
-              resultCount={totalAssetCount}
-              personNames={albumPersonNames}
-              tagNames={albumTagNames}
-              onRemoveFilter={(type, id) => {
-                if (type === 'timeline') {
-                  clearAlbumTemporalFilter();
-                } else {
-                  albumFilters = handlePhotosRemoveFilter(albumFilters, type, id);
-                }
-              }}
-              onClearAll={() => {
-                albumFilters = clearFilters(albumFilters);
-                temporalAnchor = undefined;
-              }}
+          {:else if viewMode !== AlbumPageViewMode.SELECT_ASSETS}
+            {#snippet albumFiltersBar()}
+              <ActiveFiltersBar
+                embedded
+                filters={albumFilters}
+                resultCount={totalAssetCount}
+                personNames={albumPersonNames}
+                tagNames={albumTagNames}
+                onRemoveFilter={(type, id) => {
+                  if (type === 'timeline') {
+                    clearAlbumTemporalFilter();
+                  } else {
+                    albumFilters = handlePhotosRemoveFilter(albumFilters, type, id);
+                  }
+                }}
+                onClearAll={() => {
+                  albumFilters = clearFilters(albumFilters);
+                  temporalAnchor = undefined;
+                }}
+              />
+            {/snippet}
+            <FilterToolbar
+              class="mb-2"
+              grouping={timelineGrouping}
+              onGroupingChange={handleTimelineGroupingChange}
+              showGrouping={isBrowseTimeline && !assetMultiSelectManager.selectionActive}
+              showFilters={getActiveFilterCount(albumFilters) > 0}
+              filters={albumFiltersBar}
             />
           {/if}
 
