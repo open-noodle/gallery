@@ -823,9 +823,20 @@ describe('Photos page search URL state', () => {
     renderPage();
 
     const control = await screen.findByTestId('timeline-desktop-grouping-control');
-    expect(control).toHaveClass('mb-2', 'bg-transparent', 'dark:bg-transparent');
-    expect(control).not.toHaveClass('mb-6');
-    expect(control).not.toHaveClass('bg-gray-50', 'dark:bg-gray-900', 'border-b');
+    const toolbar = control.closest('[class*="bg-transparent"]');
+    expect(toolbar).toHaveClass('mb-2', 'bg-transparent', 'dark:bg-transparent');
+    expect(toolbar).not.toHaveClass('mb-6');
+    expect(toolbar).not.toHaveClass('bg-gray-50', 'dark:bg-gray-900', 'border-b');
+  });
+
+  it('shows grouping and the filter bar in one merged toolbar (no separate spacing wrapper)', async () => {
+    mockPage.url = new URL('https://gallery.test/photos?country=Germany');
+
+    renderPage();
+
+    expect(await screen.findByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
+    expect(screen.getByTestId('active-filters-bar-stub')).toBeInTheDocument();
+    expect(screen.queryByTestId('photos-active-filters-bar-spacing')).toBeNull();
   });
 
   it('keeps active filters visually separated from grouped timeline cards', async () => {
@@ -833,8 +844,10 @@ describe('Photos page search URL state', () => {
 
     renderPage();
 
-    const activeFiltersArea = await screen.findByTestId('photos-active-filters-bar-spacing');
-    expect(activeFiltersArea).toHaveClass('mb-4', 'shrink-0');
+    const filterBar = await screen.findByTestId('active-filters-bar-stub');
+    const toolbar = filterBar.closest('[class*="shrink-0"]');
+    expect(toolbar).toHaveClass('shrink-0');
+    expect(toolbar).toHaveClass('mb-2');
   });
 
   it('changes photos grouping from the desktop control without changing filters or URL params', async () => {

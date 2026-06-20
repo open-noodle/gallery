@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/svelte';
+import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import ActiveFiltersBar from '../active-filters-bar.svelte';
 import { createFilterState } from '../filter-panel';
@@ -82,7 +82,7 @@ describe('ActiveFiltersBar', () => {
     expect(chips[0].textContent).not.toContain(',');
   });
 
-  it('should render chip for rating as "\u2605 3+"', () => {
+  it('should render chip for rating as "3+" (star shown as a leading icon)', () => {
     const filters = createFilterState();
     filters.rating = 3;
 
@@ -96,7 +96,7 @@ describe('ActiveFiltersBar', () => {
 
     const chips = getAllByTestId('active-chip');
     expect(chips).toHaveLength(1);
-    expect(chips[0].textContent).toContain('\u2605 3+');
+    expect(chips[0].textContent).toContain('3+');
   });
 
   it('should render chip for media type as "Photos only"', () => {
@@ -609,5 +609,26 @@ describe('ActiveFiltersBar', () => {
     await fireEvent.click(getByTestId('clear-all-btn'));
     expect(onClearAll).toHaveBeenCalled();
     expect(onClearSearch).not.toHaveBeenCalled();
+  });
+
+  it('omits its own band and padding in embedded mode', () => {
+    const filters = createFilterState();
+    filters.country = 'Germany';
+
+    // embedded: no self-drawn seam/padding (the host toolbar supplies them)
+    const embeddedResult = render(ActiveFiltersBar, {
+      props: { filters, onRemoveFilter: () => {}, onClearAll: () => {}, embedded: true },
+    });
+    expect(embeddedResult.getByTestId('active-filters-bar').className).not.toContain('border-b');
+    expect(embeddedResult.getByTestId('active-filters-bar').className).not.toContain('px-4');
+    cleanup();
+
+    // standalone (default): keeps the seam + padding
+    const standaloneResult = render(ActiveFiltersBar, {
+      props: { filters, onRemoveFilter: () => {}, onClearAll: () => {}, embedded: false },
+    });
+    expect(standaloneResult.getByTestId('active-filters-bar').className).toContain('border-b');
+    expect(standaloneResult.getByTestId('active-filters-bar').className).toContain('px-4');
+    cleanup();
   });
 });
