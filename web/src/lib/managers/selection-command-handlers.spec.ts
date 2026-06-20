@@ -5,8 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_SPACE_ASSETS_PER_REQUEST } from '$lib/constants';
 import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
 import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
-import AssetAddToAlbumModal from '$lib/modals/AssetAddToAlbumModal.svelte';
-import AssetAddToSpaceModal from '$lib/modals/AssetAddToSpaceModal.svelte';
+import AssetAddToCollectionModal from '$lib/modals/AssetAddToCollectionModal.svelte';
 import AssetDeleteConfirmModal from '$lib/modals/AssetDeleteConfirmModal.svelte';
 import { showDeleteModal } from '$lib/stores/preferences.store';
 import * as handleErrorModule from '$lib/utils/handle-error';
@@ -223,25 +222,25 @@ describe('selection command availability', () => {
 });
 
 describe('add selected to album', () => {
-  it('opens AssetAddToAlbumModal with selected asset ids and does not clear selection', async () => {
+  it('opens AssetAddToCollectionModal with selected asset ids and does not clear selection', async () => {
     const assets = [makeAsset({ id: 'asset-1' }), makeAsset({ id: 'asset-2' })];
     const selection = makeSelection({ assets });
 
     await handleAddSelectedToAlbum(makeCtx(selection));
 
-    expect(modalManager.show).toHaveBeenCalledWith(AssetAddToAlbumModal, { assetIds: ['asset-1', 'asset-2'] });
+    expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, { assetIds: ['asset-1', 'asset-2'] });
     expect(selection.clearSelection).not.toHaveBeenCalled();
   });
 });
 
 describe('add selected to space', () => {
-  it('opens AssetAddToSpaceModal with selected asset ids and does not clear selection', async () => {
+  it('opens AssetAddToCollectionModal with selected asset ids and does not clear selection', async () => {
     const assets = [makeAsset({ id: 'asset-1' }), makeAsset({ id: 'asset-2' })];
     const selection = makeSelection({ assets });
 
     await handleAddSelectedToSpace(makeCtx(selection));
 
-    expect(modalManager.show).toHaveBeenCalledWith(AssetAddToSpaceModal, { assetIds: ['asset-1', 'asset-2'] });
+    expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, { assetIds: ['asset-1', 'asset-2'] });
     expect(selection.clearSelection).not.toHaveBeenCalled();
   });
 
