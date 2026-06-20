@@ -64,6 +64,9 @@ export function buildSmartSearchParams(args: SmartSearchParamsArgs): SmartSearch
   if (filters.isNotInAlbum === true) {
     params.isNotInAlbum = true;
   }
+  if (filters.isInAlbum === true) {
+    params.isInAlbum = true;
+  }
   const context = buildFilterContext(filters);
   if (context?.takenAfter) {
     params.takenAfter = context.takenAfter;

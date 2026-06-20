@@ -147,6 +147,20 @@ describe('buildPhotosTimelineOptions', () => {
     expect(options).not.toHaveProperty('isNotInAlbum');
   });
 
+  it('should include has-album when selected', () => {
+    const filters = { ...createFilterState(), isInAlbum: true };
+    const options = buildPhotosTimelineOptions(filters);
+
+    expect(options.isInAlbum).toBe(true);
+  });
+
+  it('should omit has-album when it is false', () => {
+    const filters = { ...createFilterState(), isInAlbum: false };
+    const options = buildPhotosTimelineOptions(filters);
+
+    expect(options).not.toHaveProperty('isInAlbum');
+  });
+
   it('should handle multiple simultaneous filters', () => {
     const filters = {
       ...createFilterState(),
@@ -253,6 +267,21 @@ describe('handlePhotosRemoveFilter', () => {
 
     expect(handlePhotosRemoveFilter(filters, 'albums').isNotInAlbum).toBeUndefined();
     expect(handlePhotosRemoveFilter(filters, 'isNotInAlbum').isNotInAlbum).toBeUndefined();
+  });
+
+  it('should clear has-album filter', () => {
+    const filters = { ...createFilterState(), isInAlbum: true };
+
+    expect(handlePhotosRemoveFilter(filters, 'albums').isInAlbum).toBeUndefined();
+    expect(handlePhotosRemoveFilter(filters, 'isInAlbum').isInAlbum).toBeUndefined();
+  });
+
+  it('should clear both album booleans when removing the albums filter', () => {
+    const filters = { ...createFilterState(), isNotInAlbum: true, isInAlbum: true };
+    const cleared = handlePhotosRemoveFilter(filters, 'albums');
+
+    expect(cleared.isNotInAlbum).toBeUndefined();
+    expect(cleared.isInAlbum).toBeUndefined();
   });
 
   it('should preserve sortOrder when removing filters', () => {
