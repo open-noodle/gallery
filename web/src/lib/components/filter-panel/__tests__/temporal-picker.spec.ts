@@ -400,4 +400,20 @@ describe('TemporalPicker component', () => {
     const breadcrumb = getByTestId('temporal-breadcrumb-month');
     expect(breadcrumb.textContent).toContain('Jun');
   });
+
+  it('lays out the year grid in three columns with year buttons as direct grid children', () => {
+    const { getByTestId } = render(TemporalPicker, { props: { timeBuckets: buckets } });
+    const grid = getByTestId('year-grid');
+    expect(grid.className).toContain('grid-cols-3');
+    // The old flex-wrap `basis-[...]` classes are gone; buttons are direct grid items.
+    expect(grid.querySelectorAll(':scope > [data-testid^="year-btn-"]').length).toBe(2);
+  });
+
+  it('guards the year and month chips against reduced motion', () => {
+    const yearView = render(TemporalPicker, { props: { timeBuckets: buckets } });
+    expect(yearView.getByTestId('year-btn-2022').className).toContain('motion-reduce:transition-none');
+
+    const monthView = render(TemporalPicker, { props: { timeBuckets: buckets, selectedYear: 2023 } });
+    expect(monthView.getByTestId('month-btn-6').className).toContain('motion-reduce:transition-none');
+  });
 });
