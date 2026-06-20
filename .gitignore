@@ -47,3 +47,4 @@ vite.config.js.timestamp-*
 misc/release/notes.md
 .worktrees
 .codex
+.superpowers
