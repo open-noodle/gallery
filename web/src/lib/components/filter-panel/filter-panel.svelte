@@ -114,6 +114,7 @@
       mediaType: filters.mediaType,
       isFavorite: filters.isFavorite,
       isNotInAlbum: filters.isNotInAlbum,
+      isInAlbum: filters.isInAlbum,
       sortOrder: filters.sortOrder,
       dateAfter: filters.dateAfter,
       dateBefore: filters.dateBefore,
@@ -641,7 +642,7 @@
         return filters.isFavorite !== undefined;
       }
       case 'albums': {
-        return filters.isNotInAlbum === true;
+        return filters.isNotInAlbum === true || filters.isInAlbum === true;
       }
       case 'timeline': {
         return (
@@ -831,9 +832,13 @@
                   />
                 {:else if section === 'albums'}
                   <AlbumsFilter
-                    selected={filters.isNotInAlbum}
-                    onToggle={(value) => {
-                      updateFilters({ ...filters, isNotInAlbum: value });
+                    selected={filters.isInAlbum ? 'has' : filters.isNotInAlbum ? 'none' : 'all'}
+                    onChange={(value) => {
+                      updateFilters({
+                        ...filters,
+                        isInAlbum: value === 'has' ? true : undefined,
+                        isNotInAlbum: value === 'none' ? true : undefined,
+                      });
                     }}
                   />
                 {/if}

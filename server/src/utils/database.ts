@@ -807,6 +807,9 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
     .$if(!!options.isNotInAlbum && (!options.albumIds || options.albumIds.length === 0), (qb) =>
       qb.where((eb) => eb.not(eb.exists((eb) => eb.selectFrom('album_asset').whereRef('assetId', '=', 'asset.id')))),
     )
+    .$if(!!options.isInAlbum && (!options.albumIds || options.albumIds.length === 0), (qb) =>
+      qb.where((eb) => eb.exists((eb) => eb.selectFrom('album_asset').whereRef('assetId', '=', 'asset.id'))),
+    )
     .$if(options.withStacked === false, (qb) => qb.where('asset.stackId', 'is', null))
     .$if(!!options.withExif, withExifInner)
     .$if(!!(options.withFaces || options.withPeople), (qb) =>
