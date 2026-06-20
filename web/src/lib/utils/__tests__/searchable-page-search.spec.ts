@@ -147,4 +147,23 @@ describe('typed filter URL state', () => {
 
     expect(params.toString()).toBe('q=beach&sort=desc&view=timeline');
   });
+
+  it('serializes has-album into URLs as album=has', () => {
+    const url = new URL('https://gallery.test/photos');
+    const filters = { ...createFilterState(), isInAlbum: true };
+
+    expect(buildSearchablePageUrl(url, '', 'desc', filters)).toBe('/photos?sort=desc&album=has');
+  });
+
+  it('hydrates album=has into isInAlbum', () => {
+    const url = new URL('https://gallery.test/photos?album=has');
+
+    expect(getSearchablePageFilterState(url)).toEqual({ isInAlbum: true });
+  });
+
+  it('still hydrates album=none into isNotInAlbum', () => {
+    const url = new URL('https://gallery.test/photos?album=none');
+
+    expect(getSearchablePageFilterState(url)).toEqual({ isNotInAlbum: true });
+  });
 });

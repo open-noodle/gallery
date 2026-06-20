@@ -461,6 +461,52 @@ describe(SearchRepository.name, () => {
       expect(sql).toContain('not exists');
       expect(sql).toContain('"album_asset"."assetId" = "asset"."id"');
     });
+
+    it('filters suggestion asset ids to assets with album membership', () => {
+      const sql = compileFilteredAssetIds(sut, { isInAlbum: true });
+
+      expect(sql).toContain('"album_asset"');
+      expect(sql).toContain('exists');
+      expect(sql).not.toContain('not exists');
+      expect(sql).toContain('"album_asset"."assetId" = "asset"."id"');
+    });
+
+    it('does not add album inclusion for false has-album filters', () => {
+      const sql = compileFilteredAssetIds(sut, { isInAlbum: false });
+
+      expect(sql).not.toContain('"album_asset"');
+    });
+
+    it('filters dependent EXIF suggestions to assets with album membership', () => {
+      const sql = compileExifField(sut, 'model', { isInAlbum: true });
+
+      expect(sql).toContain('"album_asset"');
+      expect(sql).toContain('exists');
+      expect(sql).not.toContain('not exists');
+    });
+
+    it('filters metadata search assets to album members via searchAssetBuilder', () => {
+      const sql = buildAssetSearchSql({ isInAlbum: true });
+
+      expect(sql).toContain('"album_asset"');
+      expect(sql).toContain('exists');
+      expect(sql).not.toContain('not exists');
+    });
+
+    it('does not add album inclusion to metadata search when isInAlbum is false', () => {
+      const sql = buildAssetSearchSql({ isInAlbum: false });
+
+      expect(sql).not.toContain('"album_asset"');
+    });
+
+    // Edge case (unreachable via UI): both album booleans true → the predicates are
+    // ANDed, yielding the empty intersection. Documents that no special handling is needed.
+    it('ANDs both album predicates when isInAlbum and isNotInAlbum are both true', () => {
+      const sql = buildAssetSearchSql({ isInAlbum: true, isNotInAlbum: true });
+
+      expect(sql).toContain('exists');
+      expect(sql).toContain('not exists');
+    });
   });
 
   describe('album-scoped suggestions', () => {
