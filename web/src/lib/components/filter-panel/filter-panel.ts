@@ -67,6 +67,7 @@ export interface FilterState {
   mediaType: 'all' | 'image' | 'video';
   isFavorite?: boolean;
   isNotInAlbum?: boolean;
+  isInAlbum?: boolean;
   sortOrder: 'asc' | 'desc' | 'relevance';
   dateAfter?: string;
   dateBefore?: string;
@@ -97,6 +98,7 @@ export function getActiveFilterCount(state: FilterState): number {
     (state.mediaType === 'all' ? 0 : 1) +
     (state.isFavorite === undefined ? 0 : 1) +
     (state.isNotInAlbum === true ? 1 : 0) +
+    (state.isInAlbum === true ? 1 : 0) +
     (hasTemporalFilter ? 1 : 0)
   );
 }
@@ -109,6 +111,7 @@ export type FilterContext = {
   rating?: number;
   isFavorite?: boolean;
   isNotInAlbum?: boolean;
+  isInAlbum?: boolean;
 };
 
 function hasDateValue(value: string | undefined): value is string {
@@ -178,6 +181,10 @@ export function buildFilterContext(
     context.isNotInAlbum = true;
   }
 
+  if (includes('isInAlbum') && state.isInAlbum === true) {
+    context.isInAlbum = true;
+  }
+
   const validDateAfter = includes('dateAfter') ? dateOnlyToUtcStart(state.dateAfter) : undefined;
   const validDateBefore = includes('dateBefore') ? dateOnlyToExclusiveUtcEnd(state.dateBefore) : undefined;
 
@@ -214,6 +221,7 @@ export function clearFilters(state: FilterState): FilterState {
     mediaType: 'all',
     isFavorite: undefined,
     isNotInAlbum: undefined,
+    isInAlbum: undefined,
     dateAfter: undefined,
     dateBefore: undefined,
     selectedYear: undefined,

@@ -353,6 +353,14 @@ describe('Spaces page search URL state', () => {
     expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-not-in-album', 'true');
   });
 
+  it('hydrates has-album from the space URL into search results', () => {
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach&album=has');
+
+    renderPage();
+
+    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-in-album', 'true');
+  });
+
   it('registers current space filters for global sort changes', async () => {
     renderPage();
     await waitFor(() => expect(mockRegisterSearchablePageFilters).toHaveBeenCalledOnce());
@@ -446,6 +454,27 @@ describe('Spaces page search URL state', () => {
       );
       expect(sdkMock.getSearchSuggestions).toHaveBeenCalledWith(
         expect.objectContaining({ make: 'Sony', spaceId: 'space-1', isNotInAlbum: true }),
+      );
+    });
+  });
+
+  it('narrows space suggestions and dependent providers to has-album when selected', async () => {
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
+
+    renderPage();
+    await fireEvent.click(screen.getByTestId('select-has-album-filter'));
+    await fireEvent.click(screen.getByTestId('load-city-suggestions'));
+    await fireEvent.click(screen.getByTestId('load-camera-model-suggestions'));
+
+    await waitFor(() => {
+      expect(sdkMock.getFilterSuggestions).toHaveBeenCalledWith(
+        expect.objectContaining({ spaceId: 'space-1', isInAlbum: true }),
+      );
+      expect(sdkMock.getSearchSuggestions).toHaveBeenCalledWith(
+        expect.objectContaining({ country: 'Germany', spaceId: 'space-1', isInAlbum: true }),
+      );
+      expect(sdkMock.getSearchSuggestions).toHaveBeenCalledWith(
+        expect.objectContaining({ make: 'Sony', spaceId: 'space-1', isInAlbum: true }),
       );
     });
   });

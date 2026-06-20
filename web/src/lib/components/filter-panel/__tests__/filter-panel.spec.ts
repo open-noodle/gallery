@@ -182,6 +182,43 @@ describe('FilterPanel', () => {
     expect(screen.getByTestId('collapsed-icon-strip').querySelector('.bg-immich-primary')).toBeTruthy();
   });
 
+  it('should select has-album and clear has-no-album (mutual exclusivity)', async () => {
+    const onFiltersChange = vi.fn();
+    // Start with "Has no album" already active to prove selecting "Has album" clears it.
+    const filters = { ...createFilterState(), isNotInAlbum: true };
+
+    render(FilterPanel, {
+      props: {
+        config: { sections: ['albums' as FilterSection], providers: {} },
+        timeBuckets: [],
+        filters,
+        onFiltersChange,
+      },
+    });
+
+    await fireEvent.click(screen.getByTestId('albums-has'));
+
+    const updated = onFiltersChange.mock.calls.at(-1)![0];
+    expect(updated.isInAlbum).toBe(true);
+    expect(updated.isNotInAlbum).toBeUndefined();
+  });
+
+  it('should show active state for has-album when collapsed', async () => {
+    const filters = { ...createFilterState(), isInAlbum: true };
+
+    render(FilterPanel, {
+      props: {
+        config: { sections: ['albums' as FilterSection], providers: {} },
+        timeBuckets: [],
+        filters,
+      },
+    });
+
+    await fireEvent.click(screen.getByTestId('collapse-panel-btn'));
+
+    expect(screen.getByTestId('collapsed-icon-strip').querySelector('.bg-immich-primary')).toBeTruthy();
+  });
+
   it('should work without onFiltersChange callback', () => {
     const { queryByTestId } = render(FilterPanel, {
       props: {

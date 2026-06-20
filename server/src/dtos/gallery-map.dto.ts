@@ -36,6 +36,7 @@ const FilteredMapMarkerSchema = z
     takenBefore: isoDatetimeToDate.optional().describe('Filter assets taken before this date'),
     isFavorite: stringToBool.optional().describe('Filter by favorite status'),
     isNotInAlbum: stringToBool.optional().describe('Filter assets not in any album'),
+    isInAlbum: stringToBool.optional().describe('Filter assets in at least one album'),
     city: z.string().optional().describe('Filter by city'),
     country: z.string().optional().describe('Filter by country'),
     withSharedSpaces: stringToBool.optional().describe('Include shared space assets'),
