@@ -52,4 +52,36 @@ describe('search DTO albumless filters', () => {
     expect(result.success).toBe(true);
     expect(result.data?.isNotInAlbum).toBeUndefined();
   });
+
+  it('should accept isInAlbum on smart search requests', () => {
+    const result = SmartSearchDto.schema.safeParse({ query: 'beach', isInAlbum: true });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.isInAlbum).toBe(true);
+  });
+
+  it('should accept isInAlbum on smart search facet requests', () => {
+    const result = SmartSearchFacetsDto.schema.safeParse({ query: 'beach', isInAlbum: true });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.isInAlbum).toBe(true);
+  });
+
+  it('should coerce isInAlbum on filter suggestion requests', () => {
+    const result = FilterSuggestionsRequestDto.schema.safeParse({ isInAlbum: 'true' });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.isInAlbum).toBe(true);
+  });
+
+  it('should coerce isInAlbum on dependent search suggestion requests', () => {
+    const result = SearchSuggestionRequestDto.schema.safeParse({
+      type: SearchSuggestionType.CITY,
+      country: 'Germany',
+      isInAlbum: 'true',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.isInAlbum).toBe(true);
+  });
 });
