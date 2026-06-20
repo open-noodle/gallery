@@ -263,6 +263,7 @@
             : AssetTypeEnum.Video,
       isFavorite: nextFilters.isFavorite,
       isNotInAlbum: nextFilters.isNotInAlbum === true ? true : undefined,
+      isInAlbum: nextFilters.isInAlbum === true ? true : undefined,
       takenAfter: context?.takenAfter,
       takenBefore: context?.takenBefore,
       spaceId: space.id,

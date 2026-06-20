@@ -86,6 +86,7 @@ interface LivePhotoSearchOptions {
 interface AssetBuilderOptions {
   isFavorite?: boolean;
   isNotInAlbum?: boolean;
+  isInAlbum?: boolean;
   isTrashed?: boolean;
   isDuplicate?: boolean;
   albumId?: string;
@@ -242,7 +243,7 @@ const addBucketInterval = (bucketStart: string, bucketSize: TimeBucketSize): str
   }
 };
 
-function withTimeBucketAssetFilters<O>(
+export function withTimeBucketAssetFilters<O>(
   qb: SelectQueryBuilder<DB, 'asset', O>,
   options: TimeBucketOptions,
   // Upstream (#30739) widens the owner check for person-scoped timelines so a viewer also sees the
@@ -303,6 +304,11 @@ function withTimeBucketAssetFilters<O>(
     .$if(!!options.isNotInAlbum && !options.albumId, (qb) =>
       qb.where((eb) =>
         eb.not(eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id'))),
+      ),
+    )
+    .$if(!!options.isInAlbum && !options.albumId, (qb) =>
+      qb.where((eb) =>
+        eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id')),
       ),
     )
     .$if(!!options.spaceId, (qb) =>
@@ -1350,6 +1356,11 @@ export class AssetRepository {
           .$if(!!options.isNotInAlbum && !options.albumId, (qb) =>
             qb.where((eb) =>
               eb.not(eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id'))),
+            ),
+          )
+          .$if(!!options.isInAlbum && !options.albumId, (qb) =>
+            qb.where((eb) =>
+              eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id')),
             ),
           )
           .$if(!!options.spaceId, (qb) =>
