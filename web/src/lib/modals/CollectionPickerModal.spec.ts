@@ -47,8 +47,8 @@ const space = (id: string, name: string): SharedSpaceResponseDto =>
     recentAssetIds: [],
   }) as unknown as SharedSpaceResponseDto;
 const withAlbum = () =>
-  sdkMock.getAllAlbums.mockImplementation(({ shared }: { shared?: boolean }) =>
-    Promise.resolve(shared ? [] : [album('a1', 'Trip')]),
+  sdkMock.getAllAlbums.mockImplementation(({ isShared }: { isShared?: boolean }) =>
+    Promise.resolve(isShared ? [] : [album('a1', 'Trip')]),
   );
 
 beforeEach(() => {
