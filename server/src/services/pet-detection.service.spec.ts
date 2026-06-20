@@ -53,6 +53,8 @@ describe(PetDetectionService.name, () => {
       visibility: AssetVisibility.Timeline,
       previewFile: '/uploads/user-id/thumbs/path.jpg',
     });
+    // SharedSpaceRepository is a strict mock, so the reset path's deleteAllPets needs an implementation.
+    mocks.sharedSpace.deleteAllPets.mockResolvedValue(void 0);
   });
 
   it('should work', () => {
@@ -144,6 +146,42 @@ describe(PetDetectionService.name, () => {
       expect(await sut.handleQueuePetDetection({ force: false })).toEqual(JobStatus.Success);
 
       expect(mocks.person.deleteAllPets).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.deleteAllPets).not.toHaveBeenCalled();
+    });
+
+    it('should also clear pet detections from shared spaces on a force reset', async () => {
+      // Pets propagate into shared spaces as shared_space_person rows (#718 follow-up); the
+      // personal purge alone leaves them lingering in a space's People view, so the reset must
+      // clear the space copies too. Like the personal purge, this is not gated on detection
+      // being enabled — here it runs with detection disabled and still clears both.
+      expect(await sut.handleQueuePetDetection({ force: true })).toEqual(JobStatus.Skipped);
+
+      expect(mocks.person.deleteAllPets).toHaveBeenCalledTimes(1);
+      expect(mocks.sharedSpace.deleteAllPets).toHaveBeenCalledTimes(1);
+    });
+
+    it('should clear existing pet detections on a force reset even when pet detection is disabled', async () => {
+      // Regression test for #718: a user turns pet detection off (so pets stop
+      // reappearing), then clicks Reset. The confirmation dialog promises deletion,
+      // so the reset must still purge every detected pet — the deletion cannot be
+      // short-circuited by the "pet detection disabled" early return. With detection
+      // off there is nothing to reprocess, so no jobs are requeued.
+      expect(await sut.handleQueuePetDetection({ force: true })).toEqual(JobStatus.Skipped);
+
+      expect(mocks.person.deleteAllPets).toHaveBeenCalledTimes(1);
+      expect(mocks.assetJob.streamForPetDetectionJob).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+    });
+
+    it('should not clear existing pet detections when force is false and pet detection is disabled', async () => {
+      // A plain "missing"-style run (force: false) while detection is disabled must
+      // remain a no-op: nothing is deleted and nothing is requeued.
+      expect(await sut.handleQueuePetDetection({ force: false })).toEqual(JobStatus.Skipped);
+
+      expect(mocks.person.deleteAllPets).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.deleteAllPets).not.toHaveBeenCalled();
+      expect(mocks.assetJob.streamForPetDetectionJob).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
   });
 
