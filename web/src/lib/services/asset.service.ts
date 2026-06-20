@@ -54,7 +54,7 @@ import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { eventManager } from '$lib/managers/event-manager.svelte';
 import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
-import AssetAddToAlbumModal from '$lib/modals/AssetAddToAlbumModal.svelte';
+import AssetAddToCollectionModal from '$lib/modals/AssetAddToCollectionModal.svelte';
 import AssetTagModal from '$lib/modals/AssetTagModal.svelte';
 import ProfileImageCropperModal from '$lib/modals/ProfileImageCropperModal.svelte';
 import SharedLinkCreateModal from '$lib/modals/SharedLinkCreateModal.svelte';
@@ -76,11 +76,13 @@ export const getAssetBulkActions = ($t: MessageFormatter, album?: AlbumResponseD
   };
 
   const AddToAlbum: ActionItem = {
-    title: $t('add_to_album'),
+    title: $t('add_to_album_or_space'),
     icon: mdiPlus,
     shortcuts: [{ key: 'l' }],
     onAction: () =>
-      modalManager.show(AssetAddToAlbumModal, { assetIds: assetMultiSelectManager.assets.map((asset) => asset.id) }),
+      modalManager.show(AssetAddToCollectionModal, {
+        assetIds: assetMultiSelectManager.assets.map((asset) => asset.id),
+      }),
   };
 
   const RemoveFromAlbum: ActionItem = {
@@ -209,11 +211,11 @@ export const getAssetActions = (
   };
 
   const AddToAlbum: ActionItem = {
-    title: $t('add_to_album'),
+    title: $t('add_to_album_or_space'),
     icon: mdiPlus,
     shortcuts: [{ key: 'l' }],
     $if: () => asset.visibility !== AssetVisibility.Locked && !asset.isTrashed,
-    onAction: () => modalManager.show(AssetAddToAlbumModal, { assetIds: [asset.id] }),
+    onAction: () => modalManager.show(AssetAddToCollectionModal, { assetIds: [asset.id] }),
   };
 
   const RemoveFromAlbum: ActionItem = {
