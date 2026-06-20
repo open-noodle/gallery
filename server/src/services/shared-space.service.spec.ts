@@ -9461,6 +9461,19 @@ describe(SharedSpaceService.name, () => {
       );
     });
 
+    it('should pass has-album to repository', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
+
+      await sut.getFilteredMapMarkers(auth, { isInAlbum: true });
+
+      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isInAlbum: true,
+        }),
+      );
+    });
+
     it('should map undefined city/state/country to null', async () => {
       const auth = factory.auth();
 
