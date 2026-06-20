@@ -166,6 +166,11 @@
         }
         break;
       }
+      case CollectionModalRowType.SECTION:
+      case CollectionModalRowType.MESSAGE: {
+        // Section headers and informational rows are never selectable, so Enter is a no-op.
+        break;
+      }
     }
     selectedRowIndex = -1;
   };
