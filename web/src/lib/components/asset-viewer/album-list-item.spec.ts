@@ -2,7 +2,7 @@
 import { mdiImageMultipleOutline } from '@mdi/js';
 import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
-import AlbumListItem from './album-list-item.svelte';
+import AlbumListItem from './AlbumListItem.svelte';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const album = { id: 'a1', albumName: 'Trip', assetCount: 3, albumThumbnailAssetId: null, shared: false } as any;
