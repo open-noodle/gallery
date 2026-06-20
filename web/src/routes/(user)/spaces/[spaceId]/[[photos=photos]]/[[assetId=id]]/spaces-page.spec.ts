@@ -873,13 +873,24 @@ describe('Spaces page search URL state', () => {
     expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
   });
 
-  it('keeps active filters visually separated from grouped space timeline cards', async () => {
+  it('shows grouping and the filters bar in one merged toolbar (no separate spacing wrapper)', async () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?country=Germany');
 
     renderPage();
 
-    const activeFiltersArea = await screen.findByTestId('space-active-filters-bar-spacing');
-    expect(activeFiltersArea).toHaveClass('mb-4', 'shrink-0');
+    expect(await screen.findByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
+    expect(screen.getByTestId('active-filters-bar-stub')).toBeInTheDocument();
+    expect(screen.queryByTestId('space-active-filters-bar-spacing')).toBeNull();
+  });
+
+  it('keeps active filters visually separated from grouped space timeline cards', async () => {
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
+
+    renderPage();
+
+    const groupingControl = await screen.findByTestId('timeline-desktop-grouping-control');
+    const toolbarRoot = groupingControl.parentElement!;
+    expect(toolbarRoot).toHaveClass('mb-2');
   });
 
   it('does not show the desktop grouping control during space search results', () => {
