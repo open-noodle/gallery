@@ -3,40 +3,56 @@ import { describe, expect, it, vi } from 'vitest';
 import AlbumsFilter from '$lib/components/filter-panel/albums-filter.svelte';
 
 describe('AlbumsFilter', () => {
-  it('should render All and Has no album buttons', () => {
-    render(AlbumsFilter, { props: { selected: undefined, onToggle: vi.fn() } });
+  it('should render All, Has album, and Has no album buttons', () => {
+    render(AlbumsFilter, { props: { selected: 'all', onChange: vi.fn() } });
 
     expect(screen.getByTestId('albums-all')).toBeInTheDocument();
+    expect(screen.getByTestId('albums-has')).toBeInTheDocument();
     expect(screen.getByTestId('albums-none')).toBeInTheDocument();
   });
 
-  it('should highlight All when selected is undefined', () => {
-    render(AlbumsFilter, { props: { selected: undefined, onToggle: vi.fn() } });
+  it('should highlight All when selected is all', () => {
+    render(AlbumsFilter, { props: { selected: 'all', onChange: vi.fn() } });
 
     expect(screen.getByTestId('albums-all').className).toContain('border-immich-primary');
   });
 
-  it('should highlight Has no album when selected is true', () => {
-    render(AlbumsFilter, { props: { selected: true, onToggle: vi.fn() } });
+  it('should highlight Has album when selected is has', () => {
+    render(AlbumsFilter, { props: { selected: 'has', onChange: vi.fn() } });
+
+    expect(screen.getByTestId('albums-has').className).toContain('border-immich-primary');
+  });
+
+  it('should highlight Has no album when selected is none', () => {
+    render(AlbumsFilter, { props: { selected: 'none', onChange: vi.fn() } });
 
     expect(screen.getByTestId('albums-none').className).toContain('border-immich-primary');
   });
 
-  it('should call onToggle with true when Has no album is clicked', () => {
-    const onToggle = vi.fn();
-    render(AlbumsFilter, { props: { selected: undefined, onToggle } });
+  it('should call onChange with has when Has album is clicked', () => {
+    const onChange = vi.fn();
+    render(AlbumsFilter, { props: { selected: 'all', onChange } });
+
+    screen.getByTestId('albums-has').click();
+
+    expect(onChange).toHaveBeenCalledWith('has');
+  });
+
+  it('should call onChange with none when Has no album is clicked', () => {
+    const onChange = vi.fn();
+    render(AlbumsFilter, { props: { selected: 'all', onChange } });
 
     screen.getByTestId('albums-none').click();
 
-    expect(onToggle).toHaveBeenCalledWith(true);
+    expect(onChange).toHaveBeenCalledWith('none');
   });
 
-  it('should call onToggle with undefined when All is clicked', () => {
-    const onToggle = vi.fn();
-    render(AlbumsFilter, { props: { selected: true, onToggle } });
+  it('should call onChange with all when All is clicked', () => {
+    const onChange = vi.fn();
+    render(AlbumsFilter, { props: { selected: 'has', onChange } });
 
     screen.getByTestId('albums-all').click();
 
-    expect(onToggle).toHaveBeenCalledWith(undefined);
+    expect(onChange).toHaveBeenCalledWith('all');
   });
 });
