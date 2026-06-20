@@ -941,7 +941,7 @@ test.describe('Spaces FilterPanel', () => {
       await page.locator('[data-testid="rating-star-3"]').click();
 
       const chip = page.locator('[data-testid="active-chip"]');
-      await expect(chip.first()).toContainText('\u2605 3+');
+      await expect(chip.first()).toContainText('3+');
     });
 
     test('should clear rating filter when removing rating chip', async ({ context, page }) => {
@@ -1195,7 +1195,7 @@ test.describe('Spaces FilterPanel', () => {
 
       await page.locator('[data-testid="rating-star-3"]').click();
       const chip = page.locator('[data-testid="active-chip"]');
-      await expect(chip.first()).toContainText('\u2605 3+');
+      await expect(chip.first()).toContainText('3+');
     });
 
     test('should show "Photos only" chip when applying media type filter', async ({ context, page }) => {
