@@ -101,6 +101,20 @@ describe('buildMapFilterConfig', () => {
       );
     });
 
+    it('should pass has-album to filter suggestions', async () => {
+      const config = buildMapFilterConfig();
+      await config.suggestionsProvider!({ ...emptyFilters, isInAlbum: true });
+
+      expect(getFilterSuggestions).toHaveBeenCalledWith(expect.objectContaining({ isInAlbum: true }));
+    });
+
+    it('should omit has-album from filter suggestions when false', async () => {
+      const config = buildMapFilterConfig();
+      await config.suggestionsProvider!({ ...emptyFilters, isInAlbum: false });
+
+      expect(getFilterSuggestions).toHaveBeenCalledWith(expect.not.objectContaining({ isInAlbum: expect.anything() }));
+    });
+
     it('should map people with thumbnail URLs', async () => {
       vi.mocked(getFilterSuggestions).mockResolvedValueOnce({
         countries: [],
