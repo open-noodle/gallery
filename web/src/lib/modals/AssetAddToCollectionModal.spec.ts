@@ -1,10 +1,12 @@
 // AssetAddToCollectionModal.spec.ts
+import type { AlbumResponseDto } from '@immich/sdk';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
 import '$lib/__mocks__/sdk.mock';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { getVisualViewportMock } from '$lib/__mocks__/visual-viewport.mock';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import AssetAddToCollectionModal from './AssetAddToCollectionModal.svelte';
 
 const { mockUser, mockAdd } = vi.hoisted(() => ({
   mockUser: { current: { id: 'me', isAdmin: false } },
@@ -21,9 +23,6 @@ vi.mock('$lib/managers/auth-manager.svelte', () => ({
     },
   },
 }));
-
-import type { AlbumResponseDto } from '@immich/sdk';
-import AssetAddToCollectionModal from './AssetAddToCollectionModal.svelte';
 
 const album = (id: string, name: string): AlbumResponseDto =>
   ({
