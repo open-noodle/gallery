@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/domain/models/config/app_config.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
@@ -21,6 +22,7 @@ import 'package:immich_mobile/infrastructure/repositories/store.repository.dart'
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_empty_state.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
+import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart' as infra;
 import 'package:immich_mobile/providers/photos_filter/timeline_query.provider.dart';
@@ -99,6 +101,7 @@ Future<TimelineService> _pumpTimeline(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        appConfigProvider.overrideWithValue(const AppConfig(timeline: TimelineConfig(tilesPerRow: 3))),
         timelineFactoryProvider.overrideWithValue(factory),
         infra.userServiceProvider.overrideWithValue(userService),
         currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(userService, user)),
@@ -145,7 +148,6 @@ void main() {
   setUp(() async {
     await Store.clear();
     await Store.put(StoreKey.serverEndpoint, 'http://test-server');
-    await Store.put(StoreKey.tilesPerRow, 3);
   });
 
   tearDownAll(() async {
