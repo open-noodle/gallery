@@ -9,6 +9,7 @@
     mdiHeart,
     mdiImage,
     mdiImageAlbum,
+    mdiImageMultipleOutline,
     mdiMagnify,
     mdiMapMarker,
     mdiStar,
@@ -129,6 +130,9 @@
     // Albums chip
     if (filters.isNotInAlbum === true) {
       result.push({ type: 'albums', icon: mdiImageAlbum, labelKey: 'filter_has_no_album' });
+    }
+    if (filters.isInAlbum === true) {
+      result.push({ type: 'albums', icon: mdiImageMultipleOutline, labelKey: 'filter_has_album' });
     }
 
     // Timeline chip

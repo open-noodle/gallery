@@ -44,6 +44,12 @@
     }
   }
 
+  function selectHasAlbum() {
+    if (filters) {
+      updateFilters({ ...filters, isInAlbum: true });
+    }
+  }
+
   function loadCitySuggestions() {
     if (filters) {
       void config?.providers?.cities?.('Germany', buildFilterContext(filters, ['country', 'city']));
@@ -86,6 +92,7 @@
   data-country={filters?.country ?? ''}
   data-is-favorite={String(filters?.isFavorite)}
   data-is-not-in-album={String(filters?.isNotInAlbum)}
+  data-is-in-album={String(filters?.isInAlbum)}
   data-selected-year={filters?.selectedYear ?? ''}
   data-selected-month={filters?.selectedMonth ?? ''}
   data-date-after={filters?.dateAfter ?? ''}
@@ -97,6 +104,7 @@
 >
   <button type="button" data-testid="select-favorites-filter" onclick={selectFavorites}>Favorites</button>
   <button type="button" data-testid="select-has-no-album-filter" onclick={selectHasNoAlbum}>Has no album</button>
+  <button type="button" data-testid="select-has-album-filter" onclick={selectHasAlbum}>Has album</button>
   <button type="button" data-testid="load-city-suggestions" onclick={loadCitySuggestions}>Load cities</button>
   <button type="button" data-testid="load-camera-model-suggestions" onclick={loadCameraModelSuggestions}>
     Load camera models

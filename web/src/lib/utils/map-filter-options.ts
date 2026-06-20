@@ -28,6 +28,9 @@ function applyCommonMapFilters(base: Record<string, unknown>, filters: FilterSta
   if (filters.isNotInAlbum === true) {
     base.isNotInAlbum = true;
   }
+  if (filters.isInAlbum === true) {
+    base.isInAlbum = true;
+  }
   if (filters.city) {
     base.city = filters.city;
   }

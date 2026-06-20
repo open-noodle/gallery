@@ -156,6 +156,24 @@ describe('buildSmartSearchParams', () => {
       expect(result.isNotInAlbum).toBeUndefined();
     });
 
+    it('sets isInAlbum when has-album is selected', () => {
+      const result = buildSmartSearchParams({
+        query: 'beach',
+        filters: { ...baseFilters, isInAlbum: true },
+      });
+
+      expect(result.isInAlbum).toBe(true);
+    });
+
+    it('omits isInAlbum when has-album is false', () => {
+      const result = buildSmartSearchParams({
+        query: 'beach',
+        filters: { ...baseFilters, isInAlbum: false },
+      });
+
+      expect(result.isInAlbum).toBeUndefined();
+    });
+
     it('builds takenAfter/takenBefore for selectedYear + selectedMonth (January)', () => {
       const result = buildSmartSearchParams({
         query: 'beach',
