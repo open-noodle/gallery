@@ -1290,6 +1290,11 @@ delete from "shared_space_person_face"
 -- SharedSpaceRepository.deleteAllPersons
 delete from "shared_space_person"
 
+-- SharedSpaceRepository.deleteAllPets
+delete from "shared_space_person"
+where
+  "type" = $1
+
 -- SharedSpaceRepository.recountPersons
 update "shared_space_person"
 set
