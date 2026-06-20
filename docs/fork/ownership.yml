@@ -9,6 +9,7 @@ metadata:
 
 coverage_ignore:
   - docs/superpowers/**
+  - design-exploration/**
 
 fork_surface:
   preferred_namespaces:
