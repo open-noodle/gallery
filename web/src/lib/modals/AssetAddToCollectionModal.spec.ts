@@ -42,8 +42,8 @@ beforeEach(() => {
   vi.resetAllMocks();
   mockUser.current = { id: 'me', isAdmin: false };
   mockAdd.mockResolvedValue(true);
-  sdkMock.getAllAlbums.mockImplementation(({ shared }: { shared?: boolean }) =>
-    Promise.resolve(shared ? [] : [album('a1', 'Trip')]),
+  sdkMock.getAllAlbums.mockImplementation(({ isShared }: { isShared?: boolean }) =>
+    Promise.resolve(isShared ? [] : [album('a1', 'Trip')]),
   );
   sdkMock.getAllSpaces.mockResolvedValue([]);
 });
