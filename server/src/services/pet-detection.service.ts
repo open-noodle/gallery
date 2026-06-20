@@ -11,14 +11,23 @@ export class PetDetectionService extends BaseService {
   @OnJob({ name: JobName.PetDetectionQueueAll, queue: QueueName.PetDetection })
   async handleQueuePetDetection({ force }: JobOf<JobName.PetDetectionQueueAll>): Promise<JobStatus> {
     const { machineLearning } = await this.getConfig({ withCache: false });
-    if (!isPetDetectionEnabled(machineLearning)) {
-      return JobStatus.Skipped;
-    }
 
     if (force) {
       // A reset must clear existing pet people/faces so stale labels disappear immediately,
       // rather than lingering throughout the reprocessing window (and duplicating on re-detect).
+      //
+      // This runs *before* the enabled check on purpose (#718): users turn pet detection off
+      // precisely so detected pets stop coming back, then hit Reset to wipe the ones already
+      // there. The confirmation dialog promises that deletion, so the purge must happen even
+      // when detection is disabled — only the reprocessing requeue below is gated on it.
       await this.personRepository.deleteAllPets();
+      // Pets also propagate into shared spaces as their own person rows, so clear those copies
+      // too — otherwise the pets linger in every space's People view after a reset.
+      await this.sharedSpaceRepository.deleteAllPets();
+    }
+
+    if (!isPetDetectionEnabled(machineLearning)) {
+      return JobStatus.Skipped;
     }
 
     let jobs: JobItem[] = [];

@@ -3290,4 +3290,52 @@ describe(SharedSpaceRepository.name, () => {
       expect(results.find((r) => r.id === asset.id)).toBeDefined();
     });
   });
+
+  describe('deleteAllPets', () => {
+    it('deletes pet space people and their faces while preserving human space people and faces', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+
+      // A pet space person (propagated from pet detection) with a detected face.
+      const { assetFace: petFace } = await ctx.newAssetFace({ assetId: asset.id });
+      const petPerson = await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: space.id, name: 'dog', type: 'pet' })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      await sut.addPersonFaces([{ personId: petPerson.id, assetFaceId: petFace.id }], { skipRecount: true });
+
+      // A human space person with a face — a pet reset must leave it untouched.
+      const { assetFace: humanFace } = await ctx.newAssetFace({ assetId: asset.id });
+      const humanPerson = await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: space.id, name: 'Alice', type: 'person' })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      await sut.addPersonFaces([{ personId: humanPerson.id, assetFaceId: humanFace.id }], { skipRecount: true });
+
+      await sut.deleteAllPets();
+
+      const people = await ctx.database
+        .selectFrom('shared_space_person')
+        .select(['id', 'type'])
+        .where('spaceId', '=', space.id)
+        .execute();
+      // shared_space_person_face cascades on the pet person delete, so only the human link remains.
+      // Scope to this space's persons — the medium DB is shared across tests, so an unfiltered
+      // query would pick up face links created by other specs.
+      const faces = await ctx.database
+        .selectFrom('shared_space_person_face')
+        .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_face.personId')
+        .select(['shared_space_person_face.personId', 'shared_space_person_face.assetFaceId'])
+        .where('shared_space_person.spaceId', '=', space.id)
+        .execute();
+
+      expect(people).toEqual([expect.objectContaining({ id: humanPerson.id, type: 'person' })]);
+      expect(faces).toEqual([expect.objectContaining({ personId: humanPerson.id, assetFaceId: humanFace.id })]);
+    });
+  });
 });
