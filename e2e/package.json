@@ -26,6 +26,7 @@
   "author": "",
   "license": "GNU Affero General Public License version 3",
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
     "@eslint/js": "^10.0.0",
     "@faker-js/faker": "^10.3.0",
     "@immich/cli": "workspace:*",
