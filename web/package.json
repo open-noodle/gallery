@@ -24,6 +24,8 @@
     "prepare": "svelte-kit sync"
   },
   "dependencies": {
+    "@fontsource-variable/bricolage-grotesque": "^5.2.10",
+    "@fontsource-variable/dm-sans": "^5.2.8",
     "@formatjs/icu-messageformat-parser": "^3.0.0",
     "@immich/justified-layout-wasm": "^0.4.3",
     "@immich/sdk": "workspace:*",
