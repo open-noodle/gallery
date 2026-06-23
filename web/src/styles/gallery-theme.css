@@ -1,0 +1,250 @@
+/* web/src/styles/gallery-theme.css
+ * Gallery fork-owned theme layer. Imported by web/src/app.css AFTER the
+ * @immich/ui theme so these overrides win the cascade. See
+ * docs/superpowers/specs/2026-06-22-web-tonal-reskin-design.md.
+ * Token VALUE overrides are unlayered (beat @immich/ui's @layer base);
+ * Tailwind palette/radius/font/shadow live in @theme.
+ * Legacy --immich-* AND --immich-dark-* are mode-agnostic → defined here in
+ * the :root,.light block (matching upstream app.css), NOT in .dark.
+ */
+
+@import '@fontsource-variable/dm-sans';
+@import '@fontsource-variable/bricolage-grotesque';
+
+:root,
+.light {
+  --gallery-theme: light;
+  --immich-ui-primary-50: #eaf1fc;
+  --immich-ui-primary-100: #d3e3fd; /* primary container */
+  --immich-ui-primary-200: #abc8fb;
+  --immich-ui-primary-300: #7eabf7;
+  --immich-ui-primary-400: #4285f4;
+  --immich-ui-primary-500: #0b57d0; /* primary accent — button fill */
+  --immich-ui-primary-600: #0a4dba; /* solid accent: focus, links */
+  --immich-ui-primary-700: #0842a0;
+  --immich-ui-primary-800: #073688;
+  --immich-ui-primary-900: #052a6b;
+  --immich-ui-primary-950: #001d35; /* on-primary-container */
+  --immich-primary: 11 87 208; /* #0b57d0 — blue accent (legacy rgb) */
+  --immich-dark-primary: 168 199 250; /* #a8c7fa — blue accent (dark), mode-agnostic */
+  --immich-ui-light: #ffffff; /* surface/panel — white content area */
+  --immich-ui-dark: #1f1f1f; /* fg text — near-black */
+  --immich-ui-muted: #5f6368; /* secondary text */
+  --immich-ui-gray: #dde3ea; /* subtle surface — distinct from chrome so hovers show */
+  --immich-ui-default-border: #dde3ea;
+  --immich-bg: 240 244 249; /* #f0f4f9 — cool off-white page */
+  --immich-fg: 31 31 31; /* #1f1f1f */
+  --immich-dark-bg: 19 19 20; /* #131314 — content/page (darker than chrome) */
+  --immich-dark-fg: 227 227 227; /* #e3e3e3 */
+  --immich-dark-gray: 40 41 42; /* #28292a */
+}
+
+.dark {
+  /* only --immich-ui-* ramps differ per mode */
+  --gallery-theme: dark;
+  --immich-ui-primary-950: #eef4fe;
+  --immich-ui-primary-900: #dce8fd;
+  --immich-ui-primary-800: #c9dcfc;
+  --immich-ui-primary-700: #bcd3fb;
+  --immich-ui-primary-600: #b0ccfb;
+  --immich-ui-primary-500: #a8c7fa; /* blue accent on dark */
+  --immich-ui-primary-400: #5b9af6;
+  --immich-ui-primary-300: #2e7df0;
+  --immich-ui-primary-200: #0b57d0;
+  --immich-ui-primary-100: #08409a;
+  --immich-ui-primary-50: #001d35;
+  --immich-ui-light: #131314; /* surface/content (dark) — darker than the chrome */
+  --immich-ui-dark: #e3e3e3; /* fg text (dark) */
+  --immich-ui-muted: #9aa0a6; /* secondary text (dark) */
+  --immich-ui-gray: #2a2b2e; /* subtle surface (dark) — lighter than chrome so hovers show */
+  --immich-ui-default-border: #3c3f43; /* dark divider */
+}
+
+@theme {
+  /* neutral surface gray ramp (cool off-white in light, neutral dark) */
+  --color-gray-50: #f8fafd;
+  --color-gray-100: #f0f4f9;
+  --color-gray-200: #e9eef6;
+  --color-gray-300: #dde3ea;
+  --color-gray-400: #bdc1c6;
+  --color-gray-500: #9aa0a6;
+  --color-gray-600: #5f6368;
+  --color-gray-700: #3c3f43;
+  --color-gray-800: #2d2e31;
+  --color-gray-900: #1e1f20;
+  --color-gray-950: #131314;
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.375rem;
+  --radius-2xl: 1.75rem;
+  --radius-3xl: 2.25rem;
+
+  --shadow-sm: 0 1px 2px rgb(26 31 41 / 0.07);
+  --shadow-md: 0 10px 30px rgb(40 55 95 / 0.1);
+  --shadow-lg: 0 18px 44px rgb(40 55 95 / 0.14);
+
+  --font-sans: 'DM Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'GoogleSansCode', ui-monospace, monospace;
+}
+
+/* Light-mode readability: the neutral ramp made the mid grays too faint on white
+ * for secondary text (filter labels use text-gray-500; counts / placeholders use
+ * text-gray-400). Darken them in LIGHT mode only — dark mode pairs those utilities
+ * with dark:text-gray-300/500 and needs the lighter values for text on dark
+ * surfaces, so it's left untouched. */
+:root:not(.dark) {
+  --color-gray-400: #6e7378;
+  --color-gray-500: #5f6368;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+}
+
+/* Two-tone chrome + rounded content panel:
+ * - the page (body) takes the chrome tint; the navbar + sidebar match it
+ * - the timeline (<main>) is the distinct surface, a rounded floating panel
+ *   with an 8px chrome gutter. Light = white content on gray chrome;
+ *   dark = darker content on lighter chrome (elevation flips per mode).
+ * Couples to upstream ids #dashboard-navbar / #sidebar and the <main> content
+ * column — if upstream restructures these, the styling degrades, not breaks.
+ * Unlayered so it beats the sidebar's `bg-light` utility. */
+:root,
+.light {
+  --gallery-chrome: #e9edf3;
+}
+.dark {
+  --gallery-chrome: #1e1f20;
+}
+body {
+  background-color: var(--gallery-chrome);
+}
+#dashboard-navbar,
+#sidebar {
+  background-color: var(--gallery-chrome);
+}
+/* Drop the navbar's bottom divider — the chrome/content two-tone already
+ * separates it (targets the navbar's inner grid row that carries `border-b`). */
+#dashboard-navbar > div {
+  border-bottom-width: 0;
+}
+
+/* The rounded content panel. Scoped to the user-page-layout <main> via its
+ * direct-child scroll container (absolute + overflow-y-auto) so it does NOT hit
+ * the app's other <main> elements (asset viewer, shared-link pages, workflow
+ * editor), which are full-bleed and must not be clipped/rounded/gutter'd. */
+main:has(> div.absolute.overflow-y-auto) {
+  background-color: var(--immich-ui-light);
+  border-radius: 16px;
+  overflow: clip;
+  margin: 8px; /* chrome gutter so all four rounded corners read as a floating panel */
+}
+/* Inset ONLY the page header row (title + actions: Albums, Settings, …) so it
+ * clears the panel's rounded corners. Keyed on the stable page-header-title-row
+ * testid; the timeline/content keeps its tighter gutter untouched. */
+main > div:has([data-testid='page-header-title-row']) {
+  padding-inline: 1.25rem;
+}
+
+/* Search bar (navbar global-search trigger): a touch taller, a larger magnifier
+ * with no icon-button background. Keyed on the stable cmdk-input-trigger testid;
+ * the magnifier is the trigger's leading <span>. */
+[data-testid='cmdk-input-trigger'] {
+  height: 3rem;
+}
+[data-testid='cmdk-input-trigger'] > span {
+  background: transparent;
+  box-shadow: none;
+}
+[data-testid='cmdk-input-trigger'] > span svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+/* Darken the search placeholder in light mode (it was gray-500 ≈ too faint);
+ * dark mode keeps its lighter placeholder. */
+:root:not(.dark) [data-testid='cmdk-input-trigger'] input::placeholder {
+  color: #5f6368;
+}
+
+/* Temporal filter (From/To inputs + year/month chips): the generous global
+ * radius scale over-rounds these small controls into near-pills. Radius should
+ * scale down with element size — tidy input + chip radii, scoped to the picker
+ * so larger buttons/cards elsewhere keep their roundness. */
+[data-testid='temporal-picker'] input {
+  border-radius: 8px;
+}
+[data-testid='temporal-picker'] [data-testid='year-grid'] > button,
+[data-testid='temporal-picker'] [data-testid='month-grid'] > button {
+  border-radius: 10px;
+}
+
+/* Filter panel scrollbar — keep it subtle: thin, transparent track, a faint
+ * thumb that firms up only on hover. Adapts to light/dark via --immich-ui-muted. */
+[data-testid='discovery-panel'] {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--immich-ui-muted) 25%, transparent) transparent;
+}
+[data-testid='discovery-panel']::-webkit-scrollbar {
+  width: 8px;
+}
+[data-testid='discovery-panel']::-webkit-scrollbar-track {
+  background: transparent;
+}
+[data-testid='discovery-panel']::-webkit-scrollbar-thumb {
+  background-color: color-mix(in oklab, var(--immich-ui-muted) 25%, transparent);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 9999px;
+}
+[data-testid='discovery-panel']:hover::-webkit-scrollbar-thumb {
+  background-color: color-mix(in oklab, var(--immich-ui-muted) 45%, transparent);
+}
+[data-testid='discovery-panel']::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in oklab, var(--immich-ui-muted) 65%, transparent);
+}
+
+/* Collapsed filter panel: the w-14 strip leaves a lot of empty space around the
+ * 24px icons. Tighten it so the icons read as centered, and drop the now-
+ * redundant right divider. Scoped to the collapsed state via :has. */
+[data-testid='filter-panel-shell']:has(> [data-testid='collapsed-icon-strip']) {
+  width: 3rem;
+  border-inline-end-width: 0;
+}
+
+/* Admin pages use @immich/ui's AppShell (not the <main> layout above), so they
+ * miss the treatments. Bring them in line:
+ *  1. drop the AppShellHeader's own bottom border (navbar already has none),
+ *  2/3. make the admin content a rounded floating panel with a chrome gutter —
+ *       which also spaces the title off the sidebar. Keyed on the admin-page-header
+ *       testid (its parent div is the content panel). */
+header:has(#dashboard-navbar) {
+  border-bottom-width: 0;
+}
+div:has(> [data-testid='admin-page-header']) {
+  background-color: var(--immich-ui-light);
+  border-radius: 16px;
+  overflow: clip;
+  margin: 8px;
+  height: calc(100% - 16px); /* offset the vertical margin so it doesn't overflow the scroller */
+}
+/* The admin sidebar (@immich/ui AppShellSidebar) hardcodes bg-light (surface);
+ * recolor it to the chrome tint so it matches the navbar + timeline sidebar.
+ * Class signature is unique to AppShellSidebar (the timeline #sidebar is
+ * `relative`, not `absolute`); degrades to bg-light if upstream changes it. */
+.bg-light.shrink-0.absolute {
+  background-color: var(--gallery-chrome);
+}
+/* Inset the admin page title (Job Queues, Users, …) off the panel edge — same
+ * treatment as the timeline header. */
+[data-testid='admin-page-header'] {
+  padding-inline: 1.25rem;
+}
