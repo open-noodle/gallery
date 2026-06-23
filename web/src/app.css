@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 @import '@immich/ui/theme/default.css';
-
+@import './styles/gallery-theme.css';
 @source "../node_modules/@immich/ui";
 /* @import '../../../ui/packages/ui/dist/theme/default.css'; */
 
