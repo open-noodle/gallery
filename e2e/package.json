@@ -24,6 +24,7 @@
   "author": "",
   "license": "GNU Affero General Public License version 3",
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
     "@eslint/js": "^10.0.0",
     "@futo-org/backups-orchestrator-ui": "1.12.1",
     "@immich/cli": "workspace:*",
