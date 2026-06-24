@@ -1282,7 +1282,7 @@ from
 where
   "shared_space_member"."updateId" < $1
   and "shared_space_member"."updateId" <= $2
-  and "shared_space_member"."updateId" >= $3
+  and "shared_space_member"."updateId" > $3
   and "shared_space_member"."spaceId" = $4
 order by
   "shared_space_member"."updateId" asc
@@ -1375,7 +1375,7 @@ from
 where
   "shared_space_asset"."updateId" < $1
   and "shared_space_asset"."updateId" <= $2
-  and "shared_space_asset"."updateId" >= $3
+  and "shared_space_asset"."updateId" > $3
   and "shared_space_asset"."spaceId" = $4
 order by
   "shared_space_asset"."updateId" asc
@@ -1509,7 +1509,7 @@ from
 where
   "shared_space_asset"."updateId" < $1
   and "shared_space_asset"."updateId" <= $2
-  and "shared_space_asset"."updateId" >= $3
+  and "shared_space_asset"."updateId" > $3
   and "shared_space_asset"."spaceId" = $4
 order by
   "shared_space_asset"."updateId" asc
@@ -1629,7 +1629,7 @@ from
 where
   "shared_space_asset"."updateId" < $1
   and "shared_space_asset"."updateId" <= $2
-  and "shared_space_asset"."updateId" >= $3
+  and "shared_space_asset"."updateId" > $3
   and "shared_space_asset"."spaceId" = $4
 order by
   "shared_space_asset"."updateId" asc
@@ -1820,7 +1820,7 @@ from
 where
   "asset"."updateId" < $1
   and "asset"."updateId" <= $2
-  and "asset"."updateId" >= $3
+  and "asset"."updateId" > $3
   and "asset"."libraryId" = $4
 order by
   "asset"."updateId" asc
@@ -1963,7 +1963,7 @@ from
 where
   "asset"."updateId" < $1
   and "asset"."updateId" <= $2
-  and "asset"."updateId" >= $3
+  and "asset"."updateId" > $3
   and "asset"."libraryId" = $4
 order by
   "asset"."updateId" asc
@@ -2055,7 +2055,7 @@ from
 where
   "shared_space_library"."updateId" < $1
   and "shared_space_library"."updateId" <= $2
-  and "shared_space_library"."updateId" >= $3
+  and "shared_space_library"."updateId" > $3
   and "shared_space_library"."spaceId" = $4
 order by
   "shared_space_library"."updateId" asc
