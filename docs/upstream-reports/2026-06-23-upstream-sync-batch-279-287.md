@@ -120,5 +120,20 @@ All 9 batches passed the 7-check per-batch audit gate (`postrebase-audit`, `mobi
 ## Remote CI Verification
 
 - **Branch**: `rebase/upstream-rolling-20260509-active` (force-pushed after the rebase).
-- Workflows dispatched: `test.yml`, `docker.yml`, `static_analysis.yml`, `gallery-build-mobile.yml`, `gallery-rebase-smoke.yml`, `storage-migration-tests.yml`, `storage-migration-e2e.yml`, `gallery-revert-to-immich-validation.yml`.
-- _(filled in during babysitting)_
+- All 8 workflows dispatched. **First pass: 7/8 GREEN** (Docker, Static Code Analysis, Gallery Build Mobile, Gallery Rebase Smoke, Storage-Migration Tests + E2E, Revert-to-Immich Validation). **Test RED** — 3 jobs:
+
+| Failed job              | Cause                                                                                                                                                                                             | Fix (commit `934f2e7166`)                                                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SQL Schema Checks       | `sync.repository.sql` not regenerated — upstream #29267 flipped the backfill `afterUpdateId` from `>=` to `>` in the shared helper; the fork's 7 shared-space/library backfill queries inherit it | Applied the 7 `>=`→`>` changes (matches CI's authoritative regen exactly)                                                                             |
+| Test Web (`web:format`) | #724's `web/src/lib/styles/gallery-theme.spec.ts` not prettier-clean under v3's prettier (passed on main/v2.7.5)                                                                                  | `prettier --write`                                                                                                                                    |
+| Unit Test Mobile        | location-disclosure policy test — Basque `eu.json` (added by upstream #29284) had an unbranded `background_location_permission_content` ("Immichek")                                              | Dropped the key from `eu.json` → falls back to en.json's branded text; regenerated mobile translations (codegen_loader is gitignored; CI regenerates) |
+
+- **Second pass** (`test.yml` re-run after `934f2e7166`): the 3 fixed jobs (SQL Schema Checks, Test Web, Unit Test Mobile) went **GREEN**. Two _different_ jobs that passed first-pass now failed on **infra flakes** — Medium Tests (`404 No such image: ghcr.io/immich-app/postgres` testcontainers pull) and E2E Server/CLI (`toomanyrequests` registry rate-limit during `docker compose` pull; the other matrix leg fail-fast-cancelled). Confirmed flakes (passed first pass, infra-only signatures) → re-ran failed jobs → **GREEN**.
+
+- **Final verdict: ALL 8 workflows GREEN.** `test.yml` green on `934f2e7166` (the CI-fix commit); the other 7 green on `25fa5766e7` — each unaffected by the three fixes (a generated `.sql` doc-file regen, a web `.spec` prettier reformat, and an i18n string-value deletion change neither the Docker/mobile builds nor the dart static analysis). Rolling branch updated; held off `main`.
+
+### Notes for the skill / next rebase
+
+- **`mise //:sql` is NOT safely skippable** when an upstream batch changes a `@GenerateSql` repository the fork extends. The fork's shared-space/library sync queries reuse upstream's `backfill` helper, so a helper change (`>=`→`>`) silently drifts the fork's generated `.sql`. The local dev DB being v2.7.5 means it can't regenerate v3 `.sql` — either spin up a v3 DB or extract the exact change from the `SQL Schema Checks` CI diff (as done here).
+- **Upstream's "remove unused i18n strings" PRs delete keys the fork still uses.** This rebase lost `photos_only`/`videos_only`/`sharing_page_description`. A `$t`/`labelKey`-reference-vs-`en.json` completeness scan catches them.
+- **Newly-added upstream locales re-introduce the location-disclosure policy break.** #29284 added Basque with the unbranded upstream disclosure text; the `location_disclosure_copy_test` requires every locale's disclosure to be branded. Fix = drop the key from the new locale (fallback to en).
