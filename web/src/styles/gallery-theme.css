@@ -125,6 +125,19 @@
 .dark {
   --gallery-chrome: #1e1f20;
 }
+/* The pre-hydration boot screen (app.html's #stencil loader) hard-codes the
+ * html background to black/white for FOUC prevention. Once this theme loads,
+ * the chrome-tinted <body> paints only a band around the centered loader — the
+ * stencil's tall top/bottom margins collapse the body box down to a strip — so
+ * the loader ends up sitting on a chrome strip floating over the black html.
+ * Paint the html root with the same chrome so the boot backdrop is seamless and
+ * matches the running app's page tint (html shows otherwise only on overscroll).
+ * :root.dark / :root:not(.dark) (specificity 0,2,0) outranks app.html's inline
+ * html.dark / html.light (0,1,1); the matched class also resolves the var. */
+:root.dark,
+:root:not(.dark) {
+  background-color: var(--gallery-chrome);
+}
 body {
   background-color: var(--gallery-chrome);
 }
