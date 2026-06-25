@@ -7,6 +7,8 @@ export interface MockTimelineState {
   grouping: string;
   months: unknown[];
   assetCount: number;
+  removeAssets: (assetIds: string[]) => void;
+  upsertAssets: (assets: unknown[]) => void;
 }
 
 export const mockTimelineState: MockTimelineState = {
@@ -15,6 +17,8 @@ export const mockTimelineState: MockTimelineState = {
   grouping: 'day',
   months: [{}],
   assetCount: 12,
+  removeAssets: vi.fn(),
+  upsertAssets: vi.fn(),
 };
 
 export function resetMockTimelineState(): void {
@@ -23,6 +27,8 @@ export function resetMockTimelineState(): void {
   mockTimelineState.grouping = 'day';
   mockTimelineState.months = [{}];
   mockTimelineState.assetCount = 12;
+  mockTimelineState.removeAssets = vi.fn();
+  mockTimelineState.upsertAssets = vi.fn();
 }
 
 export function setMockTimelineEmpty(): void {

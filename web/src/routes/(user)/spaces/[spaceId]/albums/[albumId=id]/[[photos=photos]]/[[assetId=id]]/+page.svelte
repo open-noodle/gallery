@@ -14,7 +14,7 @@
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-  import type { TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
+  import type { TimelineAsset, TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
   import { addAssetsToAlbums, getAlbumAssetsActions } from '$lib/services/album.service';
   import { buildAlbumAssetPickerOptions, buildAlbumTimelineOptions } from '$lib/utils/album-filter-options';
   import { buildAlbumAssetPickerFilterConfig, buildAlbumDetailFilterConfig } from '$lib/utils/album-filter-config';
@@ -127,9 +127,11 @@
     album = await getAlbumInfo({ id: album.id });
   };
 
-  const handleRemoveAssets = (_: string[]) => {
+  const handleRemoveAssets = (assetIds: string[]) => {
+    // Prune the browse timeline immediately so removed photos don't linger.
     // RemoveFromAlbumAction already re-fetches the album via bind:album and clears the
     // selection internally before firing onRemove, so we only need to defensively clear here.
+    timelineManager?.removeAssets(assetIds);
     assetMultiSelectManager.clear();
   };
 
@@ -152,7 +154,8 @@
     mode = 'browse';
   };
 
-  const handleAddAssetsSuccess = async () => {
+  const handleAddAssetsSuccess = async (added: TimelineAsset[] = []) => {
+    timelineManager?.upsertAssets(added);
     resetPicker();
     mode = 'browse';
     await refreshAlbum();
@@ -393,12 +396,14 @@
         <HeaderActionButton
           action={{
             ...AddAssets,
-            onAction: () =>
+            onAction: () => {
+              const added = pickerMultiSelectManager.assets;
               void addAssetsToAlbums(
                 [album.id],
-                pickerMultiSelectManager.assets.map(({ id }) => id),
+                added.map(({ id }) => id),
                 { notify: true },
-              ).then(handleAddAssetsSuccess),
+              ).then(() => handleAddAssetsSuccess(added));
+            },
           }}
         />
       {/snippet}
