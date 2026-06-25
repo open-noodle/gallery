@@ -171,7 +171,7 @@ describe('member leaves space', () => {
     expect(linkAudit).toHaveLength(0); // link persists for remaining members
   });
 
-  it("retains the grant when the leaving member holds a manual album_user share (album_user row is untouched)", async () => {
+  it('retains the grant when the leaving member holds a manual album_user share (album_user row is untouched)', async () => {
     // Mirrors the line-85 unlink test for the LEAVE path.
     // user_has_album_path returns true via album_user → the leave trigger's
     // gated revocation is suppressed, so the shared_space_album_user grant

@@ -1,7 +1,7 @@
 import { Kysely } from 'kysely';
 import { SharedSpaceRole } from 'src/enum';
-import { up } from 'src/schema/migrations-gallery/1779300000000-BackfillSharedSpaceAlbumUserGrants';
 import { DB } from 'src/schema';
+import { up } from 'src/schema/migrations-gallery/1779300000000-BackfillSharedSpaceAlbumUserGrants';
 import { SyncTestContext } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 

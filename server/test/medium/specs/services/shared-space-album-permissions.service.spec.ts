@@ -679,22 +679,14 @@ describe('SharedSpaceService — space-album permission matrix', () => {
       await isolatedSpaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
 
       // Before soft-delete: accessible via checkSpaceAccessForSpace
-      const before = await isolatedAccessRepo.asset.checkSpaceAccessForSpace(
-        member.id,
-        space.id,
-        new Set([asset.id]),
-      );
+      const before = await isolatedAccessRepo.asset.checkSpaceAccessForSpace(member.id, space.id, new Set([asset.id]));
       expect(before.has(asset.id)).toBe(true);
 
       // Soft-delete the album
       await ctx.softDeleteAlbum(album.id);
 
       // After soft-delete: must be denied
-      const after = await isolatedAccessRepo.asset.checkSpaceAccessForSpace(
-        member.id,
-        space.id,
-        new Set([asset.id]),
-      );
+      const after = await isolatedAccessRepo.asset.checkSpaceAccessForSpace(member.id, space.id, new Set([asset.id]));
       expect(after.has(asset.id)).toBe(false);
     });
   });
