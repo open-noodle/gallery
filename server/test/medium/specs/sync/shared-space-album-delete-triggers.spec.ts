@@ -170,6 +170,53 @@ describe('member leaves space', () => {
       .execute();
     expect(linkAudit).toHaveLength(0); // link persists for remaining members
   });
+
+  it("retains the grant when the leaving member holds a manual album_user share (album_user row is untouched)", async () => {
+    // Mirrors the line-85 unlink test for the LEAVE path.
+    // user_has_album_path returns true via album_user → the leave trigger's
+    // gated revocation is suppressed, so the shared_space_album_user grant
+    // is RETAINED and the album_user row is NEVER touched.
+    const ctx = new SyncTestContext(db);
+    const { user: owner } = await ctx.newUser();
+    const { user: member } = await ctx.newUser();
+    const { album } = await ctx.newAlbum({ ownerId: owner.id });
+    // member has a manual album_user row (a direct share, independent of the space)
+    await db
+      .insertInto('album_user')
+      .values({ albumId: album.id, userId: member.id, role: AlbumUserRole.Editor })
+      .execute();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+    await db
+      .insertInto('shared_space_album')
+      .values({ spaceId: space.id, albumId: album.id, addedById: owner.id })
+      .execute();
+
+    // Sanity: member has a grant.
+    const grantsBefore = await grantsFor(album.id);
+    expect(grantsBefore.some((g) => g.userId === member.id)).toBe(true);
+
+    // Member leaves the space.
+    await db
+      .deleteFrom('shared_space_member')
+      .where('spaceId', '=', space.id)
+      .where('userId', '=', member.id)
+      .execute();
+
+    // user_has_album_path is true via album_user → grant is RETAINED (not revoked).
+    const grantsAfter = await grantsFor(album.id);
+    expect(grantsAfter.some((g) => g.userId === member.id)).toBe(true);
+
+    // The album_user row itself is NEVER touched by the member-leave trigger chain.
+    const au = await db
+      .selectFrom('album_user')
+      .selectAll()
+      .where('albumId', '=', album.id)
+      .where('userId', '=', member.id)
+      .execute();
+    expect(au).toHaveLength(1);
+  });
 });
 
 describe('whole-space delete', () => {

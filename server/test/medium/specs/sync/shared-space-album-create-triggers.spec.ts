@@ -99,3 +99,67 @@ describe('shared_space_member_after_insert_album (join → grant linked albums)'
     expect(grants).toHaveLength(0);
   });
 });
+
+// ── E2: documentation test — simultaneous member-insert + album-link race ────
+//
+// Two triggers handle grant creation:
+//   A1 (shared_space_album_after_insert_user): album-link → grants all current members
+//   A2 (shared_space_member_after_insert_album): member-join → grants all already-linked albums
+//
+// LOW-PROBABILITY HAZARD: if a member INSERT and an album-link INSERT land in
+// two concurrent transactions, each trigger sees only the rows committed before
+// its READ snapshot.  In the worst case:
+//   - T1 reads shared_space_member (to fan-out grants) before T2 commits the
+//     member row → T1 misses the new member.
+//   - T2 reads shared_space_album (to fan-out grants) before T1 commits the
+//     album row → T2 misses the new album.
+//   Both triggers complete without error; neither wrote a grant for the
+//   (new-member, new-album) pair.
+//
+// This mirrors the equivalent hazard in the library trigger set (see
+// library-audit-triggers.spec.ts trigger_simultaneous_member_and_library_unlink).
+//
+// RESOLUTION (by design): the getCreatedAfter backfill stream re-delivers ALL
+// accessible albums on reconnect, so a missed initial grant self-heals on the
+// next sync session.  No separate repair job is needed.
+//
+// This test documents the *sequential* outcome (each event fires after the other
+// is committed) and asserts both grants ARE written — confirming the happy-path
+// behavior that the race can interfere with.
+describe('(doc) simultaneous member-insert + album-link race — sequential simulation', () => {
+  it('both grants are written when the two events are strictly ordered', async () => {
+    // Sequential simulation: member joins, then album is linked.
+    // In a real concurrent scenario the second trigger might not see the first
+    // row yet (see comment above), leaving exactly one grant instead of two.
+    // This test documents the expected sequential outcome.
+    const ctx = new SyncTestContext(db);
+    const { user: owner } = await ctx.newUser();
+    const { user: lateMember } = await ctx.newUser();
+    const { album } = await ctx.newAlbum({ ownerId: owner.id });
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+
+    // Event 1 (strictly before event 2): member joins the space.
+    // A2 fires but finds no linked albums → no grant yet for lateMember.
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: lateMember.id, role: SharedSpaceRole.Viewer });
+    const grantsAfterJoin = await db
+      .selectFrom('shared_space_album_user')
+      .selectAll()
+      .where('userId', '=', lateMember.id)
+      .execute();
+    expect(grantsAfterJoin).toHaveLength(0); // no albums linked yet
+
+    // Event 2 (strictly after event 1): album is linked.
+    // A1 fires and now sees lateMember in shared_space_member → grant written.
+    await db
+      .insertInto('shared_space_album')
+      .values({ spaceId: space.id, albumId: album.id, addedById: owner.id })
+      .execute();
+    const grantsAfterLink = await db
+      .selectFrom('shared_space_album_user')
+      .selectAll()
+      .where('userId', '=', lateMember.id)
+      .execute();
+    expect(grantsAfterLink.some((g) => g.albumId === album.id)).toBe(true);
+  });
+});

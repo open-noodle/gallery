@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import { SharedSpaceRole } from 'src/enum';
+import { SharedSpaceRole, SyncEntityType } from 'src/enum';
 import { SyncRepository } from 'src/repositories/sync.repository';
 import { DB } from 'src/schema';
 import { SyncTestContext } from 'test/medium.factory';
@@ -217,5 +217,49 @@ describe('accessibleSpaceAlbums set-equality guard', () => {
     for (const id of upsertIds) {
       expect(accessibleIds.has(id)).toBe(true);
     }
+  });
+});
+
+describe('SharedSpaceAlbumSync.getUpserts post-grant re-delivery (E3)', () => {
+  // Pins getUpserts independently from getCreatedAfter so a regression in the
+  // upsert stream cannot be masked by the backfill/created-after path.
+  // Scenario: member gains a grant because an album is linked to their space
+  // (shared_space_album INSERT → trigger bumps album.updateId).
+  // After the bump, getUpserts with ack.updateId at the pre-bump value MUST
+  // include the album — asserted DIRECTLY against getUpserts, not inferred
+  // from any other stream.
+  it('re-delivers album via getUpserts after member gains a grant (updateId bump)', async () => {
+    const { ctx, db, sut } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { user: member } = await ctx.newUser();
+    const { album } = await ctx.newAlbum({ ownerId: owner.id });
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Editor });
+
+    // Snapshot album.updateId BEFORE the link (and its updateId-bumping trigger).
+    const preBump = await db
+      .selectFrom('album')
+      .select(['updateId'])
+      .where('id', '=', album.id)
+      .executeTakeFirstOrThrow();
+
+    // Link the album to the space — triggers fire: grant inserted into
+    // shared_space_album_user AND album.updateId bumped.
+    await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+    // Call getUpserts with ack at the pre-bump updateId.  Because
+    // album.updateId is now > ack.updateId, the upsert stream MUST include
+    // the album — this is the re-delivery contract.
+    const stream = sut.getUpserts({
+      nowId: NOW_ID,
+      userId: member.id,
+      ack: { type: SyncEntityType.SharedSpaceAlbumV1, updateId: preBump.updateId },
+    });
+    const result: { id: string }[] = [];
+    for await (const row of stream) {
+      result.push(row as { id: string });
+    }
+    expect(result.map((r) => r.id)).toContain(album.id);
   });
 });
