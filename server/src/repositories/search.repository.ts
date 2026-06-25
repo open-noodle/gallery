@@ -1111,6 +1111,16 @@ export class SearchRepository {
                 .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
                 .where('shared_space_library.spaceId', '=', asUuid(options!.spaceId!)),
             ),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_album')
+                .innerJoin('album', (j) =>
+                  j.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+                )
+                .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
+                .whereRef('album_asset.assetId', '=', 'asset.id')
+                .where('shared_space_album.spaceId', '=', asUuid(options!.spaceId!)),
+            ),
           ]),
         ),
       )
@@ -1129,6 +1139,16 @@ export class SearchRepository {
                 .selectFrom('shared_space_library')
                 .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
                 .where('shared_space_library.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
+            ),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_album')
+                .innerJoin('album', (j) =>
+                  j.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+                )
+                .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
+                .whereRef('album_asset.assetId', '=', 'asset.id')
+                .where('shared_space_album.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
             ),
           ]),
         ),
@@ -1211,6 +1231,16 @@ export class SearchRepository {
                 .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
                 .where('shared_space_library.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
             ),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_album')
+                .innerJoin('album', (j) =>
+                  j.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+                )
+                .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
+                .whereRef('album_asset.assetId', '=', 'asset.id')
+                .where('shared_space_album.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
+            ),
           ]),
         ),
       )
@@ -1235,6 +1265,16 @@ export class SearchRepository {
                 .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
                 .where('shared_space_library.spaceId', '=', asUuid(options!.spaceId!)),
             ),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_album')
+                .innerJoin('album', (j) =>
+                  j.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+                )
+                .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
+                .whereRef('album_asset.assetId', '=', 'asset.id')
+                .where('shared_space_album.spaceId', '=', asUuid(options!.spaceId!)),
+            ),
           ]),
         ),
       )
@@ -1253,6 +1293,16 @@ export class SearchRepository {
                 .selectFrom('shared_space_library')
                 .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
                 .where('shared_space_library.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
+            ),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_album')
+                .innerJoin('album', (j) =>
+                  j.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+                )
+                .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
+                .whereRef('album_asset.assetId', '=', 'asset.id')
+                .where('shared_space_album.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
             ),
           ]),
         ),

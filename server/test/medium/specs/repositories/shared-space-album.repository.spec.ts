@@ -282,6 +282,43 @@ describe('AccessRepository.album.checkSpaceLinkedAlbumReadAccess', () => {
   });
 });
 
+describe('AccessRepository.person.checkSharedSpaceAccess — album leg', () => {
+  it('GRANT — person whose only visible face is on an asset in a linked album is returned', async () => {
+    const { ctx, accessRepo } = setupRead();
+    const { user: owner } = await ctx.newUser();
+    const { user: member } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+    const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'PersonReadAlbum' });
+    await ctx.get(SharedSpaceRepository).addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+    const { asset } = await ctx.newAsset({ ownerId: owner.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+    const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'AlbumFacePerson' });
+    await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+
+    const result = await accessRepo.person.checkSharedSpaceAccess(member.id, new Set([person.id]));
+
+    expect(result.has(person.id)).toBe(true);
+  });
+
+  it('DENY — non-member gets empty set for person accessible only via linked album', async () => {
+    const { ctx, accessRepo } = setupRead();
+    const { user: owner } = await ctx.newUser();
+    const { user: nonMember } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'PersonDenyAlbum' });
+    await ctx.get(SharedSpaceRepository).addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+    const { asset } = await ctx.newAsset({ ownerId: owner.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+    const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'DenyAlbumPerson' });
+    await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+
+    const result = await accessRepo.person.checkSharedSpaceAccess(nonMember.id, new Set([person.id]));
+
+    expect(result.has(person.id)).toBe(false);
+  });
+});
+
 describe('isFaceInSpace — album leg', () => {
   it('returns true when face belongs to an asset in a linked album', async () => {
     const { ctx, sut } = setup();

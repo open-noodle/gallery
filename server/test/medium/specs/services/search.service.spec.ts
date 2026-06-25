@@ -212,6 +212,88 @@ describe(SearchService.name, () => {
     });
   });
 
+  describe('album-linked space assets', () => {
+    it('should include album-linked assets in getSearchSuggestions for countries', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+
+      // Create an album and an asset belonging to that album
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'SearchAlbumCountry' });
+      const { asset: albumAsset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: albumAsset.id });
+      await ctx.newExif({ assetId: albumAsset.id, country: 'France' });
+
+      // Create a space, add member, link the album
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      const auth = factory.auth({ user: { id: member.id } });
+
+      const result = await sut.getSearchSuggestions(auth, {
+        type: SearchSuggestionType.COUNTRY,
+        spaceId: space.id,
+        includeNull: false,
+      });
+
+      expect(result).toContain('France');
+    });
+
+    it('should include album-linked assets in getSearchSuggestions for cities', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'SearchAlbumCity' });
+      const { asset: albumAsset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: albumAsset.id });
+      await ctx.newExif({ assetId: albumAsset.id, city: 'Paris', country: 'France' });
+
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      const auth = factory.auth({ user: { id: member.id } });
+
+      const result = await sut.getSearchSuggestions(auth, {
+        type: SearchSuggestionType.CITY,
+        spaceId: space.id,
+        includeNull: false,
+      });
+
+      expect(result).toContain('Paris');
+    });
+
+    it('should include album-linked assets in getSearchSuggestions for camera makes', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'SearchAlbumMake' });
+      const { asset: albumAsset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: albumAsset.id });
+      await ctx.newExif({ assetId: albumAsset.id, make: 'Nikon' });
+
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      const auth = factory.auth({ user: { id: member.id } });
+
+      const result = await sut.getSearchSuggestions(auth, {
+        type: SearchSuggestionType.CAMERA_MAKE,
+        spaceId: space.id,
+        includeNull: false,
+      });
+
+      expect(result).toContain('Nikon');
+    });
+  });
+
   describe('withStacked option', () => {
     it('should exclude stacked assets when withStacked is false', async () => {
       const { sut, ctx } = setup();
