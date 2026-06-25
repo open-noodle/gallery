@@ -319,6 +319,40 @@ describe('AccessRepository.person.checkSharedSpaceAccess — album leg', () => {
   });
 });
 
+describe('getRecentAssets and getNewAssetCount — album leg (C2 consistency)', () => {
+  it('album-only space: getRecentAssets returns album image assets, getNewAssetCount counts them, both equal getAssetCount', async () => {
+    const { ctx, sut } = setup();
+    const { user } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: user.id });
+    const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'RecentAlbum' });
+
+    const thumbhash = Buffer.from('deadbeef', 'hex');
+    const createdAt = new Date('2024-01-01T00:00:00Z');
+    const { asset: a1 } = await ctx.newAsset({ ownerId: user.id, thumbhash, createdAt });
+    const { asset: a2 } = await ctx.newAsset({ ownerId: user.id, thumbhash, createdAt });
+    const { asset: a3 } = await ctx.newAsset({ ownerId: user.id, thumbhash, createdAt });
+
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: a1.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: a2.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: a3.id });
+
+    await sut.addAlbum({ spaceId: space.id, albumId: album.id, addedById: user.id });
+
+    const recentAssets = await sut.getRecentAssets(space.id);
+    expect(recentAssets).toHaveLength(3);
+    const recentIds = recentAssets.map((a) => a.id);
+    expect(recentIds).toContain(a1.id);
+    expect(recentIds).toContain(a2.id);
+    expect(recentIds).toContain(a3.id);
+
+    const newCount = await sut.getNewAssetCount(space.id, new Date(0));
+    expect(newCount).toBe(3);
+
+    const totalCount = await sut.getAssetCount(space.id);
+    expect(totalCount).toBe(newCount);
+  });
+});
+
 describe('isFaceInSpace — album leg', () => {
   it('returns true when face belongs to an asset in a linked album', async () => {
     const { ctx, sut } = setup();
