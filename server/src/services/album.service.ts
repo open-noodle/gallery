@@ -191,6 +191,7 @@ export class AlbumService extends BaseService {
 
   async delete(auth: AuthDto, id: string): Promise<void> {
     await this.requireAccess({ auth, permission: Permission.AlbumDelete, ids: [id] });
+    await this.eventRepository.emit('AlbumDelete', { albumId: id });
     await this.albumRepository.delete(id);
   }
 

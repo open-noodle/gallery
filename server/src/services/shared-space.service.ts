@@ -2801,6 +2801,31 @@ export class SharedSpaceService extends BaseService {
     }
   }
 
+  @OnEvent({ name: 'AlbumDelete' })
+  async onAlbumDelete({ albumId }: ArgOf<'AlbumDelete'>): Promise<void> {
+    try {
+      const spaces = await this.sharedSpaceRepository.getSpacesLinkedToAlbum(albumId);
+      let anyOrphanWork = false;
+      for (const space of spaces) {
+        if (!space.faceRecognitionEnabled) {
+          continue;
+        }
+        const orphaned = await this.sharedSpaceRepository.getAlbumAssetIdsWithoutOtherSpacePath(space.spaceId, albumId);
+        if (orphaned.length === 0) {
+          continue;
+        }
+        await this.sharedSpaceRepository.removePersonFacesByAssetIds(space.spaceId, orphaned);
+        await this.sharedSpaceRepository.deleteOrphanedPersons(space.spaceId);
+        anyOrphanWork = true;
+      }
+      if (anyOrphanWork) {
+        await this.queueSpacePersonMetadataBackfill();
+      }
+    } catch (error) {
+      this.logger.error(`Failed to sync space people after deleting album ${albumId}: ${error}`);
+    }
+  }
+
   @OnEvent({ name: 'AlbumAssetsRemove' })
   async onAlbumAssetsRemove({ albumId, assetIds }: ArgOf<'AlbumAssetsRemove'>): Promise<void> {
     if (assetIds.length === 0) {
