@@ -777,9 +777,12 @@ export class SharedSpaceService extends BaseService {
       data: { count: dto.assetIds.length },
     });
 
-    await this.sharedSpaceRepository.removePersonFacesByAssetIds(spaceId, dto.assetIds);
-    await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
-    await this.queueSpacePersonMetadataBackfill();
+    const orphanedAssetIds = await this.sharedSpaceRepository.getAssetIdsWithoutOtherSpacePath(spaceId, dto.assetIds);
+    if (orphanedAssetIds.length > 0) {
+      await this.sharedSpaceRepository.removePersonFacesByAssetIds(spaceId, orphanedAssetIds);
+      await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
+      await this.queueSpacePersonMetadataBackfill();
+    }
   }
 
   async getMapMarkers(auth: AuthDto, id: string) {
