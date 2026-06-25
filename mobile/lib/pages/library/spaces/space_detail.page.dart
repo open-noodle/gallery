@@ -236,8 +236,9 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   }
 
   /// Opens the [SpaceLinkAlbumPage] picker with the current linked-album ids
-  /// pre-excluded. On confirm, calls [_onAlbumsPicked] which loops the PUT
-  /// endpoint and fires the sync-nudge.
+  /// pre-excluded. The picker returns the selected ids via [context.maybePop];
+  /// this method calls [_onAlbumsPicked] once on the returned list to loop the
+  /// PUT endpoint and fire the sync-nudge.
   Future<void> _openLinkPicker() async {
     // Collect the ids of albums already linked to this space so the picker
     // can exclude them from the candidate list.
@@ -250,7 +251,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
 
     if (!mounted) return;
     final picked = await context.pushRoute<List<String>>(
-      SpaceLinkAlbumRoute(spaceId: widget.spaceId, linkedAlbumIds: linkedAlbumIds, onAlbumsPicked: _onAlbumsPicked),
+      SpaceLinkAlbumRoute(spaceId: widget.spaceId, linkedAlbumIds: linkedAlbumIds),
     );
     if (picked == null || picked.isEmpty) return;
     await _onAlbumsPicked(picked);
