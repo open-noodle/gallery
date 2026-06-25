@@ -45,10 +45,14 @@ _access_, but not yet in _people / tags / folders / memories / search filters_ i
 
 ### Group C — Consistency / sync
 
-- **C1 — Phase-2 grant backfill missing.** `1779100000000-…CreateSideTriggers.ts` installs the
-  triggers but no standalone backfill (the library blueprint has one). Albums linked during Phase 1
-  get zero `shared_space_album_user` grants for existing members when the Phase-2 triggers deploy →
-  no offline delivery until re-link / re-join. Only bites instances that ran Phase 1 before Phase 2.
+- **C1 — Phase-2 grant backfill — DROPPED (not needed).** Initially flagged as "the create-side
+  triggers install no standalone backfill (the library blueprint has one)." On reflection this does
+  **not** apply to albums: orphan grants can only exist if `shared_space_album` rows were created on
+  a DB **before** the `1779100000000` triggers were applied to it — i.e. a staged Phase-1-then-Phase-2
+  deployment. This feature ships as one unit (table + triggers in the same release; never released at
+  a Phase-1-only state), so on every real deploy the triggers exist before any album can be linked →
+  no orphans. The library blueprint needs its backfill only because `library_user` was bolted onto an
+  already-deployed library feature with pre-existing rows. No migration is shipped for C1.
 - **C2 — Space summary counts inconsistent.** `getAssetCount` (`shared-space.repository.ts:239`)
   unions the album branch; `getRecentAssets` (`:490`) and `getNewAssetCount` (`:538`) omit it. The
   headline count jumps but the card thumbnail strip and "N new" badge never reflect album assets.

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Slices are independent — implement in any order; the numbering is by risk.
 
-**Goal:** Fix the 9 verified defects from the space-albums review (spec: `docs/superpowers/specs/2026-06-25-space-albums-review-fixes-design.md`) — trashed-album read leak, multi-path face cleanup, in-space read surfaces for people/tags/folders/memories/search, the Phase-2 grant backfill, summary-count consistency, the web stale-timeline bug, the mobile double-link bug, plus three test backfills.
+**Goal:** Fix the verified defects from the space-albums review (spec: `docs/superpowers/specs/2026-06-25-space-albums-review-fixes-design.md`) — trashed-album read leak, multi-path face cleanup, in-space read surfaces for people/tags/folders/memories/search, summary-count consistency, the web stale-timeline bug, the mobile double-link bug, plus test backfills. (Slice 5, a Phase-2 grant backfill migration, was dropped as unnecessary — see that section.)
 
 **Architecture:** Each slice pins behavior with a failing test, then makes the minimal change. The server fixes are SQL-predicate and service-method edits mirroring the existing `shared_space_library` branch / `unlinkAlbum` cleanup. One new server-internal event (`AlbumDelete`) and one new fork migration. No API/DTO/endpoint/OpenAPI/SDK changes.
 
@@ -235,46 +235,16 @@ async onAlbumDelete({ albumId }: ArgOf<'AlbumDelete'>): Promise<void> {
 
 ---
 
-## Slice 5: Phase-2 grant backfill migration (C1)
+## Slice 5: Phase-2 grant backfill migration (C1) — DROPPED (not needed)
 
-**Files:**
-
-- Create: `server/src/schema/migrations-gallery/1779300000000-BackfillSharedSpaceAlbumUserGrants.ts`
-- Test: `server/test/medium/specs/sync/shared-space-album-create-triggers.spec.ts` (extend)
-
-**Interfaces:**
-
-- Consumes: `shared_space_album`, `shared_space_member`, `shared_space_album_user`, `album` tables; `immich_uuid_v7()`.
-- Produces: a one-shot data migration. Round timestamp `1779300000000` (after the delete-side `1779200000000`, no collision).
-
-- [ ] **Step 1: Write the failing medium test.** Seed: space `S` (2 members), album `A` linked to `S`. Then simulate a Phase-1-only state — `DELETE FROM shared_space_album_user`. Execute the backfill statement (factor the SQL so the test can run it, or run the migration's `up`). Assert **2** grant rows `(member, A)` exist with distinct `createId`s, and `ON CONFLICT` makes a second run a no-op.
-- [ ] **Step 2: Run; verify FAIL** (no grants). Run: `cd server && pnpm test:medium -- --run test/medium/specs/sync/shared-space-album-create-triggers.spec.ts`
-- [ ] **Step 3: Write the migration** (mirror library Pass-2, `1778300000000-AddLibraryUserTable.ts:169-191`):
-
-```ts
-import { Kysely, sql } from 'kysely';
-
-// Backfill shared_space_album_user for albums linked under Phase 1 (before the A2 create-side
-// triggers existed). Idempotent. Mirrors the library_user Pass-2 backfill.
-export async function up(db: Kysely<any>): Promise<void> {
-  await sql`
-    INSERT INTO shared_space_album_user ("userId", "albumId")
-    SELECT DISTINCT ssm."userId", ssa."albumId"
-    FROM shared_space_album ssa
-    INNER JOIN shared_space_member ssm ON ssa."spaceId" = ssm."spaceId"
-    ON CONFLICT DO NOTHING;`.execute(db);
-
-  await sql`
-    UPDATE album
-    SET "updatedAt" = clock_timestamp(), "updateId" = immich_uuid_v7(clock_timestamp())
-    WHERE "id" IN (SELECT DISTINCT "albumId" FROM shared_space_album);`.execute(db);
-}
-
-// Data-only backfill — nothing structural to revert; grants are reconciled by triggers/audit.
-export async function down(): Promise<void> {}
-```
-
-- [ ] **Step 4: Run; verify PASS.** **Step 5:** `make check-server`; **do not** run `migrations:run` against an existing DB (fork note — server applies migrations at startup). Commit `fix(spaces): backfill album sync grants for Phase-1-era linked albums`.
+**Not implemented.** Orphan `shared_space_album_user` grants can only exist if `shared_space_album`
+rows were created on a database **before** the `1779100000000` create-side triggers were applied to
+it — i.e. a staged Phase-1-then-Phase-2 deploy. This feature ships as one unit (table + triggers in
+the same release, never released at a Phase-1-only state), so the triggers always exist before any
+album can be linked → every link/join is granted → no orphans, and a backfill migration would always
+insert 0 rows. The library blueprint's backfill exists only because `library_user` was added to an
+already-deployed library feature with pre-existing rows; albums have no such history. C1 is a non-issue;
+no migration is shipped.
 
 ---
 
@@ -379,7 +349,7 @@ export async function down(): Promise<void> {}
 
 ## Self-Review
 
-**Spec coverage:** A1→S1, A2→S3, A3→S4, B1→S2a, B2→S2b-e, C1→S5, C2→S6, D1→S7, D2→S8, E1/E2/E3→S9. All nine findings + the audit-discrepancy note are covered.
+**Spec coverage:** A1→S1, A2→S3, A3→S4, B1→S2a, B2→S2b-e, C1→dropped (not needed), C2→S6, D1→S7, D2→S8, E1/E2/E3→S9. (Slice 10, added later, folds in the face-pipeline album leg — `getSharedSpaceFaceMatchBackfillTargets` + the `timeline_spaces` face projections.)
 
 **Placeholder scan:** production code shown for S1 (canonical join), S3, S4 (event + handler), S5 (full migration), S6 (full union). S2 gives both branch shapes + per-surface tasks. S7/S8 reference exact clone-source lines (web global-album page; mobile picker) — client changes are described against verified line refs per house style.
 
@@ -388,5 +358,4 @@ export async function down(): Promise<void> {}
 ## Open items
 
 - S4 Step 1: confirm `eventRepository.emit` awaits handlers synchronously; if not, capture the orphan set in `album.service.delete` before the row delete and carry it on the payload.
-- S5: the cleanest way to exercise the backfill SQL in a medium test (run `up()` vs run the factored statement) — pick whichever the existing migration specs use.
 - S7: whether `addedAssets` objects are available in `handleAddAssetsSuccess` for `upsertAssets`, else use the `forceNavigate` reload path.
