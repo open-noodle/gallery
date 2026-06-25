@@ -2367,6 +2367,9 @@ describe(SharedSpaceService.name, () => {
 
   describe('removeAssets', () => {
     beforeEach(() => {
+      // removeAssets now gates face cleanup on assets with no other space path; echo the removed
+      // ids back so the cleanup branch runs and the existing call-assertions still hold.
+      mocks.sharedSpace.getAssetIdsWithoutOtherSpacePath.mockImplementation((_spaceId, ids) => Promise.resolve(ids));
       mocks.sharedSpace.removePersonFacesByAssetIds.mockResolvedValue(void 0);
       mocks.sharedSpace.deleteOrphanedPersons.mockResolvedValue(void 0);
     });
