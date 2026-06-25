@@ -72,6 +72,8 @@ where
       select
       from
         "shared_space_album"
+        inner join "album" on "album"."id" = "shared_space_album"."albumId"
+        and "album"."deletedAt" is null
         inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
       where
         "album_asset"."assetId" = "asset"."id"
@@ -177,6 +179,8 @@ from
           select
           from
             "shared_space_album"
+            inner join "album" on "album"."id" = "shared_space_album"."albumId"
+            and "album"."deletedAt" is null
             inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
           where
             "album_asset"."assetId" = "asset"."id"
@@ -251,6 +255,8 @@ drop as (
         select
         from
           "shared_space_album"
+          inner join "album" on "album"."id" = "shared_space_album"."albumId"
+          and "album"."deletedAt" is null
           inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
         where
           "album_asset"."assetId" = "asset"."id"
@@ -1037,8 +1043,19 @@ where
             "shared_space_library"."libraryId" = "asset"."libraryId"
             and "shared_space_library"."spaceId" = any ($4::uuid[])
         )
+        or exists (
+          select
+          from
+            "shared_space_album"
+            inner join "album" on "album"."id" = "shared_space_album"."albumId"
+            and "album"."deletedAt" is null
+            inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+          where
+            "album_asset"."assetId" = "asset"."id"
+            and "shared_space_album"."spaceId" = any ($5::uuid[])
+        )
       )
-      and "asset"."fileCreatedAt" >= $5
+      and "asset"."fileCreatedAt" >= $6
       and exists (
         select
         from
@@ -1048,11 +1065,11 @@ where
           "asset_face"."assetId" = "asset"."id"
           and "asset_face"."deletedAt" is null
           and "asset_face"."isVisible" is true
-          and "face_identity_face"."identityId" = $6::uuid
+          and "face_identity_face"."identityId" = $7::uuid
       )
   )
   and "country" is not null
-  and "country" != $7
+  and "country" != $8
 order by
   "country"
 select distinct
@@ -1086,8 +1103,19 @@ where
             "shared_space_library"."libraryId" = "asset"."libraryId"
             and "shared_space_library"."spaceId" = any ($4::uuid[])
         )
+        or exists (
+          select
+          from
+            "shared_space_album"
+            inner join "album" on "album"."id" = "shared_space_album"."albumId"
+            and "album"."deletedAt" is null
+            inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+          where
+            "album_asset"."assetId" = "asset"."id"
+            and "shared_space_album"."spaceId" = any ($5::uuid[])
+        )
       )
-      and "asset"."fileCreatedAt" >= $5
+      and "asset"."fileCreatedAt" >= $6
       and exists (
         select
         from
@@ -1097,11 +1125,11 @@ where
           "asset_face"."assetId" = "asset"."id"
           and "asset_face"."deletedAt" is null
           and "asset_face"."isVisible" is true
-          and "face_identity_face"."identityId" = $6::uuid
+          and "face_identity_face"."identityId" = $7::uuid
       )
   )
   and "make" is not null
-  and "make" != $7
+  and "make" != $8
 order by
   "make"
 select distinct
@@ -1137,8 +1165,19 @@ where
             "shared_space_library"."libraryId" = "asset"."libraryId"
             and "shared_space_library"."spaceId" = any ($4::uuid[])
         )
+        or exists (
+          select
+          from
+            "shared_space_album"
+            inner join "album" on "album"."id" = "shared_space_album"."albumId"
+            and "album"."deletedAt" is null
+            inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+          where
+            "album_asset"."assetId" = "asset"."id"
+            and "shared_space_album"."spaceId" = any ($5::uuid[])
+        )
       )
-      and "asset"."fileCreatedAt" >= $5
+      and "asset"."fileCreatedAt" >= $6
       and exists (
         select
         from
@@ -1148,7 +1187,7 @@ where
           "asset_face"."assetId" = "asset"."id"
           and "asset_face"."deletedAt" is null
           and "asset_face"."isVisible" is true
-          and "face_identity_face"."identityId" = $6::uuid
+          and "face_identity_face"."identityId" = $7::uuid
       )
   )
 order by
@@ -1181,8 +1220,19 @@ WITH
               "shared_space_library"."libraryId" = "asset"."libraryId"
               and "shared_space_library"."spaceId" = any ($4::uuid[])
           )
+          or exists (
+            select
+            from
+              "shared_space_album"
+              inner join "album" on "album"."id" = "shared_space_album"."albumId"
+              and "album"."deletedAt" is null
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($5::uuid[])
+          )
         )
-        and "asset"."fileCreatedAt" >= $5
+        and "asset"."fileCreatedAt" >= $6
     )
   ),
   identity_faces AS (
@@ -1209,7 +1259,7 @@ WITH
     FROM
       person
     WHERE
-      person."ownerId" = $6
+      person."ownerId" = $7
       AND person."identityId" IS NOT NULL
       AND EXISTS (
         SELECT
@@ -1239,9 +1289,9 @@ WITH
     FROM
       shared_space_person
       LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
-      AND shared_space_person_alias."userId" = $7
+      AND shared_space_person_alias."userId" = $8
     WHERE
-      shared_space_person."spaceId" = any ($8::uuid[])
+      shared_space_person."spaceId" = any ($9::uuid[])
       AND shared_space_person."identityId" IS NOT NULL
       AND EXISTS (
         SELECT
@@ -1361,8 +1411,19 @@ where
             "shared_space_library"."libraryId" = "asset"."libraryId"
             and "shared_space_library"."spaceId" = any ($4::uuid[])
         )
+        or exists (
+          select
+          from
+            "shared_space_album"
+            inner join "album" on "album"."id" = "shared_space_album"."albumId"
+            and "album"."deletedAt" is null
+            inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+          where
+            "album_asset"."assetId" = "asset"."id"
+            and "shared_space_album"."spaceId" = any ($5::uuid[])
+        )
       )
-      and "asset"."fileCreatedAt" >= $5
+      and "asset"."fileCreatedAt" >= $6
       and exists (
         select
         from
@@ -1372,11 +1433,11 @@ where
           "asset_face"."assetId" = "asset"."id"
           and "asset_face"."deletedAt" is null
           and "asset_face"."isVisible" is true
-          and "face_identity_face"."identityId" = $6::uuid
+          and "face_identity_face"."identityId" = $7::uuid
       )
   )
   and "rating" is not null
-  and "rating" > $7
+  and "rating" > $8
 order by
   "rating"
 select distinct
@@ -1410,8 +1471,19 @@ where
             "shared_space_library"."libraryId" = "asset"."libraryId"
             and "shared_space_library"."spaceId" = any ($4::uuid[])
         )
+        or exists (
+          select
+          from
+            "shared_space_album"
+            inner join "album" on "album"."id" = "shared_space_album"."albumId"
+            and "album"."deletedAt" is null
+            inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+          where
+            "album_asset"."assetId" = "asset"."id"
+            and "shared_space_album"."spaceId" = any ($5::uuid[])
+        )
       )
-      and "asset"."fileCreatedAt" >= $5
+      and "asset"."fileCreatedAt" >= $6
       and exists (
         select
         from
@@ -1421,7 +1493,7 @@ where
           "asset_face"."assetId" = "asset"."id"
           and "asset_face"."deletedAt" is null
           and "asset_face"."isVisible" is true
-          and "face_identity_face"."identityId" = $6::uuid
+          and "face_identity_face"."identityId" = $7::uuid
       )
   )
 order by

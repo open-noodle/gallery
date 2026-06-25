@@ -138,6 +138,8 @@ from
       "asset"."id"
     from
       "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+      and "album"."deletedAt" is null
       inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
       inner join "asset" on "asset"."id" = "album_asset"."assetId"
     where
@@ -291,11 +293,29 @@ from
       and "asset"."type" = $8
       and "asset"."visibility" in ($9, $10)
       and "asset"."thumbhash" is not null
+    union
+    select
+      "asset"."id",
+      "asset"."thumbhash",
+      "asset"."fileCreatedAt"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+      and "album"."deletedAt" is null
+      inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+      inner join "asset" on "asset"."id" = "album_asset"."assetId"
+    where
+      "shared_space_album"."spaceId" = $11
+      and "asset"."deletedAt" is null
+      and "asset"."isOffline" = $12
+      and "asset"."type" = $13
+      and "asset"."visibility" in ($14, $15)
+      and "asset"."thumbhash" is not null
   ) as "combined"
 order by
   "combined"."fileCreatedAt" desc
 limit
-  $11
+  $16
 
 -- SharedSpaceRepository.getLastAssetAddedAt
 select
@@ -337,6 +357,21 @@ from
       and "asset"."deletedAt" is null
       and "asset"."isOffline" = $8
       and "asset"."visibility" in ($9, $10)
+    union
+    select
+      "asset"."id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+      and "album"."deletedAt" is null
+      inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+      inner join "asset" on "asset"."id" = "album_asset"."assetId"
+    where
+      "shared_space_album"."spaceId" = $11
+      and "asset"."createdAt" > $12
+      and "asset"."deletedAt" is null
+      and "asset"."isOffline" = $13
+      and "asset"."visibility" in ($14, $15)
   ) as "combined"
 
 -- SharedSpaceRepository.getLastContributor

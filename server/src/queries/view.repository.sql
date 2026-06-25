@@ -26,8 +26,20 @@ where
         "shared_space_library"."libraryId" = "asset"."libraryId"
         and "shared_space_member"."userId" = $4::uuid
     )
+    or exists (
+      select
+      from
+        "shared_space_album"
+        inner join "album" on "album"."id" = "shared_space_album"."albumId"
+        and "album"."deletedAt" is null
+        inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+        inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+      where
+        "album_asset"."assetId" = "asset"."id"
+        and "shared_space_member"."userId" = $5::uuid
+    )
   )
-  and "visibility" = $5
+  and "visibility" = $6
   and "deletedAt" is null
   and "fileCreatedAt" is not null
   and "fileModifiedAt" is not null
@@ -63,13 +75,25 @@ where
         "shared_space_library"."libraryId" = "asset"."libraryId"
         and "shared_space_member"."userId" = $3::uuid
     )
+    or exists (
+      select
+      from
+        "shared_space_album"
+        inner join "album" on "album"."id" = "shared_space_album"."albumId"
+        and "album"."deletedAt" is null
+        inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+        inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+      where
+        "album_asset"."assetId" = "asset"."id"
+        and "shared_space_member"."userId" = $4::uuid
+    )
   )
-  and "visibility" = $4
+  and "visibility" = $5
   and "deletedAt" is null
   and "fileCreatedAt" is not null
   and "fileModifiedAt" is not null
   and "localDateTime" is not null
-  and "originalPath" like $5
-  and "originalPath" not like $6
+  and "originalPath" like $6
+  and "originalPath" not like $7
 order by
-  regexp_replace("asset"."originalPath", $7, $8) asc
+  regexp_replace("asset"."originalPath", $8, $9) asc
