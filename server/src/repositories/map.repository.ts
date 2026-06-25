@@ -127,6 +127,9 @@ export class MapRepository {
               eb.exists((eb) =>
                 eb
                   .selectFrom('shared_space_album')
+                  .innerJoin('album', (join) =>
+                    join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+                  )
                   .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
                   .whereRef('asset.id', '=', 'album_asset.assetId')
                   .where('shared_space_album.spaceId', 'in', timelineSpaceIds)
@@ -173,6 +176,9 @@ export class MapRepository {
               eb.exists((eb) =>
                 eb
                   .selectFrom('shared_space_album')
+                  .innerJoin('album', (join) =>
+                    join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+                  )
                   .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
                   .whereRef('asset.id', '=', 'album_asset.assetId')
                   .where('shared_space_album.spaceId', 'in', timelineSpaceIds)

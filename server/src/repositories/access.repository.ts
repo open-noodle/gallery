@@ -303,6 +303,9 @@ class AssetAccess {
           .union(
             this.db
               .selectFrom('shared_space_album')
+              .innerJoin('album', (join) =>
+                join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+              )
               .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_album.spaceId')
               .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
               .innerJoin('asset', (join) =>
@@ -373,6 +376,9 @@ class AssetAccess {
           .union(
             this.db
               .selectFrom('shared_space_album')
+              .innerJoin('album', (join) =>
+                join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+              )
               .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_album.spaceId')
               .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
               .innerJoin('asset', (join) =>

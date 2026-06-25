@@ -629,6 +629,77 @@ describe('SharedSpaceService — space-album permission matrix', () => {
   });
 
   // =========================================================================
+  // Grid 6c — soft-deleted album: assets no longer readable via space path
+  // =========================================================================
+
+  describe('Grid 6c — soft-deleted album: assets no longer readable via space path', () => {
+    it('after soft-deleting linked album A, spaceViewer cannot read assetInA via checkSpaceAccess', async () => {
+      // Use an isolated setup so we don't mutate the shared world fixture.
+      const { ctx } = setup();
+      const isolatedAccessRepo = ctx.get(AccessRepository);
+      const isolatedSpaceRepo = ctx.get(SharedSpaceRepository);
+
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'G6c-soft-deleted-album' });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+      await isolatedSpaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+
+      // Before soft-delete: member can read the asset
+      const before = await isolatedAccessRepo.asset.checkSpaceAccess(member.id, new Set([asset.id]));
+      expect(before.has(asset.id)).toBe(true);
+
+      // Soft-delete the album (album.deletedAt = now(), link row survives)
+      await ctx.softDeleteAlbum(album.id);
+
+      // After soft-delete: asset must NOT be readable via the space-album path
+      const after = await isolatedAccessRepo.asset.checkSpaceAccess(member.id, new Set([asset.id]));
+      expect(after.has(asset.id)).toBe(false);
+    });
+
+    it('after soft-deleting linked album A, checkSpaceAccessForSpace also denies the asset', async () => {
+      const { ctx } = setup();
+      const isolatedAccessRepo = ctx.get(AccessRepository);
+      const isolatedSpaceRepo = ctx.get(SharedSpaceRepository);
+
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'G6c-checkSpaceAccessForSpace' });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+      await isolatedSpaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+
+      // Before soft-delete: accessible via checkSpaceAccessForSpace
+      const before = await isolatedAccessRepo.asset.checkSpaceAccessForSpace(
+        member.id,
+        space.id,
+        new Set([asset.id]),
+      );
+      expect(before.has(asset.id)).toBe(true);
+
+      // Soft-delete the album
+      await ctx.softDeleteAlbum(album.id);
+
+      // After soft-delete: must be denied
+      const after = await isolatedAccessRepo.asset.checkSpaceAccessForSpace(
+        member.id,
+        space.id,
+        new Set([asset.id]),
+      );
+      expect(after.has(asset.id)).toBe(false);
+    });
+  });
+
+  // =========================================================================
   // Grid 6b — multi-path READ (direct asset + album paths, unlink behaviour)
   // =========================================================================
 

@@ -318,6 +318,9 @@ function withTimeBucketAssetFilters<O>(
           eb.exists(
             eb
               .selectFrom('shared_space_album')
+              .innerJoin('album', (join) =>
+                join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+              )
               .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
               .whereRef('album_asset.assetId', '=', 'asset.id')
               .where('shared_space_album.spaceId', '=', asUuid(options.spaceId!))
@@ -358,6 +361,9 @@ function withTimeBucketAssetFilters<O>(
           eb.exists(
             eb
               .selectFrom('shared_space_album')
+              .innerJoin('album', (join) =>
+                join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+              )
               .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
               .whereRef('album_asset.assetId', '=', 'asset.id')
               .where('shared_space_album.spaceId', '=', anyUuid(options.timelineSpaceIds!))
@@ -1383,6 +1389,9 @@ export class AssetRepository {
                 eb.exists(
                   eb
                     .selectFrom('shared_space_album')
+                    .innerJoin('album', (join) =>
+                      join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+                    )
                     .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
                     .whereRef('album_asset.assetId', '=', 'asset.id')
                     .where('shared_space_album.spaceId', '=', asUuid(options.spaceId!))
@@ -1421,6 +1430,9 @@ export class AssetRepository {
                 eb.exists(
                   eb
                     .selectFrom('shared_space_album')
+                    .innerJoin('album', (join) =>
+                      join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+                    )
                     .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
                     .whereRef('album_asset.assetId', '=', 'asset.id')
                     .where('shared_space_album.spaceId', '=', anyUuid(options.timelineSpaceIds!))

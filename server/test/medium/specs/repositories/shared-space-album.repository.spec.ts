@@ -156,6 +156,34 @@ describe('getAlbumAssetIdsWithoutOtherSpacePath', () => {
   });
 });
 
+describe('getAssetCount — soft-deleted album', () => {
+  it('getAssetCount excludes assets from a soft-deleted linked album', async () => {
+    const { ctx, sut } = setup();
+    const { user } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: user.id });
+
+    const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'SoftDeletedAlbum' });
+    const { asset: a1 } = await ctx.newAsset({ ownerId: user.id });
+    const { asset: a2 } = await ctx.newAsset({ ownerId: user.id });
+    const { asset: a3 } = await ctx.newAsset({ ownerId: user.id });
+
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: a1.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: a2.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: a3.id });
+
+    await sut.addAlbum({ spaceId: space.id, albumId: album.id, addedById: user.id });
+
+    // Before soft-delete: all 3 assets counted
+    expect(await sut.getAssetCount(space.id)).toBe(3);
+
+    // Soft-delete the album (link row survives via FK deferral)
+    await ctx.softDeleteAlbum(album.id);
+
+    // After soft-delete: album assets must NOT be counted
+    expect(await sut.getAssetCount(space.id)).toBe(0);
+  });
+});
+
 describe('getAlbumAssetCount', () => {
   it('returns 3 for an album with 3 live assets, then 2 after one is soft-deleted', async () => {
     const { ctx, sut } = setup();
