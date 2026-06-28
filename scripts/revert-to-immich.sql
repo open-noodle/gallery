@@ -423,6 +423,9 @@ END $$;
 -- 1779806699547-AddPluginTemplates later added "plugin"."templates" and
 -- "plugin"."sha256hash". Recreating the plugin table to its v2.7.5 shape below
 -- drops both columns, so no separate rollback is needed.
+--
+-- 1782414436633-AddPluginMethodAllowedHosts added "plugin_method"."allowedHosts";
+-- dropping "plugin_method" below removes that column, so no separate rollback is needed.
 DROP TABLE IF EXISTS "workflow_step" CASCADE;
 DROP TABLE IF EXISTS "workflow_filter" CASCADE;
 DROP TABLE IF EXISTS "workflow_action" CASCADE;
@@ -620,7 +623,8 @@ DELETE FROM "kysely_migrations"
    '1780435471692-DeleteMismatchedAssetFaces',
    '1780592070031-ConvertNegativeRatingToNull',
    '1780592071031-AssetOcrSync',
-   '1781089983296-CreateIntegrityReportTable'
+   '1781089983296-CreateIntegrityReportTable',
+   '1782414436633-AddPluginMethodAllowedHosts'
  );
 
 -- -----------------------------------------------------------------------------
