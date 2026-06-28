@@ -39,14 +39,6 @@ macos-arm64 = { asset_pattern = "jellyfin-ffmpeg_*_portable_macarm64-gpl.tar.xz"
 pin = true
 lockfile = true
 
-[tasks.release]
-run = [
-  "pnpm --filter @immich/scripts install --frozen-lockfile",
-  "pnpm --filter @immich/scripts build",
-  "pnpm --filter @immich/scripts cli release {{arg(name='args', var=true)}}",
-  { task = "//:open-api" },
-]
-
 [tasks.plugins]
 # Fork: build @immich/sdk BEFORE the workspace-inject install so the injected copies
 # capture its ./build output. With injectWorkspacePackages=true, pnpm hard-copies the
