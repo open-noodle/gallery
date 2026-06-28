@@ -12,7 +12,6 @@ Our [GitHub Repository](https://github.com/open-noodle/gallery) is a [monorepo](
 | `.vscode/`          | VSCode debug launch profiles                                                         |
 | `packages/cli`      | Source code for the CLI                                                              |
 | `packages/sdk`      | Source code for the generated OpenAPI SDK                                            |
-| `packages/scripts`  | Scripts for version bumps and draft releases                                         |
 | `docker/`           | Docker compose resources for dev, test, production                                   |
 | `design/`           | Screenshots and logos for the README                                                 |
 | `docs/`             | Source code for the [https://docs.opennoodle.de](https://docs.opennoodle.de) website |
