@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -45,7 +46,7 @@ void main() {
     testWidgets('renders AppBar with back icon, title key, and Done button', (tester) async {
       await tester.pumpConsumerWidget(const PersonPickerPage());
       expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
-      expect(find.text('filter_sheet_picker_people_title'), findsOneWidget);
+      expect(find.text('filter_sheet_picker_people_title'.tr()), findsOneWidget);
       expect(find.byKey(const Key('person-picker-done')), findsOneWidget);
     });
 
@@ -120,7 +121,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(const Key('person-picker-count-label')),
-          matching: find.text('filter_sheet_picker_people_count.other'),
+          matching: find.text('filter_sheet_picker_people_count.other'.tr(namedArgs: {'count': '3'})),
         ),
         findsOneWidget,
         reason: 'Should render plural "other" variant for count=3',
