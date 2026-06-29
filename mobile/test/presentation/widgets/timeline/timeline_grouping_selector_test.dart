@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -169,7 +170,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.descendant(of: find.byType(GroupSettings), matching: find.text('year')));
+      await tester.tap(find.descendant(of: find.byType(GroupSettings), matching: find.text('year'.tr())));
       await tester.pumpAndSettle();
 
       expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.year);
