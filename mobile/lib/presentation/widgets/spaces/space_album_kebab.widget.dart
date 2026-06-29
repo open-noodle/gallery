@@ -18,6 +18,7 @@ class SpaceAlbumKebab extends StatelessWidget {
     required this.onAddPhotos,
     required this.onToggleTimeline,
     required this.onUnlink,
+    this.toggleEnabled = true,
   });
 
   final bool canEdit;
@@ -25,6 +26,13 @@ class SpaceAlbumKebab extends StatelessWidget {
   final VoidCallback onAddPhotos;
   final VoidCallback onToggleTimeline;
   final VoidCallback onUnlink;
+
+  /// Whether the "Show/Hide in timeline" menu item is interactive.
+  ///
+  /// Set to [false] while the album stream is unresolved so an editor who
+  /// taps the item before metadata loads neither no-ops silently nor triggers
+  /// a premature mutation.
+  final bool toggleEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +58,7 @@ class SpaceAlbumKebab extends StatelessWidget {
         PopupMenuItem<_KebabAction>(
           key: const Key('space-album-kebab-toggle'),
           value: _KebabAction.toggle,
+          enabled: toggleEnabled,
           child: Text(showInTimeline ? 'Hide from timeline' : 'Show in timeline'),
         ),
         const PopupMenuItem<_KebabAction>(

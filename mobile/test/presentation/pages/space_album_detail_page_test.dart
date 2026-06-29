@@ -98,4 +98,66 @@ void main() {
     // No subtitle should be rendered before the space name is loaded.
     expect(find.textContaining('photos · in'), findsNothing);
   });
+
+  // ---------------------------------------------------------------------------
+  // Slice 14 — toggle disabled when album stream is unresolved
+  // ---------------------------------------------------------------------------
+
+  testWidgets('toggle menu item is DISABLED when album is null (stream unresolved)', (tester) async {
+    bool toggled = false;
+    await tester.pumpWidget(
+      _wrapSliver(
+        SpaceAlbumAppBar(
+          canEdit: true,
+          album: null, // stream not yet resolved
+          onToggleTimeline: () => toggled = true,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // Open the popup menu
+    await tester.tap(find.byWidgetPredicate((w) => w is PopupMenuButton));
+    await tester.pumpAndSettle();
+
+    // The toggle item must exist and be disabled
+    final toggleItem = tester.widget<PopupMenuItem<dynamic>>(
+      find.byKey(const Key('space-album-kebab-toggle')),
+    );
+    expect(toggleItem.enabled, isFalse, reason: 'toggle item should be disabled when album is null');
+
+    // Tapping a disabled item must NOT fire the callback
+    await tester.tap(find.byKey(const Key('space-album-kebab-toggle')));
+    await tester.pumpAndSettle();
+    expect(toggled, isFalse, reason: 'onToggleTimeline must not be called when item is disabled');
+  });
+
+  testWidgets('toggle menu item is ENABLED when album is non-null and invokes callback', (tester) async {
+    bool toggled = false;
+    await tester.pumpWidget(
+      _wrapSliver(
+        SpaceAlbumAppBar(
+          canEdit: true,
+          album: _album(id: 'a4', name: 'Loaded Album'),
+          onToggleTimeline: () => toggled = true,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // Open the popup menu
+    await tester.tap(find.byWidgetPredicate((w) => w is PopupMenuButton));
+    await tester.pumpAndSettle();
+
+    // The toggle item must exist and be enabled
+    final toggleItem = tester.widget<PopupMenuItem<dynamic>>(
+      find.byKey(const Key('space-album-kebab-toggle')),
+    );
+    expect(toggleItem.enabled, isTrue, reason: 'toggle item should be enabled when album is non-null');
+
+    // Tapping an enabled item MUST fire the callback
+    await tester.tap(find.byKey(const Key('space-album-kebab-toggle')));
+    await tester.pumpAndSettle();
+    expect(toggled, isTrue, reason: 'onToggleTimeline must be called when item is enabled and tapped');
+  });
 }

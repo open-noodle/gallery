@@ -239,6 +239,7 @@ class SpaceAlbumAppBar extends StatelessWidget {
         SpaceAlbumKebab(
           canEdit: canEdit,
           showInTimeline: album?.showInTimeline ?? true,
+          toggleEnabled: album != null,
           onAddPhotos: onAddPhotos ?? () {},
           onToggleTimeline: onToggleTimeline ?? () {},
           onUnlink: onUnlink ?? () {},
