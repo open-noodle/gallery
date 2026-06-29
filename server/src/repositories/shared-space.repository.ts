@@ -2427,6 +2427,9 @@ export class SharedSpaceRepository {
           .union(
             this.db
               .selectFrom('shared_space_album')
+              .innerJoin('album', (j) =>
+                j.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+              )
               .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
               .innerJoin('asset', 'asset.id', 'album_asset.assetId')
               .select('asset.id')
@@ -2582,6 +2585,9 @@ export class SharedSpaceRepository {
           .union(
             this.db
               .selectFrom('shared_space_album')
+              .innerJoin('album', (j) =>
+                j.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+              )
               .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
               .innerJoin('shared_space', 'shared_space.id', 'shared_space_album.spaceId')
               .select('shared_space_album.spaceId')

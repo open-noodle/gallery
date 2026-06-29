@@ -381,3 +381,45 @@ describe('isFaceInSpace — album leg', () => {
     expect(await sut.isFaceInSpace(space.id, faceId)).toBe(false);
   });
 });
+
+describe('face-pipeline gates honor album.deletedAt (faces F3a)', () => {
+  it('isAssetInSpace and getSpaceIdsForAsset exclude a soft-deleted album', async () => {
+    const { ctx, sut } = setup();
+    const { user } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+    const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'GateAlbum' });
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+    await sut.addAlbum({ spaceId: space.id, albumId: album.id, addedById: user.id });
+
+    // Live album: the asset resolves as in-space and the face pipeline queues the space.
+    expect(await sut.isAssetInSpace(space.id, asset.id)).toBe(true);
+    const liveSpaceIds = await sut.getSpaceIdsForAsset(asset.id);
+    expect(liveSpaceIds.map((r) => r.spaceId)).toContain(space.id);
+
+    await ctx.softDeleteAlbum(album.id);
+
+    // Soft-deleted album: both gates must stop resolving its assets (A1 invariant).
+    expect(await sut.isAssetInSpace(space.id, asset.id)).toBe(false);
+    const deletedSpaceIds = await sut.getSpaceIdsForAsset(asset.id);
+    expect(deletedSpaceIds.map((r) => r.spaceId)).not.toContain(space.id);
+  });
+
+  it('keeps an asset in-space via a surviving direct path when its album is soft-deleted', async () => {
+    const { ctx, sut } = setup();
+    const { user } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+    const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'GateDualAlbum' });
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+    await sut.addAlbum({ spaceId: space.id, albumId: album.id, addedById: user.id });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+
+    await ctx.softDeleteAlbum(album.id);
+
+    // Direct path survives the album soft-delete.
+    expect(await sut.isAssetInSpace(space.id, asset.id)).toBe(true);
+    const spaceIds = await sut.getSpaceIdsForAsset(asset.id);
+    expect(spaceIds.map((r) => r.spaceId)).toContain(space.id);
+  });
+});
