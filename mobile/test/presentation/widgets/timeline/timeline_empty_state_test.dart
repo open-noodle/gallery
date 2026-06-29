@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -68,13 +69,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('timeline_empty_title'), findsOneWidget);
+    expect(find.text('timeline_empty_title'.tr()), findsOneWidget);
     expect(find.byType(FilledButton), findsOneWidget);
     expect(find.byType(ImmichLoadingIndicator), findsNothing);
   });
 
   testWidgets('while the initial remote sync runs it shows a loader, not the onboarding', (tester) async {
-    await tester.pumpConsumerWidget(
+    await tester.pumpConsumerWidgetRaw(
       const TimelineEmptyState(),
       overrides: [
         photosFilterProvider.overrideWith(() => _FixedFilter(SearchFilter.empty())),
@@ -99,13 +100,13 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('timeline_empty_filtered_title'), findsOneWidget);
-    expect(find.text('timeline_empty_clear_filters'), findsOneWidget);
+    expect(find.text('timeline_empty_filtered_title'.tr()), findsOneWidget);
+    expect(find.text('timeline_empty_clear_filters'.tr()), findsOneWidget);
 
-    await tester.tap(find.text('timeline_empty_clear_filters'));
+    await tester.tap(find.text('timeline_empty_clear_filters'.tr()));
     await tester.pump();
 
-    expect(find.text('timeline_empty_filtered_title'), findsNothing);
+    expect(find.text('timeline_empty_filtered_title'.tr()), findsNothing);
     expect(find.byType(ImmichLoadingIndicator), findsOneWidget);
   });
 }
