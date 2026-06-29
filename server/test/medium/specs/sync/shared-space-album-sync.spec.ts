@@ -78,6 +78,27 @@ describe('SharedSpaceAlbumSync.getCreatedAfter', () => {
     const rows = await sut.getCreatedAfter({ nowId: NOW_ID, userId: stranger.id, afterCreateId: undefined });
     expect(rows).toHaveLength(0);
   });
+
+  it('excludes soft-deleted albums', async () => {
+    const { ctx, db, sut } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { user: member } = await ctx.newUser();
+    const { album } = await ctx.newAlbum({ ownerId: owner.id });
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Editor });
+    await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+
+    // Confirm grant is visible before soft-delete
+    const rowsBefore = await sut.getCreatedAfter({ nowId: NOW_ID, userId: member.id, afterCreateId: undefined });
+    expect(rowsBefore.map((r) => r.id)).toContain(album.id);
+
+    // Soft-delete the album
+    await db.updateTable('album').set({ deletedAt: new Date() }).where('id', '=', album.id).execute();
+
+    const rowsAfter = await sut.getCreatedAfter({ nowId: NOW_ID, userId: member.id, afterCreateId: undefined });
+    expect(rowsAfter.map((r) => r.id)).not.toContain(album.id);
+  });
 });
 
 describe('SharedSpaceAlbumSync.getUpserts', () => {

@@ -96,6 +96,37 @@ describe('SharedSpaceAlbumToAssetSync.getUpserts', () => {
     }
     expect(result.some((r: any) => r.albumId === album.id)).toBe(false);
   });
+
+  it('excludes membership rows for soft-deleted albums', async () => {
+    const { ctx, db, sut } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { user: member } = await ctx.newUser();
+    const { album } = await ctx.newAlbum({ ownerId: owner.id });
+    const { asset } = await ctx.newAsset({ ownerId: owner.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Editor });
+    await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+    // Confirm membership row is visible before soft-delete
+    const streamBefore = sut.getUpserts({ nowId: NOW_ID, userId: member.id });
+    const resultBefore: any[] = [];
+    for await (const row of streamBefore) {
+      resultBefore.push(row);
+    }
+    expect(resultBefore.some((r: any) => r.albumId === album.id && r.assetId === asset.id)).toBe(true);
+
+    // Soft-delete the album
+    await db.updateTable('album').set({ deletedAt: new Date() }).where('id', '=', album.id).execute();
+
+    const stream = sut.getUpserts({ nowId: NOW_ID, userId: member.id });
+    const result: any[] = [];
+    for await (const row of stream) {
+      result.push(row);
+    }
+    expect(result.some((r: any) => r.albumId === album.id)).toBe(false);
+  });
 });
 
 describe('SharedSpaceAlbumToAssetSync.getDeletes', () => {

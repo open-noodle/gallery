@@ -61,6 +61,33 @@ describe('SharedSpaceAlbumAssetExifSync.getBackfill', () => {
     }
     expect(result).toHaveLength(0);
   });
+
+  it('returns empty for a soft-deleted album', async () => {
+    const { ctx, db, sut } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { album } = await ctx.newAlbum({ ownerId: owner.id });
+    const { asset } = await ctx.newAsset({ ownerId: owner.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+    await ctx.newExif({ assetId: asset.id, make: 'TestCamera' });
+
+    // Confirm exif appears before soft-delete
+    const streamBefore = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id);
+    const resultBefore: any[] = [];
+    for await (const row of streamBefore) {
+      resultBefore.push(row);
+    }
+    expect(resultBefore.map((r: any) => r.assetId)).toContain(asset.id);
+
+    // Soft-delete the album
+    await db.updateTable('album').set({ deletedAt: new Date() }).where('id', '=', album.id).execute();
+
+    const stream = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id);
+    const result: any[] = [];
+    for await (const row of stream) {
+      result.push(row);
+    }
+    expect(result).toHaveLength(0);
+  });
 });
 
 describe('SharedSpaceAlbumAssetExifSync.getCreates', () => {
@@ -103,9 +130,78 @@ describe('SharedSpaceAlbumAssetExifSync.getCreates', () => {
     }
     expect(result.map((r: any) => r.assetId)).not.toContain(asset.id);
   });
+
+  it('excludes exif rows from soft-deleted albums', async () => {
+    const { ctx, db, sut } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { user: member } = await ctx.newUser();
+    const { album } = await ctx.newAlbum({ ownerId: owner.id });
+    const { asset } = await ctx.newAsset({ ownerId: owner.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+    await ctx.newExif({ assetId: asset.id, make: 'TestCamera' });
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Editor });
+    await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+    // Confirm exif is visible before soft-delete
+    const streamBefore = sut.getCreates({ nowId: NOW_ID, userId: member.id });
+    const resultBefore: any[] = [];
+    for await (const row of streamBefore) {
+      resultBefore.push(row);
+    }
+    expect(resultBefore.map((r: any) => r.assetId)).toContain(asset.id);
+
+    // Soft-delete the album
+    await db.updateTable('album').set({ deletedAt: new Date() }).where('id', '=', album.id).execute();
+
+    const stream = sut.getCreates({ nowId: NOW_ID, userId: member.id });
+    const result: any[] = [];
+    for await (const row of stream) {
+      result.push(row);
+    }
+    expect(result.map((r: any) => r.assetId)).not.toContain(asset.id);
+  });
 });
 
 describe('SharedSpaceAlbumAssetExifSync.getUpdates', () => {
+  it('excludes exif updates for soft-deleted albums', async () => {
+    const { ctx, db, sut } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { user: member } = await ctx.newUser();
+    const { album } = await ctx.newAlbum({ ownerId: owner.id });
+    const { asset } = await ctx.newAsset({ ownerId: owner.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+    await ctx.newExif({ assetId: asset.id, make: 'TestCamera' });
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Editor });
+    await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+    // Confirm exif is visible in updates before soft-delete (with max ack)
+    const streamBefore = sut.getUpdates(
+      { nowId: NOW_ID, userId: member.id },
+      { type: SyncEntityType.AlbumToAssetV1, updateId: BEFORE_UPDATE_ID },
+    );
+    const resultBefore: any[] = [];
+    for await (const row of streamBefore) {
+      resultBefore.push(row);
+    }
+    expect(resultBefore.map((r: any) => r.assetId)).toContain(asset.id);
+
+    // Soft-delete the album
+    await db.updateTable('album').set({ deletedAt: new Date() }).where('id', '=', album.id).execute();
+
+    const stream = sut.getUpdates(
+      { nowId: NOW_ID, userId: member.id },
+      { type: SyncEntityType.AlbumToAssetV1, updateId: BEFORE_UPDATE_ID },
+    );
+    const result: any[] = [];
+    for await (const row of stream) {
+      result.push(row);
+    }
+    expect(result.map((r: any) => r.assetId)).not.toContain(asset.id);
+  });
+
   it('honors albumToAssetAck coupling — only sends exif updates for assets the client already knows about', async () => {
     const { ctx, sut } = setup();
     const { user: owner } = await ctx.newUser();
