@@ -1410,3 +1410,145 @@ describe('UserAdminService — restore: space face re-projection (faces F3b)', (
     );
   });
 });
+
+/**
+ * Emit-timing note: AssetDelete fires AFTER the asset row (and cascaded asset_face →
+ * shared_space_person_face rows) are already deleted.  The onAssetDelete handler therefore
+ * receives the affected (spaceId, personId) pairs pre-captured at the emit site in
+ * asset.service.ts BEFORE deletion.  These tests exercise the handler directly with
+ * the pre-captured payload and verify it correctly recounts surviving persons and removes orphans.
+ */
+describe('SharedSpaceService — onAssetDelete face cleanup', () => {
+  it('getSpacePersonsForAsset returns (spaceId, personId) pairs for faces on the asset', async () => {
+    const { ctx } = setup();
+    const { user } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id });
+
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+    const spacePerson = await spaceRepo.createPerson({
+      spaceId: space.id,
+      name: 'FaceQueryPerson',
+      type: 'person',
+      representativeFaceId: null,
+    });
+    await spaceRepo.addPersonFaces([{ personId: spacePerson.id, assetFaceId: faceId }]);
+
+    const pairs = await spaceRepo.getSpacePersonsForAsset(asset.id);
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0]).toMatchObject({ spaceId: space.id, personId: spacePerson.id });
+  });
+
+  it('recounts surviving person and removes orphan person after asset hard-delete', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: 'owner' });
+
+    // Two assets: X will be deleted; Y will survive.
+    const { asset: assetX } = await ctx.newAsset({ ownerId: user.id });
+    const { asset: assetY } = await ctx.newAsset({ ownerId: user.id });
+
+    const { result: faceXId } = await ctx.newAssetFace({ assetId: assetX.id });
+    const { result: faceYId } = await ctx.newAssetFace({ assetId: assetY.id });
+
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+
+    // Person P has faces on both X and Y — survives with reduced count.
+    const personP = await spaceRepo.createPerson({
+      spaceId: space.id,
+      name: 'PersonP',
+      type: 'person',
+      representativeFaceId: null,
+    });
+    await spaceRepo.addPersonFaces([
+      { personId: personP.id, assetFaceId: faceXId },
+      { personId: personP.id, assetFaceId: faceYId },
+    ]);
+
+    // Person Q has a face only on X — becomes orphan after deletion.
+    const personQ = await spaceRepo.createPerson({
+      spaceId: space.id,
+      name: 'PersonQ',
+      type: 'person',
+      representativeFaceId: null,
+    });
+    await spaceRepo.addPersonFaces([{ personId: personQ.id, assetFaceId: faceXId }]);
+
+    // Capture affected pairs BEFORE deletion (mirrors asset.service.ts behaviour).
+    const affectedSpacePersons = await spaceRepo.getSpacePersonsForAsset(assetX.id);
+
+    // Hard-delete asset X; the DB cascade removes asset_face and shared_space_person_face rows.
+    await defaultDatabase.deleteFrom('asset').where('id', '=', assetX.id).execute();
+
+    // Fire the handler with the pre-captured payload.
+    await sut.onAssetDelete({ assetId: assetX.id, userId: user.id, affectedSpacePersons });
+
+    // P survives with recounted faceCount/assetCount = 1 (only Y's face remains).
+    const personPAfter = await defaultDatabase
+      .selectFrom('shared_space_person')
+      .select(['faceCount', 'assetCount'])
+      .where('id', '=', personP.id)
+      .executeTakeFirst();
+    expect(personPAfter).toBeDefined();
+    expect(personPAfter!.faceCount).toBe(1);
+    expect(personPAfter!.assetCount).toBe(1);
+
+    // Q was an orphan (no remaining faces) and must be deleted.
+    const personQAfter = await defaultDatabase
+      .selectFrom('shared_space_person')
+      .select('id')
+      .where('id', '=', personQ.id)
+      .execute();
+    expect(personQAfter).toHaveLength(0);
+  });
+
+  it('leaves persons in unaffected spaces untouched', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+
+    // Space S contains assetX; space T has no relation to assetX.
+    const { space: spaceS } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+    const { space: spaceT } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+
+    const { asset: assetX } = await ctx.newAsset({ ownerId: user.id });
+    const { asset: assetT } = await ctx.newAsset({ ownerId: user.id });
+
+    const { result: faceXId } = await ctx.newAssetFace({ assetId: assetX.id });
+    const { result: faceTId } = await ctx.newAssetFace({ assetId: assetT.id });
+
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+
+    const personS = await spaceRepo.createPerson({
+      spaceId: spaceS.id,
+      name: 'PersonS',
+      type: 'person',
+      representativeFaceId: null,
+    });
+    await spaceRepo.addPersonFaces([{ personId: personS.id, assetFaceId: faceXId }]);
+
+    const personT = await spaceRepo.createPerson({
+      spaceId: spaceT.id,
+      name: 'PersonT',
+      type: 'person',
+      representativeFaceId: null,
+    });
+    await spaceRepo.addPersonFaces([{ personId: personT.id, assetFaceId: faceTId }]);
+
+    // Only spaceS is affected by the delete of assetX.
+    const affectedSpacePersons = await spaceRepo.getSpacePersonsForAsset(assetX.id);
+    await defaultDatabase.deleteFrom('asset').where('id', '=', assetX.id).execute();
+
+    await sut.onAssetDelete({ assetId: assetX.id, userId: user.id, affectedSpacePersons });
+
+    // PersonT in spaceT must not have been deleted.
+    const personTAfter = await defaultDatabase
+      .selectFrom('shared_space_person')
+      .select('id')
+      .where('id', '=', personT.id)
+      .execute();
+    expect(personTAfter).toHaveLength(1);
+  });
+});

@@ -2801,6 +2801,36 @@ export class SharedSpaceService extends BaseService {
     }
   }
 
+  // Emit-timing note: AssetDelete fires AFTER the asset row and its DB cascade
+  // (asset → asset_face → shared_space_person_face) have already run.  By the time this
+  // handler executes, those rows are gone.  The affected (spaceId, personId) pairs are
+  // therefore captured at the emit site in asset.service.ts BEFORE deletion via
+  // sharedSpaceRepository.getSpacePersonsForAsset() and forwarded in the payload.
+  @OnEvent({ name: 'AssetDelete' })
+  async onAssetDelete({ assetId, affectedSpacePersons }: ArgOf<'AssetDelete'>): Promise<void> {
+    if (!affectedSpacePersons || affectedSpacePersons.length === 0) {
+      return;
+    }
+    try {
+      // Group personIds by spaceId: one recount + orphan-cleanup pass per space.
+      const spacePersonMap = new Map<string, string[]>();
+      for (const { spaceId, personId } of affectedSpacePersons) {
+        let ids = spacePersonMap.get(spaceId);
+        if (!ids) {
+          ids = [];
+          spacePersonMap.set(spaceId, ids);
+        }
+        ids.push(personId);
+      }
+      for (const [spaceId, personIds] of spacePersonMap) {
+        await this.sharedSpaceRepository.recountPersons(personIds);
+        await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to sync space people after deleting asset ${assetId}: ${error}`);
+    }
+  }
+
   @OnEvent({ name: 'AlbumDelete' })
   async onAlbumDelete({ albumId }: ArgOf<'AlbumDelete'>): Promise<void> {
     try {

@@ -10171,6 +10171,44 @@ describe(SharedSpaceService.name, () => {
     });
   });
 
+  describe('onAssetDelete', () => {
+    it('recounts affected persons and deletes orphans for each impacted space', async () => {
+      const spaceA = newUuid();
+      const spaceB = newUuid();
+      const p1 = newUuid();
+      const p2 = newUuid();
+      mocks.sharedSpace.recountPersons.mockResolvedValue(void 0);
+      mocks.sharedSpace.deleteOrphanedPersons.mockResolvedValue();
+
+      await sut.onAssetDelete({
+        assetId: newUuid(),
+        userId: newUuid(),
+        affectedSpacePersons: [
+          { spaceId: spaceA, personId: p1 },
+          { spaceId: spaceA, personId: p2 },
+          { spaceId: spaceB, personId: p1 },
+        ],
+      });
+
+      expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledWith([p1, p2]);
+      expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledWith([p1]);
+      expect(mocks.sharedSpace.deleteOrphanedPersons).toHaveBeenCalledWith(spaceA);
+      expect(mocks.sharedSpace.deleteOrphanedPersons).toHaveBeenCalledWith(spaceB);
+    });
+
+    it('does nothing when affectedSpacePersons is an empty array', async () => {
+      await sut.onAssetDelete({ assetId: newUuid(), userId: newUuid(), affectedSpacePersons: [] });
+      expect(mocks.sharedSpace.recountPersons).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.deleteOrphanedPersons).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when affectedSpacePersons is absent from the payload', async () => {
+      await sut.onAssetDelete({ assetId: newUuid(), userId: newUuid() });
+      expect(mocks.sharedSpace.recountPersons).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.deleteOrphanedPersons).not.toHaveBeenCalled();
+    });
+  });
+
   describe('activity logging', () => {
     it('linkAlbum logs an album_link activity for a new link', async () => {
       const auth = factory.auth({ user: { isAdmin: false } });

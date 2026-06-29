@@ -51,7 +51,7 @@ type EventMap = {
   AssetHide: [{ assetId: string; userId: string }];
   AssetShow: [{ assetId: string; userId: string }];
   AssetTrash: [{ assetId: string; userId: string }];
-  AssetDelete: [{ assetId: string; userId: string }];
+  AssetDelete: [{ assetId: string; userId: string; affectedSpacePersons?: { spaceId: string; personId: string }[] }];
   AssetMetadataExtracted: [{ assetId: string; userId: string; source?: JobSource }];
 
   // asset bulk events

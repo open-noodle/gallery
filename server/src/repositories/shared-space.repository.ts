@@ -2617,6 +2617,23 @@ export class SharedSpaceRepository {
       .execute();
   }
 
+  /**
+   * Returns the (spaceId, personId) pairs for every shared-space person face that references
+   * an asset_face belonging to the given asset.  Must be called BEFORE the asset row is deleted
+   * (i.e. before the asset → asset_face → shared_space_person_face cascade runs).
+   */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getSpacePersonsForAsset(assetId: string) {
+    return this.db
+      .selectFrom('shared_space_person_face')
+      .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+      .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_face.personId')
+      .select(['shared_space_person.spaceId', 'shared_space_person_face.personId'])
+      .distinct()
+      .where('asset_face.assetId', '=', assetId)
+      .execute();
+  }
+
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async isPersonFaceAssigned(assetFaceId: string, spaceId: string): Promise<boolean> {
     const result = await this.db
