@@ -2072,8 +2072,32 @@ from
   "shared_space_album_user"
 where
   "userId" = $1
-  and "createId" >= $2
-  and "createId" < $3
+  and "albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $2
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $3
+      )
+  )
+  and "createId" >= $4
+  and "createId" < $5
 order by
   "createId" asc
 
@@ -2276,6 +2300,30 @@ where
   "album_asset"."updateId" < $1
   and "album_asset"."updateId" > $2
   and "shared_space_album_user"."userId" = $3
+  and "album_asset"."albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $4
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $5
+      )
+  )
 order by
   "album_asset"."updateId" asc
 
@@ -2308,11 +2356,13 @@ select
 from
   "album_asset" as "album_asset"
   inner join "asset" on "asset"."id" = "album_asset"."assetId"
+  inner join "album" on "album"."id" = "album_asset"."albumId"
 where
   "album_asset"."updateId" < $3
   and "album_asset"."updateId" <= $4
   and "album_asset"."updateId" >= $5
   and "album_asset"."albumId" = $6
+  and "album"."deletedAt" is null
 order by
   "album_asset"."updateId" asc
 
@@ -2351,6 +2401,30 @@ where
   and "asset"."updateId" > $4
   and "album_asset"."updateId" <= $5
   and "shared_space_album_user"."userId" = $6
+  and "album_asset"."albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $7
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $8
+      )
+  )
 order by
   "asset"."updateId" asc
 
@@ -2388,6 +2462,30 @@ where
   "album_asset"."updateId" < $3
   and "album_asset"."updateId" > $4
   and "shared_space_album_user"."userId" = $5
+  and "album_asset"."albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $6
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $7
+      )
+  )
 order by
   "album_asset"."updateId" asc
 
@@ -2422,11 +2520,13 @@ select
 from
   "album_asset" as "album_asset"
   inner join "asset_exif" on "asset_exif"."assetId" = "album_asset"."assetId"
+  inner join "album" on "album"."id" = "album_asset"."albumId"
 where
   "album_asset"."updateId" < $1
   and "album_asset"."updateId" <= $2
   and "album_asset"."updateId" >= $3
   and "album_asset"."albumId" = $4
+  and "album"."deletedAt" is null
 order by
   "album_asset"."updateId" asc
 
@@ -2467,6 +2567,30 @@ where
   and "asset_exif"."updateId" > $2
   and "album_asset"."updateId" <= $3
   and "shared_space_album_user"."userId" = $4
+  and "album_asset"."albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $5
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $6
+      )
+  )
 order by
   "asset_exif"."updateId" asc
 
@@ -2506,5 +2630,29 @@ where
   "album_asset"."updateId" < $1
   and "album_asset"."updateId" > $2
   and "shared_space_album_user"."userId" = $3
+  and "album_asset"."albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $4
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $5
+      )
+  )
 order by
   "album_asset"."updateId" asc
