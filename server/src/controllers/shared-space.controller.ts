@@ -37,6 +37,7 @@ import {
   SharedSpaceActivityQueryDto,
   SharedSpaceActivityResponseDto,
   SharedSpaceAlbumLinkUpdateDto,
+  SharedSpaceAlbumParamDto,
   SharedSpaceAssetAddDto,
   SharedSpaceAssetRemoveDto,
   SharedSpaceCreateDto,
@@ -606,7 +607,7 @@ export class SharedSpaceController {
     description: 'Link an album so its photos appear in the space. Requires space editor/owner and album owner/editor.',
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
-  linkAlbum(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto, @Param('albumId') albumId: string): Promise<void> {
+  linkAlbum(@Auth() auth: AuthDto, @Param() { id, albumId }: SharedSpaceAlbumParamDto): Promise<void> {
     return this.service.linkAlbum(auth, id, albumId);
   }
 
@@ -619,8 +620,7 @@ export class SharedSpaceController {
   })
   updateSharedSpaceAlbum(
     @Auth() auth: AuthDto,
-    @Param() { id }: UUIDParamDto,
-    @Param('albumId') albumId: string,
+    @Param() { id, albumId }: SharedSpaceAlbumParamDto,
     @Body() dto: SharedSpaceAlbumLinkUpdateDto,
   ): Promise<void> {
     return this.service.updateAlbumLink(auth, id, albumId, dto);
@@ -634,7 +634,7 @@ export class SharedSpaceController {
     description: 'Remove an album link. Album assets will no longer appear in the space.',
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
-  unlinkAlbum(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto, @Param('albumId') albumId: string): Promise<void> {
+  unlinkAlbum(@Auth() auth: AuthDto, @Param() { id, albumId }: SharedSpaceAlbumParamDto): Promise<void> {
     return this.service.unlinkAlbum(auth, id, albumId);
   }
 }

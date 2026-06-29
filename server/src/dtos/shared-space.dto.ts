@@ -133,6 +133,11 @@ const SharedSpaceAlbumLinkUpdateSchema = z
   })
   .meta({ id: 'SharedSpaceAlbumLinkUpdateDto' });
 
+const SharedSpaceAlbumParamSchema = z.object({
+  id: z.uuidv4(),
+  albumId: z.uuidv4(),
+});
+
 const SharedSpaceLinkedAlbumSchema = z
   .object({
     albumId: z.string(),
@@ -194,6 +199,7 @@ export class SharedSpaceMemberMetadataContributionDto extends createZodDto(
 ) {}
 export class SharedSpaceLibraryLinkDto extends createZodDto(SharedSpaceLibraryLinkSchema) {}
 export class SharedSpaceAlbumLinkUpdateDto extends createZodDto(SharedSpaceAlbumLinkUpdateSchema) {}
+export class SharedSpaceAlbumParamDto extends createZodDto(SharedSpaceAlbumParamSchema) {}
 export class SharedSpaceLinkedAlbumDto extends createZodDto(SharedSpaceLinkedAlbumSchema) {}
 export class SharedSpaceAssetAddDto extends createZodDto(SharedSpaceAssetAddSchema) {}
 export class SharedSpaceAssetRemoveDto extends createZodDto(SharedSpaceAssetRemoveSchema) {}

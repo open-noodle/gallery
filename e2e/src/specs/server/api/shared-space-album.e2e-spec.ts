@@ -425,6 +425,36 @@ describe('/shared-spaces/:id/albums (T18)', () => {
     });
   });
 
+  // ─── RBAC F3: non-UUID albumId param → 400 (not 500) ─────────────────────
+  //
+  // The controller now uses SharedSpaceAlbumParamDto (z.uuidv4() for both id
+  // and albumId) so a non-UUID albumId is rejected by the ZodValidationPipe
+  // with a 400 before the service layer is reached.
+
+  describe('invalid albumId param → 400 (RBAC F3)', () => {
+    it('PUT with non-UUID albumId → 400 (not 500)', async () => {
+      const { status } = await request(app)
+        .put(`/shared-spaces/${spaceId}/albums/not-a-uuid`)
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      expect(status).toBe(400);
+    });
+
+    it('PATCH with non-UUID albumId → 400 (not 500)', async () => {
+      const { status } = await request(app)
+        .patch(`/shared-spaces/${spaceId}/albums/not-a-uuid`)
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .send({ showInTimeline: true });
+      expect(status).toBe(400);
+    });
+
+    it('DELETE with non-UUID albumId → 400 (not 500)', async () => {
+      const { status } = await request(app)
+        .delete(`/shared-spaces/${spaceId}/albums/not-a-uuid`)
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      expect(status).toBe(400);
+    });
+  });
+
   // ─── DELETE /shared-spaces/:id/albums/:albumId ────────────────────────────
 
   describe('DELETE /shared-spaces/:id/albums/:albumId', () => {
