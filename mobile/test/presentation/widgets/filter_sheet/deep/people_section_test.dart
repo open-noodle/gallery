@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -51,10 +52,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Title uses 'filter_sheet_deep_people_section'.tr() — in a test without
-      // localization init this returns the raw key. Assert on the i18n-key
-      // fallback (matches sibling-test patterns).
-      expect(find.text('FILTER_SHEET_DEEP_PEOPLE_SECTION'), findsOneWidget);
+      // DeepSectionScaffold renders the title as .tr().toUpperCase(); the
+      // localized pump resolves it, so assert on the same value.
+      expect(find.text('filter_sheet_deep_people_section'.tr().toUpperCase()), findsOneWidget);
       expect(find.text('Emma'), findsOneWidget);
       expect(find.text('Lars'), findsOneWidget);
       expect(find.byKey(const Key('people-section-search-more')), findsOneWidget);
