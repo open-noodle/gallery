@@ -323,6 +323,14 @@ export class UserService extends BaseService {
     }
 
     this.logger.warn(`Removing user from database: ${user.id}`);
+
+    // Clean up shared-space face projections for this user's albums before the
+    // albums (and their album_asset / shared_space_album links) are hard-deleted.
+    const ownedAlbumIds = await this.albumRepository.getAllIds(user.id, { isOwned: true });
+    for (const albumId of ownedAlbumIds) {
+      await this.eventRepository.emit('AlbumDelete', { albumId });
+    }
+
     await this.albumRepository.deleteAll(user.id);
     await this.userRepository.delete(user, true);
 
