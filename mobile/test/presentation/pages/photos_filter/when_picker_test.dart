@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -21,7 +22,7 @@ void main() {
     testWidgets('renders AppBar with back icon, title key, and Done button', (tester) async {
       await tester.pumpConsumerWidget(const WhenPickerPage());
       expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
-      expect(find.text('filter_sheet_picker_when_title'), findsOneWidget);
+      expect(find.text('filter_sheet_picker_when_title'.tr()), findsOneWidget);
       expect(find.byKey(const Key('when-picker-done')), findsOneWidget);
     });
 
