@@ -631,6 +631,7 @@ DELETE FROM "kysely_migrations"
    '1779000000000-AddSharedSpaceAlbumUserTables',
    '1779100000000-AddSharedSpaceAlbumCreateSideTriggers',
    '1779200000000-AddSharedSpaceAlbumDeleteSideTriggers',
+   '1779300000000-FixUserHasAlbumPathSoftDeleted',
 
    -- Post-v2.7.5 upstream migrations pulled in by rebase. Paired with the
    -- schema rollbacks in step 7 above.
