@@ -40,9 +40,7 @@ void main() {
 
   group('get', () {
     test('forwards currentUserId to the repository', () async {
-      when(
-        () => repository.get(any(), currentUserId: any(named: 'currentUserId')),
-      ).thenAnswer((_) async => null);
+      when(() => repository.get(any(), currentUserId: any(named: 'currentUserId'))).thenAnswer((_) async => null);
 
       await sut.get('a1', currentUserId: 'u1');
 

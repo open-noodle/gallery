@@ -174,10 +174,7 @@ class _AlbumCard extends ConsumerWidget {
         if (snapshot.hasData && snapshot.data != null) {
           return ClipRRect(
             borderRadius: const BorderRadius.all(Radius.circular(16)),
-            child: Thumbnail.remote(
-              remoteId: thumbnailId,
-              thumbhash: snapshot.data!.thumbHash ?? '',
-            ),
+            child: Thumbnail.remote(remoteId: thumbnailId, thumbhash: snapshot.data!.thumbHash ?? ''),
           );
         }
         return _buildFallback(cs);
@@ -199,10 +196,7 @@ class _AlbumCard extends ConsumerWidget {
           Expanded(
             child: Stack(
               children: [
-                Opacity(
-                  opacity: isOffTimeline ? 0.6 : 1.0,
-                  child: _buildCoverArt(context, ref, cs),
-                ),
+                Opacity(opacity: isOffTimeline ? 0.6 : 1.0, child: _buildCoverArt(context, ref, cs)),
                 // Off-timeline badge
                 if (isOffTimeline)
                   Positioned.fill(

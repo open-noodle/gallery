@@ -11,8 +11,9 @@
 **Goal:** Fix every finding from the three post-#726 reviews of `feat/space-albums` @ `5f0076cd6e`
 (RBAC `sa-rbac-k7`, server-faces `sa-faces-m3`, mobile `sa-mobile-p2`) — the people-projection
 ship-blocker, owner-account/soft-delete/asset-delete face cleanup, sync-stream + `user_has_album_path`
-+ route-param consistency, and the mobile add-photos/link-picker/polish gaps. Product-only items
-(faces F6, RBAC F4/F5) are noted, not implemented.
+
+- route-param consistency, and the mobile add-photos/link-picker/polish gaps. Product-only items
+  (faces F6, RBAC F4/F5) are noted, not implemented.
 
 **Architecture:** Server fixes are Kysely SQL-predicate edits mirroring the existing
 `shared_space_library` branch / the `onAlbumDelete` cleanup sequence, one new fork migration
@@ -23,7 +24,8 @@ sequence directly.
 
 **Tech Stack:** NestJS 11 + Kysely (server), zod DTOs, SvelteKit/Svelte 5 (web — none in scope this
 round), Flutter/Riverpod/Drift (mobile), Vitest (server unit + medium via testcontainers), Playwright
-+ Vitest (e2e), `flutter test` (mobile).
+
+- Vitest (e2e), `flutter test` (mobile).
 
 ## Global Constraints
 
@@ -37,7 +39,7 @@ round), Flutter/Riverpod/Drift (mobile), Vitest (server unit + medium via testco
   shifts. **Re-grep by symbol name + scoping construct before editing.** Every cited method name and
   signature was verified at this commit.
 - **The A1 invariant:** every album read/stat/face/count/sync SQL branch MUST filter `album.deletedAt
-  is null` via a non-deleted `album` join. New branches include it from the start.
+is null` via a non-deleted `album` join. New branches include it from the start.
 - **Clone source for every predicate change:** the adjacent `shared_space_library` branch in the same
   method. For face cleanup: the `onAlbumDelete` handler sequence in `shared-space.service.ts`.
 - **Server imports:** no relative imports — use the `src/` alias. Strict TS.
@@ -63,15 +65,15 @@ round), Flutter/Riverpod/Drift (mobile), Vitest (server unit + medium via testco
 
 **The 7 queries and their scoping site** (anchor by method name; verify line by grep):
 
-| # | Method | Scoping construct to extend |
-| --- | --- | --- |
-| 1 | `getSpaceRepresentativeFaces` (called by `getSpacePersonFaces`) | `eb.or([...])` (asset + library EXISTS) |
-| 2 | `getSpacePersonStatistics` | `asset_scope` CTE (asset UNION library) |
-| 3 | `countPersonsBySpaceId` (svc `getSpacePeopleStatistics`) | `asset_scope` CTE **and** the `detectedFaceCount` subquery **and** `datePersonFilter` |
-| 4 | `getPeopleFaceStatisticsBySpaceId` (svc `getSpacePeopleFaceStatistics`) | `asset_scope` CTE |
-| 5 | `getPersonsBySpaceId` | in-space EXISTS `eb.or([...])` (carries date filter) |
-| 6 | `getSpaceRepresentativeFaceForUpdate` | `eb.or([...])` |
-| 7 | `getIdentityEvidenceForSpacePerson` | `eb.or([...])` |
+| #   | Method                                                                  | Scoping construct to extend                                                           |
+| --- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| 1   | `getSpaceRepresentativeFaces` (called by `getSpacePersonFaces`)         | `eb.or([...])` (asset + library EXISTS)                                               |
+| 2   | `getSpacePersonStatistics`                                              | `asset_scope` CTE (asset UNION library)                                               |
+| 3   | `countPersonsBySpaceId` (svc `getSpacePeopleStatistics`)                | `asset_scope` CTE **and** the `detectedFaceCount` subquery **and** `datePersonFilter` |
+| 4   | `getPeopleFaceStatisticsBySpaceId` (svc `getSpacePeopleFaceStatistics`) | `asset_scope` CTE                                                                     |
+| 5   | `getPersonsBySpaceId`                                                   | in-space EXISTS `eb.or([...])` (carries date filter)                                  |
+| 6   | `getSpaceRepresentativeFaceForUpdate`                                   | `eb.or([...])`                                                                        |
+| 7   | `getIdentityEvidenceForSpacePerson`                                     | `eb.or([...])`                                                                        |
 
 **Canonical album branch** (member-/space-scoped `EXISTS` form, mirrors the library branch + A1 join):
 
@@ -108,11 +110,11 @@ the `takenAfter`/`takenBefore` date filters:
 ```
 
 - [ ] **Step 1 (RED): comprehensive medium test** in `shared-space.repository.spec.ts`, a new
-  `describe('people projection — album-linked space', …)`. Seed a face-recognition-enabled space `S`;
-  link album `A` (via `addAlbum`) with image assets that are **not** direct-added and **not** in any
-  linked library; run/seed the projection so a space person `P` has `shared_space_person_face` rows on
-  `A`'s assets (mirror the existing direct/library projection seeding). Assert, **before** the fix
-  (RED):
+      `describe('people projection — album-linked space', …)`. Seed a face-recognition-enabled space `S`;
+      link album `A` (via `addAlbum`) with image assets that are **not** direct-added and **not** in any
+      linked library; run/seed the projection so a space person `P` has `shared_space_person_face` rows on
+      `A`'s assets (mirror the existing direct/library projection seeding). Assert, **before** the fix
+      (RED):
   - `getSpaceRepresentativeFaces(S, [P])` (via `getSpacePersonFaces`) returns a **non-empty** face
     list for `P` (RED: empty).
   - `getSpacePersonStatistics(S, P)` returns `assets > 0 && faces > 0` matching the projection's
@@ -133,17 +135,17 @@ the `takenAfter`/`takenBefore` date filters:
     0 (this also pins F3's read behavior).
 - [ ] **Step 2: Run; verify FAIL.** `cd server && pnpm test:medium -- --run test/medium/specs/repositories/shared-space.repository.spec.ts`
 - [ ] **Step 3 (GREEN): add the album branch** to all 7 scoping sites (and the two extra sites inside
-  `countPersonsBySpaceId`: the `detectedFaceCount` subquery and `datePersonFilter`). Match each
-  sibling's join column (`asset.id` vs `asset_face.assetId`) and scope key (`spaceId` literal vs
-  `shared_space_person.spaceId` ref). Do **not** modify `recountPersons` or `getPersonAssetIds` (they
-  read the projection directly by design). Grep to confirm none missed: `grep -n
-  "shared_space_library" server/src/repositories/shared-space.repository.ts` within the people block —
-  every people-projection hit must now have a paired `shared_space_album` branch.
+      `countPersonsBySpaceId`: the `detectedFaceCount` subquery and `datePersonFilter`). Match each
+      sibling's join column (`asset.id` vs `asset_face.assetId`) and scope key (`spaceId` literal vs
+      `shared_space_person.spaceId` ref). Do **not** modify `recountPersons` or `getPersonAssetIds` (they
+      read the projection directly by design). Grep to confirm none missed: `grep -n
+"shared_space_library" server/src/repositories/shared-space.repository.ts` within the people block —
+      every people-projection hit must now have a paired `shared_space_album` branch.
 - [ ] **Step 4: Run; verify PASS.** Re-run the spec; then run the broader recognition specs to confirm
-  no regression on direct/library spaces:
-  `cd server && pnpm test:medium -- --run test/medium/specs/repositories/shared-space-face-matching.spec.ts`
+      no regression on direct/library spaces:
+      `cd server && pnpm test:medium -- --run test/medium/specs/repositories/shared-space-face-matching.spec.ts`
 - [ ] **Step 5: slice gate.** `make check-server`; commit
-  `fix(spaces): album-linked faces appear in space people read/stats/faces (faces F1)`.
+      `fix(spaces): album-linked faces appear in space people read/stats/faces (faces F1)`.
 
 ---
 
@@ -166,14 +168,14 @@ Both album branches `innerJoin('album_asset', …)` directly without joining `al
 ```
 
 - [ ] **Step 1 (RED):** in `shared-space-album.repository.spec.ts`, link album `A` (with asset `X`)
-  into face-enabled space `S`. Assert `isAssetInSpace(S, X) === true` and `getSpaceIdsForAsset(X)`
-  includes `S`. Then soft-delete `A` and assert `isAssetInSpace(S, X) === false` and
-  `getSpaceIdsForAsset(X)` **excludes** `S` (RED: both still true/included).
+      into face-enabled space `S`. Assert `isAssetInSpace(S, X) === true` and `getSpaceIdsForAsset(X)`
+      includes `S`. Then soft-delete `A` and assert `isAssetInSpace(S, X) === false` and
+      `getSpaceIdsForAsset(X)` **excludes** `S` (RED: both still true/included).
 - [ ] **Step 2: Run; verify FAIL.** `cd server && pnpm test:medium -- --run test/medium/specs/repositories/shared-space-album.repository.spec.ts`
 - [ ] **Step 3 (GREEN):** add the non-deleted `album` join to both album branches.
 - [ ] **Step 4: Run; verify PASS.**
 - [ ] **Step 5: slice gate.** `make check-server`; commit
-  `fix(spaces): face-pipeline gates exclude soft-deleted albums (faces F3a)`.
+      `fix(spaces): face-pipeline gates exclude soft-deleted albums (faces F3a)`.
 
 ---
 
@@ -191,34 +193,34 @@ Both album branches `innerJoin('album_asset', …)` directly without joining `al
 **Interfaces:**
 
 - Consumes (already present, reused from `onAlbumDelete`): `eventRepository.emit('AlbumDelete', {
-  albumId })` (awaited in-process), or directly `sharedSpaceRepository.getSpacesLinkedToAlbum`,
+albumId })` (awaited in-process), or directly `sharedSpaceRepository.getSpacesLinkedToAlbum`,
   `getAlbumAssetIdsWithoutOtherSpacePath`, `removePersonFacesByAssetIds`, `deleteOrphanedPersons`,
   `queueSpacePersonMetadataBackfill`.
 
 - [ ] **Step 1: Confirm emit ordering.** `handleUserDelete` emits only `UserDelete` today; verify
-  `eventRepository.emit` awaits handlers in-process (it does for `AlbumAssetsAdd/Remove`/`AlbumDelete`).
-  The cleanup must run while `album_asset` rows still exist (i.e. **before** `deleteAll` and before the
-  user/asset cascade).
+      `eventRepository.emit` awaits handlers in-process (it does for `AlbumAssetsAdd/Remove`/`AlbumDelete`).
+      The cleanup must run while `album_asset` rows still exist (i.e. **before** `deleteAll` and before the
+      user/asset cascade).
 - [ ] **Step 2 (RED): medium test** in `shared-space-album.service.spec.ts`. Alice owns album `A` with
-  photos from **Alice and Bob**; Bob's face-enabled space `S` links `A`; the projection has space
-  persons derived from `A`'s faces (assert `assetCount > 0` pre-delete). A second asset `Z` in `A` is
-  **also** direct-added to `S`. Hard-delete Alice via `userService.handleUserDelete({ id: alice })`.
-  Assert:
+      photos from **Alice and Bob**; Bob's face-enabled space `S` links `A`; the projection has space
+      persons derived from `A`'s faces (assert `assetCount > 0` pre-delete). A second asset `Z` in `A` is
+      **also** direct-added to `S`. Hard-delete Alice via `userService.handleUserDelete({ id: alice })`.
+      Assert:
   - `shared_space_person_face` rows for `A`'s assets that are now path-less are **removed** and
     zero-face `shared_space_person` rows are gone (`deleteOrphanedPersons` ran).
   - the face on `Z` is **retained** (survives via the direct path).
   - control: a face-enabled space that did **not** link `A` is untouched.
-  (RED: faces stranded, orphan persons remain.)
+    (RED: faces stranded, orphan persons remain.)
 - [ ] **Step 3: Run; verify FAIL.** `cd server && pnpm test:medium -- --run test/medium/specs/services/shared-space-album.service.spec.ts`
 - [ ] **Step 4 (GREEN):** in `handleUserDelete`, before `albumRepository.deleteAll(user.id)`,
-  enumerate the user's album ids and `await this.eventRepository.emit('AlbumDelete', { albumId })` for
-  each (reusing the tested `onAlbumDelete` cleanup). If a bulk sweep is preferred for large accounts,
-  call the `getSpacesLinkedToAlbum → … → deleteOrphanedPersons` sequence directly per album. Mind
-  `no-floating-promises`.
+      enumerate the user's album ids and `await this.eventRepository.emit('AlbumDelete', { albumId })` for
+      each (reusing the tested `onAlbumDelete` cleanup). If a bulk sweep is preferred for large accounts,
+      call the `getSpacesLinkedToAlbum → … → deleteOrphanedPersons` sequence directly per album. Mind
+      `no-floating-promises`.
 - [ ] **Step 5: Run; verify PASS.** Add/confirm the `user.service.spec.ts` unit assertion that the
-  emit/sweep happens before `deleteAll`.
+      emit/sweep happens before `deleteAll`.
 - [ ] **Step 6: slice gate.** `make check-server`; commit
-  `fix(spaces): clean space faces when an album owner's account is hard-deleted (faces F2)`.
+      `fix(spaces): clean space faces when an album owner's account is hard-deleted (faces F2)`.
 
 > Edge note: a deleted user's **direct-added / library** assets in other spaces (not via an album)
 > can still leave stale faces — that is the F5 class (Slice 6), not this slice.
@@ -244,30 +246,31 @@ restore, the existing per-(space,asset) face-match queue (`SharedSpaceFaceMatch`
 **Depends on:** Slice 2 (gates) so no new faces are added during the window while we clean.
 
 - [ ] **Step 1 (RED): medium test** — owner-account soft-delete. Bob's face-enabled space `S` links
-  Alice's album `A`; projection has album-sourced people with `assetCount > 0`. Soft-delete Alice's
-  account (drive `userAdminService.delete(auth, alice, {})` — non-force, the soft path). Assert the
-  album-sourced `shared_space_person_face` rows are **removed**, zero-face persons gone, and (with
-  Slice 1 in place) the people read surfaces return empty for `A`-only people. (RED: faces persist.)
+      Alice's album `A`; projection has album-sourced people with `assetCount > 0`. Soft-delete Alice's
+      account (drive `userAdminService.delete(auth, alice, {})` — non-force, the soft path). Assert the
+      album-sourced `shared_space_person_face` rows are **removed**, zero-face persons gone, and (with
+      Slice 1 in place) the people read surfaces return empty for `A`-only people. (RED: faces persist.)
 - [ ] **Step 2 (RED): medium test** — restore. After the soft-delete above, restore Alice
-  (`userAdminService.restore(auth, alice)`); assert a face re-match is queued per linking face-enabled
-  space (assert the job enqueue, or — if the test runs the worker — that the album-sourced people
-  re-appear). (RED: nothing re-queued.)
+      (`userAdminService.restore(auth, alice)`); assert a face re-match is queued per linking face-enabled
+      space (assert the job enqueue, or — if the test runs the worker — that the album-sourced people
+      re-appear). (RED: nothing re-queued.)
 - [ ] **Step 3: Run; verify FAIL.** `cd server && pnpm test:medium -- --run test/medium/specs/services/shared-space-album.service.spec.ts`
 - [ ] **Step 4 (GREEN): cleanup on soft-delete.** From the soft-delete path, for each of the user's
-  albums run the `onAlbumDelete` cleanup sequence per face-enabled linking space (the `album_asset`
-  rows still exist on soft-delete). Wire it via a small shared-space method invoked from
-  `user-admin.service.delete()` (inject `SharedSpaceService`/repo as the codebase already does) — do
-  **not** invent a public API/event surface beyond an internal call.
+      albums run the `onAlbumDelete` cleanup sequence per face-enabled linking space (the `album_asset`
+      rows still exist on soft-delete). Wire it via a small shared-space method invoked from
+      `user-admin.service.delete()` (inject `SharedSpaceService`/repo as the codebase already does) — do
+      **not** invent a public API/event surface beyond an internal call.
 - [ ] **Step 5 (GREEN): re-projection on restore.** From the restore path, for each restored album,
-  for each linking face-enabled space, queue face matching (mirror `addMember`'s
-  `queueSpacePersonMetadataBackfill` + per-space `SharedSpaceFaceMatchAll`).
+      for each linking face-enabled space, queue face matching (mirror `addMember`'s
+      `queueSpacePersonMetadataBackfill` + per-space `SharedSpaceFaceMatchAll`).
 - [ ] **Step 6: Run; verify PASS.**
 - [ ] **Step 7: slice gate.** `make check-server`; commit
-  `fix(spaces): clean/re-project space faces on owner-account soft-delete and restore (faces F3b)`.
+      `fix(spaces): clean/re-project space faces on owner-account soft-delete and restore (faces F3b)`.
 
 > Decision baked in: this implements the **eager** cleanup the report recommends (consistency with A1
-> + clears `getSpacePersonThumbnail` exposure). The lazy alternative is noted in the design's Product
-> decisions; do not switch without a captain decision.
+>
+> - clears `getSpacePersonThumbnail` exposure). The lazy alternative is noted in the design's Product
+>   decisions; do not switch without a captain decision.
 
 ---
 
@@ -308,13 +311,13 @@ const albumRows = await this.db
 Union its `userId`s with the existing direct + library rows.
 
 - [ ] **Step 1 (RED): medium test** in `shared-space.repository.spec.ts`: a space person whose faces
-  are only on an album-linked asset → `getSpacePersonAssetAdderIds(S, P)` includes the album's
-  `addedById` (RED: omitted).
+      are only on an album-linked asset → `getSpacePersonAssetAdderIds(S, P)` includes the album's
+      `addedById` (RED: omitted).
 - [ ] **Step 2: Run; verify FAIL.** `cd server && pnpm test:medium -- --run test/medium/specs/repositories/shared-space.repository.spec.ts`
 - [ ] **Step 3 (GREEN):** add the album-adder subquery + union.
 - [ ] **Step 4: Run; verify PASS.**
 - [ ] **Step 5: slice gate.** `make check-server`; commit
-  `fix(spaces): include album-linker as asset adder for metadata inheritance (faces F4)`.
+      `fix(spaces): include album-linker as asset adder for metadata inheritance (faces F4)`.
 
 ---
 
@@ -334,22 +337,22 @@ Union its `userId`s with the existing direct + library rows.
 needs the set of affected spaces (`getSpaceIdsForAsset`) and affected person ids.
 
 - [ ] **Step 1: Confirm timing (open item).** Determine whether `AssetDelete` (`asset.service.ts:485`)
-  fires **before or after** the `asset → asset_face → shared_space_person_face` cascade. If **before**:
-  the handler can query affected `(spaceId, personId)` from `shared_space_person_face` then recount
-  after. If **after**: the rows are already gone — capture affected spaces/persons in the payload
-  (enrich the event) or recount all persons for the spaces the asset belonged to. Document the chosen
-  path in the slice plan.
+      fires **before or after** the `asset → asset_face → shared_space_person_face` cascade. If **before**:
+      the handler can query affected `(spaceId, personId)` from `shared_space_person_face` then recount
+      after. If **after**: the rows are already gone — capture affected spaces/persons in the payload
+      (enrich the event) or recount all persons for the spaces the asset belonged to. Document the chosen
+      path in the slice plan.
 - [ ] **Step 2 (RED): medium test** — face-enabled space `S` (album- or direct-sourced); a person `P`
-  has faces on assets `X` and `Y`. Hard-delete `X`. Assert `P`'s `assetCount`/`faceCount` are
-  recounted (decremented) and, if `X` was `P`'s only asset, `P` is removed as a zero-face orphan.
-  Control: a person in a space not containing `X` is untouched. (RED: counts stale, orphan remains.)
+      has faces on assets `X` and `Y`. Hard-delete `X`. Assert `P`'s `assetCount`/`faceCount` are
+      recounted (decremented) and, if `X` was `P`'s only asset, `P` is removed as a zero-face orphan.
+      Control: a person in a space not containing `X` is untouched. (RED: counts stale, orphan remains.)
 - [ ] **Step 3: Run; verify FAIL.** `cd server && pnpm test:medium -- --run test/medium/specs/services/shared-space-album.service.spec.ts`
 - [ ] **Step 4 (GREEN):** add `onAssetDelete` — for each affected face-enabled space, `recountPersons`
-  the affected person ids and `deleteOrphanedPersons(spaceId)`. Keep it idempotent and guarded
-  (`try/catch` + logger, like `onAlbumDelete`).
+      the affected person ids and `deleteOrphanedPersons(spaceId)`. Keep it idempotent and guarded
+      (`try/catch` + logger, like `onAlbumDelete`).
 - [ ] **Step 5: Run; verify PASS.** Add the unit dispatch assertion in `shared-space.service.spec.ts`.
 - [ ] **Step 6: slice gate.** `make check-server`; commit
-  `fix(spaces): recount space people and drop orphans on asset delete (faces F5)`.
+      `fix(spaces): recount space people and drop orphans on asset delete (faces F5)`.
 
 > Pre-existing/broad: this also covers direct/library spaces. Lowest-priority engineering slice; the
 > timing question in Step 1 is the only real risk.
@@ -390,15 +393,15 @@ Add the non-deleted-album scope (mirror `SharedSpaceAlbumSync.getUpserts` ~`:139
 null` guard so a backfill for a soft-deleted album returns nothing.)
 
 - [ ] **Step 1 (RED): medium tests** in each asset/exif/to-asset spec: grant member `M` access to
-  album `A` (linked to face-enabled space `S`), confirm the stream returns `A`'s asset/exif/to-asset
-  rows; soft-delete `A`; assert the stream now returns **none** for `M` (RED: still streamed). Also
-  assert `SharedSpaceAlbumSync.getCreatedAfter` no longer creates the album for `M` after soft-delete.
+      album `A` (linked to face-enabled space `S`), confirm the stream returns `A`'s asset/exif/to-asset
+      rows; soft-delete `A`; assert the stream now returns **none** for `M` (RED: still streamed). Also
+      assert `SharedSpaceAlbumSync.getCreatedAfter` no longer creates the album for `M` after soft-delete.
 - [ ] **Step 2: Run; verify FAIL.** `cd server && pnpm test:medium -- --run test/medium/specs/sync/shared-space-album-asset-sync.spec.ts test/medium/specs/sync/shared-space-album-asset-exif-sync.spec.ts test/medium/specs/sync/shared-space-album-to-asset-sync.spec.ts`
 - [ ] **Step 3 (GREEN):** add `accessibleSpaceAlbums` / `album.deletedAt` scope to the eight stream
-  methods.
+      methods.
 - [ ] **Step 4: Run; verify PASS.**
 - [ ] **Step 5: slice gate.** `make check-server`; commit
-  `fix(spaces): stop syncing soft-deleted album assets to space members (RBAC F1)`.
+      `fix(spaces): stop syncing soft-deleted album assets to space members (RBAC F1)`.
 
 ---
 
@@ -412,7 +415,7 @@ null` guard so a backfill for a soft-deleted album returns nothing.)
 - Add: a new fork migration
   `server/src/schema/migrations-gallery/1779300000000-FixUserHasAlbumPathSoftDeleted.ts` (round
   timestamp **after** `1779200000000` — verify no collision) that `CREATE OR REPLACE FUNCTION
-  user_has_album_path(...)` with the corrected body.
+user_has_album_path(...)` with the corrected body.
 - Test: `server/test/medium/specs/sync/user-has-album-path.spec.ts` (extend) and/or
   `shared-space-album-delete-triggers.spec.ts`.
 
@@ -420,20 +423,20 @@ null` guard so a backfill for a soft-deleted album returns nothing.)
 `migrations-gallery/` (never touched by rebases) and `postbuild` merges them into `dist`.
 
 - [ ] **Step 1 (RED): medium test** in `user-has-album-path.spec.ts`: album `A` linked to two spaces
-  `S1`, `S2`; user `M` is a member of `S2` only. `user_has_album_path(A, M, S1)` returns `true`
-  (branch 2). Soft-delete `A`; assert it now returns `false` (RED: still `true` — under-revocation).
-  Add a branch-3 (other-space creator) variant. Confirm branch 1 (`album_user`) already returns
-  `false` for a soft-deleted album (regression guard).
+      `S1`, `S2`; user `M` is a member of `S2` only. `user_has_album_path(A, M, S1)` returns `true`
+      (branch 2). Soft-delete `A`; assert it now returns `false` (RED: still `true` — under-revocation).
+      Add a branch-3 (other-space creator) variant. Confirm branch 1 (`album_user`) already returns
+      `false` for a soft-deleted album (regression guard).
 - [ ] **Step 2: Run; verify FAIL.** `cd server && pnpm test:medium -- --run test/medium/specs/sync/user-has-album-path.spec.ts`
 - [ ] **Step 3 (GREEN):** edit `functions.ts` (so the schema source matches), then write the fork
-  migration with `CREATE OR REPLACE FUNCTION user_has_album_path` adding the `album.deletedAt` guard to
-  branches 2 & 3. Keep both copies byte-identical to avoid drift.
+      migration with `CREATE OR REPLACE FUNCTION user_has_album_path` adding the `album.deletedAt` guard to
+      branches 2 & 3. Keep both copies byte-identical to avoid drift.
 - [ ] **Step 4: Run; verify PASS.** Also run `shared-space-album-delete-triggers.spec.ts` to confirm
-  the grant-revocation gating still behaves (a leave where the only other path is a now-soft-deleted
-  album should revoke the grant).
+      the grant-revocation gating still behaves (a leave where the only other path is a now-soft-deleted
+      album should revoke the grant).
 - [ ] **Step 5: slice gate.** `make check-server` (and confirm `pnpm build` postbuild copies the new
-  migration); commit
-  `fix(spaces): exclude soft-deleted albums from user_has_album_path grant retention (RBAC F2)`.
+      migration); commit
+      `fix(spaces): exclude soft-deleted albums from user_has_album_path grant retention (RBAC F2)`.
 
 ---
 
@@ -452,19 +455,19 @@ null` guard so a backfill for a soft-deleted album returns nothing.)
 `@Param() { id, albumId }: SharedSpaceAlbumParamDto` on all three endpoints.
 
 - [ ] **Step 1 (RED): e2e test** in `shared-space-album.e2e-spec.ts`: as an authorized space
-  Owner/Editor, call `PUT /shared-spaces/:id/albums/not-a-uuid` and assert status **400** (RED:
-  currently 500). Add the same for `PATCH` and `DELETE`.
+      Owner/Editor, call `PUT /shared-spaces/:id/albums/not-a-uuid` and assert status **400** (RED:
+      currently 500). Add the same for `PATCH` and `DELETE`.
 - [ ] **Step 2: Run; verify FAIL.** Run the e2e API suite for the spec.
 - [ ] **Step 3 (GREEN):** add the DTO and switch the three handlers to it.
 - [ ] **Step 4: OpenAPI gate (decision point).** Build the server and check whether the generated spec
-  changes (`cd server && pnpm build && pnpm sync:open-api`, then `git diff` the spec). **If it
-  changes**, this is the one slice that runs the regen workflow: `make open-api` (TS SDK + Dart),
-  commit the regenerated clients. **If it does not change**, no regen. If the team prefers strictly
-  no-regen, instead use a runtime-only UUID guard that emits no param format metadata — resolve at
-  plan-review.
+      changes (`cd server && pnpm build && pnpm sync:open-api`, then `git diff` the spec). **If it
+      changes**, this is the one slice that runs the regen workflow: `make open-api` (TS SDK + Dart),
+      commit the regenerated clients. **If it does not change**, no regen. If the team prefers strictly
+      no-regen, instead use a runtime-only UUID guard that emits no param format metadata — resolve at
+      plan-review.
 - [ ] **Step 5: Run; verify PASS.**
 - [ ] **Step 6: slice gate.** `make check-server`; commit
-  `fix(spaces): validate albumId route param (400 not 500) (RBAC F3)`.
+      `fix(spaces): validate albumId route param (400 not 500) (RBAC F3)`.
 
 ---
 
@@ -494,18 +497,18 @@ Future<int> addAssets(String albumId, List<String> assetIds) async {
 ```
 
 - [ ] **Step 1 (RED): unit test** in `space_album_actions_test.dart` (mocktail): `addAssets` calls
-  `DriftAlbumApiRepository.addAssets` then `syncRemote()`, returns the added count, and **never**
-  touches the local album repository. Assert it does **not** call `RemoteAlbumRepository.addAssets`.
+      `DriftAlbumApiRepository.addAssets` then `syncRemote()`, returns the added count, and **never**
+      touches the local album repository. Assert it does **not** call `RemoteAlbumRepository.addAssets`.
 - [ ] **Step 2 (RED): regression test** in `space_album_repository_test.dart` (real Drift DB, FK ON):
-  pin that the old path fails — `DriftRemoteAlbumRepository.addAssets('absorbed-album', [assetId])`
-  (no `remote_album` row) throws FK 787 — then assert the new server-only path performs no local
-  junction insert (no FK violation). (Mirrors the empirical repro in the report.)
+      pin that the old path fails — `DriftRemoteAlbumRepository.addAssets('absorbed-album', [assetId])`
+      (no `remote_album` row) throws FK 787 — then assert the new server-only path performs no local
+      junction insert (no FK violation). (Mirrors the empirical repro in the report.)
 - [ ] **Step 3: Run; verify FAIL/repro.** `cd mobile && flutter test test/providers/infrastructure/space_album_actions_test.dart test/medium/repositories/space_album_repository_test.dart`
 - [ ] **Step 4 (GREEN):** implement `SpaceAlbumActions.addAssets`; point `_addPhotos` at it; on
-  success show the success toast, on real failure show the error toast (the false-failure is gone).
+      success show the success toast, on real failure show the error toast (the false-failure is gone).
 - [ ] **Step 5: Run; verify PASS.** `mise //mobile:analyze` clean on touched files.
 - [ ] **Step 6: slice gate.** Commit
-  `fix(spaces/mobile): add photos to absorbed linked albums without false failure (mobile F1)`.
+      `fix(spaces/mobile): add photos to absorbed linked albums without false failure (mobile F1)`.
 
 > Edge: owner case (album in `remote_album`) still works via the server-only path (no double insert);
 > remove path is already a safe no-op and is unchanged.
@@ -527,16 +530,16 @@ Future<int> addAssets(String albumId, List<String> assetIds) async {
 current-user-keyed read of `.role`. `toDto` gains a `currentUserRole` param.
 
 - [ ] **Step 1 (RED): medium repo test** — seed an album shared with the current user as **editor**
-  (a `remote_album_user` row, role=editor) that the user does **not** own; assert the mapped
-  `RemoteAlbum.currentUserRole == AlbumUserRole.editor` (RED: `null`). Add owner and viewer variants.
+      (a `remote_album_user` row, role=editor) that the user does **not** own; assert the mapped
+      `RemoteAlbum.currentUserRole == AlbumUserRole.editor` (RED: `null`). Add owner and viewer variants.
 - [ ] **Step 2: Run; verify FAIL.** `cd mobile && flutter test test/medium/repositories/space_album_repository_test.dart`
 - [ ] **Step 3 (GREEN):** read the current user's role in the album query and thread it through
-  `toDto(... currentUserRole: ...)`. The current user id is already available to these queries (used
-  for owner/shared computation) — reuse it.
+      `toDto(... currentUserRole: ...)`. The current user id is already available to these queries (used
+      for owner/shared computation) — reuse it.
 - [ ] **Step 4: Run; verify PASS.** Confirm `space_link_album_candidates_test.dart` still passes (the
-  editor branch is now reachable with real data).
+      editor branch is now reachable with real data).
 - [ ] **Step 5: slice gate.** `mise //mobile:analyze` clean; commit
-  `fix(spaces/mobile): offer editable (not just owned) albums in the link picker (mobile F2)`.
+      `fix(spaces/mobile): offer editable (not just owned) albums in the link picker (mobile F2)`.
 
 > Alternative (product): if editor-linking is out of scope for mobile v1, instead drop the `isEditor`
 > branch + "or can edit" wording. The design grants the capability, so this slice implements it; do
@@ -558,14 +561,14 @@ current-user-keyed read of `.role`. `toDto` gains a `currentUserRole` param.
 space name from the space-metadata source.
 
 - [ ] **Step 1 (RED): widget test** — pump `SpaceAlbumDetailPage`/`SpaceAlbumAppBar` with a known
-  `assetCount` and space name; assert the subtitle text `"{count} photos · in {space.name}"` renders
-  (RED: absent).
+      `assetCount` and space name; assert the subtitle text `"{count} photos · in {space.name}"` renders
+      (RED: absent).
 - [ ] **Step 2: Run; verify FAIL.** `cd mobile && flutter test test/presentation/pages/space_album_detail_page_test.dart`
 - [ ] **Step 3 (GREEN):** add the subtitle (e.g. an app-bar `bottom`/two-line title) using the count +
-  space name; guard for the loading state (no subtitle until resolved — see Slice 14).
+      space name; guard for the loading state (no subtitle until resolved — see Slice 14).
 - [ ] **Step 4: Run; verify PASS.**
 - [ ] **Step 5: slice gate.** `mise //mobile:analyze` clean; commit
-  `fix(spaces/mobile): show photo count + space on album detail header (mobile F3)`.
+      `fix(spaces/mobile): show photo count + space on album detail header (mobile F3)`.
 
 ---
 
@@ -587,14 +590,14 @@ space name from the space-metadata source.
 (make them `ConsumerWidget` where they aren't already).
 
 - [ ] **Step 1 (RED): widget test** — render a cover for an album with a `thumbnailAssetId`; assert a
-  `Thumbnail`/image renders (not the placeholder icon). With a null `thumbnailAssetId`, assert the
-  placeholder icon still renders. (RED: always the icon.)
+      `Thumbnail`/image renders (not the placeholder icon). With a null `thumbnailAssetId`, assert the
+      placeholder icon still renders. (RED: always the icon.)
 - [ ] **Step 2: Run; verify FAIL.** `cd mobile && flutter test test/presentation/widgets/spaces/space_albums_shelf_test.dart`
 - [ ] **Step 3 (GREEN):** port the `album_tile.dart` `FutureBuilder` cover pattern into the three
-  cover sites, keeping the icon as the no-thumbnail / loading / error fallback.
+      cover sites, keeping the icon as the no-thumbnail / loading / error fallback.
 - [ ] **Step 4: Run; verify PASS.**
 - [ ] **Step 5: slice gate.** `mise //mobile:analyze` clean; commit
-  `fix(spaces/mobile): render real album cover thumbnails (mobile F4)`.
+      `fix(spaces/mobile): render real album cover thumbnails (mobile F4)`.
 
 ---
 
@@ -611,16 +614,16 @@ space name from the space-metadata source.
 album stream is still `null`.
 
 - [ ] **Step 1 (RED): widget test** — render the detail page with `canEdit == true` but the
-  `spaceAlbumsProvider` stream **unresolved**; assert the timeline toggle is **disabled** (or tapping
-  it surfaces a "still loading" affordance) rather than silently no-opping. Once the album resolves,
-  assert the toggle is enabled and fires `toggleTimeline`. (RED: toggle enabled + silent no-op while
-  loading.)
+      `spaceAlbumsProvider` stream **unresolved**; assert the timeline toggle is **disabled** (or tapping
+      it surfaces a "still loading" affordance) rather than silently no-opping. Once the album resolves,
+      assert the toggle is enabled and fires `toggleTimeline`. (RED: toggle enabled + silent no-op while
+      loading.)
 - [ ] **Step 2: Run; verify FAIL.** `cd mobile && flutter test test/presentation/pages/space_album_detail_page_test.dart`
 - [ ] **Step 3 (GREEN):** disable the toggle entry until `album != null` (gate on the album stream,
-  not just `canEdit`), or show a transient "still loading" toast on early tap.
+      not just `canEdit`), or show a transient "still loading" toast on early tap.
 - [ ] **Step 4: Run; verify PASS.**
 - [ ] **Step 5: slice gate.** `mise //mobile:analyze` clean; commit
-  `fix(spaces/mobile): disable timeline toggle until album metadata loads (mobile F5)`.
+      `fix(spaces/mobile): disable timeline toggle until album metadata loads (mobile F5)`.
 
 ---
 
@@ -633,7 +636,7 @@ These need a captain decision before any code; the slices above do not touch the
   exceeding the timeline). Cheap either way; it's a "what does the space's photo count mean" call.
 - **RBAC F4** — confirm the transitive-write model is intended (album-editor who is a space Editor can
   re-share the album's write surface to that space's Editors).
-- **RBAC F5** — whether a space *creator* can be membership-removed at all, and whether sync should
+- **RBAC F5** — whether a space _creator_ can be membership-removed at all, and whether sync should
   then follow membership (pre-existing shared-space infra, broader than albums).
 - **F3b eagerness** — eager cleanup-on-soft-delete (implemented in Slice 4) vs lazy reliance on Slice
   1 read-scoping + Slice 2 gates (leaves `getSpacePersonThumbnail` exposure). Slice 4 proceeds with

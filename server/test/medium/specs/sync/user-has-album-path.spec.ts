@@ -96,8 +96,14 @@ describe('user_has_album_path', () => {
     const { space: s1 } = await ctx.newSharedSpace({ createdById: owner.id });
     const { space: s2 } = await ctx.newSharedSpace({ createdById: owner.id });
     await ctx.newSharedSpaceMember({ spaceId: s2.id, userId: member.id, role: SharedSpaceRole.Viewer });
-    await db.insertInto('shared_space_album').values({ spaceId: s1.id, albumId: album.id, addedById: owner.id }).execute();
-    await db.insertInto('shared_space_album').values({ spaceId: s2.id, albumId: album.id, addedById: owner.id }).execute();
+    await db
+      .insertInto('shared_space_album')
+      .values({ spaceId: s1.id, albumId: album.id, addedById: owner.id })
+      .execute();
+    await db
+      .insertInto('shared_space_album')
+      .values({ spaceId: s2.id, albumId: album.id, addedById: owner.id })
+      .execute();
 
     // member reaches album via s2; excluding s1 → branch 2 should be true
     expect(await hasPath(album.id, member.id, s1.id)).toBe(true);
@@ -116,8 +122,14 @@ describe('user_has_album_path', () => {
     const { album } = await ctx.newAlbum({ ownerId: albumOwner.id });
     const { space: s1 } = await ctx.newSharedSpace({ createdById: albumOwner.id });
     const { space: s2 } = await ctx.newSharedSpace({ createdById: creator.id });
-    await db.insertInto('shared_space_album').values({ spaceId: s1.id, albumId: album.id, addedById: albumOwner.id }).execute();
-    await db.insertInto('shared_space_album').values({ spaceId: s2.id, albumId: album.id, addedById: creator.id }).execute();
+    await db
+      .insertInto('shared_space_album')
+      .values({ spaceId: s1.id, albumId: album.id, addedById: albumOwner.id })
+      .execute();
+    await db
+      .insertInto('shared_space_album')
+      .values({ spaceId: s2.id, albumId: album.id, addedById: creator.id })
+      .execute();
 
     // creator of s2; excluding s1 → branch 3 should be true
     expect(await hasPath(album.id, creator.id, s1.id)).toBe(true);
@@ -134,7 +146,10 @@ describe('user_has_album_path', () => {
     const { user: owner } = await ctx.newUser();
     const { user: viewer } = await ctx.newUser();
     const { album } = await ctx.newAlbum({ ownerId: owner.id });
-    await db.insertInto('album_user').values({ albumId: album.id, userId: viewer.id, role: AlbumUserRole.Viewer }).execute();
+    await db
+      .insertInto('album_user')
+      .values({ albumId: album.id, userId: viewer.id, role: AlbumUserRole.Viewer })
+      .execute();
     expect(await hasPath(album.id, viewer.id, NIL)).toBe(true);
     await db.updateTable('album').set({ deletedAt: new Date() }).where('id', '=', album.id).execute();
     expect(await hasPath(album.id, viewer.id, NIL)).toBe(false);

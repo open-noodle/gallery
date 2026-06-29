@@ -228,10 +228,7 @@ class SpaceAlbumAppBar extends StatelessWidget {
               children: [
                 Text(album!.name),
                 if (showSubtitle)
-                  Text(
-                    '${album!.assetCount} photos · in $spaceName',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+                  Text('${album!.assetCount} photos · in $spaceName', style: Theme.of(context).textTheme.bodySmall),
               ],
             )
           : null,

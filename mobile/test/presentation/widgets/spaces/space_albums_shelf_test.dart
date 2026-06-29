@@ -34,30 +34,15 @@ Finder findByKeyPrefix(String prefix) => find.byWidgetPredicate(
 // Helpers
 // ---------------------------------------------------------------------------
 
-SpaceAlbum _album({
-  required String id,
-  String? name,
-  String? thumbnailAssetId,
-  bool showInTimeline = true,
-}) =>
-    SpaceAlbum(
-      id: id,
-      name: name ?? 'Album $id',
-      thumbnailAssetId: thumbnailAssetId,
-      showInTimeline: showInTimeline,
-    );
+SpaceAlbum _album({required String id, String? name, String? thumbnailAssetId, bool showInTimeline = true}) =>
+    SpaceAlbum(id: id, name: name ?? 'Album $id', thumbnailAssetId: thumbnailAssetId, showInTimeline: showInTimeline);
 
 /// Wraps [widget] in a [ProviderScope] that overrides [spaceAlbumsProvider]
 /// with a fixed list, and a minimal [MaterialApp] for theme/directionality.
 ///
 /// Pass [assetService] to also override [assetServiceProvider] — needed for
 /// cover-thumbnail tests that call [assetServiceProvider.getRemoteAsset].
-Widget _wrap(
-  Widget widget, {
-  required String spaceId,
-  required List<SpaceAlbum> albums,
-  AssetService? assetService,
-}) {
+Widget _wrap(Widget widget, {required String spaceId, required List<SpaceAlbum> albums, AssetService? assetService}) {
   return ProviderScope(
     overrides: [
       spaceAlbumsProvider(spaceId).overrideWith((_) => Stream.value(albums)),
@@ -81,19 +66,11 @@ void main() {
   const spaceId = 'space-1';
 
   testWidgets('count>0 + canEdit: shows cover tiles and Link tile', (tester) async {
-    final albums = [
-      _album(id: 'a1', name: 'Hawaii'),
-      _album(id: 'a2', name: 'Sunset'),
-    ];
+    final albums = [_album(id: 'a1', name: 'Hawaii'), _album(id: 'a2', name: 'Sunset')];
 
     await tester.pumpWidget(
       _wrap(
-        SpaceAlbumsShelf(
-          spaceId: spaceId,
-          canEdit: true,
-          onLinkTap: () {},
-          onAlbumTap: (_) {},
-        ),
+        SpaceAlbumsShelf(spaceId: spaceId, canEdit: true, onLinkTap: () {}, onAlbumTap: (_) {}),
         spaceId: spaceId,
         albums: albums,
       ),
@@ -114,12 +91,7 @@ void main() {
 
     await tester.pumpWidget(
       _wrap(
-        SpaceAlbumsShelf(
-          spaceId: spaceId,
-          canEdit: true,
-          onLinkTap: () {},
-          onAlbumTap: (_) {},
-        ),
+        SpaceAlbumsShelf(spaceId: spaceId, canEdit: true, onLinkTap: () {}, onAlbumTap: (_) {}),
         spaceId: spaceId,
         albums: albums,
       ),
@@ -133,12 +105,7 @@ void main() {
   testWidgets('count==0 + canEdit=true: shows only the Link tile', (tester) async {
     await tester.pumpWidget(
       _wrap(
-        SpaceAlbumsShelf(
-          spaceId: spaceId,
-          canEdit: true,
-          onLinkTap: () {},
-          onAlbumTap: (_) {},
-        ),
+        SpaceAlbumsShelf(spaceId: spaceId, canEdit: true, onLinkTap: () {}, onAlbumTap: (_) {}),
         spaceId: spaceId,
         albums: [],
       ),
@@ -153,12 +120,7 @@ void main() {
   testWidgets('count==0 + canEdit=false: renders nothing', (tester) async {
     await tester.pumpWidget(
       _wrap(
-        SpaceAlbumsShelf(
-          spaceId: spaceId,
-          canEdit: false,
-          onLinkTap: () {},
-          onAlbumTap: (_) {},
-        ),
+        SpaceAlbumsShelf(spaceId: spaceId, canEdit: false, onLinkTap: () {}, onAlbumTap: (_) {}),
         spaceId: spaceId,
         albums: [],
       ),
@@ -171,18 +133,11 @@ void main() {
   });
 
   testWidgets('album with null thumbnailAssetId uses photo_album_outlined fallback icon', (tester) async {
-    final albums = [
-      _album(id: 'a1', name: 'Unsynced', thumbnailAssetId: null),
-    ];
+    final albums = [_album(id: 'a1', name: 'Unsynced', thumbnailAssetId: null)];
 
     await tester.pumpWidget(
       _wrap(
-        SpaceAlbumsShelf(
-          spaceId: spaceId,
-          canEdit: false,
-          onLinkTap: () {},
-          onAlbumTap: (_) {},
-        ),
+        SpaceAlbumsShelf(spaceId: spaceId, canEdit: false, onLinkTap: () {}, onAlbumTap: (_) {}),
         spaceId: spaceId,
         albums: albums,
       ),
@@ -216,34 +171,27 @@ void main() {
     expect(called, isTrue);
   });
 
-  testWidgets(
-    'album WITH thumbnailAssetId resolving to asset shows Thumbnail cover (not placeholder icon)',
-    (tester) async {
-      final mockService = _MockAssetService();
-      final asset = _remoteAsset(id: 'thumb-1');
-      when(() => mockService.getRemoteAsset('thumb-1')).thenAnswer((_) async => asset);
+  testWidgets('album WITH thumbnailAssetId resolving to asset shows Thumbnail cover (not placeholder icon)', (
+    tester,
+  ) async {
+    final mockService = _MockAssetService();
+    final asset = _remoteAsset(id: 'thumb-1');
+    when(() => mockService.getRemoteAsset('thumb-1')).thenAnswer((_) async => asset);
 
-      final albums = [_album(id: 'a1', name: 'Hawaii', thumbnailAssetId: 'thumb-1')];
+    final albums = [_album(id: 'a1', name: 'Hawaii', thumbnailAssetId: 'thumb-1')];
 
-      await tester.pumpWidget(
-        _wrap(
-          SpaceAlbumsShelf(
-            spaceId: spaceId,
-            canEdit: false,
-            onLinkTap: () {},
-            onAlbumTap: (_) {},
-          ),
-          spaceId: spaceId,
-          albums: albums,
-          assetService: mockService,
-        ),
-      );
-      await tester.pump(); // StreamProvider emits albums
-      await tester.pump(); // FutureBuilder resolves (mock future is immediate)
+    await tester.pumpWidget(
+      _wrap(
+        SpaceAlbumsShelf(spaceId: spaceId, canEdit: false, onLinkTap: () {}, onAlbumTap: (_) {}),
+        spaceId: spaceId,
+        albums: albums,
+        assetService: mockService,
+      ),
+    );
+    await tester.pump(); // StreamProvider emits albums
+    await tester.pump(); // FutureBuilder resolves (mock future is immediate)
 
-      expect(find.byType(Thumbnail), findsOneWidget);
-      expect(find.byIcon(Icons.photo_album_outlined), findsNothing);
-    },
-  );
+    expect(find.byType(Thumbnail), findsOneWidget);
+    expect(find.byIcon(Icons.photo_album_outlined), findsNothing);
+  });
 }
-

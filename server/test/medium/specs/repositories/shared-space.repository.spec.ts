@@ -3562,7 +3562,11 @@ describe(SharedSpaceRepository.name, () => {
         .executeTakeFirstOrThrow();
       const { result: immichPerson } = await ctx.newPerson({ ownerId: user.id, identityId: identity.id });
       const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: immichPerson.id });
-      const spacePerson = await sut.createPerson({ spaceId: space.id, name: 'Album Alice', representativeFaceId: null });
+      const spacePerson = await sut.createPerson({
+        spaceId: space.id,
+        name: 'Album Alice',
+        representativeFaceId: null,
+      });
       await sut.addPersonFaces([{ personId: spacePerson.id, assetFaceId: assetFace.id }], { skipRecount: true });
 
       const evidence = await sut.getIdentityEvidenceForSpacePerson(space.id, spacePerson.id);

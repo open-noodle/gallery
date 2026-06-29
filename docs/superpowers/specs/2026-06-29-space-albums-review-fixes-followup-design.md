@@ -5,11 +5,11 @@
 After PR #726 ("space-albums review fixes") merged into `feat/space-albums`, **three independent
 adversarial reviews** were run against the branch at commit `5f0076cd6e` (post-#726):
 
-| Review | Scope | Verdict |
-| --- | --- | --- |
-| `sa-rbac-k7` | access-control / RBAC | model **SOUND**; no shippable security bug. LOW/consistency: sync-stream `album.deletedAt` parity, `user_has_album_path` nit, unvalidated `albumId` param → 500; two informational notes. |
-| `sa-faces-m3` | server correctness — face/person pipeline + membership/link lifecycle | **1 HIGH ship-blocker** (album branch never propagated to the space *people-projection* read/stat/face queries), **2 MEDIUM** (owner-account hard/soft delete face cleanup), 2 LOW, 1 product note. |
-| `sa-mobile-p2` | Flutter client | **1 HIGH** (add-photos false-failure for non-owner editors, reproduced), **1 MEDIUM** (link picker only offers owned albums / dead `currentUserRole`), 3 LOW. |
+| Review         | Scope                                                                 | Verdict                                                                                                                                                                                             |
+| -------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sa-rbac-k7`   | access-control / RBAC                                                 | model **SOUND**; no shippable security bug. LOW/consistency: sync-stream `album.deletedAt` parity, `user_has_album_path` nit, unvalidated `albumId` param → 500; two informational notes.           |
+| `sa-faces-m3`  | server correctness — face/person pipeline + membership/link lifecycle | **1 HIGH ship-blocker** (album branch never propagated to the space _people-projection_ read/stat/face queries), **2 MEDIUM** (owner-account hard/soft delete face cleanup), 2 LOW, 1 product note. |
+| `sa-mobile-p2` | Flutter client                                                        | **1 HIGH** (add-photos false-failure for non-owner editors, reproduced), **1 MEDIUM** (link picker only offers owned albums / dead `currentUserRole`), 3 LOW.                                       |
 
 This follow-up spec defines a TDD fix for **every** finding across all three reviews. The companion
 plan (`docs/superpowers/plans/2026-06-29-space-albums-review-fixes-followup.md`) slices them for
@@ -53,12 +53,12 @@ album-derived face data (owner-account delete, soft-delete, asset-delete), and t
 
 ### Group F — Server faces / people correctness (`sa-faces-m3`)
 
-#### F1 — Album-sourced space *people* are broken across every people-projection read/stat/face query — **HIGH, ship-blocker**
+#### F1 — Album-sourced space _people_ are broken across every people-projection read/stat/face query — **HIGH, ship-blocker**
 
 **The defect.** In the people-projection block of `server/src/repositories/shared-space.repository.ts`
 (~lines 793–1620), `shared_space_library` appears 29 times and `shared_space_album` appears **0**
-times. The album feature added the album branch to the *asset* surfaces (access predicates, timeline,
-counts — all in #726) but never to the *people* projection's read surfaces. The result is two sources
+times. The album feature added the album branch to the _asset_ surfaces (access predicates, timeline,
+counts — all in #726) but never to the _people_ projection's read surfaces. The result is two sources
 of truth that disagree:
 
 - **Projection write/grid INCLUDE album faces.** `recountPersons` (~`:2104`) recomputes
@@ -70,21 +70,21 @@ of truth that disagree:
   "in-space" scoping from an `eb.or([...])` / `asset_scope` CTE that contains **only**
   `shared_space_asset` + `shared_space_library`:
 
-  | # | Surface (service → repo method) | Scoping construct | Symptom for an album-sourced person |
-  | --- | --- | --- | --- |
-  | 1 | person faces strip / representative — `getSpacePersonFaces` → `getSpaceRepresentativeFaces` | `eb.or([...])` | **empty faces strip** though person + thumbnail exist |
-  | 2 | per-person stats — `getSpacePersonStatistics` | `asset_scope` CTE | **assets: 0, faces: 0** (contradicts the card's `assetCount>0`) |
-  | 3 | people header — `getSpacePeopleStatistics` → `countPersonsBySpaceId` (+ its `datePersonFilter` + `detectedFaceCount` subquery) | `asset_scope` CTE | **`detectedFaceCount` undercounts**; album-only people **drop under a date filter** |
-  | 4 | face stats — `getSpacePeopleFaceStatistics` → `getPeopleFaceStatisticsBySpaceId` | `asset_scope` CTE | detected/assigned/unassigned face counts **exclude album** |
-  | 5 | people list (+ date filter) — `getPersonsBySpaceId` | EXISTS `eb.or([...])` | album-only person **disappears** when filtering `takenAfter/takenBefore` |
-  | 6 | set representative face — `getSpaceRepresentativeFaceForUpdate` | `eb.or([...])` | **cannot pick an album face** as the representative |
-  | 7 | identity evidence — `getIdentityEvidenceForSpacePerson` | `eb.or([...])` | identity reconciliation evidence **omits album faces** |
+  | #   | Surface (service → repo method)                                                                                                | Scoping construct     | Symptom for an album-sourced person                                                 |
+  | --- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------- | ----------------------------------------------------------------------------------- |
+  | 1   | person faces strip / representative — `getSpacePersonFaces` → `getSpaceRepresentativeFaces`                                    | `eb.or([...])`        | **empty faces strip** though person + thumbnail exist                               |
+  | 2   | per-person stats — `getSpacePersonStatistics`                                                                                  | `asset_scope` CTE     | **assets: 0, faces: 0** (contradicts the card's `assetCount>0`)                     |
+  | 3   | people header — `getSpacePeopleStatistics` → `countPersonsBySpaceId` (+ its `datePersonFilter` + `detectedFaceCount` subquery) | `asset_scope` CTE     | **`detectedFaceCount` undercounts**; album-only people **drop under a date filter** |
+  | 4   | face stats — `getSpacePeopleFaceStatistics` → `getPeopleFaceStatisticsBySpaceId`                                               | `asset_scope` CTE     | detected/assigned/unassigned face counts **exclude album**                          |
+  | 5   | people list (+ date filter) — `getPersonsBySpaceId`                                                                            | EXISTS `eb.or([...])` | album-only person **disappears** when filtering `takenAfter/takenBefore`            |
+  | 6   | set representative face — `getSpaceRepresentativeFaceForUpdate`                                                                | `eb.or([...])`        | **cannot pick an album face** as the representative                                 |
+  | 7   | identity evidence — `getIdentityEvidenceForSpacePerson`                                                                        | `eb.or([...])`        | identity reconciliation evidence **omits album faces**                              |
 
   (#7 was not in the report's numbered table but is the same library-only pattern; it completes the
   "7 distinct queries" phrasing.)
 
-**Repro.** Create a face-recognition-enabled space; link an album whose photos are *not* directly
-added and *not* in a linked library. `handleSharedSpaceAlbumFaceSync` → `processSpaceFaceMatch`
+**Repro.** Create a face-recognition-enabled space; link an album whose photos are _not_ directly
+added and _not_ in a linked library. `handleSharedSpaceAlbumFaceSync` → `processSpaceFaceMatch`
 creates `shared_space_person` rows and `recountPersons` sets `assetCount > 0`. In the web People tab:
 the person shows with a thumbnail and the grid shows album photos, **but** opening the person shows an
 empty faces strip and "0 assets / 0 faces", the header `detectedFaceCount` ignores those faces, and a
@@ -92,7 +92,7 @@ date filter hides the person.
 
 **Why it's in scope (not a documented deferral).** "Linked-album photos participate in the space's
 face recognition … matched into space persons" is a Phase-1 goal
-(`2026-06-09-space-albums-design.md`), and PR #726 explicitly fixed B1 to make album-sourced *people*
+(`2026-06-09-space-albums-design.md`), and PR #726 explicitly fixed B1 to make album-sourced _people_
 **readable** (`PersonAccess.checkSharedSpaceAccess`). The statistics/face-listing surfaces remaining
 album-blind is an **incomplete implementation** of that goal. The #726 B-group fixed
 `tag/view/memory/search` but not the `shared-space.repository` people queries.
@@ -107,8 +107,9 @@ album-sourced person renders identical statistics, face strip, list-membership, 
 behavior to a direct/library-sourced person.
 
 **Edge cases the slice must cover.**
+
 - **Album-only person** (faces solely on album assets) — now fully visible/counted.
-- **Multi-path person** (faces on album *and* direct/library assets) — counted **once**, not
+- **Multi-path person** (faces on album _and_ direct/library assets) — counted **once**, not
   doubled. The branches are `eb.or` / `UNION`-by-asset, so a face whose asset matches multiple paths
   still yields one row per `(person, face)`; the test must assert no inflation.
 - **Trashed album** (soft-deleted) — the `album.deletedAt IS NULL` join means an album-only person
@@ -119,7 +120,7 @@ behavior to a direct/library-sourced person.
   people headers/lists include album people in-range and exclude out-of-range.
 - **Representative-face selection** — `getSpaceRepresentativeFaceForUpdate` must be able to choose an
   album-only face; the strip/representative read (`getSpaceRepresentativeFaces`) must then return it.
-- **`detectedFaceCount`** — the subquery inside `countPersonsBySpaceId` is a *second* scoping site in
+- **`detectedFaceCount`** — the subquery inside `countPersonsBySpaceId` is a _second_ scoping site in
   the same method; both must get the album branch or the header count stays wrong.
 
 #### F2 — Owner-account HARD delete bypasses space face cleanup → stranded faces + orphan persons — **MEDIUM**
@@ -155,7 +156,7 @@ non-face-enabled spaces (skipped).
 
 Account soft-delete (`user-admin.service.ts:105` → `albumRepository.softDeleteAll(id)`,
 `album.repository.ts:369` sets `album.deletedAt`) is the **only** writer of `album.deletedAt`. A1
-correctly hides such an album's *assets* from read/timeline/count, but two gaps remain on the **face**
+correctly hides such an album's _assets_ from read/timeline/count, but two gaps remain on the **face**
 pipeline:
 
 - **No cleanup on soft-delete.** There is no `AlbumSoftDelete` event (`onAlbumDelete` fires only on
@@ -169,12 +170,13 @@ pipeline:
 On restore (`user-admin.service.ts:121` `restoreAll`) it should re-converge; on hard delete it hits
 F2.
 
-**Note on interaction with F1.** Once F1 lands, the 7 people *read* surfaces carry `album.deletedAt
+**Note on interaction with F1.** Once F1 lands, the 7 people _read_ surfaces carry `album.deletedAt
 IS NULL`, so a soft-deleted album-only person already disappears from reads/stats. F3 still matters
 for: (a) the gates that keep **adding** faces during the window; (b) the raw projection
 (`recountPersons` counts, `getSpacePersonThumbnail` crop) that reads tables directly and stays stale.
 
 **Intended behavior.**
+
 - **F3a (gates):** add `INNER JOIN album … AND album.deletedAt IS NULL` to the album branches of
   `isAssetInSpace` and `getSpaceIdsForAsset`, so the pipeline stops projecting faces for
   soft-deleted albums (consistent with A1).
@@ -192,7 +194,7 @@ path in the same space (face retained), hard-delete-after-soft (F2 path), multi-
 `getSpacePersonAssetAdderIds` (~`:1494`) collects asset-adder user ids from
 `shared_space_asset.addedById` + `shared_space_library.addedById` but has **no
 `shared_space_album.addedById` branch** — unlike its sibling `getSpaceAssetAdder` (~`:1530`), which
-*does* include album. So an album-sourced space person doesn't treat the album-linker as an asset
+_does_ include album. So an album-sourced space person doesn't treat the album-linker as an asset
 adder, weakening name/birth-date inheritance for album-only people.
 
 **Intended behavior.** Add the album-adder subquery mirroring the library subquery, following the same
@@ -238,13 +240,13 @@ fires). Meanwhile `SharedSpaceAlbumSync.getUpserts` (~`:1396`) and
 
 **Why it's not a security hole.** Only users who already had legitimate access (past/current members
 with a grant) can reach it; no new user can. It also matches upstream personal-album sync. The
-space-albums-specific wrinkle is the *internal asymmetry* (metadata upsert filters `deletedAt`, asset
+space-albums-specific wrinkle is the _internal asymmetry_ (metadata upsert filters `deletedAt`, asset
 streams don't), which during the owner account-deletion grace window lets a fresh-syncing client
 backfill asset/exif rows for a trashed album without its parent metadata shell.
 
 **Intended behavior.** Add the `accessibleSpaceAlbums`/`album.deletedAt` scope to the four
 grant-gated album-asset streams so trashed-owner albums stop streaming, matching the A1 web fix and
-the sibling streams that already do this. Thematically this is the *sync* leg of the same
+the sibling streams that already do this. Thematically this is the _sync_ leg of the same
 "soft-deleted album should disappear everywhere" goal as F3.
 
 #### R-F2 — `user_has_album_path` branches 2 & 3 omit `album.deletedAt` — **LOW / cosmetic**
@@ -254,7 +256,7 @@ the sibling streams that already do this. Thematically this is the *sync* leg of
 (and as the schema source-of-truth in `server/src/schema/functions.ts:520`, body `:526-551`). Branch
 1 (`album_user`) filters `a.deletedAt IS NULL`; branch 2 (other-space member) and branch 3
 (other-space creator) join `shared_space_album` **without** an `album.deletedAt` check. Effect: a
-soft-deleted album still *linked* to another space is treated as a valid "path," so a grant is
+soft-deleted album still _linked_ to another space is treated as a valid "path," so a grant is
 **retained** (under-revocation) during the same owner-deletion window as R-F1/F3. Direction is
 grant-retention, not over-revocation, and all reads are independently `deletedAt`-guarded → **no read
 leak**; purely a consistency nit, fix alongside R-F1.
@@ -279,7 +281,7 @@ See the OpenAPI caveat in [Decisions](#decisions-baked-into-the-plan).
 
 An `album_user`-**editor** (not owner) who is also a space Editor may link an album into a space;
 thereafter **other** space Editors gain add/remove on that album via `checkSpaceLinkedAlbumAccess`.
-This is the documented model ("write follows space role"; linking requires album owner *or* editor) —
+This is the documented model ("write follows space role"; linking requires album owner _or_ editor) —
 flagged for product awareness, not a defect. **Not implemented.**
 
 #### R-F5 — `accessibleSpaces` creator path — **NOTE (informational, pre-existing infra)**
@@ -306,7 +308,7 @@ insert) → `remote_album.repository.dart:281-302` batch-inserts into `remote_al
 whose FK `albumId → RemoteAlbumEntity.id` (`remote_album_asset.entity.dart:14`) is enforced
 (`db.repository.dart:377,459` PRAGMA `foreign_keys = ON`). For a non-owner editor the album lives only
 in `shared_space_album` (absorbed) — no `remote_album` row → FK 787. The owner case works (the album
-*is* in `remote_album`). The **remove** path is safe (DELETE of absent junction rows is a no-op).
+_is_ in `remote_album`). The **remove** path is safe (DELETE of absent junction rows is a no-op).
 
 **Intended behavior.** Route the space-album add through a **server-only** path that does not touch
 the personal junction table — consistent with the "absorbed invariant" (space-album sync never writes
@@ -315,7 +317,7 @@ the personal junction table — consistent with the "absorbed invariant" (space-
 provider `:10`) then `_syncManager.syncRemote()`; the `spaceAlbum()` Drift watch already drives the
 grid. Point `SpaceAlbumDetailPage._addPhotos` at the new action.
 
-**Edge cases.** non-owner editor (absorbed album, no `remote_album` row — the bug), owner (album *is*
+**Edge cases.** non-owner editor (absorbed album, no `remote_album` row — the bug), owner (album _is_
 in `remote_album` — must still succeed via the new path, no double insert), remove path (already safe;
 unchanged), absorbed-album-with-no-remote-row (the core: no local junction write attempted), empty
 selection (no-op), server failure (toast shows a **real** error).
@@ -372,9 +374,9 @@ These are surfaced for the captain; the plan does **not** schedule them.
    strip would drop `showInTimeline=false` albums). Engineering-cheap either way; it's a product call
    about what "the space's photo count" means.
 2. **RBAC F4 — transitive write awareness.** Confirm the model is intended: granting album-edit to
-   someone who is a space Editor lets them re-share the album's *write* surface to that space's
+   someone who is a space Editor lets them re-share the album's _write_ surface to that space's
    Editors. No code change unless the model is to change.
-3. **RBAC F5 — creator sync path.** Decide whether a space *creator* can be membership-removed at all,
+3. **RBAC F5 — creator sync path.** Decide whether a space _creator_ can be membership-removed at all,
    and if so whether sync access should follow membership. Pre-existing shared-space infra, broader
    than albums.
 4. **F3b cleanup eagerness (mild).** The plan implements eager face cleanup on owner-account
@@ -399,9 +401,9 @@ These are surfaced for the captain; the plan does **not** schedule them.
 
 - **F1 fix shape:** add the album `EXISTS` / `asset_scope` branch mirroring the adjacent
   `shared_space_library` branch in each of the 7 queries, with `INNER JOIN album … AND
-  album.deletedAt IS NULL`. Carry the same date predicates into the `asset_scope`/`datePersonFilter`
+album.deletedAt IS NULL`. Carry the same date predicates into the `asset_scope`/`datePersonFilter`
   album branch. Do **not** touch `recountPersons`/`getPersonAssetIds` (they intentionally read the
-  projection directly — the fix is to make the *read* surfaces agree with them, scoped to non-deleted
+  projection directly — the fix is to make the _read_ surfaces agree with them, scoped to non-deleted
   albums).
 - **F2/F3 cleanup reuse:** reuse the exact `onAlbumDelete` cleanup sequence
   (`getSpacesLinkedToAlbum` → skip non-face-enabled → `getAlbumAssetIdsWithoutOtherSpacePath` →
@@ -421,8 +423,8 @@ These are surfaced for the captain; the plan does **not** schedule them.
   was strictly no-regen. If a no-regen path is preferred, use a runtime-only UUID guard that doesn't
   emit format metadata. Resolve at plan-review.
 - **M-F1 fix shape:** new `SpaceAlbumActions.addAssets` calling `DriftAlbumApiRepository.addAssets`
-  + `syncRemote()`; no local personal-junction write (absorbed invariant). Detail page routes through
-  it.
+  - `syncRemote()`; no local personal-junction write (absorbed invariant). Detail page routes through
+    it.
 
 ## Test Strategy
 

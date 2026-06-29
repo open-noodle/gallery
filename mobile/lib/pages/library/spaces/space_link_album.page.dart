@@ -233,10 +233,7 @@ class _AlbumCover extends ConsumerWidget {
           if (snapshot.hasData && snapshot.data != null) {
             return ClipRRect(
               borderRadius: const BorderRadius.all(Radius.circular(8)),
-              child: Thumbnail.remote(
-                remoteId: thumbnailId,
-                thumbhash: snapshot.data!.thumbHash ?? '',
-              ),
+              child: Thumbnail.remote(remoteId: thumbnailId, thumbhash: snapshot.data!.thumbHash ?? ''),
             );
           }
           return _buildFallback(cs);

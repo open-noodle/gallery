@@ -136,18 +136,9 @@ void main() {
   });
 
   group('currentUserRole', () {
-    Future<void> addAlbumUser(
-      String albumId,
-      String userId,
-      AlbumUserRole role,
-    ) =>
-        ctx.db.into(ctx.db.remoteAlbumUserEntity).insert(
-          RemoteAlbumUserEntityCompanion(
-            albumId: Value(albumId),
-            userId: Value(userId),
-            role: Value(role),
-          ),
-        );
+    Future<void> addAlbumUser(String albumId, String userId, AlbumUserRole role) => ctx.db
+        .into(ctx.db.remoteAlbumUserEntity)
+        .insert(RemoteAlbumUserEntityCompanion(albumId: Value(albumId), userId: Value(userId), role: Value(role)));
 
     test('getAll: populates editor role when current user is an editor', () async {
       final owner = await ctx.newUser();

@@ -188,10 +188,7 @@ class _SpaceAlbumCoverTile extends ConsumerWidget {
             child: SizedBox(
               width: _kTileSize,
               height: _kTileSize,
-              child: Thumbnail.remote(
-                remoteId: thumbnailId,
-                thumbhash: snapshot.data!.thumbHash ?? '',
-              ),
+              child: Thumbnail.remote(remoteId: thumbnailId, thumbhash: snapshot.data!.thumbHash ?? ''),
             ),
           );
         }
@@ -216,10 +213,7 @@ class _SpaceAlbumCoverTile extends ConsumerWidget {
             Stack(
               children: [
                 // Cover background / thumbnail
-                Opacity(
-                  opacity: isOffTimeline ? 0.6 : 1.0,
-                  child: _buildCoverArt(context, ref, cs),
-                ),
+                Opacity(opacity: isOffTimeline ? 0.6 : 1.0, child: _buildCoverArt(context, ref, cs)),
                 // Off-timeline badge
                 if (isOffTimeline)
                   Positioned.fill(

@@ -11,13 +11,11 @@ import 'package:mocktail/mocktail.dart';
 // Mocks
 // ---------------------------------------------------------------------------
 
-class MockSharedSpaceApiRepository extends Mock
-    implements SharedSpaceApiRepository {}
+class MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiRepository {}
 
 class MockBackgroundSyncManager extends Mock implements BackgroundSyncManager {}
 
-class MockDriftAlbumApiRepository extends Mock
-    implements DriftAlbumApiRepository {}
+class MockDriftAlbumApiRepository extends Mock implements DriftAlbumApiRepository {}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -61,8 +59,9 @@ void main() {
     // Default stubs
     when(() => repo.linkAlbum(any(), any())).thenAnswer((_) async {});
     when(() => repo.unlinkAlbum(any(), any())).thenAnswer((_) async {});
-    when(() => repo.updateAlbumLink(any(), any(), showInTimeline: any(named: 'showInTimeline')))
-        .thenAnswer((_) async {});
+    when(
+      () => repo.updateAlbumLink(any(), any(), showInTimeline: any(named: 'showInTimeline')),
+    ).thenAnswer((_) async {});
     when(() => syncMgr.syncRemote()).thenAnswer((_) async => true);
 
     container = _makeContainer(repo: repo, syncMgr: syncMgr, albumApiRepo: albumApiRepo);
@@ -95,15 +94,11 @@ void main() {
     });
 
     test('on repo error: still fires syncRemote and rethrows', () async {
-      when(() => repo.linkAlbum(any(), any()))
-          .thenThrow(Exception('network error'));
+      when(() => repo.linkAlbum(any(), any())).thenThrow(Exception('network error'));
 
       final actions = container.read(spaceAlbumActionsProvider);
       // Expect an exception to be thrown
-      await expectLater(
-        () => actions.link(_spaceId, [_albumId]),
-        throwsA(isA<Exception>()),
-      );
+      await expectLater(() => actions.link(_spaceId, [_albumId]), throwsA(isA<Exception>()));
 
       // syncRemote is NOT called when the first API call throws (fail-fast).
       // This is the chosen design: bubble the error, let the page catch it.
@@ -121,46 +116,28 @@ void main() {
     });
 
     test('on repo error: rethrows without calling syncRemote', () async {
-      when(() => repo.unlinkAlbum(any(), any()))
-          .thenThrow(Exception('network error'));
+      when(() => repo.unlinkAlbum(any(), any())).thenThrow(Exception('network error'));
 
       final actions = container.read(spaceAlbumActionsProvider);
-      await expectLater(
-        () => actions.unlink(_spaceId, _albumId),
-        throwsA(isA<Exception>()),
-      );
+      await expectLater(() => actions.unlink(_spaceId, _albumId), throwsA(isA<Exception>()));
       verifyNever(() => syncMgr.syncRemote());
     });
   });
 
   group('SpaceAlbumActions.toggleTimeline', () {
-    test('toggleTimeline(current:true) calls updateAlbumLink(showInTimeline:false) then syncRemote',
-        () async {
+    test('toggleTimeline(current:true) calls updateAlbumLink(showInTimeline:false) then syncRemote', () async {
       final actions = container.read(spaceAlbumActionsProvider);
       await actions.toggleTimeline(_spaceId, _albumId, current: true);
 
-      verify(
-        () => repo.updateAlbumLink(
-          _spaceId,
-          _albumId,
-          showInTimeline: false,
-        ),
-      ).called(1);
+      verify(() => repo.updateAlbumLink(_spaceId, _albumId, showInTimeline: false)).called(1);
       verify(() => syncMgr.syncRemote()).called(1);
     });
 
-    test('toggleTimeline(current:false) calls updateAlbumLink(showInTimeline:true) then syncRemote',
-        () async {
+    test('toggleTimeline(current:false) calls updateAlbumLink(showInTimeline:true) then syncRemote', () async {
       final actions = container.read(spaceAlbumActionsProvider);
       await actions.toggleTimeline(_spaceId, _albumId, current: false);
 
-      verify(
-        () => repo.updateAlbumLink(
-          _spaceId,
-          _albumId,
-          showInTimeline: true,
-        ),
-      ).called(1);
+      verify(() => repo.updateAlbumLink(_spaceId, _albumId, showInTimeline: true)).called(1);
       verify(() => syncMgr.syncRemote()).called(1);
     });
 
@@ -170,18 +147,16 @@ void main() {
       ).thenThrow(Exception('network error'));
 
       final actions = container.read(spaceAlbumActionsProvider);
-      await expectLater(
-        () => actions.toggleTimeline(_spaceId, _albumId, current: true),
-        throwsA(isA<Exception>()),
-      );
+      await expectLater(() => actions.toggleTimeline(_spaceId, _albumId, current: true), throwsA(isA<Exception>()));
       verifyNever(() => syncMgr.syncRemote());
     });
   });
 
   group('SpaceAlbumActions.addAssets', () {
     test('routes through the album API repo (server-only), nudges sync, returns added count', () async {
-      when(() => albumApiRepo.addAssets(any(), any()))
-          .thenAnswer((_) async => (added: ['a1', 'a2'], failed: <String>[]));
+      when(
+        () => albumApiRepo.addAssets(any(), any()),
+      ).thenAnswer((_) async => (added: ['a1', 'a2'], failed: <String>[]));
 
       final actions = container.read(spaceAlbumActionsProvider);
       final count = await actions.addAssets(_albumId, ['a1', 'a2']);
@@ -195,8 +170,7 @@ void main() {
     });
 
     test('returns only the count of successfully added assets', () async {
-      when(() => albumApiRepo.addAssets(any(), any()))
-          .thenAnswer((_) async => (added: ['a1'], failed: ['a2']));
+      when(() => albumApiRepo.addAssets(any(), any())).thenAnswer((_) async => (added: ['a1'], failed: ['a2']));
 
       final actions = container.read(spaceAlbumActionsProvider);
       final count = await actions.addAssets(_albumId, ['a1', 'a2']);
@@ -218,10 +192,7 @@ void main() {
       when(() => albumApiRepo.addAssets(any(), any())).thenThrow(Exception('network error'));
 
       final actions = container.read(spaceAlbumActionsProvider);
-      await expectLater(
-        () => actions.addAssets(_albumId, ['a1']),
-        throwsA(isA<Exception>()),
-      );
+      await expectLater(() => actions.addAssets(_albumId, ['a1']), throwsA(isA<Exception>()));
       verifyNever(() => syncMgr.syncRemote());
     });
   });

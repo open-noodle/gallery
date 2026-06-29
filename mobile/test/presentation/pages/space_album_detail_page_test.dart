@@ -12,17 +12,16 @@ import 'package:immich_mobile/presentation/widgets/spaces/space_album_kebab.widg
 Widget _wrapSliver(Widget sliverWidget) => MaterialApp(
   home: Scaffold(
     body: CustomScrollView(
-      slivers: [sliverWidget, const SliverToBoxAdapter(child: SizedBox(height: 800))],
+      slivers: [
+        sliverWidget,
+        const SliverToBoxAdapter(child: SizedBox(height: 800)),
+      ],
     ),
   ),
 );
 
-SpaceAlbum _album({required String id, String? name, bool showInTimeline = true, int assetCount = 0}) => SpaceAlbum(
-  id: id,
-  name: name ?? 'Album $id',
-  showInTimeline: showInTimeline,
-  assetCount: assetCount,
-);
+SpaceAlbum _album({required String id, String? name, bool showInTimeline = true, int assetCount = 0}) =>
+    SpaceAlbum(id: id, name: name ?? 'Album $id', showInTimeline: showInTimeline, assetCount: assetCount);
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -43,10 +42,7 @@ void main() {
     expect(find.byType(SpaceAlbumKebab), findsOneWidget);
     // canEdit:true → SpaceAlbumKebab renders a PopupMenuButton (not SizedBox.shrink)
     // Use byWidgetPredicate since the type param is private (_KebabAction).
-    expect(
-      find.byWidgetPredicate((w) => w is PopupMenuButton),
-      findsOneWidget,
-    );
+    expect(find.byWidgetPredicate((w) => w is PopupMenuButton), findsOneWidget);
   });
 
   testWidgets('viewer role (canEdit:false) — SpaceAlbumKebab renders SizedBox.shrink', (tester) async {
@@ -62,10 +58,7 @@ void main() {
 
     expect(find.byType(SpaceAlbumKebab), findsOneWidget);
     // canEdit:false → the kebab renders SizedBox.shrink, so no PopupMenuButton
-    expect(
-      find.byWidgetPredicate((w) => w is PopupMenuButton),
-      findsNothing,
-    );
+    expect(find.byWidgetPredicate((w) => w is PopupMenuButton), findsNothing);
   });
 
   testWidgets('subtitle "{count} photos · in {space}" renders when album and spaceName are provided', (tester) async {
@@ -121,9 +114,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // The toggle item must exist and be disabled
-    final toggleItem = tester.widget<PopupMenuItem<dynamic>>(
-      find.byKey(const Key('space-album-kebab-toggle')),
-    );
+    final toggleItem = tester.widget<PopupMenuItem<dynamic>>(find.byKey(const Key('space-album-kebab-toggle')));
     expect(toggleItem.enabled, isFalse, reason: 'toggle item should be disabled when album is null');
 
     // Tapping a disabled item must NOT fire the callback
@@ -150,9 +141,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // The toggle item must exist and be enabled
-    final toggleItem = tester.widget<PopupMenuItem<dynamic>>(
-      find.byKey(const Key('space-album-kebab-toggle')),
-    );
+    final toggleItem = tester.widget<PopupMenuItem<dynamic>>(find.byKey(const Key('space-album-kebab-toggle')));
     expect(toggleItem.enabled, isTrue, reason: 'toggle item should be enabled when album is non-null');
 
     // Tapping an enabled item MUST fire the callback
