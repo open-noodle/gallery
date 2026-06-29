@@ -536,17 +536,21 @@ export const user_has_album_path = registerFunction({
         SELECT 1
         FROM shared_space_album ssa2
         INNER JOIN shared_space_member ssm2 ON ssm2."spaceId" = ssa2."spaceId"
+        INNER JOIN album a2 ON a2."id" = ssa2."albumId"
         WHERE ssa2."albumId" = target_album_id
           AND ssm2."userId" = target_user_id
           AND ssa2."spaceId" <> exclude_space_id
+          AND a2."deletedAt" IS NULL
       )
       OR EXISTS (
         SELECT 1
         FROM shared_space_album ssa3
         INNER JOIN shared_space ss3 ON ss3."id" = ssa3."spaceId"
+        INNER JOIN album a3 ON a3."id" = ssa3."albumId"
         WHERE ssa3."albumId" = target_album_id
           AND ss3."createdById" = target_user_id
           AND ssa3."spaceId" <> exclude_space_id
+          AND a3."deletedAt" IS NULL
       );
 `,
 });
