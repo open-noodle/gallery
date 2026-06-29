@@ -1,8 +1,11 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
+import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 
@@ -135,7 +138,7 @@ class _AlbumGrid extends StatelessWidget {
 // Album card
 // ---------------------------------------------------------------------------
 
-class _AlbumCard extends StatelessWidget {
+class _AlbumCard extends ConsumerWidget {
   const _AlbumCard({
     super.key,
     required this.album,
@@ -151,8 +154,39 @@ class _AlbumCard extends StatelessWidget {
   final void Function(String albumId) onUnlink;
   final void Function(String albumId) onTap;
 
+  Widget _buildFallback(ColorScheme cs) {
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+        border: Border.all(color: cs.outline.withValues(alpha: 0.3), width: 1),
+      ),
+      child: const Center(child: Icon(Icons.photo_album_outlined, size: 40, color: Colors.grey)),
+    );
+  }
+
+  Widget _buildCoverArt(BuildContext context, WidgetRef ref, ColorScheme cs) {
+    final thumbnailId = album.thumbnailAssetId;
+    if (thumbnailId == null) return _buildFallback(cs);
+    return FutureBuilder<RemoteAsset?>(
+      future: ref.read(assetServiceProvider).getRemoteAsset(thumbnailId),
+      builder: (context, snapshot) {
+        if (snapshot.hasData && snapshot.data != null) {
+          return ClipRRect(
+            borderRadius: const BorderRadius.all(Radius.circular(16)),
+            child: Thumbnail.remote(
+              remoteId: thumbnailId,
+              thumbhash: snapshot.data!.thumbHash ?? '',
+            ),
+          );
+        }
+        return _buildFallback(cs);
+      },
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = context.colorScheme;
     final isOffTimeline = !album.showInTimeline;
 
@@ -167,14 +201,7 @@ class _AlbumCard extends StatelessWidget {
               children: [
                 Opacity(
                   opacity: isOffTimeline ? 0.6 : 1.0,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHighest,
-                      borderRadius: const BorderRadius.all(Radius.circular(16)),
-                      border: Border.all(color: cs.outline.withValues(alpha: 0.3), width: 1),
-                    ),
-                    child: const Center(child: Icon(Icons.photo_album_outlined, size: 40, color: Colors.grey)),
-                  ),
+                  child: _buildCoverArt(context, ref, cs),
                 ),
                 // Off-timeline badge
                 if (isOffTimeline)

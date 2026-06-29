@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
+import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
 
 /// Fixed height of the Albums shelf when it is visible (at least one album
@@ -144,29 +147,61 @@ class _HeaderRow extends StatelessWidget {
 
 /// A single cover tile.
 ///
-/// Cover strategy (D4 — album_tile.dart FutureBuilder fallback pattern):
+/// Cover strategy (album_tile.dart FutureBuilder pattern):
 ///   - If [album.thumbnailAssetId] is null → show [Icons.photo_album_outlined]
 ///     on [surfaceContainerHighest] immediately (cover is not yet synced).
-///   - Otherwise, show the same icon (B4 will wire the real thumbnail via an
-///     assetService lookup; for B2 the tile always shows the fallback icon
-///     when the cover is present — this keeps the test-harness stable and
-///     avoids async image loading in widget tests, per the plan RULES).
-///
-/// NOTE: replacing the unconditional fallback with a real thumbnail lookup
-/// is explicitly deferred to B4. The trade-off is documented here so the
-/// reviewer understands the placeholder is intentional.
+///   - Otherwise → look up the asset via [assetServiceProvider.getRemoteAsset]
+///     and render [Thumbnail.remote] when it resolves; falls back to the same
+///     placeholder icon while loading or when the asset is not found.
 ///
 /// Off-timeline dim: ~60 % opacity via [Color.withValues(alpha:)] on the
 /// tile + [Icons.visibility_off] badge. [withOpacity] is banned by `dart
 /// analyze --fatal-infos` (replaced by [withValues(alpha:)] in Material 3).
-class _SpaceAlbumCoverTile extends StatelessWidget {
+class _SpaceAlbumCoverTile extends ConsumerWidget {
   const _SpaceAlbumCoverTile({super.key, required this.album, required this.onTap});
 
   final SpaceAlbum album;
   final VoidCallback onTap;
 
+  Widget _buildFallback(ColorScheme cs) {
+    return Container(
+      width: _kTileSize,
+      height: _kTileSize,
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: const BorderRadius.all(Radius.circular(_kTileRadius)),
+        border: Border.all(color: cs.outline.withValues(alpha: 0.3), width: 1),
+      ),
+      child: const Icon(Icons.photo_album_outlined, size: 32, color: Colors.grey),
+    );
+  }
+
+  Widget _buildCoverArt(BuildContext context, WidgetRef ref, ColorScheme cs) {
+    final thumbnailId = album.thumbnailAssetId;
+    if (thumbnailId == null) return _buildFallback(cs);
+    return FutureBuilder<RemoteAsset?>(
+      future: ref.read(assetServiceProvider).getRemoteAsset(thumbnailId),
+      builder: (context, snapshot) {
+        if (snapshot.hasData && snapshot.data != null) {
+          return ClipRRect(
+            borderRadius: const BorderRadius.all(Radius.circular(_kTileRadius)),
+            child: SizedBox(
+              width: _kTileSize,
+              height: _kTileSize,
+              child: Thumbnail.remote(
+                remoteId: thumbnailId,
+                thumbhash: snapshot.data!.thumbHash ?? '',
+              ),
+            ),
+          );
+        }
+        return _buildFallback(cs);
+      },
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = context.colorScheme;
     final isOffTimeline = !album.showInTimeline;
 
@@ -180,23 +215,10 @@ class _SpaceAlbumCoverTile extends StatelessWidget {
             // Cover art (with optional dim + badge for off-timeline)
             Stack(
               children: [
-                // Cover background / fallback
+                // Cover background / thumbnail
                 Opacity(
                   opacity: isOffTimeline ? 0.6 : 1.0,
-                  child: Container(
-                    width: _kTileSize,
-                    height: _kTileSize,
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHighest,
-                      borderRadius: const BorderRadius.all(Radius.circular(_kTileRadius)),
-                      border: Border.all(
-                        // Use withValues(alpha:) — withOpacity is fatal-info in analyze
-                        color: cs.outline.withValues(alpha: 0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: const Icon(Icons.photo_album_outlined, size: 32, color: Colors.grey),
-                  ),
+                  child: _buildCoverArt(context, ref, cs),
                 ),
                 // Off-timeline badge
                 if (isOffTimeline)

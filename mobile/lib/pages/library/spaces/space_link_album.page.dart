@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/album/album.model.dart';
+import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/utils/space_link_album_candidates.dart';
 
@@ -199,13 +202,11 @@ class _AlbumRow extends StatelessWidget {
 // Cover thumbnail
 // ---------------------------------------------------------------------------
 
-class _AlbumCover extends StatelessWidget {
+class _AlbumCover extends ConsumerWidget {
   const _AlbumCover({required this.album});
   final RemoteAlbum album;
 
-  @override
-  Widget build(BuildContext context) {
-    final cs = context.colorScheme;
+  Widget _buildFallback(ColorScheme cs) {
     return Container(
       width: 52,
       height: 52,
@@ -215,6 +216,32 @@ class _AlbumCover extends StatelessWidget {
         border: Border.all(color: cs.outline.withValues(alpha: 0.3), width: 1),
       ),
       child: const Center(child: Icon(Icons.photo_album_outlined, size: 24, color: Colors.grey)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = context.colorScheme;
+    final thumbnailId = album.thumbnailAssetId;
+    if (thumbnailId == null) return _buildFallback(cs);
+    return SizedBox(
+      width: 52,
+      height: 52,
+      child: FutureBuilder<RemoteAsset?>(
+        future: ref.read(assetServiceProvider).getRemoteAsset(thumbnailId),
+        builder: (context, snapshot) {
+          if (snapshot.hasData && snapshot.data != null) {
+            return ClipRRect(
+              borderRadius: const BorderRadius.all(Radius.circular(8)),
+              child: Thumbnail.remote(
+                remoteId: thumbnailId,
+                thumbhash: snapshot.data!.thumbHash ?? '',
+              ),
+            );
+          }
+          return _buildFallback(cs);
+        },
+      ),
     );
   }
 }
