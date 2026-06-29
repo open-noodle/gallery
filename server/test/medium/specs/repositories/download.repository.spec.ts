@@ -94,4 +94,32 @@ describe('DownloadRepository.downloadSpaceId', () => {
     expect(ids.has(live.id)).toBe(true);
     expect(ids.has(deleted.id)).toBe(false);
   });
+
+  it('excludes assets of a soft-deleted (trashed) linked album', async () => {
+    const { ctx, sut, spaceRepo } = setup();
+    const { user } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: user.id });
+
+    // Asset reachable only via a linked album that we then trash → must be EXCLUDED.
+    const { asset: trashedAlbumAsset } = await ctx.newAsset({ ownerId: user.id });
+    await ctx.newExif({ assetId: trashedAlbumAsset.id, fileSizeInByte: 1024 });
+    const { result: trashedAlbum } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Trashed' }, [
+      trashedAlbumAsset.id,
+    ]);
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: trashedAlbum.id, addedById: user.id });
+
+    // Control: asset in a live linked album → must remain INCLUDED (fix must not over-filter).
+    const { asset: liveAlbumAsset } = await ctx.newAsset({ ownerId: user.id });
+    await ctx.newExif({ assetId: liveAlbumAsset.id, fileSizeInByte: 1024 });
+    const { result: liveAlbum } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Live' }, [liveAlbumAsset.id]);
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: liveAlbum.id, addedById: user.id });
+
+    // Trash the first album (album.deletedAt = now(), link row survives).
+    await ctx.softDeleteAlbum(trashedAlbum.id);
+
+    const ids = await collectIds(sut.downloadSpaceId(space.id));
+
+    expect(ids.has(trashedAlbumAsset.id)).toBe(false);
+    expect(ids.has(liveAlbumAsset.id)).toBe(true);
+  });
 });
