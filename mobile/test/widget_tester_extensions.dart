@@ -50,6 +50,30 @@ extension PumpConsumerWidget on WidgetTester {
   }
 }
 
+extension PumpConsumerWidgetRaw on WidgetTester {
+  /// Fork helper: the pre-#29360 `pumpConsumerWidget` behaviour — no
+  /// `EasyLocalization` wrapper and no trailing `pumpAndSettle()`. Use this for
+  /// tests that assert a still-animating state (e.g. a loading spinner) where the
+  /// localized helper's automatic `pumpAndSettle()` would never settle and time
+  /// out. The widget renders synchronously; the caller controls settling via
+  /// `pump()` / `pumpAndSettle()`.
+  Future<void> pumpConsumerWidgetRaw(
+    Widget widget, {
+    Duration? duration,
+    EnginePhase phase = EnginePhase.sendSemanticsUpdate,
+    List<Override> overrides = const [],
+  }) async {
+    return pumpWidget(
+      ProviderScope(
+        overrides: overrides,
+        child: MaterialApp(debugShowCheckedModeBanner: false, home: Material(child: widget)),
+      ),
+      duration: duration,
+      phase: phase,
+    );
+  }
+}
+
 extension PumpConsumerWidgetDark on WidgetTester {
   /// Same shape as pumpConsumerWidget but forces MaterialApp(theme: dark).
   Future<void> pumpConsumerWidgetDark(Widget widget, {List<Override> overrides = const []}) async {
