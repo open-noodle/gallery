@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -113,9 +114,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // DeepSectionScaffold uppercases the key via .tr().toUpperCase() — in
-      // tests without localization init, .tr() returns the key as-is.
-      expect(find.text('FILTER_SHEET_DEEP_TAGS_SECTION'), findsOneWidget);
+      // DeepSectionScaffold renders the title as .tr().toUpperCase(); the
+      // localized pump resolves it, so assert on the same value.
+      expect(find.text('filter_sheet_deep_tags_section'.tr().toUpperCase()), findsOneWidget);
     });
 
     testWidgets('selected chip renders primary color in dark theme', (tester) async {
