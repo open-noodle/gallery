@@ -1596,7 +1596,24 @@ export class SharedSpaceRepository {
       .where('shared_space_library.addedById', 'is not', null)
       .execute();
 
-    return [...new Set([...directRows, ...libraryRows].flatMap((row) => (row.userId ? [row.userId] : [])))];
+    const albumRows = await this.db
+      .selectFrom('shared_space_person_face')
+      .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .innerJoin('album_asset', 'album_asset.assetId', 'asset.id')
+      .innerJoin('shared_space_album', (join) =>
+        join.onRef('shared_space_album.albumId', '=', 'album_asset.albumId').on('shared_space_album.spaceId', '=', spaceId),
+      )
+      .innerJoin('album', (j) => j.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null))
+      .select('shared_space_album.addedById as userId')
+      .distinct()
+      .where('shared_space_person_face.personId', '=', personId)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', '=', false)
+      .where('shared_space_album.addedById', 'is not', null)
+      .execute();
+
+    return [...new Set([...directRows, ...libraryRows, ...albumRows].flatMap((row) => (row.userId ? [row.userId] : [])))];
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })

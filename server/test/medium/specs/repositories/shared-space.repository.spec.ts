@@ -3606,4 +3606,34 @@ describe(SharedSpaceRepository.name, () => {
       ).resolves.toEqual([]);
     });
   });
+
+  // ==========================================
+  // getSpacePersonAssetAdderIds — faces F4
+  // ==========================================
+
+  describe('getSpacePersonAssetAdderIds — album adder (faces F4)', () => {
+    it('includes the album-linker as an asset adder for an album-only space person', async () => {
+      const { ctx, sut } = setup();
+      const { user, space, person } = await seedAlbumPerson(ctx, sut);
+
+      const result = await sut.getSpacePersonAssetAdderIds(space.id, person.id);
+
+      expect(result).toContain(user.id);
+    });
+
+    it('does not surface a different space album-linker for an unrelated space person', async () => {
+      const { ctx, sut } = setup();
+      // seed two independent album-linked spaces
+      const { user: user1, space: space1, person: person1 } = await seedAlbumPerson(ctx, sut);
+      const { user: user2, space: space2, person: person2 } = await seedAlbumPerson(ctx, sut);
+
+      const result1 = await sut.getSpacePersonAssetAdderIds(space1.id, person1.id);
+      const result2 = await sut.getSpacePersonAssetAdderIds(space2.id, person2.id);
+
+      expect(result1).toContain(user1.id);
+      expect(result1).not.toContain(user2.id);
+      expect(result2).toContain(user2.id);
+      expect(result2).not.toContain(user1.id);
+    });
+  });
 });
