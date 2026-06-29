@@ -11,6 +11,7 @@ import 'package:immich_mobile/providers/background_sync.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album_actions.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
+import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
 
@@ -38,6 +39,25 @@ class SpaceAlbumDetailPage extends ConsumerStatefulWidget {
 }
 
 class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
+  String? _spaceName;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSpaceName();
+  }
+
+  Future<void> _loadSpaceName() async {
+    try {
+      final space = await ref.read(sharedSpaceApiRepositoryProvider).get(widget.spaceId);
+      if (mounted) {
+        setState(() => _spaceName = space.name);
+      }
+    } catch (_) {
+      // Best-effort — the subtitle simply won't render until the name loads.
+    }
+  }
+
   /// Add photos to this album by pushing the asset-selection timeline, then
   /// calling the server-only add path (D3 — server enforces space-editor
   /// permission), then nudging sync.
@@ -144,6 +164,7 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
         appBar: SpaceAlbumAppBar(
           canEdit: widget.canEdit,
           album: album,
+          spaceName: _spaceName,
           onAddPhotos: widget.canEdit ? _addPhotos : () {},
           onToggleTimeline: widget.canEdit ? _toggleTimeline : () {},
           onUnlink: widget.canEdit ? _unlink : () {},
@@ -172,6 +193,7 @@ class SpaceAlbumAppBar extends StatelessWidget {
     super.key,
     required this.canEdit,
     this.album,
+    this.spaceName,
     this.onAddPhotos,
     this.onToggleTimeline,
     this.onUnlink,
@@ -179,6 +201,10 @@ class SpaceAlbumAppBar extends StatelessWidget {
 
   final bool canEdit;
   final SpaceAlbum? album;
+
+  /// The name of the parent shared space, used for the app bar subtitle.
+  /// Null until the space metadata has loaded (subtitle is hidden until then).
+  final String? spaceName;
 
   /// Called when the editor taps "Add photos" in the kebab.
   final VoidCallback? onAddPhotos;
@@ -191,10 +217,24 @@ class SpaceAlbumAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showSubtitle = album != null && spaceName != null;
     return SliverAppBar(
       floating: true,
       pinned: false,
-      title: album != null ? Text(album!.name) : null,
+      title: album != null
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(album!.name),
+                if (showSubtitle)
+                  Text(
+                    '${album!.assetCount} photos · in $spaceName',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+              ],
+            )
+          : null,
       actions: [
         SpaceAlbumKebab(
           canEdit: canEdit,

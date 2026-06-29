@@ -17,10 +17,11 @@ Widget _wrapSliver(Widget sliverWidget) => MaterialApp(
   ),
 );
 
-SpaceAlbum _album({required String id, String? name, bool showInTimeline = true}) => SpaceAlbum(
+SpaceAlbum _album({required String id, String? name, bool showInTimeline = true, int assetCount = 0}) => SpaceAlbum(
   id: id,
   name: name ?? 'Album $id',
   showInTimeline: showInTimeline,
+  assetCount: assetCount,
 );
 
 // ---------------------------------------------------------------------------
@@ -65,5 +66,36 @@ void main() {
       find.byWidgetPredicate((w) => w is PopupMenuButton),
       findsNothing,
     );
+  });
+
+  testWidgets('subtitle "{count} photos · in {space}" renders when album and spaceName are provided', (tester) async {
+    await tester.pumpWidget(
+      _wrapSliver(
+        SpaceAlbumAppBar(
+          canEdit: false,
+          album: _album(id: 'a2', name: 'Summer', assetCount: 7),
+          spaceName: 'Trip 2024',
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('7 photos · in Trip 2024'), findsOneWidget);
+  });
+
+  testWidgets('subtitle is absent when spaceName is null (metadata not yet loaded)', (tester) async {
+    await tester.pumpWidget(
+      _wrapSliver(
+        SpaceAlbumAppBar(
+          canEdit: false,
+          album: _album(id: 'a3', name: 'Summer', assetCount: 7),
+          // spaceName omitted / null
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // No subtitle should be rendered before the space name is loaded.
+    expect(find.textContaining('photos · in'), findsNothing);
   });
 }
