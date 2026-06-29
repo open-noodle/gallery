@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,18 +40,18 @@ void main() {
     await tester.pumpConsumerWidget(const GroupSettings());
     await tester.pumpAndSettle();
 
-    expect(find.text('year'), findsOneWidget);
-    expect(find.text('month'), findsOneWidget);
-    expect(find.text('asset_list_layout_settings_group_by_month_day'), findsOneWidget);
-    expect(find.text('asset_list_layout_settings_group_automatically'), findsNothing);
-    expect(find.text('none'), findsNothing);
+    expect(find.text('year'.tr()), findsOneWidget);
+    expect(find.text('month'.tr()), findsOneWidget);
+    expect(find.text('asset_list_layout_settings_group_by_month_day'.tr()), findsOneWidget);
+    expect(find.text('asset_list_layout_settings_group_automatically'.tr()), findsNothing);
+    expect(find.text('none'.tr()), findsNothing);
   });
 
   testWidgets('selecting year persists selected grouping', (tester) async {
     await tester.pumpConsumerWidget(const GroupSettings());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('year'));
+    await tester.tap(find.text('year'.tr()));
     await tester.pumpAndSettle();
 
     expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.year);
@@ -62,7 +63,7 @@ void main() {
     await tester.pumpConsumerWidget(const GroupSettings());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('month'));
+    await tester.tap(find.text('month'.tr()));
     await tester.pumpAndSettle();
 
     expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
