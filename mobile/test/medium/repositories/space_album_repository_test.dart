@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/infrastructure/repositories/remote_album.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/space_album.repository.dart';
 
 import '../repository_context.dart';
@@ -89,5 +90,23 @@ void main() {
     expect(await ctx.db.select(ctx.db.sharedSpaceAlbumLinkEntity).get(), isEmpty);
     expect(await ctx.db.select(ctx.db.sharedSpaceAlbumEntity).get(), isNotEmpty);
     expect(await ctx.db.select(ctx.db.sharedSpaceAlbumAssetEntity).get(), isNotEmpty);
+  });
+
+  group('absorbed album add-photos (mobile F1 regression)', () {
+    test('local junction write throws on an absorbed album (no remote_album row), leaving no junction row', () async {
+      final user = await ctx.newUser();
+      final asset = await ctx.newRemoteAsset(ownerId: user.id);
+      final localRepo = DriftRemoteAlbumRepository(ctx.db);
+
+      // An absorbed linked album lives only in shared_space_album — it has no
+      // remote_album row. The personal-album add path batch-inserts into
+      // remote_album_asset, whose FK albumId -> remote_album is enforced, so the
+      // write fails (the empirical FK 787 bug the new server-only path avoids).
+      await expectLater(localRepo.addAssets('absorbed-album', [asset.id]), throwsA(anything));
+
+      // The failed transaction rolls back; the server-only fix never performs
+      // this local insert, so the junction table stays empty either way.
+      expect(await ctx.db.select(ctx.db.remoteAlbumAssetEntity).get(), isEmpty);
+    });
   });
 }
