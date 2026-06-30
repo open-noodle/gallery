@@ -5,7 +5,7 @@ metadata:
   upstream_branch: main
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: 7dbd29113b5d32ba8afe9f5742ff3467ed27e7a0
+  last_verified_fork_head: ca13ebb954aa088082e7fe12fafc8ff5b63917fd
 
 coverage_ignore:
   - docs/superpowers/**
@@ -302,6 +302,7 @@ features:
       - .dockerignore
       - .github/**
       - .gitignore
+      - AGENTS.md
       - CLAUDE.md
       - CODEOWNERS
       - CONTRIBUTING.md
