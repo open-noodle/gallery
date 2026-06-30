@@ -636,6 +636,10 @@ export class SearchService extends BaseService {
     }
 
     const visibility = 'visibility' in dto ? dto.visibility : undefined;
+    // Annotate so the 'not-locked' literal is preserved through the generic
+    // resolveScopedPersonFilters inference (no contextual type widens it to string).
+    const resolvedVisibility: AssetVisibility | 'not-locked' | undefined =
+      visibility ?? (auth.session?.hasElevatedPermission ? undefined : 'not-locked');
     const resolvedOptions = await this.resolveScopedPersonFilters(auth, {
       ...dto,
       timelineSpaceIds,
@@ -643,7 +647,7 @@ export class SearchService extends BaseService {
       viewingUserId: auth.user.id,
       embedding,
       maxDistance: machineLearning.clip.maxDistance,
-      visibility: visibility ?? (auth.session?.hasElevatedPermission ? undefined : 'not-locked'),
+      visibility: resolvedVisibility,
     });
 
     if (options.includeOrder) {
