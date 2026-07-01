@@ -12,7 +12,9 @@ final citySuggestionsProvider = FutureProvider.autoDispose.family<List<String>, 
   final response = await api.getSearchSuggestionsWithHttpInfo(
     SearchSuggestionType.city,
     country: country,
-    withSharedSpaces: false,
+    // Include cities from shared-space assets so a non-owner viewer sees them, mirroring the
+    // web filter page (map-filter-config.ts `withSharedSpaces: true`). RBAC-projected server-side.
+    withSharedSpaces: true,
   );
 
   if (response.body.isEmpty) {
