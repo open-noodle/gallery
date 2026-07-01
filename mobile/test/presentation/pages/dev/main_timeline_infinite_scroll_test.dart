@@ -9,6 +9,7 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/search_result.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
+import 'package:immich_mobile/domain/services/feature_message.service.dart';
 import 'package:immich_mobile/domain/services/search.service.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
@@ -19,6 +20,7 @@ import 'package:immich_mobile/infrastructure/repositories/store.repository.dart'
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/presentation/pages/dev/main_timeline.page.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
+import 'package:immich_mobile/providers/feature_message.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/search.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
@@ -40,6 +42,17 @@ class _MockApiService extends Mock implements ApiService {}
 class _MockUserService extends Mock implements UserService {}
 
 class _FakeFilter extends Fake implements SearchFilter {}
+
+// Upstream #29388 shows a "what's new" dialog from MainTimelinePage.initState when
+// FeatureMessageService.shouldShow() is true. Stub it off so the dialog does not
+// fire (and throw on unmocked deps) during these fork timeline widget tests.
+class _StubFeatureMessageService implements FeatureMessageService {
+  @override
+  bool shouldShow() => false;
+
+  @override
+  Future<void> markSeen() async {}
+}
 
 class _StubUserNotifier extends CurrentUserProvider {
   _StubUserNotifier(super.service, UserDto? initial) {
@@ -70,6 +83,7 @@ ProviderContainer _makeContainer({required SearchService search, required Drift 
       currentUserProvider.overrideWith((ref) => _StubUserNotifier(mockUserSvc, user)),
       timelineUsersProvider.overrideWith((_) => user == null ? const Stream.empty() : Stream.value([user.id])),
       photosFilterCountProvider.overrideWith((ref) => 0),
+      featureMessageServiceProvider.overrideWithValue(_StubFeatureMessageService()),
     ],
   );
 }
