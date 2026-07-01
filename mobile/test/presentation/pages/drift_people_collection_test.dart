@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
@@ -127,7 +128,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('add_a_name'), findsOneWidget);
+      expect(find.text('add_a_name'.tr()), findsOneWidget);
     });
 
     testWidgets('hides the add-a-name affordance for a viewer-only space person', (tester) async {
@@ -142,7 +143,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('add_a_name'), findsNothing);
+      expect(find.text('add_a_name'.tr()), findsNothing);
     });
 
     testWidgets('still renders a viewer-only space person\'s name read-only', (tester) async {
