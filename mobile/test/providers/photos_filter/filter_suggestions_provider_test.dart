@@ -29,6 +29,49 @@ void main() {
   });
 
   group('photosFilterSuggestionsProvider', () {
+    // A non-owner viewer whose visible photos are all shared-space owns no assets, so an
+    // owner-scoped facet query returns nothing. Request shared-space content so the facets
+    // populate — mirrors the web filter page (map-filter-config.ts withSharedSpaces: true).
+    test('requests shared-space facets so a viewer sees them (withSharedSpaces: true)', () async {
+      when(
+        () => mockSearchApi.getFilterSuggestions(
+          city: any(named: 'city'),
+          country: any(named: 'country'),
+          isFavorite: any(named: 'isFavorite'),
+          make: any(named: 'make'),
+          mediaType: any(named: 'mediaType'),
+          model: any(named: 'model'),
+          personIds: any(named: 'personIds'),
+          rating: any(named: 'rating'),
+          spaceId: any(named: 'spaceId'),
+          tagIds: any(named: 'tagIds'),
+          takenAfter: any(named: 'takenAfter'),
+          takenBefore: any(named: 'takenBefore'),
+          withSharedSpaces: any(named: 'withSharedSpaces'),
+        ),
+      ).thenAnswer((_) async => FilterSuggestionsResponseDto(hasUnnamedPeople: false));
+
+      await container.read(photosFilterSuggestionsProvider(SearchFilter.empty()).future);
+
+      verify(
+        () => mockSearchApi.getFilterSuggestions(
+          city: any(named: 'city'),
+          country: any(named: 'country'),
+          isFavorite: any(named: 'isFavorite'),
+          make: any(named: 'make'),
+          mediaType: any(named: 'mediaType'),
+          model: any(named: 'model'),
+          personIds: any(named: 'personIds'),
+          rating: any(named: 'rating'),
+          spaceId: any(named: 'spaceId'),
+          tagIds: any(named: 'tagIds'),
+          takenAfter: any(named: 'takenAfter'),
+          takenBefore: any(named: 'takenBefore'),
+          withSharedSpaces: true,
+        ),
+      ).called(1);
+    });
+
     test('returns the FilterSuggestionsResponseDto returned by the API', () async {
       final dto = FilterSuggestionsResponseDto(hasUnnamedPeople: false, countries: ['France']);
       when(
@@ -123,6 +166,7 @@ void main() {
           tagIds: ['tag-1', 'tag-2'],
           takenAfter: after,
           takenBefore: before,
+          withSharedSpaces: true,
         ),
       ).called(1);
     });
