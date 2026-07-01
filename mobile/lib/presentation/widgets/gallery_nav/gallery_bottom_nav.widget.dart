@@ -138,7 +138,8 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
         break;
       case GalleryTabEnum.library:
         ref.invalidate(localAlbumProvider);
-        ref.invalidate(driftGetAllPeopleProvider);
+        ref.invalidate(getAllPeopleProvider);
+        ref.invalidate(driftGetAllPeopleWithSharedSpacesProvider);
         break;
     }
 
