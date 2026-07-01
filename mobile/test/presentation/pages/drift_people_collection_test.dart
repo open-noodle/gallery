@@ -11,12 +11,13 @@ import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/pages/drift_people_collection.page.dart';
+import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 
 import '../../test_utils.dart';
 import '../../widget_tester_extensions.dart';
 
-DriftPerson _person(String id, String name) => DriftPerson(
+DriftPerson _person(String id, String name, {String? spaceId}) => DriftPerson(
   id: id,
   createdAt: DateTime(2024, 1, 1),
   updatedAt: DateTime(2024, 1, 1),
@@ -25,6 +26,7 @@ DriftPerson _person(String id, String name) => DriftPerson(
   isFavorite: false,
   isHidden: false,
   color: null,
+  spaceId: spaceId,
 );
 
 void main() {
@@ -68,7 +70,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const DriftPeopleCollectionPage(),
         overrides: [
-          driftGetAllPeopleProvider.overrideWith(
+          driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
             (ref, sortBy) async => sortBy == PeopleSortBy.photoCount
                 ? [_person('zoe', 'Zoe'), _person('alice', 'Alice')]
                 : [_person('alice', 'Alice'), _person('zoe', 'Zoe')],
@@ -92,7 +94,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const DriftPeopleCollectionPage(),
         overrides: [
-          driftGetAllPeopleProvider.overrideWith(
+          driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
             (ref, sortBy) async => [_person('zo', 'Zora'), _person('al', 'Alora'), _person('bo', 'Bob')],
           ),
         ],
@@ -107,6 +109,95 @@ void main() {
       expect(find.byKey(const ValueKey('bo')), findsNothing);
       expect(find.byKey(const ValueKey('zo')), findsWidgets);
       expect(isBefore(tester, 'zo', 'al'), isTrue);
+    });
+
+    // The page lists non-owned shared-space people; the rename affordance must be gated to
+    // owner-or-space-editor exactly like the web People page (issue #727 sibling). A personal
+    // person (null spaceId) and a space person the viewer can edit both show "add a name" for
+    // an empty name; a viewer-only space person shows a read-only name and no add-a-name.
+    testWidgets('shows the add-a-name affordance for an editable space person', (tester) async {
+      await tester.pumpConsumerWidget(
+        const DriftPeopleCollectionPage(),
+        overrides: [
+          driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
+            (ref, sortBy) async => [_person('sp', '', spaceId: 'space-1')],
+          ),
+          driftSpaceEditableProvider.overrideWith((ref, spaceId) async => true),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('add_a_name'), findsOneWidget);
+    });
+
+    testWidgets('hides the add-a-name affordance for a viewer-only space person', (tester) async {
+      await tester.pumpConsumerWidget(
+        const DriftPeopleCollectionPage(),
+        overrides: [
+          driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
+            (ref, sortBy) async => [_person('sp', '', spaceId: 'space-1')],
+          ),
+          driftSpaceEditableProvider.overrideWith((ref, spaceId) async => false),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('add_a_name'), findsNothing);
+    });
+
+    testWidgets('still renders a viewer-only space person\'s name read-only', (tester) async {
+      await tester.pumpConsumerWidget(
+        const DriftPeopleCollectionPage(),
+        overrides: [
+          driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
+            (ref, sortBy) async => [_person('sp', 'Shared Sam', spaceId: 'space-1')],
+          ),
+          driftSpaceEditableProvider.overrideWith((ref, spaceId) async => false),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Shared Sam'), findsOneWidget);
+    });
+
+    // A space-only person's id is a shared_space_person id with no row in the owner-only
+    // person table, so its avatar must resolve via the membership-gated space thumbnail
+    // endpoint (not /people/{id}/thumbnail, which 404s), matching the web People page.
+    String? avatarUrl(WidgetTester tester, String personId) {
+      final avatar = tester.widget<CircleAvatar>(
+        find.byWidgetPredicate((w) => w is CircleAvatar && w.key == ValueKey(personId)),
+      );
+      final provider = avatar.backgroundImage;
+      return provider is RemoteImageProvider ? provider.url : null;
+    }
+
+    testWidgets('builds a space person\'s avatar from the space thumbnail endpoint', (tester) async {
+      await tester.pumpConsumerWidget(
+        const DriftPeopleCollectionPage(),
+        overrides: [
+          driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
+            (ref, sortBy) async => [_person('sp', 'Shared Sam', spaceId: 'space-1')],
+          ),
+          driftSpaceEditableProvider.overrideWith((ref, spaceId) async => true),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(avatarUrl(tester, 'sp'), endsWith('/shared-spaces/space-1/people/sp/thumbnail'));
+    });
+
+    testWidgets('builds a personal person\'s avatar from the owner thumbnail endpoint', (tester) async {
+      await tester.pumpConsumerWidget(
+        const DriftPeopleCollectionPage(),
+        overrides: [
+          driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
+            (ref, sortBy) async => [_person('me', 'Personal Pat')],
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(avatarUrl(tester, 'me'), endsWith('/people/me/thumbnail'));
     });
   });
 }
