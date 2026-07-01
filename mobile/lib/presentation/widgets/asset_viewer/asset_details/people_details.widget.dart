@@ -12,6 +12,7 @@ import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.
 import 'package:immich_mobile/presentation/widgets/people/person_edit_name_modal.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/routes.provider.dart';
+import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/utils/image_url_builder.dart';
 import 'package:immich_mobile/utils/people.utils.dart';
@@ -28,7 +29,11 @@ class PeopleDetails extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    final peopleFuture = ref.watch(peopleAssetProvider(asset.id));
+    final currentUserId = ref.watch(currentUserProvider.select((user) => user?.id));
+    final ownedByCurrentUser = asset.ownerId == currentUserId;
+    final assetKey = (id: asset.id, ownerId: asset.ownerId);
+
+    final peopleFuture = ref.watch(peopleAssetProvider(assetKey));
 
     Future<void> showNameEditModal(Person person) async {
       await showDialog(
@@ -39,7 +44,7 @@ class PeopleDetails extends ConsumerWidget {
         },
       );
 
-      ref.invalidate(peopleAssetProvider(asset.id));
+      ref.invalidate(peopleAssetProvider(assetKey));
     }
 
     return peopleFuture.when(
@@ -66,6 +71,7 @@ class PeopleDetails extends ConsumerWidget {
                       _Avatar(
                         person: person,
                         assetFileCreatedAt: asset.createdAt,
+                        ownedByCurrentUser: ownedByCurrentUser,
                         onTap: () {
                           final previousRouteData = ref.read(previousRouteDataProvider);
                           final previousRouteArgs = previousRouteData?.arguments;
@@ -78,7 +84,7 @@ class PeopleDetails extends ConsumerWidget {
                           ContextHelper(context).pop();
                           unawaited(context.pushRoute(PersonRoute(person: person)));
                         },
-                        onNameTap: () => showNameEditModal(person),
+                        onNameTap: ownedByCurrentUser ? () => showNameEditModal(person) : null,
                       ),
                   ],
                 ),
@@ -98,11 +104,18 @@ class PeopleDetails extends ConsumerWidget {
 class _Avatar extends StatelessWidget {
   final Person person;
   final DateTime assetFileCreatedAt;
+  final bool ownedByCurrentUser;
   final VoidCallback? onTap;
   final VoidCallback? onNameTap;
   final double imageSize = 96;
 
-  const _Avatar({required this.person, required this.assetFileCreatedAt, this.onTap, this.onNameTap});
+  const _Avatar({
+    required this.person,
+    required this.assetFileCreatedAt,
+    required this.ownedByCurrentUser,
+    this.onTap,
+    this.onNameTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -132,16 +145,18 @@ class _Avatar extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             if (person.name.isEmpty)
-              GestureDetector(
-                onTap: () => onNameTap?.call(),
-                child: Text(
-                  context.t.add_a_name,
-                  style: context.textTheme.labelLarge?.copyWith(color: context.primaryColor),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
-              )
+              ownedByCurrentUser
+                  ? GestureDetector(
+                      onTap: () => onNameTap?.call(),
+                      child: Text(
+                        context.t.add_a_name,
+                        style: context.textTheme.labelLarge?.copyWith(color: context.primaryColor),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                    )
+                  : const SizedBox.shrink()
             else
               Column(
                 mainAxisSize: MainAxisSize.min,
