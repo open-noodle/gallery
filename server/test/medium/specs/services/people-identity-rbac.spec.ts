@@ -3180,6 +3180,29 @@ describe('People identity RBAC projection', () => {
     expect(JSON.stringify({ filters, metadata, cities })).not.toContain('No Reshare Name');
   });
 
+  it('timeline opt-in: album scope includes shared-space assets for a member who has not hidden the space', async () => {
+    // Upstream immich #29352 grants album-scoped searchMetadata access via album.read.
+    // A space member who owns/can-read the album AND has not hidden the space from their
+    // timeline should see the space's asset through the album (the shared-space gate lets
+    // it through because the space is in their accessible timelineSpaceIds).
+    const { ctx, sut } = setupSearch();
+    const { user: owner } = await ctx.newUser();
+    const { user: member } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+    const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+    const { album } = await ctx.newAlbum({ ownerId: member.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+    // member has NOT hidden the space from their timeline (default = shown)
+
+    const shown = await sut.searchMetadata(authFor(member), { albumIds: [album.id] });
+
+    expect(shown.assets.items).toHaveLength(1);
+    expect(shown.assets.items[0].id).toBe(asset.id);
+  });
+
   it('timeline opt-in: disabling a space is per viewer and does not hide it for another member', async () => {
     const { ctx, sut } = setupSearch();
     const faceIdentityRepository = ctx.get(FaceIdentityRepository);
