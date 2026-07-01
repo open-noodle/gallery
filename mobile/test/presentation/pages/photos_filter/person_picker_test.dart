@@ -91,7 +91,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const PersonPickerPage(),
         overrides: [
-          driftGetAllPeopleProvider.overrideWith((ref, sortBy) async => [_d('a', 'Alice'), _d('b', 'Bob')]),
+          getAllPeopleProvider.overrideWith((ref, sortBy) async => [_d('a', 'Alice'), _d('b', 'Bob')]),
         ],
       );
       await tester.pumpAndSettle();
@@ -132,7 +132,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const PersonPickerPage(),
         overrides: [
-          driftGetAllPeopleProvider.overrideWith((ref, sortBy) async => [_d('a', 'Alice')]),
+          getAllPeopleProvider.overrideWith((ref, sortBy) async => [_d('a', 'Alice')]),
         ],
       );
       await tester.pumpAndSettle();
@@ -151,7 +151,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const PersonPickerPage(),
         overrides: [
-          driftGetAllPeopleProvider.overrideWith((ref, sortBy) async => [_d('a', 'Alice')]),
+          getAllPeopleProvider.overrideWith((ref, sortBy) async => [_d('a', 'Alice')]),
         ],
       );
       await tester.pumpAndSettle();

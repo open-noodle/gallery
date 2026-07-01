@@ -18,7 +18,7 @@ DriftPerson _d(String id, String name, {bool isHidden = false}) => DriftPerson(
 PersonDto _p(String id, String name) => PersonDto(id: id, name: name, isHidden: false, thumbnailPath: '');
 
 ProviderContainer _containerWith(List<DriftPerson> people) {
-  return ProviderContainer(overrides: [driftGetAllPeopleProvider.overrideWith((ref, sortBy) async => people)]);
+  return ProviderContainer(overrides: [getAllPeopleProvider.overrideWith((ref, sortBy) async => people)]);
 }
 
 void main() {
@@ -50,7 +50,7 @@ void main() {
     test('pins photoCount ordering regardless of the people sort preference', () async {
       final c = ProviderContainer(
         overrides: [
-          driftGetAllPeopleProvider.overrideWith(
+          getAllPeopleProvider.overrideWith(
             (ref, sortBy) async => sortBy == PeopleSortBy.photoCount ? [_d('pinned', 'Alice')] : [_d('leaked', 'Bob')],
           ),
         ],

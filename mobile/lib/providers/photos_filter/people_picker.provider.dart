@@ -20,7 +20,7 @@ PersonDto _toPersonDto(DriftPerson p) => PersonDto(
 /// Pinned to photoCount ordering: peopleAlphaIndex preserves input order within
 /// letter buckets, so the People-view sort preference must not leak in here.
 final peoplePickerAllProvider = FutureProvider.autoDispose<List<PersonDto>>((ref) async {
-  final all = await ref.watch(driftGetAllPeopleProvider(PeopleSortBy.photoCount).future);
+  final all = await ref.watch(getAllPeopleProvider(PeopleSortBy.photoCount).future);
   return all.where((p) => !p.isHidden && p.name.isNotEmpty).map(_toPersonDto).toList();
 });
 
