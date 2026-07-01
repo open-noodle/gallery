@@ -30,7 +30,12 @@ class _PersonNameEditFormState extends ConsumerState<PersonBirthdayEditForm> {
 
   Future<void> saveBirthday() async {
     try {
-      final result = await ref.read(peopleServiceProvider).updateBirthday(widget.person.id, _selectedDate);
+      final result = await ref.read(peopleServiceProvider).updateBirthday(widget.person, _selectedDate);
+
+      if (result != 0 && mounted) {
+        // A Drift stream can never observe a server-side edit — a space-person birthday edit
+        // writes nothing locally — so the server-backed list must still be invalidated by hand.
+        ref.invalidate(driftGetAllPeopleWithSharedSpacesProvider);
 
       if (result != 0 && mounted) {
         context.pop<DateTime>(_selectedDate);
