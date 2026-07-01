@@ -8,11 +8,14 @@
   squashed fork base + 5 later fork search PRs); the generated
   `search.repository.sql` auto-resolved via a temporary, scoped keep-theirs merge
   driver and was regenerated canonically at the end.
-- **Post-rebase fork fix**: 1 commit (`85174620c5`) — a `not-locked` literal-type pin
-  in `resolveSmartSearch` + an album-access mock in one fork unit test.
+- **Post-rebase fork fixes**: 2 commits — (`85174620c5`) a `not-locked` literal-type
+  pin in `resolveSmartSearch` + an album-access mock in one fork unit test; and
+  (`73ebb21325`) a shared-space RBAC gate for album-scoped search (see the dedicated
+  section below — the one issue the first CI run caught).
 - **Risk level**: MEDIUM (a breaking upstream change on the fork's most heavily
-  extended surface — search) → resolved cleanly and verified.
-- **Recommendation**: PROCEED (pending CI on the test branch)
+  extended surface — search, including a real RBAC reconciliation) → resolved and
+  verified.
+- **Recommendation**: PROCEED (re-verifying CI on the test branch after the RBAC gate)
 
 Upstream is untagged post-`v3.0.0-rc.4` dev. The fork stays on its tagged base
 `branding/config.json.upstream.version = 2.7.5` (unchanged — no version bump). The
@@ -132,6 +135,39 @@ plus the fork's own rewrites; every piece of upstream's new logic is positively
 present in the final tree (the `$if` visibility block, the four `not-locked`
 defaults, the `Permission.AlbumRead` gate). The old `AssetVisibility.Timeline`
 default is correctly removed.
+
+## Fork RBAC Reconciliation — album-scoped search (#29352) — commit `73ebb21325`
+
+The mechanical conflict resolution was clean, but the first CI run surfaced a
+**semantic** interaction that unit tests could not catch (only Medium Tests did):
+upstream #29352 makes `searchMetadata` honor `album.read` access by dropping
+`userIds` owner-scoping when `albumIds` is set. The fork's shared-space RBAC in
+`searchAssetBuilder` (`server/src/utils/database.ts`) enforces access through
+clauses **all gated on `options.userIds`** (owner scope at `:712`; accessible-space
+scope at `:634`). With `userIds` undefined, those gates switch off, so a
+shared-space asset **leaked** to a searcher who only had album access — a
+non-space-member, or a member who hid the space from their timeline. Three fork
+`people-identity-rbac` "timeline opt-in" tests caught this
+(`toEqual([])` → returned one `timeline`-visibility asset).
+
+**Decision (with the maintainer): Option B — adopt upstream's album access, add a
+shared-space gate.** A new clause fires only in the `albumIds && !options.userIds`
+path: an asset is visible iff it is **not** shared-space content (absent from
+`shared_space_asset` and its library absent from `shared_space_library`) **or** it
+is reachable through a space the searcher can currently access
+(`shared_space_asset`/`shared_space_library` `spaceId` ∈ `options.timelineSpaceIds`).
+This keeps upstream's shared-album search for plain assets while preserving the
+fork's space-membership + timeline-visibility gating for shared-space content.
+
+- **Verified**: the 3 fork RBAC tests pass; upstream's new "should return assets
+  from shared album" medium test still passes; a new positive fork test asserts a
+  member who has _not_ hidden the space sees the asset via album search
+  (`people-identity-rbac.spec.ts`, 69 tests). Server `tsc` + 4697 unit tests green.
+- **SQL**: unchanged — the `@GenerateSql` dummy params set `userIds`, so the gate
+  never fires in the generated `search.repository.sql`.
+- **Scope note**: matches upstream — only `searchMetadata` adopts album access;
+  `searchStatistics`/`searchRandom`/`searchLargeAssets` still owner-scope album
+  searches (no leak), so the gate is a no-op for them.
 
 ## Fork Feature Verification
 
