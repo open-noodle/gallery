@@ -111,14 +111,35 @@ class PersonApiRepository extends ApiRepository {
   Future<List<Person>> getAssetPeople(String assetId) async {
     final info = await checkNull(_apiService.assetsApi.getAssetInfo(assetId));
     final people = info.people.orElse(null) ?? const <PersonResponseDto>[];
-    return people.where((person) => !person.isHidden).map(_toAssetPerson).toList();
+    return people
+        .where((person) => !person.isHidden)
+        .map((person) => _toAssetPerson(person, info.resolvedSpaceId.orElse(null)))
+        .toList();
   }
 
   // The unified Person model carries no owner/created/face-asset/hidden/colour fields, and
   // updatedAt is nullable — so the epoch-0 sentinel the old DriftPerson mapping needed is gone.
   // v3 openapi wraps optional person fields in Optional<...?> → unwrap with orElse.
-  static Person _toAssetPerson(PersonResponseDto dto) =>
-      Person(id: dto.id, name: dto.name, updatedAt: dto.updatedAt.orElse(null), birthDate: dto.birthDate);
+  //
+  // Face-tap → person detail: for a Space-shared person the asset-info endpoint carries the
+  // space-person id (dto.spacePersonId) separately from the global identity id (dto.id), and
+  // the space id lives on the asset (resolvedSpaceId). Map such a person shape-identical to
+  // the People-page one — id = space-person id, spaceId set — so buildPersonTimelineRouteService
+  // takes the space branch and the detail page loads photos (and the thumbnail routes to the
+  // membership-gated space endpoint), mirroring web. Both ids must be present: the space assets
+  // endpoint needs the (spaceId, space-person id) pair. Personal/owned people keep the global id
+  // and null spaceId (owner-scoped local query + owner thumbnail). See issue #727.
+  static Person _toAssetPerson(PersonResponseDto dto, String? resolvedSpaceId) {
+    final spacePersonId = dto.spacePersonId.orElse(null);
+    final isSpacePerson = spacePersonId != null && resolvedSpaceId != null;
+    return Person(
+      id: isSpacePerson ? spacePersonId : dto.id,
+      name: dto.name,
+      updatedAt: dto.updatedAt.orElse(null),
+      birthDate: dto.birthDate,
+      spaceId: isSpacePerson ? resolvedSpaceId : null,
+    );
+  }
 
   Future<Person> update(String id, {String? name, DateTime? birthday}) async {
     final birthdayUtc = birthday == null ? null : DateTime.utc(birthday.year, birthday.month, birthday.day);
