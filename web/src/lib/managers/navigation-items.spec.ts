@@ -8,8 +8,8 @@ import { isAlmostExactNavMatch, NAVIGATION_ITEMS } from './navigation-items';
 const here = dirname(fileURLToPath(import.meta.url));
 
 describe('NAVIGATION_ITEMS schema', () => {
-  it('has exactly 35 items', () => {
-    expect(NAVIGATION_ITEMS).toHaveLength(36);
+  it('has exactly 37 items', () => {
+    expect(NAVIGATION_ITEMS).toHaveLength(37);
   });
 
   it('every item has non-empty required fields', () => {
@@ -44,7 +44,7 @@ describe('NAVIGATION_ITEMS schema', () => {
 
   it('system-settings routes match the /admin/system-settings?isOpen=<key> pattern', () => {
     const items = NAVIGATION_ITEMS.filter((i) => i.category === 'systemSettings');
-    expect(items).toHaveLength(20);
+    expect(items).toHaveLength(21);
     for (const item of items) {
       expect(item.route).toMatch(/^\/admin\/system-settings\?isOpen=[a-z-]+$/);
       expect(item.adminOnly).toBe(true);
