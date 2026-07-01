@@ -1,0 +1,196 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/data/db/main/dao/person.dart';
+import 'package:immich_mobile/data/server/person.dart';
+import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/domain/services/people.service.dart';
+import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:openapi/api.dart' as api;
+
+class MockPeopleDatabaseRepository extends Mock implements PeopleDatabaseRepository {}
+
+class MockPersonApiRepository extends Mock implements PersonApiRepository {}
+
+class MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiRepository {}
+
+class MockSharedSpacePersonResponseDto extends Mock implements api.SharedSpacePersonResponseDto {}
+
+void main() {
+  late PeopleService sut;
+  late MockPeopleDatabaseRepository mockRepository;
+  late MockPersonApiRepository mockApiRepository;
+  late MockSharedSpaceApiRepository mockSharedSpace;
+
+  Person person(String id, {String? spaceId}) =>
+      Person(id: id, name: 'Alice', updatedAt: DateTime(2020), spaceId: spaceId);
+
+  setUpAll(() {
+    registerFallbackValue(PeopleSortBy.photoCount);
+  });
+
+  setUp(() {
+    mockRepository = MockPeopleDatabaseRepository();
+    mockApiRepository = MockPersonApiRepository();
+    mockSharedSpace = MockSharedSpaceApiRepository();
+    sut = PeopleService(mockRepository, mockApiRepository, mockSharedSpace);
+
+    // The local sync DB never receives faces for assets the viewer does not own, so the
+    // drift query comes back empty for a Space-shared asset.
+    when(() => mockRepository.getAssetPeople(any())).thenAnswer((_) async => <Person>[]);
+    // The server (like the web app) resolves the Space's people for that asset.
+    when(() => mockApiRepository.getAssetPeople(any())).thenAnswer((_) async => [person('space-person')]);
+  });
+
+  group('getAssetPeople', () {
+    // Regression test for issue #727: web showed faces on Space-shared assets but mobile did not.
+    test('fetches people from the server for an asset the viewer does not own', () async {
+      final result = await sut.getAssetPeople('shared-asset', ownedByCurrentUser: false);
+
+      expect(result, [person('space-person')]);
+      verify(() => mockApiRepository.getAssetPeople('shared-asset')).called(1);
+      verifyNever(() => mockRepository.getAssetPeople(any()));
+    });
+
+    test('reads people from the local sync DB for the viewer\'s own asset', () async {
+      when(() => mockRepository.getAssetPeople(any())).thenAnswer((_) async => [person('local-person')]);
+
+      final result = await sut.getAssetPeople('own-asset', ownedByCurrentUser: true);
+
+      expect(result, [person('local-person')]);
+      verify(() => mockRepository.getAssetPeople('own-asset')).called(1);
+      verifyNever(() => mockApiRepository.getAssetPeople(any()));
+    });
+
+    // The supplementary people strip is best-effort for non-owned assets: a network/server
+    // failure must silently hide it (empty list) rather than surface a visible error.
+    test('returns no people when the server fetch fails for a non-owned asset', () async {
+      when(() => mockApiRepository.getAssetPeople(any())).thenThrow(Exception('network down'));
+
+      final result = await sut.getAssetPeople('shared-asset', ownedByCurrentUser: false);
+
+      expect(result, isEmpty);
+    });
+  });
+
+  group('getAllPeopleWithSharedSpaces', () {
+    // Regression test for the People-page sibling of issue #727: the web People page shows
+    // people from Space-shared assets (getAllPeople withSharedSpaces:true), but the mobile
+    // People page read only the owner-scoped local Drift DB and so was empty for a viewer
+    // who owns no people. The service must surface the server's shared-space-inclusive list.
+    test('returns the server shared-space-inclusive people list', () async {
+      // The local sync DB is owner-scoped: a viewer who owns no people gets nothing from it.
+      when(() => mockRepository.getAllPeople(sortBy: any(named: 'sortBy'))).thenAnswer((_) async => <Person>[]);
+      when(
+        () => mockApiRepository.getAllPeopleWithSharedSpaces(sortBy: any(named: 'sortBy')),
+      ).thenAnswer((_) async => [person('space-person')]);
+
+      final result = await sut.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.photoCount);
+
+      expect(result, [person('space-person')]);
+      verify(() => mockApiRepository.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.photoCount)).called(1);
+    });
+
+    // Offline / server failure must not blank the page: the viewer's own people still render
+    // from the owner-scoped local sync DB (their shared-space people are simply unavailable).
+    test('falls back to the local sync DB when the server fetch fails', () async {
+      when(
+        () => mockApiRepository.getAllPeopleWithSharedSpaces(sortBy: any(named: 'sortBy')),
+      ).thenThrow(Exception('offline'));
+      when(
+        () => mockRepository.getAllPeople(sortBy: any(named: 'sortBy')),
+      ).thenAnswer((_) async => [person('local-person')]);
+
+      final result = await sut.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.name);
+
+      expect(result, [person('local-person')]);
+      verify(() => mockRepository.getAllPeople(sortBy: PeopleSortBy.name)).called(1);
+    });
+  });
+
+  // Edits must route on the person's profile, exactly like the web People page: a personal/owned
+  // person (null spaceId) goes to the owner-only person endpoint plus a local Drift write; a
+  // Space-scoped person goes to the editor-gated shared-space endpoint with NO local write.
+  group('updateName routing', () {
+    test('routes a personal person to the owner-only person endpoint and writes locally', () async {
+      when(
+        () => mockApiRepository.update(any(), name: any(named: 'name')),
+      ).thenAnswer((_) async => Person(id: 'p1', name: 'Bob'));
+      when(() => mockRepository.updateName(any(), any())).thenAnswer((_) async => 1);
+
+      final result = await sut.updateName(person('p1'), 'Bob');
+
+      expect(result, isNonZero);
+      verify(() => mockApiRepository.update('p1', name: 'Bob')).called(1);
+      verify(() => mockRepository.updateName('p1', 'Bob')).called(1);
+      verifyNever(
+        () => mockSharedSpace.updateSpacePerson(
+          any(),
+          any(),
+          name: any(named: 'name'),
+          birthday: any(named: 'birthday'),
+        ),
+      );
+    });
+
+    test('routes a Space person to the shared-space endpoint and does not write locally', () async {
+      when(
+        () => mockSharedSpace.updateSpacePerson(
+          any(),
+          any(),
+          name: any(named: 'name'),
+          birthday: any(named: 'birthday'),
+        ),
+      ).thenAnswer((_) async => MockSharedSpacePersonResponseDto());
+
+      final result = await sut.updateName(person('sp1', spaceId: 'space-1'), 'Bob');
+
+      expect(result, isNonZero);
+      verify(() => mockSharedSpace.updateSpacePerson('space-1', 'sp1', name: 'Bob')).called(1);
+      verifyNever(() => mockApiRepository.update(any(), name: any(named: 'name')));
+      verifyNever(() => mockRepository.updateName(any(), any()));
+    });
+  });
+
+  group('updateBirthday routing', () {
+    final birthday = DateTime(1990, 5, 20);
+
+    test('routes a personal person to the owner-only person endpoint and writes locally', () async {
+      when(
+        () => mockApiRepository.update(any(), birthday: any(named: 'birthday')),
+      ).thenAnswer((_) async => Person(id: 'p1', name: 'Alice'));
+      when(() => mockRepository.updateBirthday(any(), any())).thenAnswer((_) async => 1);
+
+      final result = await sut.updateBirthday(person('p1'), birthday);
+
+      expect(result, isNonZero);
+      verify(() => mockApiRepository.update('p1', birthday: birthday)).called(1);
+      verify(() => mockRepository.updateBirthday('p1', birthday)).called(1);
+      verifyNever(
+        () => mockSharedSpace.updateSpacePerson(
+          any(),
+          any(),
+          name: any(named: 'name'),
+          birthday: any(named: 'birthday'),
+        ),
+      );
+    });
+
+    test('routes a Space person to the shared-space endpoint and does not write locally', () async {
+      when(
+        () => mockSharedSpace.updateSpacePerson(
+          any(),
+          any(),
+          name: any(named: 'name'),
+          birthday: any(named: 'birthday'),
+        ),
+      ).thenAnswer((_) async => MockSharedSpacePersonResponseDto());
+
+      final result = await sut.updateBirthday(person('sp1', spaceId: 'space-1'), birthday);
+
+      expect(result, isNonZero);
+      verify(() => mockSharedSpace.updateSpacePerson('space-1', 'sp1', birthday: birthday)).called(1);
+      verifyNever(() => mockApiRepository.update(any(), birthday: any(named: 'birthday')));
+      verifyNever(() => mockRepository.updateBirthday(any(), any()));
+    });
+  });
+}
