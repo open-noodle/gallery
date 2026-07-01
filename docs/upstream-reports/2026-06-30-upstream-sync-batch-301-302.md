@@ -234,12 +234,38 @@ already routes all visibility through the shared `searchAssetBuilder` /
 
 ## Remote CI Verification
 
-- **Test branch**: `rebase/upstream-batch-302`
-- _CI dispatched after Checkpoint 3 approval; results recorded here before force-push._
+- **Test branch**: `rebase/upstream-batch-302` (final commit `4151d856a3`)
+
+| Workflow                                  | Status | Notes                                                                                    |
+| ----------------------------------------- | ------ | ---------------------------------------------------------------------------------------- |
+| `test.yml`                                | GREEN  | Went red twice first: Medium Tests (the RBAC reconciliation) then a prettier format nit. |
+| `docker.yml`                              | GREEN  | server/web/cli/ml images build.                                                          |
+| `static_analysis.yml`                     | GREEN  | dart analyze + format + generated freshness (unchanged inputs).                          |
+| `gallery-build-mobile.yml`                | GREEN  | iOS + Android compile (no mobile change this batch).                                     |
+| `gallery-rebase-smoke.yml`                | GREEN  | rebase e2e smoke.                                                                        |
+| `storage-migration-tests.yml`             | GREEN  |                                                                                          |
+| `storage-migration-e2e.yml`               | GREEN  |                                                                                          |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | migration coverage intact (no new migrations).                                           |
+
+- Smoke gates `gallery-ml-smoke` / `gallery-mobile-smoke` are not on `main` yet → not
+  dispatchable against the rolling branch; this batch touches neither ML nor mobile.
+- **Failures fixed**: (1) `people-identity-rbac` album RBAC reconciliation → gate
+  `73ebb21325`; (2) prettier whole-chain reflow from a mid-chain comment → helper
+  extraction `4151d856a3`. The final green set (`test`/`docker`/`rebase-smoke`) ran on
+  `4151d856a3`; the other five workflows carried their green from `da53fc0e8a` (diff to
+  HEAD is only `database.ts` + the RBAC spec + this report — inputs to those five are
+  byte-identical).
+
+### Follow-up work
+
+- **Timeline hidden-space owner suppression** (deferred, by maintainer decision): make
+  the timeline hide a hidden space's assets even for the owner (mirroring this batch's
+  album gate). Not part of upstream absorption; needs care so an owner's own _library_
+  photo that is also in a hidden space does not vanish from their main timeline.
 
 ## Post-Rebase Verification
 
-- Fork commits ahead of upstream: 828 (+ this report)
+- Fork commits ahead of upstream: 828 (+ post-rebase fixes + this report)
 - Commits behind upstream: 0
 - Both upstream commits (`b4cc406a3f`, `deeb042a9e`) are ancestors of HEAD.
 - Fork diff looks clean: YES
