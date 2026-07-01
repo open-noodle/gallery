@@ -796,6 +796,26 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
     origin: TimelineOrigin.person,
   );
 
+  /// Timeline for a Space-shared person, restricted to the [assetIds] the server resolved for
+  /// that person (GET /shared-spaces/{id}/people/{id}/assets). Unlike [person], this does NOT
+  /// filter by ownerId or join asset_face: a Space person's photos are owned by another user
+  /// and their face→person links are owner-scoped and never sync to the viewer, so the local
+  /// join would be empty ("0 items"). The Space assets themselves do sync locally, so once the
+  /// server tells us which ones contain the person we render them straight from remote_asset —
+  /// mirroring the web person detail page for a Space person. An empty [assetIds] yields an
+  /// empty timeline.
+  TimelineQuery sharedSpacePerson(
+    List<String> assetIds,
+    GroupAssetsBy groupBy, {
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => _remoteQueryBuilder(
+    filter: (row) =>
+        row.deletedAt.isNull() & row.visibility.equalsValue(AssetVisibility.timeline) & row.id.isIn(assetIds),
+    groupBy: groupBy,
+    temporalScope: temporalScope,
+    origin: TimelineOrigin.person,
+  );
+
   Stream<List<Bucket>> _watchPlaceBucket(
     String place,
     List<String> userIds,
