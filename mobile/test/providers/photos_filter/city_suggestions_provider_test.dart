@@ -24,9 +24,7 @@ void main() {
     mockSearchApi = MockSearchApi();
     when(() => mockApiService.searchApi).thenReturn(mockSearchApi);
 
-    container = ProviderContainer(
-      overrides: [apiServiceProvider.overrideWithValue(mockApiService)],
-    );
+    container = ProviderContainer(overrides: [apiServiceProvider.overrideWithValue(mockApiService)]);
     addTearDown(container.dispose);
   });
 
@@ -41,32 +39,25 @@ void main() {
       expect(result, isEmpty);
     });
 
-    test(
-      'calls getSearchSuggestions(type=city, country) when country set',
-      () async {
-        when(
-          () => mockSearchApi.getSearchSuggestionsWithHttpInfo(
-            SearchSuggestionType.city,
-            country: 'France',
-            withSharedSpaces: false,
-          ),
-        ).thenAnswer(
-          (_) async => http.Response(jsonEncode(['Paris', 'Lyon']), 200),
-        );
+    test('calls getSearchSuggestions(type=city, country) with withSharedSpaces: true when country set', () async {
+      when(
+        () => mockSearchApi.getSearchSuggestionsWithHttpInfo(
+          SearchSuggestionType.city,
+          country: 'France',
+          withSharedSpaces: true,
+        ),
+      ).thenAnswer((_) async => http.Response(jsonEncode(['Paris', 'Lyon']), 200));
 
-        final result = await container.read(
-          citySuggestionsProvider('France').future,
-        );
-        expect(result, ['Paris', 'Lyon']);
-        verify(
-          () => mockSearchApi.getSearchSuggestionsWithHttpInfo(
-            SearchSuggestionType.city,
-            country: 'France',
-            withSharedSpaces: false,
-          ),
-        ).called(1);
-      },
-    );
+      final result = await container.read(citySuggestionsProvider('France').future);
+      expect(result, ['Paris', 'Lyon']);
+      verify(
+        () => mockSearchApi.getSearchSuggestionsWithHttpInfo(
+          SearchSuggestionType.city,
+          country: 'France',
+          withSharedSpaces: true,
+        ),
+      ).called(1);
+    });
 
     test('null response from server → empty list', () async {
       when(
@@ -77,10 +68,7 @@ void main() {
         ),
       ).thenAnswer((_) async => http.Response('', 204));
 
-      expect(
-        await container.read(citySuggestionsProvider('France').future),
-        isEmpty,
-      );
+      expect(await container.read(citySuggestionsProvider('France').future), isEmpty);
     });
   });
 }

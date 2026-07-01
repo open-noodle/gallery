@@ -100,7 +100,7 @@ class _PeopleGridTile extends ConsumerWidget {
               ),
               child: CircleAvatar(
                 radius: 24,
-                backgroundImage: RemoteImageProvider(url: getFaceThumbnailUrl(person.id)),
+                backgroundImage: RemoteImageProvider(url: photosFilterPersonThumbnailUrl(person)),
               ),
             ),
             const SizedBox(height: 6),

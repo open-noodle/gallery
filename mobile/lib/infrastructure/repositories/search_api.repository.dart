@@ -53,6 +53,10 @@ class SearchApiRepository extends ApiRepository {
         order: _order(filter) == null ? const Optional.absent() : Optional.present(_order(filter)!),
         page: Optional.present(page),
         size: const Optional.present(100),
+        // Include shared-space assets so a viewer's selected facet returns results (and a
+        // space-person token resolves). Gated on favourite — favourites are owner-only, mirroring
+        // web buildPhotosTimelineOptions (`includeSharedTimelineAssets = isFavorite === undefined`).
+        withSharedSpaces: filter.display.isFavorite ? const Optional.absent() : const Optional.present(true),
       );
       return _api.searchSmart(filter.display.isUntagged ? _ExplicitNullTagIdsSmartSearchDto(dto) : dto);
     }
@@ -82,6 +86,10 @@ class SearchApiRepository extends ApiRepository {
       order: _order(filter) == null ? const Optional.absent() : Optional.present(_order(filter)!),
       page: Optional.present(page),
       size: const Optional.present(1000),
+      // Include shared-space assets so a viewer's selected facet returns results (and a
+      // space-person token resolves). Gated on favourite — favourites are owner-only, mirroring
+      // web buildPhotosTimelineOptions (`includeSharedTimelineAssets = isFavorite === undefined`).
+      withSharedSpaces: filter.display.isFavorite ? const Optional.absent() : const Optional.present(true),
     );
     return _api.searchAssets(filter.display.isUntagged ? _ExplicitNullTagIdsMetadataSearchDto(dto) : dto);
   }
