@@ -44,6 +44,15 @@ class SharedSpaceApiRepository extends ApiRepository {
     return response;
   }
 
+  /// Asset ids of the photos of a Space-scoped [personId] in [spaceId], from the
+  /// membership-gated `GET /shared-spaces/{id}/people/{personId}/assets` endpoint (the same
+  /// data the web person detail page reads for a Space person). Used by the person detail
+  /// timeline because the owner-scoped local sync DB never receives a non-owned person's
+  /// face→person links. Sibling of issue #727.
+  Future<List<String>> getSpacePersonAssets(String spaceId, String personId) async {
+    return await checkNull(_api.getSpacePersonAssets(spaceId, personId));
+  }
+
   /// Whether [userId] may edit Space-scoped people in [spaceId] (owner or editor role).
   /// Mirrors the web resolveSpaceEditable (person.service.ts): the server enforces the role
   /// on every write, so a membership-lookup failure fails open (returns true) rather than
