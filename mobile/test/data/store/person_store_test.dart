@@ -5,12 +5,25 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/data/server/person.dart';
 import 'package:immich_mobile/data/store.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/domain/models/user.model.dart';
+import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
+import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../../medium/repository_context.dart';
 
+const _currentUserId = 'current-user';
+
 class _MockPersonApi extends Mock implements PersonApiRepository {}
+
+class _MockUserService extends Mock implements UserService {}
+
+class _StubCurrentUserNotifier extends CurrentUserProvider {
+  _StubCurrentUserNotifier(super.service) {
+    state = UserDto(id: _currentUserId, email: 'current@test.com', name: 'current', profileChangedAt: DateTime(2024));
+  }
+}
 
 void main() {
   late MediumRepositoryContext ctx;
@@ -20,12 +33,16 @@ void main() {
   setUp(() {
     ctx = MediumRepositoryContext();
     api = _MockPersonApi();
+    final userService = _MockUserService();
+    when(() => userService.tryGetMyUser()).thenReturn(null);
+    when(() => userService.watchMyUser()).thenAnswer((_) => const Stream.empty());
     container = ProviderContainer(
       overrides: [
         driftProvider.overrideWithValue(ctx.db),
         personApiRepositoryProvider.overrideWithValue(api),
         // No stored preferences: the default minimum face count applies
         Store.userMetadata.preferences().overrideWith((ref) => Stream.value(null)),
+        currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(userService)),
       ],
     );
     addTearDown(container.dispose);
@@ -34,15 +51,33 @@ void main() {
 
   Future<Person?> byId(String personId) => container.read(Store.people.byId(personId).future);
 
-  test('forAsset serves the people on the asset', () async {
-    final user = await ctx.newUser();
-    final asset = await ctx.newRemoteAsset(ownerId: user.id);
-    final person = await ctx.newPerson(ownerId: user.id);
+  test('forAsset reads the local sync DB for the viewer\'s own asset', () async {
+    await ctx.newUser(id: _currentUserId);
+    final asset = await ctx.newRemoteAsset(ownerId: _currentUserId);
+    final person = await ctx.newPerson(ownerId: _currentUserId);
     await ctx.newFace(assetId: asset.id, personId: person.id);
 
-    final people = await container.read(Store.people.forAsset(asset.id).future);
+    final people = await container.read(Store.people.forAsset((id: asset.id, ownerId: _currentUserId)).future);
 
     expect(people.map((p) => p.id), [person.id]);
+    verifyNever(() => api.getAssetPeople(any()));
+  });
+
+  test('forAsset fetches from the server for an asset the viewer does not own', () async {
+    when(() => api.getAssetPeople(any())).thenAnswer((_) async => [Person(id: 'space-person', name: 'Alice')]);
+
+    final people = await container.read(Store.people.forAsset((id: 'shared-asset', ownerId: 'other-user')).future);
+
+    expect(people.map((p) => p.id), ['space-person']);
+    verify(() => api.getAssetPeople('shared-asset')).called(1);
+  });
+
+  test('forAsset returns no people when the server fetch fails for a non-owned asset', () async {
+    when(() => api.getAssetPeople(any())).thenThrow(Exception('network down'));
+
+    final people = await container.read(Store.people.forAsset((id: 'shared-asset', ownerId: 'other-user')).future);
+
+    expect(people, isEmpty);
   });
 
   test('all serves named people, hiding unnamed ones lacking the face count', () async {

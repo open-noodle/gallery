@@ -8,5 +8,5 @@ import 'package:immich_mobile/providers/infrastructure/user_metadata.provider.da
 /// asset-details strip) that just want the unsorted local list.
 final getAllPeopleProvider = StreamProvider.family<List<Person>, PeopleSortBy>((ref, sortBy) async* {
   final prefs = await ref.watch(userMetadataPreferencesProvider.future);
-  yield* ref.watch(driftProvider).peopleDatabaseRepository.watch(minFaces: prefs?.minimumFaces ?? 3, sortBy: sortBy);
+  yield* ref.watch(driftProvider).peopleDatabaseRepository.watchAll(minFaces: prefs?.minimumFaces ?? 3, sortBy: sortBy);
 });
