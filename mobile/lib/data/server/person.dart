@@ -14,6 +14,22 @@ class PersonApiRepository extends ApiRepository {
 
   PeopleApi get _api => _apiService.peopleApi;
 
+  /// Fetches the people visible on [assetId] from the server.
+  ///
+  /// The local sync DB only ever receives faces for assets the viewer owns, so for an
+  /// asset shared with the viewer through a Space this must go to the server. The
+  /// asset-info endpoint resolves those faces to the Space's people exactly like the web
+  /// app (see `AssetService.get`), which keeps mobile at parity with web. See issue #727.
+  Future<List<Person>> getAssetPeople(String assetId) async {
+    final info = await checkNull(_apiService.assetsApi.getAssetInfo(assetId));
+    return info.people.where((person) => !person.isHidden).map(_toAssetPerson).toList();
+  }
+
+  // The unified Person model carries no owner/created/face-asset/hidden/colour fields, and
+  // updatedAt is nullable — so the epoch-0 sentinel the old DriftPerson mapping needed is gone.
+  static Person _toAssetPerson(PersonWithFacesResponseDto dto) =>
+      Person(id: dto.id, name: dto.name, updatedAt: dto.updatedAt, birthDate: dto.birthDate);
+
   Future<Person> update(String id, {String? name, DateTime? birthday}) async {
     final birthdayUtc = birthday == null ? null : DateTime.utc(birthday.year, birthday.month, birthday.day);
     final dto = PersonUpdateDto(
