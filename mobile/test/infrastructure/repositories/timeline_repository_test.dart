@@ -1145,4 +1145,60 @@ void main() {
       await controller.close();
     });
   });
+
+  group('DriftTimelineRepository.sharedSpacePerson()', () {
+    // Parity gap sibling of #727 (per-photo faces) and #737 (People page): a Space-shared
+    // person's DETAIL timeline.
+    //
+    // A Space-shared person's photos are owned by another user but sync into the viewer's
+    // local DB as Space assets. The face→person links, however, are owner-scoped and never
+    // sync to the viewer, so the owner-scoped person() timeline is empty for a person the
+    // viewer doesn't own — the "0 items" bug. The server resolves the person's asset ids
+    // (GET /shared-spaces/{id}/people/{id}/assets); sharedSpacePerson() renders a timeline
+    // restricted to those ids from the locally-synced Space assets, matching the web person
+    // detail page.
+
+    setUp(() async {
+      await insertUser('admin');
+      await insertUser('viewer');
+      // Two Space-shared photos owned by admin; only a1 contains the Space person.
+      await insertVideo('a1', 'admin', type: AssetType.image);
+      await insertVideo('a2', 'admin', type: AssetType.image);
+      await insertSpace('s1', 'admin');
+      await insertMember('s1', 'viewer', showInTimeline: true);
+      await linkAssetToSpace('s1', 'a1');
+      await linkAssetToSpace('s1', 'a2');
+    });
+
+    test('renders the resolved asset ids even though the viewer does not own them', () async {
+      final assets = await sut.sharedSpacePerson(['a1'], GroupAssetsBy.day).assetSource(0, 100);
+      expect(assets.map((a) => (a as RemoteAsset).id), ['a1']);
+
+      final buckets = await sut.sharedSpacePerson(['a1'], GroupAssetsBy.day).bucketSource().first;
+      final total = buckets.fold<int>(0, (sum, b) => sum + (b as TimeBucket).assetCount);
+      expect(total, 1);
+    });
+
+    test('restricts the timeline to the resolved ids, not the whole space', () async {
+      final assets = await sut.sharedSpacePerson(['a1'], GroupAssetsBy.day).assetSource(0, 100);
+      expect(assets.map((a) => (a as RemoteAsset).id), ['a1']);
+      expect(assets.map((a) => (a as RemoteAsset).id), isNot(contains('a2')));
+    });
+
+    test('empty resolved id list → no assets and no buckets', () async {
+      final assets = await sut.sharedSpacePerson(const [], GroupAssetsBy.day).assetSource(0, 100);
+      expect(assets, isEmpty);
+
+      final buckets = await sut.sharedSpacePerson(const [], GroupAssetsBy.day).bucketSource().first;
+      final total = buckets.fold<int>(0, (sum, b) => sum + (b as TimeBucket).assetCount);
+      expect(total, 0);
+    });
+
+    test('owner-scoped person() is empty for a non-owned Space person (the gap this closes)', () async {
+      // No face rows sync for the viewer and the assets are owned by admin, so the existing
+      // owner-scoped person timeline returns nothing — the "0 items" bug on the detail page.
+      final assets = await sut.person('viewer', 'space-person-1', GroupAssetsBy.day).assetSource(0, 100);
+      expect(assets, isEmpty);
+    });
+  });
 }
