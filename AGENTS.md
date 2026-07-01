@@ -157,6 +157,8 @@ This merge is needed because:
 - **Local DB**: Isar with Drift for migrations
 - **API client**: Generated from OpenAPI (in `mobile/openapi/`)
 - **Navigation**: auto_route
+- **Faces/people are local-first, and sync is owner-scoped.** The asset-viewer people strip (`people_details.widget.dart` → `driftPeopleAssetProvider` → `DriftPeopleRepository.getAssetPeople`) reads faces from the local Drift DB. The `person`/`asset_face` sync streams (`sync.repository.ts` `PersonSync`/`AssetFaceSync`) filter `ownerId = userId`, so a viewer never syncs faces for assets shared with them through a Space — unlike the web app, which fetches asset detail on demand (`AssetService.get`) and resolves those faces to the Space's people. For non-owned assets the mobile people strip therefore fetches from the asset-info endpoint (`PersonApiRepository.getAssetPeople`) to match web (issue #727); those server-resolved people are read-only on the strip, so the inline add-a-name / rename affordance is gated to owned assets. Tapping through to a shared person's own page still hits local Drift and remains limited.
+- **Running mobile unit tests locally** (mirrors `.github/workflows/test.yml`): use Flutter **3.41.7** (the pinned SDK; `mise.toml` may symlink an older patch). From `mobile/`: `flutter pub get`, then generate localization/keys once — `dart run easy_localization:generate -S ../i18n && dart run bin/generate_keys.dart` (the `lib/generated/*.g.dart` files are gitignored) — then `flutter test <path>`. Drift/OpenAPI generated code is committed, so `build_runner` is not needed for tests.
 
 ### Machine Learning (Python)
 
