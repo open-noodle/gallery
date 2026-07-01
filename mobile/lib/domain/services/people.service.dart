@@ -46,6 +46,24 @@ class PeopleService {
     return _repository.getAllPeople(minFaces: minFaces, sortBy: sortBy);
   }
 
+  /// Asset ids of the photos of a Space-shared [personId] in [spaceId], as resolved by the
+  /// server. The person detail timeline needs this because the local sync DB is owner-scoped:
+  /// a non-owned Space person's face→person links never sync, so the local person query is
+  /// empty ("0 items"). The Space assets themselves DO sync locally, so the timeline renders
+  /// them once the server says which ones contain the person — matching the web person detail
+  /// page. This is the person-detail sibling of issue #727.
+  ///
+  /// Best-effort like [getAssetPeople]: a network/server failure returns an empty list so the
+  /// detail page degrades to "no photos" rather than surfacing a visible error.
+  Future<List<String>> getSharedSpacePersonAssetIds(String spaceId, String personId) async {
+    try {
+      return await _sharedSpaceApiRepository.getSpacePersonAssets(spaceId, personId);
+    } catch (error, stackTrace) {
+      _log.warning("Failed to fetch assets for Space person $personId in space $spaceId", error, stackTrace);
+      return const [];
+    }
+  }
+
   /// People for the global People page: the viewer's own people AND people on assets shared
   /// with them through a Space, matching the web People page (which calls the server with
   /// withSharedSpaces:true). The local sync DB is owner-scoped and never receives
