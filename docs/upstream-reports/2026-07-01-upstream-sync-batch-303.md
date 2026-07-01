@@ -120,13 +120,52 @@ None. Server tree is byte-identical to the last-green batch-302 tip.
 
 ## Remote CI Verification
 
-- **Test branch**: `rebase/upstream-batch-303`
-- _CI dispatched after Checkpoint 3 approval; results recorded before force-push. Mobile-heavy
-  batch → static_analysis / gallery-build-mobile / Unit-Test-Mobile are the load-bearing gates._
+- **Test branch**: `rebase/upstream-batch-303` (final commit `5d3c903856`)
+
+| Workflow                                   | Status | Notes                                                                                                                                     |
+| ------------------------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `test.yml`                                 | GREEN  | Went red twice first (see fixes below); green on `5d3c903856`.                                                                            |
+| `docker.yml`                               | GREEN  | server/web/cli/ml images build.                                                                                                           |
+| `static_analysis.yml`                      | GREEN  | dart analyze + format + `verify-changed-files` confirmed the hand-merged `router.gr.dart` (incl. restored `WhatsNewRoute`) is byte-exact. |
+| `gallery-build-mobile.yml`                 | GREEN  | iOS + Android compile — validates all mobile conflict resolutions.                                                                        |
+| `gallery-rebase-smoke.yml`                 | GREEN  | (one Docker-Compose base-image flake first; cleared on re-run).                                                                           |
+| `storage-migration-tests.yml` / `-e2e.yml` | GREEN  |                                                                                                                                           |
+| `gallery-revert-to-immich-validation.yml`  | GREEN  | (one exit-125 Docker container-start flake first; cleared on re-run).                                                                     |
+
+- Smoke gates `gallery-ml-smoke` / `gallery-mobile-smoke` not on `main` → not dispatchable.
+  This batch touches neither ML nor the mobile-smoke codegen surface.
+
+### Post-rebase fixes (all consequences of the new upstream features)
+
+1. `1a79d7f410` — restore upstream's generated `WhatsNewRoute` in `router.gr.dart` (see
+   Conflict Resolutions).
+2. `b8d856b129` — **Test Web**: upstream #29406 adds an `integrity-checks` accordion section;
+   the fork's `NAVIGATION_ITEMS` (command palette) drift-guard requires a matching entry.
+   Added it (`mdiFileCheckOutline`) + bumped the count guards (37 / 21).
+3. `102fd61e62` — **Unit Test Mobile**: upstream #29388's `initState()` shows the "what's new"
+   dialog from `MainTimelinePage`, which fired (and threw on unmocked localization) in the fork's
+   `main_timeline_infinite_scroll_test` while it scrolled. Stubbed `featureMessageServiceProvider`
+   so `shouldShow()` returns false. (The other `MainTimelinePage` tests only read the static const
+   / don't settle enough to fire the post-frame dialog.)
+4. `5d3c903856` — **E2E (Server & CLI)**: a **real** failure the earlier Docker-startup infra
+   flakes had masked. Upstream's `GET /server/version` test asserts `prerelease: expect.anything()`
+   (rejects null). It passed on `3.0.0-rc.4` (numeric prerelease) but upstream is now **GA-tagged
+   `v3.0.0`** — a clean release whose SemVer has no prerelease, so `ServerVersionResponseDto`
+   returns `prerelease: null` (exactly what `version.service.spec.ts` expects). Upstream never hits
+   this because it only e2e-builds dev versions. Adapted the test to accept null or numeric
+   prerelease. **This is a durable adaptation** — it will recur every rebase now that upstream ships
+   GA tags and the fork rebases onto them.
+
+- **Confirmed flakes**: Docker-based e2e stack startup (rebase-smoke Docker-Compose base-image pull,
+  revert exit-125 container start, and the first E2E `ECONNREFUSED`) — all cleared on re-run;
+  server tree is byte-identical to the last-green batch-302 tip.
 
 ## Post-Rebase Verification
 
-- Fork commits ahead of upstream: 835 (+ this report)
+- Fork commits ahead of upstream: 835 (+ 4 post-rebase fixes + this report)
 - Commits behind upstream: 0
 - All 6 upstream commits are ancestors of HEAD.
 - Fork diff looks clean: YES
+- All 8 CI workflows green on the final commit (`test.yml` directly; the other 7 carry from
+  their green commits — inputs byte-identical: since `102fd61e62` only the e2e spec changed;
+  since `a302b4839d` `mobile/lib` is unchanged).
