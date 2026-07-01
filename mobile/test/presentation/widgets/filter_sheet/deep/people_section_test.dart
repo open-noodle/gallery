@@ -11,6 +11,7 @@ import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/people_section.widget.dart';
+import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:openapi/api.dart';
@@ -80,6 +81,41 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(container.read(photosFilterProvider).people.any((p) => p.id == 'p1'), isTrue);
+    });
+
+    // With withSharedSpaces the server returns a tokenized id + a space-person primaryProfile.
+    // The avatar must route off the profile to the membership-gated space endpoint, not the
+    // tokenized id (which would 404 through the owner /people/{id} endpoint). Mirrors #737.
+    testWidgets('space-person avatar routes to the membership-gated space thumbnail endpoint', (tester) async {
+      await tester.pumpConsumerWidget(
+        const Material(child: PeopleSectionDeep(onOpenPicker: null)),
+        overrides: [
+          photosFilterSuggestionsProvider.overrideWith(
+            (ref, filter) => Future.value(
+              _sugg(
+                people: [
+                  FilterSuggestionsPersonDto(
+                    id: 'space-person:profile-1',
+                    name: 'Alice',
+                    primaryProfile: Optional.present(
+                      ScopedPrimaryProfile(
+                        id: 'profile-1',
+                        spaceId: const Optional.present('space-1'),
+                        type: ScopedPrimaryProfileTypeEnum.spacePerson,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      final avatar = tester.widget<CircleAvatar>(find.byType(CircleAvatar));
+      final provider = avatar.backgroundImage! as RemoteImageProvider;
+      expect(provider.url, 'http://localhost:0/shared-spaces/space-1/people/profile-1/thumbnail');
     });
 
     testWidgets('empty list → empty state string and no "Search N" affordance', (tester) async {
