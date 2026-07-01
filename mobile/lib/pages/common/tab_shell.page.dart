@@ -112,6 +112,13 @@ void _onNavigationSelected(TabsRouter router, int index, WidgetRef ref) {
     ref.invalidate(sharedSpacesProvider);
   }
 
+  // Library page
+  if (index == kLibraryTabIndex) {
+    // The local list is a Drift stream now, so upstream's invalidate of it is correctly gone.
+    // The server-backed list is NOT reactive and must still be invalidated here.
+    ref.invalidate(driftGetAllPeopleWithSharedSpacesProvider);
+  }
+
   ref.read(hapticFeedbackProvider.notifier).selectionClick();
   router.setActiveIndex(index);
   ref.read(tabProvider.notifier).state = TabEnum.values[index];

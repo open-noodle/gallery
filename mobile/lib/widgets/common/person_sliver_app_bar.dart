@@ -23,12 +23,17 @@ class PersonSliverAppBar extends ConsumerStatefulWidget {
     required this.onNameTap,
     required this.onShowOptions,
     required this.onBirthdayTap,
+    this.editable = true,
   });
 
   final Person person;
   final VoidCallback onNameTap;
   final VoidCallback onBirthdayTap;
   final VoidCallback onShowOptions;
+
+  /// Whether the viewer may edit this person (rename / birthday / options). Read-only for
+  /// Space-scoped people the viewer can only view, matching the web People page.
+  final bool editable;
 
   @override
   ConsumerState<PersonSliverAppBar> createState() => _MesmerizingSliverAppBarState();
@@ -89,10 +94,11 @@ class _MesmerizingSliverAppBarState extends ConsumerState<PersonSliverAppBar> {
               },
             ),
             actions: [
-              IconButton(
-                icon: Icon(Icons.more_vert, color: actionIconColor, shadows: actionIconShadows),
-                onPressed: widget.onShowOptions,
-              ),
+              if (widget.editable)
+                IconButton(
+                  icon: Icon(Icons.more_vert, color: actionIconColor, shadows: actionIconShadows),
+                  onPressed: widget.onShowOptions,
+                ),
             ],
             flexibleSpace: Builder(
               builder: (context) {
@@ -122,6 +128,7 @@ class _MesmerizingSliverAppBarState extends ConsumerState<PersonSliverAppBar> {
                   background: _ExpandedBackground(
                     scrollProgress: scrollProgress,
                     person: widget.person,
+                    editable: widget.editable,
                     onNameTap: widget.onNameTap,
                     onBirthdayTap: widget.onBirthdayTap,
                   ),
@@ -135,12 +142,14 @@ class _MesmerizingSliverAppBarState extends ConsumerState<PersonSliverAppBar> {
 class _ExpandedBackground extends ConsumerStatefulWidget {
   final double scrollProgress;
   final Person person;
+  final bool editable;
   final VoidCallback onNameTap;
   final VoidCallback onBirthdayTap;
 
   const _ExpandedBackground({
     required this.scrollProgress,
     required this.person,
+    required this.editable,
     required this.onNameTap,
     required this.onBirthdayTap,
   });
@@ -228,7 +237,11 @@ class _ExpandedBackgroundState extends ConsumerState<_ExpandedBackground> with S
                     child: CircleAvatar(
                       maxRadius: 84 / 2,
                       backgroundImage: RemoteImageProvider(
-                        url: getFaceThumbnailUrl(widget.person.id, updatedAt: widget.person.updatedAt),
+                        url: getPersonThumbnailUrl(
+                          widget.person.id,
+                          spaceId: widget.person.spaceId,
+                          updatedAt: widget.person.updatedAt,
+                        ),
                       ),
                     ),
                   ),
@@ -240,7 +253,7 @@ class _ExpandedBackgroundState extends ConsumerState<_ExpandedBackground> with S
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       GestureDetector(
-                        onTap: () => widget.onNameTap.call(),
+                        onTap: widget.editable ? () => widget.onNameTap.call() : null,
                         child: SizedBox(
                           width: double.infinity,
                           child: SingleChildScrollView(
@@ -257,7 +270,8 @@ class _ExpandedBackgroundState extends ConsumerState<_ExpandedBackground> with S
                                       shadows: [Shadow(offset: Offset(0, 2), blurRadius: 12, color: Colors.black45)],
                                     ),
                                   )
-                                : Text(
+                                : widget.editable
+                                ? Text(
                                     context.t.add_a_name,
                                     style: context.textTheme.titleLarge?.copyWith(
                                       color: Colors.grey[400],
@@ -265,7 +279,8 @@ class _ExpandedBackgroundState extends ConsumerState<_ExpandedBackground> with S
                                       decoration: TextDecoration.underline,
                                       decorationColor: Colors.white,
                                     ),
-                                  ),
+                                  )
+                                : const SizedBox.shrink(),
                           ),
                         ),
                       ),
@@ -280,37 +295,40 @@ class _ExpandedBackgroundState extends ConsumerState<_ExpandedBackground> with S
                         ),
                       ),
                       const SizedBox(height: 8),
-                      GestureDetector(
-                        onTap: widget.onBirthdayTap,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(Icons.cake_rounded, color: Colors.white, size: 14),
-                            const SizedBox(width: 4),
+                      // A read-only person with no birthday shows no birthday affordance at all,
+                      // matching the People page's read-only presentation.
+                      if (widget.person.birthDate != null || widget.editable)
+                        GestureDetector(
+                          onTap: widget.editable ? widget.onBirthdayTap : null,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.cake_rounded, color: Colors.white, size: 14),
+                              const SizedBox(width: 4),
 
-                            if (widget.person.birthDate != null)
-                              Text(
-                                "${DateFormat.yMMMd(context.locale.toString()).format(widget.person.birthDate!)} (${formatAge(widget.person.birthDate!, DateTime.now())})",
-                                style: context.textTheme.labelLarge?.copyWith(
-                                  color: Colors.white,
-                                  height: 1.2,
-                                  fontSize: 14,
+                              if (widget.person.birthDate != null)
+                                Text(
+                                  "${DateFormat.yMMMd(context.locale.toString()).format(widget.person.birthDate!)} (${formatAge(widget.person.birthDate!, DateTime.now())})",
+                                  style: context.textTheme.labelLarge?.copyWith(
+                                    color: Colors.white,
+                                    height: 1.2,
+                                    fontSize: 14,
+                                  ),
+                                )
+                              else
+                                Text(
+                                  context.t.add_birthday,
+                                  style: context.textTheme.labelLarge?.copyWith(
+                                    color: Colors.grey[400],
+                                    height: 1.2,
+                                    fontSize: 14,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: Colors.white,
+                                  ),
                                 ),
-                              )
-                            else
-                              Text(
-                                context.t.add_birthday,
-                                style: context.textTheme.labelLarge?.copyWith(
-                                  color: Colors.grey[400],
-                                  height: 1.2,
-                                  fontSize: 14,
-                                  decoration: TextDecoration.underline,
-                                  decorationColor: Colors.white,
-                                ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
