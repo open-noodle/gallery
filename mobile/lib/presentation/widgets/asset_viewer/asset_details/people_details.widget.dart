@@ -136,8 +136,11 @@ class _Avatar extends StatelessWidget {
                   elevation: 3,
                   child: CircleAvatar(
                     maxRadius: imageSize / 2,
+                    // A Space-shared person's id is a shared_space_person id with no row in the
+                    // owner-only person table, so /people/{id}/thumbnail 404s — route it to the
+                    // membership-gated space endpoint, mirroring the #737 People grid.
                     backgroundImage: RemoteImageProvider(
-                      url: getFaceThumbnailUrl(person.id, updatedAt: person.updatedAt),
+                      url: getPersonThumbnailUrl(person.id, spaceId: person.spaceId, updatedAt: person.updatedAt),
                     ),
                   ),
                 ),

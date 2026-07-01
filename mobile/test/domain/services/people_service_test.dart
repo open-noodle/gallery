@@ -116,6 +116,31 @@ void main() {
     });
   });
 
+  // The person DETAIL page sibling of #727/#737: a Space-shared person's photos. The local sync
+  // DB never receives the face→person links for a person the viewer does not own, so the detail
+  // timeline must ask the server which Space assets contain the person (the Space assets
+  // themselves do sync). The web person detail page resolves exactly these photos.
+  group('getSharedSpacePersonAssetIds', () {
+    test('returns the asset ids the server resolved for the Space person', () async {
+      when(() => mockSharedSpace.getSpacePersonAssets(any(), any())).thenAnswer((_) async => ['asset-1', 'asset-2']);
+
+      final result = await sut.getSharedSpacePersonAssetIds('space-1', 'sp1');
+
+      expect(result, ['asset-1', 'asset-2']);
+      verify(() => mockSharedSpace.getSpacePersonAssets('space-1', 'sp1')).called(1);
+    });
+
+    // Best-effort like getAssetPeople: a network/server failure degrades the detail page to
+    // "no photos" rather than surfacing a visible error.
+    test('returns no asset ids when the server fetch fails', () async {
+      when(() => mockSharedSpace.getSpacePersonAssets(any(), any())).thenThrow(Exception('network down'));
+
+      final result = await sut.getSharedSpacePersonAssetIds('space-1', 'sp1');
+
+      expect(result, isEmpty);
+    });
+  });
+
   // Edits must route on the person's profile, exactly like the web People page: a personal/owned
   // person (null spaceId) goes to the owner-only person endpoint plus a local Drift write; a
   // Space-scoped person goes to the editor-gated shared-space endpoint with NO local write.
