@@ -67,7 +67,7 @@ class PeopleDatabaseRepository extends DatabaseAccessor<Drift> with $PeopleDatab
           });
   }
 
-  Stream<List<Person>> watch({int minFaces = 3, PeopleSortBy sortBy = PeopleSortBy.photoCount}) {
+  Stream<List<Person>> watchAll({int minFaces = 3, PeopleSortBy sortBy = PeopleSortBy.photoCount}) {
     final people = _db.personEntity;
     return _allPeopleQuery(minFaces: minFaces, sortBy: sortBy).map((row) => row.readTable(people).toDto()).watch();
   }
