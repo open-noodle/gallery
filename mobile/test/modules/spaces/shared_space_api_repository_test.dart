@@ -245,7 +245,7 @@ void main() {
         () => mockApi.updateSpacePerson(
           'space-1',
           'person-1',
-          any(that: isA<api.SharedSpacePersonUpdateDto>().having((d) => d.name, 'name', 'Alice')),
+          any(that: isA<api.SharedSpacePersonUpdateDto>().having((d) => d.name.value, 'name', 'Alice')),
         ),
       ).called(1);
     });
@@ -263,7 +263,7 @@ void main() {
           'person-1',
           any(
             that: isA<api.SharedSpacePersonUpdateDto>().having(
-              (d) => d.birthDate,
+              (d) => d.birthDate.value,
               'birthDate',
               DateTime.utc(1990, 5, 20),
             ),
