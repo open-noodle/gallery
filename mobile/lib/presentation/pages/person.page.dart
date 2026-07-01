@@ -9,8 +9,7 @@ import 'package:immich_mobile/presentation/widgets/people/person_option_sheet.wi
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
-import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/person_timeline.provider.dart';
 import 'package:immich_mobile/utils/people.utils.dart';
 import 'package:immich_mobile/widgets/common/person_sliver_app_bar.dart';
 
@@ -85,14 +84,10 @@ class _PersonPageState extends ConsumerState<PersonPage> {
     final editable = spaceId == null ? true : ref.watch(driftSpaceEditableProvider(spaceId)).value ?? true;
 
     return TimelineRouteScope(
-      timelineServiceBuilder: (ref, scope, groupBy) {
-        final user = ref.watch(currentUserProvider);
-        if (user == null) {
-          throw Exception('User must be logged in to view person timeline');
-        }
-
-        return ref.watch(timelineFactoryProvider).person(user.id, _person.id, groupBy: groupBy, temporalScope: scope);
-      },
+      // A personal person reads the owner-scoped local timeline; a Space-shared person reads
+      // the server-resolved Space assets (the local owner-scoped join is empty for a person the
+      // viewer does not own). See buildPersonTimelineRouteService.
+      timelineServiceBuilder: (ref, scope, groupBy) => buildPersonTimelineRouteService(ref, _person, scope, groupBy),
       child: Timeline(
         withGroupingPill: true,
         appBar: PersonSliverAppBar(

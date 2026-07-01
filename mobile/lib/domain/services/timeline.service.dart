@@ -143,6 +143,18 @@ class TimelineFactory {
     _timelineRepository.person(userId, personId, groupBy ?? this.groupBy, temporalScope: temporalScope),
   );
 
+  /// Timeline for a Space-shared person, restricted to the [assetIds] the server resolved for
+  /// that person. Used instead of [person] when the viewer does not own the person: the local
+  /// sync DB is owner-scoped, so the person's face→person links never sync and [person] would
+  /// be empty. See [DriftTimelineRepository.sharedSpacePerson].
+  TimelineService sharedSpacePerson(
+    List<String> assetIds, {
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => TimelineService(
+    _timelineRepository.sharedSpacePerson(assetIds, groupBy ?? this.groupBy, temporalScope: temporalScope),
+  );
+
   TimelineService fromAssets(List<BaseAsset> assets, TimelineOrigin type) =>
       TimelineService(_timelineRepository.fromAssets(assets, type));
 
