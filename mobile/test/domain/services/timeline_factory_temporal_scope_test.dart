@@ -68,6 +68,9 @@ void main() {
       () => repo.person('user-1', 'person-1', GroupAssetsBy.day, temporalScope: year),
     ).thenReturn(_query(TimelineOrigin.person));
     when(
+      () => repo.sharedSpacePerson(['a1', 'a2'], GroupAssetsBy.day, temporalScope: year),
+    ).thenReturn(_query(TimelineOrigin.person));
+    when(
       () => repo.map(['user-1'], 'user-1', mapOptions, GroupAssetsBy.day, temporalScope: year),
     ).thenReturn(_query(TimelineOrigin.map));
 
@@ -83,6 +86,7 @@ void main() {
     sut.video(['user-1'], 'user-1', temporalScope: year, groupBy: GroupAssetsBy.day);
     sut.place('Paris', ['user-1'], 'user-1', temporalScope: year, groupBy: GroupAssetsBy.day);
     sut.person('user-1', 'person-1', temporalScope: year, groupBy: GroupAssetsBy.day);
+    sut.sharedSpacePerson(['a1', 'a2'], temporalScope: year, groupBy: GroupAssetsBy.day);
     sut.map(['user-1'], 'user-1', mapOptions, temporalScope: year, groupBy: GroupAssetsBy.day);
 
     verify(() => repo.main(['user-1'], 'user-1', GroupAssetsBy.day, temporalScope: year)).called(1);
@@ -97,6 +101,7 @@ void main() {
     verify(() => repo.video(['user-1'], 'user-1', GroupAssetsBy.day, temporalScope: year)).called(1);
     verify(() => repo.place('Paris', ['user-1'], 'user-1', GroupAssetsBy.day, temporalScope: year)).called(1);
     verify(() => repo.person('user-1', 'person-1', GroupAssetsBy.day, temporalScope: year)).called(1);
+    verify(() => repo.sharedSpacePerson(['a1', 'a2'], GroupAssetsBy.day, temporalScope: year)).called(1);
     verify(() => repo.map(['user-1'], 'user-1', mapOptions, GroupAssetsBy.day, temporalScope: year)).called(1);
   });
 }
