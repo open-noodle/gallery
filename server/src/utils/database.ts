@@ -695,6 +695,50 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
         ]),
       ),
     )
+    // Fork RBAC gate for album-scoped search. Upstream (immich #29352) grants
+    // album-scoped searchMetadata access via album.read and leaves userIds unset,
+    // which switches off the owner/space scoping above. Re-gate so shared-space
+    // content reached through an album is only visible to searchers who can access
+    // it via space membership + timeline visibility (options.timelineSpaceIds).
+    // Plain (non-shared-space) album assets stay visible per upstream album access.
+    .$if(!!options.albumIds?.length && !options.userIds, (qb) =>
+      qb.where((eb) =>
+        eb.or([
+          eb.and([
+            eb.not(
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_asset')
+                  .whereRef('shared_space_asset.assetId', '=', 'asset.id'),
+              ),
+            ),
+            eb.not(
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_library')
+                  .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId'),
+              ),
+            ),
+          ]),
+          ...(options.timelineSpaceIds
+            ? [
+                eb.exists(
+                  eb
+                    .selectFrom('shared_space_asset')
+                    .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                    .where('shared_space_asset.spaceId', '=', anyUuid(options.timelineSpaceIds)),
+                ),
+                eb.exists(
+                  eb
+                    .selectFrom('shared_space_library')
+                    .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                    .where('shared_space_library.spaceId', '=', anyUuid(options.timelineSpaceIds)),
+                ),
+              ]
+            : []),
+        ]),
+      ),
+    )
     .$if(!!(options.personIds?.length || options.identityIds?.length || options.spacePersonIds?.length), (qb) =>
       options.personMatchAny ? hasAnyPeople(qb, options) : hasAllPeople(qb, options),
     )
