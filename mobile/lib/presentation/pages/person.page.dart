@@ -8,6 +8,7 @@ import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/people/person_option_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
+import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/utils/people.utils.dart';
@@ -77,6 +78,12 @@ class _PersonPageState extends ConsumerState<PersonPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Mirror the web People page: a personal/owned person (null spaceId) is always editable by
+    // the viewer; a Space-scoped person is editable only when the viewer is an editor of that
+    // space (optimistic until resolved). A read-only Space person gets no edit affordances.
+    final spaceId = _person.spaceId;
+    final editable = spaceId == null ? true : ref.watch(driftSpaceEditableProvider(spaceId)).value ?? true;
+
     return TimelineRouteScope(
       timelineServiceBuilder: (ref, scope, groupBy) {
         final user = ref.watch(currentUserProvider);
@@ -90,6 +97,7 @@ class _PersonPageState extends ConsumerState<PersonPage> {
         withGroupingPill: true,
         appBar: PersonSliverAppBar(
           person: _person,
+          editable: editable,
           onNameTap: () => handleEditName(context),
           onBirthdayTap: () => handleEditBirthday(context),
           onShowOptions: () => showOptionSheet(context),
