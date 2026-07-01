@@ -91,5 +91,42 @@ void main() {
       final dto = verify(() => searchApi.searchAssets(captureAny())).captured.single as MetadataSearchDto;
       expect(dto.order.value, AssetOrder.asc);
     });
+
+    // A viewer's selected facet only returns shared-space assets (and space-person tokens only
+    // resolve) when the search requests shared spaces — mirror web buildPhotosTimelineOptions,
+    // which gates shared content on `isFavorite === undefined` (favourites are owner-only).
+    test('metadata search requests shared spaces when not filtering by favourite', () async {
+      when(() => searchApi.searchAssets(any())).thenAnswer((_) async => null);
+      await sut.search(SearchFilter.empty(), 1);
+      final dto = verify(() => searchApi.searchAssets(captureAny())).captured.single as MetadataSearchDto;
+      expect(dto.withSharedSpaces.value, true);
+    });
+
+    test('metadata search omits shared spaces when filtering by favourite', () async {
+      when(() => searchApi.searchAssets(any())).thenAnswer((_) async => null);
+      final filter = SearchFilter.empty().copyWith(display: SearchFilter.empty().display.copyWith(isFavorite: true));
+      await sut.search(filter, 1);
+      final dto = verify(() => searchApi.searchAssets(captureAny())).captured.single as MetadataSearchDto;
+      expect(dto.withSharedSpaces.isPresent, isFalse);
+    });
+
+    test('smart search requests shared spaces when not filtering by favourite', () async {
+      when(() => searchApi.searchSmart(any())).thenAnswer((_) async => null);
+      final filter = SearchFilter.empty().copyWith(context: 'beach');
+      await sut.search(filter, 1);
+      final dto = verify(() => searchApi.searchSmart(captureAny())).captured.single as SmartSearchDto;
+      expect(dto.withSharedSpaces.value, true);
+    });
+
+    test('smart search omits shared spaces when filtering by favourite', () async {
+      when(() => searchApi.searchSmart(any())).thenAnswer((_) async => null);
+      final filter = SearchFilter.empty().copyWith(
+        context: 'beach',
+        display: SearchFilter.empty().display.copyWith(isFavorite: true),
+      );
+      await sut.search(filter, 1);
+      final dto = verify(() => searchApi.searchSmart(captureAny())).captured.single as SmartSearchDto;
+      expect(dto.withSharedSpaces.isPresent, isFalse);
+    });
   });
 }
