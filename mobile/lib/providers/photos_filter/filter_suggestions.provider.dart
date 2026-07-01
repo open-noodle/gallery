@@ -27,6 +27,11 @@ final photosFilterSuggestionsProvider = FutureProvider.autoDispose.family<Filter
     tagIds: filter.tagIds,
     takenAfter: filter.date.takenAfter,
     takenBefore: filter.date.takenBefore,
+    // A non-owner viewer owns none of the shared-space assets they see, so an owner-scoped
+    // facet query comes up empty. Request shared-space content so the facets populate,
+    // mirroring the web filter page (map-filter-config.ts `withSharedSpaces: true`). The
+    // server RBAC-projects the result. See issue #727 family (#737 / #738).
+    withSharedSpaces: true,
   );
   return response ?? FilterSuggestionsResponseDto(hasUnnamedPeople: false);
 });
