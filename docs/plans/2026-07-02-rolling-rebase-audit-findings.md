@@ -73,7 +73,7 @@ When Android opens a photo via a view-intent (share-to / "open with"), the handl
 
 ### M1 — Realtime HLS transcoding bypasses S3 persistence and the fork video-trim edit
 
-- **File:** `server/src/services/transcoding.service.ts:240` · **Corroborated by 3 finders** · **Status:** PARTIAL (slice S10) — (a) S3 local-file fix landed; (b) trim-aware input deferred (see below)
+- **File:** `server/src/services/transcoding.service.ts:240` · **Corroborated by 3 finders** · **Status:** PARTIAL (slice S10) — (a) S3 local-file fix landed; (b) trim-aware input deferred → tracked in [#741](https://github.com/open-noodle/gallery/issues/741)
 
 Upstream v3 added an on-the-fly HLS transcoding pipeline that spawns `ffmpeg` directly on `asset.originalPath` (a relative S3 key on S3-primary installs) with **no `ensureLocalFile`/`persistFile`**. Two fork consequences: (a) on S3 storage the ffmpeg invocation receives a key, not a readable local path → fails; (b) it streams the _original_, ignoring the fork's trimmed-video edit. Same bug shape as tracked gh#671 (video trim on S3), in a new upstream code path.
 
