@@ -533,6 +533,7 @@ Expected RED: current code passes `asset.originalPath` directly and never calls 
 
 ## 6. Final gate (after all slices)
 
+0. **Regenerate committed generated artifacts** (do this FIRST, as its own `chore:` commit): several server slices change `@GenerateSql`-decorated query SQL — S2 (`searchAssetBuilder` in `utils/database.ts`, consumed by `searchMetadata`/`searchStatistics`/`searchRandom`/`searchLargeAssets`) and S3 (`getAccessibleTags`) both alter the emitted SQL, so `server/src/queries/*.sql` is stale and **CI "SQL Schema Checks" will fail without regen**. Run `mise //:sql` (**requires a live Postgres** — spin a throwaway container first; running it with no DB deletes all `.sql`). If any slice ended up changing a server DTO/controller (none planned), also run `mise //:open-api`. Commit the regenerated files. CI only runs on push, so intermediate slice commits carrying stale generated files are harmless — only the pre-push tree must be regenerated.
 1. `make check-all` (tsc/svelte-check across packages) — green.
 2. `make lint-all` — the single deferred lint pass — green.
 3. Server medium tests for the RBAC slices (`pnpm test:medium`) — green (needs Docker DB).
