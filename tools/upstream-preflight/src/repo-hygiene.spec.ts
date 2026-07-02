@@ -28,7 +28,13 @@ const REPO_ROOT = path.resolve(process.cwd(), '../..');
 
 describe('repo hygiene', () => {
   it('LOW#19/#24: open-api/typescript-sdk/build-old-root/ does not exist', () => {
-    const staleDir = path.join(REPO_ROOT, 'open-api/typescript-sdk/build-old-root');
-    expect(fs.existsSync(staleDir), `${staleDir} should have been deleted (stale compiled SDK output)`).toBe(false);
+    const staleDir = path.join(
+      REPO_ROOT,
+      'open-api/typescript-sdk/build-old-root',
+    );
+    expect(
+      fs.existsSync(staleDir),
+      `${staleDir} should have been deleted (stale compiled SDK output)`,
+    ).toBe(false);
   });
 });
