@@ -984,11 +984,24 @@ export class SharedSpaceMemberSync extends BaseSync {
 
 export class SharedSpaceAssetSync extends BaseSync {
   // Per-space backfill of asset rows joined through shared_space_asset.
-  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID], stream: true })
-  getBackfill(options: SyncBackfillOptions, spaceId: string) {
+  //
+  // isFavorite is masked to the syncing user's own rows (mirrors AlbumAssetSync):
+  // a space member must not learn another owner's favorite flag for an asset
+  // shared into the space.
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, spaceId: string, userId: string) {
     return this.backfillQuery('shared_space_asset', options)
       .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
-      .select(columns.syncAsset)
+      .select(columns.syncSharedSpaceAsset)
+      .select((eb) =>
+        eb
+          .case()
+          .when('asset.ownerId', '=', userId)
+          .then(eb.ref('asset.isFavorite'))
+          .else(eb.val(false))
+          .end()
+          .as('isFavorite'),
+      )
       .select('shared_space_asset.updateId')
       .where('shared_space_asset.spaceId', '=', spaceId)
       .stream();
@@ -997,11 +1010,23 @@ export class SharedSpaceAssetSync extends BaseSync {
   // Create-side: stream new (space, asset) pairings the user can access. Each
   // shared_space_asset row produces one event (write amplification accepted —
   // mobile dedups by asset id at insert time).
+  //
+  // isFavorite is masked to the syncing user's own rows — see getBackfill above.
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
   getCreates(options: SyncQueryOptions) {
+    const userId = options.userId;
     return this.upsertQuery('shared_space_asset', options)
       .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
-      .select(columns.syncAsset)
+      .select(columns.syncSharedSpaceAsset)
+      .select((eb) =>
+        eb
+          .case()
+          .when('asset.ownerId', '=', userId)
+          .then(eb.ref('asset.isFavorite'))
+          .else(eb.val(false))
+          .end()
+          .as('isFavorite'),
+      )
       .select('shared_space_asset.updateId')
       .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
       .stream();
@@ -1010,11 +1035,23 @@ export class SharedSpaceAssetSync extends BaseSync {
   // Update-side: stream asset metadata changes for assets the client has already
   // received. Gated by `shared_space_asset.updateId <= sharedSpaceToAssetAck` to
   // ensure we only emit updates for join rows the client has acked.
+  //
+  // isFavorite is masked to the syncing user's own rows — see getBackfill above.
   @GenerateSql({ params: [dummyQueryOptions, { updateId: DummyValue.UUID }], stream: true })
   getUpdates(options: SyncQueryOptions, sharedSpaceToAssetAck: SyncAck) {
+    const userId = options.userId;
     return this.upsertQuery('asset', options)
       .innerJoin('shared_space_asset', 'shared_space_asset.assetId', 'asset.id')
-      .select(columns.syncAsset)
+      .select(columns.syncSharedSpaceAsset)
+      .select((eb) =>
+        eb
+          .case()
+          .when('asset.ownerId', '=', userId)
+          .then(eb.ref('asset.isFavorite'))
+          .else(eb.val(false))
+          .end()
+          .as('isFavorite'),
+      )
       .select('asset.updateId')
       .where('shared_space_asset.updateId', '<=', sharedSpaceToAssetAck.updateId)
       .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
