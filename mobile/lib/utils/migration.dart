@@ -13,6 +13,7 @@ import 'package:immich_mobile/data/db/main/table/local/asset.drift.dart';
 import 'package:immich_mobile/data/db/main/table/local/trashed_asset.drift.dart';
 import 'package:immich_mobile/domain/models/config/app_config.dart';
 import 'package:immich_mobile/domain/models/log.model.dart';
+import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
@@ -213,6 +214,8 @@ Future<void> _migrateTo26(Drift drift) async {
   await _migrateAlbumSortMode(migrator);
   await migrator.migrateBool(StoreKey.legacySelectedAlbumSortReverse, SettingsKey.albumIsReverse);
   await migrator.migrateBool(StoreKey.legacyAlbumGridView, SettingsKey.albumIsGrid);
+  // People
+  await migrator.migrateEnumIndex(StoreKey.legacyPeopleSortBy, SettingsKey.peopleSortBy, PeopleSortBy.values);
   // Backup
   await migrator.migrateBool(StoreKey.legacyEnableBackup, SettingsKey.backupEnabled);
   await migrator.migrateBool(StoreKey.legacyUseWifiForUploadVideos, SettingsKey.backupUseCellularForVideos);
