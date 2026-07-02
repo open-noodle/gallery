@@ -3,7 +3,7 @@ import { Stats } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AssetVisibility, JobName, JobStatus, SharedSpaceRole, SourceType } from 'src/enum';
+import { AssetVisibility, JobName, JobStatus, SharedSpaceRole, SourceType, UserMetadataKey } from 'src/enum';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { ConfigRepository } from 'src/repositories/config.repository';
@@ -18,6 +18,7 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository'
 import { StorageRepository } from 'src/repositories/storage.repository';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
 import { TagRepository } from 'src/repositories/tag.repository';
+import { UserRepository } from 'src/repositories/user.repository';
 import { DB } from 'src/schema';
 import { MetadataService } from 'src/services/metadata.service';
 import { PersonService } from 'src/services/person.service';
@@ -108,7 +109,7 @@ const setupPersonService = (db?: Kysely<DB>) => {
   const { sut, ctx } = newMediumService(PersonService, {
     database: db || defaultDatabase,
     real: [ConfigRepository, FaceIdentityRepository],
-    mock: [LoggingRepository, SystemMetadataRepository],
+    mock: [LoggingRepository, SystemMetadataRepository, UserRepository],
   });
 
   ctx
@@ -116,6 +117,15 @@ const setupPersonService = (db?: Kysely<DB>) => {
     .get.mockResolvedValue({
       machineLearning: { facialRecognition: { minFaces: 1 } },
     } as any);
+
+  // M2: PersonService.getAll now reads the People face threshold from the caller's
+  // people.minimumFaces preference (default 3) instead of ML config. Pin it to 1 so these
+  // single-face identity tests still surface their people, mirroring the ML minFaces=1 above.
+  ctx
+    .getMock<UserRepository, Mocked<UserRepository>>(UserRepository)
+    .getMetadata.mockResolvedValue([
+      { key: UserMetadataKey.Preferences, value: { people: { minimumFaces: 1 } } },
+    ] as any);
 
   return { sut, ctx };
 };
