@@ -88,7 +88,9 @@ void main() {
     // who owns no people. The service must surface the server's shared-space-inclusive list.
     test('returns the server shared-space-inclusive people list', () async {
       // The local sync DB is owner-scoped: a viewer who owns no people gets nothing from it.
-      when(() => mockRepository.getAllPeople(sortBy: any(named: 'sortBy'))).thenAnswer((_) async => <DriftPerson>[]);
+      when(
+        () => mockRepository.getAllPeople(minFaces: any(named: 'minFaces'), sortBy: any(named: 'sortBy')),
+      ).thenAnswer((_) async => <DriftPerson>[]);
       when(
         () => mockApiRepository.getAllPeopleWithSharedSpaces(sortBy: any(named: 'sortBy')),
       ).thenAnswer((_) async => [person('space-person')]);
@@ -97,6 +99,9 @@ void main() {
 
       expect(result, [person('space-person')]);
       verify(() => mockApiRepository.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.photoCount)).called(1);
+      // The online path must never fall through to the local repository, so minFaces threading
+      // (which only applies to the offline fallback) cannot leak into the server-backed path.
+      verifyNever(() => mockRepository.getAllPeople(minFaces: any(named: 'minFaces'), sortBy: any(named: 'sortBy')));
     });
 
     // Offline / server failure must not blank the page: the viewer's own people still render
@@ -106,13 +111,45 @@ void main() {
         () => mockApiRepository.getAllPeopleWithSharedSpaces(sortBy: any(named: 'sortBy')),
       ).thenThrow(Exception('offline'));
       when(
-        () => mockRepository.getAllPeople(sortBy: any(named: 'sortBy')),
+        () => mockRepository.getAllPeople(minFaces: any(named: 'minFaces'), sortBy: any(named: 'sortBy')),
       ).thenAnswer((_) async => [person('local-person')]);
 
       final result = await sut.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.name);
 
       expect(result, [person('local-person')]);
-      verify(() => mockRepository.getAllPeople(sortBy: PeopleSortBy.name)).called(1);
+      verify(() => mockRepository.getAllPeople(minFaces: 3, sortBy: PeopleSortBy.name)).called(1);
+    });
+
+    // Regression for LOW #12: the offline shared-space People fallback silently used the
+    // repository's default minFaces (3) regardless of the caller's minimumFaces preference. The
+    // online path already resolves the preference server-side (M2); only the offline fallback
+    // needs the value threaded through explicitly.
+    test('threads an explicit minFaces into the offline fallback', () async {
+      when(
+        () => mockApiRepository.getAllPeopleWithSharedSpaces(sortBy: any(named: 'sortBy')),
+      ).thenThrow(Exception('offline'));
+      when(
+        () => mockRepository.getAllPeople(minFaces: any(named: 'minFaces'), sortBy: any(named: 'sortBy')),
+      ).thenAnswer((_) async => [person('local-person')]);
+
+      final result = await sut.getAllPeopleWithSharedSpaces(minFaces: 5, sortBy: PeopleSortBy.photoCount);
+
+      expect(result, [person('local-person')]);
+      verify(() => mockRepository.getAllPeople(minFaces: 5, sortBy: PeopleSortBy.photoCount)).called(1);
+    });
+
+    test('defaults the offline fallback to minFaces 3 when the caller passes none', () async {
+      when(
+        () => mockApiRepository.getAllPeopleWithSharedSpaces(sortBy: any(named: 'sortBy')),
+      ).thenThrow(Exception('offline'));
+      when(
+        () => mockRepository.getAllPeople(minFaces: any(named: 'minFaces'), sortBy: any(named: 'sortBy')),
+      ).thenAnswer((_) async => [person('local-person')]);
+
+      final result = await sut.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.photoCount);
+
+      expect(result, [person('local-person')]);
+      verify(() => mockRepository.getAllPeople(minFaces: 3, sortBy: PeopleSortBy.photoCount)).called(1);
     });
   });
 
