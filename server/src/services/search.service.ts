@@ -70,6 +70,7 @@ type ScopedPersonFilterOptions = {
   albumId?: string;
   albumIds?: string[];
   timelineSpaceIds?: string[];
+  visibility?: AssetVisibility | 'not-locked';
 };
 
 @Injectable()
@@ -362,7 +363,11 @@ export class SearchService extends BaseService {
       }
     }
 
-    const resolvedDto = await this.resolveScopedPersonFilters(auth, { ...dto, timelineSpaceIds });
+    // No dto.visibility to merge with — suggestion request DTOs don't expose an explicit visibility
+    // override (unlike search's dto.visibility ?? ...). Resolve the same way search does for the
+    // implicit default so suggestions cover the same asset set search would return (LOW #7).
+    const visibility = auth.session?.hasElevatedPermission ? undefined : 'not-locked';
+    const resolvedDto = await this.resolveScopedPersonFilters(auth, { ...dto, timelineSpaceIds, visibility });
     const suggestions = await this.getSuggestions(userIds, resolvedDto);
     if (dto.includeNull) {
       suggestions.push(null);
@@ -389,7 +394,9 @@ export class SearchService extends BaseService {
       }
     }
 
-    return this.searchRepository.getAccessibleTags(userIds, { ...dto, timelineSpaceIds });
+    // See getSearchSuggestions above — same not-locked/elevated resolution (LOW #7).
+    const visibility = auth.session?.hasElevatedPermission ? undefined : 'not-locked';
+    return this.searchRepository.getAccessibleTags(userIds, { ...dto, timelineSpaceIds, visibility });
   }
 
   async getFilterSuggestions(auth: AuthDto, dto: FilterSuggestionsRequestDto): Promise<FilterSuggestionsResponseDto> {
@@ -421,7 +428,9 @@ export class SearchService extends BaseService {
       }
     }
 
-    const resolvedDto = await this.resolveScopedPersonFilters(auth, { ...dto, timelineSpaceIds });
+    // See getSearchSuggestions above — same not-locked/elevated resolution (LOW #7).
+    const visibility = auth.session?.hasElevatedPermission ? undefined : 'not-locked';
+    const resolvedDto = await this.resolveScopedPersonFilters(auth, { ...dto, timelineSpaceIds, visibility });
     return await this.searchRepository.getFilterSuggestions(userIds, resolvedDto);
   }
 
