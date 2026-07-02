@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
       folders: { enabled: false, sidebarWeb: false },
       memories: { enabled: true },
       people: { enabled: false, sidebarWeb: false },
+      recentlyAdded: { sidebarWeb: false },
       sharedLinks: { enabled: false, sidebarWeb: false },
       tags: { enabled: false, sidebarWeb: false },
     },
