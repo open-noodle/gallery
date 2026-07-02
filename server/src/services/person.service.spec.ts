@@ -52,6 +52,9 @@ const recognitionCounts = (overrides: Partial<QueueStatisticsDto> = {}) =>
     ...overrides,
   });
 
+const prefsMetadata = (minimumFaces: number) =>
+  [{ key: UserMetadataKey.Preferences, value: { people: { minimumFaces } } }] as any;
+
 describe(PersonService.name, () => {
   let sut: PersonService;
   let mocks: ServiceMocks;
@@ -526,9 +529,6 @@ describe(PersonService.name, () => {
   });
 
   describe('people.minimumFaces preference (M2)', () => {
-    const prefsMetadata = (minimumFaces: number) =>
-      [{ key: UserMetadataKey.Preferences, value: { people: { minimumFaces } } }] as any;
-
     it('threads the user preference into the withSharedSpaces People list', async () => {
       const auth = AuthFactory.create();
       mocks.user.getMetadata.mockResolvedValue(prefsMetadata(5));
@@ -621,7 +621,7 @@ describe(PersonService.name, () => {
       // Count uses the same resolved threshold the list applies in SQL (person.repository.ts:334).
       expect(mocks.person.getNumberOfPeople).toHaveBeenCalledWith(auth.user.id, { minimumFaceCount: 5 });
       // The list must NOT receive a minimumFaceCount param — it already filters via SQL (no double filter).
-      const [, , listOptions] = mocks.person.getAllForUser.mock.calls[0];
+      const listOptions = mocks.person.getAllForUser.mock.calls[0][2];
       expect(listOptions).not.toHaveProperty('minimumFaceCount');
     });
 
