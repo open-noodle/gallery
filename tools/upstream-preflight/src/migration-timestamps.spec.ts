@@ -25,13 +25,20 @@ import { describe, expect, it } from 'vitest';
 //       (the LOW#2/#15 pair — benign; per the remediation decision it is kept + guarded
 //        rather than renamed, because renaming risks bricking already-deployed staging/RC DBs)
 // The baseline must NOT grow: no future PR may add a new collision or widen this set.
-const PRE_EXISTING_TIMESTAMP_COLLISIONS = new Set(['1775100000000', '1777000000000', '1778800000000']);
+const PRE_EXISTING_TIMESTAMP_COLLISIONS = new Set([
+  '1775100000000',
+  '1777000000000',
+  '1778800000000',
+]);
 
 const GALLERY_MIGRATIONS_DIR = path.resolve(
   process.cwd(),
   '../../server/src/schema/migrations-gallery',
 );
-const UPSTREAM_MIGRATIONS_DIR = path.resolve(process.cwd(), '../../server/src/schema/migrations');
+const UPSTREAM_MIGRATIONS_DIR = path.resolve(
+  process.cwd(),
+  '../../server/src/schema/migrations',
+);
 
 const TIMESTAMP_PREFIX = /^(\d+)-/;
 
@@ -44,7 +51,9 @@ function listMigrationFiles(dir: string): string[] {
 function parseTimestamp(fileName: string): string {
   const match = TIMESTAMP_PREFIX.exec(fileName);
   if (!match) {
-    throw new Error(`Migration file "${fileName}" has no leading numeric timestamp`);
+    throw new Error(
+      `Migration file "${fileName}" has no leading numeric timestamp`,
+    );
   }
   return match[1];
 }
@@ -67,25 +76,35 @@ describe('fork migration timestamps', () => {
     const files = listMigrationFiles(GALLERY_MIGRATIONS_DIR);
     const duplicates = findDuplicateTimestamps(files);
 
-    const newDuplicates = duplicates.filter(([ts]) => !PRE_EXISTING_TIMESTAMP_COLLISIONS.has(ts));
+    const newDuplicates = duplicates.filter(
+      ([ts]) => !PRE_EXISTING_TIMESTAMP_COLLISIONS.has(ts),
+    );
 
     expect(
       newDuplicates,
       newDuplicates
-        .map(([ts, names]) => `timestamp ${ts} is shared by: ${names.join(', ')}`)
+        .map(
+          ([ts, names]) => `timestamp ${ts} is shared by: ${names.join(', ')}`,
+        )
         .join('\n'),
     ).toEqual([]);
   });
 
   it('do not collide with any upstream migrations/ timestamp', () => {
-    const galleryTimestamps = new Set(listMigrationFiles(GALLERY_MIGRATIONS_DIR).map(parseTimestamp));
+    const galleryTimestamps = new Set(
+      listMigrationFiles(GALLERY_MIGRATIONS_DIR).map(parseTimestamp),
+    );
     const upstreamFiles = listMigrationFiles(UPSTREAM_MIGRATIONS_DIR);
 
-    const collisions = upstreamFiles.filter((file) => galleryTimestamps.has(parseTimestamp(file)));
+    const collisions = upstreamFiles.filter((file) =>
+      galleryTimestamps.has(parseTimestamp(file)),
+    );
 
     expect(
       collisions,
-      collisions.map((file) => `upstream migration "${file}" shares a fork timestamp`).join('\n'),
+      collisions
+        .map((file) => `upstream migration "${file}" shares a fork timestamp`)
+        .join('\n'),
     ).toEqual([]);
   });
 });
