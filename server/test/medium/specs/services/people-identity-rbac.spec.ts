@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { SearchSuggestionType } from 'src/dtos/search.dto';
-import { AssetVisibility, JobName, SharedSpaceRole, SourceType } from 'src/enum';
+import { AssetVisibility, JobName, SharedSpaceRole, SourceType, UserMetadataKey } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { ConfigRepository } from 'src/repositories/config.repository';
@@ -14,6 +14,7 @@ import { PersonRepository } from 'src/repositories/person.repository';
 import { SearchRepository } from 'src/repositories/search.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
+import { UserRepository } from 'src/repositories/user.repository';
 import { DB } from 'src/schema';
 import { PersonService } from 'src/services/person.service';
 import { SearchService } from 'src/services/search.service';
@@ -47,10 +48,17 @@ const setup = (db?: Kysely<DB>) => {
       SearchRepository,
       SharedSpaceRepository,
     ],
-    mock: [JobRepository, LoggingRepository, SystemMetadataRepository],
+    mock: [JobRepository, LoggingRepository, SystemMetadataRepository, UserRepository],
   });
   const metadata = ctx.getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository);
   metadata.get.mockResolvedValue({ machineLearning: { facialRecognition: { minFaces: 1 } } } as any);
+
+  // `PersonService.resolveMinimumFaceCount` (M2) now derives the People face threshold from the
+  // per-user `people.minimumFaces` preference (default 3 via `getPreferences`), not the ML config.
+  // These RBAC projection tests assert single-face shared people surface, so pin the preference to 1
+  // to keep the threshold the tests were written against (matching the mocked ML `minFaces: 1`).
+  const users = ctx.getMock<UserRepository, Mocked<UserRepository>>(UserRepository);
+  users.getMetadata.mockResolvedValue([{ key: UserMetadataKey.Preferences, value: { people: { minimumFaces: 1 } } }]);
 
   const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
   jobs.queue.mockResolvedValue();
