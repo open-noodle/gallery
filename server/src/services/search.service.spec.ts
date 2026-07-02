@@ -1613,7 +1613,8 @@ describe(SearchService.name, () => {
       await sut.searchRandom(auth, {});
 
       const opts = mocks.search.searchRandom.mock.calls[0][1];
-      expect(opts).toHaveProperty('visibility', undefined);
+      expect(opts).toHaveProperty('visibility');
+      expect(opts.visibility).toBeUndefined();
     });
 
     it('passes an explicit visibility through unchanged', async () => {
