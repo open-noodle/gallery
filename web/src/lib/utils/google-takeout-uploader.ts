@@ -28,7 +28,6 @@ async function computeSha1(file: File): Promise<string> {
 
 export async function uploadTakeoutItem(item: TakeoutMediaItem, options: ImportOptions): Promise<UploadResult> {
   try {
-    const deviceAssetId = 'takeout-' + item.name + '-' + item.lastModified;
     const fileCreatedAt = item.metadata?.dateTaken
       ? item.metadata.dateTaken.toISOString()
       : new Date(item.lastModified).toISOString();
@@ -53,8 +52,6 @@ export async function uploadTakeoutItem(item: TakeoutMediaItem, options: ImportO
 
     // Build FormData
     const formData = new FormData();
-    formData.append('deviceAssetId', deviceAssetId);
-    formData.append('deviceId', 'WEB_IMPORT');
     formData.append('fileCreatedAt', fileCreatedAt);
     formData.append('fileModifiedAt', fileCreatedAt);
     formData.append('isFavorite', String(options.importFavorites && item.metadata?.isFavorite === true));
