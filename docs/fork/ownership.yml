@@ -279,7 +279,8 @@ features:
       - server/src/services/user-group.service.ts
       - server/src/controllers/user-group.controller.ts
       - server/src/schema/tables/user-group*.ts
-      - web/src/lib/components/users/**
+      - web/src/lib/components/user-settings-page/group-settings.svelte
+      - web/src/lib/modals/UserGroupModal.svelte
       - .github/workflows/gallery-*.yml
       - .github/workflows/storage-migration*.yml
       - .github/workflows/docs-build.yml
