@@ -14,7 +14,8 @@ import { describe, expect, it } from 'vitest';
 // reverts to importing the generic `@immich/ui` spinner.
 
 const WEB_SRC = path.resolve(process.cwd(), '../../web/src');
-const FORK_LOCAL_SPECIFIER = '$lib/components/shared-components/LoadingSpinner.svelte';
+const FORK_LOCAL_SPECIFIER =
+  '$lib/components/shared-components/LoadingSpinner.svelte';
 const GENERIC_SPECIFIER = '@immich/ui';
 
 // The fork's full 25-file "swapped set" — every call-site that must render the
@@ -50,7 +51,8 @@ const SWAPPED_SET = [
 // Matches both import forms used in this codebase:
 //   import LoadingSpinner from '...';
 //   import { A, LoadingSpinner, B } from '...';
-const IMPORT_RE = /import\s+(?:([$\w]+)|\{([^}]*)\})\s+from\s+['"]([^'"]+)['"]/g;
+const IMPORT_RE =
+  /import\s+(?:([$\w]+)|\{([^}]*)\})\s+from\s+['"]([^'"]+)['"]/g;
 
 type SpinnerSource = 'fork-local' | 'generic' | 'other' | 'none';
 
@@ -85,7 +87,12 @@ function findLoadingSpinnerImport(content: string): SpinnerSource {
       return classifySpecifier(specifier);
     }
     if (namedList) {
-      const names = namedList.split(',').map((entry) => entry.trim().split(/\s+as\s+/)[0].trim());
+      const names = namedList.split(',').map((entry) =>
+        entry
+          .trim()
+          .split(/\s+as\s+/)[0]
+          .trim(),
+      );
       if (names.includes('LoadingSpinner')) {
         return classifySpecifier(specifier);
       }
@@ -103,7 +110,9 @@ describe('branded LoadingSpinner swap', () => {
       const content = fs.readFileSync(full, 'utf8');
       const source = findLoadingSpinnerImport(content);
       if (source !== 'fork-local') {
-        offenders.push(`${rel}: imports LoadingSpinner from ${source} instead of the fork-local component`);
+        offenders.push(
+          `${rel}: imports LoadingSpinner from ${source} instead of the fork-local component`,
+        );
       }
     }
 
@@ -111,7 +120,9 @@ describe('branded LoadingSpinner swap', () => {
   });
 
   it('no file in the swapped set imports the generic @immich/ui LoadingSpinner', () => {
-    const swappedSetAbs = new Set(SWAPPED_SET.map((rel) => path.join(WEB_SRC, rel)));
+    const swappedSetAbs = new Set(
+      SWAPPED_SET.map((rel) => path.join(WEB_SRC, rel)),
+    );
     const offenders: string[] = [];
 
     for (const file of collectSvelteFiles(WEB_SRC)) {
