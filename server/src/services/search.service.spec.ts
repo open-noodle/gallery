@@ -754,7 +754,10 @@ describe(SearchService.name, () => {
 
       const result = await sut.getTagSuggestions(authStub.user1, {});
       expect(result).toEqual(tags);
-      expect(mocks.search.getAccessibleTags).toHaveBeenCalledWith([authStub.user1.user.id], {});
+      expect(mocks.search.getAccessibleTags).toHaveBeenCalledWith([authStub.user1.user.id], {
+        timelineSpaceIds: undefined,
+        visibility: 'not-locked',
+      });
     });
 
     it('should include partner IDs in user search', async () => {
@@ -772,7 +775,7 @@ describe(SearchService.name, () => {
       await sut.getTagSuggestions(authStub.user1, {});
       expect(mocks.search.getAccessibleTags).toHaveBeenCalledWith(
         expect.arrayContaining([authStub.user1.user.id, 'partner-1']),
-        {},
+        { timelineSpaceIds: undefined, visibility: 'not-locked' },
       );
     });
 
