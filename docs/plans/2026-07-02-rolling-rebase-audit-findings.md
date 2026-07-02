@@ -97,7 +97,7 @@ Sibling of H2 — same `GalleryTabShellRoute` rename miss. Likely fixable in the
 
 ### M5 — Live-photo motion-asset hide sweep (#627) not applied to the new v3 `assetV2` sync path
 
-- **File:** `mobile/lib/infrastructure/repositories/sync_stream.repository.dart:246` · **Status:** OPEN
+- **File:** `mobile/lib/infrastructure/repositories/sync_stream.repository.dart:246` · **Status:** FIXED (slice S8)
 
 The fork's #627 sweep that hides live-photo motion parts runs on the old sync path but not the new `assetV2` path that v3 servers use — so against a v3 server, motion assets reappear in the mobile timeline.
 
