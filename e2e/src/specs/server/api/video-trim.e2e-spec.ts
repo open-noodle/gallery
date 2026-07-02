@@ -252,4 +252,71 @@ describe('/assets/:id/edits (video trim)', () => {
       expect(getResult.body.edits).toHaveLength(0);
     });
   });
+
+  // --- Trim-from-encoded-video coverage (LOW #4) ---
+  //
+  // The suite-wide `beforeAll` above disables transcoding so no `AssetFileType.EncodedVideo`
+  // (non-edited) file is ever produced, which means `handleVideoTrim`'s input-selection branch
+  // (server/src/services/media.service.ts ~294-295: `existingEncoded?.path || localPath`) never
+  // takes the `existingEncoded.path` side in any other test in this file. This block scopes
+  // transcoding back on for a single case to restore that coverage, then restores `Disabled`.
+  describe('PUT /assets/:id/edits (trim from an existing encoded video)', () => {
+    afterAll(async () => {
+      const config = await utils.getSystemConfig(admin.accessToken);
+      config.ffmpeg.transcode = TranscodePolicy.Disabled;
+      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+    });
+
+    it('should trim from the already-transcoded EncodedVideo variant, not the raw upload', async () => {
+      // `All` transcodes unconditionally (unlike `Required`/`Optimal`/`Bitrate`, which can skip
+      // if the source already matches the target codec/resolution), guaranteeing the
+      // videoConversion job produces a non-edited EncodedVideo file for this asset.
+      const config = await utils.getSystemConfig(admin.accessToken);
+      config.ffmpeg.transcode = TranscodePolicy.All;
+      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+
+      const videoId = await uploadVideo();
+
+      // The AssetEncodeVideo job is queued synchronously before the `assetUpload` websocket
+      // event fires (server/src/services/job.service.ts), so by the time uploadVideo() resolves
+      // it is already enqueued: waiting for the queue to drain here deterministically guarantees
+      // the EncodedVideo variant exists before we trim (no race with the trim request below).
+      await utils.waitForQueueFinish(admin.accessToken, 'videoConversion', 60_000);
+
+      const { status, body } = await request(app)
+        .put(`/assets/${videoId}/edits`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({
+          edits: [{ action: 'trim', parameters: { startTime: 1, endTime: 3 } }],
+        });
+
+      expect(status).toBe(200);
+      expect(body).toEqual(
+        expect.objectContaining({
+          assetId: videoId,
+          edits: expect.arrayContaining([
+            expect.objectContaining({
+              action: 'trim',
+              parameters: expect.objectContaining({
+                startTime: 1,
+                endTime: 3,
+              }),
+            }),
+          ]),
+        }),
+      );
+
+      // Wait for the editor job (handleVideoTrim) to finish re-probing/writing the trimmed
+      // duration.
+      await utils.waitForQueueFinish(admin.accessToken, 'editor', 60_000);
+
+      const info = await utils.getAssetInfo(admin.accessToken, videoId);
+      // `-c copy` trims to the nearest keyframe (server/src/repositories/media.repository.ts
+      // `trim()`), so allow generous tolerance around the requested 2s (1s-3s) window — this
+      // proves a real trim occurred against the encoded input (not a no-op leaving the
+      // untouched 4s original, and not a silent failure).
+      expect(info.duration).toBeGreaterThan(500);
+      expect(info.duration).toBeLessThan(3500);
+    }, 30_000);
+  });
 });
