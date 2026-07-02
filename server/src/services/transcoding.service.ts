@@ -21,10 +21,18 @@ import { VideoInterfaces } from 'src/types';
 import { isVideoStreamSessionPkConstraint } from 'src/utils/database';
 import { BaseConfig } from 'src/utils/media';
 
+type LocalInput = { localPath: string; cleanup: () => Promise<void> };
+
 type Session = {
   assetId: string;
   expiresAt: Date;
   id: string;
+  // Local input file for ffmpeg, materialized once per session. On S3-primary storage
+  // `asset.originalPath` is a relative key ffmpeg cannot read, so the source is
+  // downloaded to a temp file for the session's lifetime; on disk this is a passthrough.
+  // Cached as a promise so concurrent (seek/variant restart) transcodes share one
+  // download; released in onSessionEnd (which every teardown path funnels through).
+  input: Promise<LocalInput> | null;
   lastActivityTime: Date;
   lastClientRequestedSegment: number | null;
   lastCompletedSegment: number | null;
@@ -71,6 +79,7 @@ export class TranscodingService extends BaseService {
         assetId,
         expiresAt,
         id: sessionId,
+        input: null,
         lastActivityTime: new Date(),
         lastClientRequestedSegment: null,
         lastCompletedSegment: null,
@@ -104,8 +113,28 @@ export class TranscodingService extends BaseService {
       this.cleanupInterval = null;
     }
     this.stopTranscode(session);
+    await this.cleanupSessionInput(session);
     await this.removeSessionDir(session);
     await this.videoStreamRepository.deleteSession(sessionId);
+  }
+
+  /**
+   * Release the session's materialized local input file. Null-safe (a session that never
+   * transcoded has nothing to clean), idempotent (nulls the handle so repeat teardown
+   * paths are no-ops), and rejection-safe (a failed download left no temp file to remove).
+   */
+  private async cleanupSessionInput(session: Session) {
+    const input = session.input;
+    session.input = null;
+    if (!input) {
+      return;
+    }
+    try {
+      const { cleanup } = await input;
+      await cleanup();
+    } catch (error) {
+      this.logger.warn(`Failed to clean up local input for HLS session ${session.id}: ${error}`);
+    }
   }
 
   @OnEvent({ name: 'HlsHeartbeat', server: true, workers: [ImmichWorker.Microservices] })
@@ -190,6 +219,22 @@ export class TranscodingService extends BaseService {
       return;
     }
 
+    // ffmpeg needs a readable local path. On S3-primary storage `asset.originalPath` is a
+    // relative key, so download it to a temp file once for the whole session (reused across
+    // seek/variant restarts); on disk this is a passthrough. Cleaned up in onSessionEnd.
+    let localInputPath: string;
+    try {
+      session.input ??= this.ensureLocalFile(asset.originalPath);
+      ({ localPath: localInputPath } = await session.input);
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to prepare local input for HLS transcoding of asset ${session.assetId}: ${error?.message ?? error}`,
+      );
+      session.input = null;
+      await this.failSession(session, 'Failed to prepare video for streaming');
+      return;
+    }
+
     const variant = HLS_VARIANTS[variantIndex];
     if (!variant) {
       this.logger.error(`Variant ${variantIndex} out of range for asset ${session.assetId}`);
@@ -237,7 +282,7 @@ export class TranscodingService extends BaseService {
     const args = config.getHlsCommand(
       {
         initFilename: 'init.mp4',
-        inputPath: asset.originalPath,
+        inputPath: localInputPath,
         packetCount: asset.packets.packetCount,
         playlistFilename: join(variantDir, 'playlist.m3u8'),
         seekSeconds,
