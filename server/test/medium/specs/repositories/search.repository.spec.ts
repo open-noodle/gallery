@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import { AlbumUserRole, AssetType } from 'src/enum';
+import { AlbumUserRole, AssetType, AssetVisibility } from 'src/enum';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
@@ -483,6 +483,101 @@ describe(SearchRepository.name, () => {
       expect(result.cameraMakes).toContain('Sony');
       expect(result.tags.map((tag) => tag.value)).toContain('Travel');
       expect(result.people.map((p) => p.name)).toContain('Ada');
+    });
+
+    it('follows the not-locked default: includes archived values, excludes locked-only values (LOW #7)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: timelineAsset.id, country: 'Germany', make: 'Sony' });
+
+      const { asset: archivedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Archive });
+      await ctx.newExif({ assetId: archivedAsset.id, country: 'Norway', make: 'ArchivedMake' });
+
+      const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
+      await ctx.newExif({ assetId: lockedAsset.id, country: 'Spain', make: 'LockedMake' });
+
+      const result = await sut.getFilterSuggestions([user.id], { visibility: 'not-locked' });
+
+      expect(result.countries).toEqual(['Germany', 'Norway']);
+      expect(result.cameraMakes).toEqual(['ArchivedMake', 'Sony']);
+      expect(result.countries).not.toContain('Spain');
+      expect(result.cameraMakes).not.toContain('LockedMake');
+    });
+
+    it('lets an elevated caller (visibility undefined) see locked-only values too (LOW #7)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
+      await ctx.newExif({ assetId: lockedAsset.id, country: 'Spain', make: 'LockedMake' });
+
+      const result = await sut.getFilterSuggestions([user.id], {});
+
+      expect(result.countries).toContain('Spain');
+      expect(result.cameraMakes).toContain('LockedMake');
+    });
+
+    it('returns empty suggestions with no error when there are no matching assets (LOW #7)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const result = await sut.getFilterSuggestions([user.id], { visibility: 'not-locked' });
+
+      expect(result).toEqual({
+        countries: [],
+        cameraMakes: [],
+        tags: [],
+        people: [],
+        ratings: [],
+        mediaTypes: [],
+        hasUnnamedPeople: false,
+      });
+    });
+  });
+
+  describe('getCameraMakes (LOW #7)', () => {
+    it('includes archived-only values under not-locked, excludes locked-only values', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: timelineAsset.id, make: 'Sony' });
+
+      const { asset: archivedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Archive });
+      await ctx.newExif({ assetId: archivedAsset.id, make: 'ArchivedMake' });
+
+      const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
+      await ctx.newExif({ assetId: lockedAsset.id, make: 'LockedMake' });
+
+      const makes = await sut.getCameraMakes([user.id], { visibility: 'not-locked' });
+
+      expect(makes).toEqual(['ArchivedMake', 'Sony']);
+    });
+  });
+
+  describe('getAccessibleTags (LOW #7)', () => {
+    it('includes tags from archived assets under not-locked, excludes locked-only tags', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: archivedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Archive });
+      const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
+
+      const [timelineTag, archivedTag, lockedTag] = await upsertTags(ctx.get(TagRepository), {
+        userId: user.id,
+        tags: ['TimelineTag', 'ArchivedTag', 'LockedTag'],
+      });
+      await ctx.newTagAsset({ tagIds: [timelineTag.id], assetIds: [timelineAsset.id] });
+      await ctx.newTagAsset({ tagIds: [archivedTag.id], assetIds: [archivedAsset.id] });
+      await ctx.newTagAsset({ tagIds: [lockedTag.id], assetIds: [lockedAsset.id] });
+
+      const tags = await sut.getAccessibleTags([user.id], { visibility: 'not-locked' });
+
+      expect(tags.map((tag) => tag.value)).toEqual(expect.arrayContaining(['TimelineTag', 'ArchivedTag']));
+      expect(tags.map((tag) => tag.value)).not.toContain('LockedTag');
     });
   });
 });
