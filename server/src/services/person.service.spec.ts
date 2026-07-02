@@ -16,6 +16,7 @@ import {
   QueueName,
   SourceType,
   SystemMetadataKey,
+  UserMetadataKey,
 } from 'src/enum';
 import { FaceSearchResult } from 'src/repositories/search.repository';
 import { FACE_IDENTITY_BACKFILL_MAX_CONTINUATIONS, PersonService } from 'src/services/person.service';
@@ -90,6 +91,8 @@ describe(PersonService.name, () => {
     (mocks.faceIdentity as any).getAccessiblePersonByProfileId.mockResolvedValue(void 0);
     (mocks.faceIdentity as any).getAccessibleProfileIdentityId.mockResolvedValue(void 0);
     mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue([]);
+    // Default: no stored preferences → getPreferences() falls back to minimumFaces = 3.
+    mocks.user.getMetadata.mockResolvedValue([]);
   });
 
   const expectNoFaceDetectionMutation = () => {
@@ -519,6 +522,157 @@ describe(PersonService.name, () => {
 
       expect((mocks.person as any).getPeopleFaceStatistics).not.toHaveBeenCalled();
       expect((mocks.faceIdentity as any).getAccessiblePeopleFaceStatistics).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('people.minimumFaces preference (M2)', () => {
+    const prefsMetadata = (minimumFaces: number) =>
+      [{ key: UserMetadataKey.Preferences, value: { people: { minimumFaces } } }] as any;
+
+    it('threads the user preference into the withSharedSpaces People list', async () => {
+      const auth = AuthFactory.create();
+      mocks.user.getMetadata.mockResolvedValue(prefsMetadata(5));
+      (mocks.faceIdentity as any).getAccessiblePeople.mockResolvedValue({
+        total: 0,
+        hidden: 0,
+        hasNextPage: false,
+        people: [],
+      });
+
+      await sut.getAll(auth, { withHidden: false, withSharedSpaces: true, page: 1, size: 50 } as any);
+
+      expect((mocks.faceIdentity as any).getAccessiblePeople).toHaveBeenCalledWith(auth.user.id, {
+        withHidden: false,
+        page: 1,
+        size: 50,
+        minimumFaceCount: 5,
+      });
+    });
+
+    it('threads the user preference into withSharedSpaces people-stats', async () => {
+      const auth = AuthFactory.create();
+      mocks.user.getMetadata.mockResolvedValue(prefsMetadata(5));
+      (mocks.faceIdentity as any).getAccessiblePeopleStatistics.mockResolvedValue({
+        total: 0,
+        hidden: 0,
+        detectedFaceCount: 0,
+      });
+
+      await sut.getPeopleStatistics(auth, { withSharedSpaces: true, page: 1, size: 50 } as any);
+
+      expect((mocks.faceIdentity as any).getAccessiblePeopleStatistics).toHaveBeenCalledWith(auth.user.id, {
+        minimumFaceCount: 5,
+      });
+    });
+
+    it('threads the user preference into withSharedSpaces people-face-stats', async () => {
+      const auth = AuthFactory.create();
+      mocks.user.getMetadata.mockResolvedValue(prefsMetadata(5));
+      (mocks.faceIdentity as any).getAccessiblePeopleFaceStatistics.mockResolvedValue({
+        detectedFaceCount: 0,
+        assignedVisibleFaceCount: 0,
+        namedVisiblePersonCount: 0,
+        assignedHiddenFaceCount: 0,
+        unassignedFaceCount: 0,
+      });
+
+      await sut.getPeopleFaceStatistics(auth, { withSharedSpaces: true, page: 1, size: 50 } as any);
+
+      expect((mocks.faceIdentity as any).getAccessiblePeopleFaceStatistics).toHaveBeenCalledWith(auth.user.id, {
+        minimumFaceCount: 5,
+      });
+    });
+
+    it('threads the user preference into the non-shared people-stats surfaces', async () => {
+      const auth = AuthFactory.create();
+      mocks.user.getMetadata.mockResolvedValue(prefsMetadata(5));
+      (mocks.person as any).getPeopleOverviewStatistics.mockResolvedValue({
+        total: 0,
+        hidden: 0,
+        detectedFaceCount: 0,
+      });
+      (mocks.person as any).getPeopleFaceStatistics.mockResolvedValue({
+        detectedFaceCount: 0,
+        assignedVisibleFaceCount: 0,
+        namedVisiblePersonCount: 0,
+        assignedHiddenFaceCount: 0,
+        unassignedFaceCount: 0,
+      });
+
+      await sut.getPeopleStatistics(auth, { page: 1, size: 50 } as any);
+      await sut.getPeopleFaceStatistics(auth, { page: 1, size: 50 } as any);
+
+      expect((mocks.person as any).getPeopleOverviewStatistics).toHaveBeenCalledWith(auth.user.id, {
+        minimumFaceCount: 5,
+      });
+      expect((mocks.person as any).getPeopleFaceStatistics).toHaveBeenCalledWith(auth.user.id, {
+        minimumFaceCount: 5,
+      });
+    });
+
+    it('makes the non-shared count match the list threshold without double-filtering the list', async () => {
+      const auth = AuthFactory.create();
+      mocks.user.getMetadata.mockResolvedValue(prefsMetadata(5));
+      mocks.person.getAllForUser.mockResolvedValue({ items: [], hasNextPage: false });
+      mocks.person.getNumberOfPeople.mockResolvedValue({ total: 0, hidden: 0 });
+
+      await sut.getAll(auth, { withHidden: false, page: 1, size: 50 });
+
+      // Count uses the same resolved threshold the list applies in SQL (person.repository.ts:334).
+      expect(mocks.person.getNumberOfPeople).toHaveBeenCalledWith(auth.user.id, { minimumFaceCount: 5 });
+      // The list must NOT receive a minimumFaceCount param — it already filters via SQL (no double filter).
+      const [, , listOptions] = mocks.person.getAllForUser.mock.calls[0];
+      expect(listOptions).not.toHaveProperty('minimumFaceCount');
+    });
+
+    it('falls back to the default threshold when the preference is unset', async () => {
+      const auth = AuthFactory.create();
+      mocks.user.getMetadata.mockResolvedValue([]);
+      (mocks.faceIdentity as any).getAccessiblePeople.mockResolvedValue({
+        total: 0,
+        hidden: 0,
+        hasNextPage: false,
+        people: [],
+      });
+
+      await expect(
+        sut.getAll(auth, { withHidden: false, withSharedSpaces: true, page: 1, size: 50 } as any),
+      ).resolves.toBeDefined();
+
+      expect((mocks.faceIdentity as any).getAccessiblePeople).toHaveBeenCalledWith(auth.user.id, {
+        withHidden: false,
+        page: 1,
+        size: 50,
+        minimumFaceCount: 3,
+      });
+    });
+
+    it('threads boundary preference values (1 and a large value)', async () => {
+      const auth = AuthFactory.create();
+      (mocks.faceIdentity as any).getAccessiblePeople.mockResolvedValue({
+        total: 0,
+        hidden: 0,
+        hasNextPage: false,
+        people: [],
+      });
+
+      mocks.user.getMetadata.mockResolvedValue(prefsMetadata(1));
+      await sut.getAll(auth, { withHidden: false, withSharedSpaces: true, page: 1, size: 50 } as any);
+      expect((mocks.faceIdentity as any).getAccessiblePeople).toHaveBeenLastCalledWith(auth.user.id, {
+        withHidden: false,
+        page: 1,
+        size: 50,
+        minimumFaceCount: 1,
+      });
+
+      mocks.user.getMetadata.mockResolvedValue(prefsMetadata(50));
+      await sut.getAll(auth, { withHidden: false, withSharedSpaces: true, page: 1, size: 50 } as any);
+      expect((mocks.faceIdentity as any).getAccessiblePeople).toHaveBeenLastCalledWith(auth.user.id, {
+        withHidden: false,
+        page: 1,
+        size: 50,
+        minimumFaceCount: 50,
+      });
     });
   });
 
