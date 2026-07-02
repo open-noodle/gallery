@@ -9,11 +9,17 @@ import { TranscodingService } from 'src/services/transcoding.service';
 import { VIDEO_STREAM_SESSION_PK_CONSTRAINT } from 'src/utils/database';
 import { eiffelTower, train, waterfall } from 'test/fixtures/media.stub';
 import { mockSpawn, newTestService, ServiceMocks } from 'test/utils';
-import { vi } from 'vitest';
+import { type MockInstance, vi } from 'vitest';
+
+type WithEnsureLocalFile = {
+  ensureLocalFile: (filePath: string) => Promise<{ localPath: string; cleanup: () => Promise<void> }>;
+};
 
 describe(TranscodingService.name, () => {
   let sut: TranscodingService;
   let mocks: ServiceMocks;
+  let ensureLocalFileSpy: MockInstance;
+  const inputCleanup = vi.fn(async () => {});
 
   const sessionId = 'session-1';
   const assetId = 'asset-1';
@@ -35,6 +41,13 @@ describe(TranscodingService.name, () => {
     ({ sut, mocks } = newTestService(TranscodingService));
     mocks.systemMetadata.get.mockResolvedValue({ ffmpeg: { realtime: { enabled: true } } });
     mocks.videoStream.getForTranscoding.mockResolvedValue(eiffelTower);
+    inputCleanup.mockClear();
+    // ffmpeg needs a real local path. On disk this is a passthrough (localPath === input,
+    // no-op cleanup); on S3 it downloads to a temp file. Fixtures use bare relative
+    // filenames, so passthrough keeps the existing command/seek suites green.
+    ensureLocalFileSpy = vi
+      .spyOn(sut as unknown as WithEnsureLocalFile, 'ensureLocalFile')
+      .mockImplementation(async (filePath: string) => ({ localPath: filePath, cleanup: inputCleanup }));
   });
 
   describe('onSessionRequest', () => {
@@ -88,6 +101,111 @@ describe(TranscodingService.name, () => {
 
       expect(mocks.videoStream.deleteSession).not.toHaveBeenCalled();
       expect(mocks.storage.unlinkDir).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('local input file (M1)', () => {
+    it('materializes a local input file and passes it (not the raw S3 key) to ffmpeg', async () => {
+      ensureLocalFileSpy.mockResolvedValue({ localPath: '/tmp/hls-input.mp4', cleanup: inputCleanup });
+      mocks.process.spawn.mockReturnValue(mockSpawn(0, '', ''));
+
+      await sut.onSessionRequest({ sessionId, assetId, ownerId });
+      await sut.onSegmentRequest({ sessionId, assetId, variantIndex: 0, segmentIndex: 0 });
+
+      expect(ensureLocalFileSpy).toHaveBeenCalledWith('eiffel-tower.mp4');
+      const args = mocks.process.spawn.mock.calls[0][1] as string[];
+      expect(args).toContain('/tmp/hls-input.mp4');
+      expect(args).not.toContain('eiffel-tower.mp4');
+    });
+
+    it('cleans up the materialized local input exactly once on onSessionEnd', async () => {
+      mocks.process.spawn.mockReturnValue(mockSpawn(0, '', ''));
+      await sut.onSessionRequest({ sessionId, assetId, ownerId });
+      await sut.onSegmentRequest({ sessionId, assetId, variantIndex: 0, segmentIndex: 0 });
+
+      await sut.onSessionEnd({ sessionId });
+
+      expect(inputCleanup).toHaveBeenCalledTimes(1);
+    });
+
+    it('cleans up the local input when the session fails (failSession → onSessionEnd)', async () => {
+      await sut.onSessionRequest({ sessionId, assetId, ownerId });
+      // variant index out of range → startTranscode calls failSession → onSessionEnd
+      await sut.onSegmentRequest({ sessionId, assetId, variantIndex: 999, segmentIndex: 0 });
+
+      expect(inputCleanup).toHaveBeenCalledTimes(1);
+    });
+
+    it('cleans up the local input when the inactivity sweeper evicts the session', async () => {
+      vi.useFakeTimers();
+      try {
+        mocks.process.spawn.mockReturnValue(mockSpawn(0, '', ''));
+        await sut.onSessionRequest({ sessionId, assetId, ownerId });
+        await sut.onSegmentRequest({ sessionId, assetId, variantIndex: 0, segmentIndex: 0 });
+
+        await vi.advanceTimersByTimeAsync(HLS_INACTIVITY_TIMEOUT_MS + HLS_CLEANUP_INTERVAL_MS);
+
+        expect(inputCleanup).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('is null-safe when a session ends without ever starting a transcode', async () => {
+      await sut.onSessionRequest({ sessionId, assetId, ownerId });
+
+      await expect(sut.onSessionEnd({ sessionId })).resolves.not.toThrow();
+      expect(ensureLocalFileSpy).not.toHaveBeenCalled();
+      expect(inputCleanup).not.toHaveBeenCalled();
+    });
+
+    it('materializes the local input once per session across seek/variant re-transcodes', async () => {
+      mocks.process.spawn.mockReturnValueOnce(mockSpawn(0, '', '')).mockReturnValueOnce(mockSpawn(0, '', ''));
+      await sut.onSessionRequest({ sessionId, assetId, ownerId });
+      await sut.onSegmentRequest({ sessionId, assetId, variantIndex: 0, segmentIndex: 0 });
+      await sut.onSegmentRequest({ sessionId, assetId, variantIndex: 1, segmentIndex: 0 });
+
+      expect(ensureLocalFileSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('gives concurrent sessions independent temp files and independent cleanup', async () => {
+      const cleanupA = vi.fn(async () => {});
+      const cleanupB = vi.fn(async () => {});
+      ensureLocalFileSpy
+        .mockResolvedValueOnce({ localPath: '/tmp/a.mp4', cleanup: cleanupA })
+        .mockResolvedValueOnce({ localPath: '/tmp/b.mp4', cleanup: cleanupB });
+      mocks.process.spawn.mockReturnValue(mockSpawn(0, '', ''));
+
+      await sut.onSessionRequest({ sessionId: 'session-a', assetId, ownerId });
+      await sut.onSegmentRequest({ sessionId: 'session-a', assetId, variantIndex: 0, segmentIndex: 0 });
+      await sut.onSessionRequest({ sessionId: 'session-b', assetId, ownerId });
+      await sut.onSegmentRequest({ sessionId: 'session-b', assetId, variantIndex: 0, segmentIndex: 0 });
+
+      const argsA = mocks.process.spawn.mock.calls[0][1] as string[];
+      const argsB = mocks.process.spawn.mock.calls[1][1] as string[];
+      expect(argsA).toContain('/tmp/a.mp4');
+      expect(argsB).toContain('/tmp/b.mp4');
+
+      await sut.onSessionEnd({ sessionId: 'session-a' });
+      expect(cleanupA).toHaveBeenCalledTimes(1);
+      expect(cleanupB).not.toHaveBeenCalled();
+
+      await sut.onSessionEnd({ sessionId: 'session-b' });
+      expect(cleanupB).toHaveBeenCalledTimes(1);
+    });
+
+    it('passes an absolute (local disk) path through to ffmpeg with no regression', async () => {
+      mocks.videoStream.getForTranscoding.mockResolvedValue({
+        ...eiffelTower,
+        originalPath: '/data/upload/eiffel.mp4',
+      });
+      mocks.process.spawn.mockReturnValue(mockSpawn(0, '', ''));
+
+      await sut.onSessionRequest({ sessionId, assetId, ownerId });
+      await sut.onSegmentRequest({ sessionId, assetId, variantIndex: 0, segmentIndex: 0 });
+
+      const args = mocks.process.spawn.mock.calls[0][1] as string[];
+      expect(args).toContain('/data/upload/eiffel.mp4');
     });
   });
 
