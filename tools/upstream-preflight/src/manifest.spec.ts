@@ -290,15 +290,14 @@ describe('real ownership manifest owned_paths', () => {
 
     const ownedPaths =
       manifest.features['release-ci-and-infrastructure']?.owned_paths ?? [];
-    const groupSettingsMatches = ownedPaths.some(
-      (glob) =>
-        micromatch(
-          files,
-          glob.replaceAll(/[()]/g, String.raw`\$&`),
-          micromatchOptions,
-        ).includes(
-          'web/src/lib/components/user-settings-page/group-settings.svelte',
-        ),
+    const groupSettingsMatches = ownedPaths.some((glob) =>
+      micromatch(
+        files,
+        glob.replaceAll(/[()]/g, String.raw`\$&`),
+        micromatchOptions,
+      ).includes(
+        'web/src/lib/components/user-settings-page/group-settings.svelte',
+      ),
     );
 
     expect(groupSettingsMatches).toBe(true);
