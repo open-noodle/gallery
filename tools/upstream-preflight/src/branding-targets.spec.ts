@@ -19,14 +19,22 @@ import { describe, expect, it } from 'vitest';
 // It also pins config.json's upstream base version.
 
 const REPO_ROOT = path.resolve(process.cwd(), '../..');
-const APPLY_BRANDING = fs.readFileSync(path.join(REPO_ROOT, 'branding/scripts/apply-branding.sh'), 'utf8');
-const CONFIG = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'branding/config.json'), 'utf8'));
+const APPLY_BRANDING = fs.readFileSync(
+  path.join(REPO_ROOT, 'branding/scripts/apply-branding.sh'),
+  'utf8',
+);
+const CONFIG = JSON.parse(
+  fs.readFileSync(path.join(REPO_ROOT, 'branding/config.json'), 'utf8'),
+);
 
 // Each target's current, correct repo-relative path. apply-branding.sh must
 // reference it and it must exist on disk.
 const TARGETS: { finding: string; path: string }[] = [
   // M6 — sidebar server-status component renamed server-status.svelte -> ServerStatus.svelte
-  { finding: 'M6', path: 'web/src/lib/components/shared-components/side-bar/ServerStatus.svelte' },
+  {
+    finding: 'M6',
+    path: 'web/src/lib/components/shared-components/side-bar/ServerStatus.svelte',
+  },
   // LOW#22 — ErrorLayout.svelte moved to web/src/routes/
   { finding: 'LOW#22', path: 'web/src/routes/ErrorLayout.svelte' },
   // LOW#20 — cli/ moved to packages/cli, open-api/typescript-sdk/ moved to packages/sdk
@@ -39,8 +47,14 @@ const TARGETS: { finding: string; path: string }[] = [
 describe('branding target paths', () => {
   for (const { finding, path: rel } of TARGETS) {
     it(`${finding}: apply-branding.sh references an existing ${rel}`, () => {
-      expect(fs.existsSync(path.join(REPO_ROOT, rel)), `${rel} is missing from the tree`).toBe(true);
-      expect(APPLY_BRANDING.includes(rel), `apply-branding.sh does not reference ${rel}`).toBe(true);
+      expect(
+        fs.existsSync(path.join(REPO_ROOT, rel)),
+        `${rel} is missing from the tree`,
+      ).toBe(true);
+      expect(
+        APPLY_BRANDING.includes(rel),
+        `apply-branding.sh does not reference ${rel}`,
+      ).toBe(true);
     });
   }
 

@@ -912,7 +912,8 @@ describe(SearchService.name, () => {
       return asset;
     };
 
-    const elevated = (userId: string) => factory.auth({ user: { id: userId }, session: { hasElevatedPermission: true } });
+    const elevated = (userId: string) =>
+      factory.auth({ user: { id: userId }, session: { hasElevatedPermission: true } });
 
     it('hides another member archived asset from an elevated spaceId metadata search', async () => {
       const { sut, ctx } = setup();
