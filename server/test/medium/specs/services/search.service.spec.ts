@@ -892,4 +892,142 @@ describe(SearchService.name, () => {
       expect(cities).not.toContain('Stranger-City');
     });
   });
+
+  // M3: elevation only unlocks the CALLER'S OWN locked/archived folder. Other shared-space
+  // members' assets must always be Timeline-only in space-scoped search — the v3
+  // `undefined`-for-elevated visibility default must not leak their Archived/Hidden/Locked assets.
+  describe('space-scoped visibility (M3)', () => {
+    const setupSpace = async (ctx: SearchCtx) => {
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+      return { owner, member, space };
+    };
+
+    const shareAsset = async (ctx: SearchCtx, spaceId: string, ownerId: string, visibility: AssetVisibility) => {
+      const { asset } = await ctx.newAsset({ ownerId, visibility });
+      await ctx.newSharedSpaceAsset({ spaceId, assetId: asset.id, addedById: ownerId });
+      return asset;
+    };
+
+    const elevated = (userId: string) => factory.auth({ user: { id: userId }, session: { hasElevatedPermission: true } });
+
+    it('hides another member archived asset from an elevated spaceId metadata search', async () => {
+      const { sut, ctx } = setup();
+      const { owner, member, space } = await setupSpace(ctx);
+      const archived = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Archive);
+      const timeline = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Timeline);
+
+      const result = await sut.searchMetadata(elevated(member.id), { spaceId: space.id });
+      const ids = result.assets.items.map((a) => a.id);
+
+      expect(ids).toContain(timeline.id);
+      expect(ids).not.toContain(archived.id);
+    });
+
+    it('hides another member hidden and locked assets from an elevated spaceId metadata search', async () => {
+      const { sut, ctx } = setup();
+      const { owner, member, space } = await setupSpace(ctx);
+      const hidden = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Hidden);
+      const locked = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Locked);
+      const timeline = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Timeline);
+
+      const result = await sut.searchMetadata(elevated(member.id), { spaceId: space.id });
+      const ids = result.assets.items.map((a) => a.id);
+
+      expect(ids).toContain(timeline.id);
+      expect(ids).not.toContain(hidden.id);
+      expect(ids).not.toContain(locked.id);
+    });
+
+    it("exposes the caller's OWN archived asset in a space (elevated, per-owner elevation)", async () => {
+      const { sut, ctx } = setup();
+      const { member, space } = await setupSpace(ctx);
+      const ownArchived = await shareAsset(ctx, space.id, member.id, AssetVisibility.Archive);
+
+      const result = await sut.searchMetadata(elevated(member.id), { spaceId: space.id });
+      const ids = result.assets.items.map((a) => a.id);
+
+      expect(ids).toContain(ownArchived.id);
+    });
+
+    it('never exposes another member Archived/Hidden/Locked to a non-elevated member', async () => {
+      const { sut, ctx } = setup();
+      const { owner, member, space } = await setupSpace(ctx);
+      const archived = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Archive);
+      const hidden = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Hidden);
+      const locked = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Locked);
+      const timeline = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Timeline);
+
+      const auth = factory.auth({ user: { id: member.id } });
+      const result = await sut.searchMetadata(auth, { spaceId: space.id });
+      const ids = result.assets.items.map((a) => a.id);
+
+      expect(ids).toContain(timeline.id);
+      expect(ids).not.toContain(archived.id);
+      expect(ids).not.toContain(hidden.id);
+      expect(ids).not.toContain(locked.id);
+    });
+
+    it('does not expose another member archived even when the caller explicitly requests visibility=Archive', async () => {
+      const { sut, ctx } = setup();
+      const { owner, member, space } = await setupSpace(ctx);
+      const otherArchived = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Archive);
+      const ownArchived = await shareAsset(ctx, space.id, member.id, AssetVisibility.Archive);
+
+      const result = await sut.searchMetadata(elevated(member.id), {
+        spaceId: space.id,
+        visibility: AssetVisibility.Archive,
+      });
+      const ids = result.assets.items.map((a) => a.id);
+
+      expect(ids).toContain(ownArchived.id);
+      expect(ids).not.toContain(otherArchived.id);
+    });
+
+    it('hides another member archived asset in the withSharedSpaces (timeline) path for an elevated caller', async () => {
+      const { sut, ctx } = setup();
+      const { owner, member, space } = await setupSpace(ctx);
+      const archived = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Archive);
+      const timeline = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Timeline);
+
+      const result = await sut.searchMetadata(elevated(member.id), { withSharedSpaces: true });
+      const ids = result.assets.items.map((a) => a.id);
+
+      expect(ids).toContain(timeline.id);
+      expect(ids).not.toContain(archived.id);
+    });
+
+    it('excludes another member archived asset from elevated spaceId statistics', async () => {
+      const { sut, ctx } = setup();
+      const { owner, member, space } = await setupSpace(ctx);
+      await shareAsset(ctx, space.id, owner.id, AssetVisibility.Archive);
+      await shareAsset(ctx, space.id, owner.id, AssetVisibility.Timeline);
+
+      const result = await sut.searchStatistics(elevated(member.id), { spaceId: space.id });
+
+      // Only the Timeline asset counts — the other member's archived asset is excluded.
+      expect(result).toEqual({ total: 1 });
+    });
+
+    it('hides archived assets of every other owner in a mixed-owner space (elevated)', async () => {
+      const { sut, ctx } = setup();
+      const { owner, member, space } = await setupSpace(ctx);
+      const { user: secondOwner } = await ctx.newUser();
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: secondOwner.id, role: 'viewer' });
+
+      const archivedA = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Archive);
+      const archivedC = await shareAsset(ctx, space.id, secondOwner.id, AssetVisibility.Archive);
+      const timelineA = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Timeline);
+
+      const result = await sut.searchMetadata(elevated(member.id), { spaceId: space.id });
+      const ids = result.assets.items.map((a) => a.id);
+
+      expect(ids).toContain(timelineA.id);
+      expect(ids).not.toContain(archivedA.id);
+      expect(ids).not.toContain(archivedC.id);
+    });
+  });
 });
