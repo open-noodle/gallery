@@ -63,6 +63,7 @@ import { asDateTimeString } from 'src/utils/date.js';
 import { ImmichMediaResponse } from 'src/utils/file.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { batched, findOrFail, isFacialRecognitionEnabled } from 'src/utils/misc.js';
+import { getPreferences } from 'src/utils/preferences.js';
 import { Point, transformPoints } from 'src/utils/transform.js';
 
 const personKey = ({ ownerId, personGroupId }: PersonId) => `${ownerId}/${personGroupId}`;
@@ -93,16 +94,29 @@ export class PersonService extends BaseService {
     }
   }
 
+  /**
+   * Resolve the caller's People face threshold. The per-user `people.minimumFaces` preference
+   * (default 3 via `getPreferences`) takes precedence over the ML config default. This keeps the
+   * People count/stats surfaces consistent with the People list, whose SQL (`getAllForUser`,
+   * `person.repository.ts`) already reads the same preference with a literal `3` fallback — so the
+   * resolved value matches what the list applies, and neither path double-filters.
+   */
+  private async resolveMinimumFaceCount(auth: AuthDto): Promise<number> {
+    const { machineLearning } = await this.getConfig({ withCache: false });
+    const preferences = getPreferences(await this.userRepository.getMetadata(auth.user.id));
+    return preferences.people.minimumFaces ?? machineLearning.facialRecognition.minFaces;
+  }
+
   async getAll(auth: AuthDto, dto: PersonSearchDto): Promise<PeopleResponseDto> {
     const { withHidden = false, withSharedSpaces = false, closestAssetId, closestPersonId, page, size } = dto;
-    const { machineLearning } = await this.getConfig({ withCache: false });
+    const minimumFaceCount = await this.resolveMinimumFaceCount(auth);
 
     if (withSharedSpaces) {
       return this.faceIdentityRepository.getAccessiblePeople(auth.user.id, {
         withHidden,
         page,
         size,
-        minimumFaceCount: machineLearning.facialRecognition.minFaces,
+        minimumFaceCount,
       });
     }
 
@@ -127,7 +141,7 @@ export class PersonService extends BaseService {
       closestFaceAssetId,
     });
     const { total, hidden } = await this.personRepository.getNumberOfPeople(auth.user.id, {
-      minimumFaceCount: machineLearning.facialRecognition.minFaces,
+      minimumFaceCount,
     });
 
     return {
@@ -143,16 +157,16 @@ export class PersonService extends BaseService {
       throw new BadRequestException('closestPersonId and closestAssetId are not supported for people statistics');
     }
 
-    const { machineLearning } = await this.getConfig({ withCache: false });
+    const minimumFaceCount = await this.resolveMinimumFaceCount(auth);
 
     if (dto.withSharedSpaces) {
       return this.faceIdentityRepository.getAccessiblePeopleStatistics(auth.user.id, {
-        minimumFaceCount: machineLearning.facialRecognition.minFaces,
+        minimumFaceCount,
       });
     }
 
     return this.personRepository.getPeopleOverviewStatistics(auth.user.id, {
-      minimumFaceCount: machineLearning.facialRecognition.minFaces,
+      minimumFaceCount,
     });
   }
 
@@ -161,16 +175,16 @@ export class PersonService extends BaseService {
       throw new BadRequestException('closestPersonId and closestAssetId are not supported for people face statistics');
     }
 
-    const { machineLearning } = await this.getConfig({ withCache: false });
+    const minimumFaceCount = await this.resolveMinimumFaceCount(auth);
 
     if (dto.withSharedSpaces) {
       return this.faceIdentityRepository.getAccessiblePeopleFaceStatistics(auth.user.id, {
-        minimumFaceCount: machineLearning.facialRecognition.minFaces,
+        minimumFaceCount,
       });
     }
 
     return this.personRepository.getPeopleFaceStatistics(auth.user.id, {
-      minimumFaceCount: machineLearning.facialRecognition.minFaces,
+      minimumFaceCount,
     });
   }
 
