@@ -181,4 +181,88 @@ describe(SyncRequestType.SharedSpaceAssetsV1, () => {
       isFavorite: true,
     });
   });
+
+  it('masks isFavorite for a foreign-owned asset shared into the space', async () => {
+    const { auth, ctx } = await setup();
+    const { user: peer } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: peer.id });
+    await ctx.newSharedSpaceMember({
+      spaceId: space.id,
+      userId: peer.id,
+      role: SharedSpaceRole.Owner,
+    });
+    await ctx.newSharedSpaceMember({
+      spaceId: space.id,
+      userId: auth.user.id,
+      role: SharedSpaceRole.Editor,
+    });
+    const { asset } = await ctx.newAsset({ ownerId: peer.id, isFavorite: true });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+    const response = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetsV1]);
+    const assetEvents = response.filter(
+      (r: { type: string }) =>
+        r.type === SyncEntityType.SharedSpaceAssetCreateV1 || r.type === SyncEntityType.SharedSpaceAssetUpdateV1,
+    );
+    expect(assetEvents).toHaveLength(1);
+    expect((assetEvents[0] as { data: { id: string; isFavorite: boolean } }).data).toMatchObject({
+      id: asset.id,
+      isFavorite: false,
+    });
+  });
+
+  it('syncs true isFavorite for an asset owned by the requesting user', async () => {
+    const { auth, ctx } = await setup();
+    const { space } = await ctx.newSharedSpace({ createdById: auth.user.id });
+    await ctx.newSharedSpaceMember({
+      spaceId: space.id,
+      userId: auth.user.id,
+      role: SharedSpaceRole.Owner,
+    });
+    const { asset } = await ctx.newAsset({ ownerId: auth.user.id, isFavorite: true });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+    const response = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetsV1]);
+    const assetEvents = response.filter(
+      (r: { type: string }) =>
+        r.type === SyncEntityType.SharedSpaceAssetCreateV1 || r.type === SyncEntityType.SharedSpaceAssetUpdateV1,
+    );
+    expect(assetEvents).toHaveLength(1);
+    expect((assetEvents[0] as { data: { id: string; isFavorite: boolean } }).data).toMatchObject({
+      id: asset.id,
+      isFavorite: true,
+    });
+  });
+
+  it('masks isFavorite on the update path for a foreign-owned asset', async () => {
+    const { auth, ctx } = await setup();
+    const { user: peer } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: peer.id });
+    await ctx.newSharedSpaceMember({
+      spaceId: space.id,
+      userId: peer.id,
+      role: SharedSpaceRole.Owner,
+    });
+    await ctx.newSharedSpaceMember({
+      spaceId: space.id,
+      userId: auth.user.id,
+      role: SharedSpaceRole.Editor,
+    });
+    const { asset } = await ctx.newAsset({ ownerId: peer.id, isFavorite: false });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+    const initial = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetsV1]);
+    await ctx.syncAckAll(auth, initial);
+    await ctx.assertSyncIsComplete(auth, [SyncRequestType.SharedSpaceAssetsV1]);
+
+    await defaultDatabase.updateTable('asset').set({ isFavorite: true }).where('id', '=', asset.id).execute();
+
+    const next = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetsV1]);
+    const updateEvents = next.filter((r: { type: string }) => r.type === SyncEntityType.SharedSpaceAssetUpdateV1);
+    expect(updateEvents).toHaveLength(1);
+    expect((updateEvents[0] as { data: { id: string; isFavorite: boolean } }).data).toMatchObject({
+      id: asset.id,
+      isFavorite: false,
+    });
+  });
 });

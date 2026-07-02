@@ -132,7 +132,7 @@ Notable clusters (full list in the audit run output):
 - **Stale committed SDK build** at `open-api/typescript-sdk/build-old-root/` (dead directory).
 - **`apply-branding` `patch_cli`/`patch_versions`** still target `cli/` and `open-api/typescript-sdk/` (moved to `packages/` in v3); stale iOS debug/profile bundle-id patterns; `ErrorLayout.svelte` moved out from under the branding target (also on main).
 - **`gallery-build-mobile.yml` pigeon-regen list** missing the two new v3 inputs (`permission_api.dart`, `view_intent_api.dart`).
-- **Fork shared-space sync streams owner's raw `isFavorite`** to all members (`sync.repository.ts:996`) while upstream now masks it for non-owned synced assets.
+- **Fork shared-space sync streams owner's raw `isFavorite`** to all members (`sync.repository.ts:996`) while upstream now masks it for non-owned synced assets. — FIXED (slice S4)
 - **`ownership.yml` `web/src/lib/components/users/**`\*\* owned_path matches no files on either branch (stale manifest entry).
 - **CLAUDE.md** still documents the postbuild hook as a plain `cp`, hiding the stale-cleanup + alias behavior.
 
