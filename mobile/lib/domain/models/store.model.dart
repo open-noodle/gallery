@@ -60,6 +60,7 @@ enum StoreKey<T> {
   legacyMapThemeMode<int>._(124),
   legacyMapwithPartners<bool>._(125),
   legacyLogLevel<int>._(115),
+  legacyPeopleSortBy<int>._(1015),
 
   backgroundBackupStatus<String>._(1014);
 
