@@ -79,7 +79,7 @@ Upstream v3 added an on-the-fly HLS transcoding pipeline that spawns `ffmpeg` di
 
 ### M2 — New per-user "People face threshold" preference is a no-op on the fork's People surfaces
 
-- **File:** `server/src/services/person.service.ts:101–124` · **Corroborated by 4 finders** · **Status:** OPEN
+- **File:** `server/src/services/person.service.ts:101–124` · **Corroborated by 4 finders** · **Status:** FIXED (slice S5)
 
 Upstream v3 added a per-user `people.minimumFaces` preference. The fork's default People paths (the `withSharedSpaces` variants) and people-stats still read `minFaces` from ML config, so the new setting does nothing on the surfaces users see, and the People-page **count diverges from the list**. Feature-degradation, not security.
 
