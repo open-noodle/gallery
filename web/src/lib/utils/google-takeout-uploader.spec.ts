@@ -87,8 +87,25 @@ describe('uploadTakeoutItem', () => {
     const callArgs = utilsMock.uploadRequest.mock.calls[0][0];
     const formData = callArgs.data as FormData;
     expect(formData.get('fileCreatedAt')).toBe('2021-01-01T00:00:00.000Z');
-    expect(formData.get('deviceAssetId')).toBe('takeout-IMG_001.jpg-1609459200000');
-    expect(formData.get('deviceId')).toBe('WEB_IMPORT');
+  });
+
+  it('does not send fields removed from AssetMediaCreateDto (deviceAssetId, deviceId)', async () => {
+    utilsMock.uploadRequest.mockResolvedValue({
+      data: { id: 'asset-1', status: 'created' },
+      status: 201,
+    });
+
+    const item = makeItem();
+    await uploadTakeoutItem(item, defaultOptions());
+
+    const formData = utilsMock.uploadRequest.mock.calls[0][0].data as FormData;
+    expect(formData.get('deviceAssetId')).toBeNull();
+    expect(formData.get('deviceId')).toBeNull();
+    // current AssetMediaCreateDto required/known fields still present
+    expect(formData.get('fileCreatedAt')).not.toBeNull();
+    expect(formData.get('fileModifiedAt')).not.toBeNull();
+    expect(formData.get('isFavorite')).not.toBeNull();
+    expect(formData.get('assetData')).not.toBeNull();
   });
 
   it('sets isFavorite when option enabled and item is favorited', async () => {
@@ -195,7 +212,7 @@ describe('uploadTakeoutItem', () => {
 
     const formData = utilsMock.uploadRequest.mock.calls[0][0].data as FormData;
     const uploadedFile = formData.get('assetData') as File;
-    expect(formData.get('deviceAssetId')).toBe('takeout-IMG_FROM_ITEM.jpg-1609459200000');
+    expect(formData.get('deviceAssetId')).toBeNull();
     expect(formData.get('fileCreatedAt')).toBe('2021-01-01T00:00:00.000Z');
     expect(uploadedFile.name).toBe('IMG_FROM_ITEM.jpg');
   });
