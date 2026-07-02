@@ -85,6 +85,41 @@ SyncAssetV2 _createAssetV2({required String id, required String checksum, requir
   );
 }
 
+SyncAssetV2 _createAssetV2({
+  required String id,
+  required String checksum,
+  required String fileName,
+  String ownerId = 'user-1',
+  int? width,
+  int? height,
+  AssetTypeEnum type = AssetTypeEnum.IMAGE,
+  AssetVisibility visibility = AssetVisibility.timeline,
+  String? livePhotoVideoId,
+}) {
+  return SyncAssetV2(
+    id: id,
+    checksum: checksum,
+    originalFileName: fileName,
+    type: type,
+    ownerId: ownerId,
+    isFavorite: false,
+    fileCreatedAt: DateTime(2024, 1, 1),
+    fileModifiedAt: DateTime(2024, 1, 1),
+    createdAt: DateTime(2024, 1, 1),
+    localDateTime: DateTime(2024, 1, 1),
+    visibility: visibility,
+    width: width,
+    height: height,
+    deletedAt: null,
+    duration: null,
+    libraryId: null,
+    livePhotoVideoId: livePhotoVideoId,
+    stackId: null,
+    thumbhash: null,
+    isEdited: false,
+  );
+}
+
 SyncAssetExifV1 _createExif({
   required String assetId,
   required int width,
@@ -394,6 +429,109 @@ void main() {
       final stillRow = await (db.remoteAssetEntity.select()..where((tbl) => tbl.id.equals(still.id))).getSingle();
 
       expect(stillRow.livePhotoVideoId, motion.id);
+      expect(motionRow.visibility.name, 'hidden');
+    });
+
+    // M5: the v3 `assetV2` sync path (updateAssetsV2) must apply the same
+    // #627 motion-asset hide sweep as the legacy V1 path above.
+    test('hides motion asset when a V2-synced still references it', () async {
+      await sut.updateUsersV1([_createUser()]);
+
+      final motion = _createAssetV2(
+        id: 'motion-v2-1',
+        checksum: 'motion-v2-checksum',
+        fileName: 'IMG_8001.MOV',
+        type: AssetTypeEnum.VIDEO,
+        visibility: AssetVisibility.timeline,
+      );
+      await sut.updateAssetsV2([motion]);
+
+      final still = _createAssetV2(
+        id: 'still-v2-1',
+        checksum: 'still-v2-checksum',
+        fileName: 'IMG_8001.HEIC',
+        livePhotoVideoId: motion.id,
+      );
+      await sut.updateAssetsV2([still], debugLabel: 'assetV2-batch');
+
+      final motionRow = await (db.remoteAssetEntity.select()..where((tbl) => tbl.id.equals(motion.id))).getSingle();
+      final stillRow = await (db.remoteAssetEntity.select()..where((tbl) => tbl.id.equals(still.id))).getSingle();
+
+      expect(stillRow.livePhotoVideoId, motion.id);
+      expect(motionRow.visibility.name, 'hidden');
+    });
+
+    test('does not hide a non-motion asset in the same V2 batch', () async {
+      await sut.updateUsersV1([_createUser()]);
+
+      final motion = _createAssetV2(
+        id: 'motion-v2-2',
+        checksum: 'motion-v2-checksum-2',
+        fileName: 'IMG_8002.MOV',
+        type: AssetTypeEnum.VIDEO,
+      );
+      final still = _createAssetV2(
+        id: 'still-v2-2',
+        checksum: 'still-v2-checksum-2',
+        fileName: 'IMG_8002.HEIC',
+        livePhotoVideoId: motion.id,
+      );
+      final normal = _createAssetV2(
+        id: 'normal-v2-1',
+        checksum: 'normal-v2-checksum',
+        fileName: 'IMG_9000.JPG',
+      );
+
+      await sut.updateAssetsV2([motion, still, normal]);
+
+      final normalRow = await (db.remoteAssetEntity.select()..where((tbl) => tbl.id.equals(normal.id))).getSingle();
+      final motionRow = await (db.remoteAssetEntity.select()..where((tbl) => tbl.id.equals(motion.id))).getSingle();
+
+      expect(normalRow.visibility.name, 'timeline', reason: 'an unrelated asset in the same batch must stay visible');
+      expect(motionRow.visibility.name, 'hidden');
+    });
+
+    test('does not hide a V2 motion part with no linked still (edge case)', () async {
+      await sut.updateUsersV1([_createUser()]);
+
+      final orphanVideo = _createAssetV2(
+        id: 'orphan-video-v2-1',
+        checksum: 'orphan-video-checksum',
+        fileName: 'IMG_9100.MOV',
+        type: AssetTypeEnum.VIDEO,
+      );
+      await sut.updateAssetsV2([orphanVideo]);
+
+      final row = await (db.remoteAssetEntity.select()..where((tbl) => tbl.id.equals(orphanVideo.id))).getSingle();
+
+      expect(
+        row.visibility.name,
+        'timeline',
+        reason: 'the sweep only hides a row that some OTHER row references as its livePhotoVideoId',
+      );
+    });
+
+    test('idempotent re-sync of the same V2 batch stays hidden, no error', () async {
+      await sut.updateUsersV1([_createUser()]);
+
+      final motion = _createAssetV2(
+        id: 'motion-v2-3',
+        checksum: 'motion-v2-checksum-3',
+        fileName: 'IMG_8003.MOV',
+        type: AssetTypeEnum.VIDEO,
+      );
+      final still = _createAssetV2(
+        id: 'still-v2-3',
+        checksum: 'still-v2-checksum-3',
+        fileName: 'IMG_8003.HEIC',
+        livePhotoVideoId: motion.id,
+      );
+
+      await sut.updateAssetsV2([motion, still]);
+      // Re-sync the identical batch — must not throw and must stay hidden.
+      await sut.updateAssetsV2([motion, still]);
+
+      final motionRow = await (db.remoteAssetEntity.select()..where((tbl) => tbl.id.equals(motion.id))).getSingle();
       expect(motionRow.visibility.name, 'hidden');
     });
   });
