@@ -117,7 +117,7 @@ Visible Immich strings leak in What's New, the admin integrity page, notificatio
 
 ### M8 — `branding/config.json` `upstream.version` still `2.7.5` on the v3-based branch
 
-- **File:** `branding/config.json:18` · **Status:** FIXED (slice S12) — set to `3.0.0`
+- **File:** `branding/config.json:18` · **Status:** DEFERRED (attempted S12→3.0.0, reverted). The bump to `3.0.0` breaks `gallery-revert-to-immich-validation`: it boots the Gallery `:main` image (still v2.7.5-based) against `immich-server:v${upstream.version}`, so a v3.0.0 base seeds migrations the v2.7.5 `:main` image can't boot. `upstream.version` must flip to `3.0.0` **as part of the v3 cutover** (when `:main` becomes v3-based), not as a standalone bump. Kept at `2.7.5` for now.
 
 GA release notes will claim _"Based on Immich v2.7.5"_ and revert-validation pins v2.7.5.
 
