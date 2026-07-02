@@ -44,7 +44,13 @@ describe('branding target paths', () => {
     });
   }
 
-  it('M8: config.json upstream.version pins the Immich v3 base', () => {
-    expect(CONFIG.upstream.version).toBe('3.0.0');
+  // M8 (upstream.version -> 3.0.0) is DEFERRED to the v3 cutover: the
+  // gallery-revert-to-immich-validation workflow boots the Gallery `:main` image (still
+  // v2.7.5-based) against `ghcr.io/immich-app/immich-server:v${upstream.version}`, so bumping
+  // to 3.0.0 before `:main` is v3-based makes the reverted DB carry v3 upstream migrations the
+  // v2.7.5 image can't boot (corrupted-migrations hard-fail). Keep 2.7.5 until the cutover
+  // lands on main; flip to 3.0.0 as part of it.
+  it('M8: config.json upstream.version stays 2.7.5 until the v3 cutover (see revert-to-immich validation)', () => {
+    expect(CONFIG.upstream.version).toBe('2.7.5');
   });
 });
