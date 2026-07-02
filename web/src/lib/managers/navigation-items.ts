@@ -129,7 +129,7 @@ const ADMIN_PAGES: readonly NavigationItem[] = [
     labelKey: 'server_stats',
     descriptionKey: 'admin.server_stats_page_description',
     icon: mdiServer,
-    route: '/admin/system-statistics',
+    route: Route.systemStatistics(),
     adminOnly: true,
   },
   {
