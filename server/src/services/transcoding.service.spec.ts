@@ -47,7 +47,7 @@ describe(TranscodingService.name, () => {
     // filenames, so passthrough keeps the existing command/seek suites green.
     ensureLocalFileSpy = vi
       .spyOn(sut as unknown as WithEnsureLocalFile, 'ensureLocalFile')
-      .mockImplementation(async (filePath: string) => ({ localPath: filePath, cleanup: inputCleanup }));
+      .mockImplementation((filePath: string) => Promise.resolve({ localPath: filePath, cleanup: inputCleanup }));
   });
 
   describe('onSessionRequest', () => {
