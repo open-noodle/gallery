@@ -22,7 +22,7 @@ check_files=(
   "mobile/android/app/build.gradle"
   "docs/docusaurus.config.js"
   "open-api/immich-openapi-specs.json"
-  "cli/package.json"
+  "packages/cli/package.json"
   "web/src/lib/modals/HelpAndFeedbackModal.svelte"
   "web/src/lib/modals/ServerAboutModal.svelte"
 )
@@ -89,7 +89,10 @@ fi
 # Check iOS bundle ID
 pbxproj="$REPO_ROOT/mobile/ios/Runner.xcodeproj/project.pbxproj"
 if [[ -f "$pbxproj" ]]; then
-  if grep -q "app\.alextran\.immich" "$pbxproj"; then
+  # Match both the legacy app.alextran.immich prefix and the newer
+  # app.futo.immich debug/profile prefix (upstream futo rename) so a stale
+  # bundle ID from either era is caught.
+  if grep -qE "app\.(alextran|futo)\.immich" "$pbxproj"; then
     echo "  WARN: Old bundle ID still found in project.pbxproj"
     EXIT_CODE=1
   else
@@ -102,9 +105,9 @@ echo "--- Checking URL replacements ---"
 
 # Files where ALL `github.com/immich-app/immich` references must be patched away
 url_check_files=(
-  "web/src/lib/components/shared-components/side-bar/server-status.svelte"
+  "web/src/lib/components/shared-components/side-bar/ServerStatus.svelte"
   "web/src/lib/modals/VersionAnnouncementModal.svelte"
-  "web/src/lib/components/layouts/ErrorLayout.svelte"
+  "web/src/routes/ErrorLayout.svelte"
   "web/static/.well-known/security.txt"
 )
 
