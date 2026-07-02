@@ -63,7 +63,7 @@ with `visibility` unset, and `searchRandom` in `search.repository.ts` adds no vi
 
 - **File:** `mobile/lib/providers/view_intent/view_intent_handler_android.dart:100`
 - **Kind:** upstream-integration-gap (rename miss) · 2/2 refuters confirmed, not on `main`
-- **Status:** OPEN
+- **Status:** FIXED (slice S7)
 
 When Android opens a photo via a view-intent (share-to / "open with"), the handler pushes the upstream **`TabShellRoute`** instead of the fork's **`GalleryTabShellRoute`** (the fork's 3-tab layout). The fork renamed the shell route during the rebase, but this call-site (and the locked-folder one in M4) kept the upstream name. Users entering through the Android intent land in the wrong/legacy shell.
 
@@ -91,7 +91,7 @@ Same upstream `not-locked`/`undefined` default shift as H1. The sibling endpoint
 
 ### M4 — Locked-folder pause handler navigates to legacy `TabShellRoute`
 
-- **File:** `mobile/lib/presentation/pages/drift_locked_folder.page.dart:46` · **Status:** OPEN
+- **File:** `mobile/lib/presentation/pages/drift_locked_folder.page.dart:46` · **Status:** FIXED (slice S7)
 
 Sibling of H2 — same `GalleryTabShellRoute` rename miss. Likely fixable in the same patch as H2.
 
@@ -127,6 +127,7 @@ Notable clusters (full list in the audit run output):
 
 - **Duplicate migration timestamp `1778800000000`** — `migrations-gallery/1778800000000-ReconcileFaceIdentityIndexOverrides.ts` collides with `TrimSpacePersonNameIndex`; silently clobbered by the postbuild copy that merges migration dirs.
 - **Mobile `peopleSortBy` preference dropped on upgrade** (`mobile/lib/utils/migration.dart:75`) — legacy `StoreKey` removed with no `StoreKey→SettingsKey` migration.
+- **[#14] Legacy `TabShellPage` tab-switch off-by-one** (`mobile/lib/pages/common/tab_shell.page.dart`) — the fork converted the shell to a 3-tab layout (`[MainTimeline, Spaces, DriftLibrary]` → Photos 0 / Spaces 1 / Library 2) but `_onNavigationSelected` still keyed invalidations on the upstream 4-tab constants (`kSpacesTabIndex=2`, `kLibraryTabIndex=3`), so tapping Spaces invalidated nothing and tapping Library invalidated Spaces. (This is the documented rollback target for the fork bottom-nav.) — FIXED (slice S7)
 - **Mobile offline shared-space People fallback ignored `minimumFaces`** (`mobile/lib/domain/services/people.service.dart:76`) — `getAllPeopleWithSharedSpaces`'s offline fallback called `_repository.getAllPeople` without the user's `minimumFaces` preference (repository default `3` regardless of the setting), unlike the online path and the plain `getAllPeople` provider (`people.provider.dart:46-50`). — FIXED (slice S6)
 - **Filter-suggestion sources still pinned to `visibility=Timeline`** (`server/src/repositories/search.repository.ts:1295`) while search/facet defaults moved to `not-locked` — suggestions omit values search now matches. — FIXED (slice S3)
 - **Gallery-branded loading spinner dropped** from `ActivityViewer.svelte` / `DetailPanel`.
