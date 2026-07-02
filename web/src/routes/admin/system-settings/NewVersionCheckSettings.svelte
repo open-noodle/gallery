@@ -23,20 +23,25 @@
           bind:checked={configToEdit.newVersionCheck.enabled}
           {disabled}
         />
-        <SettingSelect
-          label={$t('admin.version_check_channel')}
-          desc={$t('admin.version_check_channel_description')}
-          bind:value={configToEdit.newVersionCheck.channel}
-          options={[
-            {
-              value: ReleaseChannel.Stable,
-              text: $t('admin.release_channel_stable'),
-            },
-            { value: ReleaseChannel.ReleaseCandidate, text: $t('admin.release_channel_release_candidate') },
-          ]}
-          isEdited={configToEdit.newVersionCheck.channel !== config.newVersionCheck.channel}
-          {disabled}
-        />
+        <!-- Gallery fork: the version-check URL is overridden in server-info.repository.ts,
+             so `channel` is never sent upstream and this selector would be a silent no-op.
+             Hidden rather than removed to keep future upstream diffs to this block visible. -->
+        {#if false}
+          <SettingSelect
+            label={$t('admin.version_check_channel')}
+            desc={$t('admin.version_check_channel_description')}
+            bind:value={configToEdit.newVersionCheck.channel}
+            options={[
+              {
+                value: ReleaseChannel.Stable,
+                text: $t('admin.release_channel_stable'),
+              },
+              { value: ReleaseChannel.ReleaseCandidate, text: $t('admin.release_channel_release_candidate') },
+            ]}
+            isEdited={configToEdit.newVersionCheck.channel !== config.newVersionCheck.channel}
+            {disabled}
+          />
+        {/if}
         <SettingButtonsRow bind:configToEdit keys={['newVersionCheck']} {disabled} />
       </div>
     </form>
