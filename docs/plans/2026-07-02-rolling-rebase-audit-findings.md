@@ -85,7 +85,7 @@ Upstream v3 added a per-user `people.minimumFaces` preference. The fork's defaul
 
 ### M3 — Space-scoped metadata/smart/statistics search surfaces other members' archived (and, when elevated, locked) assets
 
-- **File:** `server/src/services/search.service.ts:156` · **Status:** OPEN (fix alongside H1)
+- **File:** `server/src/services/search.service.ts:156` · **Status:** FIXED (slice S2)
 
 Same upstream `not-locked`/`undefined` default shift as H1. The sibling endpoints got the fallback, but combined with the fork's shared-space scoping, the "undefined visibility for elevated sessions" default lets space-scoped searches surface other members' **archived** assets (and locked ones for elevated sessions) that the fork previously excluded. Lower impact than H1 (no PIN bypass for non-elevated), same root cause.
 

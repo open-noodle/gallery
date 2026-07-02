@@ -699,38 +699,55 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
     .$if(!!options.albumIds && options.albumIds.length > 0, (qb) => inAlbums(qb, options.albumIds!))
     .$if(!!options.spaceId && !options.timelineSpaceIds, (qb) =>
       qb.where((eb) =>
-        eb.or([
-          eb.exists(
-            eb
-              .selectFrom('shared_space_asset')
-              .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-              .where('shared_space_asset.spaceId', '=', asUuid(options.spaceId!)),
-          ),
-          eb.exists(
-            eb
-              .selectFrom('shared_space_library')
-              .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-              .where('shared_space_library.spaceId', '=', asUuid(options.spaceId!)),
-          ),
+        eb.and([
+          eb.or([
+            eb.exists(
+              eb
+                .selectFrom('shared_space_asset')
+                .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                .where('shared_space_asset.spaceId', '=', asUuid(options.spaceId!)),
+            ),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_library')
+                .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                .where('shared_space_library.spaceId', '=', asUuid(options.spaceId!)),
+            ),
+          ]),
+          // Fork RBAC (M3): elevation only unlocks the CALLER'S OWN locked/archived folder. The
+          // caller's own (and partner) rows follow the resolved visibility applied above; every
+          // OTHER space member's row is constrained to Timeline, so a space-scoped search can never
+          // surface another member's Archived/Hidden/Locked asset.
+          eb.or([
+            ...(options.userIds ? [eb('asset.ownerId', '=', anyUuid(options.userIds))] : []),
+            eb('asset.visibility', '=', AssetVisibility.Timeline),
+          ]),
         ]),
       ),
     )
     .$if(!!options.timelineSpaceIds && !!options.userIds, (qb) =>
       qb.where((eb) =>
         eb.or([
+          // Caller's own (and partner) rows follow the resolved visibility applied above.
           eb('asset.ownerId', '=', anyUuid(options.userIds!)),
-          eb.exists(
-            eb
-              .selectFrom('shared_space_asset')
-              .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-              .where('shared_space_asset.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
-          ),
-          eb.exists(
-            eb
-              .selectFrom('shared_space_library')
-              .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-              .where('shared_space_library.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
-          ),
+          // Other space members' rows are always Timeline-only (elevation is per-owner, M3).
+          eb.and([
+            eb('asset.visibility', '=', AssetVisibility.Timeline),
+            eb.or([
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_asset')
+                  .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                  .where('shared_space_asset.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
+              ),
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_library')
+                  .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                  .where('shared_space_library.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
+              ),
+            ]),
+          ]),
         ]),
       ),
     )
