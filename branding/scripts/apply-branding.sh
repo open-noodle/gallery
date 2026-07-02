@@ -155,7 +155,7 @@ patch_web() {
   fi
 
   # Server status — hardcoded repo check and release URL
-  local server_status="$REPO_ROOT/web/src/lib/components/shared-components/side-bar/server-status.svelte"
+  local server_status="$REPO_ROOT/web/src/lib/components/shared-components/side-bar/ServerStatus.svelte"
   if [[ -f "$server_status" ]]; then
     sed -i "s|info\.repository === 'immich-app/immich'|info.repository === '${REPO_NAME}'|g" "$server_status"
     sed -i "s|https://github\.com/immich-app/immich/releases/tag/|${REPO_URL}/releases/tag/|g" "$server_status"
@@ -170,7 +170,7 @@ patch_web() {
   fi
 
   # Error layout — hardcoded "releases" link on the error page
-  local error_layout="$REPO_ROOT/web/src/lib/components/layouts/ErrorLayout.svelte"
+  local error_layout="$REPO_ROOT/web/src/routes/ErrorLayout.svelte"
   if [[ -f "$error_layout" ]]; then
     sed -i "s|https://github\.com/immich-app/immich/releases|${REPO_URL}/releases|g" "$error_layout"
     echo "  Patched ErrorLayout.svelte"
@@ -606,14 +606,19 @@ patch_ios() {
   local pbxproj="$REPO_ROOT/mobile/ios/Runner.xcodeproj/project.pbxproj"
   local info_plist="$REPO_ROOT/mobile/ios/Runner/Info.plist"
 
-  # project.pbxproj — bundle identifiers
-  sed -i "s/app\.alextran\.immich\.vdebug/${BUNDLE_ID_DEBUG}/g" "$pbxproj"
-  sed -i "s/app\.alextran\.immich\.profile/${BUNDLE_ID_PROFILE}/g" "$pbxproj"
-  sed -i "s/app\.alextran\.immich\.Widget\.debug/${BUNDLE_ID_DEBUG}.Widget/g" "$pbxproj"
-  sed -i "s/app\.alextran\.immich\.Widget\.profile/${BUNDLE_ID_PROFILE}.Widget/g" "$pbxproj"
+  # project.pbxproj — bundle identifiers.
+  #
+  # Debug + profile targets: upstream (futo rename) moved these from
+  # app.alextran.immich.vdebug / app.alextran.immich.profile to
+  # app.futo.immich.debug / app.futo.immich.profile, and reordered the suffix so
+  # the Widget/ShareExtension debug+profile targets are now app.futo.immich.debug.Widget
+  # / app.futo.immich.profile.ShareExtension etc. A single bare prefix swap covers
+  # every variant because the .Widget / .ShareExtension suffix is preserved after
+  # the prefix is replaced.
+  sed -i "s/app\.futo\.immich\.debug/${BUNDLE_ID_DEBUG}/g" "$pbxproj"
+  sed -i "s/app\.futo\.immich\.profile/${BUNDLE_ID_PROFILE}/g" "$pbxproj"
+  # Release Widget + ShareExtension targets still use app.alextran.immich.*
   sed -i "s/app\.alextran\.immich\.Widget/${BUNDLE_ID}.Widget/g" "$pbxproj"
-  sed -i "s/app\.alextran\.immich\.ShareExtension\.debug/${BUNDLE_ID_DEBUG}.ShareExtension/g" "$pbxproj"
-  sed -i "s/app\.alextran\.immich\.ShareExtension\.profile/${BUNDLE_ID_PROFILE}.ShareExtension/g" "$pbxproj"
   sed -i "s/app\.alextran\.immich\.ShareExtension/${BUNDLE_ID}.ShareExtension/g" "$pbxproj"
   # Main bundle ID last (most general pattern)
   sed -i "s/app\.alextran\.immich/${BUNDLE_ID}/g" "$pbxproj"
@@ -724,7 +729,7 @@ EOF
 patch_cli() {
   echo "--- Patching CLI ---"
 
-  local cli_pkg="$REPO_ROOT/cli/package.json"
+  local cli_pkg="$REPO_ROOT/packages/cli/package.json"
   if [[ -f "$cli_pkg" ]]; then
     local tmp
     tmp=$(mktemp)
@@ -786,8 +791,8 @@ patch_versions() {
     "$REPO_ROOT/package.json" \
     "$REPO_ROOT/server/package.json" \
     "$REPO_ROOT/web/package.json" \
-    "$REPO_ROOT/cli/package.json" \
-    "$REPO_ROOT/open-api/typescript-sdk/package.json" \
+    "$REPO_ROOT/packages/cli/package.json" \
+    "$REPO_ROOT/packages/sdk/package.json" \
     "$REPO_ROOT/e2e/package.json" \
     "$REPO_ROOT/i18n/package.json"; do
     if [[ -f "$pkg" ]]; then
