@@ -72,14 +72,19 @@ class PeopleService {
   ///
   /// Kept separate from [getAllPeople] so the owner-scoped, local-first surfaces (the photos
   /// filter people picker, the library people card) are unaffected.
-  Future<List<DriftPerson>> getAllPeopleWithSharedSpaces({PeopleSortBy sortBy = PeopleSortBy.photoCount}) async {
+  Future<List<DriftPerson>> getAllPeopleWithSharedSpaces({
+    int minFaces = 3,
+    PeopleSortBy sortBy = PeopleSortBy.photoCount,
+  }) async {
     try {
       return await _personApiRepository.getAllPeopleWithSharedSpaces(sortBy: sortBy);
     } catch (error, stackTrace) {
       // Offline / server failure: fall back to the owner-scoped local list so the viewer's
-      // own people still render (their shared-space people are unavailable offline).
+      // own people still render (their shared-space people are unavailable offline). The server
+      // already resolves the caller's minimumFaces preference for the online path (see M2); the
+      // local fallback must honor it too, so thread it through like the plain getAllPeople.
       _log.warning("Failed to fetch people from the server; using the local sync DB", error, stackTrace);
-      return _repository.getAllPeople(sortBy: sortBy);
+      return _repository.getAllPeople(minFaces: minFaces, sortBy: sortBy);
     }
   }
 
