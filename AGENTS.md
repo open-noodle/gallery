@@ -109,9 +109,13 @@ pnpm schema:reset          # Drop and recreate schema (destructive)
 
 **How they come together — the `postbuild` script:**
 
-After `nest build` compiles TypeScript to `dist/`, the npm `postbuild` hook (`server/package.json`) copies `dist/schema/migrations-gallery/*.js` into `dist/schema/migrations/`. This means the built `dist/schema/migrations/` folder contains ALL migrations (upstream + fork) in one flat directory.
+After `nest build` compiles TypeScript to `dist/`, the npm `postbuild` hook (`server/package.json`) runs `server/bin/sync-gallery-migrations.mjs`, which does three things:
 
-This merge is needed because:
+1. **Copies** `dist/schema/migrations-gallery/*.js` into `dist/schema/migrations/`. This means the built `dist/schema/migrations/` folder contains ALL migrations (upstream + fork) in one flat directory.
+2. **Removes stale copies**: if a fork migration file in `migrations-gallery/` was renamed, it deletes the old copy left behind in `dist/schema/migrations/` from a previous build.
+3. **Writes a build-time compatibility alias**: a `compatibilityAliases` array copies the current `1777667825574-ChangeDurationToInteger.js` to a second copy named `1776735180298-ChangeDurationToInteger.js` (`from` → `to`). `ChangeDurationToInteger` was re-timestamped upstream from `1776735180298` to `1777667825574`, and the fork's source now carries only the current `1777667825574` file. Already-deployed v5-RC/staging databases, however, ran the migration under its **pre-rename** `1776735180298` name and recorded *that* — and Kysely hard-fails on boot if a migration name recorded in the DB has no matching file on disk. The alias makes `dist/schema/migrations/` contain the compiled file under **both** names, so already-deployed DBs (recorded `1776735180298`) and fresh installs (run `1777667825574`) both boot cleanly. **This alias is load-bearing — do not remove it** without a migration path for already-deployed DBs that recorded the pre-rename name.
+
+The copy step (1) is needed because:
 
 1. **`sql-tools` CLI** (`migrations:run`, `generate`, `revert`) only reads from one folder (`dist/schema/migrations/`) and cannot be configured for multiple directories
 2. **The server runtime** uses `CompositeMigrationProvider` which reads from both `dist/schema/migrations/` and `dist/schema/migrations-gallery/` — duplicates from the postbuild copy are silently handled via `Object.assign` (last folder wins, identical code)
