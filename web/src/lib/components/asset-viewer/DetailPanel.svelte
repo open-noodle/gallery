@@ -17,7 +17,7 @@
   import { getParentPath } from '#lib/utils/tree-utils.ts';
   import { AssetMediaSize, getAssetInfo, type AlbumResponseDto, type AssetResponseDto } from '@immich/sdk';
   import { createQuery } from '@tanstack/svelte-query';
-  import { Icon, IconButton, Link, LoadingSpinner, Text } from '@immich/ui';
+  import { Icon, IconButton, Link, Text } from '@immich/ui';
   import { mdiCamera, mdiCameraIris, mdiClose, mdiImageOutline, mdiInformationOutline } from '@mdi/js';
   import { onDestroy } from 'svelte';
   import { t } from 'svelte-i18n';
@@ -27,6 +27,7 @@
   import AlbumListItemDetails from './AlbumListItemDetails.svelte';
   import DetailPanelPeople from '#lib/components/asset-viewer/DetailPanelPeople.svelte';
   import { faceManager } from '#lib/stores/face.svelte.ts';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
   import { getAlbumsByAssetQuery } from '#lib/queries/album.query.ts';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getPublicConfigQuery } from '#lib/queries/config-public.query.ts';
