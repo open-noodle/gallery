@@ -21,7 +21,10 @@ import { describe, expect, it } from 'vitest';
 // entry disappears from `compatibilityAliases`, and fails if `CLAUDE.md` regresses to
 // describing the postbuild hook as a plain, alias-free `cp`.
 
-const SYNC_SCRIPT_PATH = path.resolve(process.cwd(), '../../server/bin/sync-gallery-migrations.mjs');
+const SYNC_SCRIPT_PATH = path.resolve(
+  process.cwd(),
+  '../../server/bin/sync-gallery-migrations.mjs',
+);
 const CLAUDE_MD_PATH = path.resolve(process.cwd(), '../../CLAUDE.md');
 
 const REQUIRED_ALIAS = {
@@ -29,7 +32,9 @@ const REQUIRED_ALIAS = {
   to: '1776735180298-ChangeDurationToInteger',
 };
 
-function readCompatibilityAliases(source: string): Array<{ from: string; to: string }> {
+function readCompatibilityAliases(
+  source: string,
+): Array<{ from: string; to: string }> {
   const arrayMatch = /compatibilityAliases\s*=\s*\[([\s\S]*?)\];/.exec(source);
   if (!arrayMatch) {
     return [];
@@ -62,9 +67,10 @@ describe('postbuild migration compatibility alias (sync-gallery-migrations.mjs)'
   it('documents the postbuild hook as copy + stale-cleanup + compatibility alias, not a plain cp (LOW #17)', () => {
     const claudeMd = fs.readFileSync(CLAUDE_MD_PATH, 'utf8');
 
-    expect(claudeMd, 'CLAUDE.md should reference the postbuild script by name').toContain(
-      'sync-gallery-migrations.mjs',
-    );
+    expect(
+      claudeMd,
+      'CLAUDE.md should reference the postbuild script by name',
+    ).toContain('sync-gallery-migrations.mjs');
     expect(
       claudeMd,
       'CLAUDE.md should describe the compatibility alias behavior, not just a plain copy',
