@@ -45,7 +45,7 @@ class _LockedFolderPageState extends ConsumerState<LockedFolderPage> with Widget
     }
     if (state == AppLifecycleState.paused) {
       unawaited(ref.read(authProvider.notifier).lockPinCode());
-      unawaited(context.navigateTo(const TabShellRoute()));
+      unawaited(context.navigateTo(const GalleryTabShellRoute()));
       return;
     }
     setState(() {
