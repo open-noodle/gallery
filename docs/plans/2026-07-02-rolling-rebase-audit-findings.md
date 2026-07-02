@@ -105,19 +105,19 @@ The fork's #627 sweep that hides live-photo motion parts runs on the old sync pa
 
 ### M6 — `apply-branding` misses renamed `ServerStatus.svelte`
 
-- **File:** `branding/scripts/apply-branding.sh:158` · **Status:** OPEN
+- **File:** `branding/scripts/apply-branding.sh:158` · **Status:** FIXED (slice S12)
 
 Upstream renamed the file; the branding patch's target string no longer matches, so the sidebar new-release link and repo check ship **unbranded** (leak Immich).
 
 ### M7 — Nine new upstream i18n keys containing "Immich" are not covered by branding overrides
 
-- **File:** `branding/i18n/overrides-en.json` · **Status:** OPEN
+- **File:** `branding/i18n/overrides-en.json` · **Status:** FIXED (slice S12) — 9 keys branded; 4 further un-branded keys found (see follow-ups)
 
 Visible Immich strings leak in What's New, the admin integrity page, notifications, and feature settings.
 
 ### M8 — `branding/config.json` `upstream.version` still `2.7.5` on the v3-based branch
 
-- **File:** `branding/config.json:18` · **Status:** OPEN
+- **File:** `branding/config.json:18` · **Status:** FIXED (slice S12) — set to `3.0.0`
 
 GA release notes will claim _"Based on Immich v2.7.5"_ and revert-validation pins v2.7.5.
 
@@ -127,19 +127,21 @@ GA release notes will claim _"Based on Immich v2.7.5"_ and revert-validation pin
 
 Notable clusters (full list in the audit run output):
 
-- **Duplicate migration timestamp `1778800000000`** — `migrations-gallery/1778800000000-ReconcileFaceIdentityIndexOverrides.ts` collides with `TrimSpacePersonNameIndex`; silently clobbered by the postbuild copy that merges migration dirs.
+- **Duplicate migration timestamp `1778800000000`** — `migrations-gallery/1778800000000-ReconcileFaceIdentityIndexOverrides.ts` collides with `TrimSpacePersonNameIndex`; silently clobbered by the postbuild copy that merges migration dirs. — GUARDED, not renamed (slice S17): the collision is benign (distinct filenames apply in deterministic order, nothing is clobbered), and renaming an applied migration risks bricking staging/RC DBs (Kysely missing-migration hard-fail), so a guard grandfathers the 3 known-benign collisions and fails CI on any NEW one instead.
 - **Mobile `peopleSortBy` preference dropped on upgrade** (`mobile/lib/utils/migration.dart:75`) — legacy `StoreKey` removed with no `StoreKey→SettingsKey` migration. — FIXED (slice S9)
 - **[#14] Legacy `TabShellPage` tab-switch off-by-one** (`mobile/lib/pages/common/tab_shell.page.dart`) — the fork converted the shell to a 3-tab layout (`[MainTimeline, Spaces, DriftLibrary]` → Photos 0 / Spaces 1 / Library 2) but `_onNavigationSelected` still keyed invalidations on the upstream 4-tab constants (`kSpacesTabIndex=2`, `kLibraryTabIndex=3`), so tapping Spaces invalidated nothing and tapping Library invalidated Spaces. (This is the documented rollback target for the fork bottom-nav.) — FIXED (slice S7)
 - **Mobile offline shared-space People fallback ignored `minimumFaces`** (`mobile/lib/domain/services/people.service.dart:76`) — `getAllPeopleWithSharedSpaces`'s offline fallback called `_repository.getAllPeople` without the user's `minimumFaces` preference (repository default `3` regardless of the setting), unlike the online path and the plain `getAllPeople` provider (`people.provider.dart:46-50`). — FIXED (slice S6)
 - **Filter-suggestion sources still pinned to `visibility=Timeline`** (`server/src/repositories/search.repository.ts:1295`) while search/facet defaults moved to `not-locked` — suggestions omit values search now matches. — FIXED (slice S3)
 - **[#4] `video-trim.e2e-spec.ts` disabled transcoding suite-wide** (`beforeAll` sets `config.ffmpeg.transcode = TranscodePolicy.Disabled`; `main` did not), so no test ever produced a non-edited `EncodedVideo` file and `handleVideoTrim`'s `existingEncoded?.path || localPath` input-selection branch (`media.service.ts` ~294-295) was never exercised. — FIXED (slice S11)
-- **Gallery-branded loading spinner dropped** from `ActivityViewer.svelte` / `DetailPanel`.
-- **Stale committed SDK build** at `open-api/typescript-sdk/build-old-root/` (dead directory).
-- **`apply-branding` `patch_cli`/`patch_versions`** still target `cli/` and `open-api/typescript-sdk/` (moved to `packages/` in v3); stale iOS debug/profile bundle-id patterns; `ErrorLayout.svelte` moved out from under the branding target (also on main).
-- **`gallery-build-mobile.yml` pigeon-regen list** missing the two new v3 inputs (`permission_api.dart`, `view_intent_api.dart`).
+- **Gallery-branded loading spinner dropped** from `ActivityViewer.svelte` / `DetailPanel`. — FIXED (slice S13)
+- **Stale committed SDK build** at `open-api/typescript-sdk/build-old-root/` (dead directory). — FIXED (slice S19). Sibling LOW#18 (re-wire the orphaned Dart `native_class_nullable_items_in_arrays.patch` in `generate-dart-sdk.sh`) is DEFERRED: upstream's later `native_class.mustache` three-state-DTO rework makes the patch's hunks reject, and the script runs `set -euo pipefail`, so a rejecting patch would abort every SDK build — the patch needs re-authoring (see follow-ups).
+- **`apply-branding` `patch_cli`/`patch_versions`** still target `cli/` and `open-api/typescript-sdk/` (moved to `packages/` in v3); stale iOS debug/profile bundle-id patterns; `ErrorLayout.svelte` moved out from under the branding target (also on main). — FIXED (slice S12)
+- **`gallery-build-mobile.yml` pigeon-regen list** missing the two new v3 inputs (`permission_api.dart`, `view_intent_api.dart`). — FIXED (slice S21, in both the android + ios jobs)
 - **Fork shared-space sync streams owner's raw `isFavorite`** to all members (`sync.repository.ts:996`) while upstream now masks it for non-owned synced assets. — FIXED (slice S4)
-- **`ownership.yml` `web/src/lib/components/users/**`\*\* owned_path matches no files on either branch (stale manifest entry).
-- **CLAUDE.md** still documents the postbuild hook as a plain `cp`, hiding the stale-cleanup + alias behavior.
+- **`ownership.yml` `web/src/lib/components/users/**`\*\* owned_path matches no files on either branch (stale manifest entry). — FIXED (slice S20)
+- **CLAUDE.md** still documents the postbuild hook as a plain `cp`, hiding the stale-cleanup + alias behavior. — FIXED (slice S18)
+
+**Also fixed (not in the abbreviated cluster list above):** command-palette "Server Stats" dead route → real `/admin/server-status` (LOW#10, slice S15); takeout uploader dropped removed `deviceAssetId`/`deviceId` DTO fields (LOW#5, slice S16); inert stable/RC release-channel selector hidden (LOW#6, slice S22); `WorkflowSummary` close-button i18n re-applied (LOW#9, slice S14).
 
 ---
 
@@ -153,6 +155,20 @@ These areas had no dedicated finder or only shallow coverage — candidates for 
 4. **New upstream database-backup feature** — checked only for auth guards, not against the fork's dual-backend storage (likely fine — `pg_dump` targets local disk as upstream intends).
 
 Closed by critic spot-check (confirmed intact): `server/src/utils/fetch.ts`, `server/helmet.json`, mobile map paths (`map_marker.provider.dart`, `map.service.dart`), `web/static/gallery-*`, `design/`.
+
+---
+
+## Follow-ups discovered during remediation (2026-07-02 impl-loop)
+
+New issues surfaced while fixing the findings above (each verified by the slice's subagent, none in the original 34):
+
+1. **M1 trim-aware realtime HLS (deferred half of M1)** — realtime HLS streams the untrimmed original; the naive fix desyncs the stream (playlist/seek metadata is probed from the original and never recomputed on trim). Proper fix threads re-probed trimmed keyframe/packet metadata through `hls.service.ts` + the playlist builders. **Tracked in [#741](https://github.com/open-noodle/gallery/issues/741).**
+2. **`LibraryAssetSync` leaks owner `isFavorite`** (`sync.repository.ts` ~:1194) — same shape as LOW#1 (fixed for shared-space sync in S4) but on the connected-libraries sync path; still selects raw `isFavorite` with no per-row ownership mask. Not renamed/touched (out of S4's scope).
+3. **`handleVideoTrim` re-trim race** — a rapid re-trim of the same asset throws `Input file is missing: *_edited.mp4.frame.jpg` (async, post-response; does not fail a request today). Surfaced by the S11 e2e (`'should re-trim (widen)'`).
+4. **Dart `nullable_items_in_arrays` patch needs re-authoring (LOW#18)** — the orphaned patch's hunks reject against v3's `native_class.mustache` (upstream #27231 three-state-DTO rework); `generate-dart-sdk.sh` runs `set -euo pipefail` so re-inserting it verbatim would abort every SDK build. Live symptom: `TimeBucketAssetResponseDto` declares 8 nullable-item array fields as non-nullable.
+5. **4 more un-branded i18n "Immich" keys** (beyond M7's 9): `admin.asset_offline_description`, `import_option_skip_duplicates`, `my_immich_title`, `my_immich_description`. (S12 also hardened `verify-branding.sh`, which had been silently passing on a leaking tree.)
+6. **Two other pre-existing benign migration-timestamp collisions** (`1775100000000`, `1777000000000`) — grandfathered by the S17 guard, not renamed (same deployment-safety reason as LOW#2/#15).
+7. **`ownership.yml` manifest matcher: `micromatch` parens quirk** — SvelteKit route-group globs like `(user)` are parsed as regex capture groups and silently fail to match; handled in the S20 guard's helper, but `coverage.ts`'s matcher may need the same escaping.
 
 ---
 
