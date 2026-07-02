@@ -73,9 +73,11 @@ When Android opens a photo via a view-intent (share-to / "open with"), the handl
 
 ### M1 — Realtime HLS transcoding bypasses S3 persistence and the fork video-trim edit
 
-- **File:** `server/src/services/transcoding.service.ts:240` · **Corroborated by 3 finders** · **Status:** OPEN
+- **File:** `server/src/services/transcoding.service.ts:240` · **Corroborated by 3 finders** · **Status:** PARTIAL (slice S10) — (a) S3 local-file fix landed; (b) trim-aware input deferred (see below)
 
 Upstream v3 added an on-the-fly HLS transcoding pipeline that spawns `ffmpeg` directly on `asset.originalPath` (a relative S3 key on S3-primary installs) with **no `ensureLocalFile`/`persistFile`**. Two fork consequences: (a) on S3 storage the ffmpeg invocation receives a key, not a readable local path → fails; (b) it streams the _original_, ignoring the fork's trimmed-video edit. Same bug shape as tracked gh#671 (video trim on S3), in a new upstream code path.
+
+**Slice S10 resolution:** (a) FIXED — the ffmpeg input is now materialized once per session via `ensureLocalFile` (disk passthrough / S3 temp download), reused across seek/variant restarts, and released on every teardown path (`onSessionEnd`, `failSession`, idle eviction, shutdown). (b) DEFERRED — a bare input swap to the trimmed `_edited.mp4` would ship a **worse** bug: the realtime-HLS playlist segmentation (`hls.service.ts`) and the transcode seek math are both keyed to the asset's `asset_video`/`asset_keyframe` metadata, which is probed from `originalPath` and **never recomputed after a trim** (`handleVideoTrim` updates only `duration` + thumbnails). Feeding the shorter trimmed video while the playlist advertises the original's segment count/durations desyncs the stream (segments past the trim never materialize → 15 s `pendingSegments` timeout → client stall). Also, the fork's authoritative playback selector is `AssetMediaService.playbackVideo` / `getForVideo` (`encodedVideoPath || originalPath`, prefers `isEdited desc`), **not** the `handleVideoTrim` non-edited selector. Proper trim support requires threading the trimmed video's own packet/keyframe metadata through `getForMainPlaylist`/`getForMediaPlaylist`/`getForTranscoding` + `hls.service.ts` — a multi-file follow-up beyond this slice's scope. See `docs/superpowers/plans/2026-07-02-rolling-rebase-audit-slice-10.md`.
 
 ### M2 — New per-user "People face threshold" preference is a no-op on the fork's People surfaces
 
