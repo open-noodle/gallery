@@ -75,6 +75,26 @@ const expectFacetsAbsent = (result: FilterSuggestionsResponseDto, marker: string
   expect(JSON.stringify(result)).not.toContain(`${marker}-`);
 };
 
+// M3: elevation only unlocks the CALLER'S OWN locked/archived folder. Other shared-space
+// members' assets must always be Timeline-only in space-scoped search — the v3
+// `undefined`-for-elevated visibility default must not leak their Archived/Hidden/Locked assets.
+const setupSpace = async (ctx: SearchCtx) => {
+  const { user: owner } = await ctx.newUser();
+  const { user: member } = await ctx.newUser();
+  const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+  return { owner, member, space };
+};
+
+const shareAsset = async (ctx: SearchCtx, spaceId: string, ownerId: string, visibility: AssetVisibility) => {
+  const { asset } = await ctx.newAsset({ ownerId, visibility });
+  await ctx.newSharedSpaceAsset({ spaceId, assetId: asset.id, addedById: ownerId });
+  return asset;
+};
+
+const elevated = (userId: string) => factory.auth({ user: { id: userId }, session: { hasElevatedPermission: true } });
+
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
@@ -897,24 +917,6 @@ describe(SearchService.name, () => {
   // members' assets must always be Timeline-only in space-scoped search — the v3
   // `undefined`-for-elevated visibility default must not leak their Archived/Hidden/Locked assets.
   describe('space-scoped visibility (M3)', () => {
-    const setupSpace = async (ctx: SearchCtx) => {
-      const { user: owner } = await ctx.newUser();
-      const { user: member } = await ctx.newUser();
-      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
-      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
-      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
-      return { owner, member, space };
-    };
-
-    const shareAsset = async (ctx: SearchCtx, spaceId: string, ownerId: string, visibility: AssetVisibility) => {
-      const { asset } = await ctx.newAsset({ ownerId, visibility });
-      await ctx.newSharedSpaceAsset({ spaceId, assetId: asset.id, addedById: ownerId });
-      return asset;
-    };
-
-    const elevated = (userId: string) =>
-      factory.auth({ user: { id: userId }, session: { hasElevatedPermission: true } });
-
     it('hides another member archived asset from an elevated spaceId metadata search', async () => {
       const { sut, ctx } = setup();
       const { owner, member, space } = await setupSpace(ctx);
