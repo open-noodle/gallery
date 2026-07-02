@@ -39,7 +39,7 @@ The rebase is **structurally sound**. No conflict markers, no leftover `.orig`/`
 
 - **File:** `server/src/services/search.service.ts:212` (in `searchRandom`)
 - **Kind:** upstream-integration-gap · **Corroborated by 3 finders**, 2/2 refuters confirmed, not present on `main`
-- **Status:** OPEN
+- **Status:** FIXED (slice S1)
 
 Upstream v3 (#29385, `b4cc406a3f`) removed `searchAssetBuilder`'s implicit `visibility = Timeline` default (now `.$if(!!options.visibility, …)` in `server/src/utils/database.ts:648-652`) and compensated by having each search endpoint pass:
 
