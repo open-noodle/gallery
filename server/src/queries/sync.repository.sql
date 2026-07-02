@@ -1304,7 +1304,6 @@ select
   "asset"."localDateTime",
   "asset"."type",
   "asset"."deletedAt",
-  "asset"."isFavorite",
   "asset"."visibility",
   "asset"."duration",
   "asset"."livePhotoVideoId",
@@ -1313,15 +1312,19 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
+  case
+    when "asset"."ownerId" = $1 then "asset"."isFavorite"
+    else $2
+  end as "isFavorite",
   "shared_space_asset"."updateId"
 from
   "shared_space_asset" as "shared_space_asset"
   inner join "asset" on "asset"."id" = "shared_space_asset"."assetId"
 where
-  "shared_space_asset"."updateId" < $1
-  and "shared_space_asset"."updateId" <= $2
-  and "shared_space_asset"."updateId" > $3
-  and "shared_space_asset"."spaceId" = $4
+  "shared_space_asset"."updateId" < $3
+  and "shared_space_asset"."updateId" <= $4
+  and "shared_space_asset"."updateId" > $5
+  and "shared_space_asset"."spaceId" = $6
 order by
   "shared_space_asset"."updateId" asc
 
@@ -1338,7 +1341,6 @@ select
   "asset"."localDateTime",
   "asset"."type",
   "asset"."deletedAt",
-  "asset"."isFavorite",
   "asset"."visibility",
   "asset"."duration",
   "asset"."livePhotoVideoId",
@@ -1347,27 +1349,31 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
+  case
+    when "asset"."ownerId" = $1 then "asset"."isFavorite"
+    else $2
+  end as "isFavorite",
   "shared_space_asset"."updateId"
 from
   "shared_space_asset" as "shared_space_asset"
   inner join "asset" on "asset"."id" = "shared_space_asset"."assetId"
 where
-  "shared_space_asset"."updateId" < $1
-  and "shared_space_asset"."updateId" > $2
+  "shared_space_asset"."updateId" < $3
+  and "shared_space_asset"."updateId" > $4
   and "shared_space_asset"."spaceId" in (
     select
       "shared_space"."id"
     from
       "shared_space"
     where
-      "shared_space"."createdById" = $3
+      "shared_space"."createdById" = $5
     union
     select
       "shared_space_member"."spaceId" as "id"
     from
       "shared_space_member"
     where
-      "shared_space_member"."userId" = $4
+      "shared_space_member"."userId" = $6
   )
 order by
   "shared_space_asset"."updateId" asc
@@ -1385,7 +1391,6 @@ select
   "asset"."localDateTime",
   "asset"."type",
   "asset"."deletedAt",
-  "asset"."isFavorite",
   "asset"."visibility",
   "asset"."duration",
   "asset"."livePhotoVideoId",
@@ -1394,28 +1399,32 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
+  case
+    when "asset"."ownerId" = $1 then "asset"."isFavorite"
+    else $2
+  end as "isFavorite",
   "asset"."updateId"
 from
   "asset" as "asset"
   inner join "shared_space_asset" on "shared_space_asset"."assetId" = "asset"."id"
 where
-  "asset"."updateId" < $1
-  and "asset"."updateId" > $2
-  and "shared_space_asset"."updateId" <= $3
+  "asset"."updateId" < $3
+  and "asset"."updateId" > $4
+  and "shared_space_asset"."updateId" <= $5
   and "shared_space_asset"."spaceId" in (
     select
       "shared_space"."id"
     from
       "shared_space"
     where
-      "shared_space"."createdById" = $4
+      "shared_space"."createdById" = $6
     union
     select
       "shared_space_member"."spaceId" as "id"
     from
       "shared_space_member"
     where
-      "shared_space_member"."userId" = $5
+      "shared_space_member"."userId" = $7
   )
 order by
   "asset"."updateId" asc
