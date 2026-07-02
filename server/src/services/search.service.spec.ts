@@ -1593,6 +1593,46 @@ describe(SearchService.name, () => {
       );
     });
 
+    it('resolves visibility to not-locked for a non-elevated session', async () => {
+      const auth = AuthFactory.from().session().build();
+      mocks.search.searchRandom.mockResolvedValue([]);
+
+      await sut.searchRandom(auth, {});
+
+      const opts = mocks.search.searchRandom.mock.calls[0][1];
+      expect(opts.visibility).toBe('not-locked');
+    });
+
+    it('resolves visibility to undefined for an elevated session', async () => {
+      const auth = AuthFactory.from().session({ hasElevatedPermission: true }).build();
+      mocks.search.searchRandom.mockResolvedValue([]);
+
+      await sut.searchRandom(auth, {});
+
+      const opts = mocks.search.searchRandom.mock.calls[0][1];
+      expect(opts).toHaveProperty('visibility', undefined);
+    });
+
+    it('passes an explicit visibility through unchanged', async () => {
+      const auth = AuthFactory.from().session().build();
+      mocks.search.searchRandom.mockResolvedValue([]);
+
+      await sut.searchRandom(auth, { visibility: AssetVisibility.Archive });
+
+      const opts = mocks.search.searchRandom.mock.calls[0][1];
+      expect(opts.visibility).toBe(AssetVisibility.Archive);
+    });
+
+    it('treats a no-session auth (api key / shared link) as not-locked', async () => {
+      const auth = AuthFactory.create();
+      mocks.search.searchRandom.mockResolvedValue([]);
+
+      await sut.searchRandom(auth, {});
+
+      const opts = mocks.search.searchRandom.mock.calls[0][1];
+      expect(opts.visibility).toBe('not-locked');
+    });
+
     it('should throw for locked visibility without elevated permission', async () => {
       const auth = AuthFactory.create();
 
