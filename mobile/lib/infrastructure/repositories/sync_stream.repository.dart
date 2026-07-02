@@ -281,6 +281,8 @@ class SyncStreamRepository extends DatabaseAccessor<Drift> with $SyncStreamRepos
           );
         }
       });
+
+      await _hideReferencedLivePhotoMotionAssets();
     } catch (error, stack) {
       _logger.severe('Error: updateAssetsV2 - $debugLabel', error, stack);
       rethrow;
