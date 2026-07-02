@@ -48,6 +48,9 @@ const getDefaultPreferences = (): UserPreferences => ({
   cast: {
     gCastEnabled: false,
   },
+  recentlyAdded: {
+    sidebarWeb: false,
+  },
 });
 
 describe('getPreferences', () => {
