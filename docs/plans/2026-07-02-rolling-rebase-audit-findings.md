@@ -127,7 +127,7 @@ Notable clusters (full list in the audit run output):
 
 - **Duplicate migration timestamp `1778800000000`** — `migrations-gallery/1778800000000-ReconcileFaceIdentityIndexOverrides.ts` collides with `TrimSpacePersonNameIndex`; silently clobbered by the postbuild copy that merges migration dirs.
 - **Mobile `peopleSortBy` preference dropped on upgrade** (`mobile/lib/utils/migration.dart:75`) — legacy `StoreKey` removed with no `StoreKey→SettingsKey` migration.
-- **Filter-suggestion sources still pinned to `visibility=Timeline`** (`server/src/repositories/search.repository.ts:1295`) while search/facet defaults moved to `not-locked` — suggestions omit values search now matches.
+- **Filter-suggestion sources still pinned to `visibility=Timeline`** (`server/src/repositories/search.repository.ts:1295`) while search/facet defaults moved to `not-locked` — suggestions omit values search now matches. — FIXED (slice S3)
 - **Gallery-branded loading spinner dropped** from `ActivityViewer.svelte` / `DetailPanel`.
 - **Stale committed SDK build** at `open-api/typescript-sdk/build-old-root/` (dead directory).
 - **`apply-branding` `patch_cli`/`patch_versions`** still target `cli/` and `open-api/typescript-sdk/` (moved to `packages/` in v3); stale iOS debug/profile bundle-id patterns; `ErrorLayout.svelte` moved out from under the branding target (also on main).

@@ -249,6 +249,14 @@ export interface SuggestionScopeOptions {
   timelineSpaceIds?: string[];
   takenAfter?: Date;
   takenBefore?: Date;
+  /**
+   * Mirrors `AssetSearchBuilderOptions.visibility` (see `searchAssetBuilder` in `src/utils/database.ts`):
+   * a concrete value filters to exactly that visibility, `'not-locked'` excludes only Locked, and
+   * `undefined` applies no filter. The caller (SearchService) resolves this the same way it resolves
+   * search's own visibility — `dto.visibility ?? (auth.session?.hasElevatedPermission ? undefined :
+   * 'not-locked')` — so suggestions cover the same asset set search would return (LOW #7).
+   */
+  visibility?: AssetVisibility | 'not-locked';
 }
 
 interface ExifSuggestionScopeOptions extends SuggestionScopeOptions {
@@ -305,7 +313,7 @@ type FilterSuggestionPerson = {
 
 type AccessibleTagScopeOptions = Pick<
   SuggestionScopeOptions,
-  'spaceId' | 'timelineSpaceIds' | 'takenAfter' | 'takenBefore'
+  'spaceId' | 'timelineSpaceIds' | 'takenAfter' | 'takenBefore' | 'visibility'
 >;
 
 export interface FilterSuggestionsResult {
@@ -1193,13 +1201,18 @@ export class SearchRepository {
     userIds: string[],
     options?: AccessibleTagScopeOptions,
   ): Promise<Array<{ id: string; value: string }>> {
+    const visibility = options?.visibility;
     return this.db
       .selectFrom('tag')
       .select(['tag.id', 'tag.value'])
       .distinct()
       .innerJoin('tag_asset', 'tag.id', 'tag_asset.tagId')
       .innerJoin('asset', 'tag_asset.assetId', 'asset.id')
-      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .$if(!!visibility, (qb) =>
+        visibility === 'not-locked'
+          ? qb.where('asset.visibility', '!=', AssetVisibility.Locked)
+          : qb.where('asset.visibility', '=', visibility!),
+      )
       .where('asset.deletedAt', 'is', null)
       .$if(!options?.spaceId && !options?.timelineSpaceIds, (qb) => qb.where('asset.ownerId', '=', anyUuid(userIds)))
       .$if(!!options?.spaceId && !options?.timelineSpaceIds, (qb) =>
@@ -1388,13 +1401,18 @@ export class SearchRepository {
     userIds: string[],
     options?: ExifSuggestionScopeOptions,
   ) {
+    const visibility = options?.visibility;
     return this.applySuggestionScope(
       this.db
         .selectFrom('asset_exif')
         .select(field)
         .distinctOn(field)
         .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
-        .where('visibility', '=', AssetVisibility.Timeline)
+        .$if(!!visibility, (qb) =>
+          visibility === 'not-locked'
+            ? qb.where('asset.visibility', '!=', AssetVisibility.Locked)
+            : qb.where('asset.visibility', '=', visibility!),
+        )
         .where('deletedAt', 'is', null)
         .where(field, 'is not', null)
         .where(field, '!=', '' as any),
@@ -1417,12 +1435,17 @@ export class SearchRepository {
 
   private buildFilteredAssetIds(userIds: string[], options: FilterSuggestionsOptions) {
     const needsExifJoin = !!(options.country || options.city || options.make || options.model || options.rating);
+    const visibility = options.visibility;
 
     return this.applySuggestionScope(
       this.db
         .selectFrom('asset')
         .select('asset.id')
-        .where('asset.visibility', '=', AssetVisibility.Timeline)
+        .$if(!!visibility, (qb) =>
+          visibility === 'not-locked'
+            ? qb.where('asset.visibility', '!=', AssetVisibility.Locked)
+            : qb.where('asset.visibility', '=', visibility!),
+        )
         .where('asset.deletedAt', 'is', null),
       userIds,
       options,
