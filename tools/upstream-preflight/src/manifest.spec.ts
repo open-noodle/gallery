@@ -1,5 +1,8 @@
+import path from 'node:path';
+import micromatch from 'micromatch';
 import { describe, expect, it } from 'vitest';
-import { parseManifest } from './manifest';
+import { runGit } from './git';
+import { defaultManifestPath, loadManifest, parseManifest } from './manifest';
 
 const validManifest = `
 version: 1
@@ -239,5 +242,65 @@ checks:
     ).toThrow(
       'Expected migration for feature shared-spaces must be a TypeScript file',
     );
+  });
+});
+
+describe('real ownership manifest owned_paths', () => {
+  // Repo-root convention shared with mobile-nav.spec.ts / cli-wiring.spec.ts:
+  // vitest runs with cwd = tools/upstream-preflight.
+  const repoRoot = path.resolve(process.cwd(), '../..');
+  const micromatchOptions = { dot: true };
+
+  function trackedFiles(): string[] {
+    return runGit(repoRoot, ['ls-files'])
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+  }
+
+  // None of the manifest's globs use extglob syntax (no `@(`, `!(`, `+(`, `?(`,
+  // `*(` group prefixes), so bare parentheses only ever occur here as literal
+  // SvelteKit route-group directory names (e.g. `web/src/routes/(user)/**`).
+  // Escape them so micromatch treats them as literal characters instead of an
+  // (empty) capture group, which otherwise silently fails to match real files.
+  function matchesAnyFile(files: string[], glob: string): boolean {
+    const literalParens = glob.replaceAll(/[()]/g, String.raw`\$&`);
+    return micromatch(files, literalParens, micromatchOptions).length > 0;
+  }
+
+  it('every owned_paths glob matches at least one tracked file', () => {
+    const manifest = loadManifest(path.join(repoRoot, defaultManifestPath));
+    const files = trackedFiles();
+
+    const offenders: string[] = [];
+    for (const [featureId, feature] of Object.entries(manifest.features)) {
+      for (const glob of feature.owned_paths ?? []) {
+        if (!matchesAnyFile(files, glob)) {
+          offenders.push(`${featureId}: ${glob}`);
+        }
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('the user-groups owned_paths resolve to the real group-management UI', () => {
+    const manifest = loadManifest(path.join(repoRoot, defaultManifestPath));
+    const files = trackedFiles();
+
+    const ownedPaths =
+      manifest.features['release-ci-and-infrastructure']?.owned_paths ?? [];
+    const groupSettingsMatches = ownedPaths.some(
+      (glob) =>
+        micromatch(
+          files,
+          glob.replaceAll(/[()]/g, String.raw`\$&`),
+          micromatchOptions,
+        ).includes(
+          'web/src/lib/components/user-settings-page/group-settings.svelte',
+        ),
+    );
+
+    expect(groupSettingsMatches).toBe(true);
   });
 });
