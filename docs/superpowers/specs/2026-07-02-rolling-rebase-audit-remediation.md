@@ -277,27 +277,30 @@ Expected RED: no migration entry exists → target key stays default.
 
 - **Finding:** M1 · `server/src/services/transcoding.service.ts` (~:240) — `getHlsCommand({ inputPath: asset.originalPath, ... })` spawns ffmpeg on a relative S3 key with no `ensureLocalFile`/`persistFile`, and ignores the fork's trimmed/encoded video.
 - **Decision:** full fix — provide ffmpeg a real local path on S3-primary installs **and** prefer the fork's trimmed/encoded variant as input.
-- **Goal:** on S3 storage the realtime-HLS ffmpeg invocation gets a readable local path; when a trimmed/encoded (non-`isEdited`-original) variant exists, it is the input; the temp local file is cleaned up after.
+- **Goal:** on S3-primary storage the realtime-HLS ffmpeg gets a readable **local** input path (not a bare S3 key), the input is the fork's trimmed/encoded variant when present, and the downloaded temp file is materialized **once per session** and removed at session teardown.
+
+**Architecture note (VERIFIED against the code — supersedes the earlier one-shot sketch):** HLS transcoding is **session-based and long-lived**, not one-shot. `startTranscode(session, variantIndex, startSegment)` (`transcoding.service.ts:180`) spawns a **persistent** ffmpeg via `processRepository.spawn` that streams segments into `variantDir` over the session's lifetime, and it is **re-invoked on seek / variant change** (kills the old process, spawns a new one on the same input). ffmpeg therefore reads `inputPath` for as long as the session lives — a `try/finally` cleanup around the spawn would delete the temp file **while ffmpeg is still reading it**. The local input must be materialized **once per session** and cleaned up in `onSessionEnd`.
 
 **RED tests first** — `server/src/services/transcoding.service.spec.ts`:
 
-1. With storage mocked as S3 (originalPath is a relative key), the transcode path calls `ensureLocalFile(<input>)` and passes the returned `localPath` to `getHlsCommand`, not the raw key.
-2. When `asset.files` contains an `EncodedVideo` variant with `isEdited === false` (fork trim output), that variant's path is chosen as the input (mirrors `media.service.ts:294-295` selection).
-3. When no encoded variant exists, `asset.originalPath` is used.
-4. `cleanup()` from `ensureLocalFile` is invoked after the command completes (success and error paths).
+1. With storage mocked as S3 (`asset.originalPath` a relative key), starting a transcode calls `ensureLocalFile(<trim-resolved input>)` and passes the returned `localPath` (not the raw key) to `getHlsCommand`.
+2. When the fork's trimmed/encoded variant exists on `asset.files`, its path (not `originalPath`) is the input handed to `ensureLocalFile` — **mirror the fork's authoritative trim-input selection** (study how the non-realtime transcode / `handleVideoTrim` path in `media.service.ts` selects the trimmed input and replicate that predicate exactly; do not invent new `isEdited`/`EncodedVideo` semantics).
+3. When no trimmed/encoded variant exists, `asset.originalPath` is used.
+4. **Cleanup at session end:** the stored cleanup is invoked exactly once on `onSessionEnd` (and via `failSession`, which calls `onSessionEnd`), deleting the temp file. It is **NOT** invoked in a `finally` right after spawning ffmpeg.
+5. **Re-transcode reuse:** a seek / variant-change re-invocation of `startTranscode` within the same session reuses the already-materialized local file (`ensureLocalFile` is called once per session, not per transcode).
 
-Expected RED: current code passes `asset.originalPath` directly and never calls `ensureLocalFile` → (1),(2),(4) fail.
+Expected RED: current code passes `asset.originalPath` directly, never calls `ensureLocalFile`, and has no per-session input cleanup → (1),(2),(4),(5) fail.
 
-**Minimal implementation:** before building the HLS command, select `inputSource = <trimmed/encoded variant path> ?? asset.originalPath`; wrap in `const { localPath, cleanup } = await this.ensureLocalFile(inputSource); try { ...getHlsCommand({ inputPath: localPath, ... })... } finally { await cleanup(); }`. `ensureLocalFile` already handles the disk-passthrough (no-op) vs S3-download cases (`base.service.ts:398`).
+**Minimal implementation:** resolve `inputSource = <fork trimmed/encoded variant path> ?? asset.originalPath`; materialize it once per session via `const { localPath, cleanup } = await this.ensureLocalFile(inputSource)` the first time the session starts a transcode, storing `localPath` + `cleanup` on the `Session` object (guard so later seek/variant transcodes reuse it); pass `inputPath: localPath` to `getHlsCommand`; in `onSessionEnd` invoke the stored `cleanup` (null-safe / idempotent). `ensureLocalFile` (`base.service.ts:398`) is a cheap passthrough on local storage (returns the original path, no-op cleanup), so disk installs are unaffected.
 
 **Edge cases:**
 
-- **Local (non-S3) storage:** `ensureLocalFile` returns the path unchanged / cheap cleanup — no behavior regression (assert a local asset still transcodes with the same effective path).
-- Trimmed variant present but marked `isEdited` → excluded (matches the fork selector semantics).
-- ffmpeg failure still runs `cleanup` (finally) and fails the session as before.
-- **Placement:** `ensureLocalFile` must run **after** the pre-existing early `failSession`/`return` block (config-build failure) — so a config failure never creates an orphaned temp file. Assert no temp file is created when config build throws.
-- **Concurrent sessions:** two realtime-HLS sessions on the same asset each get an independent local temp file and independent `cleanup` (no shared-path clobber). Assert two overlapping calls don't collide.
-- No HLS output is persisted to S3 by this slice (realtime segments are streamed); persistence only applies if a future slice caches them — call this out, do not add persistence.
+- **Local (non-S3) storage:** `ensureLocalFile` returns the original path, cleanup is a no-op — assert a local asset still transcodes with the same effective path (no regression).
+- Trim-variant selection mirrors the fork's exact selector (whatever predicate `handleVideoTrim` / media.service uses); assert it matches the non-realtime path, not a new rule.
+- **Cleanup on every teardown path:** normal `onSessionEnd`, `failSession` (config/transcode failure), and the idle-session eviction (`cleanupInterval`) path each release the temp file exactly once; a session that never started a transcode has nothing to clean up (null-safe).
+- **Re-transcode within a session** (seek/variant) reuses the cached local file — assert `ensureLocalFile` runs once per session, not per `startTranscode`.
+- **Concurrent sessions** on the same asset get independent per-session temp files + independent cleanup (no shared-path clobber).
+- No HLS output is persisted to S3 by this slice (segments stream from the local `variantDir` as upstream does) — do **not** add output persistence.
 
 **GREEN:** `cd server && pnpm test -- --run src/services/transcoding.service.spec.ts`
 **Commit:** `fix(server): realtime HLS uses local file + trimmed input on S3 (M1)`
