@@ -127,6 +127,7 @@ Notable clusters (full list in the audit run output):
 
 - **Duplicate migration timestamp `1778800000000`** — `migrations-gallery/1778800000000-ReconcileFaceIdentityIndexOverrides.ts` collides with `TrimSpacePersonNameIndex`; silently clobbered by the postbuild copy that merges migration dirs.
 - **Mobile `peopleSortBy` preference dropped on upgrade** (`mobile/lib/utils/migration.dart:75`) — legacy `StoreKey` removed with no `StoreKey→SettingsKey` migration.
+- **Mobile offline shared-space People fallback ignored `minimumFaces`** (`mobile/lib/domain/services/people.service.dart:76`) — `getAllPeopleWithSharedSpaces`'s offline fallback called `_repository.getAllPeople` without the user's `minimumFaces` preference (repository default `3` regardless of the setting), unlike the online path and the plain `getAllPeople` provider (`people.provider.dart:46-50`). — FIXED (slice S6)
 - **Filter-suggestion sources still pinned to `visibility=Timeline`** (`server/src/repositories/search.repository.ts:1295`) while search/facet defaults moved to `not-locked` — suggestions omit values search now matches. — FIXED (slice S3)
 - **Gallery-branded loading spinner dropped** from `ActivityViewer.svelte` / `DetailPanel`.
 - **Stale committed SDK build** at `open-api/typescript-sdk/build-old-root/` (dead directory).

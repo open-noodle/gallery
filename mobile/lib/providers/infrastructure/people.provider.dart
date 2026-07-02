@@ -52,5 +52,6 @@ final driftGetAllPeopleWithSharedSpacesProvider = FutureProvider.family<List<Dri
   sortBy,
 ) async {
   final service = ref.watch(driftPeopleServiceProvider);
-  return service.getAllPeopleWithSharedSpaces(sortBy: sortBy);
+  final prefs = await ref.watch(userMetadataPreferencesProvider.future);
+  return service.getAllPeopleWithSharedSpaces(minFaces: prefs?.minimumFaces ?? 3, sortBy: sortBy);
 });
