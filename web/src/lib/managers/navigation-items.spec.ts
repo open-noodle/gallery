@@ -1,11 +1,87 @@
 import { describe, expect, it } from 'vitest';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isAlmostExactNavMatch, NAVIGATION_ITEMS } from './navigation-items';
 
 // __dirname is not defined in ESM (vitest default). Derive it from import.meta.url.
 const here = dirname(fileURLToPath(import.meta.url));
+
+// web/src/lib/managers/ -> up 2 dirs -> web/src/routes
+const ROUTES_ROOT = resolve(here, '..', '..', 'routes');
+
+/**
+ * Resolves a NAVIGATION_ITEMS `route` (a URL pathname, optionally with a
+ * `?query` or `#hash` suffix) to a real SvelteKit page directory under
+ * `web/src/routes`, i.e. proves the route isn't a dead hardcoded string.
+ *
+ * Has to understand two SvelteKit filesystem-routing constructs that don't
+ * appear in the URL:
+ *  - route GROUPS `(name)` — transparent, consume zero path segments
+ *    (e.g. all user pages live under `routes/(user)/...`)
+ *  - OPTIONAL params `[[name=matcher]]` — may consume one path segment OR be
+ *    skipped entirely (e.g. `routes/(user)/photos/[[assetId=id]]/+page.svelte`
+ *    serves plain `/photos` by skipping the optional segment)
+ *
+ * Returns true iff some path through the directory tree consumes all of
+ * `segments` and lands on a directory containing `+page.svelte`.
+ */
+function resolveRoute(pathname: string, dir = ROUTES_ROOT, segments = pathToSegments(pathname)): boolean {
+  if (segments.length === 0) {
+    if (existsSync(join(dir, '+page.svelte'))) {
+      return true;
+    }
+    // Even with no segments left, a route-group or optional-param directory
+    // can still be entered (both consume zero segments here) to reach a
+    // deeper +page.svelte.
+    return childDirs(dir).some(
+      (name) => (isRouteGroup(name) || isOptionalParam(name)) && resolveRoute(pathname, join(dir, name), []),
+    );
+  }
+
+  const [next, ...rest] = segments;
+  for (const name of childDirs(dir)) {
+    if (name === next && resolveRoute(pathname, join(dir, name), rest)) {
+      return true;
+    }
+    if (isRouteGroup(name) && resolveRoute(pathname, join(dir, name), segments)) {
+      // Groups don't consume a segment — retry the same remaining segments.
+      return true;
+    }
+    if (isOptionalParam(name)) {
+      // Optional params may consume the next segment...
+      if (resolveRoute(pathname, join(dir, name), rest)) {
+        return true;
+      }
+      // ...or be skipped, leaving the segment for something deeper.
+      if (resolveRoute(pathname, join(dir, name), segments)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function pathToSegments(pathname: string): string[] {
+  return pathname.split(/[?#]/)[0].split('/').filter(Boolean);
+}
+
+function childDirs(dir: string): string[] {
+  if (!existsSync(dir)) {
+    return [];
+  }
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+}
+
+function isRouteGroup(name: string): boolean {
+  return name.startsWith('(') && name.endsWith(')');
+}
+
+function isOptionalParam(name: string): boolean {
+  return name.startsWith('[[') && name.endsWith(']]');
+}
 
 describe('NAVIGATION_ITEMS schema', () => {
   it('has exactly 37 items', () => {
@@ -58,6 +134,22 @@ describe('NAVIGATION_ITEMS schema', () => {
       expect(item.route.startsWith('/admin/')).toBe(true);
       expect(item.adminOnly).toBe(true);
     }
+  });
+
+  it('every navigation item route resolves to a real page component', () => {
+    // Drift-guard: catches ANY palette entry (not just Server Stats) whose
+    // route string points at a page that doesn't exist in web/src/routes —
+    // e.g. a hardcoded route left stale after a page was renamed/moved.
+    for (const item of NAVIGATION_ITEMS) {
+      expect(resolveRoute(item.route), `route "${item.route}" (item ${item.id}) does not resolve`).toBe(true);
+    }
+  });
+
+  it('Server Stats resolves to the real /admin/server-status page (not the dead /admin/system-statistics)', () => {
+    const item = NAVIGATION_ITEMS.find((i) => i.id === 'nav:admin:server-stats');
+    expect(item?.route).toBe('/admin/server-status');
+    expect(resolveRoute('/admin/system-statistics')).toBe(false);
+    expect(resolveRoute('/admin/server-status')).toBe(true);
   });
 
   it('user-pages items are not admin-only', () => {
