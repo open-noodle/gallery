@@ -94,7 +94,7 @@ Edge cases from the spec, all covered above:
 matches any recorded call → `Mocktail` reports 0 invocations against the expected `1`. The two
 existing tests (89-100, 104-116) also fail to compile/run correctly against the new stub shape
 until the impl adds the argument — but since we edit their stubs to `any(named: 'minFaces')`
-*before* the impl, they should still pass RED-safely at the old call (`any` matches an absent-arg
+_before_ the impl, they should still pass RED-safely at the old call (`any` matches an absent-arg
 call too? — no: mocktail requires the named-arg key to be present in the invocation to match
 `any(named: ...)`). To keep the two existing tests green through the RED step (they test
 different behavior, not this slice's target), verify by running the suite before touching
