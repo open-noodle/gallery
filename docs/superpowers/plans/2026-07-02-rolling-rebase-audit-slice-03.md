@@ -68,7 +68,7 @@ changes.
      inferred result to `{ [x: string]: any }[]`, failing `tsc` (`getAccessibleTags`'s declared
      `Promise<Array<{ id: string; value: string }>>` return type). Reverted to inlining the identical
      `.$if(!!visibility, (qb) => visibility === 'not-locked' ? qb.where('asset.visibility', '!=',
-     Locked) : qb.where('asset.visibility', '=', visibility!))` clause at each of the three call sites
+Locked) : qb.where('asset.visibility', '=', visibility!))` clause at each of the three call sites
      (same duplication level as the `searchAssetBuilder` original) — `tsc --noEmit` is clean this way.
    - `getExifField`: replace `.where('visibility', '=', AssetVisibility.Timeline)` with the inline
      `$if` clause (using `'asset.visibility'`, qualified) right after the `asset` join, keyed off
@@ -80,7 +80,7 @@ changes.
 2. `server/src/services/search.service.ts`:
    - `ScopedPersonFilterOptions`: add `visibility?: AssetVisibility | 'not-locked';`.
    - `getSearchSuggestions`: compute `const visibility = auth.session?.hasElevatedPermission ?
-     undefined : 'not-locked';`, add it to the object passed into `resolveScopedPersonFilters`.
+undefined : 'not-locked';`, add it to the object passed into `resolveScopedPersonFilters`.
    - `getFilterSuggestions`: same pattern, into the object passed into `resolveScopedPersonFilters`
      before `this.searchRepository.getFilterSuggestions(userIds, resolvedDto)`.
    - `getTagSuggestions`: same pattern, added directly to the options object passed to
@@ -125,7 +125,7 @@ New tests in `test/medium/specs/repositories/search.repository.spec.ts`:
 3. **`getFilterSuggestions` — empty result set.**
    A user with zero assets; `sut.getFilterSuggestions([user.id], { visibility: 'not-locked' })` →
    returns the all-empty shape (`countries: [], cameraMakes: [], tags: [], people: [], ratings: [],
-   mediaTypes: [], hasUnnamedPeople: false`), no throw. (Passes before and after — regression guard,
+mediaTypes: [], hasUnnamedPeople: false`), no throw. (Passes before and after — regression guard,
    not RED.)
 
 4. **`getCameraMakes` (the literal `getExifField`/~:1295 site) — not-locked default.**
@@ -156,7 +156,7 @@ Regression:
   pre-existing unrelated failures in `exif/audio-video.spec.ts` — `Cannot find ffprobe`,
   environmental — ignored).
   - Two pre-existing `getTagSuggestions` unit tests (`should return accessible tags for personal
-    timeline`, `should include partner IDs in user search`) asserted `getAccessibleTags` was called
+timeline`, `should include partner IDs in user search`) asserted `getAccessibleTags` was called
     with an exact empty options object `{}`. That's exactly what this slice changes (the resolved
     `visibility`/`timelineSpaceIds` are now always present), so both assertions were updated to expect
     `{ timelineSpaceIds: undefined, visibility: 'not-locked' }` — an intentional test update, not a
