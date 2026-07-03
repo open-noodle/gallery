@@ -321,7 +321,19 @@ DELETE FROM "kysely_migrations"
    '1778600000000-SortSpacePeopleByNameIndex',
    '1778700000000-AddSharedSpaceFaceMatchBackfillTarget',
    '1778800000000-ReconcileFaceIdentityIndexOverrides',
-   '1778800000000-TrimSpacePersonNameIndex'
+   '1778800000000-TrimSpacePersonNameIndex',
+
+   -- Build-time compatibility alias (server/bin/sync-gallery-migrations.mjs).
+   -- Gallery's postbuild records ChangeDurationToInteger under BOTH its current
+   -- upstream name (1777667825574) and its pre-rename name (1776735180298), so
+   -- already-deployed DBs that ran the migration under the pre-rename name keep
+   -- booting. Upstream Immich v3.0.1 ships only 1777667825574, so on a reverted
+   -- DB the pre-rename alias row is an orphan and upstream's migrator aborts with
+   -- "corrupted migrations: previously executed migration
+   -- 1776735180298-ChangeDurationToInteger is missing". Drop the alias row here;
+   -- the real 1777667825574 row is always present by revert time and matches the
+   -- upstream file, so it stays.
+   '1776735180298-ChangeDurationToInteger'
 
    -- Post-v3.0.1 upstream migrations pulled in by rebase would be listed here,
    -- paired with the schema rollbacks in step 7. Currently none — the branch is
