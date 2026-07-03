@@ -65,7 +65,7 @@ must not flag them:
 - `web/src/lib/modals/GeolocationPointPickerModal.svelte`
 - `web/src/lib/modals/PluginMethodPicker.svelte`
 - `web/src/lib/modals/CreateFaceModal.svelte`
-- `web/src/lib/components/DelayedLoadingSpinner.svelte` (a thin wrapper *around*
+- `web/src/lib/components/DelayedLoadingSpinner.svelte` (a thin wrapper _around_
   `@immich/ui`'s spinner that adds a display delay; several of the swapped-set files
   compose through this wrapper rather than importing the fork-local spinner directly —
   e.g. `AdaptiveImage.svelte`, `MemoryPhotoViewer.svelte`)
@@ -140,7 +140,7 @@ props) as a plain component reference, and the fork-local component is a drop-in
   to confirm they only pass props the fork-local component supports (it does — same
   `size`/`class` style props as the rest of the swapped set already uses).
 - Guard also asserts the whole 25-file swapped set (not just the 2 fixed files), so a
-  future rebase regressing any *other* file's swap is caught too — not just these two.
+  future rebase regressing any _other_ file's swap is caught too — not just these two.
 - The 9 intentionally-generic files are excluded from the asserted set so the guard
   isn't brittle / doesn't force spinner choices that aren't part of this finding.
 

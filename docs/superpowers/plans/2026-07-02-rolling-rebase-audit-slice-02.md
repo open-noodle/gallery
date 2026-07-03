@@ -49,12 +49,12 @@ caller-owned rows to the global filter:
 
 Interaction with the global filter is correct in every case:
 
-| resolved visibility | caller-owned space rows | other-member space rows |
-| --- | --- | --- |
-| `undefined` (elevated) | global off → all own visibilities | branch forces `Timeline` only |
-| `'not-locked'` (non-elevated) | global excludes Locked | `Timeline` ⊆ not-locked → Timeline only |
-| explicit `Archive` | global `= Archive` → own archived | `Timeline` ∧ `= Archive` = ∅ → **excluded** |
-| explicit `Timeline` | global `= Timeline` | consistent → Timeline |
+| resolved visibility           | caller-owned space rows           | other-member space rows                     |
+| ----------------------------- | --------------------------------- | ------------------------------------------- |
+| `undefined` (elevated)        | global off → all own visibilities | branch forces `Timeline` only               |
+| `'not-locked'` (non-elevated) | global excludes Locked            | `Timeline` ⊆ not-locked → Timeline only     |
+| explicit `Archive`            | global `= Archive` → own archived | `Timeline` ∧ `= Archive` = ∅ → **excluded** |
+| explicit `Timeline`           | global `= Timeline`               | consistent → Timeline                       |
 
 The change is entirely inside `searchAssetBuilder`; `searchMetadata`, `searchStatistics`,
 `searchRandom`, `searchLargeAssets`, `searchSmart`, and smart-facets all route through it, so all
