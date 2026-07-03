@@ -35,14 +35,14 @@ also 3 out of the box). The repository methods that receive the param
 
 ## Call-sites to fix (all currently `machineLearning.facialRecognition.minFaces`)
 
-| service line | method                                    | surface                        |
-| ------------ | ----------------------------------------- | ------------------------------ |
-| ~102         | `faceIdentity.getAccessiblePeople`        | withSharedSpaces LIST          |
-| ~124         | `person.getNumberOfPeople`                | non-shared COUNT (getAll)      |
-| ~144         | `faceIdentity.getAccessiblePeopleStatistics` | withSharedSpaces stats      |
-| ~149         | `person.getPeopleOverviewStatistics`      | non-shared stats               |
+| service line | method                                           | surface                     |
+| ------------ | ------------------------------------------------ | --------------------------- |
+| ~102         | `faceIdentity.getAccessiblePeople`               | withSharedSpaces LIST       |
+| ~124         | `person.getNumberOfPeople`                       | non-shared COUNT (getAll)   |
+| ~144         | `faceIdentity.getAccessiblePeopleStatistics`     | withSharedSpaces stats      |
+| ~149         | `person.getPeopleOverviewStatistics`             | non-shared stats            |
 | ~162         | `faceIdentity.getAccessiblePeopleFaceStatistics` | withSharedSpaces face-stats |
-| ~167         | `person.getPeopleFaceStatistics`          | non-shared face-stats          |
+| ~167         | `person.getPeopleFaceStatistics`                 | non-shared face-stats       |
 
 **Out of scope (do NOT touch):** face-recognition/clustering internals at
 `person.service.ts` ~995/~1012/~1019 (`numResults`, match thresholds) — ML matching,

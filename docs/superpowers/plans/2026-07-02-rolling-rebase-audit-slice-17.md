@@ -8,7 +8,7 @@
 > migration recorded in the DB has no matching file (`#ensureNoMissingMigrations`). So the
 > rename was reverted; the `1778800000000` collision is **kept and grandfathered** alongside
 > the two other pre-existing benign collisions in the guard. The delivered value is the guard
-> (`tools/upstream-preflight/src/migration-timestamps.spec.ts`), which fails CI on any *new*
+> (`tools/upstream-preflight/src/migration-timestamps.spec.ts`), which fails CI on any _new_
 > collision. The RED/GREEN below reflects the abandoned rename approach; the shipped guard
 > asserts "no NEW collision beyond the documented baseline" instead.
 
@@ -24,7 +24,7 @@
 share the timestamp prefix `1778800000000`:
 
 - `1778800000000-ReconcileFaceIdentityIndexOverrides.ts` (single commit `e0642a3fd8
-  fix(server): reconcile face identity index overrides` — recent, part of this active
+fix(server): reconcile face identity index overrides` — recent, part of this active
   rebase branch, not yet merged/released, so no staging/RC DB can have recorded a
   migration name under the old timestamp; safe to rename outright, no coordination
   needed).
@@ -48,7 +48,7 @@ numeric order). So:
   — there is no class to rename, only the filename.
 - Current apply order between the two colliders is **implementation-defined by string
   sort**, not by insertion or coincidence: `"...-Reconcile..."` (`R`) sorts before
-  `"...-Trim..."` (`T`), so today `ReconcileFaceIdentityIndexOverrides` runs *before*
+  `"...-Trim..."` (`T`), so today `ReconcileFaceIdentityIndexOverrides` runs _before_
   `TrimSpacePersonNameIndex`.
 - The two migrations touch disjoint indexes (Reconcile: `face_identity`, `person`,
   `asset_face`, and two `shared_space_person` indexes unrelated to name-sorting; Trim:
@@ -109,7 +109,7 @@ Re-run the guard → green (no duplicate timestamps in either directory).
   sort tiebreak).
 - No live DB has recorded this migration under its old timestamp yet (single-commit,
   unreleased on this branch) — no reconciliation/alias needed (contrast with Slice 18's
-  `ChangeDurationToInteger` compatibility-alias case, which *is* already deployed).
+  `ChangeDurationToInteger` compatibility-alias case, which _is_ already deployed).
 
 ## GREEN commands
 
