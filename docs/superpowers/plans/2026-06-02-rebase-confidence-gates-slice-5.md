@@ -42,6 +42,7 @@
 ## Task 1: Red Tests For ML Smoke Target And Script Wiring
 
 **Files:**
+
 - Modify: `tools/upstream-preflight/src/cli-wiring.spec.ts`
 
 - [ ] **Step 1: Add failing Makefile and script structure tests**
@@ -49,39 +50,31 @@
 Patch `tools/upstream-preflight/src/cli-wiring.spec.ts`:
 
 ```ts
-  it('exposes a local Gallery ML smoke Make target', () => {
-    const makefile = fs.readFileSync(
-      path.resolve(process.cwd(), '../../Makefile'),
-      'utf8',
-    );
+it('exposes a local Gallery ML smoke Make target', () => {
+  const makefile = fs.readFileSync(path.resolve(process.cwd(), '../../Makefile'), 'utf8');
 
-    expect(makefile).toContain('.PHONY: gallery-ml-smoke');
-    expect(makefile).toContain(
-      'machine-learning/scripts/gallery-ml-smoke.sh',
-    );
-  });
+  expect(makefile).toContain('.PHONY: gallery-ml-smoke');
+  expect(makefile).toContain('machine-learning/scripts/gallery-ml-smoke.sh');
+});
 
-  it('checks Docker availability and probes the ML container in the ML smoke script', () => {
-    const script = fs.readFileSync(
-      path.resolve(
-        process.cwd(),
-        '../../machine-learning/scripts/gallery-ml-smoke.sh',
-      ),
-      'utf8',
-    );
+it('checks Docker availability and probes the ML container in the ML smoke script', () => {
+  const script = fs.readFileSync(
+    path.resolve(process.cwd(), '../../machine-learning/scripts/gallery-ml-smoke.sh'),
+    'utf8',
+  );
 
-    expect(script).toContain('Docker is required for gallery-ml-smoke');
-    expect(script).toContain('buildx build');
-    expect(script).toContain('--load');
-    expect(script).toContain('--build-arg DEVICE=cpu');
-    expect(script).toContain('"$DOCKER_BIN" run --detach');
-    expect(script).toContain('"$DOCKER_BIN" inspect');
-    expect(script).toContain('python3 healthcheck.py');
-    expect(script).toContain('immich_ml.main');
-    expect(script).toContain('immich_ml.models');
-    expect(script).toContain('"$DOCKER_BIN" logs');
-    expect(script).toContain('"$DOCKER_BIN" rm --force');
-  });
+  expect(script).toContain('Docker is required for gallery-ml-smoke');
+  expect(script).toContain('buildx build');
+  expect(script).toContain('--load');
+  expect(script).toContain('--build-arg DEVICE=cpu');
+  expect(script).toContain('"$DOCKER_BIN" run --detach');
+  expect(script).toContain('"$DOCKER_BIN" inspect');
+  expect(script).toContain('python3 healthcheck.py');
+  expect(script).toContain('immich_ml.main');
+  expect(script).toContain('immich_ml.models');
+  expect(script).toContain('"$DOCKER_BIN" logs');
+  expect(script).toContain('"$DOCKER_BIN" rm --force');
+});
 ```
 
 - [ ] **Step 2: Run focused tests to verify RED**
@@ -98,6 +91,7 @@ Expected: FAIL because `gallery-ml-smoke` is not in `Makefile` and `machine-lear
 ## Task 2: Implement The Local ML Smoke Script And Make Target
 
 **Files:**
+
 - Create: `machine-learning/scripts/gallery-ml-smoke.sh`
 - Modify: `Makefile`
 
@@ -251,6 +245,7 @@ ERROR: Docker is required for gallery-ml-smoke; install Docker or run the dispat
 ## Task 3: Red Tests For ML Smoke Workflow Assertions
 
 **Files:**
+
 - Modify: `tools/upstream-preflight/src/audits/rebase-confidence.spec.ts`
 - Modify after red: `tools/upstream-preflight/src/audits/rebase-confidence.ts`
 
@@ -279,24 +274,17 @@ const mlSmokeWorkflow = [
 Add in `describe('validateGalleryWorkflowText', ...)`:
 
 ```ts
-  it('passes for the ML smoke workflow structure', () => {
-    const result = validateGalleryWorkflowText(
-      'gallery-ml-smoke.yml',
-      mlSmokeWorkflow,
-      {
-        requireDispatch: true,
-        requiredDispatchInputs: ['ref'],
-        requireBranding: true,
-        brandingBeforeMarkers: ['machine-learning/scripts/gallery-ml-smoke.sh'],
-        requiredWorkflowReferences: [
-          'docker/setup-buildx-action',
-          'machine-learning/scripts/gallery-ml-smoke.sh',
-        ],
-      },
-    );
-
-    expect(result.ok).toBe(true);
+it('passes for the ML smoke workflow structure', () => {
+  const result = validateGalleryWorkflowText('gallery-ml-smoke.yml', mlSmokeWorkflow, {
+    requireDispatch: true,
+    requiredDispatchInputs: ['ref'],
+    requireBranding: true,
+    brandingBeforeMarkers: ['machine-learning/scripts/gallery-ml-smoke.sh'],
+    requiredWorkflowReferences: ['docker/setup-buildx-action', 'machine-learning/scripts/gallery-ml-smoke.sh'],
   });
+
+  expect(result.ok).toBe(true);
+});
 ```
 
 - [ ] **Step 3: Add failing negative assertion test**
@@ -304,40 +292,35 @@ Add in `describe('validateGalleryWorkflowText', ...)`:
 Add in the same describe block:
 
 ```ts
-  it('fails when the ML smoke workflow misses branding or the smoke script', () => {
-    const result = validateGalleryWorkflowText(
-      'gallery-ml-smoke.yml',
-      [
-        'on:',
-        '  workflow_dispatch:',
-        '    inputs:',
-        '      ref:',
-        'jobs:',
-        '  smoke:',
-        '    steps:',
-        '      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd',
-        '      - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2',
-      ].join('\\n'),
-      {
-        requireDispatch: true,
-        requiredDispatchInputs: ['ref'],
-        requireBranding: true,
-        brandingBeforeMarkers: ['machine-learning/scripts/gallery-ml-smoke.sh'],
-        requiredWorkflowReferences: [
-          'docker/setup-buildx-action',
-          'machine-learning/scripts/gallery-ml-smoke.sh',
-        ],
-      },
-    );
+it('fails when the ML smoke workflow misses branding or the smoke script', () => {
+  const result = validateGalleryWorkflowText(
+    'gallery-ml-smoke.yml',
+    [
+      'on:',
+      '  workflow_dispatch:',
+      '    inputs:',
+      '      ref:',
+      'jobs:',
+      '  smoke:',
+      '    steps:',
+      '      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd',
+      '      - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2',
+    ].join('\\n'),
+    {
+      requireDispatch: true,
+      requiredDispatchInputs: ['ref'],
+      requireBranding: true,
+      brandingBeforeMarkers: ['machine-learning/scripts/gallery-ml-smoke.sh'],
+      requiredWorkflowReferences: ['docker/setup-buildx-action', 'machine-learning/scripts/gallery-ml-smoke.sh'],
+    },
+  );
 
-    expect(result.ok).toBe(false);
-    expect(result.details).toContain(
-      'gallery-ml-smoke.yml is missing ./.github/actions/apply-branding',
-    );
-    expect(result.details).toContain(
-      'gallery-ml-smoke.yml is missing workflow reference machine-learning/scripts/gallery-ml-smoke.sh',
-    );
-  });
+  expect(result.ok).toBe(false);
+  expect(result.details).toContain('gallery-ml-smoke.yml is missing ./.github/actions/apply-branding');
+  expect(result.details).toContain(
+    'gallery-ml-smoke.yml is missing workflow reference machine-learning/scripts/gallery-ml-smoke.sh',
+  );
+});
 ```
 
 - [ ] **Step 4: Add failing missing-workflow static assertion coverage**
@@ -345,20 +328,18 @@ Add in the same describe block:
 Add:
 
 ```ts
-  it('requires the Gallery ML smoke workflow in release workflow assertions', () => {
-    const result = runGalleryWorkflowAssertions('/tmp/gallery-missing-workflows', {
-      '.github/workflows/gallery-rc-build.yml': minimalWorkflow,
-      '.github/workflows/gallery-release-server-only.yml': minimalWorkflow,
-      '.github/workflows/gallery-release-mobile.yml': minimalWorkflow,
-      '.github/workflows/gallery-build-mobile.yml': minimalWorkflow,
-      '.github/workflows/gallery-mobile-smoke.yml': mobileSmokeWorkflow,
-    });
-
-    expect(result.ok).toBe(false);
-    expect(result.details).toContain(
-      '.github/workflows/gallery-ml-smoke.yml is missing workflow_dispatch',
-    );
+it('requires the Gallery ML smoke workflow in release workflow assertions', () => {
+  const result = runGalleryWorkflowAssertions('/tmp/gallery-missing-workflows', {
+    '.github/workflows/gallery-rc-build.yml': minimalWorkflow,
+    '.github/workflows/gallery-release-server-only.yml': minimalWorkflow,
+    '.github/workflows/gallery-release-mobile.yml': minimalWorkflow,
+    '.github/workflows/gallery-build-mobile.yml': minimalWorkflow,
+    '.github/workflows/gallery-mobile-smoke.yml': mobileSmokeWorkflow,
   });
+
+  expect(result.ok).toBe(false);
+  expect(result.details).toContain('.github/workflows/gallery-ml-smoke.yml is missing workflow_dispatch');
+});
 ```
 
 - [ ] **Step 5: Run focused tests to verify RED**
@@ -375,6 +356,7 @@ Expected: FAIL because production assertions do not yet require `.github/workflo
 ## Task 4: Add ML Smoke Workflow And Production Assertions
 
 **Files:**
+
 - Modify: `tools/upstream-preflight/src/audits/rebase-confidence.ts`
 - Create: `.github/workflows/gallery-ml-smoke.yml`
 
@@ -467,6 +449,7 @@ Expected: PASS.
 ## Task 5: Update Operator Output And Docs
 
 **Files:**
+
 - Modify: `tools/upstream-preflight/src/audits/rebase-confidence.spec.ts`
 - Modify: `docs/docs/developer/upstream-rebase-process.md`
 
@@ -475,18 +458,18 @@ Expected: PASS.
 In `tools/upstream-preflight/src/audits/rebase-confidence.spec.ts`, update `emits available local commands while keeping missing future workflows planned` so it now expects exact ML local and remote commands:
 
 ```ts
-    expect(details).toContain(
-      'make gallery-ml-smoke (required by docker: server/Dockerfile, machine-learning/Dockerfile; ml: machine-learning/Dockerfile)',
-    );
-    expect(details).toContain(
-      'gh workflow run gallery-ml-smoke.yml --ref rebase/upstream-batch-176 (required by docker: server/Dockerfile, machine-learning/Dockerfile; ml: machine-learning/Dockerfile)',
-    );
-    expect(details).not.toContain(
-      'planned Slice 5 check: make gallery-ml-smoke (target missing; required by docker: server/Dockerfile, machine-learning/Dockerfile; ml: machine-learning/Dockerfile)',
-    );
-    expect(details).not.toContain(
-      'planned Slice 5 workflow: gallery-ml-smoke.yml (workflow missing; required by docker: server/Dockerfile, machine-learning/Dockerfile; ml: machine-learning/Dockerfile)',
-    );
+expect(details).toContain(
+  'make gallery-ml-smoke (required by docker: server/Dockerfile, machine-learning/Dockerfile; ml: machine-learning/Dockerfile)',
+);
+expect(details).toContain(
+  'gh workflow run gallery-ml-smoke.yml --ref rebase/upstream-batch-176 (required by docker: server/Dockerfile, machine-learning/Dockerfile; ml: machine-learning/Dockerfile)',
+);
+expect(details).not.toContain(
+  'planned Slice 5 check: make gallery-ml-smoke (target missing; required by docker: server/Dockerfile, machine-learning/Dockerfile; ml: machine-learning/Dockerfile)',
+);
+expect(details).not.toContain(
+  'planned Slice 5 workflow: gallery-ml-smoke.yml (workflow missing; required by docker: server/Dockerfile, machine-learning/Dockerfile; ml: machine-learning/Dockerfile)',
+);
 ```
 
 - [ ] **Step 2: Add risk-based confidence docs**

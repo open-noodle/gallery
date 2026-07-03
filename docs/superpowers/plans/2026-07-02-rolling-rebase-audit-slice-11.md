@@ -194,7 +194,7 @@ select duration from asset where id = '<the test's videoId>';
 --         [500, 3500) tolerance and far below the untouched 4000ms original)
 ```
 
-The non-edited `encoded_video` row is proven present *before* the trim request (guaranteed by
+The non-edited `encoded_video` row is proven present _before_ the trim request (guaranteed by
 the drain-wait), so `handleVideoTrim`'s selector deterministically resolved
 `existingEncoded.path` — not by inference, by direct row presence. Then ran the full file
 (all 11 tests, real ffmpeg, real queues): **`Test Files 1 passed (1)` / `Tests 11 passed
@@ -202,7 +202,7 @@ the drain-wait), so `handleVideoTrim`'s selector deterministically resolved
 242-263ms).
 
 **Aside (pre-existing, unrelated, out of scope):** both the RED and GREEN runs logged one
-async `ERROR` from the *existing* `'should re-trim (widen) on a fresh asset'` test: `Input file
+async `ERROR` from the _existing_ `'should re-trim (widen) on a fresh asset'` test: `Input file
 is missing: .../<id>_edited.mp4.frame.jpg` (a `handleVideoTrim` → `extractFrame` →
 `generateImageThumbnails` race when two trim jobs land on the same asset in quick succession,
 exactly what that test's own comment "before async job modifies duration" is exploiting).
@@ -224,8 +224,8 @@ code needs to change" instruction — this is worth a follow-up finding, not a S
 - `cd e2e && npx tsc --noEmit` — clean, no errors.
 - `cd e2e && npx eslint src/specs/server/api/video-trim.e2e-spec.ts --max-warnings 0` — clean.
 - Scoped runs used `VITEST_DISABLE_DOCKER_SETUP=true npx vitest run --reporter=verbose
-  src/specs/server/api/video-trim.e2e-spec.ts` (the `pnpm test -- --run <path>` form doubles up
-  `--run` via the package.json script and vitest then ran the *entire* 61-file suite instead of
+src/specs/server/api/video-trim.e2e-spec.ts` (the `pnpm test -- --run <path>` form doubles up
+  `--run` via the package.json script and vitest then ran the _entire_ 61-file suite instead of
   the one file — still useful once: it surfaced 5 pre-existing, unrelated failing files
   (`library.e2e-spec.ts`, CLI specs) with **zero** failures in `video-trim.e2e-spec.ts`,
   corroborating the scoped result).
