@@ -30,12 +30,13 @@ string, so `Route.systemStatistics()` is the idiomatic fix — matches the
 existing convention in the same file.
 
 Confirmed via directory listing:
+
 - `web/src/routes/admin/system-statistics` — does not exist.
 - `web/src/routes/admin/server-status/+page.svelte` — exists.
 
 ### Route resolution is non-trivial (SvelteKit route groups + optional params)
 
-All the other `NAVIGATION_ITEMS` routes were checked to make sure a *generic*
+All the other `NAVIGATION_ITEMS` routes were checked to make sure a _generic_
 "route resolves to a real page" guard is possible without false positives:
 
 - Admin routes (`/admin/...`) map directly onto `web/src/routes/admin/...`.
