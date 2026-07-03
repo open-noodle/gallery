@@ -58,14 +58,14 @@ input **once per session** and clean it up on every teardown path.
 Two independent reasons, both matching the spec's STOP conditions:
 
 1. **The non-realtime path selects differently than the task's pointer.** The fork's
-   *authoritative playback* selector is `AssetMediaService.playbackVideo`
+   _authoritative playback_ selector is `AssetMediaService.playbackVideo`
    (`asset-media.service.ts:246-252`): `getForVideo(id)` →
    `filepath = asset.encodedVideoPath || asset.originalPath`, where `encodedVideoPath`
    is the `EncodedVideo` file `ORDER BY isEdited DESC LIMIT 1`
    (`asset.repository.ts:1720-1735`) — i.e. prefer the trimmed `_edited.mp4`. The task
    pointed at `handleVideoTrim` (`media.service.ts:292`
    `files.find(f => f.type === EncodedVideo && !f.isEdited)`), but that is the trim
-   **source** selector (must be *un-trimmed*), not the playback selector.
+   **source** selector (must be _un-trimmed_), not the playback selector.
 2. **A bare input swap desyncs the HLS pipeline → a WORSE bug.** The playlist's
    `segmentCount` / `#EXTINF` durations and the transcode seek math are both derived
    from the **original's** `asset_keyframe` / `asset_video`, which a trim does not

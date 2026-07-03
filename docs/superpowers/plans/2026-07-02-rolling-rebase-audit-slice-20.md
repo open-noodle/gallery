@@ -49,7 +49,7 @@ as `coverage.ts`) matches at least one tracked file.
   `release-ci-and-infrastructure`) is the sole offender.
 - **Command:** `cd tools/upstream-preflight && npx vitest run src/manifest.spec.ts`
 
-A second assertion (edge case) checks the *replacement* globs resolve to the known
+A second assertion (edge case) checks the _replacement_ globs resolve to the known
 `group-settings.svelte` file, so the guard would also catch a future regression that
 deletes/moves the group-settings component without updating ownership.
 
@@ -58,14 +58,14 @@ deletes/moves the group-settings component without updating ownership.
 `docs/fork/ownership.yml` line 282: replace
 
 ```yaml
-      - web/src/lib/components/users/**
+- web/src/lib/components/users/**
 ```
 
 with
 
 ```yaml
-      - web/src/lib/components/user-settings-page/group-settings.svelte
-      - web/src/lib/modals/UserGroupModal.svelte
+- web/src/lib/components/user-settings-page/group-settings.svelte
+- web/src/lib/modals/UserGroupModal.svelte
 ```
 
 No other `owned_path` in the file changes.
