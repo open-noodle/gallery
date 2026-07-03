@@ -146,7 +146,7 @@ New tests:
    initially) is shared into a space auth.user (member, non-owner) belongs to; after the initial ack,
    the DB is updated so the asset becomes a favorite (`isFavorite: true` on the `asset` row, owned by
    A); the next sync's `SharedSpaceAssetUpdateV1` row for that asset must still read `isFavorite:
-   false` for member B (`getUpdates`'s mask).
+false` for member B (`getUpdates`'s mask).
    Expected RED: current `getUpdates` selects raw `asset.isFavorite` → row has `isFavorite: true`.
 
 Edge cases covered: owner-owned unaffected (test 2); cross-owner masked on both the create path

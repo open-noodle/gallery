@@ -63,6 +63,7 @@ passed.
 ## Task 1: Red Tests For Core Confidence Audit
 
 **Files:**
+
 - Create: `tools/upstream-preflight/src/audits/rebase-confidence.spec.ts`
 - Create after red: `tools/upstream-preflight/src/audits/rebase-confidence.ts`
 
@@ -156,10 +157,7 @@ describe('renderRequiredConfidenceChecks', () => {
 
   it('marks future checks as planned when referenced targets do not exist yet', () => {
     const details = renderRequiredConfidenceChecks(
-      classifyConfidenceSurfaces([
-        'mobile/lib/routing/router.dart',
-        'machine-learning/Dockerfile',
-      ]),
+      classifyConfidenceSurfaces(['mobile/lib/routing/router.dart', 'machine-learning/Dockerfile']),
       '176',
       { makeTargets: new Set(), workflows: new Set() },
     );
@@ -203,33 +201,27 @@ describe('validateGalleryWorkflowText', () => {
   it('fails when required workflow dispatch inputs are missing', () => {
     const result = validateGalleryWorkflowText(
       'gallery-rc-build.yml',
-      [
-        'on:',
-        '  workflow_dispatch:',
-        '    inputs:',
-        '      rc_tag:',
-        '      build_ml:',
-      ].join('\n'),
+      ['on:', '  workflow_dispatch:', '    inputs:', '      rc_tag:', '      build_ml:'].join('\n'),
       {
         requireDispatch: true,
         requiredDispatchInputs: ['rc_tag', 'ref', 'build_ml'],
       },
     );
 
-    expect(result.details).toEqual([
-      'gallery-rc-build.yml is missing workflow_dispatch input ref',
-    ]);
+    expect(result.details).toEqual(['gallery-rc-build.yml is missing workflow_dispatch input ref']);
   });
 
   it('fails when branding is missing before a required release build', () => {
-    const result = validateGalleryWorkflowText('gallery-release-server-only.yml', minimalWorkflow.replace('      - uses: ./.github/actions/apply-branding\n', ''), {
-      requireBranding: true,
-      brandingBeforeMarkers: ['docker/build-push-action'],
-    });
+    const result = validateGalleryWorkflowText(
+      'gallery-release-server-only.yml',
+      minimalWorkflow.replace('      - uses: ./.github/actions/apply-branding\n', ''),
+      {
+        requireBranding: true,
+        brandingBeforeMarkers: ['docker/build-push-action'],
+      },
+    );
 
-    expect(result.details).toEqual([
-      'gallery-release-server-only.yml is missing ./.github/actions/apply-branding',
-    ]);
+    expect(result.details).toEqual(['gallery-release-server-only.yml is missing ./.github/actions/apply-branding']);
   });
 
   it('fails when branding appears after a Docker build marker', () => {
@@ -281,16 +273,12 @@ describe('validateGalleryWorkflowText', () => {
   });
 
   it('reports path-specific failures for malformed workflow structure', () => {
-    const result = validateGalleryWorkflowText(
-      'gallery-build-mobile.yml',
-      'not a workflow',
-      {
-        requireDispatch: true,
-        requiredDispatchInputs: ['environment', 'version', 'build_target'],
-        requireBranding: true,
-        brandingBeforeMarkers: ['flutter build'],
-      },
-    );
+    const result = validateGalleryWorkflowText('gallery-build-mobile.yml', 'not a workflow', {
+      requireDispatch: true,
+      requiredDispatchInputs: ['environment', 'version', 'build_target'],
+      requireBranding: true,
+      brandingBeforeMarkers: ['flutter build'],
+    });
 
     expect(result.details).toEqual([
       'gallery-build-mobile.yml is missing workflow_dispatch',
@@ -303,9 +291,13 @@ describe('validateGalleryWorkflowText', () => {
   });
 
   it('fails on upstream Immich image names in Gallery release workflows', () => {
-    const result = validateGalleryWorkflowText('gallery-release-server-only.yml', 'ghcr.io/immich-app/immich-server\n', {
-      requireServerImage: true,
-    });
+    const result = validateGalleryWorkflowText(
+      'gallery-release-server-only.yml',
+      'ghcr.io/immich-app/immich-server\n',
+      {
+        requireServerImage: true,
+      },
+    );
 
     expect(result.details).toEqual([
       'gallery-release-server-only.yml is missing ghcr.io/open-noodle/gallery-server',
@@ -321,21 +313,14 @@ describe('validateGalleryWorkflowText', () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.details).toContain(
-      '.github/workflows/gallery-release-server-only.yml is missing workflow_dispatch',
-    );
+    expect(result.details).toContain('.github/workflows/gallery-release-server-only.yml is missing workflow_dispatch');
     expect(result.details).toContain(
       '.github/workflows/gallery-release-server-only.yml is missing ./.github/actions/apply-branding',
     );
   });
 
   it('does not emit strict ownership checks before Slice 2', () => {
-    expect(
-      renderRequiredConfidenceChecks(
-        classifyConfidenceSurfaces(['docs/fork/ownership.yml']),
-        '176',
-      ),
-    ).toEqual([]);
+    expect(renderRequiredConfidenceChecks(classifyConfidenceSurfaces(['docs/fork/ownership.yml']), '176')).toEqual([]);
   });
 });
 
@@ -389,13 +374,7 @@ import path from 'node:path';
 import micromatch from 'micromatch';
 import type { AuditResult } from '../types';
 
-export type ConfidenceSurface =
-  | 'branding'
-  | 'docker'
-  | 'ml'
-  | 'mobile'
-  | 'ownership'
-  | 'release';
+export type ConfidenceSurface = 'branding' | 'docker' | 'ml' | 'mobile' | 'ownership' | 'release';
 
 export type ConfidenceSurfaceMatch = {
   surface: ConfidenceSurface;
@@ -477,9 +456,7 @@ const workflowAssertions: Record<string, WorkflowAssertionOptions> = {
   },
 };
 
-export function classifyConfidenceSurfaces(
-  files: string[],
-): ConfidenceSurfaceMatch[] {
+export function classifyConfidenceSurfaces(files: string[]): ConfidenceSurfaceMatch[] {
   return (Object.keys(surfaceGlobs) as ConfidenceSurface[])
     .map((surface) => ({
       surface,
@@ -489,10 +466,7 @@ export function classifyConfidenceSurfaces(
     .sort((left, right) => left.surface.localeCompare(right.surface));
 }
 
-export function renderRequiredConfidenceChecks(
-  matches: ConfidenceSurfaceMatch[],
-  batch = '<id>',
-): string[] {
+export function renderRequiredConfidenceChecks(matches: ConfidenceSurfaceMatch[], batch = '<id>'): string[] {
   if (matches.length === 0) {
     return ['No extra risk-based confidence checks are required for this batch'];
   }
@@ -505,11 +479,7 @@ export function renderRequiredConfidenceChecks(
       .map((surface) => `${surface}: ${bySurface.get(surface)?.join(', ')}`)
       .join('; ');
 
-  if (
-    bySurface.has('branding') ||
-    bySurface.has('release') ||
-    bySurface.has('docker')
-  ) {
+  if (bySurface.has('branding') || bySurface.has('release') || bySurface.has('docker')) {
     details.push(`make gallery-branding-check (required by ${reasonFor('branding', 'release', 'docker')})`);
   }
   if (bySurface.has('ml') || bySurface.has('docker')) {
@@ -575,10 +545,7 @@ export function validateGalleryWorkflowText(
     details.push(`${workflowPath} is missing ghcr.io/open-noodle/gallery-ml`);
   }
   if (options.requireRcSummaryLinks) {
-    for (const image of [
-      'ghcr.io/open-noodle/gallery-server:${RC_TAG}',
-      'ghcr.io/open-noodle/gallery-ml:${RC_TAG}',
-    ]) {
+    for (const image of ['ghcr.io/open-noodle/gallery-server:${RC_TAG}', 'ghcr.io/open-noodle/gallery-ml:${RC_TAG}']) {
       if (!text.includes(image)) details.push(`${workflowPath} RC summary is missing ${image}`);
     }
   }
@@ -604,10 +571,7 @@ function hasWorkflowDispatchInput(text: string, input: string): boolean {
   return new RegExp(`(^|\\n)\\s{6,}${escapedInput}:`, 'm').test(text);
 }
 
-export function runGalleryWorkflowAssertions(
-  cwd = process.cwd(),
-  workflowTexts?: Record<string, string>,
-): AuditResult {
+export function runGalleryWorkflowAssertions(cwd = process.cwd(), workflowTexts?: Record<string, string>): AuditResult {
   const details = Object.entries(workflowAssertions).flatMap(([workflowPath, options]) => {
     const text = workflowTexts?.[workflowPath] ?? readWorkflowText(cwd, workflowPath);
     return validateGalleryWorkflowText(workflowPath, text, options).details.filter(
@@ -622,9 +586,7 @@ export function runGalleryWorkflowAssertions(
   };
 }
 
-export function runRebaseConfidenceAudits(
-  input: RebaseConfidenceAuditInput,
-): AuditResult[] {
+export function runRebaseConfidenceAudits(input: RebaseConfidenceAuditInput): AuditResult[] {
   const matches = classifyConfidenceSurfaces(input.upstreamTouchedFiles);
   const requirementDetails = renderRequiredConfidenceChecks(matches, input.batch);
 
@@ -658,6 +620,7 @@ Expected: PASS for the new rebase-confidence tests.
 ## Task 2: Red Tests For CLI And Make Wiring
 
 **Files:**
+
 - Modify: `tools/upstream-preflight/src/cli-wiring.spec.ts`
 - Modify after red: `tools/upstream-preflight/package.json`
 - Modify after red: `Makefile`
@@ -772,6 +735,7 @@ Expected: PASS.
 ## Task 3: Full Slice Verification And Commit
 
 **Files:**
+
 - Verify all files changed in Tasks 1-2.
 
 - [ ] **Step 1: Add stale persisted-plan coverage for the new command**
