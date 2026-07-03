@@ -80,7 +80,7 @@ actually staged (`_migratedStoreIds`). So:
 
 - A legacy ordinal that resolves to `PeopleSortBy.photoCount` (the default) is
   staged but then **skipped on write** (`complete()`'s `if (entry.value ==
-  defaultConfig.read(entry.key)) continue;`) — and its legacy row **is still
+defaultConfig.read(entry.key)) continue;`) — and its legacy row **is still
   deleted** (staging happens before the write-skip check, and
   `_migratedStoreIds` was already appended in `migrateEnumIndex`). This is
   correct existing behavior, not something this slice needs to change.
@@ -116,7 +116,7 @@ the fixed `_migrateTo26` for the first time, migrating their legacy row 1015
 in the same pass as every other legacy setting.
 
 (If this reasoning is ever wrong — i.e. if `_migrateTo26` ships to users
-*before* this fix lands — the correct remediation would be a new
+_before_ this fix lands — the correct remediation would be a new
 `_migrateTo27` + `targetVersion = 27`, per the task's stated fallback. Ground
 truth checked above rules that out for now.)
 
@@ -159,7 +159,7 @@ truth checked above rules that out for now.)
 is file-private). It reads/writes the migration version through the **global**
 `Store` singleton (`StoreService.I`, `entities/store.entity.dart`), not through
 the `drift` parameter directly — so the test must wire `StoreService` to the
-*same* in-memory `Drift` instance passed to `migrateDatabaseIfNeeded`, exactly
+_same_ in-memory `Drift` instance passed to `migrateDatabaseIfNeeded`, exactly
 like `test/medium/repository_context.dart` and
 `test/infrastructure/repositories/store_repository_test.dart` construct a
 fresh DB:

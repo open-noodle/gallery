@@ -28,15 +28,15 @@ declares.
 - `server/src/dtos/asset-media.dto.ts` `AssetMediaCreateSchema`: no device
   fields exist in the current schema.
 - Existing spec `google-takeout-uploader.spec.ts` has two tests that
-  currently assert the stale fields' *values* (`deviceAssetId` ===
+  currently assert the stale fields' _values_ (`deviceAssetId` ===
   `'takeout-IMG_001.jpg-1609459200000'`, `deviceId` === `'WEB_IMPORT'`) —
   these assertions must flip to asserting absence.
 
 ## Plan (strict TDD)
 
 1. RED: update the existing spec assertions (`builds FormData with correct
-   fileCreatedAt from Takeout date`, `uses item name and lastModified
-   metadata instead of file metadata`) to assert `formData.get('deviceAssetId')`
+fileCreatedAt from Takeout date`, `uses item name and lastModified
+metadata instead of file metadata`) to assert `formData.get('deviceAssetId')`
    and `formData.get('deviceId')` are `null` (field absent), plus add one
    dedicated test asserting the current required fields present
    (`fileCreatedAt`, `isFavorite`, `assetData`) and the two legacy fields
