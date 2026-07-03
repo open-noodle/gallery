@@ -29,7 +29,7 @@ spec's own note: "this slice only deletes the directory"). Confirmed safe to del
 Patch file exists: `open-api/templates/mobile/serialization/native/native_class_nullable_items_in_arrays.patch`.
 
 `main`'s `open-api/bin/generate-open-api.sh` applies it right after downloading the
-upstream openapi-generator template and applying the fork's *other*, larger
+upstream openapi-generator template and applying the fork's _other_, larger
 `native_class.mustache.patch`:
 
 ```sh
@@ -61,7 +61,7 @@ patching file 'open-api/templates/mobile/serialization/native/native_class.musta
 2 out of 3 hunks failed while patching 'open-api/templates/mobile/serialization/native/native_class.mustache'
 ```
 
-Root cause: `native_class.mustache.patch` — the fork's *other* template patch, added by
+Root cause: `native_class.mustache.patch` — the fork's _other_ template patch, added by
 upstream's own `96d521e149` "three-state field serialization (#27231)" work and its
 follow-ups — independently rewrote the exact same `isArray` / nullable-items region of the
 template to add `vendorExtensions.x-is-optional` branching (the `Optional<T>` wrapper
@@ -77,7 +77,7 @@ into ONE of the two branches it introduced. Concretely:
 - **Hunk 2** (fromJson `Iterable` cast) applies **only with fuzz**, and even then only
   patches the `{{^vendorExtensions.x-is-optional}}` copy of that logic. The template now
   has a sibling `{{#vendorExtensions.x-is-optional}}` branch (the `Optional.present(...)`
-  wrapped variant) with the *exact same unfixed* `.cast<{{{items.datatype}}}>()` — hunk 2
+  wrapped variant) with the _exact same unfixed_ `.cast<{{{items.datatype}}}>()` — hunk 2
   does not touch it, so applying the patch as-is would leave the bug half-fixed.
 - **Hunk 3** (numeric `.parse()` null-handling) also fails outright against the current
   content.
@@ -90,10 +90,10 @@ and 3 rejected verbatim; inspecting the surviving hunk 2's output shows the
 untouched and still non-nullable.
 
 **Real-world confirmation this is a live bug, not just a template curiosity:**
-`open-api/patch/time_bucket_asset_response_dto.dart.patch` — a *post-generate* patch
+`open-api/patch/time_bucket_asset_response_dto.dart.patch` — a _post-generate_ patch
 already in the current script — hand-fixes exactly one field of
 `TimeBucketAssetResponseDto` (`stack: List<List<String>>? → List<List<String>?>?`) because
-the template-level fix is missing. But the OpenAPI spec marks *eight more* array
+the template-level fix is missing. But the OpenAPI spec marks _eight more_ array
 properties on that same DTO as having nullable items (`city`, `country`, `duration`,
 `latitude`, `livePhotoVideoId`, `longitude`, `projectionType`, `thumbhash` — checked via
 the spec's `items.nullable` flags), and the committed generated file
