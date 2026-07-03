@@ -27,6 +27,7 @@
 ## Task 1: Red Tests For Strict Ownership Audit
 
 **Files:**
+
 - Modify: `tools/upstream-preflight/src/audits/rebase-confidence.spec.ts`
 - Modify after red: `tools/upstream-preflight/src/audits/rebase-confidence.ts`
 
@@ -130,9 +131,7 @@ describe('runStrictOwnershipConfidenceAudit', () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.details).toEqual([
-      'mobile/lib/broad-only.dart is covered only by broad optional glob mobile/**',
-    ]);
+    expect(result.details).toEqual(['mobile/lib/broad-only.dart is covered only by broad optional glob mobile/**']);
   });
 
   it('fails for uncovered fork files', () => {
@@ -149,9 +148,7 @@ describe('runStrictOwnershipConfidenceAudit', () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.details).toEqual([
-      'Ownership manifest does not cover web/src/routes/uncovered.svelte',
-    ]);
+    expect(result.details).toEqual(['Ownership manifest does not cover web/src/routes/uncovered.svelte']);
   });
 
   it('fails for missing or non-ancestor manifest baseline errors', () => {
@@ -209,12 +206,7 @@ Patch `tools/upstream-preflight/src/audits/rebase-confidence.ts`:
 
 ```ts
 import { findBroadOptionalOnlyFiles, findUncoveredFiles } from '../coverage';
-import type {
-  AuditResult,
-  CoverageClassification,
-  Manifest,
-  ManifestHeadValidation,
-} from '../types';
+import type { AuditResult, CoverageClassification, Manifest, ManifestHeadValidation } from '../types';
 ```
 
 Add:
@@ -237,9 +229,7 @@ ownership?: StrictOwnershipConfidenceInput;
 Add:
 
 ```ts
-export function runStrictOwnershipConfidenceAudit(
-  input: StrictOwnershipConfidenceInput,
-): AuditResult {
+export function runStrictOwnershipConfidenceAudit(input: StrictOwnershipConfidenceInput): AuditResult {
   const uncovered = findUncoveredFiles(input.forkFiles, input.manifest);
   const broadOptionalOnly = findBroadOptionalOnlyFiles(
     input.forkFiles,
@@ -277,9 +267,7 @@ export function runStrictOwnershipConfidenceAudit(
 Extend `runRebaseConfidenceAudits()`:
 
 ```ts
-const ownershipResults = input.ownership
-  ? [runStrictOwnershipConfidenceAudit(input.ownership)]
-  : [];
+const ownershipResults = input.ownership ? [runStrictOwnershipConfidenceAudit(input.ownership)] : [];
 
 return [
   runGalleryWorkflowAssertions(input.cwd, input.workflowTexts),
@@ -306,6 +294,7 @@ Expected: PASS.
 ## Task 2: CLI Ownership Context Wiring
 
 **Files:**
+
 - Modify: `tools/upstream-preflight/src/index.ts`
 - Test: `tools/upstream-preflight/src/audits/rebase-confidence.spec.ts`
 
@@ -373,17 +362,10 @@ const context = batch ? undefined : buildPreflightContext(options.manifest);
 const auditScope = batch
   ? (() => {
       const root = repoRoot();
-      const batchPlan = readPersistedBatchPlan(
-        root,
-        options.planDir ? resolveCliPath(options.planDir) : undefined,
-      );
+      const batchPlan = readPersistedBatchPlan(root, options.planDir ? resolveCliPath(options.planDir) : undefined);
       validatePersistedBatchPlan(batchPlan, root);
       const upstreamTouchedFiles = [
-        ...new Set(
-          batchPlan.batches.flatMap((planBatch) =>
-            planBatch.commits.flatMap((commit) => commit.files),
-          ),
-        ),
+        ...new Set(batchPlan.batches.flatMap((planBatch) => planBatch.commits.flatMap((commit) => commit.files))),
       ].sort();
       return selectBatchAuditScope({ batch, batchPlan, upstreamTouchedFiles });
     })()
@@ -421,6 +403,7 @@ Expected: PASS. `batch.spec.ts` confirms stale plans fail before confidence outp
 ## Task 3: Reconcile Current Ownership Baseline
 
 **Files:**
+
 - Modify: `docs/fork/ownership.yml`
 
 - [ ] **Step 1: Refresh manifest baseline**

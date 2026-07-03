@@ -31,6 +31,7 @@
 ## Task 1: Red Tests For Mobile Smoke Workflow Assertions
 
 **Files:**
+
 - Modify: `tools/upstream-preflight/src/audits/rebase-confidence.spec.ts`
 - Modify after red: `tools/upstream-preflight/src/audits/rebase-confidence.ts`
 
@@ -66,41 +67,37 @@ const mobileSmokeWorkflow = [
 Add in `describe('validateGalleryWorkflowText', ...)`:
 
 ```ts
-  it('passes for the mobile smoke workflow structure', () => {
-    const result = validateGalleryWorkflowText(
-      'gallery-mobile-smoke.yml',
-      mobileSmokeWorkflow,
-      {
-        requireDispatch: true,
-        requiredDispatchInputs: ['ref'],
-        requireBranding: true,
-        brandingBeforeMarkers: [
-          'mise //mobile:codegen:translation',
-          'mise //mobile:codegen:dart',
-          'mise //mobile:codegen:pigeon',
-          'mise //mobile:analyze',
-          'mise //mobile:test',
-          'flutter build apk --debug',
-        ],
-        requiredWorkflowReferences: [
-          'immich-app/devtools/actions/use-mise',
-          'flutter pub get',
-          'mise //mobile:codegen:translation',
-          'mise //mobile:codegen:dart',
-          'mise //mobile:codegen:pigeon',
-          'tj-actions/verify-changed-files',
-          'mobile/**/*.g.dart',
-          'mobile/**/*.gr.dart',
-          'mobile/**/*.drift.dart',
-          'mise //mobile:analyze',
-          'mise //mobile:test',
-          'flutter build apk --debug',
-        ],
-      },
-    );
-
-    expect(result.ok).toBe(true);
+it('passes for the mobile smoke workflow structure', () => {
+  const result = validateGalleryWorkflowText('gallery-mobile-smoke.yml', mobileSmokeWorkflow, {
+    requireDispatch: true,
+    requiredDispatchInputs: ['ref'],
+    requireBranding: true,
+    brandingBeforeMarkers: [
+      'mise //mobile:codegen:translation',
+      'mise //mobile:codegen:dart',
+      'mise //mobile:codegen:pigeon',
+      'mise //mobile:analyze',
+      'mise //mobile:test',
+      'flutter build apk --debug',
+    ],
+    requiredWorkflowReferences: [
+      'immich-app/devtools/actions/use-mise',
+      'flutter pub get',
+      'mise //mobile:codegen:translation',
+      'mise //mobile:codegen:dart',
+      'mise //mobile:codegen:pigeon',
+      'tj-actions/verify-changed-files',
+      'mobile/**/*.g.dart',
+      'mobile/**/*.gr.dart',
+      'mobile/**/*.drift.dart',
+      'mise //mobile:analyze',
+      'mise //mobile:test',
+      'flutter build apk --debug',
+    ],
   });
+
+  expect(result.ok).toBe(true);
+});
 ```
 
 - [ ] **Step 3: Add failing negative assertion test**
@@ -108,54 +105,50 @@ Add in `describe('validateGalleryWorkflowText', ...)`:
 Add in the same describe block:
 
 ```ts
-  it('fails when the mobile smoke workflow misses branding or generated drift checks', () => {
-    const result = validateGalleryWorkflowText(
-      'gallery-mobile-smoke.yml',
-      [
-        'on:',
-        '  workflow_dispatch:',
-        '    inputs:',
-        '      ref:',
-        'jobs:',
-        '  smoke:',
-        '    steps:',
-        '      - uses: immich-app/devtools/actions/use-mise@7b8610a904d57da241e4ddba17fa62b62b15aed4',
-        '      - run: flutter pub get',
-        '      - run: mise //mobile:codegen:dart',
-        '      - run: mise //mobile:analyze',
-        '      - run: mise //mobile:test',
-        '      - run: flutter build apk --debug',
-      ].join('\\n'),
-      {
-        requireDispatch: true,
-        requiredDispatchInputs: ['ref'],
-        requireBranding: true,
-        brandingBeforeMarkers: ['flutter build apk --debug'],
-        requiredWorkflowReferences: [
-          'mise //mobile:codegen:translation',
-          'mise //mobile:codegen:pigeon',
-          'tj-actions/verify-changed-files',
-          'mobile/**/*.g.dart',
-          'mobile/**/*.gr.dart',
-          'mobile/**/*.drift.dart',
-        ],
-      },
-    );
+it('fails when the mobile smoke workflow misses branding or generated drift checks', () => {
+  const result = validateGalleryWorkflowText(
+    'gallery-mobile-smoke.yml',
+    [
+      'on:',
+      '  workflow_dispatch:',
+      '    inputs:',
+      '      ref:',
+      'jobs:',
+      '  smoke:',
+      '    steps:',
+      '      - uses: immich-app/devtools/actions/use-mise@7b8610a904d57da241e4ddba17fa62b62b15aed4',
+      '      - run: flutter pub get',
+      '      - run: mise //mobile:codegen:dart',
+      '      - run: mise //mobile:analyze',
+      '      - run: mise //mobile:test',
+      '      - run: flutter build apk --debug',
+    ].join('\\n'),
+    {
+      requireDispatch: true,
+      requiredDispatchInputs: ['ref'],
+      requireBranding: true,
+      brandingBeforeMarkers: ['flutter build apk --debug'],
+      requiredWorkflowReferences: [
+        'mise //mobile:codegen:translation',
+        'mise //mobile:codegen:pigeon',
+        'tj-actions/verify-changed-files',
+        'mobile/**/*.g.dart',
+        'mobile/**/*.gr.dart',
+        'mobile/**/*.drift.dart',
+      ],
+    },
+  );
 
-    expect(result.ok).toBe(false);
-    expect(result.details).toContain(
-      'gallery-mobile-smoke.yml is missing ./.github/actions/apply-branding',
-    );
-    expect(result.details).toContain(
-      'gallery-mobile-smoke.yml is missing workflow reference mise //mobile:codegen:translation',
-    );
-    expect(result.details).toContain(
-      'gallery-mobile-smoke.yml is missing workflow reference tj-actions/verify-changed-files',
-    );
-    expect(result.details).toContain(
-      'gallery-mobile-smoke.yml is missing workflow reference mobile/**/*.drift.dart',
-    );
-  });
+  expect(result.ok).toBe(false);
+  expect(result.details).toContain('gallery-mobile-smoke.yml is missing ./.github/actions/apply-branding');
+  expect(result.details).toContain(
+    'gallery-mobile-smoke.yml is missing workflow reference mise //mobile:codegen:translation',
+  );
+  expect(result.details).toContain(
+    'gallery-mobile-smoke.yml is missing workflow reference tj-actions/verify-changed-files',
+  );
+  expect(result.details).toContain('gallery-mobile-smoke.yml is missing workflow reference mobile/**/*.drift.dart');
+});
 ```
 
 - [ ] **Step 4: Add failing missing-workflow static assertion coverage**
@@ -163,19 +156,17 @@ Add in the same describe block:
 Add in `describe('validateGalleryWorkflowText', ...)` or the existing current-workflow section:
 
 ```ts
-  it('requires the Gallery mobile smoke workflow in release workflow assertions', () => {
-    const result = runGalleryWorkflowAssertions('/tmp/gallery-missing-workflows', {
-      '.github/workflows/gallery-rc-build.yml': minimalWorkflow,
-      '.github/workflows/gallery-release-server-only.yml': minimalWorkflow,
-      '.github/workflows/gallery-release-mobile.yml': minimalWorkflow,
-      '.github/workflows/gallery-build-mobile.yml': minimalWorkflow,
-    });
-
-    expect(result.ok).toBe(false);
-    expect(result.details).toContain(
-      '.github/workflows/gallery-mobile-smoke.yml is missing workflow_dispatch',
-    );
+it('requires the Gallery mobile smoke workflow in release workflow assertions', () => {
+  const result = runGalleryWorkflowAssertions('/tmp/gallery-missing-workflows', {
+    '.github/workflows/gallery-rc-build.yml': minimalWorkflow,
+    '.github/workflows/gallery-release-server-only.yml': minimalWorkflow,
+    '.github/workflows/gallery-release-mobile.yml': minimalWorkflow,
+    '.github/workflows/gallery-build-mobile.yml': minimalWorkflow,
   });
+
+  expect(result.ok).toBe(false);
+  expect(result.details).toContain('.github/workflows/gallery-mobile-smoke.yml is missing workflow_dispatch');
+});
 ```
 
 This test must be red before production assertions are extended because the current assertion set does not know about `.github/workflows/gallery-mobile-smoke.yml`.
@@ -194,6 +185,7 @@ Expected: FAIL because `runGalleryWorkflowAssertions()` does not yet require `.g
 ## Task 2: Add Production Static Assertions For The Mobile Smoke Workflow
 
 **Files:**
+
 - Modify: `tools/upstream-preflight/src/audits/rebase-confidence.ts`
 
 - [ ] **Step 1: Extend `workflowAssertions`**
@@ -244,6 +236,7 @@ Expected: FAIL because production assertions now require `.github/workflows/gall
 ## Task 3: Create The Mobile Smoke Workflow
 
 **Files:**
+
 - Create: `.github/workflows/gallery-mobile-smoke.yml`
 
 - [ ] **Step 1: Add the workflow**
@@ -357,6 +350,7 @@ Expected: PASS.
 ## Task 4: Update Operator Output Expectations
 
 **Files:**
+
 - Modify: `tools/upstream-preflight/src/audits/rebase-confidence.spec.ts`
 
 - [ ] **Step 1: Update real-repo availability-output test**
@@ -364,12 +358,12 @@ Expected: PASS.
 In `tools/upstream-preflight/src/audits/rebase-confidence.spec.ts`, update `emits available local commands while keeping missing future workflows planned` so it expects the mobile command when the workflow exists:
 
 ```ts
-    expect(details).toContain(
-      'gh workflow run gallery-mobile-smoke.yml --ref rebase/upstream-batch-176 (required by mobile: mobile/lib/routing/router.dart)',
-    );
-    expect(details).not.toContain(
-      'planned Slice 4 workflow: gallery-mobile-smoke.yml (workflow missing; required by mobile: mobile/lib/routing/router.dart)',
-    );
+expect(details).toContain(
+  'gh workflow run gallery-mobile-smoke.yml --ref rebase/upstream-batch-176 (required by mobile: mobile/lib/routing/router.dart)',
+);
+expect(details).not.toContain(
+  'planned Slice 4 workflow: gallery-mobile-smoke.yml (workflow missing; required by mobile: mobile/lib/routing/router.dart)',
+);
 ```
 
 Keep the assertions that future Slice 5 ML checks remain planned.
