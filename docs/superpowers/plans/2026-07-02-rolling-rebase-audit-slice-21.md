@@ -41,7 +41,7 @@ formatted before commit-time lint. Per each source file's `dartOut`, the new out
 - `view_intent_api.dart` → `lib/platform/view_intent_api.g.dart`
 
 **Plan:** add one `dart run pigeon --input pigeon/permission_api.dart` line and one
-`dart run pigeon --input pigeon/view_intent_api.dart` line to *each* of the two
+`dart run pigeon --input pigeon/view_intent_api.dart` line to _each_ of the two
 "Generate platform APIs" step blocks, and append
 `lib/platform/permission_api.g.dart lib/platform/view_intent_api.g.dart` to each block's
 `dart format` line. No other file needs modification (this is a workflow-only fix; the
