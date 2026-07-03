@@ -27,6 +27,7 @@
 ## Task 1: Red Tests For Branding Target Wiring
 
 **Files:**
+
 - Modify: `tools/upstream-preflight/src/cli-wiring.spec.ts`
 - Modify: `tools/upstream-preflight/src/audits/rebase-confidence.spec.ts`
 
@@ -35,43 +36,29 @@
 Patch `tools/upstream-preflight/src/cli-wiring.spec.ts`:
 
 ```ts
-  it('exposes a local Gallery branding verification Make target', () => {
-    const makefile = fs.readFileSync(
-      path.resolve(process.cwd(), '../../Makefile'),
-      'utf8',
-    );
+it('exposes a local Gallery branding verification Make target', () => {
+  const makefile = fs.readFileSync(path.resolve(process.cwd(), '../../Makefile'), 'utf8');
 
-    expect(makefile).toContain('.PHONY: gallery-branding-check');
-    expect(makefile).toContain(
-      'branding/scripts/gallery-branding-check.sh',
-    );
-  });
+  expect(makefile).toContain('.PHONY: gallery-branding-check');
+  expect(makefile).toContain('branding/scripts/gallery-branding-check.sh');
+});
 
-  it('keeps the Gallery branding check isolated in a temporary worktree', () => {
-    const script = fs.readFileSync(
-      path.resolve(
-        process.cwd(),
-        '../../branding/scripts/gallery-branding-check.sh',
-      ),
-      'utf8',
-    );
+it('keeps the Gallery branding check isolated in a temporary worktree', () => {
+  const script = fs.readFileSync(
+    path.resolve(process.cwd(), '../../branding/scripts/gallery-branding-check.sh'),
+    'utf8',
+  );
 
-    expect(script).toContain('trap cleanup EXIT');
-    expect(script).toContain('git -C "$REPO_ROOT" worktree add');
-    expect(script).toContain('git -C "$REPO_ROOT" worktree remove --force');
-    expect(script).toContain(
-      'ruby .github/actions/apply-branding/dependencies_test.rb',
-    );
-    expect(script).toContain(
-      'branding/scripts/test-email-branding.sh',
-    );
-    expect(script).toContain(
-      'branding/scripts/test-app-download-branding.sh',
-    );
-    expect(script).toContain('branding/scripts/apply-branding.sh');
-    expect(script).toContain('branding/scripts/verify-branding.sh');
-    expect(script).toContain('active worktree status changed');
-  });
+  expect(script).toContain('trap cleanup EXIT');
+  expect(script).toContain('git -C "$REPO_ROOT" worktree add');
+  expect(script).toContain('git -C "$REPO_ROOT" worktree remove --force');
+  expect(script).toContain('ruby .github/actions/apply-branding/dependencies_test.rb');
+  expect(script).toContain('branding/scripts/test-email-branding.sh');
+  expect(script).toContain('branding/scripts/test-app-download-branding.sh');
+  expect(script).toContain('branding/scripts/apply-branding.sh');
+  expect(script).toContain('branding/scripts/verify-branding.sh');
+  expect(script).toContain('active worktree status changed');
+});
 ```
 
 These tests intentionally inspect the exact wrapper structure because the main behavioral guarantee is shell isolation and cleanup.
@@ -81,42 +68,36 @@ These tests intentionally inspect the exact wrapper structure because the main b
 In `tools/upstream-preflight/src/audits/rebase-confidence.spec.ts`, change the test named `does not emit runnable commands for missing repo targets and workflows` to:
 
 ```ts
-  it('emits available local commands while keeping missing future workflows planned', () => {
-    const results = runRebaseConfidenceAudits({
-      upstreamTouchedFiles: [
-        'mobile/lib/routing/router.dart',
-        'server/Dockerfile',
-        'machine-learning/Dockerfile',
-      ],
-      batch: '176',
-      cwd: path.resolve(process.cwd(), '../..'),
-      workflowTexts: {
-        '.github/workflows/gallery-rc-build.yml': minimalWorkflow,
-        '.github/workflows/gallery-release-server-only.yml': minimalWorkflow,
-        '.github/workflows/gallery-release-mobile.yml': minimalWorkflow,
-        '.github/workflows/gallery-build-mobile.yml': minimalWorkflow,
-      },
-    });
-    const details = results.find(
-      (result) => result.title === 'Risk-Based Confidence Requirements',
-    )?.details;
-
-    expect(details).toContain(
-      'make gallery-branding-check (required by docker: server/Dockerfile, machine-learning/Dockerfile)',
-    );
-    expect(details).not.toContain(
-      'planned Slice 3 check: make gallery-branding-check (target missing; required by docker: server/Dockerfile, machine-learning/Dockerfile)',
-    );
-    expect(details).toContain(
-      'planned Slice 4 workflow: gallery-mobile-smoke.yml (workflow missing; required by mobile: mobile/lib/routing/router.dart)',
-    );
-    expect(details).toContain(
-      'planned Slice 5 check: make gallery-ml-smoke (target missing; required by docker: server/Dockerfile, machine-learning/Dockerfile; ml: machine-learning/Dockerfile)',
-    );
-    expect(details).not.toContain(
-      'gh workflow run gallery-mobile-smoke.yml --ref rebase/upstream-batch-176 (required by mobile: mobile/lib/routing/router.dart)',
-    );
+it('emits available local commands while keeping missing future workflows planned', () => {
+  const results = runRebaseConfidenceAudits({
+    upstreamTouchedFiles: ['mobile/lib/routing/router.dart', 'server/Dockerfile', 'machine-learning/Dockerfile'],
+    batch: '176',
+    cwd: path.resolve(process.cwd(), '../..'),
+    workflowTexts: {
+      '.github/workflows/gallery-rc-build.yml': minimalWorkflow,
+      '.github/workflows/gallery-release-server-only.yml': minimalWorkflow,
+      '.github/workflows/gallery-release-mobile.yml': minimalWorkflow,
+      '.github/workflows/gallery-build-mobile.yml': minimalWorkflow,
+    },
   });
+  const details = results.find((result) => result.title === 'Risk-Based Confidence Requirements')?.details;
+
+  expect(details).toContain(
+    'make gallery-branding-check (required by docker: server/Dockerfile, machine-learning/Dockerfile)',
+  );
+  expect(details).not.toContain(
+    'planned Slice 3 check: make gallery-branding-check (target missing; required by docker: server/Dockerfile, machine-learning/Dockerfile)',
+  );
+  expect(details).toContain(
+    'planned Slice 4 workflow: gallery-mobile-smoke.yml (workflow missing; required by mobile: mobile/lib/routing/router.dart)',
+  );
+  expect(details).toContain(
+    'planned Slice 5 check: make gallery-ml-smoke (target missing; required by docker: server/Dockerfile, machine-learning/Dockerfile; ml: machine-learning/Dockerfile)',
+  );
+  expect(details).not.toContain(
+    'gh workflow run gallery-mobile-smoke.yml --ref rebase/upstream-batch-176 (required by mobile: mobile/lib/routing/router.dart)',
+  );
+});
 ```
 
 - [ ] **Step 3: Run focused tests to verify RED**
@@ -133,6 +114,7 @@ Expected: FAIL because `gallery-branding-check` is not in `Makefile`, `branding/
 ## Task 2: Implement The Branding Check Wrapper And Make Target
 
 **Files:**
+
 - Create: `branding/scripts/gallery-branding-check.sh`
 - Modify: `Makefile`
 
@@ -241,6 +223,7 @@ Expected: PASS.
 ## Task 3: Command Verification And Worktree Cleanliness
 
 **Files:**
+
 - No file edits expected unless verification exposes a bug.
 
 - [ ] **Step 1: Capture active worktree status**
