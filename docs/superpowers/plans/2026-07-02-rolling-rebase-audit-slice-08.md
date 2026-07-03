@@ -90,6 +90,7 @@ not a new helper.
    > Extending the existing file is the literal reading of "mirror the
    > existing sync-stream test setup — look for existing tests of this
    > repository['s] ... motion handling to copy the mocking/DB pattern."
+
 3. `docs/plans/2026-07-02-rolling-rebase-audit-findings.md` — M5 Status →
    `FIXED (slice S8)`.
 
@@ -113,7 +114,7 @@ narrower shape, `duration` is already an `int` not `Optional<Period>`,
 3. **`hides a motion part synced with no linked still (edge case)`** — sync
    only a video asset via `updateAssetsV2` with no other row referencing it as
    `live_photo_video_id` — assert it stays **visible** (`timeline`), matching
-   the old path's behavior: the predicate only fires when some *other* row's
+   the old path's behavior: the predicate only fires when some _other_ row's
    `live_photo_video_id` points at it, so an orphaned/unreferenced video is
    never hidden by this sweep either path.
 4. **`idempotent re-sync of the same V2 batch stays hidden, no error`** — call

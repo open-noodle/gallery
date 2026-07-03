@@ -13,9 +13,9 @@ Read `server/bin/sync-gallery-migrations.mjs` in full. It is the npm `postbuild`
 **three** things, in this order, inside `syncGalleryMigrations()`:
 
 1. `removeStaleCopiedGalleryMigrations` — deletes any file previously copied into
-   `dist/schema/migrations/` from `migrations-gallery/` whose *name* no longer exists in
+   `dist/schema/migrations/` from `migrations-gallery/` whose _name_ no longer exists in
    either `src/schema/migrations-gallery/` (by full name) or `src/schema/migrations/`
-   (upstream source), but whose *timestamp suffix* still matches a current gallery
+   (upstream source), but whose _timestamp suffix_ still matches a current gallery
    migration — i.e. cleans up stale copies left behind when a fork migration file is
    renamed (only the suffix, e.g. class name, matches after the timestamp).
 2. `copyGalleryMigrations` — copies `dist/schema/migrations-gallery/*.js` into
@@ -40,7 +40,7 @@ Read `server/bin/sync-gallery-migrations.mjs` in full. It is the npm `postbuild`
    authored under the upstream timestamp `1777667825574` and shipped in a released v5-RC.
    It was later renamed/re-timestamped to `1776735180298` (to fix ordering/collision
    concerns elsewhere in the rebase). Databases that already ran the migration recorded it
-   in their migration-history table under the *old* name
+   in their migration-history table under the _old_ name
    (`1777667825574-ChangeDurationToInteger`). Kysely's migrator hard-fails on boot
    (`#ensureNoMissingMigrations`) if a migration name recorded in the DB has no matching
    file on disk. The alias makes both filenames resolve to (functionally identical, since
@@ -71,9 +71,9 @@ signal that the alias is load-bearing and must not be dropped.
 `server/test/vitest.config.mjs` hardcodes `include: ['src/**/*.spec.ts']`, so a spec at
 `server/bin/sync-gallery-migrations.spec.ts` is invisible to
 `cd server && npx vitest run --config test/vitest.config.mjs bin/sync-gallery-migrations.spec.ts`
-(confirmed empirically: "No test files found... include: src/**/*.spec.ts"). Widening
+(confirmed empirically: "No test files found... include: src/**/\*.spec.ts"). Widening
 that include glob is a `server/test/vitest.config.mjs` edit, which is out of scope for
-this slice's file allowlist. **Using option (a) instead**: a new
+this slice's file allowlist. **Using option (a) instead\*\*: a new
 `tools/upstream-preflight/src/migration-alias.spec.ts`, following the exact pattern of
 the sibling `migration-timestamps.spec.ts` guard (repo-root-relative `fs` read of the
 source file, no build/import needed, runs standalone via
@@ -91,18 +91,18 @@ New file: `tools/upstream-preflight/src/migration-alias.spec.ts`.
   from `tools/upstream-preflight`).
 - Parses the `compatibilityAliases` array out of the source with a regex tolerant of
   future additional entries (doesn't assert exact array equality — asserts the required
-  `ChangeDurationToInteger` entry is *included*, per spec edge case: "guard tolerates
+  `ChangeDurationToInteger` entry is _included_, per spec edge case: "guard tolerates
   future additional alias entries").
 - Asserts the parsed aliases contain an entry with
   `from: '1777667825574-ChangeDurationToInteger'` and
   `to: '1776735180298-ChangeDurationToInteger'`.
 - Second `it`: reads `CLAUDE.md` as text and asserts (a) it mentions
   `sync-gallery-migrations.mjs` by name, and (b) it no longer describes the postbuild hook
-  as *only* copying files — asserted by requiring the doc to also mention "alias" (or
+  as _only_ copying files — asserted by requiring the doc to also mention "alias" (or
   "compatibility") in the same migration section, which is false against the current doc.
 
 **Expected RED reasoning (demonstrated, not by leaving the assertion broken):** the
-`CLAUDE.md` doc-guard assertion is checked against the *current* file content first — the
+`CLAUDE.md` doc-guard assertion is checked against the _current_ file content first — the
 existing subsection contains no occurrence of `alias`/`compatibility`/
 `ChangeDurationToInteger`, so asserting `claudeMd.includes('sync-gallery-migrations.mjs')
 && /alias|compatibility/i.test(claudeMd)` on the pre-edit doc evaluates to `false`,
@@ -136,7 +136,7 @@ failing state.
   exact-equality against the whole array).
 - Alias is only written by `syncCompatibilityAliases` when the `from` source file exists
   in `dist/schema/migrations/` (`existsSync(source)` guard in the script) — the guard
-  reads *source* (the `.mjs` script text), not `dist/` state, so it makes no assumption
+  reads _source_ (the `.mjs` script text), not `dist/` state, so it makes no assumption
   about a build having run.
 - Doc guard checks content, not exact prose — resilient to minor rewording as long as the
   hook name and "alias"/"compatibility" concept are both present.

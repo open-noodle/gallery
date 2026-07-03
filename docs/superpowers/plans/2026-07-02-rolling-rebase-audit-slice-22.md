@@ -48,6 +48,7 @@ Pattern: mirror `MemoriesSettings.spec.ts` (mock `featureFlagsManager`,
 real component from `@testing-library/svelte`.
 
 Assertions:
+
 1. RED (pre-fix): the channel select is rendered — `screen.getByText('admin.version_check_channel')` exists and a `<select>` (native `role=combobox`) is present for it, with both channel options.
 2. GREEN (post-fix): `screen.queryByText('admin.version_check_channel')` is `null`, and the channel select is absent from the document.
 3. Edge case coverage in the same file: the enabled switch (`admin.version_check_enabled_description`) still renders and still toggles/saves via `SettingButtonsRow` → `handleSystemConfigSave`, proving the rest of the settings panel is unaffected.
