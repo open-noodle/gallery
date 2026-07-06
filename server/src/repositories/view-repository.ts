@@ -4,7 +4,6 @@ import { DummyValue, GenerateSql } from 'src/decorators';
 import { AssetVisibility } from 'src/enum';
 import { DB } from 'src/schema';
 import { asUuid, withExif } from 'src/utils/database';
-import { spaceAssetPathBranches } from 'src/utils/shared-space-album-scope';
 
 export class ViewRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
@@ -58,11 +57,20 @@ export class ViewRepository {
   private ownedOrSpaceAccessible(eb: ExpressionBuilder<DB, 'asset'>, userId: string) {
     return eb.or([
       eb('asset.ownerId', '=', asUuid(userId)),
-      ...spaceAssetPathBranches(eb, {
-        correlateAssetId: 'asset.id',
-        correlateLibraryId: 'asset.libraryId',
-        scope: { memberUserId: userId },
-      }),
+      eb.exists(
+        eb
+          .selectFrom('shared_space_asset')
+          .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
+          .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+          .where('shared_space_member.userId', '=', asUuid(userId)),
+      ),
+      eb.exists(
+        eb
+          .selectFrom('shared_space_library')
+          .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_library.spaceId')
+          .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+          .where('shared_space_member.userId', '=', asUuid(userId)),
+      ),
     ]);
   }
 }
