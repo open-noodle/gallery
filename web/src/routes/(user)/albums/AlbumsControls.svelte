@@ -127,6 +127,17 @@
   <SearchBar placeholder={$t('search_albums')} bind:name={searchQuery} showLoadingSpinner={false} />
 </div>
 
+<!-- Create Album -->
+<Button
+  leadingIcon={mdiPlusBoxOutline}
+  onclick={() => createAlbumAndRedirect()}
+  size="small"
+  variant="ghost"
+  color="secondary"
+>
+  <p class="hidden md:block">{$t('create_album')}</p>
+</Button>
+
 <!-- Sort Albums -->
 <Dropdown
   title={$t('sort_albums_by')}
@@ -206,14 +217,3 @@
     <Text class="hidden md:block">{$t('list')}</Text>
   </Button>
 {/if}
-
-<!-- Create Album -->
-<Button
-  leadingIcon={mdiPlusBoxOutline}
-  onclick={() => createAlbumAndRedirect()}
-  size="small"
-  variant="ghost"
-  color="secondary"
->
-  <p class="hidden md:block">{$t('create_album')}</p>
-</Button>

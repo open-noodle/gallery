@@ -59,7 +59,6 @@ import {
   withTags,
 } from 'src/utils/database';
 import { globToPostgresRegex } from 'src/utils/misc';
-import { spaceAssetPathBranches } from 'src/utils/shared-space-album-scope';
 
 export type AssetStats = Record<AssetType, number>;
 
@@ -314,14 +313,20 @@ export function withTimeBucketAssetFilters<O>(
     )
     .$if(!!options.spaceId, (qb) =>
       qb.where((eb) =>
-        eb.or(
-          spaceAssetPathBranches(eb, {
-            correlateAssetId: 'asset.id',
-            correlateLibraryId: 'asset.libraryId',
-            scope: { spaceId: options.spaceId! },
-            requireShowInTimeline: true,
-          }),
-        ),
+        eb.or([
+          eb.exists(
+            eb
+              .selectFrom('shared_space_asset')
+              .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+              .where('shared_space_asset.spaceId', '=', asUuid(options.spaceId!)),
+          ),
+          eb.exists(
+            eb
+              .selectFrom('shared_space_library')
+              .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+              .where('shared_space_library.spaceId', '=', asUuid(options.spaceId!)),
+          ),
+        ]),
       ),
     )
     .$if(!!options.personIds?.length, (qb) => hasPeople(qb, options.personIds!))
@@ -347,12 +352,18 @@ export function withTimeBucketAssetFilters<O>(
           options.personId && viewerId
             ? eb.or([eb('asset.ownerId', '=', anyUuid(options.userIds!)), inSharedAlbum(eb, viewerId)])
             : eb('asset.ownerId', '=', anyUuid(options.userIds!)),
-          ...spaceAssetPathBranches(eb, {
-            correlateAssetId: 'asset.id',
-            correlateLibraryId: 'asset.libraryId',
-            scope: { spaceIds: options.timelineSpaceIds! },
-            requireShowInTimeline: true,
-          }),
+          eb.exists(
+            eb
+              .selectFrom('shared_space_asset')
+              .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+              .where('shared_space_asset.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
+          ),
+          eb.exists(
+            eb
+              .selectFrom('shared_space_library')
+              .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+              .where('shared_space_library.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
+          ),
         ]),
       ),
     )
@@ -895,23 +906,6 @@ export class AssetRepository {
       .execute();
   }
 
-  @GenerateSql({ params: [DummyValue.UUID, 1000, 0] })
-  getByAlbumIdWithFaces(albumId: string, limit = 1000, offset = 0) {
-    return this.db
-      .selectFrom('asset')
-      .innerJoin('album_asset', 'album_asset.assetId', 'asset.id')
-      .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
-      .select('asset.id')
-      .where('album_asset.albumId', '=', albumId)
-      .where('asset.deletedAt', 'is', null)
-      .where('asset.isOffline', '=', false)
-      .groupBy('asset.id')
-      .orderBy('asset.id')
-      .limit(limit)
-      .offset(offset)
-      .execute();
-  }
-
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING] })
   getByLibraryIdAndOriginalPath(libraryId: string, originalPath: string) {
     return this.db
@@ -1371,14 +1365,20 @@ export class AssetRepository {
           )
           .$if(!!options.spaceId, (qb) =>
             qb.where((eb) =>
-              eb.or(
-                spaceAssetPathBranches(eb, {
-                  correlateAssetId: 'asset.id',
-                  correlateLibraryId: 'asset.libraryId',
-                  scope: { spaceId: options.spaceId! },
-                  requireShowInTimeline: true,
-                }),
-              ),
+              eb.or([
+                eb.exists(
+                  eb
+                    .selectFrom('shared_space_asset')
+                    .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                    .where('shared_space_asset.spaceId', '=', asUuid(options.spaceId!)),
+                ),
+                eb.exists(
+                  eb
+                    .selectFrom('shared_space_library')
+                    .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                    .where('shared_space_library.spaceId', '=', asUuid(options.spaceId!)),
+                ),
+              ]),
             ),
           )
           .$if(!!options.personIds?.length, (qb) => hasPeople(qb, options.personIds!))
@@ -1402,12 +1402,18 @@ export class AssetRepository {
                 options.personId
                   ? eb.or([eb('asset.ownerId', '=', anyUuid(options.userIds!)), inSharedAlbum(eb, auth.user.id)])
                   : eb('asset.ownerId', '=', anyUuid(options.userIds!)),
-                ...spaceAssetPathBranches(eb, {
-                  correlateAssetId: 'asset.id',
-                  correlateLibraryId: 'asset.libraryId',
-                  scope: { spaceIds: options.timelineSpaceIds! },
-                  requireShowInTimeline: true,
-                }),
+                eb.exists(
+                  eb
+                    .selectFrom('shared_space_asset')
+                    .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                    .where('shared_space_asset.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
+                ),
+                eb.exists(
+                  eb
+                    .selectFrom('shared_space_library')
+                    .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                    .where('shared_space_library.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
+                ),
               ]),
             ),
           )

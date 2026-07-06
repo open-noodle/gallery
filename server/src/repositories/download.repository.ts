@@ -48,14 +48,6 @@ export class DownloadRepository {
       .where('shared_space_library.spaceId', '=', spaceId)
       .where('asset.isOffline', '=', false);
 
-    const album = builder(this.db)
-      .innerJoin('album_asset', 'asset.id', 'album_asset.assetId')
-      .innerJoin('shared_space_album', 'shared_space_album.albumId', 'album_asset.albumId')
-      .innerJoin('album', (join) =>
-        join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
-      )
-      .where('shared_space_album.spaceId', '=', spaceId);
-
-    return direct.union(library).union(album).stream();
+    return direct.union(library).stream();
   }
 }

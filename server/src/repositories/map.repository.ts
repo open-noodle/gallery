@@ -14,7 +14,6 @@ import { SystemMetadataRepository } from 'src/repositories/system-metadata.repos
 import { DB } from 'src/schema';
 import { GeodataPlacesTable } from 'src/schema/tables/geodata-places.table';
 import { NaturalEarthCountriesTable } from 'src/schema/tables/natural-earth-countries.table';
-import { spaceAlbumAssetExists, spaceAssetPathBranches } from 'src/utils/shared-space-album-scope';
 
 export interface MapMarkerSearchOptions {
   isArchived?: boolean;
@@ -113,12 +112,18 @@ export class MapRepository {
           const albumScope: Expression<SqlBool>[] = [eb('ownerId', 'in', ownerIds)];
           if (timelineSpaceIds?.length) {
             albumScope.push(
-              ...spaceAssetPathBranches(eb, {
-                correlateAssetId: 'asset.id',
-                correlateLibraryId: 'asset.libraryId',
-                scope: { spaceIds: timelineSpaceIds },
-                requireShowInTimeline: true,
-              }),
+              eb.exists((eb) =>
+                eb
+                  .selectFrom('shared_space_asset')
+                  .whereRef('asset.id', '=', 'shared_space_asset.assetId')
+                  .where('shared_space_asset.spaceId', 'in', timelineSpaceIds),
+              ),
+              eb.exists((eb) =>
+                eb
+                  .selectFrom('shared_space_library')
+                  .whereRef('asset.libraryId', '=', 'shared_space_library.libraryId')
+                  .where('shared_space_library.spaceId', 'in', timelineSpaceIds),
+              ),
             );
           }
 
@@ -154,14 +159,6 @@ export class MapRepository {
                   .whereRef('asset.libraryId', '=', 'shared_space_library.libraryId')
                   .where('shared_space_library.spaceId', 'in', timelineSpaceIds),
               ),
-            ]),
-            eb.and([
-              eb('asset.visibility', '=', AssetVisibility.Timeline),
-              spaceAlbumAssetExists(eb, {
-                correlateAssetId: 'asset.id',
-                scope: { spaceIds: timelineSpaceIds },
-                requireShowInTimeline: true,
-              }),
             ]),
           );
         }
