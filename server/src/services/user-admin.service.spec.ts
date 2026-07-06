@@ -20,11 +20,6 @@ describe(UserAdminService.name, () => {
     mocks.user.get.mockImplementation((userId) =>
       Promise.resolve([userStub.admin, userStub.user1].find((user) => user.id === userId) ?? undefined),
     );
-
-    // delete()/restore() now enumerate the user's albums and re-project space
-    // faces (faces F3b); default these to empty so unrelated tests don't break.
-    mocks.album.getAllIds.mockResolvedValue([]);
-    mocks.sharedSpace.getSpacesLinkedToAlbum.mockResolvedValue([]);
   });
 
   describe('search', () => {

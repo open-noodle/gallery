@@ -370,26 +370,6 @@ limit
 offset
   $4
 
--- AssetRepository.getByAlbumIdWithFaces
-select
-  "asset"."id"
-from
-  "asset"
-  inner join "album_asset" on "album_asset"."assetId" = "asset"."id"
-  inner join "asset_face" on "asset_face"."assetId" = "asset"."id"
-where
-  "album_asset"."albumId" = $1
-  and "asset"."deletedAt" is null
-  and "asset"."isOffline" = $2
-group by
-  "asset"."id"
-order by
-  "asset"."id"
-limit
-  $3
-offset
-  $4
-
 -- AssetRepository.getByLibraryIdAndOriginalPath
 select
   "asset".*

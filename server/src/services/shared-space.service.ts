@@ -1,7 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { AssetFace, SharedSpacePerson } from 'src/database';
-import { OnEvent, OnJob } from 'src/decorators';
-import { MapAlbumDto, mapAlbum } from 'src/dtos/album.dto';
+import { OnJob } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
 import type { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto';
 import type { MapMarkerResponseDto } from 'src/dtos/map.dto';
@@ -23,12 +22,10 @@ import {
 } from 'src/dtos/shared-space-person.dto';
 import {
   SharedSpaceActivityResponseDto,
-  SharedSpaceAlbumLinkUpdateDto,
   SharedSpaceAssetAddDto,
   SharedSpaceAssetRemoveDto,
   SharedSpaceCreateDto,
   SharedSpaceLibraryLinkDto,
-  SharedSpaceLinkedAlbumDto,
   SharedSpaceLinkedLibraryDto,
   SharedSpaceMemberCreateDto,
   SharedSpaceMemberMetadataContributionDto,
@@ -53,8 +50,6 @@ import {
   SharedSpaceRole,
   UserAvatarColor,
 } from 'src/enum';
-import { AlbumAssetCount } from 'src/repositories/album.repository';
-import type { ArgOf } from 'src/repositories/event.repository';
 import type { SpaceFaceAssignment } from 'src/repositories/shared-space.repository';
 import {
   buildAutomaticReconciliationClaim,
@@ -634,90 +629,6 @@ export class SharedSpaceService extends BaseService {
     }
   }
 
-  async linkAlbum(auth: AuthDto, spaceId: string, albumId: string): Promise<void> {
-    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
-    // Actor must own or be an editor of the album (cannot re-share a read-only album).
-    // AlbumUpdate = owner ∪ album_user-editor and is NOT extended by the space grant → no circularity.
-    await this.requireAccess({ auth, permission: Permission.AlbumUpdate, ids: [albumId] });
-
-    const result = await this.sharedSpaceRepository.addAlbum({
-      spaceId,
-      albumId,
-      addedById: auth.user.id,
-    });
-
-    // Only queue face sync for newly created links (not idempotent re-links).
-    if (result) {
-      const space = await this.sharedSpaceRepository.getById(spaceId);
-      if (space?.faceRecognitionEnabled) {
-        await this.jobRepository.queue({
-          name: JobName.SharedSpaceAlbumFaceSync,
-          data: { spaceId, albumId },
-        });
-      }
-      const album = await this.albumRepository.getById(albumId, { withAssets: false });
-      await this.sharedSpaceRepository.logActivity({
-        spaceId,
-        userId: auth.user.id,
-        type: SharedSpaceActivityType.AlbumLink,
-        data: { albumId, albumName: album?.albumName ?? '' },
-      });
-    }
-  }
-
-  async unlinkAlbum(auth: AuthDto, spaceId: string, albumId: string): Promise<void> {
-    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
-
-    const album = await this.albumRepository.getById(albumId, { withAssets: false });
-    const orphanedAssetIds = await this.sharedSpaceRepository.getAlbumAssetIdsWithoutOtherSpacePath(spaceId, albumId);
-    await this.sharedSpaceRepository.removeAlbum(spaceId, albumId);
-    await this.sharedSpaceRepository.logActivity({
-      spaceId,
-      userId: auth.user.id,
-      type: SharedSpaceActivityType.AlbumUnlink,
-      data: { albumId, albumName: album?.albumName ?? '' },
-    });
-    if (orphanedAssetIds.length > 0) {
-      await this.sharedSpaceRepository.removePersonFacesByAssetIds(spaceId, orphanedAssetIds);
-      await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
-      await this.queueSpacePersonMetadataBackfill();
-    }
-  }
-
-  async updateAlbumLink(
-    auth: AuthDto,
-    spaceId: string,
-    albumId: string,
-    dto: SharedSpaceAlbumLinkUpdateDto,
-  ): Promise<void> {
-    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
-    await this.sharedSpaceRepository.setAlbumShowInTimeline(spaceId, albumId, dto.showInTimeline);
-  }
-
-  async getLinkedAlbums(auth: AuthDto, spaceId: string): Promise<SharedSpaceLinkedAlbumDto[]> {
-    await this.requireMembership(auth, spaceId);
-    const rows = await this.sharedSpaceRepository.getLinkedAlbums(spaceId);
-    if (rows.length === 0) {
-      return [];
-    }
-    const metadata = await this.albumRepository.getMetadataForIds(rows.map((row) => row.id));
-    const byId: Record<string, AlbumAssetCount> = {};
-    for (const m of metadata) {
-      byId[m.albumId] = m;
-    }
-    return rows.map((row) => ({
-      ...mapAlbum(row as unknown as MapAlbumDto),
-      sharedLinks: undefined,
-      startDate: asDateTimeString(byId[row.id]?.startDate ?? undefined),
-      endDate: asDateTimeString(byId[row.id]?.endDate ?? undefined),
-      assetCount: byId[row.id]?.assetCount ?? 0,
-      lastModifiedAssetTimestamp: asDateTimeString(byId[row.id]?.lastModifiedAssetTimestamp ?? undefined),
-      showInTimeline: row.showInTimeline,
-      addedById: row.addedById,
-      linkedAt: (row.linkedAt as unknown as Date).toISOString(),
-    }));
-  }
-
   async unlinkLibrary(auth: AuthDto, spaceId: string, libraryId: string): Promise<void> {
     if (!auth.user.isAdmin) {
       throw new ForbiddenException('Only admins can unlink libraries from spaces');
@@ -785,12 +696,9 @@ export class SharedSpaceService extends BaseService {
       data: { count: dto.assetIds.length },
     });
 
-    const orphanedAssetIds = await this.sharedSpaceRepository.getAssetIdsWithoutOtherSpacePath(spaceId, dto.assetIds);
-    if (orphanedAssetIds.length > 0) {
-      await this.sharedSpaceRepository.removePersonFacesByAssetIds(spaceId, orphanedAssetIds);
-      await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
-      await this.queueSpacePersonMetadataBackfill();
-    }
+    await this.sharedSpaceRepository.removePersonFacesByAssetIds(spaceId, dto.assetIds);
+    await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
+    await this.queueSpacePersonMetadataBackfill();
   }
 
   async getMapMarkers(auth: AuthDto, id: string) {
@@ -1257,17 +1165,17 @@ export class SharedSpaceService extends BaseService {
 
     const alias = await this.sharedSpaceRepository.getAlias(personId, auth.user.id);
 
-    const enriched = await this.sharedSpaceRepository.getPersonById(personId);
-    if (!enriched) {
-      throw new BadRequestException('Person not found');
-    }
-
     await this.sharedSpaceRepository.logActivity({
       spaceId,
       userId: auth.user.id,
       type: SharedSpaceActivityType.PersonUpdate,
-      data: { personId, personName: enriched.name ?? '' },
+      data: { personId },
     });
+
+    const enriched = await this.sharedSpaceRepository.getPersonById(personId);
+    if (!enriched) {
+      throw new BadRequestException('Person not found');
+    }
 
     return this.mapSpacePerson(enriched, alias?.alias ?? null);
   }
@@ -1395,12 +1303,6 @@ export class SharedSpaceService extends BaseService {
     }
 
     await this.identityMergePropagationService.mergeSpacePeople(auth, spaceId, targetPersonId, dto.ids);
-    await this.sharedSpaceRepository.logActivity({
-      spaceId,
-      userId: auth.user.id,
-      type: SharedSpaceActivityType.PersonMerge,
-      data: { personName: target.name ?? '', count: dto.ids.length },
-    });
   }
 
   async setSpacePersonAlias(
@@ -1755,56 +1657,6 @@ export class SharedSpaceService extends BaseService {
     }
 
     // Queue dedup pass after library sync completes
-    await this.jobRepository.queue({
-      name: JobName.SharedSpacePersonDedup,
-      data: { spaceId: job.spaceId },
-    });
-
-    return JobStatus.Success;
-  }
-
-  @OnJob({ name: JobName.SharedSpaceAlbumFaceSync, queue: QueueName.FacialRecognition })
-  async handleSharedSpaceAlbumFaceSync(job: JobOf<JobName.SharedSpaceAlbumFaceSync>): Promise<JobStatus> {
-    const space = await this.sharedSpaceRepository.getById(job.spaceId);
-    if (!space || !space.faceRecognitionEnabled) {
-      return JobStatus.Skipped;
-    }
-
-    const linkExists = await this.sharedSpaceRepository.hasAlbumLink(job.spaceId, job.albumId);
-    if (!linkExists) {
-      return JobStatus.Skipped;
-    }
-
-    const batchSize = 1000;
-    let offset = 0;
-    let affectedAny = false;
-
-    while (true) {
-      // Re-check link each batch to handle concurrent unlink
-      const stillLinked = await this.sharedSpaceRepository.hasAlbumLink(job.spaceId, job.albumId);
-      if (!stillLinked) {
-        this.logger.log(`Album ${job.albumId} was unlinked from space ${job.spaceId} during sync, stopping`);
-        break;
-      }
-
-      const assets = await this.assetRepository.getByAlbumIdWithFaces(job.albumId, batchSize, offset);
-      if (assets.length === 0) {
-        break;
-      }
-
-      for (const asset of assets) {
-        const affectedPersonIds = await this.processSpaceFaceMatch(job.spaceId, asset.id);
-        affectedAny ||= affectedPersonIds.length > 0;
-      }
-
-      offset += assets.length;
-    }
-
-    if (affectedAny) {
-      await this.queueSpaceIdentityReconciliation({ spaceId: job.spaceId });
-    }
-
-    // Queue dedup pass after album sync completes
     await this.jobRepository.queue({
       name: JobName.SharedSpacePersonDedup,
       data: { spaceId: job.spaceId },
@@ -2781,115 +2633,5 @@ export class SharedSpaceService extends BaseService {
       updatedAt: (person.updatedAt as unknown as Date).toISOString(),
       type: person.type,
     };
-  }
-
-  // Space people sync is a best-effort side effect of an album mutation. EventRepository.onEvent
-  // awaits handlers inline and does not isolate their errors, so a throw here would bubble up and
-  // fail the user's album add/remove. Guard the whole body in try/catch: face matches are also
-  // recoverable via the post-detection backfill, so logging and moving on is correct.
-  @OnEvent({ name: 'AlbumAssetsAdd' })
-  async onAlbumAssetsAdd({ albumId, assetIds }: ArgOf<'AlbumAssetsAdd'>): Promise<void> {
-    if (assetIds.length === 0) {
-      return;
-    }
-    try {
-      const spaces = await this.sharedSpaceRepository.getSpacesLinkedToAlbum(albumId);
-      const jobs = spaces
-        .filter((space) => space.faceRecognitionEnabled)
-        .flatMap((space) =>
-          assetIds.map((assetId) => ({
-            name: JobName.SharedSpaceFaceMatch as const,
-            data: { spaceId: space.spaceId, assetId },
-          })),
-        );
-      if (jobs.length > 0) {
-        await this.jobRepository.queueAll(jobs);
-      }
-    } catch (error) {
-      this.logger.error(`Failed to sync space people after adding assets to album ${albumId}: ${error}`);
-    }
-  }
-
-  // Emit-timing note: AssetDelete fires AFTER the asset row and its DB cascade
-  // (asset → asset_face → shared_space_person_face) have already run.  By the time this
-  // handler executes, those rows are gone.  The affected (spaceId, personId) pairs are
-  // therefore captured at the emit site in asset.service.ts BEFORE deletion via
-  // sharedSpaceRepository.getSpacePersonsForAsset() and forwarded in the payload.
-  @OnEvent({ name: 'AssetDelete' })
-  async onAssetDelete({ assetId, affectedSpacePersons }: ArgOf<'AssetDelete'>): Promise<void> {
-    if (!affectedSpacePersons || affectedSpacePersons.length === 0) {
-      return;
-    }
-    try {
-      // Group personIds by spaceId: one recount + orphan-cleanup pass per space.
-      const spacePersonMap = new Map<string, string[]>();
-      for (const { spaceId, personId } of affectedSpacePersons) {
-        let ids = spacePersonMap.get(spaceId);
-        if (!ids) {
-          ids = [];
-          spacePersonMap.set(spaceId, ids);
-        }
-        ids.push(personId);
-      }
-      for (const [spaceId, personIds] of spacePersonMap) {
-        await this.sharedSpaceRepository.recountPersons(personIds);
-        await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
-      }
-    } catch (error) {
-      this.logger.error(`Failed to sync space people after deleting asset ${assetId}: ${error}`);
-    }
-  }
-
-  @OnEvent({ name: 'AlbumDelete' })
-  async onAlbumDelete({ albumId }: ArgOf<'AlbumDelete'>): Promise<void> {
-    try {
-      const spaces = await this.sharedSpaceRepository.getSpacesLinkedToAlbum(albumId);
-      let anyOrphanWork = false;
-      for (const space of spaces) {
-        if (!space.faceRecognitionEnabled) {
-          continue;
-        }
-        const orphaned = await this.sharedSpaceRepository.getAlbumAssetIdsWithoutOtherSpacePath(space.spaceId, albumId);
-        if (orphaned.length === 0) {
-          continue;
-        }
-        await this.sharedSpaceRepository.removePersonFacesByAssetIds(space.spaceId, orphaned);
-        await this.sharedSpaceRepository.deleteOrphanedPersons(space.spaceId);
-        anyOrphanWork = true;
-      }
-      if (anyOrphanWork) {
-        await this.queueSpacePersonMetadataBackfill();
-      }
-    } catch (error) {
-      this.logger.error(`Failed to sync space people after deleting album ${albumId}: ${error}`);
-    }
-  }
-
-  @OnEvent({ name: 'AlbumAssetsRemove' })
-  async onAlbumAssetsRemove({ albumId, assetIds }: ArgOf<'AlbumAssetsRemove'>): Promise<void> {
-    if (assetIds.length === 0) {
-      return;
-    }
-    try {
-      const spaces = await this.sharedSpaceRepository.getSpacesLinkedToAlbum(albumId);
-      let anyOrphanWork = false;
-      for (const space of spaces) {
-        if (!space.faceRecognitionEnabled) {
-          continue;
-        }
-        const orphaned = await this.sharedSpaceRepository.getAssetIdsWithoutOtherSpacePath(space.spaceId, assetIds);
-        if (orphaned.length === 0) {
-          continue;
-        }
-        await this.sharedSpaceRepository.removePersonFacesByAssetIds(space.spaceId, orphaned);
-        await this.sharedSpaceRepository.deleteOrphanedPersons(space.spaceId);
-        anyOrphanWork = true;
-      }
-      if (anyOrphanWork) {
-        await this.queueSpacePersonMetadataBackfill();
-      }
-    } catch (error) {
-      this.logger.error(`Failed to sync space people after removing assets from album ${albumId}: ${error}`);
-    }
   }
 }
