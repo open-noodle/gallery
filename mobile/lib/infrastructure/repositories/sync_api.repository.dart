@@ -86,12 +86,6 @@ class SyncApiRepository {
           SyncRequestType.libraryAssetsV1,
           SyncRequestType.libraryAssetExifsV1,
           SyncRequestType.sharedSpaceLibrariesV1,
-          // --- gallery-fork: shared-space album sync types (Phase 2B) ---
-          SyncRequestType.sharedSpaceAlbumsV1,
-          SyncRequestType.sharedSpaceAlbumLinksV1,
-          SyncRequestType.sharedSpaceAlbumToAssetsV1,
-          SyncRequestType.sharedSpaceAlbumAssetsV1,
-          SyncRequestType.sharedSpaceAlbumAssetExifsV1,
         ],
       ).toJson(),
     );
@@ -251,22 +245,6 @@ const _kResponseMap = <SyncEntityType, Function(Object)>{
   SyncEntityType.sharedSpaceLibraryV1: SyncSharedSpaceLibraryV1.fromJson,
   SyncEntityType.sharedSpaceLibraryBackfillV1: SyncSharedSpaceLibraryV1.fromJson,
   SyncEntityType.sharedSpaceLibraryDeleteV1: SyncSharedSpaceLibraryDeleteV1.fromJson,
-  // --- gallery-fork: shared-space album sync types (Phase 2B) ---
-  SyncEntityType.sharedSpaceAlbumV1: SyncAlbumV2.fromJson,
-  SyncEntityType.sharedSpaceAlbumBackfillV1: SyncAlbumV2.fromJson,
-  SyncEntityType.sharedSpaceAlbumDeleteV1: SyncAlbumDeleteV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumLinkV1: SyncSharedSpaceAlbumLinkV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumLinkBackfillV1: SyncSharedSpaceAlbumLinkV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumLinkDeleteV1: SyncSharedSpaceAlbumLinkDeleteV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumToAssetV1: SyncAlbumToAssetV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumToAssetBackfillV1: SyncAlbumToAssetV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumToAssetDeleteV1: SyncAlbumToAssetDeleteV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumAssetCreateV1: SyncAssetV2.fromJson,
-  SyncEntityType.sharedSpaceAlbumAssetUpdateV1: SyncAssetV2.fromJson,
-  SyncEntityType.sharedSpaceAlbumAssetBackfillV1: SyncAssetV2.fromJson,
-  SyncEntityType.sharedSpaceAlbumAssetExifCreateV1: SyncAssetExifV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumAssetExifUpdateV1: SyncAssetExifV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumAssetExifBackfillV1: SyncAssetExifV1.fromJson,
 };
 
 class _SyncEmptyDto {

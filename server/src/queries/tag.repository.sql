@@ -99,21 +99,6 @@ where
         and "asset"."deletedAt" is null
         and "shared_space_member"."userId" = $3::uuid
     )
-    or exists (
-      select
-      from
-        "tag_asset"
-        inner join "asset" on "asset"."id" = "tag_asset"."assetId"
-        inner join "album_asset" on "album_asset"."assetId" = "asset"."id"
-        inner join "shared_space_album" on "shared_space_album"."albumId" = "album_asset"."albumId"
-        inner join "album" on "album"."id" = "shared_space_album"."albumId"
-        and "album"."deletedAt" is null
-        inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
-      where
-        "tag_asset"."tagId" = "tag"."id"
-        and "asset"."deletedAt" is null
-        and "shared_space_member"."userId" = $4::uuid
-    )
   )
 order by
   "value"
