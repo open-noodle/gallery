@@ -89,7 +89,8 @@ test.describe('Spaces P1 — Collage, Hero, Sort', () => {
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto(`/spaces/${space.id}`);
       await expect(page.locator('[data-testid="hero-photo-count"]')).toContainText('1');
-      await expect(page.locator('[data-testid="hero-member-count"]')).toContainText('1');
+      // Member count moved from the hero to the Members tab badge (tabbed-nav refactor).
+      await expect(page.getByTestId('space-tab-members')).toContainText('1');
     });
 
     test('should display role badge', async ({ context, page }) => {
@@ -97,7 +98,8 @@ test.describe('Spaces P1 — Collage, Hero, Sort', () => {
 
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto(`/spaces/${space.id}`);
-      await expect(page.locator('[data-testid="hero-role-badge"]')).toContainText('Owner');
+      // Role text is the lowercase enum value ("owner"); the capital is CSS `capitalize` only.
+      await expect(page.locator('[data-testid="hero-role-badge"]')).toContainText(/owner/i);
     });
   });
 

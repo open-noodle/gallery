@@ -83,6 +83,15 @@ class TimelineFactory {
   }) =>
       TimelineService(_timelineRepository.sharedSpace(spaceId, groupBy ?? this.groupBy, temporalScope: temporalScope));
 
+  TimelineService spaceAlbum({
+    required String spaceId,
+    required String albumId,
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => TimelineService(
+    _timelineRepository.spaceAlbum(spaceId, albumId, groupBy ?? this.groupBy, temporalScope: temporalScope),
+  );
+
   TimelineService remoteAssets(
     String userId, {
     GroupAssetsBy? groupBy,

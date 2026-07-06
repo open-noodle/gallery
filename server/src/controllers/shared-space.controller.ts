@@ -36,10 +36,13 @@ import {
 import {
   SharedSpaceActivityQueryDto,
   SharedSpaceActivityResponseDto,
+  SharedSpaceAlbumLinkUpdateDto,
+  SharedSpaceAlbumParamDto,
   SharedSpaceAssetAddDto,
   SharedSpaceAssetRemoveDto,
   SharedSpaceCreateDto,
   SharedSpaceLibraryLinkDto,
+  SharedSpaceLinkedAlbumDto,
   SharedSpaceMemberCreateDto,
   SharedSpaceMemberMetadataContributionDto,
   SharedSpaceMemberPreferencesDto,
@@ -587,5 +590,51 @@ export class SharedSpaceController {
     @Param('libraryId') libraryId: string,
   ): Promise<void> {
     return this.service.unlinkLibrary(auth, id, libraryId);
+  }
+
+  @Get(':id/albums')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({ summary: 'List albums linked to a shared space', history: new HistoryBuilder().added('v1').beta('v1') })
+  getSharedSpaceAlbums(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<SharedSpaceLinkedAlbumDto[]> {
+    return this.service.getLinkedAlbums(auth, id);
+  }
+
+  @Put(':id/albums/:albumId')
+  @Authenticated({ permission: Permission.SharedSpaceAlbumCreate })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Link an album to a shared space',
+    description: 'Link an album so its photos appear in the space. Requires space editor/owner and album owner/editor.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  linkAlbum(@Auth() auth: AuthDto, @Param() { id, albumId }: SharedSpaceAlbumParamDto): Promise<void> {
+    return this.service.linkAlbum(auth, id, albumId);
+  }
+
+  @Patch(':id/albums/:albumId')
+  @Authenticated({ permission: Permission.SharedSpaceAlbumUpdate })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Update a space-album link (showInTimeline)',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  updateSharedSpaceAlbum(
+    @Auth() auth: AuthDto,
+    @Param() { id, albumId }: SharedSpaceAlbumParamDto,
+    @Body() dto: SharedSpaceAlbumLinkUpdateDto,
+  ): Promise<void> {
+    return this.service.updateAlbumLink(auth, id, albumId, dto);
+  }
+
+  @Delete(':id/albums/:albumId')
+  @Authenticated({ permission: Permission.SharedSpaceAlbumDelete })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Unlink an album from a shared space',
+    description: 'Remove an album link. Album assets will no longer appear in the space.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  unlinkAlbum(@Auth() auth: AuthDto, @Param() { id, albumId }: SharedSpaceAlbumParamDto): Promise<void> {
+    return this.service.unlinkAlbum(auth, id, albumId);
   }
 }

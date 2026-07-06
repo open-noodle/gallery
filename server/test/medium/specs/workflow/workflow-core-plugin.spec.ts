@@ -53,6 +53,8 @@ class WorkflowTestContext extends MediumTestContext<typeof WorkflowExecutionServ
     mockData.resourcePaths.corePlugin = '../packages/plugin-core';
     mockData.plugins.external.allow = false;
     this.getMock(ConfigRepository).getEnv.mockReturnValue(mockData);
+    // album.service emits AlbumAssetsAdd/Remove on asset mutations; this harness doesn't exercise
+    // space sync, so stub the emit to a no-op (automock throws on unimplemented calls).
     this.getMock(EventRepository).emit.mockResolvedValue();
     this.get(LoggingRepository).setLogLevel(LogLevel.Verbose);
 

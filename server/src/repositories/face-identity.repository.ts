@@ -16,6 +16,7 @@ import { FaceIdentityFaceSource, FaceIdentityFaceTable } from 'src/schema/tables
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table';
 import { anyUuid } from 'src/utils/database';
 import { asDateString, asDateTimeString } from 'src/utils/date';
+import { spaceAlbumAssetExistsSql } from 'src/utils/shared-space-album-scope';
 
 export type FaceIdentity = Selectable<FaceIdentityTable>;
 export type FaceIdentityFace = Selectable<FaceIdentityFaceTable>;
@@ -562,6 +563,31 @@ export class FaceIdentityRepository {
           AND asset_face."deletedAt" IS NULL
           AND asset_face."isVisible" = true
           ${assetFaceFilter}
+
+        UNION
+
+        SELECT
+          shared_space_album."spaceId",
+          asset.id AS "assetId",
+          asset_face.id AS "assetFaceId",
+          face_identity_face."identityId",
+          COALESCE(person.type, 'person') AS type
+        FROM shared_space_album
+        INNER JOIN shared_space ON shared_space.id = shared_space_album."spaceId"
+        INNER JOIN album ON album.id = shared_space_album."albumId" AND album."deletedAt" IS NULL
+        INNER JOIN album_asset ON album_asset."albumId" = shared_space_album."albumId"
+        INNER JOIN asset ON asset.id = album_asset."assetId"
+        INNER JOIN asset_face ON asset_face."assetId" = asset.id
+        INNER JOIN face_identity_face ON face_identity_face."assetFaceId" = asset_face.id
+        LEFT JOIN person ON person.id = asset_face."personId"
+        WHERE shared_space."faceRecognitionEnabled" = true
+          AND asset."deletedAt" IS NULL
+          AND asset."isOffline" = false
+          AND asset.visibility IN (${sql.join(peopleAssetVisibilities)})
+          AND asset_face."personId" IS NOT NULL
+          AND asset_face."deletedAt" IS NULL
+          AND asset_face."isVisible" = true
+          ${assetFaceFilter}
       ),
       targets AS (
         SELECT DISTINCT "spaceId", "assetId"
@@ -664,6 +690,34 @@ export class FaceIdentityRepository {
               ON shared_space_person.id = shared_space_person_face."personId"
             WHERE shared_space_person_face."assetFaceId" = asset_face.id
               AND shared_space_person."spaceId" = shared_space_library."spaceId"
+          )
+
+        UNION
+
+        SELECT
+          shared_space_album."spaceId",
+          asset.id AS "assetId"
+        FROM shared_space_album
+        INNER JOIN shared_space ON shared_space.id = shared_space_album."spaceId"
+        INNER JOIN album ON album.id = shared_space_album."albumId" AND album."deletedAt" IS NULL
+        INNER JOIN album_asset ON album_asset."albumId" = shared_space_album."albumId"
+        INNER JOIN asset ON asset.id = album_asset."assetId"
+        INNER JOIN asset_face ON asset_face."assetId" = asset.id
+        WHERE shared_space."faceRecognitionEnabled" = true
+          AND asset."deletedAt" IS NULL
+          AND asset."isOffline" = false
+          AND asset.visibility IN (${sql.join(peopleAssetVisibilities)})
+          AND asset_face.id = ${anyUuid(uniqueAssetFaceIds)}
+          AND asset_face."personId" IS NOT NULL
+          AND asset_face."deletedAt" IS NULL
+          AND asset_face."isVisible" = true
+          AND NOT EXISTS (
+            SELECT 1
+            FROM shared_space_person_face
+            INNER JOIN shared_space_person
+              ON shared_space_person.id = shared_space_person_face."personId"
+            WHERE shared_space_person_face."assetFaceId" = asset_face.id
+              AND shared_space_person."spaceId" = shared_space_album."spaceId"
           )
       )
       SELECT DISTINCT "spaceId", "assetId"
@@ -845,6 +899,10 @@ export class FaceIdentityRepository {
               INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
               WHERE shared_space_library."libraryId" = asset."libraryId"
             )
+            OR ${spaceAlbumAssetExistsSql({
+              assetIdColumn: sql`asset.id`,
+              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
+            })}
           )
       ),
       accessible_faces AS (
@@ -960,6 +1018,10 @@ export class FaceIdentityRepository {
               INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
               WHERE shared_space_library."libraryId" = asset."libraryId"
             )
+            OR ${spaceAlbumAssetExistsSql({
+              assetIdColumn: sql`asset.id`,
+              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
+            })}
           )
       ),
       accessible_faces AS (
@@ -1097,6 +1159,10 @@ export class FaceIdentityRepository {
               INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
               WHERE shared_space_library."libraryId" = asset."libraryId"
             )
+            OR ${spaceAlbumAssetExistsSql({
+              assetIdColumn: sql`asset.id`,
+              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
+            })}
           )
       )
       SELECT
@@ -1573,6 +1639,10 @@ export class FaceIdentityRepository {
               INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
               WHERE shared_space_library."libraryId" = asset."libraryId"
             )
+            OR ${spaceAlbumAssetExistsSql({
+              assetIdColumn: sql`asset.id`,
+              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
+            })}
           )
       ),
       accessible_profiles AS (
@@ -1714,6 +1784,10 @@ export class FaceIdentityRepository {
               INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
               WHERE shared_space_library."libraryId" = asset."libraryId"
             )
+            OR ${spaceAlbumAssetExistsSql({
+              assetIdColumn: sql`asset.id`,
+              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
+            })}
           )
       ),
       identity_counts AS (
@@ -1825,6 +1899,10 @@ export class FaceIdentityRepository {
               INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
               WHERE shared_space_library."libraryId" = asset."libraryId"
             )
+            OR ${spaceAlbumAssetExistsSql({
+              assetIdColumn: sql`asset.id`,
+              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
+            })}
           )
       ),
       asset_counts AS (

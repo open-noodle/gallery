@@ -2,9 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { Kysely, NotNull, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { ChunkedSet, DummyValue, GenerateSql } from 'src/decorators';
-import { AlbumUserRole, AssetVisibility } from 'src/enum';
+import { AlbumUserRole, AssetVisibility, SharedSpaceRole } from 'src/enum';
 import { DB } from 'src/schema';
 import { asUuid } from 'src/utils/database';
+import { spaceAssetPathBranches } from 'src/utils/shared-space-album-scope';
 
 class ActivityAccess {
   constructor(private db: Kysely<DB>) {}
@@ -136,6 +137,47 @@ class AlbumAccess {
           ) as Set<string>,
       );
   }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })
+  @ChunkedSet({ paramIndex: 1 })
+  async checkSpaceLinkedAlbumAccess(userId: string, albumIds: Set<string>) {
+    if (albumIds.size === 0) {
+      return new Set<string>();
+    }
+
+    return this.db
+      .selectFrom('album')
+      .select('album.id')
+      .distinct()
+      .innerJoin('shared_space_album', 'shared_space_album.albumId', 'album.id')
+      .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_album.spaceId')
+      .where('album.id', 'in', [...albumIds])
+      .where('album.deletedAt', 'is', null)
+      .where('shared_space_member.userId', '=', userId)
+      .where('shared_space_member.role', 'in', [SharedSpaceRole.Owner, SharedSpaceRole.Editor])
+      .execute()
+      .then((albums) => new Set(albums.map((album) => album.id)));
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })
+  @ChunkedSet({ paramIndex: 1 })
+  async checkSpaceLinkedAlbumReadAccess(userId: string, albumIds: Set<string>) {
+    if (albumIds.size === 0) {
+      return new Set<string>();
+    }
+
+    return this.db
+      .selectFrom('album')
+      .select('album.id')
+      .distinct()
+      .innerJoin('shared_space_album', 'shared_space_album.albumId', 'album.id')
+      .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_album.spaceId')
+      .where('album.id', 'in', [...albumIds])
+      .where('album.deletedAt', 'is', null)
+      .where('shared_space_member.userId', '=', userId)
+      .execute()
+      .then((albums) => new Set(albums.map((album) => album.id)));
+  }
 }
 
 class AssetAccess {
@@ -262,6 +304,23 @@ class AssetAccess {
                 eb.or([eb('asset.id', 'in', [...assetIds]), eb('asset.livePhotoVideoId', 'in', [...assetIds])]),
               ),
           )
+          .union(
+            this.db
+              .selectFrom('shared_space_album')
+              .innerJoin('album', (join) =>
+                join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+              )
+              .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_album.spaceId')
+              .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
+              .innerJoin('asset', (join) =>
+                join.onRef('asset.id', '=', 'album_asset.assetId').on('asset.deletedAt', 'is', null),
+              )
+              .select(['asset.id', 'asset.livePhotoVideoId'])
+              .where('shared_space_member.userId', '=', userId)
+              .where((eb) =>
+                eb.or([eb('asset.id', 'in', [...assetIds]), eb('asset.livePhotoVideoId', 'in', [...assetIds])]),
+              ),
+          )
           .as('combined'),
       )
       .select(['combined.id', 'combined.livePhotoVideoId'])
@@ -314,6 +373,24 @@ class AssetAccess {
               .select(['asset.id', 'asset.livePhotoVideoId'])
               .where('shared_space_member.userId', '=', userId)
               .where('shared_space_library.spaceId', '=', spaceId)
+              .where((eb) =>
+                eb.or([eb('asset.id', 'in', [...assetIds]), eb('asset.livePhotoVideoId', 'in', [...assetIds])]),
+              ),
+          )
+          .union(
+            this.db
+              .selectFrom('shared_space_album')
+              .innerJoin('album', (join) =>
+                join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+              )
+              .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_album.spaceId')
+              .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
+              .innerJoin('asset', (join) =>
+                join.onRef('asset.id', '=', 'album_asset.assetId').on('asset.deletedAt', 'is', null),
+              )
+              .select(['asset.id', 'asset.livePhotoVideoId'])
+              .where('shared_space_member.userId', '=', userId)
+              .where('shared_space_album.spaceId', '=', spaceId)
               .where((eb) =>
                 eb.or([eb('asset.id', 'in', [...assetIds]), eb('asset.livePhotoVideoId', 'in', [...assetIds])]),
               ),
@@ -726,22 +803,13 @@ class PersonAccess {
             .where('asset_face.deletedAt', 'is', null)
             .where('asset_face.isVisible', 'is', true)
             .where((eb) =>
-              eb.or([
-                eb.exists(
-                  eb
-                    .selectFrom('shared_space_asset')
-                    .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
-                    .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-                    .where('shared_space_member.userId', '=', userId),
-                ),
-                eb.exists(
-                  eb
-                    .selectFrom('shared_space_library')
-                    .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_library.spaceId')
-                    .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                    .where('shared_space_member.userId', '=', userId),
-                ),
-              ]),
+              eb.or(
+                spaceAssetPathBranches(eb, {
+                  correlateAssetId: 'asset.id',
+                  correlateLibraryId: 'asset.libraryId',
+                  scope: { memberUserId: userId },
+                }),
+              ),
             ),
         ),
       )
