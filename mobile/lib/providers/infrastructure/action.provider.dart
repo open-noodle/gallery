@@ -147,6 +147,17 @@ class ActionNotifier extends Notifier<void> {
     );
   }
 
+  Future<ActionResult> removeFromAlbum(ActionSource source, String albumId) async {
+    final ids = _getRemoteIdsForSource(source);
+    try {
+      final removedCount = await _service.removeFromAlbum(ids, albumId);
+      return ActionResult(count: removedCount, success: true);
+    } catch (error, stack) {
+      _logger.severe('Failed to remove assets from album', error, stack);
+      return ActionResult(count: ids.length, success: false, error: error.toString());
+    }
+  }
+
   Future<ActionResult> removeFromSpace(ActionSource source, String spaceId) async {
     // Removing from a Space is NOT owner-scoped: an editor may remove another
     // member's photo. Must stay _getRemoteIdsForSource, never the owned variant.
