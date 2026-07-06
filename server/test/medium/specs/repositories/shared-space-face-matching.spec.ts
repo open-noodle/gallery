@@ -1361,4 +1361,48 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       expect(byP2!.id).toBe(sp1.id);
     });
   });
+
+  // ==========================================
+  // Group E: Album-leg coverage
+  // ==========================================
+
+  describe('album-linked asset coverage in face pipeline', () => {
+    it('getSharedSpaceFaceMatchBackfillTargets includes an album-only asset with a face in a recognition-enabled space', async () => {
+      const { ctx, faceIdentityRepository } = setup();
+      const { user } = await ctx.newUser();
+
+      // Space S with face recognition enabled (newSharedSpace enables it by default)
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+
+      // Enable face recognition on the space explicitly
+      await ctx.database
+        .updateTable('shared_space')
+        .set({ faceRecognitionEnabled: true })
+        .where('id', '=', space.id)
+        .execute();
+
+      // Album A linked to the space
+      const { result: album } = await ctx.newAlbum({ ownerId: user.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      // Asset only in the album (NOT directly in the space, NOT in a library)
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+
+      // Create a global person and link a face on the asset to it
+      const { result: person } = await ctx.newPerson({ ownerId: user.id, name: 'Album Person' });
+      const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+      const faceId = await createFaceWithEmbedding(ctx, { assetId: asset.id, personId: person.id });
+      await faceIdentityRepository.linkFace({ assetFaceId: faceId, identityId: identity.id, source: 'owner-person' });
+
+      // The asset is NOT directly added to the space, NOT in a shared library
+      // — album is its only path into S
+
+      const targets = await faceIdentityRepository.getSharedSpaceFaceMatchBackfillTargets({ limit: 100 });
+
+      const spaceTargets = targets.filter((t) => t.spaceId === space.id);
+      const assetIds = spaceTargets.map((t) => t.assetId);
+      expect(assetIds).toContain(asset.id);
+    });
+  });
 });
