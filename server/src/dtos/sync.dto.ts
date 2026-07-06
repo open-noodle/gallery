@@ -556,6 +556,26 @@ const SyncSharedSpaceLibraryDeleteV1Schema = z
   })
   .meta({ id: 'SyncSharedSpaceLibraryDeleteV1' });
 
+// --- gallery-fork: shared-space album link DTOs ---
+
+const SyncSharedSpaceAlbumLinkV1Schema = z
+  .object({
+    spaceId: z.string().describe('Shared space ID'),
+    albumId: z.string().describe('Album ID'),
+    showInTimeline: z.boolean().describe('Whether this album appears in the space timeline'),
+    addedById: z.string().nullable().describe('User who linked the album to the space'),
+    createdAt: isoDatetimeToDate.describe('Created at'),
+    updatedAt: isoDatetimeToDate.describe('Updated at'),
+  })
+  .meta({ id: 'SyncSharedSpaceAlbumLinkV1' });
+
+const SyncSharedSpaceAlbumLinkDeleteV1Schema = z
+  .object({
+    spaceId: z.string().describe('Shared space ID'),
+    albumId: z.string().describe('Album ID'),
+  })
+  .meta({ id: 'SyncSharedSpaceAlbumLinkDeleteV1' });
+
 @ExtraModel()
 export class SyncSharedSpaceDeleteV1 extends createZodDto(SyncSharedSpaceDeleteV1Schema) {}
 
@@ -588,6 +608,12 @@ export class SyncSharedSpaceLibraryV1 extends createZodDto(SyncSharedSpaceLibrar
 
 @ExtraModel()
 export class SyncSharedSpaceLibraryDeleteV1 extends createZodDto(SyncSharedSpaceLibraryDeleteV1Schema) {}
+
+@ExtraModel()
+export class SyncSharedSpaceAlbumLinkV1 extends createZodDto(SyncSharedSpaceAlbumLinkV1Schema) {}
+
+@ExtraModel()
+export class SyncSharedSpaceAlbumLinkDeleteV1 extends createZodDto(SyncSharedSpaceAlbumLinkDeleteV1Schema) {}
 
 export type SyncItem = {
   [SyncEntityType.AuthUserV1]: SyncAuthUserV1;
@@ -669,6 +695,23 @@ export type SyncItem = {
   [SyncEntityType.SharedSpaceLibraryV1]: SyncSharedSpaceLibraryV1;
   [SyncEntityType.SharedSpaceLibraryBackfillV1]: SyncSharedSpaceLibraryV1;
   [SyncEntityType.SharedSpaceLibraryDeleteV1]: SyncSharedSpaceLibraryDeleteV1;
+  // gallery-fork: shared-space album sync types (V2 shape: no ownerId, access is
+  // via space grant so ownership info is not needed by the mobile client)
+  [SyncEntityType.SharedSpaceAlbumV1]: SyncAlbumV2;
+  [SyncEntityType.SharedSpaceAlbumBackfillV1]: SyncAlbumV2;
+  [SyncEntityType.SharedSpaceAlbumDeleteV1]: SyncAlbumDeleteV1;
+  [SyncEntityType.SharedSpaceAlbumLinkV1]: SyncSharedSpaceAlbumLinkV1;
+  [SyncEntityType.SharedSpaceAlbumLinkBackfillV1]: SyncSharedSpaceAlbumLinkV1;
+  [SyncEntityType.SharedSpaceAlbumLinkDeleteV1]: SyncSharedSpaceAlbumLinkDeleteV1;
+  [SyncEntityType.SharedSpaceAlbumToAssetV1]: SyncAlbumToAssetV1;
+  [SyncEntityType.SharedSpaceAlbumToAssetBackfillV1]: SyncAlbumToAssetV1;
+  [SyncEntityType.SharedSpaceAlbumToAssetDeleteV1]: SyncAlbumToAssetDeleteV1;
+  [SyncEntityType.SharedSpaceAlbumAssetCreateV1]: SyncAssetV2;
+  [SyncEntityType.SharedSpaceAlbumAssetUpdateV1]: SyncAssetV2;
+  [SyncEntityType.SharedSpaceAlbumAssetBackfillV1]: SyncAssetV2;
+  [SyncEntityType.SharedSpaceAlbumAssetExifCreateV1]: SyncAssetExifV1;
+  [SyncEntityType.SharedSpaceAlbumAssetExifUpdateV1]: SyncAssetExifV1;
+  [SyncEntityType.SharedSpaceAlbumAssetExifBackfillV1]: SyncAssetExifV1;
 };
 
 const SyncStreamSchema = z
