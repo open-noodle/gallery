@@ -1,9 +1,12 @@
 import 'dart:async';
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/infrastructure/repositories/remote_album.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_asset.repository.dart';
+import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/repositories/asset_api.repository.dart';
+import 'package:immich_mobile/repositories/drift_album_api_repository.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 
 final actionServiceProvider = Provider<ActionService>(
@@ -11,6 +14,8 @@ final actionServiceProvider = Provider<ActionService>(
     ref.watch(assetApiRepositoryProvider),
     ref.watch(driftProvider).remoteAssetRepository,
     ref.watch(sharedSpaceApiRepositoryProvider),
+    ref.watch(driftAlbumApiRepositoryProvider),
+    ref.watch(remoteAlbumRepository),
   ),
 );
 
@@ -18,8 +23,16 @@ class ActionService {
   final AssetApiRepository _assetApiRepository;
   final RemoteAssetRepository _remoteAssetRepository;
   final SharedSpaceApiRepository _sharedSpaceApiRepository;
+  final DriftAlbumApiRepository _albumApiRepository;
+  final DriftRemoteAlbumRepository _remoteAlbumRepository;
 
-  const ActionService(this._assetApiRepository, this._remoteAssetRepository, this._sharedSpaceApiRepository);
+  const ActionService(
+    this._assetApiRepository,
+    this._remoteAssetRepository,
+    this._sharedSpaceApiRepository,
+    this._albumApiRepository,
+    this._remoteAlbumRepository,
+  );
 
   /// Fork-only: removing an asset from a Space is NOT owner-scoped — an editor
   /// may remove another member's photo. Callers must resolve ids via
@@ -27,6 +40,18 @@ class ActionService {
   Future<int> removeFromSpace(List<String> remoteIds, String spaceId) async {
     await _sharedSpaceApiRepository.removeAssets(spaceId, remoteIds);
     return remoteIds.length;
+  }
+
+  /// Retained after upstream migrated remove-from-album into
+  /// `remove_from_album.action.dart`: the fork's `ActionNotifier.removeFromAlbum`
+  /// additionally fires `_nudgeSpaceSyncIfLinked`, which upstream's action has no
+  /// hook for, and fork-only `SpaceAlbumBottomSheet` depends on that path.
+  Future<int> removeFromAlbum(List<String> remoteIds, String albumId) async {
+    final result = await _albumApiRepository.removeAssets(albumId, remoteIds);
+    if (result.removed.isNotEmpty) {
+      await _remoteAlbumRepository.removeAssets(albumId, result.removed);
+    }
+    return result.removed.length;
   }
 
   Future<int> emptyTrash(String userId) async {

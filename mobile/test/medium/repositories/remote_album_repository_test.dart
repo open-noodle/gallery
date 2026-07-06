@@ -1,5 +1,8 @@
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/constants/enums.dart';
+import 'package:immich_mobile/domain/models/album/album.model.dart';
+import 'package:immich_mobile/infrastructure/entities/remote_album_user.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_album.repository.dart';
 
 import '../repository_context.dart';
@@ -129,6 +132,68 @@ void main() {
 
       expect(albums, hasLength(1));
       expect(albums.first.assetCount, 0);
+    });
+  });
+
+  group('currentUserRole', () {
+    Future<void> addAlbumUser(String albumId, String userId, AlbumUserRole role) => ctx.db
+        .into(ctx.db.remoteAlbumUserEntity)
+        .insert(RemoteAlbumUserEntityCompanion(albumId: Value(albumId), userId: Value(userId), role: Value(role)));
+
+    test('getAll: populates editor role when current user is an editor', () async {
+      final owner = await ctx.newUser();
+      final currentUser = await ctx.newUser();
+      final album = await ctx.newRemoteAlbum(ownerId: owner.id);
+      await addAlbumUser(album.id, currentUser.id, AlbumUserRole.editor);
+
+      final albums = await sut.getAll(currentUserId: currentUser.id);
+
+      expect(albums, hasLength(1));
+      expect(albums.first.currentUserRole, AlbumUserRole.editor);
+    });
+
+    test('getAll: populates owner role when current user owns the album', () async {
+      final currentUser = await ctx.newUser();
+      await ctx.newRemoteAlbum(ownerId: currentUser.id);
+
+      final albums = await sut.getAll(currentUserId: currentUser.id);
+
+      expect(albums, hasLength(1));
+      expect(albums.first.currentUserRole, AlbumUserRole.owner);
+    });
+
+    test('getAll: populates viewer role when current user is a viewer', () async {
+      final owner = await ctx.newUser();
+      final currentUser = await ctx.newUser();
+      final album = await ctx.newRemoteAlbum(ownerId: owner.id);
+      await addAlbumUser(album.id, currentUser.id, AlbumUserRole.viewer);
+
+      final albums = await sut.getAll(currentUserId: currentUser.id);
+
+      expect(albums, hasLength(1));
+      expect(albums.first.currentUserRole, AlbumUserRole.viewer);
+    });
+
+    test('getAll: currentUserRole is null when currentUserId is not provided', () async {
+      final user = await ctx.newUser();
+      await ctx.newRemoteAlbum(ownerId: user.id);
+
+      final albums = await sut.getAll();
+
+      expect(albums, hasLength(1));
+      expect(albums.first.currentUserRole, isNull);
+    });
+
+    test('get: populates editor role when current user is an editor', () async {
+      final owner = await ctx.newUser();
+      final currentUser = await ctx.newUser();
+      final album = await ctx.newRemoteAlbum(ownerId: owner.id);
+      await addAlbumUser(album.id, currentUser.id, AlbumUserRole.editor);
+
+      final result = await sut.get(album.id, currentUserId: currentUser.id);
+
+      expect(result, isNotNull);
+      expect(result!.currentUserRole, AlbumUserRole.editor);
     });
   });
 

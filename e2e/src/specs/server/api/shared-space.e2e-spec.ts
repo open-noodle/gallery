@@ -1020,6 +1020,30 @@ describe('/shared-spaces', () => {
       expect(spaceIds).not.toContain(space.id);
     });
 
+    it('revokes access to the space people once a member leaves', async () => {
+      const space = await utils.createSpace(user1.accessToken, { name: 'Leave Revokes People Access' });
+      await utils.addSpaceMember(user1.accessToken, space.id, { userId: user2.userId });
+
+      // While still a member, user2 can read the space's people listing.
+      const before = await request(app)
+        .get(`/shared-spaces/${space.id}/people`)
+        .set('Authorization', `Bearer ${user2.accessToken}`);
+      expect(before.status).toBe(200);
+
+      // user2 leaves the space (self-remove).
+      const leave = await request(app)
+        .delete(`/shared-spaces/${space.id}/members/${user2.userId}`)
+        .set('Authorization', `Bearer ${user2.accessToken}`);
+      expect(leave.status).toBe(204);
+
+      // After leaving, user2 is a non-member → people access is forbidden (403), matching the
+      // non-member case of the GET /people access matrix.
+      const after = await request(app)
+        .get(`/shared-spaces/${space.id}/people`)
+        .set('Authorization', `Bearer ${user2.accessToken}`);
+      expect(after.status).toBe(403);
+    });
+
     it('should reject owner leaving own space', async () => {
       const space = await utils.createSpace(user1.accessToken, { name: 'Owner Leave' });
 
