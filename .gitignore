@@ -2,9 +2,6 @@
 
 .DS_Store
 
-# Superpowers brainstorming visual-companion scratch
-.superpowers/
-
 # Certificates and secrets
 *.pem
 *.crt
