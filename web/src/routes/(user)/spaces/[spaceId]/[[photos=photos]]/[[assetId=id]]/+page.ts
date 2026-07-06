@@ -1,9 +1,16 @@
+import { getMembers, getSpace } from '@immich/sdk';
 import { authenticate } from '$lib/utils/auth';
 import type { PageLoad } from './$types';
 
-// space + members come from the parent [spaceId] layout load.
-export const load = (async ({ url, parent }) => {
+export const load = (async ({ url, params }) => {
   await authenticate(url);
-  await parent();
-  return {};
+  const [space, members] = await Promise.all([getSpace({ id: params.spaceId }), getMembers({ id: params.spaceId })]);
+
+  return {
+    space,
+    members,
+    meta: {
+      title: space.name,
+    },
+  };
 }) satisfies PageLoad;

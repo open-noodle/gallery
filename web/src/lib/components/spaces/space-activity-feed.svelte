@@ -72,21 +72,6 @@
       case 'space_color_change': {
         return $t('spaces_changed_color');
       }
-      case 'album_link': {
-        return `${name} linked album "${data.albumName ?? ''}"`;
-      }
-      case 'album_unlink': {
-        return `${name} unlinked album "${data.albumName ?? ''}"`;
-      }
-      case 'person_update': {
-        return `${name} updated person "${data.personName ?? ''}"`;
-      }
-      case 'person_delete': {
-        return `${name} deleted person "${data.personName ?? ''}"`;
-      }
-      case 'person_merge': {
-        return `${name} merged ${data.count ?? 0} people into "${data.personName ?? ''}"`;
-      }
       default: {
         return $t('spaces_activity_default', { values: { name } });
       }

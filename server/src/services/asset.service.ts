@@ -486,17 +486,12 @@ export class AssetService extends BaseService {
       }
     }
 
-    // Capture affected shared-space (spaceId, personId) pairs BEFORE the asset row and its
-    // DB cascade (asset_face → shared_space_person_face) are deleted.  The onAssetDelete
-    // handler in SharedSpaceService receives this data and recounts/cleans up after the delete.
-    const affectedSpacePersons = await this.sharedSpaceRepository.getSpacePersonsForAsset(id);
-
     await this.assetRepository.remove(asset);
     if (!asset.libraryId) {
       await this.userRepository.updateUsage(asset.ownerId, -(asset.exifInfo?.fileSizeInByte || 0));
     }
 
-    await this.eventRepository.emit('AssetDelete', { assetId: id, userId: asset.ownerId, affectedSpacePersons });
+    await this.eventRepository.emit('AssetDelete', { assetId: id, userId: asset.ownerId });
 
     // delete the motion if it is not used by another asset
     if (asset.livePhotoVideoId) {
