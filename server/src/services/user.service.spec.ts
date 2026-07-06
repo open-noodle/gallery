@@ -44,6 +44,9 @@ describe(UserService.name, () => {
     mocks.user.get.mockImplementation((userId) =>
       Promise.resolve([userStub.admin, userStub.user1].find((user) => user.id === userId) ?? undefined),
     );
+    // GREEN: handleUserDelete enumerates owned albums before deleteAll; default to empty so
+    // existing tests that don't mock getAllIds don't get a non-iterable undefined.
+    mocks.album.getAllIds.mockResolvedValue([]);
   });
 
   describe('getAll', () => {
@@ -896,6 +899,35 @@ describe(UserService.name, () => {
 
       expect(mocks.storage.unlinkDir).toHaveBeenCalledTimes(5);
       expect((StorageService as any).s3Backend).toBeUndefined();
+    });
+
+    it('should emit AlbumDelete for each owned album before albumRepository.deleteAll (faces F2)', async () => {
+      const user = { id: 'user-with-albums', deletedAt: makeDeletedAt(10) } as UserAdmin;
+      const ownedAlbumIds = ['album-f2-1', 'album-f2-2'];
+
+      mocks.user.get.mockResolvedValue(user);
+      mocks.album.getAllIds.mockResolvedValue(ownedAlbumIds);
+
+      const callOrder: string[] = [];
+      mocks.event.emit.mockImplementation(((event: string) => {
+        callOrder.push(`emit:${event}`);
+      }) as any);
+      mocks.album.deleteAll.mockImplementation(() => {
+        callOrder.push('deleteAll');
+        return Promise.resolve();
+      });
+
+      await sut.handleUserDelete({ id: user.id, force: true });
+
+      // AlbumDelete must be emitted once per owned album
+      expect(mocks.event.emit).toHaveBeenCalledWith('AlbumDelete', { albumId: 'album-f2-1' });
+      expect(mocks.event.emit).toHaveBeenCalledWith('AlbumDelete', { albumId: 'album-f2-2' });
+
+      // All AlbumDelete emits must precede deleteAll
+      const firstAlbumDeleteIndex = callOrder.indexOf('emit:AlbumDelete');
+      const deleteAllIndex = callOrder.indexOf('deleteAll');
+      expect(firstAlbumDeleteIndex).toBeGreaterThanOrEqual(0);
+      expect(deleteAllIndex).toBeGreaterThan(firstAlbumDeleteIndex);
     });
   });
 

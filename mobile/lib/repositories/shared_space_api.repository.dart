@@ -120,4 +120,22 @@ class SharedSpaceApiRepository extends ApiRepository {
     final dto = SharedSpaceAssetRemoveDto(assetIds: assetIds);
     await _api.removeAssets(spaceId, dto);
   }
+
+  /// Link an album to a shared space (PUT /shared-spaces/{id}/albums/{albumId}).
+  /// SDK arg order is (albumId, id) where id = spaceId.
+  Future<void> linkAlbum(String spaceId, String albumId) async {
+    await _api.linkAlbum(albumId, spaceId);
+  }
+
+  /// Unlink an album from a shared space (DELETE /shared-spaces/{id}/albums/{albumId}).
+  /// SDK arg order is (albumId, id) where id = spaceId.
+  Future<void> unlinkAlbum(String spaceId, String albumId) async {
+    await _api.unlinkAlbum(albumId, spaceId);
+  }
+
+  /// Update the showInTimeline flag for a space-album link
+  /// (PATCH /shared-spaces/{id}/albums/{albumId}).
+  Future<void> updateAlbumLink(String spaceId, String albumId, {required bool showInTimeline}) async {
+    await _api.updateSharedSpaceAlbum(albumId, spaceId, SharedSpaceAlbumLinkUpdateDto(showInTimeline: showInTimeline));
+  }
 }
