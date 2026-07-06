@@ -9,9 +9,11 @@ import {
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import type { Component } from 'svelte';
 import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info-cache';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
@@ -53,11 +55,6 @@ vi.mock('@immich/ui', async (importOriginal) => {
     modalManager: { show: vi.fn(), showDialog: vi.fn() },
     toastManager: { primary: vi.fn(), success: vi.fn(), warning: vi.fn() },
   };
-});
-
-vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
-  const { default: MockComponent } = await import('$lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
-  return { default: MockComponent };
 });
 
 function makeSpacePerson(overrides: Partial<SharedSpacePersonResponseDto> = {}): SharedSpacePersonResponseDto {
@@ -121,16 +118,21 @@ function renderPage(people: SharedSpacePersonResponseDto[], peopleStatistics?: S
     },
   ];
 
-  return render(SpacePeoplePage, {
-    props: {
-      data: {
-        space,
-        members,
-        people,
-        peopleStatistics,
-        meta: { title: 'Test Space - People' },
-      },
+  const props = {
+    data: {
+      space,
+      members,
+      people,
+      peopleStatistics,
+      meta: { title: 'Test Space - People' },
     },
+  };
+
+  // The page no longer renders UserPageLayout (which provided the Tooltip context); the shell layout
+  // does. TestWrapper supplies the TooltipProvider the people grid's menus rely on.
+  return render(TestWrapper as Component<{ component: typeof SpacePeoplePage; componentProps: typeof props }>, {
+    component: SpacePeoplePage,
+    componentProps: props,
   });
 }
 

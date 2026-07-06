@@ -2,7 +2,7 @@ import type { LoginResponseDto } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
 import { utils } from 'src/utils';
 
-test.describe('Spaces P3 — Activity Feed, Panel Tabs, New-Since-Last-Visit', () => {
+test.describe('Spaces P3 — Activity Feed, Members Tab, New-Since-Last-Visit', () => {
   let admin: LoginResponseDto;
   let user2: LoginResponseDto;
 
@@ -17,6 +17,8 @@ test.describe('Spaces P3 — Activity Feed, Panel Tabs, New-Since-Last-Visit', (
     });
   });
 
+  // The Activity feed now lives on its own Activity tab route (/spaces/<id>/activity),
+  // wrapped in the `space-activity` section (moved off the Members page).
   test.describe('Activity Feed', () => {
     test('should show activity feed with "added N photos" event after adding assets', async ({ context, page }) => {
       const space = await utils.createSpace(admin.accessToken, { name: 'Activity Feed Test' });
@@ -26,30 +28,20 @@ test.describe('Spaces P3 — Activity Feed, Panel Tabs, New-Since-Last-Visit', (
       await utils.addSpaceAssets(admin.accessToken, space.id, [asset1.id, asset2.id, asset3.id]);
 
       await utils.setAuthCookies(context, admin.accessToken);
-      await page.goto(`/spaces/${space.id}`);
+      await page.goto(`/spaces/${space.id}/activity`);
 
-      // Open the panel by clicking the members/panel button
-      await page.locator('[data-testid="space-members-button"]').click();
-      await expect(page.locator('[data-testid="space-panel"]')).toHaveClass(/translate-x-0/);
-
-      // Activity tab should be active by default
-      await expect(page.locator('[data-testid="tab-activity"]')).toBeVisible();
-
-      // Verify the "added 3 photos" activity event is visible
-      await expect(page.locator('[data-testid="space-panel"]')).toContainText('added 3 photos');
+      // Verify the "added 3 photos" activity event is visible in the activity section.
+      await expect(page.getByTestId('space-activity')).toContainText('added 3 photos');
     });
 
     test('should show empty state when no activities exist', async ({ context, page }) => {
       const space = await utils.createSpace(admin.accessToken, { name: 'Empty Activity' });
 
       await utils.setAuthCookies(context, admin.accessToken);
-      await page.goto(`/spaces/${space.id}`);
+      await page.goto(`/spaces/${space.id}/activity`);
 
-      await page.locator('[data-testid="space-members-button"]').click();
-      await expect(page.locator('[data-testid="space-panel"]')).toHaveClass(/translate-x-0/);
-
-      await expect(page.locator('[data-testid="activity-empty-state"]')).toBeVisible();
-      await expect(page.locator('[data-testid="activity-empty-state"]')).toContainText('No activity yet');
+      await expect(page.getByTestId('activity-empty-state')).toBeVisible();
+      await expect(page.getByTestId('activity-empty-state')).toContainText('No activity yet');
     });
 
     test('should show member join activity when a member is added', async ({ context, page }) => {
@@ -57,18 +49,15 @@ test.describe('Spaces P3 — Activity Feed, Panel Tabs, New-Since-Last-Visit', (
       await utils.addSpaceMember(admin.accessToken, space.id, { userId: user2.userId });
 
       await utils.setAuthCookies(context, admin.accessToken);
-      await page.goto(`/spaces/${space.id}`);
+      await page.goto(`/spaces/${space.id}/activity`);
 
-      await page.locator('[data-testid="space-members-button"]').click();
-      await expect(page.locator('[data-testid="space-panel"]')).toHaveClass(/translate-x-0/);
-
-      await expect(page.locator('[data-testid="space-panel"]')).toContainText('joined as');
+      await expect(page.getByTestId('space-activity')).toContainText('joined as');
     });
   });
 
-  test.describe('Tab Switching', () => {
-    test('should switch between Activity and Members tabs', async ({ context, page }) => {
-      const space = await utils.createSpace(admin.accessToken, { name: 'Tab Switch Test' });
+  test.describe('Members Tab', () => {
+    test('Members tab shows the member list (no feed); Activity tab shows the feed', async ({ context, page }) => {
+      const space = await utils.createSpace(admin.accessToken, { name: 'Members Tab Page' });
       const asset = await utils.createAsset(admin.accessToken);
       await utils.addSpaceAssets(admin.accessToken, space.id, [asset.id]);
       await utils.addSpaceMember(admin.accessToken, space.id, { userId: user2.userId });
@@ -76,48 +65,28 @@ test.describe('Spaces P3 — Activity Feed, Panel Tabs, New-Since-Last-Visit', (
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto(`/spaces/${space.id}`);
 
-      // Open panel
-      await page.locator('[data-testid="space-members-button"]').click();
-      await expect(page.locator('[data-testid="space-panel"]')).toHaveClass(/translate-x-0/);
+      // Members tab via the shell tab bar: shows the member list and no longer the activity feed.
+      await page.getByTestId('space-tab-members').click();
+      await page.waitForURL(`/spaces/${space.id}/members`);
+      await expect(page.getByTestId('member-list')).toBeVisible();
+      await expect(page.getByTestId('member-list')).toContainText('User Two');
+      await expect(page.getByTestId('members-activity')).not.toBeVisible();
 
-      // Activity tab is active by default — verify activity content is visible
-      await expect(page.locator('[data-testid="space-panel"]')).toContainText('added 1 photos');
-
-      // Switch to Members tab
-      await page.locator('[data-testid="tab-members"]').click();
-      await expect(page.locator('[data-testid="member-list"]')).toBeVisible();
-      // Verify we can see both members
-      await expect(page.locator('[data-testid="member-list"]')).toContainText('User Two');
-
-      // Switch back to Activity tab
-      await page.locator('[data-testid="tab-activity"]').click();
-      // Verify activity content is visible again
-      await expect(page.locator('[data-testid="space-panel"]')).toContainText('added 1 photos');
+      // Activity tab: the feed now lives here and shows the add event.
+      await page.getByTestId('space-tab-activity').click();
+      await page.waitForURL(`/spaces/${space.id}/activity`);
+      await expect(page.getByTestId('space-activity')).toContainText('added 1 photos');
     });
 
-    test('should show member count in Members tab label', async ({ context, page }) => {
+    test('should show member count in the Members tab badge', async ({ context, page }) => {
       const space = await utils.createSpace(admin.accessToken, { name: 'Member Count Tab' });
       await utils.addSpaceMember(admin.accessToken, space.id, { userId: user2.userId });
 
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto(`/spaces/${space.id}`);
 
-      await page.locator('[data-testid="space-members-button"]').click();
-      // Members tab should show count (2 = admin + user2)
-      await expect(page.locator('[data-testid="tab-members"]')).toContainText('Members (2)');
-    });
-
-    test('should close panel when close button is clicked', async ({ context, page }) => {
-      const space = await utils.createSpace(admin.accessToken, { name: 'Close Panel Test' });
-
-      await utils.setAuthCookies(context, admin.accessToken);
-      await page.goto(`/spaces/${space.id}`);
-
-      await page.locator('[data-testid="space-members-button"]').click();
-      await expect(page.locator('[data-testid="space-panel"]')).toHaveClass(/translate-x-0/);
-
-      await page.locator('[data-testid="panel-close"]').click();
-      await expect(page.locator('[data-testid="space-panel"]')).toHaveClass(/translate-x-full/);
+      // The Members tab carries a count badge (2 = admin + user2).
+      await expect(page.getByTestId('space-tab-members')).toContainText('2');
     });
   });
 

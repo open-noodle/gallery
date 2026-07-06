@@ -17,6 +17,7 @@ import { AssetFileType, AssetOrderWithRandom, AssetVisibility, MemoryType } from
 import { type YearMonthDay } from 'src/repositories/asset.repository.js';
 import { DB } from 'src/schema/index.js';
 import { MemoryTable } from 'src/schema/tables/memory.table.js';
+import { spaceAlbumAssetExists } from 'src/utils/shared-space-album-scope.js';
 
 const asMakeDate = (eb: ExpressionBuilder<DB, 'asset'>, { year, month, day }: YearMonthDay) =>
   eb.fn('make_date', [sql`${year}::int`, sql`${month}::int`, sql`${day}::int`]);
@@ -107,6 +108,10 @@ export class MemoryRepository implements IBulkAsset {
                     .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
                     .where('asset.isOffline', '=', false),
                 ),
+                spaceAlbumAssetExists(eb, {
+                  correlateAssetId: 'asset.id',
+                  scope: { memberUserId: userId },
+                }),
               ]),
             ),
         ),

@@ -10,8 +10,10 @@ import { modalManager, toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import type { Component } from 'svelte';
 import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info-cache';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
@@ -52,11 +54,6 @@ vi.mock('@immich/ui', async (importOriginal) => {
     modalManager: { show: vi.fn(), showDialog: vi.fn() },
     toastManager: { danger: vi.fn(), primary: vi.fn(), success: vi.fn(), warning: vi.fn() },
   };
-});
-
-vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
-  const { default: MockComponent } = await import('./mock-user-page-layout.test-wrapper.svelte');
-  return { default: MockComponent };
 });
 
 function makeSpace(overrides: Partial<SharedSpaceResponseDto> = {}): SharedSpaceResponseDto {
@@ -140,16 +137,21 @@ function renderPage({
   authManager.setUser(currentUser);
   authManager.setPreferences(preferencesFactory.build());
 
-  return render(SpacePeoplePage, {
-    props: {
-      data: {
-        space,
-        members,
-        people,
-        peopleStatistics,
-        meta: { title: `${space.name} - People` },
-      },
+  const props = {
+    data: {
+      space,
+      members,
+      people,
+      peopleStatistics,
+      meta: { title: `${space.name} - People` },
     },
+  };
+
+  // The page no longer renders UserPageLayout (which provided the Tooltip context); the shell layout
+  // does. TestWrapper supplies the TooltipProvider the people grid's menus rely on.
+  return render(TestWrapper as Component<{ component: typeof SpacePeoplePage; componentProps: typeof props }>, {
+    component: SpacePeoplePage,
+    componentProps: props,
   });
 }
 
@@ -172,7 +174,7 @@ describe('Spaces people page', () => {
       peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 1980 },
     });
 
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10) \u00B7 1,980 faces');
+    expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(10) \u00B7 1,980 faces');
   });
 
   it('derives the heading person count from overview statistics instead of loaded rows', () => {
@@ -181,7 +183,7 @@ describe('Spaces people page', () => {
       peopleStatistics: { total: 60, hidden: 4, detectedFaceCount: 100 },
     });
 
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(56) \u00B7 100 faces');
+    expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(56) \u00B7 100 faces');
   });
 
   it('shows detected faces when all space people are hidden', () => {
@@ -190,7 +192,7 @@ describe('Spaces people page', () => {
       peopleStatistics: { total: 1, hidden: 1, detectedFaceCount: 42 },
     });
 
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(0) \u00B7 42 faces');
+    expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(0) \u00B7 42 faces');
   });
 
   it('omits the heading description for an empty scope with no detected faces', () => {
@@ -199,7 +201,7 @@ describe('Spaces people page', () => {
       peopleStatistics: { total: 0, hidden: 0, detectedFaceCount: 0 },
     });
 
-    expect(screen.getByTestId('user-page-layout')).not.toHaveAttribute('data-description');
+    expect(screen.queryByTestId('space-people-heading-description')).not.toBeInTheDocument();
   });
 
   it('keeps loaded people and controls when overview statistics are unavailable', () => {
@@ -212,7 +214,7 @@ describe('Spaces people page', () => {
     expect(screen.getByDisplayValue('Alice')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('search_people')).toBeInTheDocument();
     expect(screen.getByText('show_and_hide_people')).toBeInTheDocument();
-    expect(screen.getByTestId('user-page-layout')).not.toHaveAttribute('data-description');
+    expect(screen.queryByTestId('space-people-heading-description')).not.toBeInTheDocument();
   });
 
   it('does not call detailed face statistics on initial render', () => {
@@ -338,7 +340,7 @@ describe('Spaces people page', () => {
 
     await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
     await waitFor(() => {
-      expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00B7 7 faces');
+      expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(1) \u00B7 7 faces');
     });
     expect(screen.getByRole('button', { name: 'view_face_statistics_details' })).toBeInTheDocument();
 
@@ -362,7 +364,7 @@ describe('Spaces people page', () => {
     bobPeopleRequest.resolve([people[1]]);
     bobStatsRequest.resolve({ total: 1, hidden: 0, detectedFaceCount: 9 });
     await waitFor(() => {
-      expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00B7 9 faces');
+      expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(1) \u00B7 9 faces');
     });
 
     await userEvent.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
@@ -405,7 +407,7 @@ describe('Spaces people page', () => {
 
     await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
     await waitFor(() => {
-      expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00B7 7 faces');
+      expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(1) \u00B7 7 faces');
     });
 
     await userEvent.click(screen.getByLabelText('clear_value'));
@@ -415,14 +417,17 @@ describe('Spaces people page', () => {
 
     pageStore.setUrl('http://localhost/spaces/space-2/people');
     await view.rerender({
-      data: {
-        space: space2,
-        members: [makeMember()],
-        people: [charlie],
-        peopleStatistics: { total: 1, hidden: 0, detectedFaceCount: 9 },
-        meta: { title: 'Space Two - People' },
+      component: SpacePeoplePage,
+      componentProps: {
+        data: {
+          space: space2,
+          members: [makeMember()],
+          people: [charlie],
+          peopleStatistics: { total: 1, hidden: 0, detectedFaceCount: 9 },
+          meta: { title: 'Space Two - People' },
+        },
       },
-    });
+    } as never);
 
     clearPeopleRequest.resolve([alice, bob]);
     clearStatsRequest.resolve({ total: 2, hidden: 0, detectedFaceCount: 22 });
@@ -430,7 +435,7 @@ describe('Spaces people page', () => {
 
     expect(screen.getByDisplayValue('Charlie')).toBeInTheDocument();
     expect(screen.queryByDisplayValue('Alice')).not.toBeInTheDocument();
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00B7 9 faces');
+    expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(1) \u00B7 9 faces');
   });
 
   it('does not show stale search errors after navigating to another space', async () => {
@@ -465,14 +470,17 @@ describe('Spaces people page', () => {
 
     pageStore.setUrl('http://localhost/spaces/space-2/people');
     await view.rerender({
-      data: {
-        space: space2,
-        members: [makeMember()],
-        people: [charlie],
-        peopleStatistics: { total: 1, hidden: 0, detectedFaceCount: 9 },
-        meta: { title: 'Space Two - People' },
+      component: SpacePeoplePage,
+      componentProps: {
+        data: {
+          space: space2,
+          members: [makeMember()],
+          people: [charlie],
+          peopleStatistics: { total: 1, hidden: 0, detectedFaceCount: 9 },
+          meta: { title: 'Space Two - People' },
+        },
       },
-    });
+    } as never);
 
     searchPeopleRequest.reject(new Error('stale search failed'));
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -539,7 +547,7 @@ describe('Spaces people page', () => {
     await userEvent.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('unable_to_load_face_statistics');
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10) \u00B7 2,901 faces');
+    expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(10) \u00B7 2,901 faces');
   });
 
   it('hides the face statistics details button when overview statistics are unavailable', () => {
@@ -567,7 +575,7 @@ describe('Spaces people page', () => {
       peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 1980 },
     });
 
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10)');
+    expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(10)');
   });
 
   it('hides the face statistics details button when the peopleStatistics feature flag is disabled', () => {
@@ -599,7 +607,7 @@ describe('Spaces people page', () => {
     expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Ali' }, expect.any(Object));
     expect(screen.getByDisplayValue('Alice')).toBeInTheDocument();
     expect(screen.queryByDisplayValue('Bob')).not.toBeInTheDocument();
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00B7 7 faces');
+    expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(1) \u00B7 7 faces');
   });
 
   it('clears search statistics back to the unfiltered space scope', async () => {
@@ -640,7 +648,7 @@ describe('Spaces people page', () => {
     });
     expect(screen.getByDisplayValue('Alice')).toBeInTheDocument();
     expect(screen.queryByDisplayValue('Bob')).not.toBeInTheDocument();
-    expect(screen.getByTestId('user-page-layout')).not.toHaveAttribute('data-description');
+    expect(screen.queryByTestId('space-people-heading-description')).not.toBeInTheDocument();
   });
 
   it('updates the hidden count without losing the detected face count when a person is hidden', async () => {
@@ -664,7 +672,7 @@ describe('Spaces people page', () => {
         sharedSpacePersonUpdateDto: { isHidden: true },
       });
     });
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00B7 42 faces');
+    expect(screen.getByTestId('space-people-heading-description')).toHaveTextContent('(1) \u00B7 42 faces');
   });
 
   it('renders circular thumbnails for each person', async () => {
@@ -909,13 +917,6 @@ describe('Spaces people page', () => {
 
     expect(screen.getByText('spaces_no_people')).toBeInTheDocument();
     expect(screen.getByText('spaces_no_people_description')).toBeInTheDocument();
-  });
-
-  it('back button is present', () => {
-    renderPage();
-
-    const backButton = screen.getByLabelText('back');
-    expect(backButton).toBeInTheDocument();
   });
 
   it('renders multiple person cards', () => {

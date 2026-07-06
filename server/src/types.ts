@@ -296,6 +296,11 @@ export interface ISharedSpaceLibraryFaceSyncJob extends IBaseJob {
   libraryId: string;
 }
 
+export interface ISharedSpaceAlbumFaceSyncJob extends IBaseJob {
+  spaceId: string;
+  albumId: string;
+}
+
 export interface ISharedSpaceIdentityReconciliationJob extends IBaseJob {
   spaceId: string;
   userId?: string;
@@ -562,6 +567,7 @@ export type JobItem =
   | { name: JobName.SharedSpaceFaceMatchPage; data: ISharedSpaceFaceMatchPageJob }
   | { name: JobName.SharedSpaceFaceMatchFromBackfill; data: ISharedSpaceFaceMatchJob }
   | { name: JobName.SharedSpaceLibraryFaceSync; data: ISharedSpaceLibraryFaceSyncJob }
+  | { name: JobName.SharedSpaceAlbumFaceSync; data: ISharedSpaceAlbumFaceSyncJob }
   | { name: JobName.SharedSpaceIdentityReconciliation; data: ISharedSpaceIdentityReconciliationJob }
   | { name: JobName.SharedSpacePersonDedup; data: ISharedSpacePersonDedupJob }
   | { name: JobName.SharedSpacePersonMetadataBackfill; data: ISharedSpacePersonMetadataBackfillJob }

@@ -45,6 +45,10 @@ describe(AssetService.name, () => {
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(AssetService));
+
+    // handleAssetDeletion now captures affected shared-space people before delete
+    // (faces F5); default to empty so unrelated deletion tests don't break.
+    mocks.sharedSpace.getSpacePersonsForAsset.mockResolvedValue([]);
   });
 
   describe('getStatistics', () => {
@@ -1325,6 +1329,7 @@ describe(AssetService.name, () => {
       expect(mocks.event.emit).toHaveBeenCalledWith('AssetDelete', {
         assetId: asset.id,
         userId: asset.ownerId,
+        affectedSpacePersons: [],
       });
     });
   });
