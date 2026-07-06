@@ -512,63 +512,6 @@ class SharedSpacesApi {
     return null;
   }
 
-  /// List albums linked to a shared space
-  ///
-  /// Note: This method returns the HTTP [Response].
-  ///
-  /// Parameters:
-  ///
-  /// * [String] id (required):
-  Future<Response> getSharedSpaceAlbumsWithHttpInfo(String id, { Future<void>? abortTrigger, }) async {
-    // ignore: prefer_const_declarations
-    final apiPath = r'/shared-spaces/{id}/albums'
-      .replaceAll('{id}', id);
-
-    // ignore: prefer_final_locals
-    Object? postBody;
-
-    final queryParams = <QueryParam>[];
-    final headerParams = <String, String>{};
-    final formParams = <String, String>{};
-
-    const contentTypes = <String>[];
-
-
-    return apiClient.invokeAPI(
-      apiPath,
-      'GET',
-      queryParams,
-      postBody,
-      headerParams,
-      formParams,
-      contentTypes.isEmpty ? null : contentTypes.first,
-      abortTrigger: abortTrigger,
-    );
-  }
-
-  /// List albums linked to a shared space
-  ///
-  /// Parameters:
-  ///
-  /// * [String] id (required):
-  Future<List<SharedSpaceLinkedAlbumDto>?> getSharedSpaceAlbums(String id, { Future<void>? abortTrigger, }) async {
-    final response = await getSharedSpaceAlbumsWithHttpInfo(id, abortTrigger: abortTrigger,);
-    if (response.statusCode >= HttpStatus.badRequest) {
-      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
-    }
-    // When a remote server returns no body with a status of 204, we shall not decode it.
-    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
-    // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      final responseBody = await _decodeBodyBytes(response);
-      return (await apiClient.deserializeAsync(responseBody, 'List<SharedSpaceLinkedAlbumDto>') as List)
-        .cast<SharedSpaceLinkedAlbumDto>()
-        .toList(growable: false);
-
-    }
-    return null;
-  }
-
   /// Get a shared space
   ///
   /// Retrieve details of a specific shared space.
@@ -1514,61 +1457,6 @@ class SharedSpacesApi {
     return null;
   }
 
-  /// Link an album to a shared space
-  ///
-  /// Link an album so its photos appear in the space. Requires space editor/owner and album owner/editor.
-  ///
-  /// Note: This method returns the HTTP [Response].
-  ///
-  /// Parameters:
-  ///
-  /// * [String] albumId (required):
-  ///
-  /// * [String] id (required):
-  Future<Response> linkAlbumWithHttpInfo(String albumId, String id, { Future<void>? abortTrigger, }) async {
-    // ignore: prefer_const_declarations
-    final apiPath = r'/shared-spaces/{id}/albums/{albumId}'
-      .replaceAll('{albumId}', albumId)
-      .replaceAll('{id}', id);
-
-    // ignore: prefer_final_locals
-    Object? postBody;
-
-    final queryParams = <QueryParam>[];
-    final headerParams = <String, String>{};
-    final formParams = <String, String>{};
-
-    const contentTypes = <String>[];
-
-
-    return apiClient.invokeAPI(
-      apiPath,
-      'PUT',
-      queryParams,
-      postBody,
-      headerParams,
-      formParams,
-      contentTypes.isEmpty ? null : contentTypes.first,
-      abortTrigger: abortTrigger,
-    );
-  }
-
-  /// Link an album to a shared space
-  ///
-  /// Link an album so its photos appear in the space. Requires space editor/owner and album owner/editor.
-  ///
-  /// Parameters:
-  ///
-  /// * [String] albumId (required):
-  ///
-  /// * [String] id (required):
-  Future<void> linkAlbum(String albumId, String id, { Future<void>? abortTrigger, }) async {
-    final response = await linkAlbumWithHttpInfo(albumId, id, abortTrigger: abortTrigger,);
-    if (response.statusCode >= HttpStatus.badRequest) {
-      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
-    }
-  }
-
   /// Link a library to a shared space
   ///
   /// Link an external library so its assets appear in the space. Requires admin and space editor/owner.
@@ -1950,61 +1838,6 @@ class SharedSpacesApi {
     }
   }
 
-  /// Unlink an album from a shared space
-  ///
-  /// Remove an album link. Album assets will no longer appear in the space.
-  ///
-  /// Note: This method returns the HTTP [Response].
-  ///
-  /// Parameters:
-  ///
-  /// * [String] albumId (required):
-  ///
-  /// * [String] id (required):
-  Future<Response> unlinkAlbumWithHttpInfo(String albumId, String id, { Future<void>? abortTrigger, }) async {
-    // ignore: prefer_const_declarations
-    final apiPath = r'/shared-spaces/{id}/albums/{albumId}'
-      .replaceAll('{albumId}', albumId)
-      .replaceAll('{id}', id);
-
-    // ignore: prefer_final_locals
-    Object? postBody;
-
-    final queryParams = <QueryParam>[];
-    final headerParams = <String, String>{};
-    final formParams = <String, String>{};
-
-    const contentTypes = <String>[];
-
-
-    return apiClient.invokeAPI(
-      apiPath,
-      'DELETE',
-      queryParams,
-      postBody,
-      headerParams,
-      formParams,
-      contentTypes.isEmpty ? null : contentTypes.first,
-      abortTrigger: abortTrigger,
-    );
-  }
-
-  /// Unlink an album from a shared space
-  ///
-  /// Remove an album link. Album assets will no longer appear in the space.
-  ///
-  /// Parameters:
-  ///
-  /// * [String] albumId (required):
-  ///
-  /// * [String] id (required):
-  Future<void> unlinkAlbum(String albumId, String id, { Future<void>? abortTrigger, }) async {
-    final response = await unlinkAlbumWithHttpInfo(albumId, id, abortTrigger: abortTrigger,);
-    if (response.statusCode >= HttpStatus.badRequest) {
-      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
-    }
-  }
-
   /// Unlink a library from a shared space
   ///
   /// Remove a library link. Library assets will no longer appear in the space.
@@ -2316,61 +2149,6 @@ class SharedSpacesApi {
     
     }
     return null;
-  }
-
-  /// Update a space-album link (showInTimeline)
-  ///
-  /// Note: This method returns the HTTP [Response].
-  ///
-  /// Parameters:
-  ///
-  /// * [String] albumId (required):
-  ///
-  /// * [String] id (required):
-  ///
-  /// * [SharedSpaceAlbumLinkUpdateDto] sharedSpaceAlbumLinkUpdateDto (required):
-  Future<Response> updateSharedSpaceAlbumWithHttpInfo(String albumId, String id, SharedSpaceAlbumLinkUpdateDto sharedSpaceAlbumLinkUpdateDto, { Future<void>? abortTrigger, }) async {
-    // ignore: prefer_const_declarations
-    final apiPath = r'/shared-spaces/{id}/albums/{albumId}'
-      .replaceAll('{albumId}', albumId)
-      .replaceAll('{id}', id);
-
-    // ignore: prefer_final_locals
-    Object? postBody = sharedSpaceAlbumLinkUpdateDto;
-
-    final queryParams = <QueryParam>[];
-    final headerParams = <String, String>{};
-    final formParams = <String, String>{};
-
-    const contentTypes = <String>['application/json'];
-
-
-    return apiClient.invokeAPI(
-      apiPath,
-      'PATCH',
-      queryParams,
-      postBody,
-      headerParams,
-      formParams,
-      contentTypes.isEmpty ? null : contentTypes.first,
-      abortTrigger: abortTrigger,
-    );
-  }
-
-  /// Update a space-album link (showInTimeline)
-  ///
-  /// Parameters:
-  ///
-  /// * [String] albumId (required):
-  ///
-  /// * [String] id (required):
-  ///
-  /// * [SharedSpaceAlbumLinkUpdateDto] sharedSpaceAlbumLinkUpdateDto (required):
-  Future<void> updateSharedSpaceAlbum(String albumId, String id, SharedSpaceAlbumLinkUpdateDto sharedSpaceAlbumLinkUpdateDto, { Future<void>? abortTrigger, }) async {
-    final response = await updateSharedSpaceAlbumWithHttpInfo(albumId, id, sharedSpaceAlbumLinkUpdateDto, abortTrigger: abortTrigger,);
-    if (response.statusCode >= HttpStatus.badRequest) {
-      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
-    }
   }
 
   /// Update a shared space

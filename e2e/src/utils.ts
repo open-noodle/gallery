@@ -51,8 +51,6 @@ import {
   markSpaceViewed,
   runQueueCommandLegacy,
   scanLibrary,
-  linkAlbum as sdkLinkAlbum,
-  unlinkAlbum as sdkUnlinkAlbum,
   searchAssets,
   setBaseUrl,
   setMaintenanceMode,
@@ -376,20 +374,11 @@ export const utils = {
   addSpaceAssets: (accessToken: string, spaceId: string, assetIds: string[]) =>
     addSpaceAssets({ id: spaceId, sharedSpaceAssetAddDto: { assetIds } }, { headers: asBearerAuth(accessToken) }),
 
-  updateSpace: (
-    accessToken: string,
-    spaceId: string,
-    dto: { thumbnailAssetId?: string; name?: string; faceRecognitionEnabled?: boolean },
-  ) => updateSpace({ id: spaceId, sharedSpaceUpdateDto: dto }, { headers: asBearerAuth(accessToken) }),
+  updateSpace: (accessToken: string, spaceId: string, dto: { thumbnailAssetId?: string; name?: string }) =>
+    updateSpace({ id: spaceId, sharedSpaceUpdateDto: dto }, { headers: asBearerAuth(accessToken) }),
 
   markSpaceViewed: (accessToken: string, spaceId: string) =>
     markSpaceViewed({ id: spaceId }, { headers: asBearerAuth(accessToken) }),
-
-  linkSpaceAlbum: (accessToken: string, spaceId: string, albumId: string) =>
-    sdkLinkAlbum({ id: spaceId, albumId }, { headers: asBearerAuth(accessToken) }),
-
-  unlinkSpaceAlbum: (accessToken: string, spaceId: string, albumId: string) =>
-    sdkUnlinkAlbum({ id: spaceId, albumId }, { headers: asBearerAuth(accessToken) }),
 
   createAsset: async (
     accessToken: string,

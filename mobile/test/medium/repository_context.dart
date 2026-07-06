@@ -490,49 +490,4 @@ class MediumRepositoryContext {
           ),
         );
   }
-
-  Future<SharedSpaceAlbumEntityData> newSharedSpaceAlbum({
-    String? id,
-    String? name,
-    String? thumbnailAssetId,
-    bool? isActivityEnabled,
-    int? order,
-  }) async {
-    id ??= TestUtils.uuid();
-    return db
-        .into(db.sharedSpaceAlbumEntity)
-        .insertReturning(
-          SharedSpaceAlbumEntityCompanion(
-            id: .new(id),
-            name: .new(name ?? 'space_album_$id'),
-            thumbnailAssetId: .new(thumbnailAssetId),
-            isActivityEnabled: .new(isActivityEnabled ?? true),
-            order: .new(order ?? 0),
-          ),
-        );
-  }
-
-  Future<void> insertSharedSpaceAlbumLink({
-    required String spaceId,
-    required String albumId,
-    bool? showInTimeline,
-    String? addedById,
-  }) {
-    return db
-        .into(db.sharedSpaceAlbumLinkEntity)
-        .insert(
-          SharedSpaceAlbumLinkEntityCompanion(
-            spaceId: .new(spaceId),
-            albumId: .new(albumId),
-            showInTimeline: .new(showInTimeline ?? true),
-            addedById: .new(addedById),
-          ),
-        );
-  }
-
-  Future<void> insertSharedSpaceAlbumAsset({required String albumId, required String assetId}) {
-    return db
-        .into(db.sharedSpaceAlbumAssetEntity)
-        .insert(SharedSpaceAlbumAssetEntityCompanion(albumId: .new(albumId), assetId: .new(assetId)));
-  }
 }
