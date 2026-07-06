@@ -22,18 +22,11 @@ class RemoteAlbumRepository extends DatabaseAccessor<Drift> with $RemoteAlbumRep
 
   Drift get _db => attachedDatabase;
 
-  Future<List<RemoteAlbum>> getAll({
-    Set<SortRemoteAlbumsBy> sortBy = const {SortRemoteAlbumsBy.updatedAt},
-    String? currentUserId,
-  }) {
+  Future<List<RemoteAlbum>> getAll({Set<SortRemoteAlbumsBy> sortBy = const {SortRemoteAlbumsBy.updatedAt}}) {
     // Count non-trashed assets via the joined asset table. Filtering trashed assets in the
     // join condition (instead of the where clause) keeps albums whose assets are all trashed
     // in the result, the same way truly empty albums are kept
     final assetCount = _db.remoteAssetEntity.id.count(distinct: true);
-
-    // Alias used to read the current user's role without disturbing the
-    // existing leftOuterJoin on remoteAlbumUserEntity (used for isShared count).
-    final cuRole = currentUserId != null ? _db.alias(_db.remoteAlbumUserEntity, 'cu_role') : null;
 
     final query = _db.remoteAlbumEntity.select().join([
       leftOuterJoin(
@@ -59,22 +52,12 @@ class RemoteAlbumRepository extends DatabaseAccessor<Drift> with $RemoteAlbumRep
             _db.remoteAlbumUserEntity.role.equalsValue(AlbumUserRole.owner),
         useColumns: false,
       ),
-      if (cuRole != null)
-        leftOuterJoin(
-          cuRole,
-          cuRole.albumId.equalsExp(_db.remoteAlbumEntity.id) & cuRole.userId.equals(currentUserId!),
-          useColumns: false,
-        ),
     ]);
     query
       ..addColumns([assetCount])
       ..addColumns([_db.userEntity.name, _db.userEntity.id])
       ..addColumns([_db.remoteAlbumUserEntity.userId.count(distinct: true)])
       ..groupBy([_db.remoteAlbumEntity.id]);
-
-    if (cuRole != null) {
-      query.addColumns([cuRole.role]);
-    }
 
     if (sortBy.isNotEmpty) {
       final orderings = <OrderingTerm>[];
@@ -96,18 +79,13 @@ class RemoteAlbumRepository extends DatabaseAccessor<Drift> with $RemoteAlbumRep
                 ownerId: row.read(_db.userEntity.id)!,
                 ownerName: row.read(_db.userEntity.name)!,
                 isShared: row.read(_db.remoteAlbumUserEntity.userId.count(distinct: true))! > 0,
-                currentUserRole: cuRole != null ? row.readWithConverter(cuRole.role) : null,
               ),
         )
         .get();
   }
 
-  Future<RemoteAlbum?> get(String albumId, {String? currentUserId}) {
+  Future<RemoteAlbum?> get(String albumId) {
     final assetCount = _db.remoteAssetEntity.id.count(distinct: true);
-
-    // Alias used to read the current user's role without disturbing the
-    // existing leftOuterJoin on remoteAlbumUserEntity (used for isShared count).
-    final cuRole = currentUserId != null ? _db.alias(_db.remoteAlbumUserEntity, 'cu_role') : null;
 
     final query =
         _db.remoteAlbumEntity.select().join([
@@ -134,22 +112,12 @@ class RemoteAlbumRepository extends DatabaseAccessor<Drift> with $RemoteAlbumRep
                   _db.remoteAlbumUserEntity.role.equalsValue(AlbumUserRole.owner),
               useColumns: false,
             ),
-            if (cuRole != null)
-              leftOuterJoin(
-                cuRole,
-                cuRole.albumId.equalsExp(_db.remoteAlbumEntity.id) & cuRole.userId.equals(currentUserId!),
-                useColumns: false,
-              ),
           ])
           ..where(_db.remoteAlbumEntity.id.equals(albumId))
           ..addColumns([assetCount])
           ..addColumns([_db.userEntity.name, _db.userEntity.id])
           ..addColumns([_db.remoteAlbumUserEntity.userId.count(distinct: true)])
           ..groupBy([_db.remoteAlbumEntity.id]);
-
-    if (cuRole != null) {
-      query.addColumns([cuRole.role]);
-    }
 
     return query
         .map(
@@ -160,7 +128,6 @@ class RemoteAlbumRepository extends DatabaseAccessor<Drift> with $RemoteAlbumRep
                 ownerId: row.read(_db.userEntity.id)!,
                 ownerName: row.read(_db.userEntity.name)!,
                 isShared: row.read(_db.remoteAlbumUserEntity.userId.count(distinct: true))! > 0,
-                currentUserRole: cuRole != null ? row.readWithConverter(cuRole.role) : null,
               ),
         )
         .getSingleOrNull();
@@ -604,13 +571,7 @@ class RemoteAlbumRepository extends DatabaseAccessor<Drift> with $RemoteAlbumRep
 }
 
 extension on RemoteAlbumEntityData {
-  RemoteAlbum toDto({
-    int assetCount = 0,
-    required String ownerName,
-    required String ownerId,
-    required bool isShared,
-    AlbumUserRole? currentUserRole,
-  }) {
+  RemoteAlbum toDto({int assetCount = 0, required String ownerName, required String ownerId, required bool isShared}) {
     return RemoteAlbum(
       id: id,
       name: name,
@@ -624,7 +585,6 @@ extension on RemoteAlbumEntityData {
       assetCount: assetCount,
       ownerName: ownerName,
       isShared: isShared,
-      currentUserRole: currentUserRole,
     );
   }
 }
