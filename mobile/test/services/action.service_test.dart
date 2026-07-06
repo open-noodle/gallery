@@ -21,6 +21,8 @@ void main() {
   late MockAssetApiRepository assetApiRepository;
   late MockRemoteAssetRepository remoteAssetRepository;
   late MockSharedSpaceApiRepository sharedSpaceApiRepository;
+  late MockDriftAlbumApiRepository albumApiRepository;
+  late MockRemoteAlbumRepository remoteAlbumRepository;
 
   late Drift db;
 
@@ -42,8 +44,16 @@ void main() {
     assetApiRepository = MockAssetApiRepository();
     remoteAssetRepository = MockRemoteAssetRepository();
     sharedSpaceApiRepository = MockSharedSpaceApiRepository();
+    albumApiRepository = MockDriftAlbumApiRepository();
+    remoteAlbumRepository = MockRemoteAlbumRepository();
 
-    sut = ActionService(assetApiRepository, remoteAssetRepository, sharedSpaceApiRepository);
+    sut = ActionService(
+      assetApiRepository,
+      remoteAssetRepository,
+      sharedSpaceApiRepository,
+      albumApiRepository,
+      remoteAlbumRepository,
+    );
   });
 
   tearDown(() async {
