@@ -36,7 +36,6 @@ import {
 } from 'src/utils/database.js';
 import { without } from 'src/utils/filter-suggestions.js';
 import { type PaginationOptions, paginationHelper } from 'src/utils/pagination.js';
-import { spaceAssetPathBranches } from 'src/utils/shared-space-album-scope.js';
 
 export interface SearchAssetIdOptions {
   checksum?: Buffer;
@@ -1218,24 +1217,38 @@ export class SearchRepository {
       .$if(!options?.spaceId && !options?.timelineSpaceIds, (qb) => qb.where('asset.ownerId', '=', anyUuid(userIds)))
       .$if(!!options?.spaceId && !options?.timelineSpaceIds, (qb) =>
         qb.where((eb) =>
-          eb.or(
-            spaceAssetPathBranches(eb, {
-              correlateAssetId: 'asset.id',
-              correlateLibraryId: 'asset.libraryId',
-              scope: { spaceId: options!.spaceId! },
-            }),
-          ),
+          eb.or([
+            eb.exists(
+              eb
+                .selectFrom('shared_space_asset')
+                .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                .where('shared_space_asset.spaceId', '=', asUuid(options!.spaceId!)),
+            ),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_library')
+                .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                .where('shared_space_library.spaceId', '=', asUuid(options!.spaceId!)),
+            ),
+          ]),
         ),
       )
       .$if(!!options?.timelineSpaceIds, (qb) =>
         qb.where((eb) =>
           eb.or([
             eb('asset.ownerId', '=', anyUuid(userIds)),
-            ...spaceAssetPathBranches(eb, {
-              correlateAssetId: 'asset.id',
-              correlateLibraryId: 'asset.libraryId',
-              scope: { spaceIds: options!.timelineSpaceIds! },
-            }),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_asset')
+                .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                .where('shared_space_asset.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
+            ),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_library')
+                .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                .where('shared_space_library.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
+            ),
           ]),
         ),
       )
@@ -1321,11 +1334,20 @@ export class SearchRepository {
                     .where('album_user.albumId', '=', asUuid(options!.albumId!)),
                 ),
                 ...(options?.timelineSpaceIds?.length
-                  ? spaceAssetPathBranches(eb, {
-                      correlateAssetId: 'asset.id',
-                      correlateLibraryId: 'asset.libraryId',
-                      scope: { spaceIds: options.timelineSpaceIds },
-                    })
+                  ? [
+                      eb.exists(
+                        eb
+                          .selectFrom('shared_space_asset')
+                          .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                          .where('shared_space_asset.spaceId', '=', anyUuid(options.timelineSpaceIds)),
+                      ),
+                      eb.exists(
+                        eb
+                          .selectFrom('shared_space_library')
+                          .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                          .where('shared_space_library.spaceId', '=', anyUuid(options.timelineSpaceIds)),
+                      ),
+                    ]
                   : []),
               ]),
             ]),
@@ -1336,24 +1358,38 @@ export class SearchRepository {
         )
         .$if(!!options?.spaceId && !options?.timelineSpaceIds && !options?.albumId, (qb) =>
           qb.where((eb) =>
-            eb.or(
-              spaceAssetPathBranches(eb, {
-                correlateAssetId: 'asset.id',
-                correlateLibraryId: 'asset.libraryId',
-                scope: { spaceId: options!.spaceId! },
-              }),
-            ),
+            eb.or([
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_asset')
+                  .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                  .where('shared_space_asset.spaceId', '=', asUuid(options!.spaceId!)),
+              ),
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_library')
+                  .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                  .where('shared_space_library.spaceId', '=', asUuid(options!.spaceId!)),
+              ),
+            ]),
           ),
         )
         .$if(!!options?.timelineSpaceIds && !options?.albumId, (qb) =>
           qb.where((eb) =>
             eb.or([
               eb('asset.ownerId', '=', anyUuid(userIds)),
-              ...spaceAssetPathBranches(eb, {
-                correlateAssetId: 'asset.id',
-                correlateLibraryId: 'asset.libraryId',
-                scope: { spaceIds: options!.timelineSpaceIds! },
-              }),
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_asset')
+                  .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                  .where('shared_space_asset.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
+              ),
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_library')
+                  .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                  .where('shared_space_library.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
+              ),
             ]),
           ),
         )

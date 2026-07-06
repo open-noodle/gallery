@@ -14,7 +14,6 @@ import { MapRepository } from 'src/repositories/map.repository.js';
 import { OcrRepository } from 'src/repositories/ocr.repository.js';
 import { SharedLinkAssetRepository } from 'src/repositories/shared-link-asset.repository.js';
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository.js';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StackRepository } from 'src/repositories/stack.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { UserRepository } from 'src/repositories/user.repository.js';
@@ -36,7 +35,6 @@ const setup = (db?: Kysely<DB>) => {
       AlbumRepository,
       AccessRepository,
       SharedLinkAssetRepository,
-      SharedSpaceRepository,
       StackRepository,
       UserRepository,
     ],

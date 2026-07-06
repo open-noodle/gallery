@@ -1,5 +1,4 @@
 import { createZodDto } from 'nestjs-zod';
-import { AlbumResponseSchema } from 'src/dtos/album.dto';
 import { SharedSpaceRole, UserAvatarColor, UserAvatarColorSchema } from 'src/enum';
 import z from 'zod';
 
@@ -128,23 +127,6 @@ const SharedSpaceLibraryLinkSchema = z
   })
   .meta({ id: 'SharedSpaceLibraryLinkDto' });
 
-const SharedSpaceAlbumLinkUpdateSchema = z
-  .object({
-    showInTimeline: z.boolean().describe('Include this album in the space timeline'),
-  })
-  .meta({ id: 'SharedSpaceAlbumLinkUpdateDto' });
-
-const SharedSpaceAlbumParamSchema = z.object({
-  id: z.uuidv4(),
-  albumId: z.uuidv4(),
-});
-
-const SharedSpaceLinkedAlbumSchema = AlbumResponseSchema.extend({
-  showInTimeline: z.boolean().describe('Include this album in the space timeline'),
-  addedById: z.string().nullable().describe('User who linked the album into the space'),
-  linkedAt: z.string().meta({ format: 'date-time' }).describe('Link creation timestamp'),
-}).meta({ id: 'SharedSpaceLinkedAlbumDto' });
-
 export const MAX_SPACE_ASSETS_PER_REQUEST = 10_000;
 
 const SharedSpaceAssetAddSchema = z
@@ -193,9 +175,6 @@ export class SharedSpaceMemberMetadataContributionDto extends createZodDto(
   SharedSpaceMemberMetadataContributionSchema,
 ) {}
 export class SharedSpaceLibraryLinkDto extends createZodDto(SharedSpaceLibraryLinkSchema) {}
-export class SharedSpaceAlbumLinkUpdateDto extends createZodDto(SharedSpaceAlbumLinkUpdateSchema) {}
-export class SharedSpaceAlbumParamDto extends createZodDto(SharedSpaceAlbumParamSchema) {}
-export class SharedSpaceLinkedAlbumDto extends createZodDto(SharedSpaceLinkedAlbumSchema) {}
 export class SharedSpaceAssetAddDto extends createZodDto(SharedSpaceAssetAddSchema) {}
 export class SharedSpaceAssetRemoveDto extends createZodDto(SharedSpaceAssetRemoveSchema) {}
 export class SharedSpaceActivityQueryDto extends createZodDto(SharedSpaceActivityQuerySchema) {}
