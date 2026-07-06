@@ -35,7 +35,6 @@ void main() {
     registerFallbackValue(api.SharedSpaceAssetAddDto(assetIds: []));
     registerFallbackValue(api.SharedSpaceAssetRemoveDto(assetIds: []));
     registerFallbackValue(api.SharedSpaceMemberTimelineDto(showInTimeline: false));
-    registerFallbackValue(api.SharedSpaceAlbumLinkUpdateDto(showInTimeline: false));
   });
 
   setUp(() {
@@ -435,76 +434,6 @@ void main() {
         () => mockApi.removeAssets(
           'space-1',
           any(that: isA<api.SharedSpaceAssetRemoveDto>().having((d) => d.assetIds, 'assetIds', ['asset-1'])),
-        ),
-      ).called(1);
-    });
-  });
-
-  group('linkAlbum', () {
-    test('calls SDK linkAlbum(albumId, spaceId) — note arg order', () async {
-      when(
-        () => mockApi.linkAlbum('album-1', 'space-1'),
-      ).thenAnswer((_) async {});
-
-      await repository.linkAlbum('space-1', 'album-1');
-
-      verify(() => mockApi.linkAlbum('album-1', 'space-1')).called(1);
-    });
-  });
-
-  group('unlinkAlbum', () {
-    test('calls SDK unlinkAlbum(albumId, spaceId) — note arg order', () async {
-      when(
-        () => mockApi.unlinkAlbum('album-1', 'space-1'),
-      ).thenAnswer((_) async {});
-
-      await repository.unlinkAlbum('space-1', 'album-1');
-
-      verify(() => mockApi.unlinkAlbum('album-1', 'space-1')).called(1);
-    });
-  });
-
-  group('updateAlbumLink', () {
-    test('calls updateSharedSpaceAlbum with showInTimeline:false', () async {
-      when(
-        () => mockApi.updateSharedSpaceAlbum('album-1', 'space-1', any()),
-      ).thenAnswer((_) async {});
-
-      await repository.updateAlbumLink('space-1', 'album-1', showInTimeline: false);
-
-      verify(
-        () => mockApi.updateSharedSpaceAlbum(
-          'album-1',
-          'space-1',
-          any(
-            that: isA<api.SharedSpaceAlbumLinkUpdateDto>().having(
-              (d) => d.showInTimeline,
-              'showInTimeline',
-              false,
-            ),
-          ),
-        ),
-      ).called(1);
-    });
-
-    test('calls updateSharedSpaceAlbum with showInTimeline:true', () async {
-      when(
-        () => mockApi.updateSharedSpaceAlbum('album-1', 'space-1', any()),
-      ).thenAnswer((_) async {});
-
-      await repository.updateAlbumLink('space-1', 'album-1', showInTimeline: true);
-
-      verify(
-        () => mockApi.updateSharedSpaceAlbum(
-          'album-1',
-          'space-1',
-          any(
-            that: isA<api.SharedSpaceAlbumLinkUpdateDto>().having(
-              (d) => d.showInTimeline,
-              'showInTimeline',
-              true,
-            ),
-          ),
         ),
       ).called(1);
     });
