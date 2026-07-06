@@ -192,6 +192,7 @@ export class AlbumService extends BaseService {
 
   async delete(auth: AuthDto, id: string): Promise<void> {
     await this.requireAccess({ auth, permission: Permission.AlbumDelete, ids: [id] });
+    await this.eventRepository.emit('AlbumDelete', { albumId: id });
     await this.albumRepository.delete(id);
   }
 
@@ -220,6 +221,9 @@ export class AlbumService extends BaseService {
       const userIds = album.albumUsers.map(({ user }) => user.id);
       const recipientIds = userIds.filter((userId) => userId !== auth.user.id);
       await this.eventRepository.emit('AlbumUpdate', { id, userIds, recipientIds });
+
+      const addedAssetIds = results.filter(({ success }) => success).map(({ id }) => id);
+      await this.eventRepository.emit('AlbumAssetsAdd', { albumId: id, assetIds: addedAssetIds });
     }
 
     return results;
@@ -281,6 +285,24 @@ export class AlbumService extends BaseService {
       await this.eventRepository.emit('AlbumUpdate', event);
     }
 
+    // Best-effort space people sync: albumAssetValues already excludes assets present in the
+    // album (the notPresentAssetIds filter above), so in the normal path these are exactly the
+    // newly-inserted rows. A concurrent insert could make addAssetIdsToAlbums' onConflict-do-nothing
+    // skip one; the downstream SharedSpaceFaceMatch is idempotent and guards on isAssetInSpace, so a
+    // spurious id is harmless. We accept best-effort here rather than plumbing inserted ids back.
+    const addedByAlbum = new Map<string, string[]>();
+    for (const { albumId, assetId } of albumAssetValues) {
+      const ids = addedByAlbum.get(albumId);
+      if (ids) {
+        ids.push(assetId);
+      } else {
+        addedByAlbum.set(albumId, [assetId]);
+      }
+    }
+    for (const [albumId, assetIds] of addedByAlbum) {
+      await this.eventRepository.emit('AlbumAssetsAdd', { albumId, assetIds });
+    }
+
     return results;
   }
 
@@ -305,6 +327,9 @@ export class AlbumService extends BaseService {
         userIds: album.albumUsers.map(({ user }) => user.id),
         recipientIds: [],
       });
+    }
+    if (removedIds.length > 0) {
+      await this.eventRepository.emit('AlbumAssetsRemove', { albumId: id, assetIds: removedIds });
     }
 
     return results;
