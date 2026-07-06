@@ -6,7 +6,6 @@ import type { Component } from 'svelte';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
-import { spaceUiManager } from '$lib/managers/space-ui-manager.svelte';
 import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
 import { lang } from '$lib/stores/preferences.store';
 import { buildSpaceTimelineOptions } from '$lib/utils/space-filter-options';
@@ -17,7 +16,6 @@ const OVER_SPACE_ASSET_LIMIT = 10_001;
 
 const {
   gotoMock,
-  invalidateAllMock,
   mockPage,
   mockAssetMultiSelectManager,
   mockAuthManager,
@@ -27,7 +25,6 @@ const {
   mockRegisterSearchablePageFilters,
 } = vi.hoisted(() => ({
   gotoMock: vi.fn().mockResolvedValue(undefined),
-  invalidateAllMock: vi.fn().mockResolvedValue(undefined),
   mockPage: {
     url: new URL('https://gallery.test/spaces/space-1/photos'),
     route: { id: '/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]' },
@@ -52,7 +49,7 @@ const {
   mockRegisterSearchablePageFilters: vi.fn(() => vi.fn()),
 }));
 
-vi.mock('$app/navigation', () => ({ goto: gotoMock, invalidateAll: invalidateAllMock }));
+vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 vi.mock('$app/state', () => ({ page: mockPage }));
 
 vi.mock('@immich/ui', async (importOriginal) => {
@@ -117,6 +114,16 @@ vi.mock('$lib/components/shared-components/context-menu/ButtonContextMenu.svelte
   return { default: MockComponent };
 });
 
+vi.mock('$lib/components/spaces/space-map.svelte', async () => {
+  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+  return { default: MockComponent };
+});
+
+vi.mock('$lib/components/spaces/space-panel.svelte', async () => {
+  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+  return { default: MockComponent };
+});
+
 vi.mock('$lib/components/timeline/Timeline.svelte', async () => {
   const { default: MockComponent } = await import('./mock-timeline.test-wrapper.svelte');
   return { default: MockComponent };
@@ -136,6 +143,10 @@ vi.mock('$lib/managers/global-search-manager.svelte', () => ({
   globalSearchManager: {
     registerSearchablePageFilters: mockRegisterSearchablePageFilters,
   },
+}));
+vi.mock('$lib/utils/space-hero-storage', () => ({
+  loadHeroCollapsed: vi.fn().mockReturnValue(false),
+  persistHeroCollapsed: vi.fn(),
 }));
 
 vi.mock('$lib/utils/space-filter-options', async (importOriginal) => {
@@ -222,19 +233,10 @@ function renderPage(overrides: { space?: SharedSpaceResponseDto; members?: Share
   });
 }
 
-// The ＋Add photos affordance now lives in the shell layout (not this page); it signals the page
-// through the space-ui-manager intent, which the page consumes to enter select-assets mode.
-async function enterSelectAssets() {
-  spaceUiManager.requestAddPhotos();
-  await waitFor(() => expect(screen.getByLabelText('add_to_space')).toBeInTheDocument());
-}
-
 describe('Spaces page search URL state', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    spaceUiManager.reset();
     gotoMock.mockResolvedValue(undefined);
-    invalidateAllMock.mockResolvedValue(undefined);
     mockAssetMultiSelectManager.selectionActive = false;
     mockAssetMultiSelectManager.assets = [];
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
@@ -389,6 +391,30 @@ describe('Spaces page search URL state', () => {
       'data-tag-names',
       JSON.stringify([['tag-nature', 'nature']]),
     );
+  });
+
+  it('updates current member metadata sharing from the space menu', async () => {
+    renderPage();
+
+    await fireEvent.click(screen.getByText('spaces_stop_sharing_person_metadata'));
+
+    expect(sdkMock.updateMemberPreferences).toHaveBeenCalledWith({
+      id: 'space-1',
+      sharedSpaceMemberPreferencesDto: { sharePersonMetadata: false },
+    });
+    await waitFor(() => expect(screen.getByText('spaces_share_person_metadata')).toBeInTheDocument());
+  });
+
+  it('keeps timeline visibility on the legacy endpoint', async () => {
+    renderPage();
+
+    await fireEvent.click(screen.getByText('spaces_hide_from_timeline'));
+
+    expect(sdkMock.updateMemberTimeline).toHaveBeenCalledWith({
+      id: 'space-1',
+      sharedSpaceMemberTimelineDto: { showInTimeline: false },
+    });
+    await waitFor(() => expect(screen.getByText('spaces_show_on_timeline')).toBeInTheDocument());
   });
 
   it('narrows space search results and facets to favorites within the space when selected', async () => {
@@ -597,7 +623,7 @@ describe('Spaces page search URL state', () => {
     renderPage();
     const options = mockRegisterSelectionContext.mock.calls[0][0];
 
-    await enterSelectAssets();
+    await fireEvent.click(screen.getByLabelText('add_photos'));
 
     await waitFor(() => expect(options.getAddSelectedToCurrentSpace()).toEqual(expect.any(Function)));
     expect(options.getOnFavorite()).toBeUndefined();
@@ -612,8 +638,7 @@ describe('Spaces page search URL state', () => {
     const options = mockRegisterSelectionContext.mock.calls[0][0];
     const spaceOptions = mockRegisterSpaceContext.mock.calls[0][2];
 
-    // The ＋Add photos affordance now lives in the shell layout (gated there); the page exposes
-    // no add-to-space capability for a viewer through either selection or space context.
+    expect(screen.queryByLabelText('add_photos')).not.toBeInTheDocument();
     expect(options.getAddSelectedToCurrentSpace()).toBeUndefined();
     expect(spaceOptions.getAddPhotosToCurrentSpace()).toBeUndefined();
   });
@@ -621,7 +646,7 @@ describe('Spaces page search URL state', () => {
   it('addSelectedToCurrentSpace rejects empty and over-limit selections', async () => {
     renderPage();
     const options = mockRegisterSelectionContext.mock.calls[0][0];
-    await enterSelectAssets();
+    await fireEvent.click(screen.getByLabelText('add_photos'));
     const addSelected = options.getAddSelectedToCurrentSpace() as () => Promise<boolean>;
 
     mockAssetMultiSelectManager.assets = [];
@@ -639,7 +664,7 @@ describe('Spaces page search URL state', () => {
     mockAssetMultiSelectManager.assets = [makeTimelineAsset({ id: 'asset-1' })];
     const options = mockRegisterSelectionContext.mock.calls[0][0];
 
-    await enterSelectAssets();
+    await fireEvent.click(screen.getByLabelText('add_photos'));
     const addSelected = options.getAddSelectedToCurrentSpace() as () => Promise<boolean>;
     await expect(addSelected()).resolves.toBe(true);
     expect(sdkMock.addAssets).toHaveBeenCalledWith({
@@ -655,7 +680,7 @@ describe('Spaces page search URL state', () => {
     sdkMock.getSpaceActivities.mockResolvedValue([]);
     mockAssetMultiSelectManager.selectionActive = false;
     mockAssetMultiSelectManager.assets = [makeTimelineAsset({ id: 'asset-2' })];
-    await enterSelectAssets();
+    await fireEvent.click(screen.getByLabelText('add_photos'));
     mockAssetMultiSelectManager.selectionActive = true;
     await fireEvent.click(screen.getByLabelText('add_to_space'));
     expect(sdkMock.addAssets).toHaveBeenCalledWith({
@@ -801,7 +826,7 @@ describe('Spaces page search URL state', () => {
   it('select-assets mode keeps space timeline options without grouping', async () => {
     renderPage();
 
-    await enterSelectAssets();
+    await fireEvent.click(screen.getByLabelText('add_photos'));
 
     await waitFor(() => {
       const optionsText = screen.getByTestId('timeline-options').textContent ?? '';
@@ -814,7 +839,7 @@ describe('Spaces page search URL state', () => {
   it('ignores space bucket activation outside view mode', async () => {
     renderPage();
 
-    await enterSelectAssets();
+    await fireEvent.click(screen.getByLabelText('add_photos'));
     await fireEvent.click(await screen.findByTestId('activate-year-bucket'));
 
     await waitFor(() => {
@@ -832,9 +857,7 @@ describe('Spaces page search URL state', () => {
       expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"year"');
     });
 
-    // The change-cover affordance now lives in the shell cover (not this page); it signals the page
-    // through the space-ui-manager intent, which the page consumes to enter select-cover mode.
-    spaceUiManager.requestChangeCover();
+    await fireEvent.click(screen.getByTestId('hero-set-cover-button'));
 
     await waitFor(() => {
       expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
@@ -871,7 +894,7 @@ describe('Spaces page search URL state', () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
 
     renderPage();
-    await enterSelectAssets();
+    await fireEvent.click(screen.getByLabelText('add_photos'));
 
     await waitFor(() => {
       expect(screen.getByTestId('timeline-options')).not.toHaveTextContent('"grouping"');

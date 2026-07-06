@@ -48,7 +48,6 @@ import {
 import { DB } from 'src/schema';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table';
 import { AudioStreamInfo, VectorExtension, VideoFormat, VideoPacketInfo, VideoStreamInfo } from 'src/types';
-import { spaceAssetPathBranches } from 'src/utils/shared-space-album-scope';
 import { dateTruncUnitForTimeBucketSize } from 'src/utils/timeline-bucket';
 import { fromChecksum } from 'src/utils/request';
 
@@ -701,14 +700,20 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
     .$if(!!options.spaceId && !options.timelineSpaceIds, (qb) =>
       qb.where((eb) =>
         eb.and([
-          eb.or(
-            spaceAssetPathBranches(eb, {
-              correlateAssetId: 'asset.id',
-              correlateLibraryId: 'asset.libraryId',
-              scope: { spaceId: options.spaceId! },
-              requireShowInTimeline: true,
-            }),
-          ),
+          eb.or([
+            eb.exists(
+              eb
+                .selectFrom('shared_space_asset')
+                .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                .where('shared_space_asset.spaceId', '=', asUuid(options.spaceId!)),
+            ),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_library')
+                .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                .where('shared_space_library.spaceId', '=', asUuid(options.spaceId!)),
+            ),
+          ]),
           // Fork RBAC (M3): elevation only unlocks the CALLER'S OWN locked/archived folder. The
           // caller's own (and partner) rows follow the resolved visibility applied above; every
           // OTHER space member's row is constrained to Timeline, so a space-scoped search can never
@@ -728,14 +733,20 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
           // Other space members' rows are always Timeline-only (elevation is per-owner, M3).
           eb.and([
             eb('asset.visibility', '=', AssetVisibility.Timeline),
-            eb.or(
-              spaceAssetPathBranches(eb, {
-                correlateAssetId: 'asset.id',
-                correlateLibraryId: 'asset.libraryId',
-                scope: { spaceIds: options.timelineSpaceIds! },
-                requireShowInTimeline: true,
-              }),
-            ),
+            eb.or([
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_asset')
+                  .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                  .where('shared_space_asset.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
+              ),
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_library')
+                  .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                  .where('shared_space_library.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
+              ),
+            ]),
           ]),
         ]),
       ),

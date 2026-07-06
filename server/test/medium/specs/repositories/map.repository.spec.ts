@@ -244,47 +244,5 @@ describe(MapRepository.name, () => {
       expect(hidden.find((marker) => marker.id === asset.id)).toBeUndefined();
       expect(visible.find((marker) => marker.id === asset.id)).toBeDefined();
     });
-
-    it('should include album-linked asset with GPS when space album showInTimeline=true', async () => {
-      const { ctx, sut } = setup();
-      const { user: owner } = await ctx.newUser();
-      const { user: member } = await ctx.newUser();
-      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
-      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id });
-      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
-      const { album } = await ctx.newAlbum({ ownerId: owner.id });
-      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
-      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
-      await ctx.database
-        .insertInto('asset_exif')
-        .values({ assetId: asset.id, latitude: 51.5, longitude: -0.12 })
-        .execute();
-      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, showInTimeline: true });
-
-      const results = await sut.getMapMarkers(member.id, [member.id], [], { timelineSpaceIds: [space.id] });
-
-      expect(results.find((r) => r.id === asset.id)).toBeDefined();
-    });
-
-    it('should NOT include album-linked asset when space album showInTimeline=false', async () => {
-      const { ctx, sut } = setup();
-      const { user: owner } = await ctx.newUser();
-      const { user: member } = await ctx.newUser();
-      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
-      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id });
-      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
-      const { album } = await ctx.newAlbum({ ownerId: owner.id });
-      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
-      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
-      await ctx.database
-        .insertInto('asset_exif')
-        .values({ assetId: asset.id, latitude: 52.5, longitude: 13.4 })
-        .execute();
-      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, showInTimeline: false });
-
-      const results = await sut.getMapMarkers(member.id, [member.id], [], { timelineSpaceIds: [space.id] });
-
-      expect(results.find((r) => r.id === asset.id)).toBeUndefined();
-    });
   });
 });
