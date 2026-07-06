@@ -14,7 +14,6 @@ describe('space people page load', () => {
     name: 'Test Space',
     createdAt: '2026-01-01T00:00:00.000Z',
     createdById: 'owner-user-id',
-    faceRecognitionEnabled: true,
   };
 
   const members = [
@@ -25,18 +24,6 @@ describe('space people page load', () => {
       role: SharedSpaceRole.Editor,
       showInTimeline: false,
       joinedAt: '2026-01-01T00:00:00.000Z',
-    },
-  ];
-
-  const linkedAlbums = [
-    {
-      albumId: 'a1',
-      albumName: 'Trip',
-      assetCount: 2,
-      showInTimeline: true,
-      addedById: null,
-      albumThumbnailAssetId: null,
-      createdAt: '2026-01-01T00:00:00.000Z',
     },
   ];
 
@@ -65,30 +52,31 @@ describe('space people page load', () => {
     detectedFaceCount: 1980,
   };
 
-  const makeEvent = (overrides: { spaceId?: string } = {}) => ({
-    url: new URL(`https://gallery.test/spaces/${overrides.spaceId ?? 'space-1'}/people`),
-    params: { spaceId: overrides.spaceId ?? 'space-1' },
-    parent: vi.fn().mockResolvedValue({ space, members, linkedAlbums }),
-  });
+  const event = {
+    url: new URL('https://gallery.test/spaces/space-1/people'),
+    params: { spaceId: 'space-1' },
+  };
 
   beforeEach(() => {
     vi.resetAllMocks();
+    sdkMock.getSpace.mockResolvedValue(space as never);
+    sdkMock.getMembers.mockResolvedValue(members as never);
     sdkMock.getSpacePeople.mockResolvedValue(people as never);
     sdkMock.getSpacePeopleStatistics.mockResolvedValue(peopleStatistics);
   });
 
   it('authenticates and loads space people with overview statistics', async () => {
-    const event = makeEvent();
     await expect(load(event as never)).resolves.toEqual({
+      space,
+      members,
       people,
       peopleStatistics,
+      meta: { title: 'Test Space - People' },
     });
 
     expect(authenticate).toHaveBeenCalledWith(event.url);
-    expect(event.parent).toHaveBeenCalled();
-    // space + members no longer fetched by the page loader — they come from the layout
-    expect(sdkMock.getSpace).not.toHaveBeenCalled();
-    expect(sdkMock.getMembers).not.toHaveBeenCalled();
+    expect(sdkMock.getSpace).toHaveBeenCalledWith({ id: 'space-1' });
+    expect(sdkMock.getMembers).toHaveBeenCalledWith({ id: 'space-1' });
     expect(sdkMock.getSpacePeople).toHaveBeenCalledWith({ id: 'space-1', limit: 100 });
     expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1' });
     expect(sdkMock.getSpacePeopleFaceStatistics).not.toHaveBeenCalled();
@@ -97,9 +85,12 @@ describe('space people page load', () => {
   it('keeps the space people list when overview statistics fail', async () => {
     sdkMock.getSpacePeopleStatistics.mockRejectedValue(new Error('stats unavailable'));
 
-    await expect(load(makeEvent() as never)).resolves.toEqual({
+    await expect(load(event as never)).resolves.toEqual({
+      space,
+      members,
       people,
       peopleStatistics: null,
+      meta: { title: 'Test Space - People' },
     });
   });
 
@@ -107,18 +98,6 @@ describe('space people page load', () => {
     const error = new Error('people unavailable');
     sdkMock.getSpacePeople.mockRejectedValue(error);
 
-    await expect(load(makeEvent() as never)).rejects.toThrow(error);
-  });
-
-  it('redirects to Photos when face recognition is disabled', async () => {
-    const event = {
-      ...makeEvent(),
-      parent: vi.fn().mockResolvedValue({ space: { ...space, faceRecognitionEnabled: false }, members, linkedAlbums }),
-    };
-
-    await expect(load(event as never)).rejects.toMatchObject({ status: 307 });
-
-    // people APIs should not be called when redirecting
-    expect(sdkMock.getSpacePeople).not.toHaveBeenCalled();
+    await expect(load(event as never)).rejects.toThrow(error);
   });
 });

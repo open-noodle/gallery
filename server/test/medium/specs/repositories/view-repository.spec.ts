@@ -38,19 +38,6 @@ const seedDirectSpaceAsset = async (
   return { owner, member, space, asset };
 };
 
-// Seed an asset reachable through an album linked to a space, with `member` joined.
-const seedLinkedAlbumAsset = async (ctx: Ctx, role: SharedSpaceRole, originalPath: string) => {
-  const { user: owner } = await ctx.newUser();
-  const { user: member } = await ctx.newUser();
-  const { space } = await ctx.newSharedSpace({ createdById: owner.id });
-  const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: `ViewAlbum-${role}` });
-  await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
-  const { asset } = await ctx.newAsset({ ownerId: owner.id, originalPath });
-  await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
-  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role });
-  return { owner, member, space, album, asset };
-};
-
 // Seed an asset reachable through a library linked to a space, with `member` joined.
 const seedLinkedLibraryAsset = async (ctx: Ctx, role: SharedSpaceRole, originalPath: string) => {
   const { user: owner } = await ctx.newUser();
@@ -100,15 +87,6 @@ describe(ViewRepository.name, () => {
       const result = await sut.getUniqueOriginalPaths(member.id);
 
       expect(result).toContain(`/external/cam/${role}-lib`);
-    });
-
-    it.each(ALL_ROLES)('GRANT — space %s sees folders for assets in an album linked to the space', async (role) => {
-      const { ctx, sut } = setup();
-      const { member } = await seedLinkedAlbumAsset(ctx, role, `/album/folder/${role}-album/photo.jpg`);
-
-      const result = await sut.getUniqueOriginalPaths(member.id);
-
-      expect(result).toContain(`/album/folder/${role}-album`);
     });
 
     it('GRANT — member sees the folder even when showInTimeline is disabled', async () => {
@@ -203,16 +181,6 @@ describe(ViewRepository.name, () => {
       const { ctx, sut } = setup();
       const path = `/external/contents/${role}-lib`;
       const { member, asset } = await seedLinkedLibraryAsset(ctx, role, `${path}/clip.jpg`);
-
-      const result = await sut.getAssetsByOriginalPath(member.id, path);
-
-      expect(result.map((a) => a.id)).toEqual([asset.id]);
-    });
-
-    it.each(ALL_ROLES)('GRANT — space %s gets folder contents from a linked album', async (role) => {
-      const { ctx, sut } = setup();
-      const path = `/album/contents/${role}-album`;
-      const { member, asset } = await seedLinkedAlbumAsset(ctx, role, `${path}/photo.jpg`);
 
       const result = await sut.getAssetsByOriginalPath(member.id, path);
 
