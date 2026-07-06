@@ -91,6 +91,8 @@ export enum SharedSpaceActivityType {
   PersonUpdate = 'person_update',
   PersonDelete = 'person_delete',
   PersonMerge = 'person_merge',
+  AlbumLink = 'album_link',
+  AlbumUnlink = 'album_unlink',
 }
 
 export enum AssetOrder {
@@ -273,6 +275,10 @@ export enum Permission {
 
   SharedSpaceLibraryCreate = 'sharedSpaceLibrary.create',
   SharedSpaceLibraryDelete = 'sharedSpaceLibrary.delete',
+
+  SharedSpaceAlbumCreate = 'sharedSpaceAlbum.create',
+  SharedSpaceAlbumUpdate = 'sharedSpaceAlbum.update',
+  SharedSpaceAlbumDelete = 'sharedSpaceAlbum.delete',
 
   UserGroupCreate = 'userGroup.create',
   UserGroupRead = 'userGroup.read',
@@ -1015,6 +1021,7 @@ export enum JobName {
   SharedSpaceFaceMatchPage = 'SharedSpaceFaceMatchPage',
   SharedSpaceFaceMatchFromBackfill = 'SharedSpaceFaceMatchFromBackfill',
   SharedSpaceLibraryFaceSync = 'SharedSpaceLibraryFaceSync',
+  SharedSpaceAlbumFaceSync = 'SharedSpaceAlbumFaceSync',
   SharedSpaceIdentityReconciliation = 'SharedSpaceIdentityReconciliation',
   SharedSpacePersonDedup = 'SharedSpacePersonDedup',
   SharedSpacePersonMetadataBackfill = 'SharedSpacePersonMetadataBackfill',
@@ -1142,6 +1149,13 @@ export enum SyncRequestType {
   LibraryAssetsV1 = 'LibraryAssetsV1',
   LibraryAssetExifsV1 = 'LibraryAssetExifsV1',
   SharedSpaceLibrariesV1 = 'SharedSpaceLibrariesV1',
+
+  // Shared-space album sync (Phase 2A): one request type per granularity.
+  SharedSpaceAlbumsV1 = 'SharedSpaceAlbumsV1',
+  SharedSpaceAlbumLinksV1 = 'SharedSpaceAlbumLinksV1',
+  SharedSpaceAlbumToAssetsV1 = 'SharedSpaceAlbumToAssetsV1',
+  SharedSpaceAlbumAssetsV1 = 'SharedSpaceAlbumAssetsV1',
+  SharedSpaceAlbumAssetExifsV1 = 'SharedSpaceAlbumAssetExifsV1',
 }
 
 export const SyncRequestTypeSchema = z
@@ -1261,6 +1275,37 @@ export enum SyncEntityType {
   SharedSpaceLibraryV1 = 'SharedSpaceLibraryV1',
   SharedSpaceLibraryDeleteV1 = 'SharedSpaceLibraryDeleteV1',
   SharedSpaceLibraryBackfillV1 = 'SharedSpaceLibraryBackfillV1',
+
+  // --- gallery-fork: shared-space album sync ---
+  // metadata family (grant-keyed) ← clone AlbumSync
+  SharedSpaceAlbumV1 = 'SharedSpaceAlbumV1',
+  SharedSpaceAlbumDeleteV1 = 'SharedSpaceAlbumDeleteV1',
+  // NB: the metadata stream is NOT backfilled — getUpserts already returns every
+  // grant-accessible album (not just recent ones), so this entity type is never
+  // emitted. It is retained only to keep the wire-contract shape symmetric with
+  // the library family; per-album backfill is carried by the dependent
+  // membership/asset/exif streams keyed off the grant createId.
+  SharedSpaceAlbumBackfillV1 = 'SharedSpaceAlbumBackfillV1',
+
+  // link family (space-keyed) ← clone SharedSpaceLibrarySync
+  SharedSpaceAlbumLinkV1 = 'SharedSpaceAlbumLinkV1',
+  SharedSpaceAlbumLinkDeleteV1 = 'SharedSpaceAlbumLinkDeleteV1',
+  SharedSpaceAlbumLinkBackfillV1 = 'SharedSpaceAlbumLinkBackfillV1',
+
+  // membership ← clone AlbumToAssetSync
+  SharedSpaceAlbumToAssetV1 = 'SharedSpaceAlbumToAssetV1',
+  SharedSpaceAlbumToAssetDeleteV1 = 'SharedSpaceAlbumToAssetDeleteV1',
+  SharedSpaceAlbumToAssetBackfillV1 = 'SharedSpaceAlbumToAssetBackfillV1',
+
+  // assets (current V2 asset shape) ← clone AlbumAssetSync
+  SharedSpaceAlbumAssetCreateV1 = 'SharedSpaceAlbumAssetCreateV1',
+  SharedSpaceAlbumAssetUpdateV1 = 'SharedSpaceAlbumAssetUpdateV1',
+  SharedSpaceAlbumAssetBackfillV1 = 'SharedSpaceAlbumAssetBackfillV1',
+
+  // exif ← clone AlbumAssetExifSync
+  SharedSpaceAlbumAssetExifCreateV1 = 'SharedSpaceAlbumAssetExifCreateV1',
+  SharedSpaceAlbumAssetExifUpdateV1 = 'SharedSpaceAlbumAssetExifUpdateV1',
+  SharedSpaceAlbumAssetExifBackfillV1 = 'SharedSpaceAlbumAssetExifBackfillV1',
 
   SyncAckV1 = 'SyncAckV1',
   SyncResetV1 = 'SyncResetV1',

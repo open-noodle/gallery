@@ -40,6 +40,9 @@ type EventMap = {
   // album events
   AlbumUpdate: [{ id: string; userIds: string[]; recipientIds: string[] }];
   AlbumInvite: [{ id: string; userId: string; senderName: string }];
+  AlbumAssetsAdd: [{ albumId: string; assetIds: string[] }];
+  AlbumAssetsRemove: [{ albumId: string; assetIds: string[] }];
+  AlbumDelete: [{ albumId: string }];
 
   // cluster group events
   ClusterGroupRequest: [{ clusterGroupId: string; userId: string; senderName: string }];
@@ -51,7 +54,7 @@ type EventMap = {
   AssetHide: [{ assetId: string; userId: string }];
   AssetShow: [{ assetId: string; userId: string }];
   AssetTrash: [{ assetId: string; userId: string }];
-  AssetDelete: [{ assetId: string; userId: string }];
+  AssetDelete: [{ assetId: string; userId: string; affectedSpacePersons?: { spaceId: string; personId: string }[] }];
   AssetMetadataExtracted: [{ assetId: string; userId: string; source?: JobSource }];
 
   // asset bulk events
