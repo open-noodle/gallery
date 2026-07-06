@@ -261,9 +261,7 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
         ids.difference(isOwner),
         AlbumUserRole.Viewer,
       );
-      const granted = isOwner.union(isShared);
-      const isSpaceLinked = await access.album.checkSpaceLinkedAlbumReadAccess(auth.user.id, ids.difference(granted));
-      return granted.union(isSpaceLinked);
+      return isOwner.union(isShared);
     }
 
     case Permission.AlbumAssetCreate: {
@@ -273,9 +271,7 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
         ids.difference(isOwner),
         AlbumUserRole.Editor,
       );
-      const granted = isOwner.union(isShared);
-      const isSpaceLinked = await access.album.checkSpaceLinkedAlbumAccess(auth.user.id, ids.difference(granted));
-      return granted.union(isSpaceLinked);
+      return isOwner.union(isShared);
     }
 
     case Permission.AlbumUpdate: {
@@ -309,9 +305,7 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
         ids.difference(isOwner),
         AlbumUserRole.Viewer,
       );
-      const granted = isOwner.union(isShared);
-      const isSpaceLinked = await access.album.checkSpaceLinkedAlbumReadAccess(auth.user.id, ids.difference(granted));
-      return granted.union(isSpaceLinked);
+      return isOwner.union(isShared);
     }
 
     case Permission.AlbumAssetDelete: {
@@ -321,9 +315,7 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
         ids.difference(isOwner),
         AlbumUserRole.Editor,
       );
-      const granted = isOwner.union(isShared);
-      const isSpaceLinked = await access.album.checkSpaceLinkedAlbumAccess(auth.user.id, ids.difference(granted));
-      return granted.union(isSpaceLinked);
+      return isOwner.union(isShared);
     }
 
     case Permission.AssetUpload: {

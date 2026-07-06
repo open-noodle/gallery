@@ -10,11 +10,7 @@ import {
   UpdateDateColumn,
 } from '@immich/sql-tools';
 import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
-import {
-  shared_space_delete_album_audit,
-  shared_space_delete_audit,
-  shared_space_delete_library_audit,
-} from 'src/schema/functions';
+import { shared_space_delete_audit, shared_space_delete_library_audit } from 'src/schema/functions';
 import { AssetTable } from 'src/schema/tables/asset.table';
 import { UserTable } from 'src/schema/tables/user.table';
 
@@ -37,17 +33,6 @@ import { UserTable } from 'src/schema/tables/user.table';
   actions: ['delete'],
   scope: 'row',
   function: shared_space_delete_library_audit,
-})
-// Gallery-fork Phase 2A A3: BEFORE-row trigger so shared_space_album and
-// shared_space_member rows are still visible when fanning out
-// shared_space_album_user_audit on space deletion. The companion AFTER triggers
-// on shared_space_album and shared_space_member skip during this cascade via
-// EXISTS shared_space guards.
-@TriggerFunction({
-  timing: 'before',
-  actions: ['delete'],
-  scope: 'row',
-  function: shared_space_delete_album_audit,
 })
 export class SharedSpaceTable {
   @PrimaryGeneratedColumn()

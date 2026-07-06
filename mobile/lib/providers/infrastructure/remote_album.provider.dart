@@ -42,8 +42,7 @@ class RemoteAlbumNotifier extends Notifier<RemoteAlbumState> {
 
   Future<List<RemoteAlbum>> _getAll() async {
     try {
-      final currentUserId = ref.read(currentUserProvider)?.id;
-      final albums = await _remoteAlbumService.getAll(currentUserId: currentUserId);
+      final albums = await _remoteAlbumService.getAll();
       state = state.copyWith(albums: albums);
       return albums;
     } catch (error, stack) {
@@ -275,7 +274,7 @@ class RemoteAlbumNotifier extends Notifier<RemoteAlbumState> {
   /// that views bound to the album list (counts, thumbnails) reflect the
   /// latest junction-table changes without a full `refresh()`.
   Future<void> _refreshAlbumInState(String albumId) async {
-    final updated = await _remoteAlbumService.get(albumId, currentUserId: ref.read(currentUserProvider)?.id);
+    final updated = await _remoteAlbumService.get(albumId);
     if (updated == null) {
       return;
     }

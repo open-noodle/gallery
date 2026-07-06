@@ -133,20 +133,6 @@ from
       and "asset"."deletedAt" is null
       and "asset"."isOffline" = $6
       and "asset"."visibility" in ($7, $8)
-    union
-    select
-      "asset"."id"
-    from
-      "shared_space_album"
-      inner join "album" on "album"."id" = "shared_space_album"."albumId"
-      and "album"."deletedAt" is null
-      inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-      inner join "asset" on "asset"."id" = "album_asset"."assetId"
-    where
-      "shared_space_album"."spaceId" = $9
-      and "asset"."deletedAt" is null
-      and "asset"."isOffline" = $10
-      and "asset"."visibility" in ($11, $12)
   ) as "combined"
 
 -- SharedSpaceRepository.getEditableByAssetIds
@@ -199,114 +185,6 @@ where
   "spaceId" = $1
   and "libraryId" = $2
 
--- SharedSpaceRepository.removeAlbum
-delete from "shared_space_album"
-where
-  "spaceId" = $1
-  and "albumId" = $2
-
--- SharedSpaceRepository.getLinkedAlbums
-select
-  "album".*,
-  (
-    select
-      coalesce(json_agg(agg), '[]')
-    from
-      (
-        select
-          "album_user"."role",
-          (
-            select
-              to_json(obj)
-            from
-              (
-                select
-                  "id",
-                  "name",
-                  "email",
-                  "avatarColor",
-                  "profileImagePath",
-                  "profileChangedAt"
-                from
-                  (
-                    select
-                      1
-                  ) as "dummy"
-              ) as obj
-          ) as "user"
-        from
-          "album_user"
-          inner join "user" on "user"."id" = "album_user"."userId"
-        where
-          "album_user"."albumId" = "album"."id"
-        order by
-          "album_user"."role",
-          "user"."name" asc
-      ) as agg
-  ) as "albumUsers",
-  (
-    select
-      coalesce(json_agg(agg), '[]')
-    from
-      (
-        select
-          "shared_link".*
-        from
-          "shared_link"
-        where
-          "shared_link"."albumId" = "album"."id"
-      ) as agg
-  ) as "sharedLinks",
-  "shared_space_album"."addedById",
-  "shared_space_album"."showInTimeline",
-  "shared_space_album"."createdAt" as "linkedAt"
-from
-  "shared_space_album"
-  inner join "album" on "album"."id" = "shared_space_album"."albumId"
-where
-  "shared_space_album"."spaceId" = $1
-  and "album"."deletedAt" is null
-order by
-  "album"."createdAt" desc,
-  "album"."id" asc
-
--- SharedSpaceRepository.getSpacesLinkedToAlbum
-select
-  "shared_space_album".*,
-  "shared_space"."faceRecognitionEnabled"
-from
-  "shared_space_album"
-  inner join "shared_space" on "shared_space"."id" = "shared_space_album"."spaceId"
-where
-  "shared_space_album"."albumId" = $1
-
--- SharedSpaceRepository.hasAlbumLink
-select
-  "spaceId"
-from
-  "shared_space_album"
-where
-  "spaceId" = $1
-  and "albumId" = $2
-
--- SharedSpaceRepository.setAlbumShowInTimeline
-update "shared_space_album"
-set
-  "showInTimeline" = $1
-where
-  "spaceId" = $2
-  and "albumId" = $3
-
--- SharedSpaceRepository.getAlbumAssetCount
-select
-  count(*) as "count"
-from
-  "album_asset"
-  inner join "asset" on "asset"."id" = "album_asset"."assetId"
-where
-  "album_asset"."albumId" = $1
-  and "asset"."deletedAt" is null
-
 -- SharedSpaceRepository.getRecentAssets
 select
   "combined"."id",
@@ -342,29 +220,11 @@ from
       and "asset"."type" = $8
       and "asset"."visibility" in ($9, $10)
       and "asset"."thumbhash" is not null
-    union
-    select
-      "asset"."id",
-      "asset"."thumbhash",
-      "asset"."fileCreatedAt"
-    from
-      "shared_space_album"
-      inner join "album" on "album"."id" = "shared_space_album"."albumId"
-      and "album"."deletedAt" is null
-      inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-      inner join "asset" on "asset"."id" = "album_asset"."assetId"
-    where
-      "shared_space_album"."spaceId" = $11
-      and "asset"."deletedAt" is null
-      and "asset"."isOffline" = $12
-      and "asset"."type" = $13
-      and "asset"."visibility" in ($14, $15)
-      and "asset"."thumbhash" is not null
   ) as "combined"
 order by
   "combined"."fileCreatedAt" desc
 limit
-  $16
+  $11
 
 -- SharedSpaceRepository.getLastAssetAddedAt
 select
@@ -406,21 +266,6 @@ from
       and "asset"."deletedAt" is null
       and "asset"."isOffline" = $8
       and "asset"."visibility" in ($9, $10)
-    union
-    select
-      "asset"."id"
-    from
-      "shared_space_album"
-      inner join "album" on "album"."id" = "shared_space_album"."albumId"
-      and "album"."deletedAt" is null
-      inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-      inner join "asset" on "asset"."id" = "album_asset"."assetId"
-    where
-      "shared_space_album"."spaceId" = $11
-      and "asset"."createdAt" > $12
-      and "asset"."deletedAt" is null
-      and "asset"."isOffline" = $13
-      and "asset"."visibility" in ($14, $15)
   ) as "combined"
 
 -- SharedSpaceRepository.getLastContributor
@@ -632,20 +477,6 @@ WITH
       AND "asset"."deletedAt" IS NULL
       AND "asset"."isOffline" = false
       AND "asset"."visibility" IN ($5, $6)
-    UNION
-    SELECT
-      "asset"."id" AS "assetId"
-    FROM
-      "shared_space_album"
-      INNER JOIN "album" ON "album"."id" = "shared_space_album"."albumId"
-      AND "album"."deletedAt" IS NULL
-      INNER JOIN "album_asset" ON "album_asset"."albumId" = "shared_space_album"."albumId"
-      INNER JOIN "asset" ON "asset"."id" = "album_asset"."assetId"
-    WHERE
-      "shared_space_album"."spaceId" = $7
-      AND "asset"."deletedAt" IS NULL
-      AND "asset"."isOffline" = false
-      AND "asset"."visibility" IN ($8, $9)
   ),
   "person_rows" AS (
     SELECT
@@ -657,11 +488,11 @@ WITH
     FROM
       "shared_space_person"
     WHERE
-      "shared_space_person"."spaceId" = $10
-      AND "shared_space_person"."name" ILIKE $11 ESCAPE '\'
+      "shared_space_person"."spaceId" = $7
+      AND "shared_space_person"."name" ILIKE $8 ESCAPE '\'
       AND (
         "shared_space_person"."name" != ''
-        OR "shared_space_person"."assetCount" >= $12
+        OR "shared_space_person"."assetCount" >= $9
       )
   ),
   "person_keys" AS (
@@ -700,8 +531,8 @@ WITH
           INNER JOIN "shared_space_person" ON "shared_space_person"."id" = "shared_space_person_face"."personId"
         WHERE
           "shared_space_person_face"."assetFaceId" = "asset_face"."id"
-          AND "shared_space_person"."spaceId" = $13
-          AND "shared_space_person"."name" ILIKE $14 ESCAPE '\'
+          AND "shared_space_person"."spaceId" = $10
+          AND "shared_space_person"."name" ILIKE $11 ESCAPE '\'
       )
   )
 SELECT
@@ -736,20 +567,6 @@ WITH
       AND "asset"."deletedAt" IS NULL
       AND "asset"."isOffline" = false
       AND "asset"."visibility" IN ($5, $6)
-    UNION
-    SELECT
-      "asset"."id" AS "assetId"
-    FROM
-      "shared_space_album"
-      INNER JOIN "album" ON "album"."id" = "shared_space_album"."albumId"
-      AND "album"."deletedAt" IS NULL
-      INNER JOIN "album_asset" ON "album_asset"."albumId" = "shared_space_album"."albumId"
-      INNER JOIN "asset" ON "asset"."id" = "album_asset"."assetId"
-    WHERE
-      "shared_space_album"."spaceId" = $7
-      AND "asset"."deletedAt" IS NULL
-      AND "asset"."isOffline" = false
-      AND "asset"."visibility" IN ($8, $9)
   ),
   "detected_faces" AS (
     SELECT DISTINCT
@@ -771,10 +588,10 @@ WITH
       COALESCE(
         BOOL_OR(
           "shared_space_person"."id" IS NOT NULL
-          AND "shared_space_person"."name" ILIKE $10 ESCAPE '\'
+          AND "shared_space_person"."name" ILIKE $7 ESCAPE '\'
           AND (
             "shared_space_person"."name" != ''
-            OR "shared_space_person"."assetCount" >= $11
+            OR "shared_space_person"."assetCount" >= $8
           )
         ),
         false
@@ -782,10 +599,10 @@ WITH
       COALESCE(
         BOOL_OR(
           "shared_space_person"."isHidden" = false
-          AND "shared_space_person"."name" ILIKE $12 ESCAPE '\'
+          AND "shared_space_person"."name" ILIKE $9 ESCAPE '\'
           AND (
             "shared_space_person"."name" != ''
-            OR "shared_space_person"."assetCount" >= $13
+            OR "shared_space_person"."assetCount" >= $10
           )
         ),
         false
@@ -793,10 +610,10 @@ WITH
       COALESCE(
         BOOL_OR(
           "shared_space_person"."isHidden" = true
-          AND "shared_space_person"."name" ILIKE $14 ESCAPE '\'
+          AND "shared_space_person"."name" ILIKE $11 ESCAPE '\'
           AND (
             "shared_space_person"."name" != ''
-            OR "shared_space_person"."assetCount" >= $15
+            OR "shared_space_person"."assetCount" >= $12
           )
         ),
         false
@@ -805,7 +622,7 @@ WITH
       "detected_faces"
       LEFT JOIN "shared_space_person_face" ON "shared_space_person_face"."assetFaceId" = "detected_faces"."assetFaceId"
       LEFT JOIN "shared_space_person" ON "shared_space_person"."id" = "shared_space_person_face"."personId"
-      AND "shared_space_person"."spaceId" = $16
+      AND "shared_space_person"."spaceId" = $13
     GROUP BY
       "detected_faces"."assetFaceId"
   ),
@@ -829,10 +646,10 @@ WITH
       "detected_faces"
       INNER JOIN "shared_space_person_face" ON "shared_space_person_face"."assetFaceId" = "detected_faces"."assetFaceId"
       INNER JOIN "shared_space_person" ON "shared_space_person"."id" = "shared_space_person_face"."personId"
-      AND "shared_space_person"."spaceId" = $17
+      AND "shared_space_person"."spaceId" = $14
     WHERE
       true
-      AND "shared_space_person"."name" ILIKE $18 ESCAPE '\'
+      AND "shared_space_person"."name" ILIKE $15 ESCAPE '\'
   ),
   "matching_person_keys" AS (
     SELECT
@@ -906,20 +723,6 @@ WITH
       AND "asset"."deletedAt" IS NULL
       AND "asset"."isOffline" = false
       AND "asset"."visibility" IN ($7, $8)
-    UNION
-    SELECT
-      "asset"."id" AS "assetId"
-    FROM
-      "shared_space_album"
-      INNER JOIN "album" ON "album"."id" = "shared_space_album"."albumId"
-      AND "album"."deletedAt" IS NULL
-      INNER JOIN "album_asset" ON "album_asset"."albumId" = "shared_space_album"."albumId"
-      INNER JOIN "asset" ON "asset"."id" = "album_asset"."assetId"
-    WHERE
-      "shared_space_album"."spaceId" = $9
-      AND "asset"."deletedAt" IS NULL
-      AND "asset"."isOffline" = false
-      AND "asset"."visibility" IN ($10, $11)
   ),
   "selected_faces" AS (
     SELECT DISTINCT
@@ -985,18 +788,6 @@ where
         "shared_space_library"."libraryId" = "asset"."libraryId"
         and "shared_space_library"."spaceId" = "shared_space_person"."spaceId"
     )
-    or exists (
-      select
-        1 as "exists"
-      from
-        "shared_space_album"
-        inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-        inner join "album" on "album"."id" = "shared_space_album"."albumId"
-        and "album"."deletedAt" is null
-      where
-        "album_asset"."assetId" = "asset_face"."assetId"
-        and "shared_space_album"."spaceId" = "shared_space_person"."spaceId"
-    )
   )
 
 -- SharedSpaceRepository.getSpaceRepresentativeFaces
@@ -1035,18 +826,6 @@ where
       where
         "shared_space_library"."libraryId" = "asset"."libraryId"
         and "shared_space_library"."spaceId" = "shared_space_person"."spaceId"
-    )
-    or exists (
-      select
-        1 as "exists"
-      from
-        "shared_space_album"
-        inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-        inner join "album" on "album"."id" = "shared_space_album"."albumId"
-        and "album"."deletedAt" is null
-      where
-        "album_asset"."assetId" = "asset_face"."assetId"
-        and "shared_space_album"."spaceId" = "shared_space_person"."spaceId"
     )
   )
 order by
@@ -1159,22 +938,6 @@ where
   and "asset"."deletedAt" is null
   and "asset"."isOffline" = $3
   and "shared_space_library"."addedById" is not null
-select distinct
-  "shared_space_album"."addedById" as "userId"
-from
-  "shared_space_person_face"
-  inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
-  inner join "asset" on "asset"."id" = "asset_face"."assetId"
-  inner join "album_asset" on "album_asset"."assetId" = "asset"."id"
-  inner join "shared_space_album" on "shared_space_album"."albumId" = "album_asset"."albumId"
-  and "shared_space_album"."spaceId" = $1
-  inner join "album" on "album"."id" = "shared_space_album"."albumId"
-  and "album"."deletedAt" is null
-where
-  "shared_space_person_face"."personId" = $2
-  and "asset"."deletedAt" is null
-  and "asset"."isOffline" = $3
-  and "shared_space_album"."addedById" is not null
 
 -- SharedSpaceRepository.getSpaceAssetAdder
 select
@@ -1191,19 +954,6 @@ from
   inner join "asset" on "asset"."libraryId" = "shared_space_library"."libraryId"
 where
   "shared_space_library"."spaceId" = $1
-  and "asset"."id" = $2
-  and "asset"."deletedAt" is null
-  and "asset"."isOffline" = $3
-select
-  "shared_space_album"."addedById"
-from
-  "shared_space_album"
-  inner join "album" on "album"."id" = "shared_space_album"."albumId"
-  and "album"."deletedAt" is null
-  inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-  inner join "asset" on "asset"."id" = "album_asset"."assetId"
-where
-  "shared_space_album"."spaceId" = $1
   and "asset"."id" = $2
   and "asset"."deletedAt" is null
   and "asset"."isOffline" = $3
@@ -1252,18 +1002,6 @@ where
       where
         "shared_space_library"."libraryId" = "asset"."libraryId"
         and "shared_space_library"."spaceId" = $3
-    )
-    or exists (
-      select
-        1 as "exists"
-      from
-        "shared_space_album"
-        inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-        inner join "album" on "album"."id" = "shared_space_album"."albumId"
-        and "album"."deletedAt" is null
-      where
-        "album_asset"."assetId" = "asset_face"."assetId"
-        and "shared_space_album"."spaceId" = $4::uuid
     )
   )
   and "person"."identityId" is not null
@@ -1362,18 +1100,6 @@ where
         "shared_space_library"."libraryId" = "asset"."libraryId"
         and "shared_space_library"."spaceId" = "shared_space_person"."spaceId"
     )
-    or exists (
-      select
-        1 as "exists"
-      from
-        "shared_space_album"
-        inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-        inner join "album" on "album"."id" = "shared_space_album"."albumId"
-        and "album"."deletedAt" is null
-      where
-        "album_asset"."assetId" = "asset_face"."assetId"
-        and "shared_space_album"."spaceId" = "shared_space_person"."spaceId"
-    )
   )
 
 -- SharedSpaceRepository.getFirstValidRepresentativeFaceForPerson
@@ -1409,18 +1135,6 @@ where
       where
         "shared_space_library"."libraryId" = "asset"."libraryId"
         and "shared_space_library"."spaceId" = "shared_space_person"."spaceId"
-    )
-    or exists (
-      select
-        1 as "exists"
-      from
-        "shared_space_album"
-        inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-        inner join "album" on "album"."id" = "shared_space_album"."albumId"
-        and "album"."deletedAt" is null
-      where
-        "album_asset"."assetId" = "asset_face"."assetId"
-        and "shared_space_album"."spaceId" = "shared_space_person"."spaceId"
     )
   )
 order by
@@ -1535,79 +1249,6 @@ where
       "shared_space_person"
     where
       "shared_space_person"."spaceId" = $2
-  )
-
--- SharedSpaceRepository.getAlbumAssetIdsWithoutOtherSpacePath
-select
-  "album_asset"."assetId"
-from
-  "album_asset"
-where
-  "album_asset"."albumId" = $1
-  and not exists (
-    select
-    from
-      "shared_space_asset"
-    where
-      "shared_space_asset"."assetId" = "album_asset"."assetId"
-      and "shared_space_asset"."spaceId" = $2
-  )
-  and not exists (
-    select
-    from
-      "shared_space_album"
-      inner join "album" on "album"."id" = "shared_space_album"."albumId"
-      and "album"."deletedAt" is null
-      inner join "album_asset" as "other" on "other"."albumId" = "shared_space_album"."albumId"
-    where
-      "other"."assetId" = "album_asset"."assetId"
-      and "shared_space_album"."spaceId" = $3
-      and "shared_space_album"."albumId" != $4
-  )
-  and not exists (
-    select
-    from
-      "shared_space_library"
-      inner join "asset" on "asset"."libraryId" = "shared_space_library"."libraryId"
-    where
-      "asset"."id" = "album_asset"."assetId"
-      and "shared_space_library"."spaceId" = $5
-  )
-
--- SharedSpaceRepository.getAssetIdsWithoutOtherSpacePath
-select
-  "asset"."id"
-from
-  "asset"
-where
-  "asset"."id" in ($1)
-  and not exists (
-    select
-    from
-      "shared_space_asset"
-    where
-      "shared_space_asset"."assetId" = "asset"."id"
-      and "shared_space_asset"."spaceId" = $2
-  )
-  and not exists (
-    select
-    from
-      "shared_space_album"
-      inner join "album" on "album"."id" = "shared_space_album"."albumId"
-      and "album"."deletedAt" is null
-      inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-    where
-      "album_asset"."assetId" = "asset"."id"
-      and "shared_space_album"."spaceId" = $3
-  )
-  and not exists (
-    select
-    from
-      "shared_space_library"
-      inner join "asset" as "libAsset" on "libAsset"."libraryId" = "shared_space_library"."libraryId"
-    where
-      "libAsset"."id" = "asset"."id"
-      and "shared_space_library"."spaceId" = $4
   )
 
 -- SharedSpaceRepository.deleteOrphanedPersons
@@ -1823,24 +1464,9 @@ from
       and "asset"."deletedAt" is null
       and "asset"."isOffline" = $8
       and "asset"."visibility" in ($9, $10)
-    union
-    select
-      "asset"."id"
-    from
-      "shared_space_album"
-      inner join "album" on "album"."id" = "shared_space_album"."albumId"
-      and "album"."deletedAt" is null
-      inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-      inner join "asset" on "asset"."id" = "album_asset"."assetId"
-    where
-      "shared_space_album"."spaceId" = $11
-      and "asset"."id" = $12
-      and "asset"."deletedAt" is null
-      and "asset"."isOffline" = $13
-      and "asset"."visibility" in ($14, $15)
   ) as "combined"
 limit
-  $16
+  $11
 
 -- SharedSpaceRepository.isFaceInSpace
 select
@@ -1869,25 +1495,9 @@ from
       and "asset_face"."deletedAt" is null
       and "asset"."deletedAt" is null
       and "asset"."isOffline" = $5
-    union
-    select
-      "asset_face"."id"
-    from
-      "shared_space_album"
-      inner join "album" on "album"."id" = "shared_space_album"."albumId"
-      and "album"."deletedAt" is null
-      inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-      inner join "asset" on "asset"."id" = "album_asset"."assetId"
-      inner join "asset_face" on "asset_face"."assetId" = "asset"."id"
-    where
-      "shared_space_album"."spaceId" = $6
-      and "asset_face"."id" = $7
-      and "asset_face"."deletedAt" is null
-      and "asset"."deletedAt" is null
-      and "asset"."isOffline" = $8
   ) as "combined"
 limit
-  $9
+  $6
 
 -- SharedSpaceRepository.getAssetIdForFace
 select
@@ -1983,30 +1593,7 @@ from
     where
       "asset"."id" = $3
       and "shared_space"."faceRecognitionEnabled" = $4
-    union
-    select
-      "shared_space_album"."spaceId"
-    from
-      "shared_space_album"
-      inner join "album" on "album"."id" = "shared_space_album"."albumId"
-      and "album"."deletedAt" is null
-      inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-      inner join "shared_space" on "shared_space"."id" = "shared_space_album"."spaceId"
-    where
-      "album_asset"."assetId" = $5
-      and "shared_space"."faceRecognitionEnabled" = $6
   ) as "combined"
-
--- SharedSpaceRepository.getSpacePersonsForAsset
-select distinct
-  "shared_space_person"."spaceId",
-  "shared_space_person_face"."personId"
-from
-  "shared_space_person_face"
-  inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
-  inner join "shared_space_person" on "shared_space_person"."id" = "shared_space_person_face"."personId"
-where
-  "asset_face"."assetId" = $1
 
 -- SharedSpaceRepository.isPersonFaceAssigned
 select

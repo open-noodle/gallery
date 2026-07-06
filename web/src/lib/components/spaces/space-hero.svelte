@@ -1,45 +1,66 @@
 <script lang="ts">
-  import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
-  import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
   import { getAssetMediaUrl } from '$lib/utils';
   import { AssetMediaSize, type SharedSpaceResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
-  import { mdiCameraOutline, mdiCursorMove, mdiImageEditOutline, mdiPencilOutline } from '@mdi/js';
+  import {
+    mdiAccountGroupOutline,
+    mdiAccountMultipleOutline,
+    mdiCameraOutline,
+    mdiChevronDown,
+    mdiChevronUp,
+    mdiCursorMove,
+    mdiImageEditOutline,
+  } from '@mdi/js';
   import { t } from 'svelte-i18n';
 
   interface Props {
     space: SharedSpaceResponseDto;
+    memberCount: number;
+    assetCount: number;
     currentRole?: string;
     gradientClass?: string;
-    canEdit?: boolean;
-    onChangeCover?: () => void;
+    onSetCover?: () => void;
     onReposition?: () => void;
     repositioning?: boolean;
     onSavePosition?: (cropY: number) => void;
     onCancelReposition?: () => void;
-    assetCount?: number;
-    compact?: boolean;
+    faceRecognitionEnabled?: boolean;
+    spaceId?: string;
+    onShowMembers?: () => void;
+    height?: number;
     collapsed?: boolean;
+    onToggleCollapse?: () => void;
   }
 
   let {
     space,
+    memberCount,
+    assetCount,
     currentRole,
     gradientClass = 'from-gray-400 to-gray-600',
-    canEdit = false,
-    onChangeCover,
+    onSetCover,
     onReposition,
     repositioning = false,
     onSavePosition,
     onCancelReposition,
-    assetCount,
-    compact = false,
+    faceRecognitionEnabled,
+    spaceId,
+    onShowMembers,
+    height = 450,
     collapsed = false,
+    onToggleCollapse,
   }: Props = $props();
 
   let coverUrl = $derived(
     space.thumbnailAssetId ? getAssetMediaUrl({ id: space.thumbnailAssetId, size: AssetMediaSize.Preview }) : null,
   );
+  let showFullDescription = $state(false);
+
+  let roleLabels: Record<string, string> = $derived({
+    owner: $t('owner'),
+    editor: $t('role_editor'),
+    viewer: $t('role_viewer'),
+  });
 
   // Drag-to-reposition state
   let dragCropY = $state(50);
@@ -58,10 +79,8 @@
   let displayCropY = $derived(repositioning ? dragCropY : (space.thumbnailCropY ?? 50));
 
   let hasCover = $derived(!!space.thumbnailAssetId);
-
-  const TALL = 220;
-  const COMPACT = 96;
-  let effectiveHeight = $derived(repositioning ? TALL : collapsed ? 0 : compact ? COMPACT : TALL);
+  let isCollapsed = $derived(collapsed && !repositioning);
+  let effectiveHeight = $derived(isCollapsed ? 56 : height);
 
   const handlePointerDown = (e: PointerEvent) => {
     if (!repositioning) {
@@ -89,7 +108,7 @@
 </script>
 
 <div
-  class="group relative w-full overflow-hidden rounded-xl"
+  class="relative w-full overflow-hidden rounded-xl"
   style="height: {effectiveHeight}px; transition: height 300ms ease;"
   data-testid="space-hero"
 >
@@ -97,7 +116,7 @@
     <img
       src={coverUrl}
       alt={space.name}
-      class="absolute inset-0 size-full object-cover select-none"
+      class="absolute inset-0 size-full select-none object-cover"
       class:cursor-grab={repositioning && !isDragging}
       class:cursor-grabbing={repositioning && isDragging}
       style="object-position: center {displayCropY}%;"
@@ -108,13 +127,74 @@
       onpointerup={handlePointerUp}
     />
   {:else}
-    <div class="absolute inset-0 bg-linear-to-br {gradientClass}" data-testid="hero-gradient"></div>
+    <div class="absolute inset-0 bg-gradient-to-br {gradientClass}" data-testid="hero-gradient"></div>
   {/if}
 
-  {#if repositioning}
+  {#if isCollapsed}
+    <!-- Collapsed compact bar -->
+    <div class="absolute inset-0 bg-black/60"></div>
+    <div class="relative flex h-full items-center gap-3 px-4" data-testid="hero-collapsed-bar">
+      <span
+        class="min-w-0 flex-1 truncate text-base font-semibold text-white drop-shadow-md"
+        data-testid="hero-collapsed-name"
+      >
+        {space.name}
+      </span>
+      <span
+        class="hidden items-center gap-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs text-white backdrop-blur-sm sm:inline-flex"
+        data-testid="hero-collapsed-photo-count"
+      >
+        <Icon icon={mdiCameraOutline} size="14" />
+        {assetCount}
+        {$t('photos')}
+      </span>
+      <button
+        type="button"
+        class="hidden items-center gap-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs text-white backdrop-blur-sm transition-colors hover:bg-white/30 sm:inline-flex"
+        onclick={() => onShowMembers?.()}
+        data-testid="hero-collapsed-member-count"
+      >
+        <Icon icon={mdiAccountMultipleOutline} size="14" />
+        {memberCount}
+        {$t('members')}
+      </button>
+      {#if faceRecognitionEnabled && spaceId}
+        <a
+          href="/spaces/{spaceId}/people"
+          class="hidden items-center gap-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs text-white backdrop-blur-sm transition-colors hover:bg-white/30 sm:inline-flex"
+          data-testid="hero-collapsed-manage-people"
+        >
+          <Icon icon={mdiAccountGroupOutline} size="14" />
+          {$t('manage_people')}
+        </a>
+      {/if}
+      {#if currentRole}
+        <span
+          class="hidden items-center rounded-full bg-white/20 px-2 py-0.5 text-xs font-medium capitalize text-white backdrop-blur-sm sm:inline-flex"
+          data-testid="hero-collapsed-role"
+        >
+          {roleLabels[currentRole] ?? currentRole}
+        </span>
+      {/if}
+      {#if onToggleCollapse}
+        <button
+          type="button"
+          class="rounded-full bg-white/20 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-white/30"
+          onclick={onToggleCollapse}
+          aria-expanded="false"
+          aria-label={$t('spaces_expand_header')}
+          data-testid="hero-expand-toggle"
+        >
+          <Icon icon={mdiChevronDown} size="16" />
+        </button>
+      {/if}
+    </div>
+  {:else if repositioning}
     <!-- Reposition mode overlay -->
-    <div class="pointer-events-none absolute inset-x-0 top-0 h-16 bg-linear-to-b from-black/50 to-transparent"></div>
-    <div class="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-black/50 to-transparent"></div>
+    <div class="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/50 to-transparent"></div>
+    <div
+      class="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/50 to-transparent"
+    ></div>
 
     {#if !hasInteracted}
       <div class="pointer-events-none absolute inset-0 flex items-center justify-center" data-testid="reposition-hint">
@@ -124,7 +204,7 @@
       </div>
     {/if}
 
-    <div class="absolute right-3 bottom-3 flex gap-2" data-testid="reposition-controls">
+    <div class="absolute bottom-3 right-3 flex gap-2" data-testid="reposition-controls">
       <button
         type="button"
         class="rounded-full bg-white/20 px-4 py-1.5 text-sm font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/30"
@@ -143,63 +223,114 @@
       </button>
     </div>
   {:else}
-    <div class="absolute inset-0 bg-linear-to-t from-black/70 via-black/20 to-transparent"></div>
+    <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
 
-    <div class="absolute inset-x-0 bottom-0 p-5 text-white">
-      <h1 class="text-2xl font-bold drop-shadow-md" data-testid="hero-title">{space.name}</h1>
-      {#if space.description}
-        <p class="mt-1 line-clamp-2 text-sm text-white/80 drop-shadow-sm" data-testid="hero-description">
-          {space.description}
-        </p>
-      {/if}
-      {#if assetCount != null}
-        <span
-          class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-1 text-xs font-medium backdrop-blur-sm"
-          data-testid="hero-photo-count"
-        >
-          <Icon icon={mdiCameraOutline} size="14" />
-          {assetCount}
-          {$t('photos')}
-        </span>
-      {/if}
-    </div>
-
-    <!-- Mockup: hover ✎ (editors) + role badge grouped at the top-right of the cover. -->
-    <div class="absolute top-3 right-3 flex items-center gap-2">
-      {#if canEdit && hasCover}
-        <div class="transition" data-testid="hero-edit-cover">
-          <ButtonContextMenu
-            icon={mdiPencilOutline}
-            title={$t('edit')}
-            color="secondary"
-            align="top-right"
-            direction="left"
-          >
-            <MenuOption text={$t('change_cover_photo')} icon={mdiImageEditOutline} onClick={() => onChangeCover?.()} />
-            <MenuOption text={$t('reposition')} icon={mdiCursorMove} onClick={() => onReposition?.()} />
-          </ButtonContextMenu>
-        </div>
-      {/if}
-      {#if currentRole}
-        <span
-          class="inline-flex items-center rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-medium text-white capitalize backdrop-blur-sm"
-          data-testid="hero-role-badge"
-        >
-          {currentRole}
-        </span>
-      {/if}
-    </div>
-
-    {#if canEdit && !hasCover}
+    {#if !hasCover && onSetCover}
       <button
         type="button"
-        class="absolute top-3 left-3 flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm transition hover:bg-black/60"
-        onclick={onChangeCover}
+        class="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+        onclick={onSetCover}
         data-testid="hero-set-cover-button"
       >
         <Icon icon={mdiImageEditOutline} size="14" />
         {$t('set_cover_photo')}
       </button>
+    {:else if hasCover && onSetCover && onReposition}
+      <div class="absolute right-3 top-3 flex gap-2" data-testid="hero-cover-buttons">
+        <button
+          type="button"
+          class="flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+          onclick={onReposition}
+          data-testid="hero-reposition-button"
+        >
+          <Icon icon={mdiCursorMove} size="14" />
+          {$t('reposition')}
+        </button>
+        <button
+          type="button"
+          class="flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+          onclick={onSetCover}
+          data-testid="hero-change-cover-button"
+        >
+          <Icon icon={mdiImageEditOutline} size="14" />
+          {$t('change_cover_photo')}
+        </button>
+      </div>
     {/if}
+
+    <div class="absolute bottom-0 left-0 right-0 p-6 text-white">
+      <h1 class="text-2xl font-bold drop-shadow-md" data-testid="hero-title">{space.name}</h1>
+
+      {#if space.description}
+        <p
+          class="mt-1 text-sm text-white/80 drop-shadow-sm"
+          class:line-clamp-2={!showFullDescription}
+          data-testid="hero-description"
+        >
+          {space.description}
+        </p>
+        {#if space.description.length > 120}
+          <button
+            type="button"
+            class="mt-0.5 text-xs text-white/60 hover:text-white/90"
+            onclick={() => (showFullDescription = !showFullDescription)}
+            data-testid="hero-show-more"
+          >
+            {showFullDescription ? $t('show_less') : $t('show_more')}
+          </button>
+        {/if}
+      {/if}
+
+      <div class="mt-2 flex flex-wrap items-center gap-2">
+        <span
+          class="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-sm backdrop-blur-sm"
+          data-testid="hero-photo-count"
+        >
+          <Icon icon={mdiCameraOutline} size="16" />
+          {assetCount}
+          {$t('photos')}
+        </span>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-sm backdrop-blur-sm transition-colors hover:bg-white/30"
+          onclick={() => onShowMembers?.()}
+          data-testid="hero-member-count"
+        >
+          <Icon icon={mdiAccountMultipleOutline} size="16" />
+          {memberCount}
+          {$t('members')}
+        </button>
+        {#if faceRecognitionEnabled && spaceId}
+          <a
+            href="/spaces/{spaceId}/people"
+            class="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-sm backdrop-blur-sm transition-colors hover:bg-white/30"
+            data-testid="hero-manage-people"
+          >
+            <Icon icon={mdiAccountGroupOutline} size="16" />
+            {$t('manage_people')}
+          </a>
+        {/if}
+        {#if currentRole}
+          <span
+            class="inline-flex items-center rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-medium capitalize backdrop-blur-sm"
+            data-testid="hero-role-badge"
+          >
+            {roleLabels[currentRole] ?? currentRole}
+          </span>
+        {/if}
+        {#if onToggleCollapse}
+          <button
+            type="button"
+            class="inline-flex items-center rounded-full bg-white/20 p-1 backdrop-blur-sm transition-colors hover:bg-white/30"
+            onclick={onToggleCollapse}
+            aria-expanded="true"
+            aria-label={$t('spaces_collapse_header')}
+            data-testid="hero-collapse-toggle"
+          >
+            <Icon icon={mdiChevronUp} size="16" />
+          </button>
+        {/if}
+      </div>
+    </div>
   {/if}
 </div>
