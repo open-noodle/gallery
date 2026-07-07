@@ -8,7 +8,7 @@ Both are manual (`Actions → Run workflow`, or `gh workflow run`) and must be t
 
 ### Release Mobile
 
-Workflow: `gallery-release-mobile.yml`. Input: a required `version` (e.g. `v4.56.6`).
+Workflow: `gallery-release-mobile.yml`. Input: a required `version` (e.g. `v5.0.0`).
 
 1. Builds + signs the Android AAB/APK and the iOS IPA at the commit that dispatched the run.
 2. Uploads the Android AAB to the Play Store **internal** track and the iOS IPA to **TestFlight**.
@@ -28,8 +28,8 @@ It builds and pushes multi-arch Docker images to `ghcr.io/open-noodle/`, moves t
 
 The three git tags:
 
-- `vX.Y.Z` — the specific version (e.g. `v4.56.6`)
-- `vX` — floats to the latest release in that major (e.g. `v4`)
+- `vX.Y.Z` — the specific version (e.g. `v5.0.0`)
+- `vX` — floats to the latest release in that major (e.g. `v5`)
 - `release` — always points to the latest server release
 
 ## Keeping mobile and server in sync (optional)
@@ -54,8 +54,8 @@ Users pin their deployments with the `IMMICH_VERSION` env var in `docker-compose
 
 | Tag              | Example   | Behavior                  |
 | ---------------- | --------- | ------------------------- |
-| Specific version | `v4.56.6` | Pinned to exact release   |
-| Major version    | `v4`      | Floats to latest `v4.x.x` |
+| Specific version | `v5.0.0`  | Pinned to exact release   |
+| Major version    | `v5`      | Floats to latest `v5.x.x` |
 | `release`        | `release` | Always latest build       |
 
 ## Upstream tracking
