@@ -363,6 +363,18 @@ jobs:
 
           git push origin "$VERSION" "v${major}" "release" --force
 
+      - name: Sync example.env to release major
+        env:
+          MAJOR: ${{ needs.version.outputs.major }}
+        run: |
+          # example.env is attached to the release below and is what the install
+          # docs' releases/latest/download/example.env link serves. It pins
+          # IMMICH_VERSION to the major rolling tag (e.g. v5). Rewrite it to this
+          # release's major so the attached asset never lags a major bump, even
+          # if the committed docker/example.env wasn't bumped for this release.
+          sed -i "s/^IMMICH_VERSION=.*/IMMICH_VERSION=${MAJOR}/" docker/example.env
+          grep '^IMMICH_VERSION=' docker/example.env
+
       - name: Create GitHub Release
         env:
           VERSION: ${{ needs.version.outputs.version }}
