@@ -23,13 +23,13 @@
 <br/>
 
 > [!NOTE]
-> This is a **community fork** of [Immich](https://github.com/immich-app/immich) with additional features and improvements. Currently based on **Immich v2.7.5**. We regularly sync with upstream to stay up to date. See [What's Different](#whats-different-from-upstream-immich) below.
+> This is a **community fork** of [Immich](https://github.com/immich-app/immich) with additional features and improvements. Currently based on **Immich v3.0.1**. We regularly sync with upstream to stay up to date. See [What's Different](#whats-different-from-upstream-immich) below.
 
 > [!TIP]
 > **Noodle Gallery mobile apps are out!** Back up your photos and browse your library on the go. [Download on the App Store](https://apps.apple.com/il/app/noodle-gallery/id6761776289) · [Get it on Google Play](https://play.google.com/store/apps/details?id=de.opennoodle.gallery)
 
 > [!TIP]
-> **Already running Immich?** Switching to Gallery is a three-line config change — two image names in your `docker-compose.yml` and `IMMICH_VERSION=v4` in your `.env`. Your library and database are fully compatible. See the [install guide](https://opennoodle.de/install/#migrate-from-immich).
+> **Already running Immich?** Switching to Gallery is a three-line config change — two image names in your `docker-compose.yml` and `IMMICH_VERSION=v5` in your `.env`. Your library and database are fully compatible. See the [install guide](https://opennoodle.de/install/#migrate-from-immich).
 >
 > **Not for you?** A one-command [switch-back script](https://docs.opennoodle.de/guides/switch-back-to-immich) cleans up Gallery-specific tables and columns and puts you back on upstream Immich. Your photos and videos never move.
 
@@ -117,7 +117,7 @@ docker exec -t immich_postgres pg_dumpall -c -U postgres | gzip > immich-db-back
 Set the version in your `.env` file:
 
 ```bash
-IMMICH_VERSION=v4
+IMMICH_VERSION=v5
 ```
 
 Change the image references in your `docker-compose.yml`:
@@ -256,8 +256,8 @@ Pre-built Docker images are published to GitHub Container Registry (GHCR) under 
 ### Tags
 
 - **`release`** / **`release-cuda`** — most recent published build (like upstream's `release` tag)
-- **`v4`** — floats to the latest v4.x.x release (set `IMMICH_VERSION=v4` to auto-update within major version)
-- **`v4.2.6`** — pinned version using [semantic versioning](https://semver.org/)
+- **`v5`** — floats to the latest v5.x.x release (set `IMMICH_VERSION=v5` to auto-update within major version)
+- **`v5.0.0`** — pinned version using [semantic versioning](https://semver.org/)
 
 ### Publishing
 
