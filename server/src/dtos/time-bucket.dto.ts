@@ -62,6 +62,12 @@ const TimeBucketQueryBaseSchema = z
     country: z.string().optional().describe('Filter by country name'),
     make: z.string().optional().describe('Filter by camera make'),
     model: z.string().optional().describe('Filter by camera model'),
+    originalFileName: z
+      .string()
+      .optional()
+      .describe('Filter by original filename (substring, case/accent-insensitive)'),
+    description: z.string().optional().describe('Filter by asset description (substring, case/accent-insensitive)'),
+    ocr: z.string().optional().describe('Filter by OCR text content (substring, case/accent-insensitive)'),
     rating: z.coerce.number().int().min(1).max(5).optional().describe('Minimum star rating (>=)'),
     type: AssetTypeSchema.optional().describe('Filter by asset type (IMAGE or VIDEO)'),
     takenAfter: z.string().optional().describe('Only include assets taken on or after this date (ISO 8601)'),

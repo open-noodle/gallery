@@ -6,14 +6,17 @@
     mdiCalendarRange,
     mdiCamera,
     mdiClose,
+    mdiFileOutline,
     mdiHeart,
     mdiImage,
     mdiImageAlbum,
     mdiImageMultipleOutline,
     mdiMagnify,
     mdiMapMarker,
+    mdiOcr,
     mdiStar,
     mdiTag,
+    mdiTextSearch,
     mdiVideo,
   } from '@mdi/js';
   import { t, type Translations } from 'svelte-i18n';
@@ -133,6 +136,17 @@
     }
     if (filters.isInAlbum === true) {
       result.push({ type: 'albums', icon: mdiImageMultipleOutline, labelKey: 'filter_has_album' });
+    }
+
+    // Text filter chips
+    if (filters.description?.trim()) {
+      result.push({ type: 'description', icon: mdiTextSearch, label: filters.description.trim() });
+    }
+    if (filters.originalFileName?.trim()) {
+      result.push({ type: 'filename', icon: mdiFileOutline, label: filters.originalFileName.trim() });
+    }
+    if (filters.ocr?.trim()) {
+      result.push({ type: 'ocr', icon: mdiOcr, label: filters.ocr.trim() });
     }
 
     // Timeline chip
