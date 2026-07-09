@@ -18,6 +18,7 @@ import {
 import { StorageFolder, SystemMetadataKey } from 'src/enum.js';
 import { UserStatsQueryResponse } from 'src/repositories/user.repository.js';
 import { BaseService } from 'src/services/base.service.js';
+import { getAdminAvailableMemoryTypeKeys, MEMORY_TYPE_KEYS } from 'src/services/memory-rules/memory-type.metadata.js';
 import { asHumanReadable } from 'src/utils/bytes.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import {
@@ -167,6 +168,7 @@ export class ServerService extends BaseService {
       mapLightStyleUrl: config.map.lightStyle,
       maintenanceMode: false,
       minFaces: config.machineLearning.facialRecognition.minFaces,
+      availableMemoryTypes: MEMORY_TYPE_KEYS.filter((key) => getAdminAvailableMemoryTypeKeys(config.memories).has(key)),
     };
   }
 

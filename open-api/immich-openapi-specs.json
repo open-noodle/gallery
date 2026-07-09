@@ -23207,12 +23207,20 @@
           "sidebarWeb": {
             "description": "Whether memories appear in web sidebar",
             "type": "boolean"
+          },
+          "types": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "description": "Per-memory-type enable map, keyed by memory type",
+            "type": "object"
           }
         },
         "required": [
           "duration",
           "enabled",
-          "sidebarWeb"
+          "sidebarWeb",
+          "types"
         ],
         "type": "object"
       },
@@ -23231,6 +23239,13 @@
           "sidebarWeb": {
             "description": "Whether memories appear in web sidebar",
             "type": "boolean"
+          },
+          "types": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "description": "Per-memory-type enable overrides, keyed by memory type",
+            "type": "object"
           }
         },
         "type": "object"
@@ -27369,6 +27384,13 @@
       },
       "ServerConfigDto": {
         "properties": {
+          "availableMemoryTypes": {
+            "description": "Globally-available memory type keys",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "externalDomain": {
             "description": "External domain URL",
             "type": "string"
@@ -27425,6 +27447,7 @@
           }
         },
         "required": [
+          "availableMemoryTypes",
           "externalDomain",
           "isInitialized",
           "isOnboarded",
@@ -32779,6 +32802,14 @@
             "maximum": 9007199254740991,
             "minimum": 0,
             "type": "integer"
+          },
+          "types": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "default": {},
+            "description": "Per-type memory availability overrides",
+            "type": "object"
           }
         },
         "required": [
