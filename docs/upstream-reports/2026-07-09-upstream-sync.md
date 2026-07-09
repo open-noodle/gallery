@@ -132,18 +132,36 @@ _No broad cross-cutting refactor (e.g. class-validator→zod) landed in this pat
 | OpenAPI (TS SDK + Dart)          | regenerated; 3 files (HLS realtime config) |
 | SQL query docs                   | regenerated; **no diff**                   |
 
-## Local Verification
+## Local Verification (full gate — all green)
 
-| Check                                        | Status           |
-| -------------------------------------------- | ---------------- |
-| SDK chain + `nest build` (server type-check) | PASS             |
-| `dart analyze` (changed mobile files)        | PASS (no issues) |
-| `flutter test` drift `migration_test`        | PASS (598)       |
-| conflict markers in tree                     | none             |
-| ahead / behind v3.0.2                        | 901 / 0          |
+| Check                                        | Status                    |
+| -------------------------------------------- | ------------------------- |
+| SDK chain + `nest build` (server type-check) | PASS                      |
+| `check:typescript` (web)                     | PASS                      |
+| Server lint · Web lint                       | PASS (0 err; tw warns ok) |
+| Server unit tests                            | PASS (4779)               |
+| Web unit tests                               | PASS (3373)               |
+| `dart analyze --fatal-infos lib test`        | PASS (no issues)          |
+| `dart format` (lib)                          | PASS (0 changed)          |
+| `flutter test` (full)                        | PASS (2502)               |
+| drift `migration_test` (v1→v35)              | PASS (598)                |
+| conflict markers in tree                     | none                      |
+| ahead / behind v3.0.2                        | 901 / 0                   |
 
-_Web unit tests, full mobile analyze/test, lint, and the full remote CI suite are run in the
-push/CI phase._
+### Regressions caught + fixed during local verification
+
+1. **Web UTC bucketing** — v3.0.2 (#29666) reverted `TimelineMonth.createdAt` to `.toLocal()`,
+   re-emptying `/recently-added` for negative-offset-TZ viewers (server still buckets by UTC).
+   Restored the fork's `fromISODateTimeUTCToObject`.
+2. **Lost `deleteSqliteDatabase`** — v3.0.2 (#29656) added this top-level fn to `db.repository.dart`;
+   the fork-side take dropped it while the upstream callers landed. Restored.
+3. **i18n branding** — v3.0.2 translation sync re-introduced "Immich" in `sq`/`yue_Hant`
+   location-disclosure copy; restored "Noodle Gallery" (policy test).
+4. Adapted 2 kept-from-upstream tests to fork APIs (`main(userIds, currentUserId, groupBy)`,
+   `livePhotoVideoId` now RemoteAsset-only).
+
+_Remaining: full remote CI suite (docker, static_analysis, mobile build, e2e, storage-migration,
+revert-to-immich) dispatched in the push/CI phase._
 
 ## Post-Rebase Verification
 
