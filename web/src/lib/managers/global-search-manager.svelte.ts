@@ -25,6 +25,7 @@ import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
+import { createFilterState } from '$lib/components/filter-panel/filter-panel';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
 import { Route } from '$lib/route';
@@ -32,6 +33,7 @@ import { addEntry, getEntries, makePlaceId, removeEntry, type RecentEntry } from
 import { getGlobalPersonHref } from '$lib/utils/global-person-route';
 import {
   buildSearchablePageUrl,
+  getSearchablePageBasePath,
   getSearchablePageState,
   type SearchablePageSortOrder,
 } from '$lib/utils/searchable-page-search';
@@ -1554,6 +1556,45 @@ export class GlobalSearchManager {
     return buildSearchablePageUrl(new URL('/photos', page.url), text, this.searchSortOrder, filters) ?? '/photos';
   }
 
+  /**
+   * Navigate the current searchable page (or `/photos`) to a full result set filtered by the
+   * active field-search mode. The current filters are preserved and the one text field is
+   * AND-ed in, so "See all" / Enter from a field mode lands on the filterable timeline rather
+   * than dropping the mode into a smart `?q=` search.
+   */
+  private navigateToFieldResults(text: string, mode: SearchMode): void {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return;
+    }
+    const filters: FilterState = { ...(this.searchablePageFiltersProvider?.() ?? createFilterState()) };
+    switch (mode) {
+      case 'metadata': {
+        filters.originalFileName = trimmed;
+        break;
+      }
+      case 'description': {
+        filters.description = trimmed;
+        break;
+      }
+      case 'ocr': {
+        filters.ocr = trimmed;
+        break;
+      }
+      case 'smart': {
+        // Unreachable: navigateToFieldResults is only called for field modes.
+        return;
+      }
+    }
+    // Field results are always a filtered timeline, never a /map view. Target the current
+    // searchable page if there is one, else /photos — going through buildSearchDestination
+    // would route /map through its `q=` special-case and drop the text filter entirely.
+    // Ephemeral URL object for destination construction only; no reactive state is retained.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+    const base = getSearchablePageBasePath(page.url.pathname) ? page.url : new URL('/photos', page.url);
+    void goto(buildSearchablePageUrl(base, '', this.searchSortOrder, filters) ?? '/photos');
+  }
+
   async applySearchSort(sortOrder: SearchablePageSortOrder, text = this.query) {
     this.searchSortOrder = sortOrder;
 
@@ -1595,6 +1636,20 @@ export class GlobalSearchManager {
         this.clearQueryOnNextModalOpen = false;
         void goto(searchablePageUrl);
       }
+      return;
+    }
+
+    // Field-search modes (filename / description / OCR) bypass typed-search parsing and route to
+    // the filtered timeline so the selected mode is honoured instead of becoming a smart search.
+    if (this.mode === 'metadata' || this.mode === 'description' || this.mode === 'ocr') {
+      addEntry({
+        kind: 'query',
+        id: `query:${trimmed.toLowerCase()}`,
+        text: trimmed,
+        lastUsed: Date.now(),
+      });
+      this.clearQueryOnNextModalOpen = true;
+      this.navigateToFieldResults(trimmed, this.mode);
       return;
     }
 

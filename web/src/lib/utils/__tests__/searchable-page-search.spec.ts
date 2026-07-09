@@ -40,6 +40,15 @@ describe('searchable page URL state', () => {
       '/photos?q=sunset&people=person-1&city=Berlin&view=timeline&sort=asc',
     );
   });
+
+  it('drops the transient `at` grid scroll target so filter changes do not re-scroll to a stale asset', () => {
+    const url = new URL('https://gallery.test/photos?at=asset-123&view=timeline');
+
+    const result = buildSearchablePageUrl(url, '', 'desc', { ...createFilterState(), originalFileName: '20' });
+
+    expect(result).not.toContain('at=');
+    expect(result).toContain('filename=20');
+  });
 });
 
 describe('typed filter URL state', () => {
@@ -165,5 +174,65 @@ describe('typed filter URL state', () => {
     const url = new URL('https://gallery.test/photos?album=none');
 
     expect(getSearchablePageFilterState(url)).toEqual({ isNotInAlbum: true });
+  });
+});
+
+describe('text filter URL params', () => {
+  it('reads description / filename / ocr params into filter state', () => {
+    const state = getSearchablePageFilterState(
+      new URL('https://gallery.test/photos?description=beach&filename=IMG_001&ocr=invoice'),
+    );
+
+    expect(state.description).toBe('beach');
+    expect(state.originalFileName).toBe('IMG_001');
+    expect(state.ocr).toBe('invoice');
+  });
+
+  it('trims and omits empty / whitespace-only text params', () => {
+    const state = getSearchablePageFilterState(
+      new URL('https://gallery.test/photos?description=%20%20&filename=&ocr=%20hi%20'),
+    );
+
+    expect(state.description).toBeUndefined();
+    expect(state.originalFileName).toBeUndefined();
+    expect(state.ocr).toBe('hi');
+  });
+
+  it('serializes text filters back to URL params, mapping originalFileName to filename', () => {
+    const filters = {
+      ...createFilterState(),
+      description: 'beach',
+      originalFileName: 'IMG_001',
+      ocr: 'invoice',
+    };
+
+    const url = buildSearchablePageUrl(new URL('https://gallery.test/photos'), '', 'desc', filters)!;
+    const params = new URL(`https://gallery.test${url}`).searchParams;
+
+    expect(params.get('description')).toBe('beach');
+    expect(params.get('filename')).toBe('IMG_001');
+    expect(params.get('ocr')).toBe('invoice');
+    expect(params.get('originalFileName')).toBeNull();
+  });
+
+  it('clears text filter params while leaving non-filter params intact', () => {
+    const params = new URLSearchParams('description=beach&filename=IMG&ocr=invoice&sort=desc');
+
+    clearSearchablePageFilterParams(params);
+
+    expect(params.get('description')).toBeNull();
+    expect(params.get('filename')).toBeNull();
+    expect(params.get('ocr')).toBeNull();
+    expect(params.get('sort')).toBe('desc');
+  });
+
+  it('coexists with existing filters', () => {
+    const state = getSearchablePageFilterState(
+      new URL('https://gallery.test/photos?people=p1&album=has&description=beach'),
+    );
+
+    expect(state.personIds).toEqual(['p1']);
+    expect(state.isInAlbum).toBe(true);
+    expect(state.description).toBe('beach');
   });
 });

@@ -1220,6 +1220,27 @@ describe('global-search root', () => {
     await vi.waitFor(() => expect(m.activeItemId).toBe('top-search'));
   });
 
+  it('shows a count-less "See all results" button in field modes and navigates on click', async () => {
+    const m = new GlobalSearchManager();
+    installPhotoStub(m, [{ id: 'photo-1', originalFileName: 'beach.jpg' }]);
+    m.mode = 'metadata';
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+
+    const input = screen.getByRole('combobox') as HTMLInputElement;
+    await user.type(input, 'beach');
+
+    // svelte-i18n is uninitialised in this spec, so $t echoes the key — asserting the
+    // seeAllLabel key (not the count-form `cmdk_see_all`) proves the count-less path.
+    const seeAll = await screen.findByTestId('see-all-button', undefined, { timeout: 2000 });
+    expect(seeAll.textContent).toContain('cmdk_see_all_results');
+
+    await user.click(seeAll);
+    await vi.waitFor(() =>
+      expect(vi.mocked(goto).mock.calls.some((c) => String(c[0]).includes('filename=beach'))).toBe(true),
+    );
+  });
+
   it('does not steal selection back from a real row until the query changes again', async () => {
     const m = new GlobalSearchManager();
     installPhotoStub(m, [{ id: 'photo-1', originalFileName: 'beach.jpg' }]);
