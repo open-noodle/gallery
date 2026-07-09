@@ -45,6 +45,10 @@
   import { locale } from '$lib/stores/preferences.store';
   import { websocketEvents } from '$lib/stores/websocket';
   import { createUrl, getPeopleThumbnailUrl } from '$lib/utils';
+  import {
+    createCrossOwnerMergeHandlers,
+    runScopedMergeWithCrossOwnerConfirmation,
+  } from '$lib/utils/cross-owner-merge';
   import { handleError } from '$lib/utils/handle-error';
   import { isSpaceScopedPerson, toScopedPersonRef } from '$lib/utils/scoped-person-ref';
   import { normalizeSearchString } from '$lib/utils/string-utils';
@@ -57,7 +61,6 @@
     getAllPeople,
     getPerson,
     mergePerson,
-    mergeScopedPeople,
     searchPerson,
     Type2 as ScopedPersonProfileType,
     type PersonFaceResponseDto,
@@ -200,6 +203,25 @@
     return data.people;
   };
 
+  // Runs a scoped merge, transparently handling the cross-owner boundary (issue #733):
+  // - a descriptive `blocked` error is shown as a clean toast (never the raw server string);
+  // - a `confirmationRequired` response prompts a strong confirmation, then re-runs with the
+  //   acknowledgement so the server commits the cross-owner merge.
+  // Returns the number of merged people, or `undefined` when nothing was merged (blocked/declined).
+  const mergeScopedPeopleWithCrossOwnerConfirmation = async (
+    targetPerson: PersonResponseDto,
+    sourcePeople: PersonResponseDto[],
+  ): Promise<number | undefined> => {
+    const committed = await runScopedMergeWithCrossOwnerConfirmation(
+      {
+        target: toScopedPersonRef(targetPerson),
+        sources: sourcePeople.map((sourcePerson) => toScopedPersonRef(sourcePerson)),
+      },
+      createCrossOwnerMergeHandlers(),
+    );
+    return committed ? sourcePeople.length : undefined;
+  };
+
   const mergePeople = async (targetCandidate: PersonResponseDto, selectedPeople: PersonResponseDto[]) => {
     const targetPerson = person;
     const sourcePeople =
@@ -208,20 +230,22 @@
         : [targetCandidate, ...selectedPeople.filter((selectedPerson) => selectedPerson.id !== targetPerson.id)];
     const usesScopedRepair =
       isSpaceScopedPerson(targetPerson) || sourcePeople.some((sourcePerson) => isSpaceScopedPerson(sourcePerson));
-    const mergedCount = await (usesScopedRepair
-      ? (async () => {
-          await mergeScopedPeople({
-            mergeScopedPeopleDto: {
-              target: toScopedPersonRef(targetPerson),
-              sources: sourcePeople.map((sourcePerson) => toScopedPersonRef(sourcePerson)),
-            },
-          });
-          return sourcePeople.length;
-        })()
-      : mergePerson({
-          id: targetPerson.id,
-          mergePersonDto: { ids: sourcePeople.map(({ id }) => id) },
-        }).then((results) => results.filter(({ success }) => success).length));
+
+    let mergedCount: number | undefined;
+    if (usesScopedRepair) {
+      mergedCount = await mergeScopedPeopleWithCrossOwnerConfirmation(targetPerson, sourcePeople);
+      if (mergedCount === undefined) {
+        // Cross-owner merge was blocked or the user declined the confirmation — nothing merged.
+        return;
+      }
+    } else {
+      const results = await mergePerson({
+        id: targetPerson.id,
+        mergePersonDto: { ids: sourcePeople.map(({ id }) => id) },
+      });
+      mergedCount = results.filter(({ success }) => success).length;
+    }
+
     const mergedPerson = await getPerson({ id: targetPerson.id });
     toastManager.primary($t('merged_people_count', { values: { count: mergedCount } }));
     return mergedPerson;
