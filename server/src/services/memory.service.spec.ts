@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import { defaults } from 'src/config';
-import { MemoryType, SystemMetadataKey } from 'src/enum';
+import { MemoryType, SystemMetadataKey, UserMetadataKey } from 'src/enum';
 import { MemoryService } from 'src/services/memory.service';
 import { OnThisDayData, RuleMemoryData } from 'src/types';
 import { AssetFactory } from 'test/factories/asset.factory';
@@ -18,6 +18,7 @@ describe(MemoryService.name, () => {
     ({ sut, mocks } = newTestService(MemoryService));
     mocks.memory.search.mockResolvedValue([]);
     mocks.memory.searchAccessible.mockResolvedValue([]);
+    mocks.user.getMetadata.mockResolvedValue([]);
   });
 
   it('should be defined', () => {
@@ -489,6 +490,106 @@ describe(MemoryService.name, () => {
 
       vi.useRealTimers();
     });
+
+    it('should skip on-this-day generation when the user disabled that type', async () => {
+      const user = factory.userAdmin({
+        metadata: [{ key: UserMetadataKey.Preferences, value: { memories: { types: { on_this_day: false } } } }],
+      });
+      mocks.user.getList.mockResolvedValue([user]);
+      mocks.systemMetadata.get.mockResolvedValue(null);
+
+      await sut.onMemoriesCreate();
+
+      expect(mocks.asset.getByDayOfYear).not.toHaveBeenCalled();
+    });
+
+    it('should skip on-this-day generation when an admin disabled that type globally', async () => {
+      const user = factory.userAdmin();
+      mocks.user.getList.mockResolvedValue([user]);
+      mocks.systemMetadata.get.mockImplementation((key) =>
+        Promise.resolve(
+          key === SystemMetadataKey.SystemConfig ? { memories: { types: { on_this_day: false } } } : null,
+        ),
+      );
+
+      await sut.onMemoriesCreate();
+
+      expect(mocks.asset.getByDayOfYear).not.toHaveBeenCalled();
+    });
+
+    it('should evaluate a rule only for users who enabled it', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-04-23T12:00:00Z'));
+
+      const userA = factory.userAdmin();
+      const userB = factory.userAdmin({
+        metadata: [{ key: UserMetadataKey.Preferences, value: { memories: { types: { birthday: false } } } }],
+      });
+      mocks.user.getList.mockResolvedValue([userA, userB]);
+      mocks.systemMetadata.get.mockResolvedValue({
+        lastOnThisDayDate: '2026-04-25T00:00:00.000Z',
+        lastRuleDate: '2026-04-22T00:00:00.000Z',
+      });
+      mocks.asset.getByDayOfYear.mockResolvedValue([]);
+      mocks.person.getBirthdaysForDay.mockResolvedValue([]);
+      mocks.asset.getMemoryLocationClusters.mockResolvedValue([]);
+
+      await sut.onMemoriesCreate();
+
+      // birthday rule runs only for userA; recent-trip runs for both
+      expect(mocks.person.getBirthdaysForDay).toHaveBeenCalledTimes(1);
+      expect(mocks.person.getBirthdaysForDay).toHaveBeenCalledWith(userA.id, expect.anything());
+      expect(mocks.asset.getMemoryLocationClusters).toHaveBeenCalledWith(userA.id, expect.anything());
+      expect(mocks.asset.getMemoryLocationClusters).toHaveBeenCalledWith(userB.id, expect.anything());
+
+      vi.useRealTimers();
+    });
+
+    it('should never evaluate a rule disabled by the admin types map', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-04-23T12:00:00Z'));
+
+      const user = factory.userAdmin();
+      mocks.user.getList.mockResolvedValue([user]);
+      mocks.systemMetadata.get.mockImplementation((key) =>
+        Promise.resolve(
+          key === SystemMetadataKey.SystemConfig
+            ? { memories: { types: { recent_trip: false } } }
+            : { lastOnThisDayDate: '2026-04-25T00:00:00.000Z', lastRuleDate: '2026-04-22T00:00:00.000Z' },
+        ),
+      );
+      mocks.asset.getByDayOfYear.mockResolvedValue([]);
+      mocks.person.getBirthdaysForDay.mockResolvedValue([]);
+
+      await sut.onMemoriesCreate();
+
+      expect(mocks.asset.getMemoryLocationClusters).not.toHaveBeenCalled();
+      expect(mocks.person.getBirthdaysForDay).toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
+
+    it('should still generate rule memories when the master switch is off (display-only)', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-04-23T12:00:00Z'));
+
+      const user = factory.userAdmin({
+        metadata: [{ key: UserMetadataKey.Preferences, value: { memories: { enabled: false } } }],
+      });
+      mocks.user.getList.mockResolvedValue([user]);
+      mocks.systemMetadata.get.mockResolvedValue({
+        lastOnThisDayDate: '2026-04-25T00:00:00.000Z',
+        lastRuleDate: '2026-04-22T00:00:00.000Z',
+      });
+      mocks.asset.getByDayOfYear.mockResolvedValue([]);
+      mocks.person.getBirthdaysForDay.mockResolvedValue([]);
+
+      await sut.onMemoriesCreate();
+
+      expect(mocks.person.getBirthdaysForDay).toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
   });
 
   describe('search', () => {
@@ -571,6 +672,114 @@ describe(MemoryService.name, () => {
           title: 'Happy birthday, Alice',
           subtitle: 'Photos from different years',
         }),
+      ]);
+    });
+
+    it('should hide an on-this-day memory when the user disabled that type', async () => {
+      const userId = newUuid();
+      const asset = AssetFactory.create();
+      const memory = MemoryFactory.from({ ownerId: userId, type: MemoryType.OnThisDay, data: { year: 2020 } })
+        .asset(asset)
+        .build();
+      mocks.memory.searchAccessible.mockResolvedValue([getForMemory(memory)]);
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.user.getMetadata.mockResolvedValue([
+        { key: UserMetadataKey.Preferences, value: { memories: { types: { on_this_day: false } } } },
+      ]);
+
+      await expect(sut.search(factory.auth({ user: { id: userId } }), {})).resolves.toEqual([]);
+    });
+
+    it('should return an on-this-day memory when the type is enabled', async () => {
+      const userId = newUuid();
+      const asset = AssetFactory.create();
+      const memory = MemoryFactory.from({ ownerId: userId, type: MemoryType.OnThisDay, data: { year: 2020 } })
+        .asset(asset)
+        .build();
+      mocks.memory.searchAccessible.mockResolvedValue([getForMemory(memory)]);
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+
+      await expect(sut.search(factory.auth({ user: { id: userId } }), {})).resolves.toEqual([
+        expect.objectContaining({ id: memory.id }),
+      ]);
+    });
+
+    it('should hide a rule memory when the user disabled its type', async () => {
+      const userId = newUuid();
+      const asset = AssetFactory.create();
+      const memory = MemoryFactory.from({
+        ownerId: userId,
+        type: MemoryType.Rule,
+        data: { ruleId: 'birthday', dedupeKey: 'k', title: 'Happy birthday' } satisfies RuleMemoryData,
+      })
+        .asset(asset)
+        .build();
+      mocks.memory.searchAccessible.mockResolvedValue([getForMemory(memory)]);
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.user.getMetadata.mockResolvedValue([
+        { key: UserMetadataKey.Preferences, value: { memories: { types: { birthday: false } } } },
+      ]);
+
+      await expect(sut.search(factory.auth({ user: { id: userId } }), {})).resolves.toEqual([]);
+    });
+
+    it('should hide a memory whose type an admin disabled globally', async () => {
+      const userId = newUuid();
+      const asset = AssetFactory.create();
+      const memory = MemoryFactory.from({
+        ownerId: userId,
+        type: MemoryType.Rule,
+        data: { ruleId: 'recent_trip', dedupeKey: 'k', title: 'Trip' } satisfies RuleMemoryData,
+      })
+        .asset(asset)
+        .build();
+      mocks.memory.searchAccessible.mockResolvedValue([getForMemory(memory)]);
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.systemMetadata.get.mockResolvedValue({ memories: { types: { recent_trip: false } } });
+
+      await expect(sut.search(factory.auth({ user: { id: userId } }), {})).resolves.toEqual([]);
+    });
+
+    it('should keep a saved memory even when its type is disabled', async () => {
+      const userId = newUuid();
+      const asset = AssetFactory.create();
+      const memory = MemoryFactory.from({
+        ownerId: userId,
+        type: MemoryType.Rule,
+        isSaved: true,
+        data: { ruleId: 'birthday', dedupeKey: 'k', title: 'Happy birthday' } satisfies RuleMemoryData,
+      })
+        .asset(asset)
+        .build();
+      mocks.memory.searchAccessible.mockResolvedValue([getForMemory(memory)]);
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.user.getMetadata.mockResolvedValue([
+        { key: UserMetadataKey.Preferences, value: { memories: { types: { birthday: false } } } },
+      ]);
+
+      await expect(sut.search(factory.auth({ user: { id: userId } }), {})).resolves.toEqual([
+        expect.objectContaining({ id: memory.id }),
+      ]);
+    });
+
+    it('should keep a memory with an unknown rule id', async () => {
+      const userId = newUuid();
+      const asset = AssetFactory.create();
+      const memory = MemoryFactory.from({
+        ownerId: userId,
+        type: MemoryType.Rule,
+        data: { ruleId: 'foreign_rule', dedupeKey: 'k', title: 'Foreign' } satisfies RuleMemoryData,
+      })
+        .asset(asset)
+        .build();
+      mocks.memory.searchAccessible.mockResolvedValue([getForMemory(memory)]);
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.user.getMetadata.mockResolvedValue([
+        { key: UserMetadataKey.Preferences, value: { memories: { types: { birthday: false } } } },
+      ]);
+
+      await expect(sut.search(factory.auth({ user: { id: userId } }), {})).resolves.toEqual([
+        expect.objectContaining({ id: memory.id }),
       ]);
     });
   });
