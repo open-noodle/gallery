@@ -40,6 +40,13 @@
           bind:checked={configToEdit.server.publicUsers}
         />
 
+        <SettingSwitch
+          title={$t('admin.server_merge_people_across_owners')}
+          subtitle={$t('admin.server_merge_people_across_owners_description')}
+          {disabled}
+          bind:checked={configToEdit.server.mergePeopleAcrossOwners}
+        />
+
         <div class="ms-4">
           <SettingButtonsRow bind:configToEdit keys={['server']} {disabled} />
         </div>
