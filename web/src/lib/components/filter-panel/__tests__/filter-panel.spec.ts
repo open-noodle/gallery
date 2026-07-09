@@ -930,4 +930,42 @@ describe('Section Accordion Persistence', () => {
     expect(stored.selected).toContain('people');
     expect(stored.selected).toContain('rating');
   });
+
+  describe('text filter section', () => {
+    it('renders the text section with three inputs when configured', () => {
+      const { getByTestId } = render(FilterPanel, {
+        props: { config: { sections: ['text'], providers: {} }, timeBuckets: [] },
+      });
+
+      expect(getByTestId('filter-section-text')).toBeTruthy();
+      expect(getByTestId('text-filter-description')).toBeTruthy();
+      expect(getByTestId('text-filter-filename')).toBeTruthy();
+      expect(getByTestId('text-filter-ocr')).toBeTruthy();
+    });
+
+    it('does not render the text section when not configured', () => {
+      const { queryByTestId } = render(FilterPanel, {
+        props: { config: { sections: ['rating'], providers: {} }, timeBuckets: [] },
+      });
+
+      expect(queryByTestId('filter-section-text')).toBeNull();
+    });
+
+    it('emits onFiltersChange with the typed description after the debounce', async () => {
+      vi.useFakeTimers();
+      try {
+        const onFiltersChange = vi.fn();
+        const { getByTestId } = render(FilterPanel, {
+          props: { config: { sections: ['text'], providers: {} }, timeBuckets: [], onFiltersChange },
+        });
+
+        await fireEvent.input(getByTestId('text-filter-description'), { target: { value: 'beach' } });
+        vi.advanceTimersByTime(300);
+
+        expect(onFiltersChange).toHaveBeenCalledWith(expect.objectContaining({ description: 'beach' }));
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
 });
