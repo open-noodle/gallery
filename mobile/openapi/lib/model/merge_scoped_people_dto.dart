@@ -13,9 +13,19 @@ part of openapi.api;
 class MergeScopedPeopleDto {
   /// Returns a new [MergeScopedPeopleDto] instance.
   MergeScopedPeopleDto({
+    this.confirmCrossOwner = const Optional.absent(),
     this.sources = const [],
     required this.target,
   });
+
+  /// Acknowledgement that this merge will modify people/faces owned by other users. Required to commit a cross-owner merge.
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  Optional<bool?> confirmCrossOwner;
 
   /// Source scoped profiles
   List<ScopedPersonProfileRefDto> sources;
@@ -24,20 +34,26 @@ class MergeScopedPeopleDto {
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is MergeScopedPeopleDto &&
+    other.confirmCrossOwner == confirmCrossOwner &&
     _deepEquality.equals(other.sources, sources) &&
     other.target == target;
 
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
+    (confirmCrossOwner == null ? 0 : confirmCrossOwner!.hashCode) +
     (sources.hashCode) +
     (target.hashCode);
 
   @override
-  String toString() => 'MergeScopedPeopleDto[sources=$sources, target=$target]';
+  String toString() => 'MergeScopedPeopleDto[confirmCrossOwner=$confirmCrossOwner, sources=$sources, target=$target]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
+    if (this.confirmCrossOwner.isPresent) {
+      final value = this.confirmCrossOwner.value;
+      json[r'confirmCrossOwner'] = value;
+    }
       json[r'sources'] = this.sources;
       json[r'target'] = this.target;
     return json;
@@ -52,6 +68,7 @@ class MergeScopedPeopleDto {
       final json = value.cast<String, dynamic>();
 
       return MergeScopedPeopleDto(
+        confirmCrossOwner: json.containsKey(r'confirmCrossOwner') ? Optional.present(mapValueOfType<bool>(json, r'confirmCrossOwner')) : const Optional.absent(),
         sources: ScopedPersonProfileRefDto.listFromJson(json[r'sources']),
         target: ScopedPersonProfileRefDto.fromJson(json[r'target'])!,
       );

@@ -121,7 +121,12 @@
 
     try {
       const mergedPerson = await mergePeople(person, selectedPeople);
-      onMerge(mergedPerson ?? person);
+      // `mergePeople` returns nothing when the merge did not run (e.g. the user declined the
+      // cross-owner confirmation, or it was blocked with a descriptive message) — stay in the
+      // selector instead of navigating away as if it had succeeded.
+      if (mergedPerson) {
+        onMerge(mergedPerson);
+      }
     } catch (error) {
       handleError(error, mergeErrorMessage ?? $t('cannot_merge_people'));
     }
