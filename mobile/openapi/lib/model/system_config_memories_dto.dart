@@ -16,6 +16,7 @@ class SystemConfigMemoriesDto {
     required this.birthday,
     required this.recentTrips,
     required this.retentionDays,
+    this.types = const Optional.present(const {}),
   });
 
   /// Birthday memories
@@ -30,27 +31,36 @@ class SystemConfigMemoriesDto {
   /// Maximum value: 9007199254740991
   int retentionDays;
 
+  /// Per-type memory availability overrides
+  Optional<Map<String, bool>?> types;
+
   @override
   bool operator ==(Object other) => identical(this, other) || other is SystemConfigMemoriesDto &&
     other.birthday == birthday &&
     other.recentTrips == recentTrips &&
-    other.retentionDays == retentionDays;
+    other.retentionDays == retentionDays &&
+    _deepEquality.equals(other.types, types);
 
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
     (birthday.hashCode) +
     (recentTrips.hashCode) +
-    (retentionDays.hashCode);
+    (retentionDays.hashCode) +
+    (types.hashCode);
 
   @override
-  String toString() => 'SystemConfigMemoriesDto[birthday=$birthday, recentTrips=$recentTrips, retentionDays=$retentionDays]';
+  String toString() => 'SystemConfigMemoriesDto[birthday=$birthday, recentTrips=$recentTrips, retentionDays=$retentionDays, types=$types]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'birthday'] = this.birthday;
       json[r'recentTrips'] = this.recentTrips;
       json[r'retentionDays'] = this.retentionDays;
+    if (this.types.isPresent) {
+      final value = this.types.value;
+      json[r'types'] = value;
+    }
     return json;
   }
 
@@ -66,6 +76,7 @@ class SystemConfigMemoriesDto {
         birthday: mapValueOfType<bool>(json, r'birthday')!,
         recentTrips: mapValueOfType<bool>(json, r'recentTrips')!,
         retentionDays: mapValueOfType<int>(json, r'retentionDays')!,
+        types: json.containsKey(r'types') ? Optional.present(mapCastOfType<String, bool>(json, r'types')) : const Optional.absent(),
       );
     }
     return null;
