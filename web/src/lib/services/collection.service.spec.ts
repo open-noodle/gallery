@@ -64,8 +64,14 @@ describe('addAssetsToCollections', () => {
     expect(primary).not.toHaveBeenCalled();
   });
 
-  it('over-cap selection skips spaces but still adds albums', async () => {
+  it('selection above the old 10k cap but at/below 50k still adds spaces', async () => {
     const assetIds = Array.from({ length: 10_001 }, (_, i) => `x${i}`);
+    await expect(addAssetsToCollections([spaceCol('s1')], assetIds)).resolves.toBe(true);
+    expect(addAssetsToSpace).toHaveBeenCalledWith('s1', assetIds, { notify: true });
+  });
+
+  it('over-cap (>50k) selection skips spaces but still adds albums', async () => {
+    const assetIds = Array.from({ length: 50_001 }, (_, i) => `x${i}`);
     await expect(addAssetsToCollections([albumCol('a1'), spaceCol('s1')], assetIds)).resolves.toBe(true);
     expect(addAssetsToSpace).not.toHaveBeenCalled();
     expect(addAssetsToAlbums).toHaveBeenCalledWith(['a1'], assetIds, { notify: true }); // total becomes 1 → single path
