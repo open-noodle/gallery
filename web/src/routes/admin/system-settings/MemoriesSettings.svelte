@@ -5,12 +5,24 @@
   import { SettingInputFieldType } from '$lib/constants';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { systemConfigManager } from '$lib/managers/system-config-manager.svelte';
-  import { t } from 'svelte-i18n';
+  import { t, type Translations } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
+
+  // Mirrors the server-side memory-type registry keys.
+  const memoryTypeKeys = ['on_this_day', 'birthday', 'recent_trip'];
 
   const disabled = $derived(featureFlagsManager.value.configFile);
   const config = $derived(systemConfigManager.value);
   let configToEdit = $state(systemConfigManager.cloneValue());
+
+  // Seed the availability map so every known type renders with its effective value
+  // (unset keys default to enabled, matching the registry default). `memoryTypes` shares
+  // the reference held by configToEdit, so toggles flow through to the save payload.
+  configToEdit.memories.types ??= {};
+  const memoryTypes = configToEdit.memories.types;
+  for (const key of memoryTypeKeys) {
+    memoryTypes[key] ??= true;
+  }
 </script>
 
 <div>
@@ -27,18 +39,14 @@
           {disabled}
           isEdited={configToEdit.memories.retentionDays !== config.memories.retentionDays}
         />
-        <SettingSwitch
-          title={$t('admin.birthday_memories_setting')}
-          subtitle={$t('admin.birthday_memories_setting_description')}
-          bind:checked={configToEdit.memories.birthday}
-          {disabled}
-        />
-        <SettingSwitch
-          title={$t('admin.recent_trip_memories_setting')}
-          subtitle={$t('admin.recent_trip_memories_setting_description')}
-          bind:checked={configToEdit.memories.recentTrips}
-          {disabled}
-        />
+        {#each memoryTypeKeys as key (key)}
+          <SettingSwitch
+            title={$t(`admin.memory_type_${key}_setting` as Translations)}
+            subtitle={$t(`admin.memory_type_${key}_setting_description` as Translations)}
+            bind:checked={memoryTypes[key]}
+            {disabled}
+          />
+        {/each}
 
         <SettingButtonsRow bind:configToEdit keys={['memories']} {disabled} />
       </div>

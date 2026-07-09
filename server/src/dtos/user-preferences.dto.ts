@@ -23,6 +23,10 @@ const MemoriesUpdateSchema = z
     enabled: z.boolean().optional().describe('Whether memories are enabled'),
     duration: z.int().min(1).optional().describe('Memory duration in seconds'),
     sidebarWeb: z.boolean().optional().describe('Whether memories appear in web sidebar'),
+    types: z
+      .record(z.string(), z.boolean())
+      .optional()
+      .describe('Per-memory-type enable overrides, keyed by memory type'),
   })
   .optional()
   .meta({ id: 'MemoriesUpdate' });
@@ -142,6 +146,7 @@ const MemoriesResponseSchema = z
     enabled: z.boolean().describe('Whether memories are enabled'),
     duration: z.int().describe('Memory duration in seconds'),
     sidebarWeb: z.boolean().describe('Whether memories appear in web sidebar'),
+    types: z.record(z.string(), z.boolean()).describe('Per-memory-type enable map, keyed by memory type'),
   })
   .meta({ id: 'MemoriesResponse' });
 
