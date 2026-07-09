@@ -110,6 +110,54 @@ describe('TimelineManager', () => {
     });
   });
 
+  describe('isEmptyForOptions', () => {
+    it('reports empty only for the options it actually loaded', async () => {
+      sdkMock.getTimeBuckets.mockResolvedValue([]);
+
+      const timelineManager = new TimelineManager();
+      const loadedOptions = { visibility: AssetVisibility.Timeline, personIds: ['person-1'] };
+      await timelineManager.updateOptions(loadedOptions);
+      await timelineManager.updateViewport({ width: 1588, height: 1000 });
+      await tick();
+
+      expect(timelineManager.isInitialized).toBe(true);
+      expect(timelineManager.assetCount).toBe(0);
+
+      // Empty for exactly the options it loaded...
+      expect(timelineManager.isEmptyForOptions({ visibility: AssetVisibility.Timeline, personIds: ['person-1'] })).toBe(
+        true,
+      );
+
+      // ...but NOT for different options it has not reloaded for yet. While a filter change is
+      // pending, `assetCount` still reflects the previous query, so a bare `assetCount === 0`
+      // would wrongly look "empty" — which on the photos/spaces pages hides+unmounts the filter
+      // panel and steals focus from a text input mid-typing.
+      expect(timelineManager.isEmptyForOptions({ visibility: AssetVisibility.Timeline, personIds: ['person-2'] })).toBe(
+        false,
+      );
+    });
+
+    it('is not empty before any options have loaded', () => {
+      const timelineManager = new TimelineManager();
+      expect(timelineManager.isEmptyForOptions({ visibility: AssetVisibility.Timeline })).toBe(false);
+    });
+  });
+
+  describe('reloadToken', () => {
+    it('increments on every reload so views can key+remount their bucket DOM', async () => {
+      sdkMock.getTimeBuckets.mockResolvedValue([]);
+      const timelineManager = new TimelineManager();
+      const start = timelineManager.reloadToken;
+
+      await timelineManager.updateOptions({ visibility: AssetVisibility.Timeline, personIds: ['person-1'] });
+      const afterFirst = timelineManager.reloadToken;
+      expect(afterFirst).toBeGreaterThan(start);
+
+      await timelineManager.updateOptions({ visibility: AssetVisibility.Timeline, personIds: ['person-2'] });
+      expect(timelineManager.reloadToken).toBeGreaterThan(afterFirst);
+    });
+  });
+
   describe('loadTimelineMonth', () => {
     let timelineManager: TimelineManager;
     const bucketAssets: Record<string, TimelineAsset[]> = {
