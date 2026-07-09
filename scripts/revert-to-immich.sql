@@ -277,6 +277,12 @@ DELETE FROM "migration_overrides"
 -- each one's `down()` logic here (per the mechanical diff above) and add its
 -- name to the step-8 DELETE list.
 
+-- 1782000000000-AddAssetExifDescriptionTrigramIndex added a fork-only GIN
+-- trigram index on asset_exif.description (for timeline description filtering)
+-- that v2.7.5 does not have, plus its migration_overrides registration row.
+DROP INDEX IF EXISTS "idx_asset_exif_description_trigram";
+DELETE FROM "migration_overrides" WHERE "name" = 'index_idx_asset_exif_description_trigram';
+
 -- -----------------------------------------------------------------------------
 -- 8. Delete Gallery + post-v<branding upstream.version> upstream migration rows
 --    from kysely_migrations.
@@ -322,6 +328,7 @@ DELETE FROM "kysely_migrations"
    '1778700000000-AddSharedSpaceFaceMatchBackfillTarget',
    '1778800000000-ReconcileFaceIdentityIndexOverrides',
    '1778800000000-TrimSpacePersonNameIndex',
+   '1782000000000-AddAssetExifDescriptionTrigramIndex',
 
    -- Build-time compatibility alias (server/bin/sync-gallery-migrations.mjs).
    -- Gallery's postbuild records ChangeDurationToInteger under BOTH its current
