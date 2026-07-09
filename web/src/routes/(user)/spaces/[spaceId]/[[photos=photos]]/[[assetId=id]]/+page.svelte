@@ -359,7 +359,7 @@
   };
 
   const filterConfig: FilterPanelConfig = {
-    sections: ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media', 'favorites', 'albums'],
+    sections: ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media', 'favorites', 'albums', 'text'],
     suggestionsProvider: async (nextFilters: FilterState) => {
       if (!showSearchResults) {
         return loadSpaceFilterSuggestions(nextFilters);
@@ -781,11 +781,11 @@
   >();
   let isLoading = $state(false);
   const showSearchResults = $derived(committedSearchQuery.trim().length > 0);
+  // `isEmptyForOptions` (not a bare `totalAssetCount === 0`) so clearing a filter that had 0
+  // results can't flip this true for a tick while the timeline reloads — that transient would
+  // unmount the filter panel and drop focus from a text input mid-typing.
   const isTimelineEmpty = $derived(
-    timelineManager?.isInitialized &&
-      totalAssetCount === 0 &&
-      getActiveFilterCount(filters) === 0 &&
-      !showSearchResults,
+    !!timelineManager?.isEmptyForOptions(options) && getActiveFilterCount(filters) === 0 && !showSearchResults,
   );
   const isFilteredTimelineEmpty = $derived(
     timelineManager?.isInitialized && totalAssetCount === 0 && getActiveFilterCount(filters) > 0 && !showSearchResults,
