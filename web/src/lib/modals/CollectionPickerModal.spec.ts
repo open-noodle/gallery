@@ -111,7 +111,7 @@ describe('CollectionPickerModal', () => {
 
   it('hides spaces and shows a notice when over the cap', async () => {
     sdkMock.getAllSpaces.mockResolvedValue([space('s1', 'Family')]);
-    render(CollectionPickerModal, { assetCount: 10_001, onClose: vi.fn() });
+    render(CollectionPickerModal, { assetCount: 50_001, onClose: vi.fn() });
     await waitFor(() => expect(screen.getByTestId('spaces-hidden-notice')).toBeTruthy());
     expect(screen.queryByTestId('row-space-s1')).toBeNull();
     expect(screen.queryByTestId('new-space-row')).toBeNull();

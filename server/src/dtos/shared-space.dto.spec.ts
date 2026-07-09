@@ -18,30 +18,30 @@ describe('SharedSpaceAssetAddDto', () => {
     expect(result.success).toBe(true);
   });
 
-  it('should accept 9,999 asset IDs', () => {
-    const result = SharedSpaceAssetAddDto.schema.safeParse({ assetIds: makeUUIDs(9999) });
-    expect(result.success).toBe(true);
-  });
-
-  it('should accept exactly 10,000 asset IDs', () => {
-    const result = SharedSpaceAssetAddDto.schema.safeParse({ assetIds: makeUUIDs(10_000) });
-    expect(result.success).toBe(true);
-  });
-
-  it('should reject 10,001 asset IDs', () => {
+  it('should accept 10,001 asset IDs (above the old cap, below the new one)', () => {
     const result = SharedSpaceAssetAddDto.schema.safeParse({ assetIds: makeUUIDs(10_001) });
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept exactly 50,000 asset IDs', () => {
+    const result = SharedSpaceAssetAddDto.schema.safeParse({ assetIds: makeUUIDs(50_000) });
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject 50,001 asset IDs', () => {
+    const result = SharedSpaceAssetAddDto.schema.safeParse({ assetIds: makeUUIDs(50_001) });
     expect(result.success).toBe(false);
   });
 });
 
 describe('SharedSpaceAssetRemoveDto', () => {
-  it('should accept exactly 10,000 asset IDs', () => {
-    const result = SharedSpaceAssetRemoveDto.schema.safeParse({ assetIds: makeUUIDs(10_000) });
+  it('should accept exactly 50,000 asset IDs', () => {
+    const result = SharedSpaceAssetRemoveDto.schema.safeParse({ assetIds: makeUUIDs(50_000) });
     expect(result.success).toBe(true);
   });
 
-  it('should reject 10,001 asset IDs', () => {
-    const result = SharedSpaceAssetRemoveDto.schema.safeParse({ assetIds: makeUUIDs(10_001) });
+  it('should reject 50,001 asset IDs', () => {
+    const result = SharedSpaceAssetRemoveDto.schema.safeParse({ assetIds: makeUUIDs(50_001) });
     expect(result.success).toBe(false);
   });
 });
