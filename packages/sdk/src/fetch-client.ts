@@ -370,6 +370,10 @@ export type MemoriesResponse = {
     enabled: boolean;
     /** Whether memories appear in web sidebar */
     sidebarWeb: boolean;
+    /** Per-memory-type enable map, keyed by memory type */
+    types: {
+        [key: string]: boolean;
+    };
 };
 export type PeopleResponse = {
     /** Whether people are enabled */
@@ -457,6 +461,10 @@ export type MemoriesUpdate = {
     enabled?: boolean;
     /** Whether memories appear in web sidebar */
     sidebarWeb?: boolean;
+    /** Per-memory-type enable overrides, keyed by memory type */
+    types?: {
+        [key: string]: boolean;
+    };
 };
 export type PeopleUpdate = {
     /** Whether people are enabled */
@@ -2526,6 +2534,8 @@ export type ServerApkLinksDto = {
     x86_64: string;
 };
 export type ServerConfigDto = {
+    /** Globally-available memory type keys */
+    availableMemoryTypes: string[];
     /** External domain URL */
     externalDomain: string;
     /** Whether the server has been initialized */
@@ -3326,6 +3336,10 @@ export type SystemConfigMemoriesDto = {
     recentTrips: boolean;
     /** Retention days */
     retentionDays: number;
+    /** Per-type memory availability overrides */
+    types?: {
+        [key: string]: boolean;
+    };
 };
 export type SystemConfigFacesDto = {
     /** Import */
