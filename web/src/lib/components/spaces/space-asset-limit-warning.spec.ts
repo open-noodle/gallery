@@ -8,12 +8,12 @@ describe('SpaceAssetLimitWarning', () => {
   });
 
   it('should not render when selectedCount is exactly at the limit', () => {
-    render(SpaceAssetLimitWarning, { selectedCount: 10_000 });
+    render(SpaceAssetLimitWarning, { selectedCount: 50_000 });
     expect(screen.queryByTestId('asset-limit-warning')).not.toBeInTheDocument();
   });
 
   it('should render warning when selectedCount exceeds the limit', () => {
-    render(SpaceAssetLimitWarning, { selectedCount: 10_001 });
+    render(SpaceAssetLimitWarning, { selectedCount: 50_001 });
     expect(screen.getByTestId('asset-limit-warning')).toBeInTheDocument();
   });
 

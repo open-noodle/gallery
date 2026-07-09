@@ -42,11 +42,13 @@
     searchSmart,
     type SmartSearchDto,
   } from '@immich/sdk';
-  import { ActionButton, CommandPaletteDefaultProvider, Icon, IconButton } from '@immich/ui';
+  import { ActionButton, CommandPaletteDefaultProvider, Icon, IconButton, modalManager } from '@immich/ui';
   import { mdiArrowLeft, mdiClose, mdiDotsVertical, mdiImageOffOutline, mdiSelectAll } from '@mdi/js';
   import { tick, untrack } from 'svelte';
   import { t } from 'svelte-i18n';
   import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
+  import SearchAddAllButton from '$lib/components/search/SearchAddAllButton.svelte';
+  import SearchAddAllToCollectionModal from '$lib/modals/SearchAddAllToCollectionModal.svelte';
 
   const viewport: Viewport = $state({ width: 0, height: 0 });
   let searchResultsElement: HTMLElement | undefined = $state();
@@ -59,6 +61,7 @@
   let nextPage = $state(1);
   let searchResultAlbums: AlbumResponseDto[] = $state([]);
   let searchResultAssets: AssetResponseDto[] = $state([]);
+  let searchResultTotal = $state(0);
   let isLoading = $state(true);
   let scrollY = $state(0);
   let scrollYHistory = 0;
@@ -157,10 +160,20 @@
     assetMultiSelectManager.selectAssets(searchResultAssets.map((asset) => toTimelineAsset(asset)));
   };
 
+  const handleAddAllToCollection = () => {
+    void modalManager.show(SearchAddAllToCollectionModal, {
+      terms,
+      total: searchResultTotal,
+      smartSearchEnabled,
+      language: $lang,
+    });
+  };
+
   async function onSearchQueryUpdate() {
     nextPage = 1;
     searchResultAssets = [];
     searchResultAlbums = [];
+    searchResultTotal = 0;
     await loadNextPage(true);
   }
 
@@ -187,6 +200,7 @@
 
       searchResultAlbums.push(...albums.items);
       searchResultAssets.push(...assets.items);
+      searchResultTotal = assets.total;
 
       nextPage = Number(assets.nextPage) || 0;
     } catch (error) {
@@ -369,6 +383,9 @@
 >
   <section id="search-content">
     {#if searchResultAssets.length > 0}
+      <div class="mb-3 flex justify-end px-2">
+        <SearchAddAllButton total={searchResultTotal} onclick={handleAddAllToCollection} />
+      </div>
       <GalleryViewer
         assets={searchResultAssets}
         assetInteraction={assetMultiSelectManager}
