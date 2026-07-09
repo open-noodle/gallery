@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Insertable } from 'kysely';
 import { isAbsolute } from 'node:path';
 import { Chunked, OnEvent, OnJob } from 'src/decorators';
@@ -76,6 +82,18 @@ const FACE_IDENTITY_BACKFILL_CHUNK_SIZE = 1000;
  * maintenance, or a manual run) starts a fresh chain.
  */
 export const FACE_IDENTITY_BACKFILL_MAX_CONTINUATIONS = 5;
+
+/**
+ * Machine-readable error codes for the cross-owner scoped-merge boundary (issue #733). Returned in
+ * the exception body so the web client can render descriptive UX (an enable hint or a strong
+ * confirmation) instead of a raw error string.
+ */
+export const CROSS_OWNER_MERGE_ERROR_CODE = {
+  /** The merge crosses an owner boundary and is not permitted because the instance toggle is off. */
+  blocked: 'cross_owner_merge_blocked',
+  /** The instance toggle is on: the merge is permitted but must be explicitly confirmed before it commits. */
+  confirmationRequired: 'cross_owner_merge_confirmation_required',
+} as const;
 
 @Injectable()
 export class PersonService extends BaseService {
@@ -192,11 +210,29 @@ export class PersonService extends BaseService {
     if (!resolved.accessible) {
       throw new BadRequestException('One or more people were not found or are not accessible');
     }
-    if (!resolved.allAttachedProfilesRepairable) {
-      throw new ForbiddenException('Cannot merge identities with inaccessible attached profiles');
-    }
+
+    // A same-scope profile conflict is a terminal 400: the merge can never commit. Surface it before
+    // the cross-owner confirmation below so the user is not asked to acknowledge a strong/danger
+    // dialog and re-submit only to then hard-fail on a merge that could never have completed.
     if (resolved.hasScopedProfileConflict) {
       throw new BadRequestException('Cannot merge people that already have separate profiles in the same scope');
+    }
+
+    // A cross-owner merge rewrites another user's `person.identityId` and re-links their faces. It is
+    // blocked by default and only permitted once the instance opts in via the
+    // `server.mergePeopleAcrossOwners` toggle (issue #733); with the toggle off every user gets a
+    // descriptive, machine-readable error, and with it on any user must explicitly confirm before it
+    // commits. This loosening applies only to genuine cross-owner merges (another user's personal
+    // person). It stays hard-blocked regardless of the toggle when there is no identifiable other
+    // owner to authorize, OR when an involved identity also has a shared-space profile in a space the
+    // actor cannot repair (viewer / non-member): merging would regroup that space's people (which the
+    // actor could not otherwise touch) and the identity cannot be cleanly split, so the toggle path
+    // covers only other users' personal people.
+    if (!resolved.allAttachedProfilesRepairable) {
+      if (resolved.impactedOwnerIds.length === 0 || resolved.hasInaccessibleAttachedSpaceProfile) {
+        throw new ForbiddenException('Cannot merge identities with inaccessible attached profiles');
+      }
+      await this.authorizeCrossOwnerMerge(dto, resolved.impactedOwnerIds);
     }
 
     await this.faceIdentityRepository.mergeIdentities({
@@ -205,6 +241,32 @@ export class PersonService extends BaseService {
       source: 'manual',
     });
     await this.queueSpacePersonMetadataBackfill();
+  }
+
+  /**
+   * Enforce the cross-owner merge policy (issue #733). A cross-owner merge is blocked unless the
+   * instance has opted in via the `server.mergePeopleAcrossOwners` toggle; once enabled it is a
+   * normal action available to any user with merge access, but it must be explicitly confirmed
+   * before it commits. The toggle defaults off.
+   */
+  private async authorizeCrossOwnerMerge(dto: MergeScopedPeopleDto, impactedOwnerIds: string[]): Promise<void> {
+    const { server } = await this.getConfig({ withCache: false });
+    if (!server.mergePeopleAcrossOwners) {
+      throw new ForbiddenException({
+        code: CROSS_OWNER_MERGE_ERROR_CODE.blocked,
+        message:
+          'This person also appears in another user’s library, so merging would modify people and faces owned by someone else. An administrator can enable cross-owner merges in the server settings.',
+      });
+    }
+
+    if (!dto.confirmCrossOwner) {
+      throw new ConflictException({
+        code: CROSS_OWNER_MERGE_ERROR_CODE.confirmationRequired,
+        message:
+          'This merge will modify people and faces owned by other users and may not be cleanly reversible. Confirm to continue.',
+        impactedOwnerCount: impactedOwnerIds.length,
+      });
+    }
   }
 
   async detachScopedPerson(auth: AuthDto, dto: DetachScopedPersonDto): Promise<void> {

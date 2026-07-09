@@ -28,6 +28,10 @@
   import RepresentativeFacePickerModal from '$lib/modals/RepresentativeFacePickerModal.svelte';
   import { Route } from '$lib/route';
   import { createUrl, getPeopleThumbnailUrl } from '$lib/utils';
+  import {
+    createCrossOwnerMergeHandlers,
+    runScopedMergeWithCrossOwnerConfirmation,
+  } from '$lib/utils/cross-owner-merge';
   import { handleError } from '$lib/utils/handle-error';
   import { locale } from '$lib/stores/preferences.store';
   import { getSpacePersonFaceThumbnailUrl } from '$lib/utils/people-utils';
@@ -39,7 +43,6 @@
     getSpacePersonFaces,
     getSpacePeople,
     mergeSpacePeople,
-    mergeScopedPeople,
     RepresentativeFaceSource,
     searchPerson,
     SharedSpaceRole,
@@ -290,9 +293,7 @@
     return getPeopleThumbnailUrl(person);
   };
 
-  const loadMergePeople = async () => {
-    return getSpacePeople({ id: space.id, limit: PAGE_SIZE });
-  };
+  const loadMergePeople = () => getSpacePeople({ id: space.id, limit: PAGE_SIZE });
 
   const mergePeople = async (targetPerson: ScopedMergeCandidate, selectedPeople: ScopedMergeCandidate[]) => {
     const targetRef = toScopedPersonRef(targetPerson);
@@ -302,18 +303,22 @@
       targetRef.spaceId === space.id &&
       sourceRefs.every((ref) => ref.type === ScopedPersonProfileType.SpacePerson && ref.spaceId === space.id);
 
-    await (canUseSameSpaceMerge
-      ? mergeSpacePeople({
-          id: space.id,
-          personId: targetRef.id,
-          sharedSpacePersonMergeDto: { ids: selectedPeople.map(({ id }) => id) },
-        })
-      : mergeScopedPeople({
-          mergeScopedPeopleDto: {
-            target: targetRef,
-            sources: sourceRefs,
-          },
-        }));
+    if (canUseSameSpaceMerge) {
+      await mergeSpacePeople({
+        id: space.id,
+        personId: targetRef.id,
+        sharedSpacePersonMergeDto: { ids: selectedPeople.map(({ id }) => id) },
+      });
+    } else {
+      const committed = await runScopedMergeWithCrossOwnerConfirmation(
+        { target: targetRef, sources: sourceRefs },
+        createCrossOwnerMergeHandlers(),
+      );
+      if (!committed) {
+        // Cross-owner merge was blocked or the user declined the confirmation — nothing merged.
+        return;
+      }
+    }
 
     toastManager.success($t('spaces_people_merged'));
     // Return the surviving target, not the page's route person — after an auto-swap

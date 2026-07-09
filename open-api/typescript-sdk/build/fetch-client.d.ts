@@ -1,18 +1,13 @@
 /**
  * Immich
- * 3.2.0-rc.0
+ * 2.7.5
  * DO NOT MODIFY - This file has been generated using oazapfts.
  * See https://www.npmjs.com/package/oazapfts
  */
 import * as Oazapfts from "@oazapfts/runtime";
-import * as QS from "@oazapfts/runtime/query";
-export const defaults: Oazapfts.Defaults<Oazapfts.CustomHeaders> = {
-    headers: {},
-    baseUrl: "/api"
-};
-const oazapfts = Oazapfts.runtime(defaults);
-export const servers = {
-    server1: "/api"
+export declare const defaults: Oazapfts.Defaults<Oazapfts.CustomHeaders>;
+export declare const servers: {
+    server1: string;
 };
 export type UserResponseDto = {
     avatarColor: UserAvatarColor;
@@ -118,21 +113,6 @@ export type FaceRepairResponseDto = {
             toRepair: number;
         };
     };
-};
-export type IntegrityReportResponseDto = {
-    items: {
-        /** Integrity report item id */
-        id: string;
-        /** Integrity report item path */
-        path: string;
-        "type": IntegrityReport;
-    }[];
-    nextCursor?: string;
-};
-export type IntegrityReportSummaryResponseDto = {
-    checksum_mismatch: number;
-    missing_file: number;
-    untracked_file: number;
 };
 export type SetMaintenanceModeDto = {
     action: MaintenanceAction;
@@ -322,19 +302,50 @@ export type UserAdminUpdateDto = {
     /** Storage label */
     storageLabel?: string | null;
 };
-export type CalendarHeatmapResponseDto = {
-    /** Start date in UTC */
-    "from": string;
-    series: {
-        /** Activity count */
-        count: number;
-        /** Date in UTC */
-        date: string;
-    }[];
-    /** End date in UTC */
-    to: string;
-    /** Total activity count over the period */
-    totalCount: number;
+export type LibraryManifestAlbumDto = {
+    /** Album ID */
+    id: string;
+    /** Album name */
+    name: string;
+};
+export type LibraryManifestAssetDto = {
+    /** IDs of the owner-owned albums this asset belongs to */
+    albumIds: string[];
+    /** Asset ID */
+    assetId: string;
+    /** Base64 encoded SHA1 hash */
+    checksum: string;
+    /** Checksum algorithm */
+    checksumAlgorithm: ChecksumAlgorithm;
+    /** File creation time */
+    fileCreatedAt: string;
+    /** File modification time */
+    fileModifiedAt: string;
+    /** Object-storage key (asset.originalPath) */
+    objectKey: string;
+    /** Original file name */
+    originalFileName: string;
+    /** Original file size in bytes; null if unknown */
+    size: number | null;
+    "type": AssetTypeEnum;
+};
+export type LibraryManifestOwnerDto = {
+    /** Owner email */
+    email: string;
+    /** Owner user ID */
+    id: string;
+};
+export type LibraryManifestResponseDto = {
+    /** All albums owned by the target user */
+    albums: LibraryManifestAlbumDto[];
+    assets: LibraryManifestAssetDto[];
+    /** When this page was generated */
+    generatedAt: string;
+    /** Manifest schema version; consumers must guard */
+    manifestSchemaVersion: number;
+    /** Pass as ?cursor for the next page; null when exhausted */
+    nextCursor: string | null;
+    owner: LibraryManifestOwnerDto;
 };
 export type AlbumsResponse = {
     defaultAssetOrder: AssetOrder;
@@ -368,14 +379,10 @@ export type MemoriesResponse = {
     duration: number;
     /** Whether memories are enabled */
     enabled: boolean;
-    /** Whether memories appear in web sidebar */
-    sidebarWeb: boolean;
 };
 export type PeopleResponse = {
     /** Whether people are enabled */
     enabled: boolean;
-    /** People face threshold */
-    minimumFaces?: number;
     /** Whether people appear in web sidebar */
     sidebarWeb: boolean;
 };
@@ -388,10 +395,6 @@ export type PurchaseResponse = {
 export type RatingsResponse = {
     /** Whether ratings are enabled */
     enabled: boolean;
-};
-export type RecentlyAddedResponse = {
-    /** Whether the recently added page appears in the web sidebar */
-    sidebarWeb: boolean;
 };
 export type SharedLinksResponse = {
     /** Whether shared links are enabled */
@@ -415,7 +418,6 @@ export type UserPreferencesResponseDto = {
     people: PeopleResponse;
     purchase: PurchaseResponse;
     ratings: RatingsResponse;
-    recentlyAdded: RecentlyAddedResponse;
     sharedLinks: SharedLinksResponse;
     tags: TagsResponse;
 };
@@ -454,14 +456,10 @@ export type MemoriesUpdate = {
     duration?: number;
     /** Whether memories are enabled */
     enabled?: boolean;
-    /** Whether memories appear in web sidebar */
-    sidebarWeb?: boolean;
 };
 export type PeopleUpdate = {
     /** Whether people are enabled */
     enabled?: boolean;
-    /** People face threshold */
-    minimumFaces?: number;
     /** Whether people appear in web sidebar */
     sidebarWeb?: boolean;
 };
@@ -474,10 +472,6 @@ export type PurchaseUpdate = {
 export type RatingsUpdate = {
     /** Whether ratings are enabled */
     enabled?: boolean;
-};
-export type RecentlyAddedUpdate = {
-    /** Whether the recently added page appears in the web sidebar */
-    sidebarWeb?: boolean;
 };
 export type SharedLinksUpdate = {
     /** Whether shared links are enabled */
@@ -502,7 +496,6 @@ export type UserPreferencesUpdateDto = {
     people?: PeopleUpdate;
     purchase?: PurchaseUpdate;
     ratings?: RatingsUpdate;
-    recentlyAdded?: RecentlyAddedUpdate;
     sharedLinks?: SharedLinksUpdate;
     tags?: TagsUpdate;
 };
@@ -549,7 +542,6 @@ export type AlbumResponseDto = {
     albumName: string;
     /** Thumbnail asset ID */
     albumThumbnailAssetId: string | null;
-    /** First entry is always the album owner. Second entry is the auth user, if it differs from the owner. The rest are ordered alphabetically. */
     albumUsers: AlbumUserResponseDto[];
     /** Number of assets */
     assetCount: number;
@@ -558,7 +550,7 @@ export type AlbumResponseDto = {
     createdAt: string;
     /** Album description */
     description: string;
-    /** UTC representation of (local) end date (latest asset) */
+    /** End date (latest asset) */
     endDate?: string;
     /** Has shared link */
     hasSharedLink: boolean;
@@ -569,9 +561,12 @@ export type AlbumResponseDto = {
     /** Last modified asset timestamp */
     lastModifiedAssetTimestamp?: string;
     order?: AssetOrder;
+    owner: UserResponseDto;
+    /** Owner user ID */
+    ownerId: string;
     /** Is shared album */
     shared: boolean;
-    /** UTC representation of (local) start date (earliest asset) */
+    /** Start date (earliest asset) */
     startDate?: string;
     /** Last update date */
     updatedAt: string;
@@ -589,7 +584,7 @@ export type CreateAlbumDto = {
     /** Initial asset IDs */
     assetIds?: string[];
     /** Album description */
-    description?: string | null;
+    description?: string;
 };
 export type AlbumsAddAssetsDto = {
     /** Album IDs */
@@ -625,7 +620,7 @@ export type UpdateAlbumDto = {
     /** Album thumbnail asset ID */
     albumThumbnailAssetId?: string;
     /** Album description */
-    description?: string | null;
+    description?: string;
     /** Enable activity feed */
     isActivityEnabled?: boolean;
     order?: AssetOrder;
@@ -689,41 +684,14 @@ export type ApiKeyCreateDto = {
 };
 export type ApiKeyCreateResponseDto = {
     apiKey: ApiKeyResponseDto;
-    /** Creation date */
-    createdAt: string;
-    /** API key ID */
-    id: string;
-    /** API key name */
-    name: string;
-    /** List of permissions */
-    permissions: Permission[];
     /** API key secret (only shown once) */
     secret: string;
-    /** Last update date */
-    updatedAt: string;
 };
 export type ApiKeyUpdateDto = {
     /** API key name */
     name?: string;
     /** List of permissions */
     permissions?: Permission[];
-};
-export type AssetFileResponseDto = {
-    /** Creation date */
-    createdAt: string;
-    /** Asset file ID */
-    id: string;
-    /** The file was generated from an edit */
-    isEdited: boolean;
-    /** The file is a progressively encoded JPEG */
-    isProgressive: boolean;
-    /** The file is transparent */
-    isTransparent: boolean;
-    /** File path */
-    path: string;
-    "type": AssetFileType;
-    /** Update date */
-    updatedAt: string;
 };
 export type AssetBulkDeleteDto = {
     /** Force delete even if in use */
@@ -742,8 +710,8 @@ export type AssetMetadataUpsertItemDto = {
 export type AssetMediaCreateDto = {
     /** Asset file data */
     assetData: Blob;
-    /** Duration in milliseconds (for videos) */
-    duration?: number;
+    /** Duration (for videos) */
+    duration?: string;
     /** File creation date */
     fileCreatedAt: string;
     /** File modification date */
@@ -768,7 +736,7 @@ export type AssetMediaResponseDto = {
 export type AssetBulkUpdateDto = {
     /** Original date and time */
     dateTimeOriginal?: string;
-    /** Relative time offset in minutes */
+    /** Relative time offset in seconds */
     dateTimeRelative?: number;
     /** Asset description */
     description?: string;
@@ -782,7 +750,7 @@ export type AssetBulkUpdateDto = {
     latitude?: number;
     /** Longitude coordinate */
     longitude?: number;
-    /** Rating in range [1-5] (starred), -1 (rejected), or null (unrated) */
+    /** Rating in range [1-5], or null for unrated */
     rating?: number | null;
     /** Time zone (IANA timezone) */
     timeZone?: string;
@@ -791,7 +759,7 @@ export type AssetBulkUpdateDto = {
 export type AssetBulkUploadCheckItem = {
     /** Base64 or hex encoded SHA1 hash */
     checksum: string;
-    /** Client-side identifier echoed in the response to match results to inputs (e.g. filename) */
+    /** Asset ID */
     id: string;
 };
 export type AssetBulkUploadCheckDto = {
@@ -802,7 +770,7 @@ export type AssetBulkUploadCheckResult = {
     action: AssetUploadAction;
     /** Existing asset ID if duplicate */
     assetId?: string;
-    /** Client-side identifier echoed from the request to match results to inputs */
+    /** Asset ID */
     id: string;
     /** Whether existing asset is trashed */
     isTrashed?: boolean;
@@ -915,16 +883,34 @@ export type ExifResponseDto = {
     /** Time zone */
     timeZone?: string | null;
 };
+export type AssetFaceWithoutPersonResponseDto = {
+    /** Bounding box X1 coordinate */
+    boundingBoxX1: number;
+    /** Bounding box X2 coordinate */
+    boundingBoxX2: number;
+    /** Bounding box Y1 coordinate */
+    boundingBoxY1: number;
+    /** Bounding box Y2 coordinate */
+    boundingBoxY2: number;
+    /** Face ID */
+    id: string;
+    /** Image height in pixels */
+    imageHeight: number;
+    /** Image width in pixels */
+    imageWidth: number;
+    sourceType?: SourceType;
+};
 export type ScopedPrimaryProfile = {
     id: string;
     spaceId?: string;
     "type": Type;
 };
-export type PersonResponseDto = {
+export type PersonWithFacesResponseDto = {
     /** Person date of birth */
     birthDate: string | null;
     /** Person color (hex) */
     color?: string;
+    faces: AssetFaceWithoutPersonResponseDto[];
     /** Scoped identity filter token */
     filterId?: string;
     /** Person ID */
@@ -939,7 +925,7 @@ export type PersonResponseDto = {
     numberOfAssets?: number;
     /** Accessible profile used for navigation */
     primaryProfile?: ScopedPrimaryProfile;
-    /** Space person ID when viewed through a shared space */
+    /** Space person ID (when viewed through a space) */
     spacePersonId?: string;
     /** Pet species (e.g. dog, cat) */
     species?: string | null;
@@ -981,8 +967,8 @@ export type AssetResponseDto = {
     createdAt: string;
     /** Duplicate group ID */
     duplicateId?: string | null;
-    /** Video/gif duration in milliseconds (null for static images) */
-    duration: number | null;
+    /** Video/gif duration in hh:mm:ss.SSS format (null for static images) */
+    duration: string | null;
     exifInfo?: ExifResponseDto;
     /** The actual UTC timestamp when the file was created/captured, preserving timezone information. This is the authoritative timestamp for chronological sorting within timeline groups. Combined with timezone data, this can be used to determine the exact moment the photo was taken. */
     fileCreatedAt: string;
@@ -1019,7 +1005,7 @@ export type AssetResponseDto = {
     owner?: UserResponseDto;
     /** Owner user ID */
     ownerId: string;
-    people?: PersonResponseDto[];
+    people?: PersonWithFacesResponseDto[];
     /** Is resized */
     resized?: boolean;
     /** Resolved space ID (when server auto-detects space context) */
@@ -1029,6 +1015,7 @@ export type AssetResponseDto = {
     /** Thumbhash for thumbnail generation (base64) also used as the c query param for thumbnail cache busting. */
     thumbhash: string | null;
     "type": AssetTypeEnum;
+    unassignedFaces?: AssetFaceWithoutPersonResponseDto[];
     /** The UTC timestamp when the asset record was last updated in the database. This is automatically maintained by the database and reflects when any field in the asset was last modified. */
     updatedAt: string;
     visibility: AssetVisibility;
@@ -1048,7 +1035,7 @@ export type UpdateAssetDto = {
     livePhotoVideoId?: string | null;
     /** Longitude coordinate */
     longitude?: number;
-    /** Rating in range [1-5] (starred), -1 (rejected), or null (unrated) */
+    /** Rating in range [1-5], or null for unrated */
     rating?: number | null;
     visibility?: AssetVisibility;
 };
@@ -1272,6 +1259,34 @@ export type DuplicateResolveDto = {
     /** List of duplicate groups to resolve */
     groups: DuplicateResolveGroupDto[];
 };
+export type PersonResponseDto = {
+    /** Person date of birth */
+    birthDate: string | null;
+    /** Person color (hex) */
+    color?: string;
+    /** Scoped identity filter token */
+    filterId?: string;
+    /** Person ID */
+    id: string;
+    /** Is favorite */
+    isFavorite?: boolean;
+    /** Is hidden */
+    isHidden: boolean;
+    /** Person name */
+    name: string;
+    /** Accessible asset count for this grouped person */
+    numberOfAssets?: number;
+    /** Accessible profile used for navigation */
+    primaryProfile?: ScopedPrimaryProfile;
+    /** Pet species (e.g. dog, cat) */
+    species?: string | null;
+    /** Thumbnail path */
+    thumbnailPath: string;
+    /** Entity type (person or pet) */
+    "type"?: string;
+    /** Last update date */
+    updatedAt?: string;
+};
 export type AssetFaceResponseDto = {
     /** Bounding box X1 coordinate */
     boundingBoxX1: number;
@@ -1348,7 +1363,6 @@ export type QueuesResponseLegacyDto = {
     editor: QueueResponseLegacyDto;
     faceDetection: QueueResponseLegacyDto;
     facialRecognition: QueueResponseLegacyDto;
-    integrityCheck: QueueResponseLegacyDto;
     library: QueueResponseLegacyDto;
     metadataExtraction: QueueResponseLegacyDto;
     migration: QueueResponseLegacyDto;
@@ -1717,33 +1731,72 @@ export type PersonStatisticsResponseDto = {
     /** Number of faces assigned to this person in the current accessible scope */
     faces: number;
 };
-export type PluginMethodResponseDto = {
-    /** Description */
+export type PluginJsonSchemaProperty = {
+    additionalProperties?: boolean | PluginJsonSchemaProperty;
+    "default"?: any;
+    description?: string;
+    "enum"?: string[];
+    items?: PluginJsonSchemaProperty;
+    properties?: {
+        [key: string]: PluginJsonSchemaProperty;
+    };
+    required?: string[];
+    "type"?: PluginJsonSchemaType;
+};
+export type PluginJsonSchema = {
+    additionalProperties?: boolean;
+    description?: string;
+    properties?: {
+        [key: string]: PluginJsonSchemaProperty;
+    };
+    required?: string[];
+    "type"?: PluginJsonSchemaType;
+};
+export type PluginActionResponseDto = {
+    /** Action description */
     description: string;
-    hostFunctions: boolean;
-    /** Key */
-    key: string;
-    /** Name */
-    name: string;
-    schema?: {};
-    /** Title */
+    /** Action ID */
+    id: string;
+    /** Method name */
+    methodName: string;
+    /** Plugin ID */
+    pluginId: string;
+    /** Action schema */
+    schema: (PluginJsonSchema) | null;
+    /** Supported contexts */
+    supportedContexts: PluginContextType[];
+    /** Action title */
     title: string;
-    /** Workflow types */
-    types: WorkflowType[];
-    /** Ui hints */
-    uiHints: string[];
+};
+export type PluginFilterResponseDto = {
+    /** Filter description */
+    description: string;
+    /** Filter ID */
+    id: string;
+    /** Method name */
+    methodName: string;
+    /** Plugin ID */
+    pluginId: string;
+    /** Filter schema */
+    schema: (PluginJsonSchema) | null;
+    /** Supported contexts */
+    supportedContexts: PluginContextType[];
+    /** Filter title */
+    title: string;
 };
 export type PluginResponseDto = {
+    /** Plugin actions */
+    actions: PluginActionResponseDto[];
     /** Plugin author */
     author: string;
     /** Creation date */
     createdAt: string;
     /** Plugin description */
     description: string;
+    /** Plugin filters */
+    filters: PluginFilterResponseDto[];
     /** Plugin ID */
     id: string;
-    /** Plugin methods */
-    methods: PluginMethodResponseDto[];
     /** Plugin name */
     name: string;
     /** Plugin title */
@@ -1753,29 +1806,9 @@ export type PluginResponseDto = {
     /** Plugin version */
     version: string;
 };
-export type PluginTemplateStepResponseDto = {
-    /** Step configuration */
-    config: {
-        [key: string]: any;
-    } | null;
-    /** Whether the step is enabled */
-    enabled?: boolean;
-    /** Step plugin method */
-    method: string;
-};
-export type PluginTemplateResponseDto = {
-    /** Template description */
-    description: string;
-    /** Template key (unique across all templates) */
-    key: string;
-    /** Workflow steps */
-    steps: PluginTemplateStepResponseDto[];
-    /** Template title */
-    title: string;
-    /** Workflow trigger */
-    trigger: WorkflowTrigger;
-    /** Ui hints, for example "smart-album" */
-    uiHints: string[];
+export type PluginTriggerResponseDto = {
+    contextType: PluginContextType;
+    "type": PluginTriggerType;
 };
 export type QueueJobTypeCountsDto = {
     /** Number of sampled active jobs with this name */
@@ -1825,168 +1858,6 @@ export type SearchExploreResponseDto = {
     fieldName: string;
     items: SearchExploreItem[];
 };
-export type IdsFilter = {
-    all?: string[];
-    "any"?: string[];
-    none?: string[];
-};
-export type StringFilter = {
-    eq?: string;
-    "in"?: string[];
-    ne?: string;
-    notIn?: string[];
-};
-export type StringFilterNullable = {
-    eq?: string | null;
-    "in"?: string[];
-    ne?: string | null;
-    notIn?: string[];
-};
-export type DateFilter = {
-    eq?: string;
-    gt?: string;
-    gte?: string;
-    lt?: string;
-    lte?: string;
-    ne?: string;
-};
-export type StringPatternFilter = {
-    endsWith?: string;
-    eq?: string | null;
-    "in"?: string[];
-    like?: string;
-    ne?: string | null;
-    notIn?: string[];
-    notLike?: string;
-    startsWith?: string;
-};
-export type NumberFilter = {
-    eq?: number;
-    gt?: number;
-    gte?: number;
-    "in"?: number[];
-    lt?: number;
-    lte?: number;
-    ne?: number;
-    notIn?: number[];
-};
-export type BoolFilter = {
-    eq: boolean;
-};
-export type IdFilter = {
-    eq?: string;
-    ne?: string;
-};
-export type IdFilterNullable = {
-    eq?: string | null;
-    ne?: string | null;
-};
-export type StringSimilarityFilter = {
-    matches: string;
-};
-export type NumberFilterNullable = {
-    eq?: number | null;
-    gt?: number;
-    gte?: number;
-    "in"?: number[];
-    lt?: number;
-    lte?: number;
-    ne?: number | null;
-    notIn?: number[];
-};
-export type DateFilterNullable = {
-    eq?: string | null;
-    gt?: string;
-    gte?: string;
-    lt?: string;
-    lte?: string;
-    ne?: string | null;
-};
-export type EnumFilterAssetType = {
-    eq?: AssetTypeEnum;
-    "in"?: AssetTypeEnum[];
-    ne?: AssetTypeEnum;
-    notIn?: AssetTypeEnum[];
-};
-export type EnumFilterAssetVisibility = {
-    eq?: AssetVisibility;
-    "in"?: AssetVisibility[];
-    ne?: AssetVisibility;
-    notIn?: AssetVisibility[];
-};
-export type SearchFilterBranch = {
-    albumIds?: IdsFilter;
-    checksum?: StringFilter;
-    city?: StringFilterNullable;
-    country?: StringFilterNullable;
-    createdAt?: DateFilter;
-    description?: StringPatternFilter;
-    encodedVideoPath?: StringFilter;
-    fileSizeInBytes?: NumberFilter;
-    hasAlbums?: BoolFilter;
-    hasPeople?: BoolFilter;
-    hasTags?: BoolFilter;
-    id?: IdFilter;
-    isEncoded?: BoolFilter;
-    isFavorite?: BoolFilter;
-    isMotion?: BoolFilter;
-    isOffline?: BoolFilter;
-    lensModel?: StringFilterNullable;
-    libraryId?: IdFilterNullable;
-    make?: StringFilterNullable;
-    model?: StringFilterNullable;
-    ocr?: StringSimilarityFilter;
-    originalFileName?: StringPatternFilter;
-    originalPath?: StringPatternFilter;
-    personIds?: IdsFilter;
-    rating?: NumberFilterNullable;
-    state?: StringFilterNullable;
-    tagIds?: IdsFilter;
-    takenAt?: DateFilter;
-    trashedAt?: DateFilterNullable;
-    "type"?: EnumFilterAssetType;
-    updatedAt?: DateFilter;
-    visibility?: EnumFilterAssetVisibility;
-};
-export type SearchFilter = {
-    albumIds?: IdsFilter;
-    checksum?: StringFilter;
-    city?: StringFilterNullable;
-    country?: StringFilterNullable;
-    createdAt?: DateFilter;
-    description?: StringPatternFilter;
-    encodedVideoPath?: StringFilter;
-    fileSizeInBytes?: NumberFilter;
-    hasAlbums?: BoolFilter;
-    hasPeople?: BoolFilter;
-    hasTags?: BoolFilter;
-    id?: IdFilter;
-    isEncoded?: BoolFilter;
-    isFavorite?: BoolFilter;
-    isMotion?: BoolFilter;
-    isOffline?: BoolFilter;
-    lensModel?: StringFilterNullable;
-    libraryId?: IdFilterNullable;
-    make?: StringFilterNullable;
-    model?: StringFilterNullable;
-    ocr?: StringSimilarityFilter;
-    or?: SearchFilterBranch[];
-    originalFileName?: StringPatternFilter;
-    originalPath?: StringPatternFilter;
-    personIds?: IdsFilter;
-    rating?: NumberFilterNullable;
-    state?: StringFilterNullable;
-    tagIds?: IdsFilter;
-    takenAt?: DateFilter;
-    trashedAt?: DateFilterNullable;
-    "type"?: EnumFilterAssetType;
-    updatedAt?: DateFilter;
-    visibility?: EnumFilterAssetVisibility;
-};
-export type SearchOrder = {
-    direction?: AssetOrder;
-    field?: SearchOrderField;
-};
 export type MetadataSearchDto = {
     /** Filter by album IDs */
     albumIds?: string[];
@@ -2000,13 +1871,10 @@ export type MetadataSearchDto = {
     createdAfter?: string;
     /** Filter by creation date (before) */
     createdBefore?: string;
-    /** Cursor for the next page of results */
-    cursor?: string;
     /** Filter by description text */
     description?: string;
     /** Filter by encoded video file path */
     encodedVideoPath?: string;
-    filter?: SearchFilter;
     /** Filter by asset ID */
     id?: string;
     /** Filter by encoded status */
@@ -2033,7 +1901,6 @@ export type MetadataSearchDto = {
     ocr?: string;
     /** Sort order */
     order?: AssetOrder;
-    orderBy?: SearchOrder;
     /** Filter by original file name */
     originalFileName?: string;
     /** Filter by original file path */
@@ -2107,8 +1974,6 @@ export type SearchAssetResponseDto = {
     count: number;
     facets: SearchFacetResponseDto[];
     items: AssetResponseDto[];
-    /** Cursor for the next page of results */
-    nextCursor: string | null;
     /** Next page token */
     nextPage: string | null;
     /** Total number of matching assets */
@@ -2141,7 +2006,6 @@ export type RandomSearchDto = {
     createdAfter?: string;
     /** Filter by creation date (before) */
     createdBefore?: string;
-    filter?: SearchFilter;
     /** Filter by encoded status */
     isEncoded?: boolean;
     /** Filter by favorite status */
@@ -2214,7 +2078,6 @@ export type SmartSearchDto = {
     createdAfter?: string;
     /** Filter by creation date (before) */
     createdBefore?: string;
-    filter?: SearchFilter;
     /** Filter by encoded status */
     isEncoded?: boolean;
     /** Filter by favorite status */
@@ -2378,7 +2241,6 @@ export type StatisticsSearchDto = {
     createdBefore?: string;
     /** Filter by description text */
     description?: string;
-    filter?: SearchFilter;
     /** Filter by encoded status */
     isEncoded?: boolean;
     /** Filter by favorite status */
@@ -2525,8 +2387,6 @@ export type ServerConfigDto = {
     mapDarkStyleUrl: string;
     /** Map light style URL */
     mapLightStyleUrl: string;
-    /** People min faces server default */
-    minFaces: number;
     /** OAuth button text */
     oauthButtonText: string;
     /** Whether public user registration is enabled */
@@ -2559,8 +2419,6 @@ export type ServerFeaturesDto = {
     passwordLogin: boolean;
     /** Whether the people face statistics UI is enabled */
     peopleStatistics: boolean;
-    /** Whether real-time transcoding is enabled */
-    realtimeTranscoding: boolean;
     /** Whether reverse geocoding is enabled */
     reverseGeocoding: boolean;
     /** Whether search is enabled */
@@ -2648,8 +2506,6 @@ export type ServerVersionResponseDto = {
     minor: number;
     /** Patch version number */
     patch: number;
-    /** Pre-release version number */
-    prerelease: number | null;
 };
 export type VersionCheckStateResponseDto = {
     /** Last check timestamp */
@@ -2756,6 +2612,8 @@ export type SharedLinkEditDto = {
     allowDownload?: boolean;
     /** Allow uploads */
     allowUpload?: boolean;
+    /** Whether to change the expiry time. Few clients cannot send null to set the expiryTime to never. Setting this flag and not sending expiryAt is considered as null instead. Clients that can send null values can ignore this. */
+    changeExpiryTime?: boolean;
     /** Link description */
     description?: string | null;
     /** Expiration date */
@@ -3095,14 +2953,6 @@ export type SystemConfigClassificationDto = {
     /** Enable classification globally */
     enabled: boolean;
 };
-export type SystemConfigFFmpegRealtimeDto = {
-    /** Enable real-time HLS transcoding (alpha) */
-    enabled: boolean;
-    /** Resolutions to use for real-time HLS transcoding */
-    resolutions: HlsVideoResolution[];
-    /** Video codecs to use for real-time HLS transcoding */
-    videoCodecs: VideoCodec[];
-};
 export type SystemConfigFFmpegDto = {
     accel: TranscodeHWAccel;
     /** Accelerated decode */
@@ -3126,7 +2976,6 @@ export type SystemConfigFFmpegDto = {
     preferredHwDevice: string;
     /** Preset */
     preset: string;
-    realtime: SystemConfigFFmpegRealtimeDto;
     /** References */
     refs: number;
     targetAudioCodec: AudioCodec;
@@ -3168,27 +3017,6 @@ export type SystemConfigImageDto = {
     preview: SystemConfigGeneratedImageDto;
     thumbnail: SystemConfigGeneratedImageDto;
 };
-export type SystemConfigIntegrityChecksumJob = {
-    /** Cron expression for when the integrity check should run */
-    cronExpression: string;
-    /** Enabled */
-    enabled: boolean;
-    /** Percentage limit of the integrity checksum job */
-    percentageLimit: number;
-    /** How long the integrity checksum job may run for */
-    timeLimit: number;
-};
-export type SystemConfigIntegrityJob = {
-    /** Cron expression for when the integrity check should run */
-    cronExpression: string;
-    /** Enabled */
-    enabled: boolean;
-};
-export type SystemConfigIntegrityChecks = {
-    checksumFiles: SystemConfigIntegrityChecksumJob;
-    missingFiles: SystemConfigIntegrityJob;
-    untrackedFiles: SystemConfigIntegrityJob;
-};
 export type JobSettingsDto = {
     /** Concurrency */
     concurrency: number;
@@ -3198,7 +3026,6 @@ export type SystemConfigJobDto = {
     classification: JobSettingsDto;
     editor: JobSettingsDto;
     faceDetection: JobSettingsDto;
-    integrityCheck: JobSettingsDto;
     library: JobSettingsDto;
     metadataExtraction: JobSettingsDto;
     migration: JobSettingsDto;
@@ -3320,7 +3147,6 @@ export type SystemConfigMetadataDto = {
     faces: SystemConfigFacesDto;
 };
 export type SystemConfigNewVersionCheckDto = {
-    channel: ReleaseChannel;
     /** Enabled */
     enabled: boolean;
 };
@@ -3333,7 +3159,7 @@ export type SystemConfigNightlyTasksDto = {
     generateMemories: boolean;
     /** Missing thumbnails */
     missingThumbnails: boolean;
-    /** Start time (HH:MM) */
+    /** Start time */
     startTime: string;
     /** Sync quota usage */
     syncQuotaUsage: boolean;
@@ -3440,7 +3266,6 @@ export type SystemConfigDto = {
     classification: SystemConfigClassificationDto;
     ffmpeg: SystemConfigFFmpegDto;
     image: SystemConfigImageDto;
-    integrityChecks: SystemConfigIntegrityChecks;
     job: SystemConfigJobDto;
     library: SystemConfigLibraryDto;
     logging: SystemConfigLoggingDto;
@@ -3514,18 +3339,14 @@ export type TagBulkAssetsResponseDto = {
 export type TagUpdateDto = {
     /** Tag color (hex) */
     color?: string | null;
-    /** Tag name */
-    name?: string;
 };
 export type TimeBucketAssetResponseDto = {
     /** Array of city names extracted from EXIF GPS data */
-    city?: (string | null)[];
+    city: (string | null)[];
     /** Array of country names extracted from EXIF GPS data */
-    country?: (string | null)[];
-    /** Array of UTC timestamps when each asset was originally uploaded to Immich */
-    createdAt: string[];
-    /** Array of video/gif durations in milliseconds (null for static images) */
-    duration: (number | null)[];
+    country: (string | null)[];
+    /** Array of video/gif durations in hh:mm:ss.SSS format (null for static images) */
+    duration: (string | null)[];
     /** Array of file creation timestamps in UTC */
     fileCreatedAt: string[];
     /** Array of asset IDs in the time bucket */
@@ -3584,7 +3405,7 @@ export type UserGroupMemberResponseDto = {
 };
 export type UserGroupResponseDto = {
     /** Group color */
-    color?: (UserAvatarColor) | null;
+    color?: Color | null;
     /** Creation date */
     createdAt: string;
     /** Group ID */
@@ -3641,115 +3462,91 @@ export type CreateProfileImageResponseDto = {
     /** User ID */
     userId: string;
 };
-export type WorkflowStepDto = {
-    /** Step configuration */
-    config: {
-        [key: string]: any;
-    } | null;
-    /** Step is enabled */
-    enabled?: boolean;
-    /** Step plugin method */
-    method: string;
+export type PluginConfigValue = any;
+export type WorkflowActionConfig = {
+    [key: string]: PluginConfigValue;
+};
+export type WorkflowActionResponseDto = {
+    actionConfig: (WorkflowActionConfig) | null;
+    /** Action ID */
+    id: string;
+    /** Action order */
+    order: number;
+    /** Plugin action ID */
+    pluginActionId: string;
+    /** Workflow ID */
+    workflowId: string;
+};
+export type WorkflowFilterConfig = {
+    [key: string]: PluginConfigValue;
+};
+export type WorkflowFilterResponseDto = {
+    filterConfig: (WorkflowFilterConfig) | null;
+    /** Filter ID */
+    id: string;
+    /** Filter order */
+    order: number;
+    /** Plugin filter ID */
+    pluginFilterId: string;
+    /** Workflow ID */
+    workflowId: string;
 };
 export type WorkflowResponseDto = {
+    /** Workflow actions */
+    actions: WorkflowActionResponseDto[];
     /** Creation date */
     createdAt: string;
     /** Workflow description */
-    description: string | null;
+    description: string;
     /** Workflow enabled */
     enabled: boolean;
+    /** Workflow filters */
+    filters: WorkflowFilterResponseDto[];
     /** Workflow ID */
     id: string;
-    /** Workflow logs run results */
-    logging: boolean;
     /** Workflow name */
     name: string | null;
-    /** Workflow steps */
-    steps: WorkflowStepDto[];
-    /** Workflow trigger type */
-    trigger: WorkflowTrigger;
-    /** Update date */
-    updatedAt: string;
+    /** Owner user ID */
+    ownerId: string;
+    triggerType: PluginTriggerType;
+};
+export type WorkflowActionItemDto = {
+    actionConfig?: WorkflowActionConfig;
+    /** Plugin action ID */
+    pluginActionId: string;
+};
+export type WorkflowFilterItemDto = {
+    filterConfig?: WorkflowFilterConfig;
+    /** Plugin filter ID */
+    pluginFilterId: string;
 };
 export type WorkflowCreateDto = {
+    /** Workflow actions */
+    actions: WorkflowActionItemDto[];
     /** Workflow description */
-    description?: string | null;
+    description?: string;
     /** Workflow enabled */
     enabled?: boolean;
-    /** Workflow logs run results */
-    logging?: boolean;
+    /** Workflow filters */
+    filters: WorkflowFilterItemDto[];
     /** Workflow name */
-    name?: string | null;
-    steps?: WorkflowStepDto[];
-    /** Workflow trigger type */
-    trigger: WorkflowTrigger;
-};
-export type WorkflowTriggerResponseDto = {
-    /** Trigger type */
-    trigger: WorkflowTrigger;
-    /** Workflow types */
-    types: WorkflowType[];
+    name: string;
+    triggerType: PluginTriggerType;
 };
 export type WorkflowUpdateDto = {
+    /** Workflow actions */
+    actions?: WorkflowActionItemDto[];
     /** Workflow description */
-    description?: string | null;
+    description?: string;
     /** Workflow enabled */
     enabled?: boolean;
-    /** Workflow logs run results */
-    logging?: boolean;
+    /** Workflow filters */
+    filters?: WorkflowFilterItemDto[];
     /** Workflow name */
-    name?: string | null;
-    steps?: WorkflowStepDto[];
-    /** Workflow trigger type */
-    trigger?: WorkflowTrigger;
-};
-export type WorkflowLogEntryDto = {
-    /** Workflow run date/time */
-    at: string;
-    /** Workflow log entry ID */
-    id: string;
-    /** Last step ran, if the workflow ended early */
-    lastStep?: {
-        /** Index of the step in the workflow */
-        index: number;
-        /** Method of the step */
-        method: string;
-    };
-    result: WorkflowResult;
-    /** Workflow trigger data ID */
-    triggerDataId?: string;
-};
-export type WorkflowShareStepDto = {
-    /** Step configuration */
-    config: {
-        [key: string]: any;
-    } | null;
-    /** Step is enabled */
-    enabled?: boolean;
-    /** Step plugin method */
-    method: string;
-};
-export type WorkflowShareResponseDto = {
-    /** Workflow description */
-    description: string | null;
-    /** Workflow name */
-    name: string | null;
-    /** Workflow steps */
-    steps: WorkflowShareStepDto[];
-    /** Workflow trigger type */
-    trigger: WorkflowTrigger;
+    name?: string;
+    triggerType?: PluginTriggerType;
 };
 export type LicenseResponseDto = UserLicense;
-export type ReleaseEventV1 = {
-    /** When the server last checked for a latest version. As an ISO timestamp */
-    checkedAt: string;
-    /** Whether a new version is available */
-    isAvailable: boolean;
-    releaseVersion: ServerVersionResponseDto;
-    serverVersion: ServerVersionResponseDto;
-    /** Release type */
-    "type": ReleaseType;
-};
 export type SyncAckV1 = {};
 export type SyncAlbumDeleteV1 = {
     /** Album ID */
@@ -3794,23 +3591,6 @@ export type SyncAlbumV1 = {
     order: AssetOrder;
     /** Owner ID */
     ownerId: string;
-    /** Thumbnail asset ID */
-    thumbnailAssetId: string | null;
-    /** Updated at */
-    updatedAt: string;
-};
-export type SyncAlbumV2 = {
-    /** Created at */
-    createdAt: string;
-    /** Album description */
-    description: string;
-    /** Album ID */
-    id: string;
-    /** Is activity enabled */
-    isActivityEnabled: boolean;
-    /** Album name */
-    name: string;
-    order: AssetOrder;
     /** Thumbnail asset ID */
     thumbnailAssetId: string | null;
     /** Updated at */
@@ -3957,93 +3737,13 @@ export type SyncAssetMetadataV1 = {
         [key: string]: any;
     };
 };
-export type SyncAssetOcrDeleteV1 = {
-    /** Original asset ID of the deleted OCR entry */
-    assetId: string;
-    /** Timestamp when the OCR entry was deleted */
-    deletedAt: string;
-    /** Audit row ID of the deleted OCR entry */
-    id: string;
-};
-export type SyncAssetOcrV1 = {
-    /** Asset ID */
-    assetId: string;
-    /** Confidence score of the bounding box */
-    boxScore: number;
-    /** OCR entry ID */
-    id: string;
-    /** Whether the OCR entry is visible */
-    isVisible: boolean;
-    /** Recognized text content */
-    text: string;
-    /** Confidence score of the recognized text */
-    textScore: number;
-    /** Top-left X coordinate (normalized 0–1) */
-    x1: number;
-    /** Top-right X coordinate (normalized 0–1) */
-    x2: number;
-    /** Bottom-right X coordinate (normalized 0–1) */
-    x3: number;
-    /** Bottom-left X coordinate (normalized 0–1) */
-    x4: number;
-    /** Top-left Y coordinate (normalized 0–1) */
-    y1: number;
-    /** Top-right Y coordinate (normalized 0–1) */
-    y2: number;
-    /** Bottom-right Y coordinate (normalized 0–1) */
-    y3: number;
-    /** Bottom-left Y coordinate (normalized 0–1) */
-    y4: number;
-};
 export type SyncAssetV1 = {
     /** Checksum */
     checksum: string;
-    /** Uploaded to Immich at */
-    createdAt: string | null;
     /** Deleted at */
     deletedAt: string | null;
     /** Duration */
     duration: string | null;
-    /** File created at */
-    fileCreatedAt: string | null;
-    /** File modified at */
-    fileModifiedAt: string | null;
-    /** Asset height */
-    height: number | null;
-    /** Asset ID */
-    id: string;
-    /** Is edited */
-    isEdited: boolean;
-    /** Is favorite */
-    isFavorite: boolean;
-    /** Library ID */
-    libraryId: string | null;
-    /** Live photo video ID */
-    livePhotoVideoId: string | null;
-    /** Local date time */
-    localDateTime: string | null;
-    /** Original file name */
-    originalFileName: string;
-    /** Owner ID */
-    ownerId: string;
-    /** Stack ID */
-    stackId: string | null;
-    /** Thumbhash */
-    thumbhash: string | null;
-    "type": AssetTypeEnum;
-    visibility: AssetVisibility;
-    /** Asset width */
-    width: number | null;
-};
-export type SyncAssetV2 = {
-    /** Checksum */
-    checksum: string;
-    /** Uploaded to Immich at */
-    createdAt: string | null;
-    /** Deleted at */
-    deletedAt: string | null;
-    /** Duration */
-    duration: number | null;
     /** File created at */
     fileCreatedAt: string | null;
     /** File modified at */
@@ -4337,1569 +4037,591 @@ export type SyncUserV1 = {
 /**
  * List all activities
  */
-export function getActivities({ albumId, assetId, level, $type, userId }: {
+export declare function getActivities({ albumId, assetId, level, $type, userId }: {
     albumId: string;
     assetId?: string;
     level?: ReactionLevel;
     $type?: ReactionType;
     userId?: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ActivityResponseDto[];
-    }>(`/activities${QS.query(QS.explode({
-        albumId,
-        assetId,
-        level,
-        "type": $type,
-        userId
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<ActivityResponseDto[]>;
 /**
  * Create an activity
  */
-export function createActivity({ activityCreateDto }: {
+export declare function createActivity({ activityCreateDto }: {
     activityCreateDto: ActivityCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: ActivityResponseDto;
-    }>("/activities", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: activityCreateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<ActivityResponseDto>;
 /**
  * Retrieve activity statistics
  */
-export function getActivityStatistics({ albumId, assetId }: {
+export declare function getActivityStatistics({ albumId, assetId }: {
     albumId: string;
     assetId?: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ActivityStatisticsResponseDto;
-    }>(`/activities/statistics${QS.query(QS.explode({
-        albumId,
-        assetId
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<ActivityStatisticsResponseDto>;
 /**
  * Delete an activity
  */
-export function deleteActivity({ id }: {
+export declare function deleteActivity({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/activities/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Unlink all OAuth accounts
  */
-export function unlinkAllOAuthAccountsAdmin(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/admin/auth/unlink-all", {
-        ...opts,
-        method: "POST"
-    }));
-}
+export declare function unlinkAllOAuthAccountsAdmin(opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Delete database backup
  */
-export function deleteDatabaseBackup({ databaseBackupDeleteDto }: {
+export declare function deleteDatabaseBackup({ databaseBackupDeleteDto }: {
     databaseBackupDeleteDto: DatabaseBackupDeleteDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/admin/database-backups", oazapfts.json({
-        ...opts,
-        method: "DELETE",
-        body: databaseBackupDeleteDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * List database backups
  */
-export function listDatabaseBackups(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: DatabaseBackupListResponseDto;
-    }>("/admin/database-backups", {
-        ...opts
-    }));
-}
+export declare function listDatabaseBackups(opts?: Oazapfts.RequestOpts): Promise<DatabaseBackupListResponseDto>;
 /**
  * Start database backup restore flow
  */
-export function startDatabaseRestoreFlow(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/admin/database-backups/start-restore", {
-        ...opts,
-        method: "POST"
-    }));
-}
+export declare function startDatabaseRestoreFlow(opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Upload database backup
  */
-export function uploadDatabaseBackup({ databaseBackupUploadDto }: {
+export declare function uploadDatabaseBackup({ databaseBackupUploadDto }: {
     databaseBackupUploadDto: DatabaseBackupUploadDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/admin/database-backups/upload", oazapfts.multipart({
-        ...opts,
-        method: "POST",
-        body: databaseBackupUploadDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Download database backup
  */
-export function downloadDatabaseBackup({ filename }: {
+export declare function downloadDatabaseBackup({ filename }: {
     filename: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchBlob<{
-        status: 200;
-        data: Blob;
-    }>(`/admin/database-backups/${encodeURIComponent(filename)}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<Blob>;
 /**
  * Run face re-attribution repair
  */
-export function runFaceRepair({ faceRepairRequestDto }: {
+export declare function runFaceRepair({ faceRepairRequestDto }: {
     faceRepairRequestDto: FaceRepairRequestDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: FaceRepairResponseDto;
-    }>("/admin/face-repair", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: faceRepairRequestDto
-    })));
-}
-/**
- * Get integrity report by type
- */
-export function getIntegrityReport({ cursor, limit, $type }: {
-    cursor?: string;
-    limit?: number;
-    $type: IntegrityReport;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: IntegrityReportResponseDto;
-    }>(`/admin/integrity/report${QS.query(QS.explode({
-        cursor,
-        limit,
-        "type": $type
-    }))}`, {
-        ...opts
-    }));
-}
-/**
- * Delete integrity report item
- */
-export function deleteIntegrityReport({ id }: {
-    id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/admin/integrity/report/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
-/**
- * Download flagged file
- */
-export function getIntegrityReportFile({ id }: {
-    id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchBlob<{
-        status: 200;
-        data: Blob;
-    }>(`/admin/integrity/report/${encodeURIComponent(id)}/file`, {
-        ...opts
-    }));
-}
-/**
- * Export integrity report by type as CSV
- */
-export function getIntegrityReportCsv({ $type }: {
-    $type: IntegrityReport;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchBlob<{
-        status: 200;
-        data: Blob;
-    }>(`/admin/integrity/report/${encodeURIComponent($type)}/csv`, {
-        ...opts
-    }));
-}
-/**
- * Get integrity report summary
- */
-export function getIntegrityReportSummary(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: IntegrityReportSummaryResponseDto;
-    }>("/admin/integrity/summary", {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<FaceRepairResponseDto>;
 /**
  * Set maintenance mode
  */
-export function setMaintenanceMode({ setMaintenanceModeDto }: {
+export declare function setMaintenanceMode({ setMaintenanceModeDto }: {
     setMaintenanceModeDto: SetMaintenanceModeDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/admin/maintenance", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: setMaintenanceModeDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Detect existing install
  */
-export function detectPriorInstall(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: MaintenanceDetectInstallResponseDto;
-    }>("/admin/maintenance/detect-install", {
-        ...opts
-    }));
-}
+export declare function detectPriorInstall(opts?: Oazapfts.RequestOpts): Promise<MaintenanceDetectInstallResponseDto>;
 /**
  * Log into maintenance mode
  */
-export function maintenanceLogin({ maintenanceLoginDto }: {
+export declare function maintenanceLogin({ maintenanceLoginDto }: {
     maintenanceLoginDto: MaintenanceLoginDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: MaintenanceAuthDto;
-    }>("/admin/maintenance/login", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: maintenanceLoginDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<MaintenanceAuthDto>;
 /**
  * Get maintenance mode status
  */
-export function getMaintenanceStatus(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: MaintenanceStatusResponseDto;
-    }>("/admin/maintenance/status", {
-        ...opts
-    }));
-}
+export declare function getMaintenanceStatus(opts?: Oazapfts.RequestOpts): Promise<MaintenanceStatusResponseDto>;
 /**
  * Create a notification
  */
-export function createNotification({ notificationCreateDto }: {
+export declare function createNotification({ notificationCreateDto }: {
     notificationCreateDto: NotificationCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: NotificationDto;
-    }>("/admin/notifications", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: notificationCreateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<NotificationDto>;
 /**
  * Render email template
  */
-export function getNotificationTemplateAdmin({ name, templateDto }: {
+export declare function getNotificationTemplateAdmin({ name, templateDto }: {
     name: string;
     templateDto: TemplateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: TemplateResponseDto;
-    }>(`/admin/notifications/templates/${encodeURIComponent(name)}`, oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: templateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<TemplateResponseDto>;
 /**
  * Send test email
  */
-export function sendTestEmailAdmin({ systemConfigSmtpDto }: {
+export declare function sendTestEmailAdmin({ systemConfigSmtpDto }: {
     systemConfigSmtpDto: SystemConfigSmtpDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: TestEmailResponseDto;
-    }>("/admin/notifications/test-email", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: systemConfigSmtpDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<TestEmailResponseDto>;
 /**
  * Search users
  */
-export function searchUsersAdmin({ id, withDeleted }: {
+export declare function searchUsersAdmin({ id, withDeleted }: {
     id?: string;
     withDeleted?: boolean;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserAdminResponseDto[];
-    }>(`/admin/users${QS.query(QS.explode({
-        id,
-        withDeleted
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserAdminResponseDto[]>;
 /**
  * Create a user
  */
-export function createUserAdmin({ userAdminCreateDto }: {
+export declare function createUserAdmin({ userAdminCreateDto }: {
     userAdminCreateDto: UserAdminCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: UserAdminResponseDto;
-    }>("/admin/users", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: userAdminCreateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserAdminResponseDto>;
 /**
  * Delete a user
  */
-export function deleteUserAdmin({ id, userAdminDeleteDto }: {
+export declare function deleteUserAdmin({ id, userAdminDeleteDto }: {
     id: string;
     userAdminDeleteDto: UserAdminDeleteDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserAdminResponseDto;
-    }>(`/admin/users/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "DELETE",
-        body: userAdminDeleteDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserAdminResponseDto>;
 /**
  * Retrieve a user
  */
-export function getUserAdmin({ id }: {
+export declare function getUserAdmin({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserAdminResponseDto;
-    }>(`/admin/users/${encodeURIComponent(id)}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserAdminResponseDto>;
 /**
  * Update a user
  */
-export function updateUserAdmin({ id, userAdminUpdateDto }: {
+export declare function updateUserAdmin({ id, userAdminUpdateDto }: {
     id: string;
     userAdminUpdateDto: UserAdminUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserAdminResponseDto;
-    }>(`/admin/users/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: userAdminUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserAdminResponseDto>;
 /**
- * Retrieve calendar heatmap activity
+ * Export a user library manifest
  */
-export function getUserCalendarHeatmapAdmin({ $from, id, to, $type }: {
-    $from?: string;
+export declare function getLibraryManifest({ cursor, id }: {
+    cursor?: string;
     id: string;
-    to?: string;
-    $type?: CalendarHeatmapType;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: CalendarHeatmapResponseDto;
-    }>(`/admin/users/${encodeURIComponent(id)}/calendar-heatmap${QS.query(QS.explode({
-        "from": $from,
-        to,
-        "type": $type
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<LibraryManifestResponseDto>;
 /**
  * Retrieve user preferences
  */
-export function getUserPreferencesAdmin({ id }: {
+export declare function getUserPreferencesAdmin({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserPreferencesResponseDto;
-    }>(`/admin/users/${encodeURIComponent(id)}/preferences`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserPreferencesResponseDto>;
 /**
  * Update user preferences
  */
-export function updateUserPreferencesAdmin({ id, userPreferencesUpdateDto }: {
+export declare function updateUserPreferencesAdmin({ id, userPreferencesUpdateDto }: {
     id: string;
     userPreferencesUpdateDto: UserPreferencesUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserPreferencesResponseDto;
-    }>(`/admin/users/${encodeURIComponent(id)}/preferences`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: userPreferencesUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserPreferencesResponseDto>;
 /**
  * Restore a deleted user
  */
-export function restoreUserAdmin({ id }: {
+export declare function restoreUserAdmin({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserAdminResponseDto;
-    }>(`/admin/users/${encodeURIComponent(id)}/restore`, {
-        ...opts,
-        method: "POST"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserAdminResponseDto>;
 /**
  * Retrieve user sessions
  */
-export function getUserSessionsAdmin({ id }: {
+export declare function getUserSessionsAdmin({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SessionResponseDto[];
-    }>(`/admin/users/${encodeURIComponent(id)}/sessions`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SessionResponseDto[]>;
 /**
  * Retrieve user statistics
  */
-export function getUserStatisticsAdmin({ id, isFavorite, isTrashed, visibility }: {
+export declare function getUserStatisticsAdmin({ id, isFavorite, isTrashed, visibility }: {
     id: string;
     isFavorite?: boolean;
     isTrashed?: boolean;
     visibility?: AssetVisibility;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetStatsResponseDto;
-    }>(`/admin/users/${encodeURIComponent(id)}/statistics${QS.query(QS.explode({
-        isFavorite,
-        isTrashed,
-        visibility
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetStatsResponseDto>;
 /**
  * List all albums
  */
-export function getAllAlbums({ assetId, id, isOwned, isShared, name }: {
+export declare function getAllAlbums({ assetId, shared }: {
     assetId?: string;
-    id?: string;
-    isOwned?: boolean;
-    isShared?: boolean;
-    name?: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AlbumResponseDto[];
-    }>(`/albums${QS.query(QS.explode({
-        assetId,
-        id,
-        isOwned,
-        isShared,
-        name
-    }))}`, {
-        ...opts
-    }));
-}
+    shared?: boolean;
+}, opts?: Oazapfts.RequestOpts): Promise<AlbumResponseDto[]>;
 /**
  * Create an album
  */
-export function createAlbum({ createAlbumDto }: {
+export declare function createAlbum({ createAlbumDto }: {
     createAlbumDto: CreateAlbumDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: AlbumResponseDto;
-    }>("/albums", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: createAlbumDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AlbumResponseDto>;
 /**
  * Add assets to albums
  */
-export function addAssetsToAlbums({ albumsAddAssetsDto }: {
+export declare function addAssetsToAlbums({ albumsAddAssetsDto }: {
     albumsAddAssetsDto: AlbumsAddAssetsDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AlbumsAddAssetsResponseDto;
-    }>("/albums/assets", oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: albumsAddAssetsDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AlbumsAddAssetsResponseDto>;
 /**
  * Retrieve album names
  */
-export function getAlbumNames(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AlbumNameDto[];
-    }>("/albums/names", {
-        ...opts
-    }));
-}
+export declare function getAlbumNames(opts?: Oazapfts.RequestOpts): Promise<AlbumNameDto[]>;
 /**
  * Retrieve album statistics
  */
-export function getAlbumStatistics(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AlbumStatisticsResponseDto;
-    }>("/albums/statistics", {
-        ...opts
-    }));
-}
+export declare function getAlbumStatistics(opts?: Oazapfts.RequestOpts): Promise<AlbumStatisticsResponseDto>;
 /**
  * Delete an album
  */
-export function deleteAlbum({ id }: {
+export declare function deleteAlbum({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/albums/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve an album
  */
-export function getAlbumInfo({ id, key, slug }: {
+export declare function getAlbumInfo({ id, key, slug }: {
     id: string;
     key?: string;
     slug?: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AlbumResponseDto;
-    }>(`/albums/${encodeURIComponent(id)}${QS.query(QS.explode({
-        key,
-        slug
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AlbumResponseDto>;
 /**
  * Update an album
  */
-export function updateAlbumInfo({ id, updateAlbumDto }: {
+export declare function updateAlbumInfo({ id, updateAlbumDto }: {
     id: string;
     updateAlbumDto: UpdateAlbumDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AlbumResponseDto;
-    }>(`/albums/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "PATCH",
-        body: updateAlbumDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AlbumResponseDto>;
 /**
  * Remove assets from an album
  */
-export function removeAssetFromAlbum({ id, bulkIdsDto }: {
+export declare function removeAssetFromAlbum({ id, bulkIdsDto }: {
     id: string;
     bulkIdsDto: BulkIdsDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: BulkIdResponseDto[];
-    }>(`/albums/${encodeURIComponent(id)}/assets`, oazapfts.json({
-        ...opts,
-        method: "DELETE",
-        body: bulkIdsDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<BulkIdResponseDto[]>;
 /**
  * Add assets to an album
  */
-export function addAssetsToAlbum({ id, bulkIdsDto }: {
+export declare function addAssetsToAlbum({ id, bulkIdsDto }: {
     id: string;
     bulkIdsDto: BulkIdsDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: BulkIdResponseDto[];
-    }>(`/albums/${encodeURIComponent(id)}/assets`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: bulkIdsDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<BulkIdResponseDto[]>;
 /**
  * Retrieve album map markers
  */
-export function getAlbumMapMarkers({ id, key, slug }: {
+export declare function getAlbumMapMarkers({ id, key, slug }: {
     id: string;
     key?: string;
     slug?: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: MapMarkerResponseDto[];
-    }>(`/albums/${encodeURIComponent(id)}/map-markers${QS.query(QS.explode({
-        key,
-        slug
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<MapMarkerResponseDto[]>;
 /**
  * Remove user from album
  */
-export function removeUserFromAlbum({ id, userId }: {
+export declare function removeUserFromAlbum({ id, userId }: {
     id: string;
     userId: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/albums/${encodeURIComponent(id)}/user/${encodeURIComponent(userId)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Update user role
  */
-export function updateAlbumUser({ id, userId, updateAlbumUserDto }: {
+export declare function updateAlbumUser({ id, userId, updateAlbumUserDto }: {
     id: string;
     userId: string;
     updateAlbumUserDto: UpdateAlbumUserDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/albums/${encodeURIComponent(id)}/user/${encodeURIComponent(userId)}`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: updateAlbumUserDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Share album with users
  */
-export function addUsersToAlbum({ id, addUsersDto }: {
+export declare function addUsersToAlbum({ id, addUsersDto }: {
     id: string;
     addUsersDto: AddUsersDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AlbumResponseDto;
-    }>(`/albums/${encodeURIComponent(id)}/users`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: addUsersDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AlbumResponseDto>;
 /**
  * List all API keys
  */
-export function getApiKeys(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ApiKeyResponseDto[];
-    }>("/api-keys", {
-        ...opts
-    }));
-}
+export declare function getApiKeys(opts?: Oazapfts.RequestOpts): Promise<ApiKeyResponseDto[]>;
 /**
  * Create an API key
  */
-export function createApiKey({ apiKeyCreateDto }: {
+export declare function createApiKey({ apiKeyCreateDto }: {
     apiKeyCreateDto: ApiKeyCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: ApiKeyCreateResponseDto;
-    }>("/api-keys", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: apiKeyCreateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<ApiKeyCreateResponseDto>;
 /**
  * Retrieve the current API key
  */
-export function getMyApiKey(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ApiKeyResponseDto;
-    }>("/api-keys/me", {
-        ...opts
-    }));
-}
+export declare function getMyApiKey(opts?: Oazapfts.RequestOpts): Promise<ApiKeyResponseDto>;
 /**
  * Delete an API key
  */
-export function deleteApiKey({ id }: {
+export declare function deleteApiKey({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/api-keys/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve an API key
  */
-export function getApiKey({ id }: {
+export declare function getApiKey({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ApiKeyResponseDto;
-    }>(`/api-keys/${encodeURIComponent(id)}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<ApiKeyResponseDto>;
 /**
  * Update an API key
  */
-export function updateApiKey({ id, apiKeyUpdateDto }: {
+export declare function updateApiKey({ id, apiKeyUpdateDto }: {
     id: string;
     apiKeyUpdateDto: ApiKeyUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ApiKeyResponseDto;
-    }>(`/api-keys/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: apiKeyUpdateDto
-    })));
-}
-/**
- * Rotate an API key
- */
-export function rotateApiKey({ id }: {
-    id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: ApiKeyCreateResponseDto;
-    }>(`/api-keys/${encodeURIComponent(id)}/rotate`, {
-        ...opts,
-        method: "POST"
-    }));
-}
-/**
- * Search asset files
- */
-export function searchAssetFiles({ assetId, isEdited, isProgressive, isTransparent, $type }: {
-    assetId: string;
-    isEdited?: boolean;
-    isProgressive?: boolean;
-    isTransparent?: boolean;
-    $type?: AssetFileType;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetFileResponseDto[];
-    }>(`/asset-files${QS.query(QS.explode({
-        assetId,
-        isEdited,
-        isProgressive,
-        isTransparent,
-        "type": $type
-    }))}`, {
-        ...opts
-    }));
-}
-/**
- * Delete an asset file
- */
-export function deleteAssetFile({ id }: {
-    id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/asset-files/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
-/**
- * Retrieve an asset file
- */
-export function getAssetFile({ id }: {
-    id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetFileResponseDto;
-    }>(`/asset-files/${encodeURIComponent(id)}`, {
-        ...opts
-    }));
-}
-/**
- * Download an asset file
- */
-export function downloadAssetFile({ id }: {
-    id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchBlob<{
-        status: 200;
-        data: Blob;
-    }>(`/asset-files/${encodeURIComponent(id)}/download`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<ApiKeyResponseDto>;
 /**
  * Delete assets
  */
-export function deleteAssets({ assetBulkDeleteDto }: {
+export declare function deleteAssets({ assetBulkDeleteDto }: {
     assetBulkDeleteDto: AssetBulkDeleteDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/assets", oazapfts.json({
-        ...opts,
-        method: "DELETE",
-        body: assetBulkDeleteDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Upload asset
  */
-export function uploadAsset({ key, slug, xImmichChecksum, assetMediaCreateDto }: {
+export declare function uploadAsset({ key, slug, xImmichChecksum, assetMediaCreateDto }: {
     key?: string;
     slug?: string;
     xImmichChecksum?: string;
     assetMediaCreateDto: AssetMediaCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetMediaResponseDto;
-    } | {
-        status: 201;
-        data: AssetMediaResponseDto;
-    }>(`/assets${QS.query(QS.explode({
-        key,
-        slug
-    }))}`, oazapfts.multipart({
-        ...opts,
-        method: "POST",
-        body: assetMediaCreateDto,
-        headers: oazapfts.mergeHeaders(opts?.headers, {
-            "x-immich-checksum": xImmichChecksum
-        })
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetMediaResponseDto>;
 /**
  * Update assets
  */
-export function updateAssets({ assetBulkUpdateDto }: {
+export declare function updateAssets({ assetBulkUpdateDto }: {
     assetBulkUpdateDto: AssetBulkUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/assets", oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: assetBulkUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Check bulk upload
  */
-export function checkBulkUpload({ assetBulkUploadCheckDto }: {
+export declare function checkBulkUpload({ assetBulkUploadCheckDto }: {
     assetBulkUploadCheckDto: AssetBulkUploadCheckDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetBulkUploadCheckResponseDto;
-    }>("/assets/bulk-upload-check", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: assetBulkUploadCheckDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetBulkUploadCheckResponseDto>;
 /**
  * Copy asset
  */
-export function copyAsset({ assetCopyDto }: {
+export declare function copyAsset({ assetCopyDto }: {
     assetCopyDto: AssetCopyDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/assets/copy", oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: assetCopyDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Run an asset job
  */
-export function runAssetJobs({ assetJobsDto }: {
+export declare function runAssetJobs({ assetJobsDto }: {
     assetJobsDto: AssetJobsDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/assets/jobs", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: assetJobsDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Delete asset metadata
  */
-export function deleteBulkAssetMetadata({ assetMetadataBulkDeleteDto }: {
+export declare function deleteBulkAssetMetadata({ assetMetadataBulkDeleteDto }: {
     assetMetadataBulkDeleteDto: AssetMetadataBulkDeleteDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/assets/metadata", oazapfts.json({
-        ...opts,
-        method: "DELETE",
-        body: assetMetadataBulkDeleteDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Upsert asset metadata
  */
-export function updateBulkAssetMetadata({ assetMetadataBulkUpsertDto }: {
+export declare function updateBulkAssetMetadata({ assetMetadataBulkUpsertDto }: {
     assetMetadataBulkUpsertDto: AssetMetadataBulkUpsertDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetMetadataBulkResponseDto[];
-    }>("/assets/metadata", oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: assetMetadataBulkUpsertDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetMetadataBulkResponseDto[]>;
 /**
  * Get asset statistics
  */
-export function getAssetStatistics({ isFavorite, isTrashed, visibility }: {
+export declare function getAssetStatistics({ isFavorite, isTrashed, visibility }: {
     isFavorite?: boolean;
     isTrashed?: boolean;
     visibility?: AssetVisibility;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetStatsResponseDto;
-    }>(`/assets/statistics${QS.query(QS.explode({
-        isFavorite,
-        isTrashed,
-        visibility
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetStatsResponseDto>;
 /**
  * Retrieve an asset
  */
-export function getAssetInfo({ id, key, slug, spaceId }: {
+export declare function getAssetInfo({ id, key, slug, spaceId }: {
     id: string;
     key?: string;
     slug?: string;
     spaceId?: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetResponseDto;
-    }>(`/assets/${encodeURIComponent(id)}${QS.query(QS.explode({
-        key,
-        slug,
-        spaceId
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetResponseDto>;
 /**
  * Update an asset
  */
-export function updateAsset({ id, updateAssetDto }: {
+export declare function updateAsset({ id, updateAssetDto }: {
     id: string;
     updateAssetDto: UpdateAssetDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetResponseDto;
-    }>(`/assets/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: updateAssetDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetResponseDto>;
 /**
  * Remove edits from an existing asset
  */
-export function removeAssetEdits({ id }: {
+export declare function removeAssetEdits({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/assets/${encodeURIComponent(id)}/edits`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve edits for an existing asset
  */
-export function getAssetEdits({ id }: {
+export declare function getAssetEdits({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetEditsResponseDto;
-    }>(`/assets/${encodeURIComponent(id)}/edits`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetEditsResponseDto>;
 /**
  * Apply edits to an existing asset
  */
-export function editAsset({ id, assetEditsCreateDto }: {
+export declare function editAsset({ id, assetEditsCreateDto }: {
     id: string;
     assetEditsCreateDto: AssetEditsCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetEditsResponseDto;
-    }>(`/assets/${encodeURIComponent(id)}/edits`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: assetEditsCreateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetEditsResponseDto>;
 /**
  * Get asset metadata
  */
-export function getAssetMetadata({ id }: {
+export declare function getAssetMetadata({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetMetadataResponseDto[];
-    }>(`/assets/${encodeURIComponent(id)}/metadata`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetMetadataResponseDto[]>;
 /**
  * Update asset metadata
  */
-export function updateAssetMetadata({ id, assetMetadataUpsertDto }: {
+export declare function updateAssetMetadata({ id, assetMetadataUpsertDto }: {
     id: string;
     assetMetadataUpsertDto: AssetMetadataUpsertDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetMetadataResponseDto[];
-    }>(`/assets/${encodeURIComponent(id)}/metadata`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: assetMetadataUpsertDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetMetadataResponseDto[]>;
 /**
  * Delete asset metadata by key
  */
-export function deleteAssetMetadata({ id, key }: {
+export declare function deleteAssetMetadata({ id, key }: {
     id: string;
     key: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/assets/${encodeURIComponent(id)}/metadata/${encodeURIComponent(key)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve asset metadata by key
  */
-export function getAssetMetadataByKey({ id, key }: {
+export declare function getAssetMetadataByKey({ id, key }: {
     id: string;
     key: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetMetadataResponseDto;
-    }>(`/assets/${encodeURIComponent(id)}/metadata/${encodeURIComponent(key)}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetMetadataResponseDto>;
 /**
  * Retrieve asset OCR data
  */
-export function getAssetOcr({ id }: {
+export declare function getAssetOcr({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetOcrResponseDto[];
-    }>(`/assets/${encodeURIComponent(id)}/ocr`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetOcrResponseDto[]>;
 /**
  * Download original asset
  */
-export function downloadAsset({ download, edited, id, key, slug }: {
+export declare function downloadAsset({ download, edited, id, key, slug }: {
     download?: boolean;
     edited?: boolean;
     id: string;
     key?: string;
     slug?: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchBlob<{
-        status: 200;
-        data: Blob;
-    }>(`/assets/${encodeURIComponent(id)}/original${QS.query(QS.explode({
-        download,
-        edited,
-        key,
-        slug
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<Blob>;
 /**
  * View asset thumbnail
  */
-export function viewAsset({ edited, id, key, size, slug }: {
+export declare function viewAsset({ edited, id, key, size, slug }: {
     edited?: boolean;
     id: string;
     key?: string;
     size?: AssetMediaSize;
     slug?: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchBlob<{
-        status: 200;
-        data: Blob;
-    }>(`/assets/${encodeURIComponent(id)}/thumbnail${QS.query(QS.explode({
-        edited,
-        key,
-        size,
-        slug
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<Blob>;
 /**
  * Play asset video
  */
-export function playAssetVideo({ id, key, slug }: {
+export declare function playAssetVideo({ id, key, slug }: {
     id: string;
     key?: string;
     slug?: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchBlob<{
-        status: 200;
-        data: Blob;
-    }>(`/assets/${encodeURIComponent(id)}/video/playback${QS.query(QS.explode({
-        key,
-        slug
-    }))}`, {
-        ...opts
-    }));
-}
-/**
- * Get HLS main playlist
- */
-export function getMainPlaylist({ id, key, slug }: {
-    id: string;
-    key?: string;
-    slug?: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchBlob<{
-        status: 200;
-        data: string;
-    }>(`/assets/${encodeURIComponent(id)}/video/stream/main.m3u8${QS.query(QS.explode({
-        key,
-        slug
-    }))}`, {
-        ...opts
-    }));
-}
-/**
- * End HLS streaming session
- */
-export function endSession({ id, key, sessionId, slug }: {
-    id: string;
-    key?: string;
-    sessionId: string;
-    slug?: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/assets/${encodeURIComponent(id)}/video/stream/${encodeURIComponent(sessionId)}${QS.query(QS.explode({
-        key,
-        slug
-    }))}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
-/**
- * Get HLS media playlist
- */
-export function getMediaPlaylist({ id, key, sessionId, slug, variantIndex, xImmichHlsPos }: {
-    id: string;
-    key?: string;
-    sessionId: string;
-    slug?: string;
-    variantIndex: number;
-    xImmichHlsPos?: number;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchBlob<{
-        status: 200;
-        data: string;
-    }>(`/assets/${encodeURIComponent(id)}/video/stream/${encodeURIComponent(sessionId)}/${encodeURIComponent(variantIndex)}/playlist.m3u8${QS.query(QS.explode({
-        key,
-        slug
-    }))}`, {
-        ...opts,
-        headers: oazapfts.mergeHeaders(opts?.headers, {
-            "x-immich-hls-pos": xImmichHlsPos
-        })
-    }));
-}
-/**
- * Get HLS segment or init file
- */
-export function getSegment({ filename, id, key, sessionId, slug, variantIndex, xImmichHlsMsn }: {
-    filename: string;
-    id: string;
-    key?: string;
-    sessionId: string;
-    slug?: string;
-    variantIndex: number;
-    xImmichHlsMsn?: number;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchBlob<{
-        status: 200;
-        data: Blob;
-    }>(`/assets/${encodeURIComponent(id)}/video/stream/${encodeURIComponent(sessionId)}/${encodeURIComponent(variantIndex)}/${encodeURIComponent(filename)}${QS.query(QS.explode({
-        key,
-        slug
-    }))}`, {
-        ...opts,
-        headers: oazapfts.mergeHeaders(opts?.headers, {
-            "x-immich-hls-msn": xImmichHlsMsn
-        })
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<Blob>;
 /**
  * Register admin
  */
-export function signUpAdmin({ signUpDto }: {
+export declare function signUpAdmin({ signUpDto }: {
     signUpDto: SignUpDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: UserAdminResponseDto;
-    }>("/auth/admin-sign-up", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: signUpDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserAdminResponseDto>;
 /**
  * Change password
  */
-export function changePassword({ changePasswordDto }: {
+export declare function changePassword({ changePasswordDto }: {
     changePasswordDto: ChangePasswordDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserAdminResponseDto;
-    }>("/auth/change-password", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: changePasswordDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserAdminResponseDto>;
 /**
  * Login
  */
-export function login({ loginCredentialDto }: {
+export declare function login({ loginCredentialDto }: {
     loginCredentialDto: LoginCredentialDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: LoginResponseDto;
-    }>("/auth/login", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: loginCredentialDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<LoginResponseDto>;
 /**
  * Logout
  */
-export function logout(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: LogoutResponseDto;
-    }>("/auth/logout", {
-        ...opts,
-        method: "POST"
-    }));
-}
+export declare function logout(opts?: Oazapfts.RequestOpts): Promise<LogoutResponseDto>;
 /**
  * Reset pin code
  */
-export function resetPinCode({ pinCodeResetDto }: {
+export declare function resetPinCode({ pinCodeResetDto }: {
     pinCodeResetDto: PinCodeResetDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/auth/pin-code", oazapfts.json({
-        ...opts,
-        method: "DELETE",
-        body: pinCodeResetDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Setup pin code
  */
-export function setupPinCode({ pinCodeSetupDto }: {
+export declare function setupPinCode({ pinCodeSetupDto }: {
     pinCodeSetupDto: PinCodeSetupDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/auth/pin-code", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: pinCodeSetupDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Change pin code
  */
-export function changePinCode({ pinCodeChangeDto }: {
+export declare function changePinCode({ pinCodeChangeDto }: {
     pinCodeChangeDto: PinCodeChangeDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/auth/pin-code", oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: pinCodeChangeDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Lock auth session
  */
-export function lockAuthSession(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/auth/session/lock", {
-        ...opts,
-        method: "POST"
-    }));
-}
+export declare function lockAuthSession(opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Unlock auth session
  */
-export function unlockAuthSession({ sessionUnlockDto }: {
+export declare function unlockAuthSession({ sessionUnlockDto }: {
     sessionUnlockDto: SessionUnlockDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/auth/session/unlock", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: sessionUnlockDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve auth status
  */
-export function getAuthStatus(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AuthStatusResponseDto;
-    }>("/auth/status", {
-        ...opts
-    }));
-}
+export declare function getAuthStatus(opts?: Oazapfts.RequestOpts): Promise<AuthStatusResponseDto>;
 /**
  * Validate access token
  */
-export function validateAccessToken(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ValidateAccessTokenResponseDto;
-    }>("/auth/validateToken", {
-        ...opts,
-        method: "POST"
-    }));
-}
+export declare function validateAccessToken(opts?: Oazapfts.RequestOpts): Promise<ValidateAccessTokenResponseDto>;
 /**
  * Scan all libraries for classification
  */
-export function scanClassification(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/classification/scan", {
-        ...opts,
-        method: "POST"
-    }));
-}
+export declare function scanClassification(opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Download asset archive
  */
-export function downloadArchive({ key, slug, downloadArchiveDto }: {
+export declare function downloadArchive({ key, slug, downloadArchiveDto }: {
     key?: string;
     slug?: string;
     downloadArchiveDto: DownloadArchiveDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchBlob<{
-        status: 200;
-        data: Blob;
-    }>(`/download/archive${QS.query(QS.explode({
-        key,
-        slug
-    }))}`, oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: downloadArchiveDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<Blob>;
 /**
  * Retrieve download information
  */
-export function getDownloadInfo({ key, slug, downloadInfoDto }: {
+export declare function getDownloadInfo({ key, slug, downloadInfoDto }: {
     key?: string;
     slug?: string;
     downloadInfoDto: DownloadInfoDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: DownloadResponseDto;
-    }>(`/download/info${QS.query(QS.explode({
-        key,
-        slug
-    }))}`, oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: downloadInfoDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<DownloadResponseDto>;
 /**
  * Delete duplicates
  */
-export function deleteDuplicates({ bulkIdsDto }: {
+export declare function deleteDuplicates({ bulkIdsDto }: {
     bulkIdsDto: BulkIdsDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/duplicates", oazapfts.json({
-        ...opts,
-        method: "DELETE",
-        body: bulkIdsDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve duplicates
  */
-export function getAssetDuplicates(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: DuplicateResponseDto[];
-    }>("/duplicates", {
-        ...opts
-    }));
-}
+export declare function getAssetDuplicates(opts?: Oazapfts.RequestOpts): Promise<DuplicateResponseDto[]>;
 /**
  * Resolve duplicate groups
  */
-export function resolveDuplicates({ duplicateResolveDto }: {
+export declare function resolveDuplicates({ duplicateResolveDto }: {
     duplicateResolveDto: DuplicateResolveDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: BulkIdResponseDto[];
-    }>("/duplicates/resolve", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: duplicateResolveDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<BulkIdResponseDto[]>;
 /**
- * Dismiss a duplicate group
+ * Delete a duplicate
  */
-export function deleteDuplicate({ id }: {
+export declare function deleteDuplicate({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/duplicates/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve faces for asset
  */
-export function getFaces({ id }: {
+export declare function getFaces({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetFaceResponseDto[];
-    }>(`/faces${QS.query(QS.explode({
-        id
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetFaceResponseDto[]>;
 /**
  * Create a face
  */
-export function createFace({ assetFaceCreateDto }: {
+export declare function createFace({ assetFaceCreateDto }: {
     assetFaceCreateDto: AssetFaceCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/faces", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: assetFaceCreateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Delete a face
  */
-export function deleteFace({ id, assetFaceDeleteDto }: {
+export declare function deleteFace({ id, assetFaceDeleteDto }: {
     id: string;
     assetFaceDeleteDto: AssetFaceDeleteDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/faces/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "DELETE",
-        body: assetFaceDeleteDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Re-assign a face to another person
  */
-export function reassignFacesById({ id, faceDto }: {
+export declare function reassignFacesById({ id, faceDto }: {
     id: string;
     faceDto: FaceDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PersonResponseDto;
-    }>(`/faces/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: faceDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PersonResponseDto>;
 /**
  * Get filtered map markers
  */
-export function getFilteredMapMarkers({ city, country, isFavorite, isInAlbum, isNotInAlbum, make, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }: {
+export declare function getFilteredMapMarkers({ city, country, isFavorite, isInAlbum, isNotInAlbum, make, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }: {
     city?: string;
     country?: string;
     isFavorite?: boolean;
@@ -5915,179 +4637,76 @@ export function getFilteredMapMarkers({ city, country, isFavorite, isInAlbum, is
     takenBefore?: string;
     $type?: MapMediaType;
     withSharedSpaces?: boolean;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: MapMarkerResponseDto[];
-    }>(`/gallery/map/markers${QS.query(QS.explode({
-        city,
-        country,
-        isFavorite,
-        isInAlbum,
-        isNotInAlbum,
-        make,
-        model,
-        personIds,
-        rating,
-        spaceId,
-        tagIds,
-        takenAfter,
-        takenBefore,
-        "type": $type,
-        withSharedSpaces
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<MapMarkerResponseDto[]>;
 /**
  * Retrieve queue counts and status
  */
-export function getQueuesLegacy(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: QueuesResponseLegacyDto;
-    }>("/jobs", {
-        ...opts
-    }));
-}
+export declare function getQueuesLegacy(opts?: Oazapfts.RequestOpts): Promise<QueuesResponseLegacyDto>;
 /**
  * Create a manual job
  */
-export function createJob({ jobCreateDto }: {
+export declare function createJob({ jobCreateDto }: {
     jobCreateDto: JobCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/jobs", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: jobCreateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Run jobs
  */
-export function runQueueCommandLegacy({ name, queueCommandDto }: {
+export declare function runQueueCommandLegacy({ name, queueCommandDto }: {
     name: QueueName;
     queueCommandDto: QueueCommandDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: QueueResponseLegacyDto;
-    }>(`/jobs/${encodeURIComponent(name)}`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: queueCommandDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<QueueResponseLegacyDto>;
 /**
  * Retrieve libraries
  */
-export function getAllLibraries(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: LibraryResponseDto[];
-    }>("/libraries", {
-        ...opts
-    }));
-}
+export declare function getAllLibraries(opts?: Oazapfts.RequestOpts): Promise<LibraryResponseDto[]>;
 /**
  * Create a library
  */
-export function createLibrary({ createLibraryDto }: {
+export declare function createLibrary({ createLibraryDto }: {
     createLibraryDto: CreateLibraryDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: LibraryResponseDto;
-    }>("/libraries", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: createLibraryDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<LibraryResponseDto>;
 /**
  * Delete a library
  */
-export function deleteLibrary({ id }: {
+export declare function deleteLibrary({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/libraries/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve a library
  */
-export function getLibrary({ id }: {
+export declare function getLibrary({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: LibraryResponseDto;
-    }>(`/libraries/${encodeURIComponent(id)}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<LibraryResponseDto>;
 /**
  * Update a library
  */
-export function updateLibrary({ id, updateLibraryDto }: {
+export declare function updateLibrary({ id, updateLibraryDto }: {
     id: string;
     updateLibraryDto: UpdateLibraryDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: LibraryResponseDto;
-    }>(`/libraries/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: updateLibraryDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<LibraryResponseDto>;
 /**
  * Scan a library
  */
-export function scanLibrary({ id }: {
+export declare function scanLibrary({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/libraries/${encodeURIComponent(id)}/scan`, {
-        ...opts,
-        method: "POST"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve library statistics
  */
-export function getLibraryStatistics({ id }: {
+export declare function getLibraryStatistics({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: LibraryStatsResponseDto;
-    }>(`/libraries/${encodeURIComponent(id)}/statistics`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<LibraryStatsResponseDto>;
 /**
  * Validate library settings
  */
-export function validate({ id, validateLibraryDto }: {
+export declare function validate({ id, validateLibraryDto }: {
     id: string;
     validateLibraryDto: ValidateLibraryDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ValidateLibraryResponseDto;
-    }>(`/libraries/${encodeURIComponent(id)}/validate`, oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: validateLibraryDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<ValidateLibraryResponseDto>;
 /**
  * Retrieve map markers
  */
-export function getMapMarkers({ fileCreatedAfter, fileCreatedBefore, isArchived, isFavorite, withPartners, withSharedAlbums, withSharedSpaces }: {
+export declare function getMapMarkers({ fileCreatedAfter, fileCreatedBefore, isArchived, isFavorite, withPartners, withSharedAlbums, withSharedSpaces }: {
     fileCreatedAfter?: string;
     fileCreatedBefore?: string;
     isArchived?: boolean;
@@ -6095,883 +4714,365 @@ export function getMapMarkers({ fileCreatedAfter, fileCreatedBefore, isArchived,
     withPartners?: boolean;
     withSharedAlbums?: boolean;
     withSharedSpaces?: boolean;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: MapMarkerResponseDto[];
-    }>(`/map/markers${QS.query(QS.explode({
-        fileCreatedAfter,
-        fileCreatedBefore,
-        isArchived,
-        isFavorite,
-        withPartners,
-        withSharedAlbums,
-        withSharedSpaces
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<MapMarkerResponseDto[]>;
 /**
  * Reverse geocode coordinates
  */
-export function reverseGeocode({ lat, lon }: {
+export declare function reverseGeocode({ lat, lon }: {
     lat: number;
     lon: number;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: MapReverseGeocodeResponseDto[];
-    }>(`/map/reverse-geocode${QS.query(QS.explode({
-        lat,
-        lon
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<MapReverseGeocodeResponseDto[]>;
 /**
  * Retrieve memories
  */
-export function searchMemories({ $for, id, isSaved, isTrashed, isUpcoming, order, page, size, $type }: {
+export declare function searchMemories({ $for, isSaved, isTrashed, order, size, $type }: {
     $for?: string;
-    id?: string;
     isSaved?: boolean;
     isTrashed?: boolean;
-    isUpcoming?: boolean;
     order?: MemorySearchOrder;
-    page?: number;
     size?: number;
     $type?: MemoryType;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: MemoryResponseDto[];
-    }>(`/memories${QS.query(QS.explode({
-        "for": $for,
-        id,
-        isSaved,
-        isTrashed,
-        isUpcoming,
-        order,
-        page,
-        size,
-        "type": $type
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<MemoryResponseDto[]>;
 /**
  * Create a memory
  */
-export function createMemory({ memoryCreateDto }: {
+export declare function createMemory({ memoryCreateDto }: {
     memoryCreateDto: MemoryCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: MemoryResponseDto;
-    }>("/memories", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: memoryCreateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<MemoryResponseDto>;
 /**
  * Retrieve memories statistics
  */
-export function memoriesStatistics({ $for, id, isSaved, isTrashed, isUpcoming, order, page, size, $type }: {
+export declare function memoriesStatistics({ $for, isSaved, isTrashed, order, size, $type }: {
     $for?: string;
-    id?: string;
     isSaved?: boolean;
     isTrashed?: boolean;
-    isUpcoming?: boolean;
     order?: MemorySearchOrder;
-    page?: number;
     size?: number;
     $type?: MemoryType;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: MemoryStatisticsResponseDto;
-    }>(`/memories/statistics${QS.query(QS.explode({
-        "for": $for,
-        id,
-        isSaved,
-        isTrashed,
-        isUpcoming,
-        order,
-        page,
-        size,
-        "type": $type
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<MemoryStatisticsResponseDto>;
 /**
  * Delete a memory
  */
-export function deleteMemory({ id }: {
+export declare function deleteMemory({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/memories/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve a memory
  */
-export function getMemory({ id }: {
+export declare function getMemory({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: MemoryResponseDto;
-    }>(`/memories/${encodeURIComponent(id)}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<MemoryResponseDto>;
 /**
  * Update a memory
  */
-export function updateMemory({ id, memoryUpdateDto }: {
+export declare function updateMemory({ id, memoryUpdateDto }: {
     id: string;
     memoryUpdateDto: MemoryUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: MemoryResponseDto;
-    }>(`/memories/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: memoryUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<MemoryResponseDto>;
 /**
  * Remove assets from a memory
  */
-export function removeMemoryAssets({ id, bulkIdsDto }: {
+export declare function removeMemoryAssets({ id, bulkIdsDto }: {
     id: string;
     bulkIdsDto: BulkIdsDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: BulkIdResponseDto[];
-    }>(`/memories/${encodeURIComponent(id)}/assets`, oazapfts.json({
-        ...opts,
-        method: "DELETE",
-        body: bulkIdsDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<BulkIdResponseDto[]>;
 /**
  * Add assets to a memory
  */
-export function addMemoryAssets({ id, bulkIdsDto }: {
+export declare function addMemoryAssets({ id, bulkIdsDto }: {
     id: string;
     bulkIdsDto: BulkIdsDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: BulkIdResponseDto[];
-    }>(`/memories/${encodeURIComponent(id)}/assets`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: bulkIdsDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<BulkIdResponseDto[]>;
 /**
  * Delete notifications
  */
-export function deleteNotifications({ notificationDeleteAllDto }: {
+export declare function deleteNotifications({ notificationDeleteAllDto }: {
     notificationDeleteAllDto: NotificationDeleteAllDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/notifications", oazapfts.json({
-        ...opts,
-        method: "DELETE",
-        body: notificationDeleteAllDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve notifications
  */
-export function getNotifications({ id, level, $type, unread }: {
+export declare function getNotifications({ id, level, $type, unread }: {
     id?: string;
     level?: NotificationLevel;
     $type?: NotificationType;
     unread?: boolean;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: NotificationDto[];
-    }>(`/notifications${QS.query(QS.explode({
-        id,
-        level,
-        "type": $type,
-        unread
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<NotificationDto[]>;
 /**
  * Update notifications
  */
-export function updateNotifications({ notificationUpdateAllDto }: {
+export declare function updateNotifications({ notificationUpdateAllDto }: {
     notificationUpdateAllDto: NotificationUpdateAllDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/notifications", oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: notificationUpdateAllDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Delete a notification
  */
-export function deleteNotification({ id }: {
+export declare function deleteNotification({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/notifications/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Get a notification
  */
-export function getNotification({ id }: {
+export declare function getNotification({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: NotificationDto;
-    }>(`/notifications/${encodeURIComponent(id)}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<NotificationDto>;
 /**
  * Update a notification
  */
-export function updateNotification({ id, notificationUpdateDto }: {
+export declare function updateNotification({ id, notificationUpdateDto }: {
     id: string;
     notificationUpdateDto: NotificationUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: NotificationDto;
-    }>(`/notifications/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: notificationUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<NotificationDto>;
 /**
  * Start OAuth
  */
-export function startOAuth({ oAuthConfigDto }: {
+export declare function startOAuth({ oAuthConfigDto }: {
     oAuthConfigDto: OAuthConfigDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: OAuthAuthorizeResponseDto;
-    }>("/oauth/authorize", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: oAuthConfigDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<OAuthAuthorizeResponseDto>;
 /**
  * Backchannel OAuth logout
  */
-export function logoutOAuth({ oAuthBackchannelLogoutDto }: {
+export declare function logoutOAuth({ oAuthBackchannelLogoutDto }: {
     oAuthBackchannelLogoutDto: OAuthBackchannelLogoutDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/oauth/backchannel-logout", oazapfts.form({
-        ...opts,
-        method: "POST",
-        body: oAuthBackchannelLogoutDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Finish OAuth
  */
-export function finishOAuth({ oAuthCallbackDto }: {
+export declare function finishOAuth({ oAuthCallbackDto }: {
     oAuthCallbackDto: OAuthCallbackDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: LoginResponseDto;
-    }>("/oauth/callback", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: oAuthCallbackDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<LoginResponseDto>;
 /**
  * Link OAuth account
  */
-export function linkOAuthAccount({ oAuthCallbackDto }: {
+export declare function linkOAuthAccount({ oAuthCallbackDto }: {
     oAuthCallbackDto: OAuthCallbackDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserAdminResponseDto;
-    }>("/oauth/link", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: oAuthCallbackDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserAdminResponseDto>;
 /**
  * Redirect OAuth to mobile
  */
-export function redirectOAuthToMobile(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/oauth/mobile-redirect", {
-        ...opts
-    }));
-}
+export declare function redirectOAuthToMobile(opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Unlink OAuth account
  */
-export function unlinkOAuthAccount(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserAdminResponseDto;
-    }>("/oauth/unlink", {
-        ...opts,
-        method: "POST"
-    }));
-}
+export declare function unlinkOAuthAccount(opts?: Oazapfts.RequestOpts): Promise<UserAdminResponseDto>;
 /**
  * Retrieve partners
  */
-export function getPartners({ direction }: {
+export declare function getPartners({ direction }: {
     direction: PartnerDirection;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PartnerResponseDto[];
-    }>(`/partners${QS.query(QS.explode({
-        direction
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PartnerResponseDto[]>;
 /**
  * Create a partner
  */
-export function createPartner({ partnerCreateDto }: {
+export declare function createPartner({ partnerCreateDto }: {
     partnerCreateDto: PartnerCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: PartnerResponseDto;
-    }>("/partners", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: partnerCreateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PartnerResponseDto>;
 /**
  * Remove a partner
  */
-export function removePartner({ id }: {
+export declare function removePartner({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/partners/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Create a partner
  */
-export function createPartnerDeprecated({ id }: {
+export declare function createPartnerDeprecated({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: PartnerResponseDto;
-    }>(`/partners/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "POST"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PartnerResponseDto>;
 /**
  * Update a partner
  */
-export function updatePartner({ id, partnerUpdateDto }: {
+export declare function updatePartner({ id, partnerUpdateDto }: {
     id: string;
     partnerUpdateDto: PartnerUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PartnerResponseDto;
-    }>(`/partners/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: partnerUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PartnerResponseDto>;
 /**
  * Delete people
  */
-export function deletePeople({ bulkIdsDto }: {
+export declare function deletePeople({ bulkIdsDto }: {
     bulkIdsDto: BulkIdsDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/people", oazapfts.json({
-        ...opts,
-        method: "DELETE",
-        body: bulkIdsDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Get all people
  */
-export function getAllPeople({ closestAssetId, closestPersonId, page, size, withHidden, withSharedSpaces }: {
+export declare function getAllPeople({ closestAssetId, closestPersonId, page, size, withHidden, withSharedSpaces }: {
     closestAssetId?: string;
     closestPersonId?: string;
     page?: number;
     size?: number;
     withHidden?: boolean;
     withSharedSpaces?: boolean;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PeopleResponseDto;
-    }>(`/people${QS.query(QS.explode({
-        closestAssetId,
-        closestPersonId,
-        page,
-        size,
-        withHidden,
-        withSharedSpaces
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PeopleResponseDto>;
 /**
  * Create a person
  */
-export function createPerson({ personCreateDto }: {
+export declare function createPerson({ personCreateDto }: {
     personCreateDto: PersonCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: PersonResponseDto;
-    }>("/people", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: personCreateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PersonResponseDto>;
 /**
  * Update people
  */
-export function updatePeople({ peopleUpdateDto }: {
+export declare function updatePeople({ peopleUpdateDto }: {
     peopleUpdateDto: PeopleUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: BulkIdResponseDto[];
-    }>("/people", oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: peopleUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<BulkIdResponseDto[]>;
 /**
  * Detach a scoped person profile
  */
-export function detachScopedPerson({ detachScopedPersonDto }: {
+export declare function detachScopedPerson({ detachScopedPersonDto }: {
     detachScopedPersonDto: DetachScopedPersonDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/people/detach-profile", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: detachScopedPersonDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Get people face statistics
  */
-export function getPeopleFaceStatistics({ closestAssetId, closestPersonId, page, size, withHidden, withSharedSpaces }: {
+export declare function getPeopleFaceStatistics({ closestAssetId, closestPersonId, page, size, withHidden, withSharedSpaces }: {
     closestAssetId?: string;
     closestPersonId?: string;
     page?: number;
     size?: number;
     withHidden?: boolean;
     withSharedSpaces?: boolean;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PeopleFaceStatisticsResponseDto;
-    }>(`/people/face-statistics${QS.query(QS.explode({
-        closestAssetId,
-        closestPersonId,
-        page,
-        size,
-        withHidden,
-        withSharedSpaces
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PeopleFaceStatisticsResponseDto>;
 /**
  * Merge scoped people by identity
  */
-export function mergeScopedPeople({ mergeScopedPeopleDto }: {
+export declare function mergeScopedPeople({ mergeScopedPeopleDto }: {
     mergeScopedPeopleDto: MergeScopedPeopleDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/people/same-person", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: mergeScopedPeopleDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Get people statistics
  */
-export function getPeopleStatistics({ closestAssetId, closestPersonId, page, size, withHidden, withSharedSpaces }: {
+export declare function getPeopleStatistics({ closestAssetId, closestPersonId, page, size, withHidden, withSharedSpaces }: {
     closestAssetId?: string;
     closestPersonId?: string;
     page?: number;
     size?: number;
     withHidden?: boolean;
     withSharedSpaces?: boolean;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PeopleStatisticsResponseDto;
-    }>(`/people/statistics${QS.query(QS.explode({
-        closestAssetId,
-        closestPersonId,
-        page,
-        size,
-        withHidden,
-        withSharedSpaces
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PeopleStatisticsResponseDto>;
 /**
  * Delete person
  */
-export function deletePerson({ id }: {
+export declare function deletePerson({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/people/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Get a person
  */
-export function getPerson({ id }: {
+export declare function getPerson({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PersonResponseDto;
-    }>(`/people/${encodeURIComponent(id)}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PersonResponseDto>;
 /**
  * Update person
  */
-export function updatePerson({ id, personUpdateDto }: {
+export declare function updatePerson({ id, personUpdateDto }: {
     id: string;
     personUpdateDto: PersonUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PersonResponseDto;
-    }>(`/people/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: personUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PersonResponseDto>;
 /**
  * Get person faces
  */
-export function getPersonFaces({ id, page, size }: {
+export declare function getPersonFaces({ id, page, size }: {
     id: string;
     page?: number;
     size?: number;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PersonFacePageResponseDto;
-    }>(`/people/${encodeURIComponent(id)}/faces${QS.query(QS.explode({
-        page,
-        size
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PersonFacePageResponseDto>;
 /**
  * Get person face thumbnail
  */
-export function getPersonFaceThumbnail({ faceId, id }: {
+export declare function getPersonFaceThumbnail({ faceId, id }: {
     faceId: string;
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchBlob<{
-        status: 200;
-        data: Blob;
-    }>(`/people/${encodeURIComponent(id)}/faces/${encodeURIComponent(faceId)}/thumbnail`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<Blob>;
 /**
  * Merge people
  */
-export function mergePerson({ id, mergePersonDto }: {
+export declare function mergePerson({ id, mergePersonDto }: {
     id: string;
     mergePersonDto: MergePersonDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: BulkIdResponseDto[];
-    }>(`/people/${encodeURIComponent(id)}/merge`, oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: mergePersonDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<BulkIdResponseDto[]>;
 /**
  * Reassign faces
  */
-export function reassignFaces({ id, assetFaceUpdateDto }: {
+export declare function reassignFaces({ id, assetFaceUpdateDto }: {
     id: string;
     assetFaceUpdateDto: AssetFaceUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PersonResponseDto[];
-    }>(`/people/${encodeURIComponent(id)}/reassign`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: assetFaceUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PersonResponseDto[]>;
 /**
  * Update representative face
  */
-export function updateRepresentativeFace({ id, representativeFaceUpdateDto }: {
+export declare function updateRepresentativeFace({ id, representativeFaceUpdateDto }: {
     id: string;
     representativeFaceUpdateDto: RepresentativeFaceUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PersonResponseDto;
-    }>(`/people/${encodeURIComponent(id)}/representative-face`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: representativeFaceUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PersonResponseDto>;
 /**
  * Get person statistics
  */
-export function getPersonStatistics({ id }: {
+export declare function getPersonStatistics({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PersonStatisticsResponseDto;
-    }>(`/people/${encodeURIComponent(id)}/statistics`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PersonStatisticsResponseDto>;
 /**
  * Get person thumbnail
  */
-export function getPersonThumbnail({ id }: {
+export declare function getPersonThumbnail({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchBlob<{
-        status: 200;
-        data: Blob;
-    }>(`/people/${encodeURIComponent(id)}/thumbnail`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<Blob>;
 /**
  * List all plugins
  */
-export function searchPlugins({ description, enabled, id, name, title, version }: {
-    description?: string;
-    enabled?: boolean;
-    id?: string;
-    name?: string;
-    title?: string;
-    version?: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PluginResponseDto[];
-    }>(`/plugins${QS.query(QS.explode({
-        description,
-        enabled,
-        id,
-        name,
-        title,
-        version
-    }))}`, {
-        ...opts
-    }));
-}
+export declare function getPlugins(opts?: Oazapfts.RequestOpts): Promise<PluginResponseDto[]>;
 /**
- * Retrieve plugin methods
+ * List all plugin triggers
  */
-export function searchPluginMethods({ description, enabled, id, name, pluginName, pluginVersion, title, trigger, $type }: {
-    description?: string;
-    enabled?: boolean;
-    id?: string;
-    name?: string;
-    pluginName?: string;
-    pluginVersion?: string;
-    title?: string;
-    trigger?: WorkflowTrigger;
-    $type?: WorkflowType;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PluginMethodResponseDto[];
-    }>(`/plugins/methods${QS.query(QS.explode({
-        description,
-        enabled,
-        id,
-        name,
-        pluginName,
-        pluginVersion,
-        title,
-        trigger,
-        "type": $type
-    }))}`, {
-        ...opts
-    }));
-}
-/**
- * Retrieve workflow templates
- */
-export function searchPluginTemplates(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PluginTemplateResponseDto[];
-    }>("/plugins/templates", {
-        ...opts
-    }));
-}
+export declare function getPluginTriggers(opts?: Oazapfts.RequestOpts): Promise<PluginTriggerResponseDto[]>;
 /**
  * Retrieve a plugin
  */
-export function getPlugin({ id }: {
+export declare function getPlugin({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PluginResponseDto;
-    }>(`/plugins/${encodeURIComponent(id)}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PluginResponseDto>;
 /**
  * List all queues
  */
-export function getQueues(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: QueueResponseDto[];
-    }>("/queues", {
-        ...opts
-    }));
-}
+export declare function getQueues(opts?: Oazapfts.RequestOpts): Promise<QueueResponseDto[]>;
 /**
  * Retrieve a queue
  */
-export function getQueue({ name }: {
+export declare function getQueue({ name }: {
     name: QueueName;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: QueueResponseDto;
-    }>(`/queues/${encodeURIComponent(name)}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<QueueResponseDto>;
 /**
  * Update a queue
  */
-export function updateQueue({ name, queueUpdateDto }: {
+export declare function updateQueue({ name, queueUpdateDto }: {
     name: QueueName;
     queueUpdateDto: QueueUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: QueueResponseDto;
-    }>(`/queues/${encodeURIComponent(name)}`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: queueUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<QueueResponseDto>;
 /**
  * Empty a queue
  */
-export function emptyQueue({ name, queueDeleteDto }: {
+export declare function emptyQueue({ name, queueDeleteDto }: {
     name: QueueName;
     queueDeleteDto: QueueDeleteDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/queues/${encodeURIComponent(name)}/jobs`, oazapfts.json({
-        ...opts,
-        method: "DELETE",
-        body: queueDeleteDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve queue jobs
  */
-export function getQueueJobs({ name, status }: {
+export declare function getQueueJobs({ name, status }: {
     name: QueueName;
     status?: QueueJobStatus[];
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: QueueJobResponseDto[];
-    }>(`/queues/${encodeURIComponent(name)}/jobs${QS.query(QS.explode({
-        status
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<QueueJobResponseDto[]>;
 /**
  * Retrieve assets by city
  */
-export function getAssetsByCity(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetResponseDto[];
-    }>("/search/cities", {
-        ...opts
-    }));
-}
+export declare function getAssetsByCity(opts?: Oazapfts.RequestOpts): Promise<AssetResponseDto[]>;
 /**
  * Retrieve explore data
  */
-export function getExploreData(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SearchExploreResponseDto[];
-    }>("/search/explore", {
-        ...opts
-    }));
-}
+export declare function getExploreData(opts?: Oazapfts.RequestOpts): Promise<SearchExploreResponseDto[]>;
 /**
  * Search large assets
  */
-export function searchLargeAssets({ albumIds, city, country, createdAfter, createdBefore, isEncoded, isFavorite, isInAlbum, isMotion, isNotInAlbum, isOffline, lensModel, libraryId, make, minFileSize, model, ocr, personIds, rating, size, spaceId, spacePersonIds, state, tagIds, takenAfter, takenBefore, trashedAfter, trashedBefore, $type, updatedAfter, updatedBefore, visibility, withDeleted, withExif, withSharedSpaces }: {
+export declare function searchLargeAssets({ albumIds, city, country, createdAfter, createdBefore, isEncoded, isFavorite, isInAlbum, isMotion, isNotInAlbum, isOffline, lensModel, libraryId, make, minFileSize, model, ocr, personIds, rating, size, spaceId, spacePersonIds, state, tagIds, takenAfter, takenBefore, trashedAfter, trashedBefore, $type, updatedAfter, updatedBefore, visibility, withDeleted, withExif, withSharedSpaces }: {
     albumIds?: string[];
     city?: string | null;
     country?: string | null;
@@ -7007,169 +5108,55 @@ export function searchLargeAssets({ albumIds, city, country, createdAfter, creat
     withDeleted?: boolean;
     withExif?: boolean;
     withSharedSpaces?: boolean;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetResponseDto[];
-    }>(`/search/large-assets${QS.query(QS.explode({
-        albumIds,
-        city,
-        country,
-        createdAfter,
-        createdBefore,
-        isEncoded,
-        isFavorite,
-        isInAlbum,
-        isMotion,
-        isNotInAlbum,
-        isOffline,
-        lensModel,
-        libraryId,
-        make,
-        minFileSize,
-        model,
-        ocr,
-        personIds,
-        rating,
-        size,
-        spaceId,
-        spacePersonIds,
-        state,
-        tagIds,
-        takenAfter,
-        takenBefore,
-        trashedAfter,
-        trashedBefore,
-        "type": $type,
-        updatedAfter,
-        updatedBefore,
-        visibility,
-        withDeleted,
-        withExif,
-        withSharedSpaces
-    }))}`, {
-        ...opts,
-        method: "POST"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetResponseDto[]>;
 /**
  * Search assets by metadata
  */
-export function searchAssets({ key, slug, metadataSearchDto }: {
-    key?: string;
-    slug?: string;
+export declare function searchAssets({ metadataSearchDto }: {
     metadataSearchDto: MetadataSearchDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SearchResponseDto;
-    }>(`/search/metadata${QS.query(QS.explode({
-        key,
-        slug
-    }))}`, oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: metadataSearchDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SearchResponseDto>;
 /**
  * Search people
  */
-export function searchPerson({ name, withHidden, withSharedSpaces }: {
+export declare function searchPerson({ name, withHidden, withSharedSpaces }: {
     name: string;
     withHidden?: boolean;
     withSharedSpaces?: boolean;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PersonResponseDto[];
-    }>(`/search/person${QS.query(QS.explode({
-        name,
-        withHidden,
-        withSharedSpaces
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PersonResponseDto[]>;
 /**
  * Search places
  */
-export function searchPlaces({ name }: {
+export declare function searchPlaces({ name }: {
     name: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PlacesResponseDto[];
-    }>(`/search/places${QS.query(QS.explode({
-        name
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PlacesResponseDto[]>;
 /**
  * Search random assets
  */
-export function searchRandom({ randomSearchDto }: {
+export declare function searchRandom({ randomSearchDto }: {
     randomSearchDto: RandomSearchDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetResponseDto[];
-    }>("/search/random", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: randomSearchDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetResponseDto[]>;
 /**
  * Smart asset search
  */
-export function searchSmart({ smartSearchDto }: {
+export declare function searchSmart({ smartSearchDto }: {
     smartSearchDto: SmartSearchDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SearchResponseDto;
-    }>("/search/smart", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: smartSearchDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SearchResponseDto>;
 /**
  * Smart asset search facets
  */
-export function searchSmartFacets({ smartSearchFacetsDto }: {
+export declare function searchSmartFacets({ smartSearchFacetsDto }: {
     smartSearchFacetsDto: SmartSearchFacetsDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SmartSearchFacetsResponseDto;
-    }>("/search/smart/facets", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: smartSearchFacetsDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SmartSearchFacetsResponseDto>;
 /**
  * Search asset statistics
  */
-export function searchAssetStatistics({ statisticsSearchDto }: {
+export declare function searchAssetStatistics({ statisticsSearchDto }: {
     statisticsSearchDto: StatisticsSearchDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SearchStatisticsResponseDto;
-    }>("/search/statistics", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: statisticsSearchDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SearchStatisticsResponseDto>;
 /**
  * Retrieve search suggestions
  */
-export function getSearchSuggestions({ albumId, country, includeNull, isFavorite, isInAlbum, isNotInAlbum, lensModel, make, model, personIds, rating, spaceId, state, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }: {
+export declare function getSearchSuggestions({ albumId, country, includeNull, isFavorite, isInAlbum, isNotInAlbum, lensModel, make, model, personIds, rating, spaceId, state, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }: {
     albumId?: string;
     country?: string;
     includeNull?: boolean;
@@ -7188,37 +5175,11 @@ export function getSearchSuggestions({ albumId, country, includeNull, isFavorite
     takenBefore?: string;
     $type: SearchSuggestionType;
     withSharedSpaces?: boolean;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: string[];
-    }>(`/search/suggestions${QS.query(QS.explode({
-        albumId,
-        country,
-        includeNull,
-        isFavorite,
-        isInAlbum,
-        isNotInAlbum,
-        lensModel,
-        make,
-        model,
-        personIds,
-        rating,
-        spaceId,
-        state,
-        tagIds,
-        takenAfter,
-        takenBefore,
-        "type": $type,
-        withSharedSpaces
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<string[]>;
 /**
  * Retrieve dynamic filter suggestions
  */
-export function getFilterSuggestions({ albumId, city, country, isFavorite, isInAlbum, isNotInAlbum, make, mediaType, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, withSharedSpaces }: {
+export declare function getFilterSuggestions({ albumId, city, country, isFavorite, isInAlbum, isNotInAlbum, make, mediaType, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, withSharedSpaces }: {
     albumId?: string;
     city?: string;
     country?: string;
@@ -7235,705 +5196,303 @@ export function getFilterSuggestions({ albumId, city, country, isFavorite, isInA
     takenAfter?: string;
     takenBefore?: string;
     withSharedSpaces?: boolean;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: FilterSuggestionsResponseDto;
-    }>(`/search/suggestions/filters${QS.query(QS.explode({
-        albumId,
-        city,
-        country,
-        isFavorite,
-        isInAlbum,
-        isNotInAlbum,
-        make,
-        mediaType,
-        model,
-        personIds,
-        rating,
-        spaceId,
-        tagIds,
-        takenAfter,
-        takenBefore,
-        withSharedSpaces
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<FilterSuggestionsResponseDto>;
 /**
  * Retrieve tag suggestions
  */
-export function getTagSuggestions({ spaceId, takenAfter, takenBefore, withSharedSpaces }: {
+export declare function getTagSuggestions({ spaceId, takenAfter, takenBefore, withSharedSpaces }: {
     spaceId?: string;
     takenAfter?: string;
     takenBefore?: string;
     withSharedSpaces?: boolean;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: TagSuggestionResponseDto[];
-    }>(`/search/suggestions/tags${QS.query(QS.explode({
-        spaceId,
-        takenAfter,
-        takenBefore,
-        withSharedSpaces
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<TagSuggestionResponseDto[]>;
 /**
  * Get server information
  */
-export function getAboutInfo(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ServerAboutResponseDto;
-    }>("/server/about", {
-        ...opts
-    }));
-}
+export declare function getAboutInfo(opts?: Oazapfts.RequestOpts): Promise<ServerAboutResponseDto>;
 /**
  * Get APK links
  */
-export function getApkLinks(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ServerApkLinksDto;
-    }>("/server/apk-links", {
-        ...opts
-    }));
-}
+export declare function getApkLinks(opts?: Oazapfts.RequestOpts): Promise<ServerApkLinksDto>;
 /**
  * Get config
  */
-export function getServerConfig(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ServerConfigDto;
-    }>("/server/config", {
-        ...opts
-    }));
-}
+export declare function getServerConfig(opts?: Oazapfts.RequestOpts): Promise<ServerConfigDto>;
 /**
  * Get features
  */
-export function getServerFeatures(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ServerFeaturesDto;
-    }>("/server/features", {
-        ...opts
-    }));
-}
+export declare function getServerFeatures(opts?: Oazapfts.RequestOpts): Promise<ServerFeaturesDto>;
 /**
  * Delete server product key
  */
-export function deleteServerLicense(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/server/license", {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+export declare function deleteServerLicense(opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Get product key
  */
-export function getServerLicense(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserLicense;
-    } | {
-        status: 404;
-    }>("/server/license", {
-        ...opts
-    }));
-}
+export declare function getServerLicense(opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Set server product key
  */
-export function setServerLicense({ licenseKeyDto }: {
+export declare function setServerLicense({ licenseKeyDto }: {
     licenseKeyDto: LicenseKeyDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserLicense;
-    }>("/server/license", oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: licenseKeyDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserLicense>;
 /**
  * Get supported media types
  */
-export function getSupportedMediaTypes(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ServerMediaTypesResponseDto;
-    }>("/server/media-types", {
-        ...opts
-    }));
-}
+export declare function getSupportedMediaTypes(opts?: Oazapfts.RequestOpts): Promise<ServerMediaTypesResponseDto>;
 /**
  * Smart search health
  */
-export function getMlHealth(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ServerMlHealthResponseDto;
-    }>("/server/ml-health", {
-        ...opts
-    }));
-}
+export declare function getMlHealth(opts?: Oazapfts.RequestOpts): Promise<ServerMlHealthResponseDto>;
 /**
  * Ping
  */
-export function pingServer(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ServerPingResponse;
-    }>("/server/ping", {
-        ...opts
-    }));
-}
+export declare function pingServer(opts?: Oazapfts.RequestOpts): Promise<ServerPingResponse>;
 /**
  * Get statistics
  */
-export function getServerStatistics(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ServerStatsResponseDto;
-    }>("/server/statistics", {
-        ...opts
-    }));
-}
+export declare function getServerStatistics(opts?: Oazapfts.RequestOpts): Promise<ServerStatsResponseDto>;
 /**
  * Get storage
  */
-export function getStorage(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ServerStorageResponseDto;
-    }>("/server/storage", {
-        ...opts
-    }));
-}
+export declare function getStorage(opts?: Oazapfts.RequestOpts): Promise<ServerStorageResponseDto>;
 /**
  * Get server version
  */
-export function getServerVersion(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ServerVersionResponseDto;
-    }>("/server/version", {
-        ...opts
-    }));
-}
+export declare function getServerVersion(opts?: Oazapfts.RequestOpts): Promise<ServerVersionResponseDto>;
 /**
  * Get version check status
  */
-export function getVersionCheck(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: VersionCheckStateResponseDto;
-    }>("/server/version-check", {
-        ...opts
-    }));
-}
+export declare function getVersionCheck(opts?: Oazapfts.RequestOpts): Promise<VersionCheckStateResponseDto>;
 /**
  * Get version history
  */
-export function getVersionHistory(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ServerVersionHistoryResponseDto[];
-    }>("/server/version-history", {
-        ...opts
-    }));
-}
+export declare function getVersionHistory(opts?: Oazapfts.RequestOpts): Promise<ServerVersionHistoryResponseDto[]>;
 /**
  * Delete all sessions
  */
-export function deleteAllSessions(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/sessions", {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+export declare function deleteAllSessions(opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve sessions
  */
-export function getSessions(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SessionResponseDto[];
-    }>("/sessions", {
-        ...opts
-    }));
-}
+export declare function getSessions(opts?: Oazapfts.RequestOpts): Promise<SessionResponseDto[]>;
 /**
  * Create a session
  */
-export function createSession({ sessionCreateDto }: {
+export declare function createSession({ sessionCreateDto }: {
     sessionCreateDto: SessionCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: SessionCreateResponseDto;
-    }>("/sessions", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: sessionCreateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SessionCreateResponseDto>;
 /**
  * Delete a session
  */
-export function deleteSession({ id }: {
+export declare function deleteSession({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/sessions/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Update a session
  */
-export function updateSession({ id, sessionUpdateDto }: {
+export declare function updateSession({ id, sessionUpdateDto }: {
     id: string;
     sessionUpdateDto: SessionUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SessionResponseDto;
-    }>(`/sessions/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: sessionUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SessionResponseDto>;
 /**
  * Lock a session
  */
-export function lockSession({ id }: {
+export declare function lockSession({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/sessions/${encodeURIComponent(id)}/lock`, {
-        ...opts,
-        method: "POST"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve all shared links
  */
-export function getAllSharedLinks({ albumId, id }: {
+export declare function getAllSharedLinks({ albumId, id }: {
     albumId?: string;
     id?: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SharedLinkResponseDto[];
-    }>(`/shared-links${QS.query(QS.explode({
-        albumId,
-        id
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedLinkResponseDto[]>;
 /**
  * Create a shared link
  */
-export function createSharedLink({ sharedLinkCreateDto }: {
+export declare function createSharedLink({ sharedLinkCreateDto }: {
     sharedLinkCreateDto: SharedLinkCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: SharedLinkResponseDto;
-    }>("/shared-links", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: sharedLinkCreateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedLinkResponseDto>;
 /**
  * Shared link login
  */
-export function sharedLinkLogin({ key, slug, sharedLinkLoginDto }: {
+export declare function sharedLinkLogin({ key, slug, sharedLinkLoginDto }: {
     key?: string;
     slug?: string;
     sharedLinkLoginDto: SharedLinkLoginDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: SharedLinkResponseDto;
-    }>(`/shared-links/login${QS.query(QS.explode({
-        key,
-        slug
-    }))}`, oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: sharedLinkLoginDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedLinkResponseDto>;
 /**
  * Retrieve current shared link
  */
-export function getMySharedLink({ key, slug }: {
+export declare function getMySharedLink({ key, slug }: {
     key?: string;
     slug?: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SharedLinkResponseDto;
-    }>(`/shared-links/me${QS.query(QS.explode({
-        key,
-        slug
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedLinkResponseDto>;
 /**
  * Delete a shared link
  */
-export function removeSharedLink({ id }: {
+export declare function removeSharedLink({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-links/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve a shared link
  */
-export function getSharedLinkById({ id }: {
+export declare function getSharedLinkById({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SharedLinkResponseDto;
-    }>(`/shared-links/${encodeURIComponent(id)}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedLinkResponseDto>;
 /**
  * Update a shared link
  */
-export function updateSharedLink({ id, sharedLinkEditDto }: {
+export declare function updateSharedLink({ id, sharedLinkEditDto }: {
     id: string;
     sharedLinkEditDto: SharedLinkEditDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SharedLinkResponseDto;
-    }>(`/shared-links/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "PATCH",
-        body: sharedLinkEditDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedLinkResponseDto>;
 /**
  * Remove assets from a shared link
  */
-export function removeSharedLinkAssets({ id, assetIdsDto }: {
+export declare function removeSharedLinkAssets({ id, assetIdsDto }: {
     id: string;
     assetIdsDto: AssetIdsDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetIdsResponseDto[];
-    }>(`/shared-links/${encodeURIComponent(id)}/assets`, oazapfts.json({
-        ...opts,
-        method: "DELETE",
-        body: assetIdsDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetIdsResponseDto[]>;
 /**
  * Add assets to a shared link
  */
-export function addSharedLinkAssets({ id, assetIdsDto }: {
+export declare function addSharedLinkAssets({ id, assetIdsDto }: {
     id: string;
     assetIdsDto: AssetIdsDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetIdsResponseDto[];
-    }>(`/shared-links/${encodeURIComponent(id)}/assets`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: assetIdsDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetIdsResponseDto[]>;
 /**
  * Get all shared spaces
  */
-export function getAllSpaces(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SharedSpaceResponseDto[];
-    }>("/shared-spaces", {
-        ...opts
-    }));
-}
+export declare function getAllSpaces(opts?: Oazapfts.RequestOpts): Promise<SharedSpaceResponseDto[]>;
 /**
  * Create a shared space
  */
-export function createSpace({ sharedSpaceCreateDto }: {
+export declare function createSpace({ sharedSpaceCreateDto }: {
     sharedSpaceCreateDto: SharedSpaceCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: SharedSpaceResponseDto;
-    }>("/shared-spaces", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: sharedSpaceCreateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedSpaceResponseDto>;
 /**
  * Delete a shared space
  */
-export function removeSpace({ id }: {
+export declare function removeSpace({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Get a shared space
  */
-export function getSpace({ id }: {
+export declare function getSpace({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SharedSpaceResponseDto;
-    }>(`/shared-spaces/${encodeURIComponent(id)}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedSpaceResponseDto>;
 /**
  * Update a shared space
  */
-export function updateSpace({ id, sharedSpaceUpdateDto }: {
+export declare function updateSpace({ id, sharedSpaceUpdateDto }: {
     id: string;
     sharedSpaceUpdateDto: SharedSpaceUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SharedSpaceResponseDto;
-    }>(`/shared-spaces/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "PATCH",
-        body: sharedSpaceUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedSpaceResponseDto>;
 /**
  * Get space activity feed
  */
-export function getSpaceActivities({ id, limit, offset }: {
+export declare function getSpaceActivities({ id, limit, offset }: {
     id: string;
     limit?: number;
     offset?: number;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SharedSpaceActivityResponseDto[];
-    }>(`/shared-spaces/${encodeURIComponent(id)}/activities${QS.query(QS.explode({
-        limit,
-        offset
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedSpaceActivityResponseDto[]>;
 /**
  * Remove assets from a shared space
  */
-export function removeAssets({ id, sharedSpaceAssetRemoveDto }: {
+export declare function removeAssets({ id, sharedSpaceAssetRemoveDto }: {
     id: string;
     sharedSpaceAssetRemoveDto: SharedSpaceAssetRemoveDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/assets`, oazapfts.json({
-        ...opts,
-        method: "DELETE",
-        body: sharedSpaceAssetRemoveDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Add assets to a shared space
  */
-export function addAssets({ id, sharedSpaceAssetAddDto }: {
+export declare function addAssets({ id, sharedSpaceAssetAddDto }: {
     id: string;
     sharedSpaceAssetAddDto: SharedSpaceAssetAddDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/assets`, oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: sharedSpaceAssetAddDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Add all user assets to a shared space
  */
-export function bulkAddAssets({ id }: {
+export declare function bulkAddAssets({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/assets/bulk-add`, {
-        ...opts,
-        method: "POST"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Link a library to a shared space
  */
-export function linkLibrary({ id, sharedSpaceLibraryLinkDto }: {
+export declare function linkLibrary({ id, sharedSpaceLibraryLinkDto }: {
     id: string;
     sharedSpaceLibraryLinkDto: SharedSpaceLibraryLinkDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/libraries`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: sharedSpaceLibraryLinkDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Unlink a library from a shared space
  */
-export function unlinkLibrary({ id, libraryId }: {
+export declare function unlinkLibrary({ id, libraryId }: {
     id: string;
     libraryId: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/libraries/${encodeURIComponent(libraryId)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Get map markers for a shared space
  */
-export function getSpaceMapMarkers({ id }: {
+export declare function getSpaceMapMarkers({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: MapMarkerResponseDto[];
-    }>(`/shared-spaces/${encodeURIComponent(id)}/map-markers`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<MapMarkerResponseDto[]>;
 /**
  * Get members of a shared space
  */
-export function getMembers({ id }: {
+export declare function getMembers({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SharedSpaceMemberResponseDto[];
-    }>(`/shared-spaces/${encodeURIComponent(id)}/members`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedSpaceMemberResponseDto[]>;
 /**
  * Add a member to a shared space
  */
-export function addMember({ id, sharedSpaceMemberCreateDto }: {
+export declare function addMember({ id, sharedSpaceMemberCreateDto }: {
     id: string;
     sharedSpaceMemberCreateDto: SharedSpaceMemberCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: SharedSpaceMemberResponseDto;
-    }>(`/shared-spaces/${encodeURIComponent(id)}/members`, oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: sharedSpaceMemberCreateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedSpaceMemberResponseDto>;
 /**
  * Update current member preferences
  */
-export function updateMemberPreferences({ id, sharedSpaceMemberPreferencesDto }: {
+export declare function updateMemberPreferences({ id, sharedSpaceMemberPreferencesDto }: {
     id: string;
     sharedSpaceMemberPreferencesDto: SharedSpaceMemberPreferencesDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SharedSpaceMemberResponseDto;
-    }>(`/shared-spaces/${encodeURIComponent(id)}/members/me/preferences`, oazapfts.json({
-        ...opts,
-        method: "PATCH",
-        body: sharedSpaceMemberPreferencesDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedSpaceMemberResponseDto>;
 /**
  * Update timeline visibility for current member
  */
-export function updateMemberTimeline({ id, sharedSpaceMemberTimelineDto }: {
+export declare function updateMemberTimeline({ id, sharedSpaceMemberTimelineDto }: {
     id: string;
     sharedSpaceMemberTimelineDto: SharedSpaceMemberTimelineDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SharedSpaceMemberResponseDto;
-    }>(`/shared-spaces/${encodeURIComponent(id)}/members/me/timeline`, oazapfts.json({
-        ...opts,
-        method: "PATCH",
-        body: sharedSpaceMemberTimelineDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedSpaceMemberResponseDto>;
 /**
  * Remove a member from a shared space
  */
-export function removeMember({ id, userId }: {
+export declare function removeMember({ id, userId }: {
     id: string;
     userId: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Update a member in a shared space
  */
-export function updateMember({ id, userId, sharedSpaceMemberUpdateDto }: {
+export declare function updateMember({ id, userId, sharedSpaceMemberUpdateDto }: {
     id: string;
     userId: string;
     sharedSpaceMemberUpdateDto: SharedSpaceMemberUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SharedSpaceMemberResponseDto;
-    }>(`/shared-spaces/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, oazapfts.json({
-        ...opts,
-        method: "PATCH",
-        body: sharedSpaceMemberUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedSpaceMemberResponseDto>;
 /**
  * Disable member person metadata contribution
  */
-export function updateMemberMetadataContribution({ id, userId, sharedSpaceMemberMetadataContributionDto }: {
+export declare function updateMemberMetadataContribution({ id, userId, sharedSpaceMemberMetadataContributionDto }: {
     id: string;
     userId: string;
     sharedSpaceMemberMetadataContributionDto: SharedSpaceMemberMetadataContributionDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SharedSpaceMemberResponseDto;
-    }>(`/shared-spaces/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}/metadata-contribution`, oazapfts.json({
-        ...opts,
-        method: "PATCH",
-        body: sharedSpaceMemberMetadataContributionDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedSpaceMemberResponseDto>;
 /**
  * Get people in a shared space
  */
-export function getSpacePeople({ id, limit, name, named, offset, takenAfter, takenBefore, withHidden }: {
+export declare function getSpacePeople({ id, limit, name, named, offset, takenAfter, takenBefore, withHidden }: {
     id: string;
     limit?: number;
     name?: string;
@@ -7942,37 +5501,17 @@ export function getSpacePeople({ id, limit, name, named, offset, takenAfter, tak
     takenAfter?: string;
     takenBefore?: string;
     withHidden?: boolean;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SharedSpacePersonResponseDto[];
-    }>(`/shared-spaces/${encodeURIComponent(id)}/people${QS.query(QS.explode({
-        limit,
-        name,
-        named,
-        offset,
-        takenAfter,
-        takenBefore,
-        withHidden
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedSpacePersonResponseDto[]>;
 /**
  * Deduplicate people in a shared space
  */
-export function deduplicateSpacePeople({ id }: {
+export declare function deduplicateSpacePeople({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/deduplicate`, {
-        ...opts,
-        method: "POST"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Get people face statistics in a shared space
  */
-export function getSpacePeopleFaceStatistics({ id, limit, name, named, offset, takenAfter, takenBefore, withHidden }: {
+export declare function getSpacePeopleFaceStatistics({ id, limit, name, named, offset, takenAfter, takenBefore, withHidden }: {
     id: string;
     limit?: number;
     name?: string;
@@ -7981,26 +5520,11 @@ export function getSpacePeopleFaceStatistics({ id, limit, name, named, offset, t
     takenAfter?: string;
     takenBefore?: string;
     withHidden?: boolean;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PeopleFaceStatisticsResponseDto;
-    }>(`/shared-spaces/${encodeURIComponent(id)}/people/face-statistics${QS.query(QS.explode({
-        limit,
-        name,
-        named,
-        offset,
-        takenAfter,
-        takenBefore,
-        withHidden
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PeopleFaceStatisticsResponseDto>;
 /**
  * Get people statistics in a shared space
  */
-export function getSpacePeopleStatistics({ id, limit, name, named, offset, takenAfter, takenBefore, withHidden }: {
+export declare function getSpacePeopleStatistics({ id, limit, name, named, offset, takenAfter, takenBefore, withHidden }: {
     id: string;
     limit?: number;
     name?: string;
@@ -8009,624 +5533,292 @@ export function getSpacePeopleStatistics({ id, limit, name, named, offset, taken
     takenAfter?: string;
     takenBefore?: string;
     withHidden?: boolean;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SharedSpacePeopleStatisticsResponseDto;
-    }>(`/shared-spaces/${encodeURIComponent(id)}/people/statistics${QS.query(QS.explode({
-        limit,
-        name,
-        named,
-        offset,
-        takenAfter,
-        takenBefore,
-        withHidden
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedSpacePeopleStatisticsResponseDto>;
 /**
  * Delete a person from a shared space
  */
-export function deleteSpacePerson({ id, personId }: {
+export declare function deleteSpacePerson({ id, personId }: {
     id: string;
     personId: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Get a person in a shared space
  */
-export function getSpacePerson({ id, personId }: {
+export declare function getSpacePerson({ id, personId }: {
     id: string;
     personId: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SharedSpacePersonResponseDto;
-    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedSpacePersonResponseDto>;
 /**
  * Update a person in a shared space
  */
-export function updateSpacePerson({ id, personId, sharedSpacePersonUpdateDto }: {
+export declare function updateSpacePerson({ id, personId, sharedSpacePersonUpdateDto }: {
     id: string;
     personId: string;
     sharedSpacePersonUpdateDto: SharedSpacePersonUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SharedSpacePersonResponseDto;
-    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: sharedSpacePersonUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedSpacePersonResponseDto>;
 /**
  * Delete a person alias in a shared space
  */
-export function deleteSpacePersonAlias({ id, personId }: {
+export declare function deleteSpacePersonAlias({ id, personId }: {
     id: string;
     personId: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/alias`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Set a person alias in a shared space
  */
-export function setSpacePersonAlias({ id, personId, sharedSpacePersonAliasDto }: {
+export declare function setSpacePersonAlias({ id, personId, sharedSpacePersonAliasDto }: {
     id: string;
     personId: string;
     sharedSpacePersonAliasDto: SharedSpacePersonAliasDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/alias`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: sharedSpacePersonAliasDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Get assets for a person in a shared space
  */
-export function getSpacePersonAssets({ id, personId }: {
+export declare function getSpacePersonAssets({ id, personId }: {
     id: string;
     personId: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: string[];
-    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/assets`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<string[]>;
 /**
  * Get space person faces
  */
-export function getSpacePersonFaces({ id, page, personId, size }: {
+export declare function getSpacePersonFaces({ id, page, personId, size }: {
     id: string;
     page?: number;
     personId: string;
     size?: number;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PersonFacePageResponseDto;
-    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/faces${QS.query(QS.explode({
-        page,
-        size
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PersonFacePageResponseDto>;
 /**
  * Get space person face thumbnail
  */
-export function getSpacePersonFaceThumbnail({ faceId, id, personId }: {
+export declare function getSpacePersonFaceThumbnail({ faceId, id, personId }: {
     faceId: string;
     id: string;
     personId: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchBlob<{
-        status: 200;
-        data: Blob;
-    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/faces/${encodeURIComponent(faceId)}/thumbnail`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<Blob>;
 /**
  * Merge people in a shared space
  */
-export function mergeSpacePeople({ id, personId, sharedSpacePersonMergeDto }: {
+export declare function mergeSpacePeople({ id, personId, sharedSpacePersonMergeDto }: {
     id: string;
     personId: string;
     sharedSpacePersonMergeDto: SharedSpacePersonMergeDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/merge`, oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: sharedSpacePersonMergeDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Update space person representative face
  */
-export function updateSpacePersonRepresentativeFace({ id, personId, spaceRepresentativeFaceUpdateDto }: {
+export declare function updateSpacePersonRepresentativeFace({ id, personId, spaceRepresentativeFaceUpdateDto }: {
     id: string;
     personId: string;
     spaceRepresentativeFaceUpdateDto: SpaceRepresentativeFaceUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SharedSpacePersonResponseDto;
-    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/representative-face`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: spaceRepresentativeFaceUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SharedSpacePersonResponseDto>;
 /**
  * Get space person statistics
  */
-export function getSpacePersonStatistics({ id, personId }: {
+export declare function getSpacePersonStatistics({ id, personId }: {
     id: string;
     personId: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: PersonStatisticsResponseDto;
-    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/statistics`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<PersonStatisticsResponseDto>;
 /**
  * Get a space person thumbnail
  */
-export function getSpacePersonThumbnail({ id, personId }: {
+export declare function getSpacePersonThumbnail({ id, personId }: {
     id: string;
     personId: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchBlob<{
-        status: 200;
-        data: Blob;
-    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/thumbnail`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<Blob>;
 /**
  * Mark space as viewed
  */
-export function markSpaceViewed({ id }: {
+export declare function markSpaceViewed({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/view`, {
-        ...opts,
-        method: "PATCH"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Delete stacks
  */
-export function deleteStacks({ bulkIdsDto }: {
+export declare function deleteStacks({ bulkIdsDto }: {
     bulkIdsDto: BulkIdsDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/stacks", oazapfts.json({
-        ...opts,
-        method: "DELETE",
-        body: bulkIdsDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve stacks
  */
-export function searchStacks({ primaryAssetId }: {
+export declare function searchStacks({ primaryAssetId }: {
     primaryAssetId?: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: StackResponseDto[];
-    }>(`/stacks${QS.query(QS.explode({
-        primaryAssetId
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<StackResponseDto[]>;
 /**
  * Create a stack
  */
-export function createStack({ stackCreateDto }: {
+export declare function createStack({ stackCreateDto }: {
     stackCreateDto: StackCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: StackResponseDto;
-    }>("/stacks", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: stackCreateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<StackResponseDto>;
 /**
  * Delete a stack
  */
-export function deleteStack({ id }: {
+export declare function deleteStack({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/stacks/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve a stack
  */
-export function getStack({ id }: {
+export declare function getStack({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: StackResponseDto;
-    }>(`/stacks/${encodeURIComponent(id)}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<StackResponseDto>;
 /**
  * Update a stack
  */
-export function updateStack({ id, stackUpdateDto }: {
+export declare function updateStack({ id, stackUpdateDto }: {
     id: string;
     stackUpdateDto: StackUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: StackResponseDto;
-    }>(`/stacks/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: stackUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<StackResponseDto>;
 /**
  * Remove an asset from a stack
  */
-export function removeAssetFromStack({ assetId, id }: {
+export declare function removeAssetFromStack({ assetId, id }: {
     assetId: string;
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/stacks/${encodeURIComponent(id)}/assets/${encodeURIComponent(assetId)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Get storage migration estimate
  */
-export function getEstimate({ direction }: {
+export declare function getEstimate({ direction }: {
     direction: StorageMigrationDirection;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/storage-migration/estimate${QS.query(QS.explode({
-        direction
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Rollback a storage migration batch
  */
-export function rollback({ batchId }: {
+export declare function rollback({ batchId }: {
     batchId: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/storage-migration/rollback/${encodeURIComponent(batchId)}`, {
-        ...opts,
-        method: "POST"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Start storage migration
  */
-export function start({ storageMigrationStartDto }: {
+export declare function start({ storageMigrationStartDto }: {
     storageMigrationStartDto: StorageMigrationStartDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/storage-migration/start", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: storageMigrationStartDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Get storage migration status
  */
-export function getStatus(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/storage-migration/status", {
-        ...opts
-    }));
-}
+export declare function getStatus(opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Delete acknowledgements
  */
-export function deleteSyncAck({ syncAckDeleteDto }: {
+export declare function deleteSyncAck({ syncAckDeleteDto }: {
     syncAckDeleteDto: SyncAckDeleteDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/sync/ack", oazapfts.json({
-        ...opts,
-        method: "DELETE",
-        body: syncAckDeleteDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve acknowledgements
  */
-export function getSyncAck(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SyncAckDto[];
-    }>("/sync/ack", {
-        ...opts
-    }));
-}
+export declare function getSyncAck(opts?: Oazapfts.RequestOpts): Promise<SyncAckDto[]>;
 /**
  * Acknowledge changes
  */
-export function sendSyncAck({ syncAckSetDto }: {
+export declare function sendSyncAck({ syncAckSetDto }: {
     syncAckSetDto: SyncAckSetDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/sync/ack", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: syncAckSetDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Stream sync changes
  */
-export function getSyncStream({ syncStreamDto }: {
+export declare function getSyncStream({ syncStreamDto }: {
     syncStreamDto: SyncStreamDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/sync/stream", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: syncStreamDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Get system configuration
  */
-export function getConfig(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SystemConfigDto;
-    }>("/system-config", {
-        ...opts
-    }));
-}
+export declare function getConfig(opts?: Oazapfts.RequestOpts): Promise<SystemConfigDto>;
 /**
  * Update system configuration
  */
-export function updateConfig({ systemConfigDto }: {
+export declare function updateConfig({ systemConfigDto }: {
     systemConfigDto: SystemConfigDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SystemConfigDto;
-    }>("/system-config", oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: systemConfigDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<SystemConfigDto>;
 /**
  * Get system configuration defaults
  */
-export function getConfigDefaults(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SystemConfigDto;
-    }>("/system-config/defaults", {
-        ...opts
-    }));
-}
+export declare function getConfigDefaults(opts?: Oazapfts.RequestOpts): Promise<SystemConfigDto>;
 /**
  * Get storage template options
  */
-export function getStorageTemplateOptions(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: SystemConfigTemplateStorageOptionDto;
-    }>("/system-config/storage-template-options", {
-        ...opts
-    }));
-}
+export declare function getStorageTemplateOptions(opts?: Oazapfts.RequestOpts): Promise<SystemConfigTemplateStorageOptionDto>;
 /**
  * Retrieve admin onboarding
  */
-export function getAdminOnboarding(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AdminOnboardingUpdateDto;
-    }>("/system-metadata/admin-onboarding", {
-        ...opts
-    }));
-}
+export declare function getAdminOnboarding(opts?: Oazapfts.RequestOpts): Promise<AdminOnboardingUpdateDto>;
 /**
  * Update admin onboarding
  */
-export function updateAdminOnboarding({ adminOnboardingUpdateDto }: {
+export declare function updateAdminOnboarding({ adminOnboardingUpdateDto }: {
     adminOnboardingUpdateDto: AdminOnboardingUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/system-metadata/admin-onboarding", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: adminOnboardingUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve reverse geocoding state
  */
-export function getReverseGeocodingState(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ReverseGeocodingStateResponseDto;
-    }>("/system-metadata/reverse-geocoding-state", {
-        ...opts
-    }));
-}
+export declare function getReverseGeocodingState(opts?: Oazapfts.RequestOpts): Promise<ReverseGeocodingStateResponseDto>;
 /**
  * Retrieve version check state
  */
-export function getVersionCheckState(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: VersionCheckStateResponseDto;
-    }>("/system-metadata/version-check-state", {
-        ...opts
-    }));
-}
+export declare function getVersionCheckState(opts?: Oazapfts.RequestOpts): Promise<VersionCheckStateResponseDto>;
 /**
  * Retrieve tags
  */
-export function getAllTags(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: TagResponseDto[];
-    }>("/tags", {
-        ...opts
-    }));
-}
+export declare function getAllTags(opts?: Oazapfts.RequestOpts): Promise<TagResponseDto[]>;
 /**
  * Create a tag
  */
-export function createTag({ tagCreateDto }: {
+export declare function createTag({ tagCreateDto }: {
     tagCreateDto: TagCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: TagResponseDto;
-    }>("/tags", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: tagCreateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<TagResponseDto>;
 /**
  * Upsert tags
  */
-export function upsertTags({ tagUpsertDto }: {
+export declare function upsertTags({ tagUpsertDto }: {
     tagUpsertDto: TagUpsertDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: TagResponseDto[];
-    }>("/tags", oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: tagUpsertDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<TagResponseDto[]>;
 /**
  * Tag assets
  */
-export function bulkTagAssets({ tagBulkAssetsDto }: {
+export declare function bulkTagAssets({ tagBulkAssetsDto }: {
     tagBulkAssetsDto: TagBulkAssetsDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: TagBulkAssetsResponseDto;
-    }>("/tags/assets", oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: tagBulkAssetsDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<TagBulkAssetsResponseDto>;
 /**
  * Delete a tag
  */
-export function deleteTag({ id }: {
+export declare function deleteTag({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/tags/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve a tag
  */
-export function getTagById({ id }: {
+export declare function getTagById({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: TagResponseDto;
-    }>(`/tags/${encodeURIComponent(id)}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<TagResponseDto>;
 /**
  * Update a tag
  */
-export function updateTag({ id, tagUpdateDto }: {
+export declare function updateTag({ id, tagUpdateDto }: {
     id: string;
     tagUpdateDto: TagUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: TagResponseDto;
-    }>(`/tags/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: tagUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<TagResponseDto>;
 /**
  * Untag assets
  */
-export function untagAssets({ id, bulkIdsDto }: {
+export declare function untagAssets({ id, bulkIdsDto }: {
     id: string;
     bulkIdsDto: BulkIdsDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: BulkIdResponseDto[];
-    }>(`/tags/${encodeURIComponent(id)}/assets`, oazapfts.json({
-        ...opts,
-        method: "DELETE",
-        body: bulkIdsDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<BulkIdResponseDto[]>;
 /**
  * Tag assets
  */
-export function tagAssets({ id, bulkIdsDto }: {
+export declare function tagAssets({ id, bulkIdsDto }: {
     id: string;
     bulkIdsDto: BulkIdsDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: BulkIdResponseDto[];
-    }>(`/tags/${encodeURIComponent(id)}/assets`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: bulkIdsDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<BulkIdResponseDto[]>;
 /**
  * Get time bucket
  */
-export function getTimeBucket({ albumId, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, make, model, ocr, order, orderBy, originalFileName, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, timeBucket, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export declare function getTimeBucket({ albumId, bbox, bucketSize, city, country, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, timeBucket, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
     bucketSize?: TimeBucketSize;
     city?: string;
     country?: string;
-    description?: string;
     isFavorite?: boolean;
     isInAlbum?: boolean;
     isNotInAlbum?: boolean;
@@ -8634,10 +5826,7 @@ export function getTimeBucket({ albumId, bbox, bucketSize, city, country, descri
     key?: string;
     make?: string;
     model?: string;
-    ocr?: string;
     order?: AssetOrder;
-    orderBy?: AssetOrderBy;
-    originalFileName?: string;
     personId?: string;
     personIds?: string[];
     rating?: number;
@@ -8657,61 +5846,16 @@ export function getTimeBucket({ albumId, bbox, bucketSize, city, country, descri
     withPartners?: boolean;
     withSharedSpaces?: boolean;
     withStacked?: boolean;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: TimeBucketAssetResponseDto;
-    }>(`/timeline/bucket${QS.query(QS.explode({
-        albumId,
-        bbox,
-        bucketSize,
-        city,
-        country,
-        description,
-        isFavorite,
-        isInAlbum,
-        isNotInAlbum,
-        isTrashed,
-        key,
-        make,
-        model,
-        ocr,
-        order,
-        orderBy,
-        originalFileName,
-        personId,
-        personIds,
-        rating,
-        slug,
-        spaceId,
-        spacePersonId,
-        spacePersonIds,
-        tagId,
-        tagIds,
-        takenAfter,
-        takenBefore,
-        timeBucket,
-        "type": $type,
-        userId,
-        visibility,
-        withCoordinates,
-        withPartners,
-        withSharedSpaces,
-        withStacked
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<TimeBucketAssetResponseDto>;
 /**
  * Get time bucket covers
  */
-export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, make, model, ocr, order, orderBy, originalFileName, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, timeBuckets, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export declare function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, timeBuckets, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
     bucketSize?: TimeBucketSize;
     city?: string;
     country?: string;
-    description?: string;
     isFavorite?: boolean;
     isInAlbum?: boolean;
     isNotInAlbum?: boolean;
@@ -8719,10 +5863,7 @@ export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, 
     key?: string;
     make?: string;
     model?: string;
-    ocr?: string;
     order?: AssetOrder;
-    orderBy?: AssetOrderBy;
-    originalFileName?: string;
     personId?: string;
     personIds?: string[];
     rating?: number;
@@ -8742,61 +5883,16 @@ export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, 
     withPartners?: boolean;
     withSharedSpaces?: boolean;
     withStacked?: boolean;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: TimeBucketCoverResponseDto[];
-    }>(`/timeline/bucket-covers${QS.query(QS.explode({
-        albumId,
-        bbox,
-        bucketSize,
-        city,
-        country,
-        description,
-        isFavorite,
-        isInAlbum,
-        isNotInAlbum,
-        isTrashed,
-        key,
-        make,
-        model,
-        ocr,
-        order,
-        orderBy,
-        originalFileName,
-        personId,
-        personIds,
-        rating,
-        slug,
-        spaceId,
-        spacePersonId,
-        spacePersonIds,
-        tagId,
-        tagIds,
-        takenAfter,
-        takenBefore,
-        timeBuckets,
-        "type": $type,
-        userId,
-        visibility,
-        withCoordinates,
-        withPartners,
-        withSharedSpaces,
-        withStacked
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<TimeBucketCoverResponseDto[]>;
 /**
  * Get time buckets
  */
-export function getTimeBuckets({ albumId, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, make, model, ocr, order, orderBy, originalFileName, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export declare function getTimeBuckets({ albumId, bbox, bucketSize, city, country, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
     bucketSize?: TimeBucketSize;
     city?: string;
     country?: string;
-    description?: string;
     isFavorite?: boolean;
     isInAlbum?: boolean;
     isNotInAlbum?: boolean;
@@ -8804,10 +5900,7 @@ export function getTimeBuckets({ albumId, bbox, bucketSize, city, country, descr
     key?: string;
     make?: string;
     model?: string;
-    ocr?: string;
     order?: AssetOrder;
-    orderBy?: AssetOrderBy;
-    originalFileName?: string;
     personId?: string;
     personIds?: string[];
     rating?: number;
@@ -8826,532 +5919,179 @@ export function getTimeBuckets({ albumId, bbox, bucketSize, city, country, descr
     withPartners?: boolean;
     withSharedSpaces?: boolean;
     withStacked?: boolean;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: TimeBucketsResponseDto[];
-    }>(`/timeline/buckets${QS.query(QS.explode({
-        albumId,
-        bbox,
-        bucketSize,
-        city,
-        country,
-        description,
-        isFavorite,
-        isInAlbum,
-        isNotInAlbum,
-        isTrashed,
-        key,
-        make,
-        model,
-        ocr,
-        order,
-        orderBy,
-        originalFileName,
-        personId,
-        personIds,
-        rating,
-        slug,
-        spaceId,
-        spacePersonId,
-        spacePersonIds,
-        tagId,
-        tagIds,
-        takenAfter,
-        takenBefore,
-        "type": $type,
-        userId,
-        visibility,
-        withCoordinates,
-        withPartners,
-        withSharedSpaces,
-        withStacked
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<TimeBucketsResponseDto[]>;
 /**
  * Empty trash
  */
-export function emptyTrash(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: TrashResponseDto;
-    }>("/trash/empty", {
-        ...opts,
-        method: "POST"
-    }));
-}
+export declare function emptyTrash(opts?: Oazapfts.RequestOpts): Promise<TrashResponseDto>;
 /**
  * Restore trash
  */
-export function restoreTrash(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: TrashResponseDto;
-    }>("/trash/restore", {
-        ...opts,
-        method: "POST"
-    }));
-}
+export declare function restoreTrash(opts?: Oazapfts.RequestOpts): Promise<TrashResponseDto>;
 /**
  * Restore assets
  */
-export function restoreAssets({ bulkIdsDto }: {
+export declare function restoreAssets({ bulkIdsDto }: {
     bulkIdsDto: BulkIdsDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: TrashResponseDto;
-    }>("/trash/restore/assets", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: bulkIdsDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<TrashResponseDto>;
 /**
  * Get all user groups
  */
-export function getAllGroups(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserGroupResponseDto[];
-    }>("/user-groups", {
-        ...opts
-    }));
-}
+export declare function getAllGroups(opts?: Oazapfts.RequestOpts): Promise<UserGroupResponseDto[]>;
 /**
  * Create a user group
  */
-export function createGroup({ userGroupCreateDto }: {
+export declare function createGroup({ userGroupCreateDto }: {
     userGroupCreateDto: UserGroupCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: UserGroupResponseDto;
-    }>("/user-groups", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: userGroupCreateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserGroupResponseDto>;
 /**
  * Delete a user group
  */
-export function removeGroup({ id }: {
+export declare function removeGroup({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/user-groups/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Get a user group
  */
-export function getGroup({ id }: {
+export declare function getGroup({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserGroupResponseDto;
-    }>(`/user-groups/${encodeURIComponent(id)}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserGroupResponseDto>;
 /**
  * Update a user group
  */
-export function updateGroup({ id, userGroupUpdateDto }: {
+export declare function updateGroup({ id, userGroupUpdateDto }: {
     id: string;
     userGroupUpdateDto: UserGroupUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserGroupResponseDto;
-    }>(`/user-groups/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "PATCH",
-        body: userGroupUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserGroupResponseDto>;
 /**
  * Set group members
  */
-export function setMembers({ id, userGroupMemberSetDto }: {
+export declare function setMembers({ id, userGroupMemberSetDto }: {
     id: string;
     userGroupMemberSetDto: UserGroupMemberSetDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserGroupMemberResponseDto[];
-    }>(`/user-groups/${encodeURIComponent(id)}/members`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: userGroupMemberSetDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserGroupMemberResponseDto[]>;
 /**
  * Get all users
  */
-export function searchUsers(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserResponseDto[];
-    }>("/users", {
-        ...opts
-    }));
-}
+export declare function searchUsers(opts?: Oazapfts.RequestOpts): Promise<UserResponseDto[]>;
 /**
  * Get current user
  */
-export function getMyUser(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserAdminResponseDto;
-    }>("/users/me", {
-        ...opts
-    }));
-}
+export declare function getMyUser(opts?: Oazapfts.RequestOpts): Promise<UserAdminResponseDto>;
 /**
  * Update current user
  */
-export function updateMyUser({ userUpdateMeDto }: {
+export declare function updateMyUser({ userUpdateMeDto }: {
     userUpdateMeDto: UserUpdateMeDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserAdminResponseDto;
-    }>("/users/me", oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: userUpdateMeDto
-    })));
-}
-/**
- * Retrieve calendar heatmap activity
- */
-export function getMyCalendarHeatmap({ $from, to, $type }: {
-    $from?: string;
-    to?: string;
-    $type?: CalendarHeatmapType;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: CalendarHeatmapResponseDto;
-    }>(`/users/me/calendar-heatmap${QS.query(QS.explode({
-        "from": $from,
-        to,
-        "type": $type
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserAdminResponseDto>;
 /**
  * Delete user product key
  */
-export function deleteUserLicense(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/users/me/license", {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+export declare function deleteUserLicense(opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve user product key
  */
-export function getUserLicense(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserLicense;
-    }>("/users/me/license", {
-        ...opts
-    }));
-}
+export declare function getUserLicense(opts?: Oazapfts.RequestOpts): Promise<UserLicense>;
 /**
  * Set user product key
  */
-export function setUserLicense({ licenseKeyDto }: {
+export declare function setUserLicense({ licenseKeyDto }: {
     licenseKeyDto: LicenseKeyDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserLicense;
-    }>("/users/me/license", oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: licenseKeyDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserLicense>;
 /**
  * Delete user onboarding
  */
-export function deleteUserOnboarding(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/users/me/onboarding", {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+export declare function deleteUserOnboarding(opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve user onboarding
  */
-export function getUserOnboarding(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: OnboardingResponseDto;
-    }>("/users/me/onboarding", {
-        ...opts
-    }));
-}
+export declare function getUserOnboarding(opts?: Oazapfts.RequestOpts): Promise<OnboardingResponseDto>;
 /**
  * Update user onboarding
  */
-export function setUserOnboarding({ onboardingDto }: {
+export declare function setUserOnboarding({ onboardingDto }: {
     onboardingDto: OnboardingDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: OnboardingResponseDto;
-    }>("/users/me/onboarding", oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: onboardingDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<OnboardingResponseDto>;
 /**
  * Get my preferences
  */
-export function getMyPreferences(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserPreferencesResponseDto;
-    }>("/users/me/preferences", {
-        ...opts
-    }));
-}
+export declare function getMyPreferences(opts?: Oazapfts.RequestOpts): Promise<UserPreferencesResponseDto>;
 /**
  * Update my preferences
  */
-export function updateMyPreferences({ userPreferencesUpdateDto }: {
+export declare function updateMyPreferences({ userPreferencesUpdateDto }: {
     userPreferencesUpdateDto: UserPreferencesUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserPreferencesResponseDto;
-    }>("/users/me/preferences", oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: userPreferencesUpdateDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserPreferencesResponseDto>;
 /**
  * Delete user profile image
  */
-export function deleteProfileImage(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/users/profile-image", {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+export declare function deleteProfileImage(opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Create user profile image
  */
-export function createProfileImage({ createProfileImageDto }: {
+export declare function createProfileImage({ createProfileImageDto }: {
     createProfileImageDto: CreateProfileImageDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: CreateProfileImageResponseDto;
-    }>("/users/profile-image", oazapfts.multipart({
-        ...opts,
-        method: "POST",
-        body: createProfileImageDto
-    })));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<CreateProfileImageResponseDto>;
 /**
  * Retrieve a user
  */
-export function getUser({ id }: {
+export declare function getUser({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: UserResponseDto;
-    }>(`/users/${encodeURIComponent(id)}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<UserResponseDto>;
 /**
  * Retrieve user profile image
  */
-export function getProfileImage({ id }: {
+export declare function getProfileImage({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchBlob<{
-        status: 200;
-        data: Blob;
-    }>(`/users/${encodeURIComponent(id)}/profile-image`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<Blob>;
 /**
  * Retrieve assets by original path
  */
-export function getAssetsByOriginalPath({ path }: {
+export declare function getAssetsByOriginalPath({ path }: {
     path: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: AssetResponseDto[];
-    }>(`/view/folder${QS.query(QS.explode({
-        path
-    }))}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<AssetResponseDto[]>;
 /**
  * Retrieve unique paths
  */
-export function getUniqueOriginalPaths(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: string[];
-    }>("/view/folder/unique-paths", {
-        ...opts
-    }));
-}
+export declare function getUniqueOriginalPaths(opts?: Oazapfts.RequestOpts): Promise<string[]>;
 /**
  * List all workflows
  */
-export function searchWorkflows({ description, enabled, id, logging, name, trigger }: {
-    description?: string;
-    enabled?: boolean;
-    id?: string;
-    logging?: boolean;
-    name?: string;
-    trigger?: WorkflowTrigger;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: WorkflowResponseDto[];
-    }>(`/workflows${QS.query(QS.explode({
-        description,
-        enabled,
-        id,
-        logging,
-        name,
-        trigger
-    }))}`, {
-        ...opts
-    }));
-}
+export declare function getWorkflows(opts?: Oazapfts.RequestOpts): Promise<WorkflowResponseDto[]>;
 /**
  * Create a workflow
  */
-export function createWorkflow({ workflowCreateDto }: {
+export declare function createWorkflow({ workflowCreateDto }: {
     workflowCreateDto: WorkflowCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: WorkflowResponseDto;
-    }>("/workflows", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: workflowCreateDto
-    })));
-}
-/**
- * List all workflow triggers
- */
-export function getWorkflowTriggers(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: WorkflowTriggerResponseDto[];
-    }>("/workflows/triggers", {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<WorkflowResponseDto>;
 /**
  * Delete a workflow
  */
-export function deleteWorkflow({ id }: {
+export declare function deleteWorkflow({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/workflows/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<never>;
 /**
  * Retrieve a workflow
  */
-export function getWorkflow({ id }: {
+export declare function getWorkflow({ id }: {
     id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: WorkflowResponseDto;
-    }>(`/workflows/${encodeURIComponent(id)}`, {
-        ...opts
-    }));
-}
+}, opts?: Oazapfts.RequestOpts): Promise<WorkflowResponseDto>;
 /**
  * Update a workflow
  */
-export function updateWorkflow({ id, workflowUpdateDto }: {
+export declare function updateWorkflow({ id, workflowUpdateDto }: {
     id: string;
     workflowUpdateDto: WorkflowUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: WorkflowResponseDto;
-    }>(`/workflows/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: workflowUpdateDto
-    })));
-}
-/**
- * Retrieve workflow logs
- */
-export function getWorkflowLogs({ before, id, limit, result }: {
-    before?: string;
-    id: string;
-    limit?: number;
-    result?: WorkflowResult;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: WorkflowLogEntryDto[];
-    }>(`/workflows/${encodeURIComponent(id)}/logs${QS.query(QS.explode({
-        before,
-        limit,
-        result
-    }))}`, {
-        ...opts
-    }));
-}
-/**
- * Retrieve a workflow
- */
-export function getWorkflowForShare({ id }: {
-    id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: WorkflowShareResponseDto;
-    }>(`/workflows/${encodeURIComponent(id)}/share`, {
-        ...opts
-    }));
-}
-export enum ReactionLevel {
+}, opts?: Oazapfts.RequestOpts): Promise<WorkflowResponseDto>;
+export declare enum ReactionLevel {
     Album = "album",
     Asset = "asset"
 }
-export enum ReactionType {
+export declare enum ReactionType {
     Comment = "comment",
     Like = "like"
 }
-export enum UserAvatarColor {
+export declare enum UserAvatarColor {
     Primary = "primary",
     Pink = "pink",
     Red = "red",
@@ -9363,18 +6103,13 @@ export enum UserAvatarColor {
     Gray = "gray",
     Amber = "amber"
 }
-export enum IntegrityReport {
-    UntrackedFile = "untracked_file",
-    MissingFile = "missing_file",
-    ChecksumMismatch = "checksum_mismatch"
-}
-export enum MaintenanceAction {
+export declare enum MaintenanceAction {
     Start = "start",
     End = "end",
     SelectDatabaseRestore = "select_database_restore",
     RestoreDatabase = "restore_database"
 }
-export enum StorageFolder {
+export declare enum StorageFolder {
     EncodedVideo = "encoded-video",
     Library = "library",
     Upload = "upload",
@@ -9382,13 +6117,13 @@ export enum StorageFolder {
     Thumbs = "thumbs",
     Backups = "backups"
 }
-export enum NotificationLevel {
+export declare enum NotificationLevel {
     Success = "success",
     Error = "error",
     Warning = "warning",
     Info = "info"
 }
-export enum NotificationType {
+export declare enum NotificationType {
     JobFailed = "JobFailed",
     BackupFailed = "BackupFailed",
     SystemMessage = "SystemMessage",
@@ -9396,38 +6131,43 @@ export enum NotificationType {
     AlbumUpdate = "AlbumUpdate",
     Custom = "Custom"
 }
-export enum UserStatus {
+export declare enum UserStatus {
     Active = "active",
     Removing = "removing",
     Deleted = "deleted"
 }
-export enum CalendarHeatmapType {
-    Upload = "Upload",
-    Taken = "Taken"
+export declare enum ChecksumAlgorithm {
+    Sha1 = "sha1",
+    Sha1Path = "sha1-path"
 }
-export enum AssetOrder {
+export declare enum AssetTypeEnum {
+    Image = "IMAGE",
+    Video = "VIDEO",
+    Audio = "AUDIO",
+    Other = "OTHER"
+}
+export declare enum AssetOrder {
     Asc = "asc",
     Desc = "desc"
 }
-export enum AssetVisibility {
+export declare enum AssetVisibility {
     Archive = "archive",
     Timeline = "timeline",
     Hidden = "hidden",
     Locked = "locked"
 }
-export enum AlbumUserRole {
+export declare enum AlbumUserRole {
     Editor = "editor",
-    Owner = "owner",
     Viewer = "viewer"
 }
-export enum BulkIdErrorReason {
+export declare enum BulkIdErrorReason {
     Duplicate = "duplicate",
     NoPermission = "no_permission",
     NotFound = "not_found",
     Unknown = "unknown",
     Validation = "validation"
 }
-export enum Permission {
+export declare enum Permission {
     All = "all",
     ActivityCreate = "activity.create",
     ActivityRead = "activity.read",
@@ -9438,7 +6178,6 @@ export enum Permission {
     ApiKeyRead = "apiKey.read",
     ApiKeyUpdate = "apiKey.update",
     ApiKeyDelete = "apiKey.delete",
-    ApiKeyRotate = "apiKey.rotate",
     AssetRead = "asset.read",
     AssetUpdate = "asset.update",
     AssetDelete = "asset.delete",
@@ -9449,9 +6188,6 @@ export enum Permission {
     AssetUpload = "asset.upload",
     AssetCopy = "asset.copy",
     AssetDerive = "asset.derive",
-    AssetFileRead = "assetFile.read",
-    AssetFileDelete = "assetFile.delete",
-    AssetFileDownload = "assetFile.download",
     AssetEditGet = "asset.edit.get",
     AssetEditCreate = "asset.edit.create",
     AssetEditDelete = "asset.edit.delete",
@@ -9597,7 +6333,6 @@ export enum Permission {
     WorkflowRead = "workflow.read",
     WorkflowUpdate = "workflow.update",
     WorkflowDelete = "workflow.delete",
-    WorkflowLogs = "workflow.logs",
     AdminUserCreate = "adminUser.create",
     AdminUserRead = "adminUser.read",
     AdminUserUpdate = "adminUser.update",
@@ -9605,86 +6340,64 @@ export enum Permission {
     AdminSessionRead = "adminSession.read",
     AdminAuthUnlinkAll = "adminAuth.unlinkAll"
 }
-export enum AssetFileType {
-    Fullsize = "fullsize",
-    Preview = "preview",
-    Thumbnail = "thumbnail",
-    Sidecar = "sidecar",
-    EncodedVideo = "encoded_video"
-}
-export enum AssetMediaStatus {
+export declare enum AssetMediaStatus {
     Created = "created",
     Duplicate = "duplicate"
 }
-export enum AssetUploadAction {
+export declare enum AssetUploadAction {
     Accept = "accept",
     Reject = "reject"
 }
-export enum AssetRejectReason {
+export declare enum AssetRejectReason {
     Duplicate = "duplicate",
     UnsupportedFormat = "unsupported-format"
 }
-export enum AssetJobName {
+export declare enum AssetJobName {
     RefreshFaces = "refresh-faces",
     RefreshMetadata = "refresh-metadata",
     RegenerateThumbnail = "regenerate-thumbnail",
     TranscodeVideo = "transcode-video"
 }
-export enum Type {
+export declare enum SourceType {
+    MachineLearning = "machine-learning",
+    Exif = "exif",
+    Manual = "manual"
+}
+export declare enum Type {
     UserPerson = "user-person",
     SpacePerson = "space-person"
 }
-export enum AssetTypeEnum {
-    Image = "IMAGE",
-    Video = "VIDEO",
-    Audio = "AUDIO",
-    Other = "OTHER"
-}
-export enum AssetEditAction {
+export declare enum AssetEditAction {
     Crop = "crop",
     Rotate = "rotate",
     Mirror = "mirror",
     Trim = "trim"
 }
-export enum MirrorAxis {
+export declare enum MirrorAxis {
     Horizontal = "horizontal",
     Vertical = "vertical"
 }
-export enum AssetMediaSize {
+export declare enum AssetMediaSize {
     Original = "original",
     Fullsize = "fullsize",
     Preview = "preview",
     Thumbnail = "thumbnail"
 }
-export enum SourceType {
-    MachineLearning = "machine-learning",
-    Exif = "exif",
-    Manual = "manual"
-}
-export enum MapMediaType {
+export declare enum MapMediaType {
     Image = "IMAGE",
     Video = "VIDEO"
 }
-export enum ManualJobName {
+export declare enum ManualJobName {
     PersonCleanup = "person-cleanup",
     TagCleanup = "tag-cleanup",
     UserCleanup = "user-cleanup",
     MemoryCleanup = "memory-cleanup",
     MemoryCreate = "memory-create",
     BackupDatabase = "backup-database",
-    IntegrityMissingFiles = "integrity-missing-files",
-    IntegrityUntrackedFiles = "integrity-untracked-files",
-    IntegrityChecksumMismatch = "integrity-checksum-mismatch",
-    IntegrityMissingFilesRefresh = "integrity-missing-files-refresh",
-    IntegrityUntrackedFilesRefresh = "integrity-untracked-files-refresh",
-    IntegrityChecksumMismatchRefresh = "integrity-checksum-mismatch-refresh",
-    IntegrityMissingFilesDeleteAll = "integrity-missing-files-delete-all",
-    IntegrityUntrackedFilesDeleteAll = "integrity-untracked-files-delete-all",
-    IntegrityChecksumMismatchDeleteAll = "integrity-checksum-mismatch-delete-all",
     FaceIdentityBackfill = "face-identity-backfill",
     SharedSpacePersonMetadataBackfill = "shared-space-person-metadata-backfill"
 }
-export enum QueueName {
+export declare enum QueueName {
     ThumbnailGeneration = "thumbnailGeneration",
     MetadataExtraction = "metadataExtraction",
     VideoConversion = "videoConversion",
@@ -9704,44 +6417,53 @@ export enum QueueName {
     Ocr = "ocr",
     PetDetection = "petDetection",
     Workflow = "workflow",
-    IntegrityCheck = "integrityCheck",
     Editor = "editor",
     StorageBackendMigration = "storageBackendMigration",
     Classification = "classification"
 }
-export enum QueueCommand {
+export declare enum QueueCommand {
     Start = "start",
     Pause = "pause",
     Resume = "resume",
     Empty = "empty",
     ClearFailed = "clear-failed"
 }
-export enum MemorySearchOrder {
+export declare enum MemorySearchOrder {
     Asc = "asc",
     Desc = "desc",
     Random = "random"
 }
-export enum MemoryType {
+export declare enum MemoryType {
     OnThisDay = "on_this_day",
     Rule = "rule"
 }
-export enum PartnerDirection {
+export declare enum PartnerDirection {
     SharedBy = "shared-by",
     SharedWith = "shared-with"
 }
-export enum Type2 {
+export declare enum Type2 {
     Person = "person",
     SpacePerson = "space-person"
 }
-export enum WorkflowType {
-    AssetV1 = "AssetV1"
+export declare enum PluginJsonSchemaType {
+    String = "string",
+    Number = "number",
+    Integer = "integer",
+    Boolean = "boolean",
+    Object = "object",
+    Array = "array",
+    Null = "null"
 }
-export enum WorkflowTrigger {
+export declare enum PluginContextType {
+    Asset = "asset",
+    Album = "album",
+    Person = "person"
+}
+export declare enum PluginTriggerType {
     AssetCreate = "AssetCreate",
-    AssetMetadataExtraction = "AssetMetadataExtraction",
-    AssetTagged = "AssetTagged"
+    PersonRecognized = "PersonRecognized"
 }
-export enum JobName {
+export declare enum JobName {
     AssetDelete = "AssetDelete",
     AssetDeleteCheck = "AssetDeleteCheck",
     AssetDetectFacesQueueAll = "AssetDetectFacesQueueAll",
@@ -9773,7 +6495,6 @@ export enum JobName {
     LibrarySyncFilesQueueAll = "LibrarySyncFilesQueueAll",
     LibrarySyncFiles = "LibrarySyncFiles",
     LibraryScanQueueAll = "LibraryScanQueueAll",
-    HlsSessionCleanup = "HlsSessionCleanup",
     MemoryCleanup = "MemoryCleanup",
     MemoryGenerate = "MemoryGenerate",
     NotificationsCleanup = "NotificationsCleanup",
@@ -9801,17 +6522,7 @@ export enum JobName {
     Ocr = "Ocr",
     PetDetectionQueueAll = "PetDetectionQueueAll",
     PetDetection = "PetDetection",
-    WorkflowAssetTrigger = "WorkflowAssetTrigger",
-    IntegrityUntrackedFilesQueueAll = "IntegrityUntrackedFilesQueueAll",
-    IntegrityUntrackedFiles = "IntegrityUntrackedFiles",
-    IntegrityUntrackedRefresh = "IntegrityUntrackedRefresh",
-    IntegrityMissingFilesQueueAll = "IntegrityMissingFilesQueueAll",
-    IntegrityMissingFiles = "IntegrityMissingFiles",
-    IntegrityMissingFilesRefresh = "IntegrityMissingFilesRefresh",
-    IntegrityChecksumFiles = "IntegrityChecksumFiles",
-    IntegrityChecksumFilesRefresh = "IntegrityChecksumFilesRefresh",
-    IntegrityDeleteReportType = "IntegrityDeleteReportType",
-    IntegrityDeleteReports = "IntegrityDeleteReports",
+    WorkflowRun = "WorkflowRun",
     StorageBackendMigrationQueueAll = "StorageBackendMigrationQueueAll",
     StorageBackendMigrationSingle = "StorageBackendMigrationSingle",
     SharedSpaceFaceMatch = "SharedSpaceFaceMatch",
@@ -9826,12 +6537,7 @@ export enum JobName {
     AssetClassifyQueueAll = "AssetClassifyQueueAll",
     AssetClassify = "AssetClassify"
 }
-export enum SearchOrderField {
-    FileCreatedAt = "fileCreatedAt",
-    LocalDateTime = "localDateTime",
-    FileSizeInBytes = "fileSizeInBytes",
-    Rating = "rating"
-export enum QueueJobStatus {
+export declare enum QueueJobStatus {
     Active = "active",
     Failed = "failed",
     Completed = "completed",
@@ -9839,7 +6545,7 @@ export enum QueueJobStatus {
     Waiting = "waiting",
     Paused = "paused"
 }
-export enum SearchSuggestionType {
+export declare enum SearchSuggestionType {
     Country = "country",
     State = "state",
     City = "city",
@@ -9847,48 +6553,43 @@ export enum SearchSuggestionType {
     CameraModel = "camera-model",
     CameraLensModel = "camera-lens-model"
 }
-export enum SharedLinkType {
+export declare enum SharedLinkType {
     Album = "ALBUM",
     Individual = "INDIVIDUAL"
 }
-export enum AssetIdErrorReason {
+export declare enum AssetIdErrorReason {
     Duplicate = "duplicate",
     NoPermission = "no_permission",
     NotFound = "not_found"
 }
-export enum SharedSpaceRole {
+export declare enum SharedSpaceRole {
     Owner = "owner",
     Editor = "editor",
     Viewer = "viewer"
 }
-export enum RepresentativeFaceSource {
+export declare enum RepresentativeFaceSource {
     Auto = "auto",
     Manual = "manual"
 }
-export enum StorageMigrationDirection {
+export declare enum StorageMigrationDirection {
     ToS3 = "toS3",
     ToDisk = "toDisk"
 }
-export enum SyncEntityType {
+export declare enum SyncEntityType {
     AuthUserV1 = "AuthUserV1",
     UserV1 = "UserV1",
     UserDeleteV1 = "UserDeleteV1",
     AssetV1 = "AssetV1",
-    AssetV2 = "AssetV2",
     AssetDeleteV1 = "AssetDeleteV1",
     AssetExifV1 = "AssetExifV1",
     AssetEditV1 = "AssetEditV1",
     AssetEditDeleteV1 = "AssetEditDeleteV1",
     AssetMetadataV1 = "AssetMetadataV1",
     AssetMetadataDeleteV1 = "AssetMetadataDeleteV1",
-    AssetOcrV1 = "AssetOcrV1",
-    AssetOcrDeleteV1 = "AssetOcrDeleteV1",
     PartnerV1 = "PartnerV1",
     PartnerDeleteV1 = "PartnerDeleteV1",
     PartnerAssetV1 = "PartnerAssetV1",
-    PartnerAssetV2 = "PartnerAssetV2",
     PartnerAssetBackfillV1 = "PartnerAssetBackfillV1",
-    PartnerAssetBackfillV2 = "PartnerAssetBackfillV2",
     PartnerAssetDeleteV1 = "PartnerAssetDeleteV1",
     PartnerAssetExifV1 = "PartnerAssetExifV1",
     PartnerAssetExifBackfillV1 = "PartnerAssetExifBackfillV1",
@@ -9896,17 +6597,13 @@ export enum SyncEntityType {
     PartnerStackDeleteV1 = "PartnerStackDeleteV1",
     PartnerStackV1 = "PartnerStackV1",
     AlbumV1 = "AlbumV1",
-    AlbumV2 = "AlbumV2",
     AlbumDeleteV1 = "AlbumDeleteV1",
     AlbumUserV1 = "AlbumUserV1",
     AlbumUserBackfillV1 = "AlbumUserBackfillV1",
     AlbumUserDeleteV1 = "AlbumUserDeleteV1",
     AlbumAssetCreateV1 = "AlbumAssetCreateV1",
-    AlbumAssetCreateV2 = "AlbumAssetCreateV2",
     AlbumAssetUpdateV1 = "AlbumAssetUpdateV1",
-    AlbumAssetUpdateV2 = "AlbumAssetUpdateV2",
     AlbumAssetBackfillV1 = "AlbumAssetBackfillV1",
-    AlbumAssetBackfillV2 = "AlbumAssetBackfillV2",
     AlbumAssetExifCreateV1 = "AlbumAssetExifCreateV1",
     AlbumAssetExifUpdateV1 = "AlbumAssetExifUpdateV1",
     AlbumAssetExifBackfillV1 = "AlbumAssetExifBackfillV1",
@@ -9954,26 +6651,21 @@ export enum SyncEntityType {
     SyncResetV1 = "SyncResetV1",
     SyncCompleteV1 = "SyncCompleteV1"
 }
-export enum SyncRequestType {
+export declare enum SyncRequestType {
     AlbumsV1 = "AlbumsV1",
-    AlbumsV2 = "AlbumsV2",
     AlbumUsersV1 = "AlbumUsersV1",
     AlbumToAssetsV1 = "AlbumToAssetsV1",
     AlbumAssetsV1 = "AlbumAssetsV1",
-    AlbumAssetsV2 = "AlbumAssetsV2",
     AlbumAssetExifsV1 = "AlbumAssetExifsV1",
     AssetsV1 = "AssetsV1",
-    AssetsV2 = "AssetsV2",
     AssetExifsV1 = "AssetExifsV1",
     AssetEditsV1 = "AssetEditsV1",
     AssetMetadataV1 = "AssetMetadataV1",
-    AssetOcrV1 = "AssetOcrV1",
     AuthUsersV1 = "AuthUsersV1",
     MemoriesV1 = "MemoriesV1",
     MemoryToAssetsV1 = "MemoryToAssetsV1",
     PartnersV1 = "PartnersV1",
     PartnerAssetsV1 = "PartnerAssetsV1",
-    PartnerAssetsV2 = "PartnerAssetsV2",
     PartnerAssetExifsV1 = "PartnerAssetExifsV1",
     PartnerStacksV1 = "PartnerStacksV1",
     StacksV1 = "StacksV1",
@@ -9992,75 +6684,69 @@ export enum SyncRequestType {
     LibraryAssetExifsV1 = "LibraryAssetExifsV1",
     SharedSpaceLibrariesV1 = "SharedSpaceLibrariesV1"
 }
-export enum Action {
+export declare enum Action {
     Tag = "tag",
     TagAndArchive = "tag_and_archive"
 }
-export enum ClassificationFaceExclusion {
+export declare enum ClassificationFaceExclusion {
     Off = "off",
     AnyAssignedFace = "any_assigned_face",
     NamedPeople = "named_people",
     NamedVisiblePeople = "named_visible_people"
 }
-export enum TranscodeHWAccel {
+export declare enum TranscodeHWAccel {
     Nvenc = "nvenc",
     Qsv = "qsv",
     Vaapi = "vaapi",
     Rkmpp = "rkmpp",
     Disabled = "disabled"
 }
-export enum AudioCodec {
+export declare enum AudioCodec {
     Mp3 = "mp3",
     Aac = "aac",
+    Libopus = "libopus",
     Opus = "opus",
     PcmS16Le = "pcm_s16le"
 }
-export enum VideoContainer {
+export declare enum VideoContainer {
     Mov = "mov",
     Mp4 = "mp4",
     Ogg = "ogg",
     Webm = "webm"
 }
-export enum VideoCodec {
+export declare enum VideoCodec {
     H264 = "h264",
     Hevc = "hevc",
     Vp9 = "vp9",
     Av1 = "av1"
 }
-export enum CQMode {
+export declare enum CQMode {
     Auto = "auto",
     Cqp = "cqp",
     Icq = "icq"
 }
-export enum HlsVideoResolution {
-    $480 = 480,
-    $720 = 720,
-    $1080 = 1080,
-    $1440 = 1440,
-    $2160 = 2160
-}
-export enum ToneMapping {
+export declare enum ToneMapping {
     Hable = "hable",
     Mobius = "mobius",
     Reinhard = "reinhard",
     Disabled = "disabled"
 }
-export enum TranscodePolicy {
+export declare enum TranscodePolicy {
     All = "all",
     Optimal = "optimal",
     Bitrate = "bitrate",
     Required = "required",
     Disabled = "disabled"
 }
-export enum Colorspace {
+export declare enum Colorspace {
     Srgb = "srgb",
     P3 = "p3"
 }
-export enum ImageFormat {
+export declare enum ImageFormat {
     Jpeg = "jpeg",
     Webp = "webp"
 }
-export enum LogLevel {
+export declare enum LogLevel {
     Verbose = "verbose",
     Debug = "debug",
     Log = "log",
@@ -10068,38 +6754,28 @@ export enum LogLevel {
     Error = "error",
     Fatal = "fatal"
 }
-export enum ReleaseChannel {
-    Stable = "stable",
-    ReleaseCandidate = "releaseCandidate"
-}
-export enum OAuthTokenEndpointAuthMethod {
+export declare enum OAuthTokenEndpointAuthMethod {
     ClientSecretPost = "client_secret_post",
     ClientSecretBasic = "client_secret_basic"
 }
-export enum TimeBucketSize {
+export declare enum TimeBucketSize {
     Year = "year",
     Month = "month",
     Day = "day"
 }
-export enum AssetOrderBy {
-    TakenAt = "takenAt",
-    CreatedAt = "createdAt"
+export declare enum Color {
+    Primary = "primary",
+    Pink = "pink",
+    Red = "red",
+    Yellow = "yellow",
+    Blue = "blue",
+    Green = "green",
+    Purple = "purple",
+    Orange = "orange",
+    Gray = "gray",
+    Amber = "amber"
 }
-export enum WorkflowResult {
-    Completed = "completed",
-    Halted = "halted",
-    Error = "error"
-}
-export enum ReleaseType {
-    Major = "major",
-    Premajor = "premajor",
-    Minor = "minor",
-    Preminor = "preminor",
-    Patch = "patch",
-    Prepatch = "prepatch",
-    Prerelease = "prerelease"
-}
-export enum UserMetadataKey {
+export declare enum UserMetadataKey {
     Preferences = "preferences",
     License = "license",
     Onboarding = "onboarding"
