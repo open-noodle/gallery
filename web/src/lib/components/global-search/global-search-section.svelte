@@ -12,8 +12,12 @@
     idPrefix: 'photo' | 'person' | 'place' | 'tag' | 'album' | 'space';
     onActivate: (item: T) => void;
     onSeeAll?: () => void;
+    /** Show the "See all" button whenever there is ≥1 result, even without a known total. */
+    seeAllAlways?: boolean;
+    /** Label for the count-less "See all" button (used when seeAllAlways is set). */
+    seeAllLabel?: string;
   }
-  let { heading, status, renderRow, idPrefix, onActivate, onSeeAll }: Props = $props();
+  let { heading, status, renderRow, idPrefix, onActivate, onSeeAll, seeAllAlways, seeAllLabel }: Props = $props();
 
   function itemKey(item: T): string {
     if (item.id !== undefined) {
@@ -42,13 +46,18 @@
               {@render renderRow(item)}
             </Command.Item>
           {/each}
-          {#if onSeeAll && status.total > status.items.length}
+          {#if onSeeAll && (seeAllAlways || status.total > status.items.length)}
             <button
               type="button"
               onclick={onSeeAll}
               class="mt-1 flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-primary tabular-nums"
+              data-testid="see-all-button"
             >
-              <span>{$t('cmdk_see_all', { values: { count: status.total } })}</span>
+              <span
+                >{seeAllAlways && seeAllLabel
+                  ? seeAllLabel
+                  : $t('cmdk_see_all', { values: { count: status.total } })}</span
+              >
               <span aria-hidden="true">→</span>
             </button>
           {/if}
