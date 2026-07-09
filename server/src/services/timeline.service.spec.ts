@@ -71,6 +71,24 @@ describe(TimelineService.name, () => {
       );
     });
 
+    it('should forward description, filename, and ocr text filters to the repository', async () => {
+      mocks.asset.getTimeBuckets.mockResolvedValue([{ timeBucket: '2024-01-01', count: 1 }]);
+
+      await sut.getTimeBuckets(authStub.admin, {
+        originalFileName: 'vacation',
+        description: 'birthday',
+        ocr: 'invoice',
+      });
+
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({
+          originalFileName: 'vacation',
+          description: 'birthday',
+          ocr: 'invoice',
+        }),
+      );
+    });
+
     describe('shared space access (spaceId)', () => {
       it('should check shared space member access when spaceId is provided', async () => {
         mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set(['space-id']));

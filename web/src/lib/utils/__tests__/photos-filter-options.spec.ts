@@ -53,6 +53,22 @@ describe('buildPhotosTimelineOptions', () => {
     expect(options.rating).toBe(4);
   });
 
+  it('should include trimmed description/filename/ocr text filters', () => {
+    const filters = { ...createFilterState(), description: '  beach  ', originalFileName: 'IMG_001', ocr: 'invoice' };
+    const options = buildPhotosTimelineOptions(filters);
+    expect(options.description).toBe('beach');
+    expect(options.originalFileName).toBe('IMG_001');
+    expect(options.ocr).toBe('invoice');
+  });
+
+  it('should omit empty / whitespace-only text filters', () => {
+    const filters = { ...createFilterState(), description: '   ', originalFileName: '', ocr: undefined };
+    const options = buildPhotosTimelineOptions(filters);
+    expect(options).not.toHaveProperty('description');
+    expect(options).not.toHaveProperty('originalFileName');
+    expect(options).not.toHaveProperty('ocr');
+  });
+
   it('should map mediaType image to AssetTypeEnum.Image', () => {
     const filters = { ...createFilterState(), mediaType: 'image' as const };
     const options = buildPhotosTimelineOptions(filters);
@@ -222,6 +238,13 @@ describe('handlePhotosRemoveFilter', () => {
     const result = handlePhotosRemoveFilter(filters, 'location');
     expect(result.country).toBeUndefined();
     expect(result.city).toBeUndefined();
+  });
+
+  it('should clear the description / filename / ocr text filters by chip type', () => {
+    const filters = { ...createFilterState(), description: 'beach', originalFileName: 'IMG', ocr: 'invoice' };
+    expect(handlePhotosRemoveFilter(filters, 'description').description).toBeUndefined();
+    expect(handlePhotosRemoveFilter(filters, 'filename').originalFileName).toBeUndefined();
+    expect(handlePhotosRemoveFilter(filters, 'ocr').ocr).toBeUndefined();
   });
 
   it('should clear camera (both make and model)', () => {
