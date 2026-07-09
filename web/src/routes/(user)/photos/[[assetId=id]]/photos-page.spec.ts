@@ -340,7 +340,7 @@ describe('Photos page search URL state', () => {
 
     expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute(
       'data-sections',
-      'timeline,people,location,camera,tags,rating,media,favorites,albums',
+      'timeline,people,location,camera,tags,rating,media,favorites,albums,text',
     );
   });
 
@@ -351,6 +351,18 @@ describe('Photos page search URL state', () => {
 
     await waitFor(() => {
       expect(buildPhotosTimelineOptions).toHaveBeenCalledWith(expect.objectContaining({ isNotInAlbum: true }));
+    });
+  });
+
+  it('passes description/filename/ocr text filters into photos timeline options from the URL', async () => {
+    mockPage.url = new URL('https://gallery.test/photos?description=beach&filename=IMG&ocr=invoice');
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(buildPhotosTimelineOptions).toHaveBeenCalledWith(
+        expect.objectContaining({ description: 'beach', originalFileName: 'IMG', ocr: 'invoice' }),
+      );
     });
   });
 

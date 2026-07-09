@@ -39,6 +39,8 @@
           : [],
       assetCount,
       isInitialized: true,
+      // Stub is always "settled" for the current options, so empty ⇔ assetCount === 0.
+      isEmptyForOptions: () => assetCount === 0,
       showAssetOwners: false,
       suspendTransitions: false,
       removeAssets: () => {},

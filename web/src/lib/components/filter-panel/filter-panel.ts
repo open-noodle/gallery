@@ -7,7 +7,8 @@ export type FilterSection =
   | 'rating'
   | 'media'
   | 'favorites'
-  | 'albums';
+  | 'albums'
+  | 'text';
 
 export interface PersonOption {
   id: string;
@@ -62,6 +63,9 @@ export interface FilterState {
   country?: string;
   make?: string;
   model?: string;
+  description?: string;
+  originalFileName?: string;
+  ocr?: string;
   tagIds: string[];
   rating?: number;
   mediaType: 'all' | 'image' | 'video';
@@ -99,6 +103,9 @@ export function getActiveFilterCount(state: FilterState): number {
     (state.isFavorite === undefined ? 0 : 1) +
     (state.isNotInAlbum === true ? 1 : 0) +
     (state.isInAlbum === true ? 1 : 0) +
+    (state.description?.trim() ? 1 : 0) +
+    (state.originalFileName?.trim() ? 1 : 0) +
+    (state.ocr?.trim() ? 1 : 0) +
     (hasTemporalFilter ? 1 : 0)
   );
 }
@@ -216,6 +223,9 @@ export function clearFilters(state: FilterState): FilterState {
     country: undefined,
     make: undefined,
     model: undefined,
+    description: undefined,
+    originalFileName: undefined,
+    ocr: undefined,
     tagIds: [],
     rating: undefined,
     mediaType: 'all',
