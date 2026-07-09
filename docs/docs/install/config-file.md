@@ -231,7 +231,8 @@ The default configuration looks like this:
   "server": {
     "externalDomain": "",
     "loginPageMessage": "",
-    "publicUsers": true
+    "publicUsers": true,
+    "mergePeopleAcrossOwners": false
   },
   "storageTemplate": {
     "enabled": false,
