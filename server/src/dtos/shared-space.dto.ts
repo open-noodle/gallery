@@ -127,7 +127,7 @@ const SharedSpaceLibraryLinkSchema = z
   })
   .meta({ id: 'SharedSpaceLibraryLinkDto' });
 
-export const MAX_SPACE_ASSETS_PER_REQUEST = 10_000;
+export const MAX_SPACE_ASSETS_PER_REQUEST = 50_000;
 
 const SharedSpaceAssetAddSchema = z
   .object({
