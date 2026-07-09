@@ -20,6 +20,15 @@ export function buildSpaceTimelineOptions(spaceId: string, filters: FilterState)
   if (filters.model) {
     base.model = filters.model;
   }
+  if (filters.description?.trim()) {
+    base.description = filters.description.trim();
+  }
+  if (filters.originalFileName?.trim()) {
+    base.originalFileName = filters.originalFileName.trim();
+  }
+  if (filters.ocr?.trim()) {
+    base.ocr = filters.ocr.trim();
+  }
   if (filters.tagIds.length > 0) {
     base.tagIds = filters.tagIds;
   }
@@ -87,6 +96,15 @@ export function handleSpaceRemoveFilter(filters: FilterState, type: string, id?:
     }
     case 'timeline': {
       return clearTimelineTemporalFilter(filters);
+    }
+    case 'description': {
+      return { ...filters, description: undefined };
+    }
+    case 'filename': {
+      return { ...filters, originalFileName: undefined };
+    }
+    case 'ocr': {
+      return { ...filters, ocr: undefined };
     }
     default: {
       return filters;
