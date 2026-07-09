@@ -9,6 +9,9 @@ export const SEARCHABLE_PAGE_FILTER_PARAMS = [
   'country',
   'make',
   'model',
+  'description',
+  'filename',
+  'ocr',
   'type',
   'favorite',
   'album',
@@ -26,6 +29,9 @@ export type SearchablePageFilterState = Partial<
     | 'country'
     | 'make'
     | 'model'
+    | 'description'
+    | 'originalFileName'
+    | 'ocr'
     | 'mediaType'
     | 'isFavorite'
     | 'isNotInAlbum'
@@ -114,6 +120,13 @@ export function buildSearchablePageUrl(
   const trimmedQuery = query.trim();
   const params = new URLSearchParams(url.searchParams);
 
+  // `at` is a one-shot grid scroll target left over from closing the asset viewer. It must not
+  // survive a search/filter change: the layout re-seeds `gridScrollTarget` from it on every
+  // navigation, so a stale `at` makes the timeline re-scroll to (and focus) that asset on each
+  // keystroke — stealing focus from the filter inputs and loading the asset's non-matching
+  // buckets behind a "0 results" empty state.
+  params.delete('at');
+
   if (trimmedQuery) {
     params.set('q', trimmedQuery);
     if (sortOrder === 'relevance') {
@@ -174,6 +187,18 @@ export function getSearchablePageFilterState(url: URL): SearchablePageFilterStat
   if (url.searchParams.get('model')) {
     result.model = url.searchParams.get('model') ?? undefined;
   }
+  const description = url.searchParams.get('description')?.trim();
+  if (description) {
+    result.description = description;
+  }
+  const filename = url.searchParams.get('filename')?.trim();
+  if (filename) {
+    result.originalFileName = filename;
+  }
+  const ocr = url.searchParams.get('ocr')?.trim();
+  if (ocr) {
+    result.ocr = ocr;
+  }
   if (mediaType) {
     result.mediaType = mediaType;
   }
@@ -232,6 +257,15 @@ function appendSearchablePageFilterParams(params: URLSearchParams, filters: Filt
   }
   if (filters.model) {
     params.set('model', filters.model);
+  }
+  if (filters.description?.trim()) {
+    params.set('description', filters.description.trim());
+  }
+  if (filters.originalFileName?.trim()) {
+    params.set('filename', filters.originalFileName.trim());
+  }
+  if (filters.ocr?.trim()) {
+    params.set('ocr', filters.ocr.trim());
   }
   if (filters.mediaType !== 'all') {
     params.set('type', filters.mediaType);

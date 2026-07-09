@@ -645,6 +645,73 @@ describe('ActiveFiltersBar', () => {
     expect(onClearSearch).not.toHaveBeenCalled();
   });
 
+  it('should render a description text chip with its value', () => {
+    const filters = { ...createFilterState(), description: 'beach sunset' };
+
+    const { getAllByTestId } = render(ActiveFiltersBar, {
+      props: { filters, onRemoveFilter: () => {}, onClearAll: () => {} },
+    });
+
+    const chips = getAllByTestId('active-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain('beach sunset');
+  });
+
+  it('should render a filename text chip with its value', () => {
+    const filters = { ...createFilterState(), originalFileName: 'IMG_1234' };
+
+    const { getAllByTestId } = render(ActiveFiltersBar, {
+      props: { filters, onRemoveFilter: () => {}, onClearAll: () => {} },
+    });
+
+    const chips = getAllByTestId('active-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain('IMG_1234');
+  });
+
+  it('should render an OCR text chip with its value', () => {
+    const filters = { ...createFilterState(), ocr: 'invoice total' };
+
+    const { getAllByTestId } = render(ActiveFiltersBar, {
+      props: { filters, onRemoveFilter: () => {}, onClearAll: () => {} },
+    });
+
+    const chips = getAllByTestId('active-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain('invoice total');
+  });
+
+  it('should not render text chips for empty / whitespace-only values', () => {
+    const filters = { ...createFilterState(), description: '  ', originalFileName: '', ocr: undefined };
+
+    const { queryAllByTestId } = render(ActiveFiltersBar, {
+      props: { filters, onRemoveFilter: () => {}, onClearAll: () => {} },
+    });
+
+    expect(queryAllByTestId('active-chip')).toHaveLength(0);
+  });
+
+  it('should dispatch the matching type when removing each text chip', async () => {
+    const cases = [
+      { field: 'description', value: 'beach', type: 'description' },
+      { field: 'originalFileName', value: 'IMG', type: 'filename' },
+      { field: 'ocr', value: 'invoice', type: 'ocr' },
+    ] as const;
+
+    for (const { field, value, type } of cases) {
+      const onRemoveFilter = vi.fn();
+      const filters = { ...createFilterState(), [field]: value };
+
+      const { getByTestId } = render(ActiveFiltersBar, {
+        props: { filters, onRemoveFilter, onClearAll: () => {} },
+      });
+
+      await fireEvent.click(getByTestId('chip-close'));
+      expect(onRemoveFilter).toHaveBeenCalledWith(type, undefined);
+      cleanup();
+    }
+  });
+
   it('omits its own band and padding in embedded mode', () => {
     const filters = createFilterState();
     filters.country = 'Germany';

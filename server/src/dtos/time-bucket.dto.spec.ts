@@ -128,4 +128,22 @@ describe('TimeBucketDto', () => {
       expect(result.data?.isInAlbum).toBe(false);
     });
   });
+
+  describe('text filter query params', () => {
+    it.each(['originalFileName', 'description', 'ocr'] as const)('passes through %s as a string', (field) => {
+      const result = TimeBucketDto.schema.safeParse({ [field]: 'vacation 2024' });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.[field]).toBe('vacation 2024');
+    });
+
+    it('leaves text filters undefined when omitted', () => {
+      const result = TimeBucketDto.schema.safeParse({});
+
+      expect(result.success).toBe(true);
+      expect(result.data?.originalFileName).toBeUndefined();
+      expect(result.data?.description).toBeUndefined();
+      expect(result.data?.ocr).toBeUndefined();
+    });
+  });
 });

@@ -274,7 +274,7 @@
   };
 
   const filterConfig: FilterPanelConfig = {
-    sections: ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media', 'favorites', 'albums'],
+    sections: ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media', 'favorites', 'albums', 'text'],
     suggestionsProvider: async (nextFilters: FilterState) => {
       if (!showSearchResults) {
         return loadPhotoFilterSuggestions(nextFilters);
@@ -336,7 +336,10 @@
 
   const hasActiveFilters = $derived(getActiveFilterCount(filters) > 0 || showSearchResults);
   const totalAssetCount = $derived(timelineManager?.assetCount ?? 0);
-  const isTimelineEmpty = $derived(timelineManager?.isInitialized && totalAssetCount === 0 && !hasActiveFilters);
+  // Use the timeline's *loaded* result (for the current options) rather than a bare
+  // `assetCount === 0`: clearing a filter that had 0 results would otherwise flip this true
+  // for a tick (stale count, reload pending), unmounting the filter panel and dropping focus.
+  const isTimelineEmpty = $derived(!!timelineManager?.isEmptyForOptions(options) && !hasActiveFilters);
 
   let selectedAssets = $derived(assetMultiSelectManager.assets);
   let isLinkActionAvailable = $derived.by(() => {
