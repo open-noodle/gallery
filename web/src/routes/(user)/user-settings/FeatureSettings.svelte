@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { serverConfigManager } from '$lib/managers/server-config-manager.svelte';
   import SettingAccordion from '$lib/components/shared-components/settings/SettingAccordion.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
+  import { serverConfigManager } from '$lib/managers/server-config-manager.svelte';
   import { handleError } from '$lib/utils/handle-error';
   import { AssetOrder, updateMyPreferences } from '@immich/sdk';
   import { Button, Field, NumberInput, Select, Switch, toastManager } from '@immich/ui';
-  import { t } from 'svelte-i18n';
+  import { t, type Translations } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
 
   // Albums
@@ -18,7 +18,16 @@
   // Memories
   let memoriesEnabled = $state(authManager.preferences.memories?.enabled ?? true);
   let memoriesDuration = $state(authManager.preferences.memories?.duration ?? 5);
-  let memoriesSidebar = $state(authManager.preferences.memories?.sidebarWeb ?? false);
+  let memoriesSidebar = $state(authManager.preferences.memories?.sidebarWeb ?? true);
+  const availableMemoryTypes = $derived(serverConfigManager.value.availableMemoryTypes ?? []);
+  let memoryTypes = $state<Record<string, boolean>>(
+    Object.fromEntries(
+      (serverConfigManager.value.availableMemoryTypes ?? []).map((key) => [
+        key,
+        authManager.preferences.memories?.types?.[key] ?? true,
+      ]),
+    ),
+  );
 
   // People
   let peopleEnabled = $state(authManager.preferences.people?.enabled ?? false);
@@ -48,7 +57,12 @@
         userPreferencesUpdateDto: {
           albums: { defaultAssetOrder },
           folders: { enabled: foldersEnabled, sidebarWeb: foldersSidebar },
-          memories: { enabled: memoriesEnabled, duration: memoriesDuration, sidebarWeb: memoriesSidebar },
+          memories: {
+            enabled: memoriesEnabled,
+            duration: memoriesDuration,
+            types: { ...memoryTypes },
+            sidebarWeb: memoriesSidebar,
+          },
           people: { enabled: peopleEnabled, sidebarWeb: peopleSidebar, minimumFaces: peopleMinFaces },
           ratings: { enabled: ratingsEnabled },
           sharedLinks: { enabled: sharedLinksEnabled, sidebarWeb: sharedLinkSidebar },
@@ -117,6 +131,15 @@
             <Field label={$t('duration')} description={$t('time_based_memories_duration')}>
               <NumberInput bind:value={memoriesDuration} />
             </Field>
+
+            {#each availableMemoryTypes as type (type)}
+              <Field
+                label={$t(`memory_type_${type}` as Translations)}
+                description={$t(`memory_type_${type}_description` as Translations)}
+              >
+                <Switch bind:checked={memoryTypes[type]} />
+              </Field>
+            {/each}
           </div>
         </SettingAccordion>
 
