@@ -44,7 +44,7 @@ double timelineScrubberSnappingOffset({required double? topSliverWidgetHeight, r
   return (topSliverWidgetHeight ?? 0) + appBarExpandedHeight;
 }
 
-class Timeline extends StatelessWidget {
+class Timeline extends ConsumerWidget {
   const Timeline({
     super.key,
     this.topSliverWidget,
@@ -89,7 +89,8 @@ class Timeline extends StatelessWidget {
   final bool withGroupingPill;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final columnCount = ref.watch(appConfigProvider.select((config) => config.timeline.tilesPerRow));
     return LayoutBuilder(
       builder: (_, constraints) {
         final sliverTimeline = _SliverTimeline(
@@ -108,11 +109,13 @@ class Timeline extends StatelessWidget {
         );
         return ProviderScope(
           overrides: [
-            timelineArgsProvider.overrideWith(
-              (ref) => TimelineArgs(
+            // overrideWithValue keeps the scoped args in sync with the latest constraints on rebuilds,
+            // a function override would stay locked to the first frame's constraints for the whole session
+            timelineArgsProvider.overrideWithValue(
+              TimelineArgs(
                 maxWidth: constraints.maxWidth,
                 maxHeight: constraints.maxHeight,
-                columnCount: ref.watch(appConfigProvider.select((config) => config.timeline.tilesPerRow)),
+                columnCount: columnCount,
                 showStorageIndicator: showStorageIndicator,
                 withStack: withStack,
                 groupBy: groupBy,
@@ -176,7 +179,7 @@ class _SliverTimeline extends ConsumerStatefulWidget {
   ConsumerState createState() => _SliverTimelineState();
 }
 
-class _SliverTimelineState extends ConsumerState<_SliverTimeline> {
+class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBindingObserver {
   late final ScrollController _scrollController;
   StreamSubscription? _eventSubscription;
 
@@ -197,6 +200,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _scrollController = ScrollController(onAttach: _restoreAssetPosition);
     _eventSubscription = EventStream.shared.listen(_onEvent);
 
@@ -224,13 +228,11 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> {
   void didUpdateWidget(covariant _SliverTimeline oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.maxWidth != oldWidget.maxWidth) {
-      final asyncSegments = ref.read(timelineSegmentProvider);
-      asyncSegments.whenData((segments) {
-        final index = _getCurrentAssetIndex(segments);
-        // Refresh to wait for new segments to be generated with the updated width before restoring the scroll position
-        final _ = ref.refresh(timelineArgsProvider);
-        _restoreAssetIndex = index;
-      });
+      // The updated args already regenerate the segments, only remember the scroll position to restore it afterwards
+      final segments = ref.read(timelineSegmentProvider).valueOrNull;
+      if (segments != null && _scrollController.hasClients) {
+        _restoreAssetIndex = _getCurrentAssetIndex(segments);
+      }
     }
   }
 
@@ -256,14 +258,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> {
   void _onEvent(Event event) {
     switch (event) {
       case ScrollToTopEvent():
-        {
-          final timelineState = ref.read(timelineStateProvider.notifier);
-          timelineState.setScrubbing(true);
-          _scrollController
-              .animateTo(0, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut)
-              .whenComplete(() => timelineState.setScrubbing(false));
-        }
-
+        _scrollToTop();
       case TimelineReloadEvent():
         setState(() {});
       default:
@@ -358,10 +353,23 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     scrollToDateNotifierProvider.removeListener(_requestScrollDrain);
     _scrollController.dispose();
     unawaited(_eventSubscription?.cancel());
     super.dispose();
+  }
+
+  void _scrollToTop() {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    final timelineState = ref.read(timelineStateProvider.notifier);
+    timelineState.setScrubbing(true);
+    _scrollController
+        .animateTo(0, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut)
+        .whenComplete(() => timelineState.setScrubbing(false));
   }
 
   bool _scrollDrainScheduled = false;
