@@ -194,6 +194,7 @@ describe(ServerService.name, () => {
         mapLightStyleUrl: 'https://tiles.openfreemap.org/styles/positron',
         maintenanceMode: false,
         minFaces: 3,
+        availableMemoryTypes: ['on_this_day', 'birthday', 'recent_trip'],
       });
       expect(mocks.systemMetadata.get).toHaveBeenCalled();
     });
@@ -209,6 +210,19 @@ describe(ServerService.name, () => {
       mocks.user.hasAdmin.mockResolvedValue(false);
 
       await expect(sut.getSystemConfig()).resolves.toMatchObject({ isInitialized: true });
+    });
+
+    it('should omit memory types disabled by the admin', async () => {
+      clearConfigCache();
+      mocks.systemMetadata.get.mockImplementation((key) =>
+        Promise.resolve(
+          key === SystemMetadataKey.SystemConfig ? { memories: { types: { recent_trip: false } } } : null,
+        ),
+      );
+
+      const result = await sut.getSystemConfig();
+
+      expect(result.availableMemoryTypes).toEqual(['on_this_day', 'birthday']);
     });
 
     // Regression guard: getSystemConfig is hit on every page load; must read from cache.
