@@ -620,7 +620,7 @@
   "back": "Mbrapa",
   "back_close_deselect": "Kthehu, mbyll ose çzgjidh",
   "background_location_permission": "Leje vendndodhjeje në sfond",
-  "background_location_permission_content": "Për të ndërruar rrjete kur ekzekutohet në sfond, Immich duhet *gjithmonë* të ketë qasje të saktë në vendndodhje që aplikacioni të mund të lexojë emrin e rrjetit Wi-Fi",
+  "background_location_permission_content": "Për të ndërruar rrjete kur ekzekutohet në sfond, Noodle Gallery duhet *gjithmonë* të ketë qasje të saktë në vendndodhje që aplikacioni të mund të lexojë emrin e rrjetit Wi-Fi",
   "background_options": "Opsionet e sfondit",
   "backup": "Kopje rezervë",
   "backup_album_selection_page_albums_tap": "Trokit për të përfshirë, trokit dy herë për të përjashtuar",
