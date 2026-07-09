@@ -18,6 +18,11 @@ import { AssetTable } from 'src/schema/tables/asset.table';
   using: 'gist',
   expression: 'll_to_earth_public(latitude, longitude)',
 })
+@Index({
+  name: 'idx_asset_exif_description_trigram',
+  using: 'gin',
+  expression: 'f_unaccent("description") gin_trgm_ops',
+})
 @UpdatedAtTrigger('asset_exif_updatedAt')
 export class AssetExifTable {
   @ForeignKeyColumn(() => AssetTable, { onDelete: 'CASCADE', primary: true })

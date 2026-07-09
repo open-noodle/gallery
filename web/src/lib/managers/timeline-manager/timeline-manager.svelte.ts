@@ -109,6 +109,8 @@ export class TimelineManager extends VirtualScrollManager {
   });
 
   isInitialized = $state(false);
+  /** Increments on every (re)load. Views `{#key}` their bucket DOM on it to drop stale nodes. */
+  reloadToken = $state(0);
   isScrollingOnLoad = false;
   grouping: TimelineGrouping = $state(DEFAULT_TIMELINE_GROUPING);
   timelineBuckets: TimelineBucket[] = $state([]);
@@ -345,6 +347,23 @@ export class TimelineManager extends VirtualScrollManager {
     });
   }
 
+  /**
+   * True only when the timeline has finished loading results for exactly `options` (not a
+   * stale prior query) AND that result set is empty. Pages use this instead of reading
+   * `assetCount` directly: right after a filter changes, `assetCount` still reflects the
+   * previous query for a tick (the reload is async), so a naive `assetCount === 0` check can
+   * momentarily look "empty" and unmount the filter panel — stealing focus from an input the
+   * user is typing in. Gating on the loaded options closing that window.
+   */
+  isEmptyForOptions(options: TimelineManagerOptions): boolean {
+    return (
+      this.isInitialized &&
+      this.assetCount === 0 &&
+      this.#options !== TimelineManager.#INIT_OPTIONS &&
+      isEqual(this.#options, options)
+    );
+  }
+
   async updateOptions(options: TimelineManagerOptions) {
     if (this.#destroyed) {
       return;
@@ -369,6 +388,10 @@ export class TimelineManager extends VirtualScrollManager {
 
   async #init(options: TimelineManagerOptions) {
     const sequence = ++this.#initSequence;
+    // Bump on every (re)load so views can `{#key}` their bucket DOM on it. Rapid filter changes
+    // can otherwise leave the keyed {#each months} with stale month nodes mounted (manager state
+    // is correct, but the DOM keeps an old month — they overlap). Remounting on reload clears it.
+    this.reloadToken++;
     this.isInitialized = false;
     this.disconnect();
     this.initTask.cancel();
