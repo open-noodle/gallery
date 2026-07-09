@@ -58,14 +58,13 @@ describe('branding target paths', () => {
     });
   }
 
-  // M8 — the v3 cutover is happening: the rolling branch is now rebased onto
-  // upstream Immich v3.0.1, so `branding/config.json` upstream.version is bumped
-  // to match. The gallery-revert-to-immich-validation workflow boots the Gallery
-  // `:main` image (now v3-based) against
-  // `ghcr.io/immich-app/immich-server:v${upstream.version}`, and revert-to-immich.sql
-  // no longer reverses any post-v3.0.1 upstream migrations because the branch is
-  // based on exactly v3.0.1. Keep this pinned to the base Immich version.
-  it('M8: config.json upstream.version is 3.0.1 (v3 cutover; base is immich v3.0.1)', () => {
-    expect(CONFIG.upstream.version).toBe('3.0.1');
+  // M8 — the branch is rebased onto upstream Immich v3.0.2, so
+  // `branding/config.json` upstream.version is bumped to match. The
+  // gallery-revert-to-immich-validation workflow boots the Gallery `:main` image
+  // (now v3-based) against `ghcr.io/immich-app/immich-server:v${upstream.version}`,
+  // and revert-to-immich.sql reverses no post-v3.0.2 upstream migrations because the
+  // v3.0.1→v3.0.2 delta added none. Keep this pinned to the base Immich version.
+  it('M8: config.json upstream.version is 3.0.2 (base is immich v3.0.2)', () => {
+    expect(CONFIG.upstream.version).toBe('3.0.2');
   });
 });
