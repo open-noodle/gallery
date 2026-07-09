@@ -69,6 +69,12 @@ const MergeScopedPeopleSchema = z
   .object({
     target: ScopedPersonProfileRefSchema.describe('Target scoped profile'),
     sources: z.array(ScopedPersonProfileRefSchema).min(1).describe('Source scoped profiles'),
+    confirmCrossOwner: z
+      .boolean()
+      .optional()
+      .describe(
+        'Acknowledgement that this merge will modify people/faces owned by other users. Required to commit a cross-owner merge.',
+      ),
   })
   .meta({ id: 'MergeScopedPeopleDto' });
 

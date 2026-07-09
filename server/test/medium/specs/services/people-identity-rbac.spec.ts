@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { SearchSuggestionType } from 'src/dtos/search.dto';
 import { AssetVisibility, JobName, SharedSpaceRole, SourceType, UserMetadataKey } from 'src/enum';
@@ -3529,6 +3529,77 @@ describe('People identity RBAC projection', () => {
           sources: [{ type: 'space-person', id: fx.spacePerson.id, spaceId: fx.space.id }],
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    // Issue #733 (mixed case): the identity carries another owner's personal person (which the
+    // toggle-gated cross-owner path would normally allow) AND a shared-space profile in a space the
+    // actor can only view. The identity cannot be cleanly split, so the merge stays hard-blocked even
+    // with the toggle on and confirmed — it must not rewrite the other owner's person.
+    it('hard-blocks a cross-owner merge that also touches a shared-space profile the actor cannot repair, even with the toggle on', async () => {
+      const { ctx, sut, faceIdentityRepository } = setup();
+      const metadata = ctx.getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(
+        SystemMetadataRepository,
+      );
+      metadata.get.mockResolvedValue({
+        server: { mergePeopleAcrossOwners: true },
+        machineLearning: { facialRecognition: { minFaces: 1 } },
+      } as any);
+
+      const { user: actor } = await ctx.newUser();
+      const { user: otherOwner } = await ctx.newUser();
+      const { user: stranger } = await ctx.newUser();
+
+      // Actor's own person -> target identity (resolvable).
+      const { person: actorPerson } = await ctx.newPerson({ ownerId: actor.id, name: 'Actor Alice' });
+      const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(actorPerson.id);
+
+      // A space the actor can repair (Editor) surfaces the source as a space-person the actor resolves.
+      const { space: accessibleSpace } = await ctx.newSharedSpace({ createdById: stranger.id });
+      await ctx.newSharedSpaceMember({ spaceId: accessibleSpace.id, userId: actor.id, role: SharedSpaceRole.Editor });
+
+      // A private space the actor is only a Viewer of also carries the same identity.
+      const { space: viewerSpace } = await ctx.newSharedSpace({ createdById: stranger.id });
+      await ctx.newSharedSpaceMember({ spaceId: viewerSpace.id, userId: stranger.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceMember({ spaceId: viewerSpace.id, userId: actor.id, role: SharedSpaceRole.Viewer });
+
+      // Source identity carries the resolvable space-person, the viewer-space space-person, and the
+      // other owner's personal person.
+      const sourceSpacePerson = await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: accessibleSpace.id, name: 'Space Alice', type: 'person' })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      const sourceIdentity = await faceIdentityRepository.ensureSpacePersonIdentity(sourceSpacePerson.id);
+      await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: viewerSpace.id, identityId: sourceIdentity.id, name: 'Viewer Space Alice', type: 'person' })
+        .execute();
+      const { person: otherOwnerPerson } = await ctx.newPerson({ ownerId: otherOwner.id, name: 'Ada' });
+      await ctx.database
+        .updateTable('person')
+        .set({ identityId: sourceIdentity.id })
+        .where('id', '=', otherOwnerPerson.id)
+        .execute();
+
+      const error = await sut
+        .mergeScopedPeople(factory.auth({ user: actor }), {
+          target: { type: 'person', id: actorPerson.id },
+          sources: [{ type: 'space-person', id: sourceSpacePerson.id, spaceId: accessibleSpace.id }],
+          confirmCrossOwner: true,
+        })
+        .catch((error_: unknown) => error_);
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as ForbiddenException).message).toMatch(/inaccessible attached profiles/i);
+
+      // The other owner's person is not rewritten onto the target identity.
+      const otherOwnerPersonAfter = await ctx.database
+        .selectFrom('person')
+        .select('identityId')
+        .where('id', '=', otherOwnerPerson.id)
+        .executeTakeFirstOrThrow();
+      expect(otherOwnerPersonAfter.identityId).toBe(sourceIdentity.id);
+      expect(otherOwnerPersonAfter.identityId).not.toBe(targetIdentity.id);
     });
   });
 });
