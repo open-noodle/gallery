@@ -8,15 +8,15 @@ import { handleError } from '#lib/utils/handle-error.ts';
 import {
   formatGroupTitle,
   formatTimelineMonthTitle,
-  fromISODateTimeUTC,
   fromTimelinePlainDate,
   fromTimelinePlainDateTime,
   fromTimelinePlainYearMonth,
-  getOrderingDate,
   getTimes,
   setDifference,
   type TimelineDateTime,
   type TimelineYearMonth,
+  getOrderingDate,
+  fromISODateTimeUTCToObject,
 } from '#lib/utils/timeline-util.ts';
 import { AssetOrder, AssetOrderBy, type TimeBucketAssetResponseDto } from '@immich/sdk';
 import { t } from 'svelte-i18n';
@@ -195,7 +195,12 @@ export class TimelineMonth {
         isVideo: !bucketAssets.isImage[i],
         livePhotoVideoId: bucketAssets.livePhotoVideoId[i],
         localDateTime,
-        createdAt: fromISODateTimeUTC(bucketAssets.createdAt[i]).toLocal().toObject(),
+        // Gallery fork: keep createdAt UTC-stable to match the server, which buckets
+        // createdAt by `date_trunc('MONTH', createdAt AT TIME ZONE 'UTC')`. Upstream v3.0.2
+        // (#29666) switched this to `.toLocal()`, which shifts boundary assets out of their
+        // server bucket for negative-offset-TZ viewers → empty /recently-added page. See the
+        // "buckets createdAt by its UTC month" regression test in timeline-manager.svelte.spec.ts.
+        createdAt: fromISODateTimeUTCToObject(bucketAssets.createdAt[i]),
         fileCreatedAt,
         ownerId: bucketAssets.ownerId[i],
         projectionType: bucketAssets.projectionType[i],
