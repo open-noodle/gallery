@@ -154,7 +154,7 @@ void main() {
 
       expect(assets, hasLength(1));
       expect(assets.single.remoteId, stillImage.id);
-      expect(assets.single.livePhotoVideoId, motionVideo.id);
+      expect((assets.single as RemoteAsset).livePhotoVideoId, motionVideo.id);
       expect(buckets, hasLength(1));
       expect(buckets.single.assetCount, 1);
     });
