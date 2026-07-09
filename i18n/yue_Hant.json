@@ -620,7 +620,7 @@
   "back": "上一頁",
   "back_close_deselect": "返回，關閉或者取消選擇",
   "background_location_permission": "後台定位嘅權限",
-  "background_location_permission_content": "為咗可以喺後台行緊嗰陣時換網絡，Immich喺任何時間都一定要有精確位置嘅權限，咁個程式先可以讀取你用緊 Wi-Fi 個名",
+  "background_location_permission_content": "為咗可以喺後台行緊嗰陣時換網絡，Noodle Gallery喺任何時間都一定要有精確位置嘅權限，咁個程式先可以讀取你用緊 Wi-Fi 個名",
   "background_options": "後台選項",
   "backup": "備份",
   "backup_album_selection_page_albums_tap": "一撳包括，雙撳排除",
