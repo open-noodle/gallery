@@ -165,6 +165,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
     retentionDays: 0,
     birthday: true,
     recentTrips: true,
+    types: {},
   },
   reverseGeocoding: {
     enabled: true,
@@ -429,6 +430,22 @@ describe(SystemConfigService.name, () => {
       await expect(sut.getSystemConfig()).resolves.toMatchObject({
         memories: { retentionDays: 365, birthday: true, recentTrips: true },
       });
+    });
+
+    it('should default the per-type memory availability map to empty', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({});
+
+      await expect(sut.getSystemConfig()).resolves.toMatchObject({
+        memories: { types: {} },
+      });
+    });
+
+    it('should accept a per-type memory availability override', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ memories: { types: { recent_trip: false } } });
+
+      const result = await sut.getSystemConfig();
+
+      expect(result.memories.types).toEqual({ recent_trip: false });
     });
 
     it('should accept zero generated memory retention from a config file', async () => {

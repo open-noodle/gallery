@@ -168,7 +168,8 @@ The default configuration looks like this:
   "memories": {
     "birthday": true,
     "recentTrips": true,
-    "retentionDays": 365
+    "retentionDays": 365,
+    "types": {}
   },
   "metadata": {
     "faces": {
@@ -310,23 +311,38 @@ See the [Auto-Classification docs](/features/auto-classification) for the full f
 :::
 
 :::info Memories
-The `memories` section configures generated memory retention and rule families. The same values are available in **Administration → Settings → Memories** when no config file is in use.
+The `memories` section configures generated memory retention and which memory types are globally available. The same values are available in **Administration → Settings → Memories** when no config file is in use.
 
 ```json
 "memories": {
-  "birthday": true,
-  "recentTrips": true,
-  "retentionDays": 365
+  "retentionDays": 365,
+  "types": {}
 }
 ```
 
 - `retentionDays` is the number of days to keep unsaved generated memory records. Set it to `0` to keep memory records forever. Saved memories are not removed by retention cleanup.
-- `birthday` enables or disables birthday rule memories.
-- `recentTrips` enables or disables recent trip rule memories.
+- `types` is a per-type global availability map. Each key is a memory-type key; the value enables (`true`) or disables (`false`) that type for everyone. Omitted keys default to on. Valid keys are:
+  - `on_this_day` — "N years ago" memories
+  - `birthday` — birthday memories for named people
+  - `recent_trip` — recent trip memories
 
-These rule toggles do not disable classic **On this day** memories. To disable all generated memories, set `nightlyTasks.generateMemories` to `false`.
+For example, to disable recent trips globally and leave the rest on:
 
-See the [Memories docs](/features/memories) for details about how retention and generated-memory rules work.
+```json
+"memories": {
+  "types": {
+    "recent_trip": false
+  }
+}
+```
+
+The config file only controls **global availability**. Within each available type, every user can still enable or disable it for themselves in their account settings. Disabling a type globally removes it from every user's settings and immediately hides existing unsaved memories of that type (saved memories are kept).
+
+The per-type switches do not control whether the nightly task runs. To disable all generated memories, set `nightlyTasks.generateMemories` to `false`.
+
+The older `memories.birthday` and `memories.recentTrips` booleans are deprecated but still honored as aliases for `types["birthday"]` and `types["recent_trip"]`. An explicit `types` entry takes precedence over the matching legacy field.
+
+See the [Memories docs](/features/memories) for details about how retention and generated-memory types work.
 :::
 
 ### Step 2 - Specify the file location
