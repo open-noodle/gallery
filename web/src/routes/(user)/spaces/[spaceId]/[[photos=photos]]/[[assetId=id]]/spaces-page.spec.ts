@@ -12,7 +12,7 @@ import { buildSpaceTimelineOptions } from '$lib/utils/space-filter-options';
 import { storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
 import SpacesPage from './+page.svelte';
 
-const OVER_SPACE_ASSET_LIMIT = 10_001;
+const OVER_SPACE_ASSET_LIMIT = 50_001;
 
 const {
   gotoMock,
