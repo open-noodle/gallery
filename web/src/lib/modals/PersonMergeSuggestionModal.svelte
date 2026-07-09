@@ -1,8 +1,12 @@
 <script lang="ts">
   import { getPeopleThumbnailUrl } from '$lib/utils';
+  import {
+    createCrossOwnerMergeHandlers,
+    runScopedMergeWithCrossOwnerConfirmation,
+  } from '$lib/utils/cross-owner-merge';
   import { handleError } from '$lib/utils/handle-error';
   import { isSpaceScopedPerson, toScopedPersonRef } from '$lib/utils/scoped-person-ref';
-  import { mergePeople, mergeScopedPeople, type PersonResponseDto } from '@immich/sdk';
+  import { mergePeople, type PersonResponseDto } from '@immich/sdk';
   import { FormModal, Icon, IconButton, toastManager } from '@immich/ui';
   import { mdiArrowLeft, mdiCallMerge, mdiSwapHorizontal } from '@mdi/js';
   import { onMount, tick } from 'svelte';
@@ -36,14 +40,21 @@
 
   const onSubmit = async () => {
     try {
-      await (isSpaceScopedPerson(personToMerge) || isSpaceScopedPerson(personToBeMergedInto)
-        ? mergeScopedPeople({
-            mergeScopedPeopleDto: {
-              target: toScopedPersonRef(personToBeMergedInto),
-              sources: [toScopedPersonRef(personToMerge)],
-            },
-          })
-        : mergePeople({ mergePersonDto: { ids: [personToBeMergedInto.id, personToMerge.id] } }));
+      if (isSpaceScopedPerson(personToMerge) || isSpaceScopedPerson(personToBeMergedInto)) {
+        const committed = await runScopedMergeWithCrossOwnerConfirmation(
+          {
+            target: toScopedPersonRef(personToBeMergedInto),
+            sources: [toScopedPersonRef(personToMerge)],
+          },
+          createCrossOwnerMergeHandlers(),
+        );
+        if (!committed) {
+          // Cross-owner merge was blocked or the user declined the confirmation — nothing merged.
+          return;
+        }
+      } else {
+        await mergePeople({ mergePersonDto: { ids: [personToBeMergedInto.id, personToMerge.id] } });
+      }
       toastManager.primary($t('merge_people_successfully'));
       onClose([personToMerge, personToBeMergedInto]);
     } catch (error) {
