@@ -44,6 +44,7 @@ import {
   inSharedAlbum,
   isStaleAssetForeignKeyConstraint,
   removeUndefinedKeys,
+  tokenizeForSearch,
   truncatedDate,
   unnest,
   withAnyTagId,
@@ -114,6 +115,9 @@ interface AssetBuilderOptions {
   country?: string;
   make?: string;
   model?: string;
+  originalFileName?: string;
+  description?: string;
+  ocr?: string;
   rating?: number;
   takenAfter?: string;
   takenBefore?: string;
@@ -243,6 +247,16 @@ const addBucketInterval = (bucketStart: string, bucketSize: TimeBucketSize): str
   }
 };
 
+// Escape ILIKE wildcards so user-supplied filter text matches literally — e.g. a filename
+// search for "IMG_2024" must not treat "_" as a single-char wildcard, and "%" must not match
+// everything. Pairs with an `ESCAPE '\'` clause on the ILIKE. Backslash is escaped first so it
+// does not double-escape the wildcard escapes added afterwards.
+const escapeLikePattern = (value: string): string =>
+  value
+    .replaceAll('\\', String.raw`\\`)
+    .replaceAll('%', String.raw`\%`)
+    .replaceAll('_', String.raw`\_`);
+
 export function withTimeBucketAssetFilters<O>(
   qb: SelectQueryBuilder<DB, 'asset', O>,
   options: TimeBucketOptions,
@@ -261,6 +275,7 @@ export function withTimeBucketAssetFilters<O>(
         !!options.country ||
         !!options.make ||
         !!options.model ||
+        !!options.description ||
         options.rating !== undefined,
       (qb) => {
         let q = qb.innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId');
@@ -289,6 +304,13 @@ export function withTimeBucketAssetFilters<O>(
         }
         if (options.rating !== undefined) {
           q = q.where('asset_exif.rating', '>=', options.rating) as any;
+        }
+        if (options.description) {
+          q = q.where(
+            sql`f_unaccent(asset_exif.description)`,
+            'ilike',
+            sql`'%' || f_unaccent(${escapeLikePattern(options.description)}) || '%' escape '\\'`,
+          ) as any;
         }
 
         return q;
@@ -373,6 +395,18 @@ export function withTimeBucketAssetFilters<O>(
       qb.where('asset.duplicateId', options.isDuplicate ? 'is not' : 'is', null),
     )
     .$if(!!options.tagIds?.length, (qb) => withAnyTagId(qb, options.tagIds!))
+    .$if(!!options.originalFileName, (qb) =>
+      qb.where(
+        sql`f_unaccent(asset."originalFileName")`,
+        'ilike',
+        sql`'%' || f_unaccent(${escapeLikePattern(options.originalFileName!)}) || '%' escape '\\'`,
+      ),
+    )
+    .$if(!!options.ocr, (qb) =>
+      qb
+        .innerJoin('ocr_search', 'asset.id', 'ocr_search.assetId')
+        .where(() => sql`f_unaccent(ocr_search.text) %>> f_unaccent(${tokenizeForSearch(options.ocr!).join(' ')})`),
+    )
     .$if(!!options.takenAfter, (qb) => qb.where('asset.localDateTime', '>=', new Date(options.takenAfter!)))
     .$if(!!options.takenBefore, (qb) => qb.where('asset.localDateTime', '<=', new Date(options.takenBefore!)));
 }

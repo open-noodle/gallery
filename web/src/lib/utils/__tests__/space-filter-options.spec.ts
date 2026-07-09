@@ -114,6 +114,23 @@ describe('buildSpaceTimelineOptions', () => {
 
     expect(buildSpaceTimelineOptions('space-1', filters)).not.toHaveProperty('isInAlbum');
   });
+
+  it('includes trimmed description/filename/ocr text filters', () => {
+    const filters = { ...createFilterState(), description: '  beach  ', originalFileName: 'IMG_001', ocr: 'invoice' };
+
+    expect(buildSpaceTimelineOptions('space-1', filters)).toEqual(
+      expect.objectContaining({ description: 'beach', originalFileName: 'IMG_001', ocr: 'invoice' }),
+    );
+  });
+
+  it('omits empty / whitespace-only text filters', () => {
+    const filters = { ...createFilterState(), description: '   ', originalFileName: '', ocr: undefined };
+    const options = buildSpaceTimelineOptions('space-1', filters);
+
+    expect(options).not.toHaveProperty('description');
+    expect(options).not.toHaveProperty('originalFileName');
+    expect(options).not.toHaveProperty('ocr');
+  });
 });
 
 describe('handleSpaceRemoveFilter', () => {
@@ -131,6 +148,13 @@ describe('handleSpaceRemoveFilter', () => {
     expect(result.dateBefore).toBeUndefined();
     expect(result.selectedYear).toBeUndefined();
     expect(result.selectedMonth).toBeUndefined();
+  });
+
+  it('clears description / filename / ocr text filters by chip type', () => {
+    const filters = { ...createFilterState(), description: 'beach', originalFileName: 'IMG', ocr: 'invoice' };
+    expect(handleSpaceRemoveFilter(filters, 'description').description).toBeUndefined();
+    expect(handleSpaceRemoveFilter(filters, 'filename').originalFileName).toBeUndefined();
+    expect(handleSpaceRemoveFilter(filters, 'ocr').ocr).toBeUndefined();
   });
 
   it('timeline chip removal clears only temporal filter state', () => {

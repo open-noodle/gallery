@@ -15,6 +15,7 @@
     mdiImage,
     mdiHeart,
     mdiImageAlbum,
+    mdiTextSearch,
   } from '@mdi/js';
   import { untrack } from 'svelte';
   import type {
@@ -35,6 +36,7 @@
   import MediaTypeFilter from './media-type-filter.svelte';
   import FavoritesFilter from './favorites-filter.svelte';
   import AlbumsFilter from './albums-filter.svelte';
+  import TextFilter from './text-filter.svelte';
 
   interface Props {
     config: FilterPanelConfig;
@@ -337,6 +339,7 @@
     media: mdiImage,
     favorites: mdiHeart,
     albums: mdiImageAlbum,
+    text: mdiTextSearch,
   };
 
   let sectionTitles = $derived<Record<string, string>>({
@@ -349,6 +352,7 @@
     media: $t('media_type'),
     favorites: $t('favorites'),
     albums: $t('albums'),
+    text: $t('filter_text'),
   });
 
   let sectionToggleLabels = $derived<Record<string, string>>({
@@ -649,6 +653,9 @@
           filters.dateAfter !== undefined || filters.dateBefore !== undefined || filters.selectedYear !== undefined
         );
       }
+      case 'text': {
+        return !!filters.description?.trim() || !!filters.originalFileName?.trim() || !!filters.ocr?.trim();
+      }
       default: {
         return false;
       }
@@ -838,6 +845,20 @@
                         ...filters,
                         isInAlbum: value === 'has' ? true : undefined,
                         isNotInAlbum: value === 'none' ? true : undefined,
+                      });
+                    }}
+                  />
+                {:else if section === 'text'}
+                  <TextFilter
+                    description={filters.description}
+                    originalFileName={filters.originalFileName}
+                    ocr={filters.ocr}
+                    onChange={(next) => {
+                      updateFilters({
+                        ...filters,
+                        description: next.description,
+                        originalFileName: next.originalFileName,
+                        ocr: next.ocr,
                       });
                     }}
                   />
