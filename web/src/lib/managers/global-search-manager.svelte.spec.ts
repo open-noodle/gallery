@@ -6425,3 +6425,86 @@ describe('prefix scoping — defensive recent replay of scoped query', () => {
     expect(spy).toHaveBeenCalledWith('@alice');
   });
 });
+
+describe('field-search mode navigation (filename / description / ocr)', () => {
+  beforeEach(() => {
+    mockPage.url = new URL('https://gallery.test/photos');
+    vi.mocked(goto).mockClear();
+  });
+
+  const lastGoto = () => vi.mocked(goto).mock.calls.at(-1)?.[0] as string | undefined;
+
+  it('filename mode navigates to the timeline with ?filename= and no smart ?q=', async () => {
+    const m = new GlobalSearchManager();
+    m.mode = 'metadata';
+
+    await m.activateSearch('IMG_001');
+
+    const dest = lastGoto();
+    expect(dest).toContain('filename=IMG_001');
+    expect(dest).not.toContain('q=');
+  });
+
+  it('description mode navigates with ?description=', async () => {
+    const m = new GlobalSearchManager();
+    m.mode = 'description';
+
+    await m.activateSearch('beach sunset');
+
+    expect(lastGoto()).toContain('description=beach');
+  });
+
+  it('ocr mode navigates with ?ocr=', async () => {
+    const m = new GlobalSearchManager();
+    m.mode = 'ocr';
+
+    await m.activateSearch('invoice total');
+
+    expect(lastGoto()).toContain('ocr=invoice');
+  });
+
+  it('preserves the current searchable-page filters (AND) when navigating', async () => {
+    const m = new GlobalSearchManager();
+    m.mode = 'description';
+    m.registerSearchablePageFilters(() => ({ ...createFilterState(), personIds: ['p1'] }));
+
+    await m.activateSearch('beach');
+
+    const dest = lastGoto();
+    expect(dest).toContain('description=beach');
+    expect(dest).toContain('people=p1');
+  });
+
+  it('field navigation opened on /map targets /photos, not a map ?q= search', async () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/map');
+    m.mode = 'metadata';
+
+    await m.activateSearch('IMG_001');
+
+    const dest = lastGoto();
+    expect(dest).toContain('/photos');
+    expect(dest).toContain('filename=IMG_001');
+    expect(dest).not.toContain('/map');
+  });
+
+  it('smart mode keeps the typed-search ?q= navigation (no regression)', async () => {
+    const m = new GlobalSearchManager();
+    m.mode = 'smart';
+    mockResolvedTypedSearch('beach');
+
+    await m.activateSearch('beach');
+
+    expect(lastGoto()).toContain('q=beach');
+  });
+
+  it('does not field-navigate for an empty query', async () => {
+    const m = new GlobalSearchManager();
+    m.mode = 'description';
+
+    await m.activateSearch('   ');
+
+    const fieldNav = vi.mocked(goto).mock.calls.find((c) => String(c[0]).includes('description='));
+    expect(fieldNav).toBeUndefined();
+  });
+});
