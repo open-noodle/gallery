@@ -23,7 +23,7 @@
 <br/>
 
 > [!NOTE]
-> This is a **community fork** of [Immich](https://github.com/immich-app/immich) with additional features and improvements. Currently based on **Immich v3.0.1**. We regularly sync with upstream to stay up to date. See [What's Different](#whats-different-from-upstream-immich) below.
+> This is a **community fork** of [Immich](https://github.com/immich-app/immich) with additional features and improvements. Currently based on **Immich v3.0.2**. We regularly sync with upstream to stay up to date. See [What's Different](#whats-different-from-upstream-immich) below.
 
 > [!TIP]
 > **Noodle Gallery mobile apps are out!** Back up your photos and browse your library on the go. [Download on the App Store](https://apps.apple.com/il/app/noodle-gallery/id6761776289) · [Get it on Google Play](https://play.google.com/store/apps/details?id=de.opennoodle.gallery)
