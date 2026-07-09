@@ -15,6 +15,7 @@ const getDefaultPreferences = (): UserPreferences => ({
   memories: {
     enabled: true,
     duration: 5,
+    types: { on_this_day: true, birthday: true, recent_trip: true },
   },
   people: {
     enabled: true,
@@ -157,6 +158,35 @@ describe('getPreferences', () => {
     const result = getPreferences(metadata);
     expect(result.cast.gCastEnabled).toBe(true);
   });
+
+  it('should default the memory-type map from the registry', () => {
+    const result = getPreferences([]);
+    expect(result.memories.types).toEqual({ on_this_day: true, birthday: true, recent_trip: true });
+  });
+
+  it('should override a single memory type while keeping siblings at their default', () => {
+    const metadata: UserMetadataItem[] = [
+      {
+        key: UserMetadataKey.Preferences,
+        value: { memories: { types: { birthday: false } } },
+      },
+    ];
+    const result = getPreferences(metadata);
+    expect(result.memories.types.birthday).toBe(false);
+    expect(result.memories.types.on_this_day).toBe(true);
+    expect(result.memories.types.recent_trip).toBe(true);
+  });
+
+  it('should preserve an unknown future memory-type key from stored preferences', () => {
+    const metadata: UserMetadataItem[] = [
+      {
+        key: UserMetadataKey.Preferences,
+        value: { memories: { types: { future_type: true } } },
+      },
+    ];
+    const result = getPreferences(metadata);
+    expect(result.memories.types.future_type).toBe(true);
+  });
 });
 
 describe('getPreferencesPartial', () => {
@@ -216,6 +246,13 @@ describe('getPreferencesPartial', () => {
     const result = getPreferencesPartial(preferences);
     expect(result).toEqual({ albums: { defaultAssetOrder: AssetOrder.Asc } });
   });
+
+  it('should persist only the changed memory type and not unchanged type keys', () => {
+    const preferences = getDefaultPreferences();
+    preferences.memories.types = { on_this_day: true, birthday: false, recent_trip: true };
+    const result = getPreferencesPartial(preferences);
+    expect(result).toEqual({ memories: { types: { birthday: false } } });
+  });
 });
 
 describe('mergePreferences', () => {
@@ -264,5 +301,15 @@ describe('mergePreferences', () => {
     const original = getDefaultPreferences();
     mergePreferences(preferences, {} as any);
     expect(preferences).toEqual(original);
+  });
+
+  it('should merge a single memory type without clobbering the others', () => {
+    const preferences = getDefaultPreferences();
+    preferences.memories.types = { on_this_day: true, birthday: true, recent_trip: true };
+    const dto = { memories: { types: { recent_trip: false } } };
+    const result = mergePreferences(preferences, dto as any);
+    expect(result.memories.types.recent_trip).toBe(false);
+    expect(result.memories.types.birthday).toBe(true);
+    expect(result.memories.types.on_this_day).toBe(true);
   });
 });
