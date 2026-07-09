@@ -700,6 +700,8 @@ export type UserPreferences = {
     enabled: boolean;
     duration: number;
     sidebarWeb: boolean;
+    /** per-memory-type enable map; default built from the registry */
+    types: Record<string, boolean>;
   };
   people: {
     enabled: boolean;
