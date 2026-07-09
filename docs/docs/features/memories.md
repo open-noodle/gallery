@@ -11,6 +11,8 @@ Gallery supports two memory families:
 | **On this day** | Photos taken around the same calendar day in previous years | App-generated "N years ago" title  |
 | **Rule memory** | Server-curated sets such as birthdays and recent trips      | Server-provided title and subtitle |
 
+Each individual type — **On this day**, **Birthdays**, and **Recent trips** — can be enabled or disabled both globally by an admin and per user. See [Generated memory controls](#generated-memory-controls) below.
+
 Saved memories stay available after their normal display window. Hidden or deleted assets are excluded from generated memories.
 
 ## Birthday memories
@@ -60,26 +62,68 @@ You can enable, disable, or reschedule this task from **Administration → Setti
 
 You can browse retained memories from **Memories** in the Library section of the web sidebar. The page shows all retained generated memories, grouped by the date they were shown. It has local search and an **All/Saved** filter. Opening a card uses the same full-screen memory viewer as the daily memory lane.
 
-You can configure generated memories from **Administration → Settings → Memories**. If you run Gallery with a config file, the settings page is read-only and these values must be changed in the config file instead.
+### Memory types you can turn on or off
 
-| Setting                  | Default | Behavior                                                                                            |
-| ------------------------ | ------- | --------------------------------------------------------------------------------------------------- |
-| `memories.retentionDays` | `365`   | Number of days to keep unsaved generated memory records. Set to `0` to keep memory records forever. |
-| `memories.birthday`      | `true`  | Enables or disables birthday rule memories.                                                         |
-| `memories.recentTrips`   | `true`  | Enables or disables recent trip rule memories.                                                      |
+Every memory type is controlled at two independent layers:
+
+- **Admin availability** — a global per-type switch controlled by the admin. A type that is disabled here is never generated for anyone and disappears from every user's settings.
+- **Per-user toggle** — for any type the admin leaves available, each user chooses whether they personally receive it.
+
+A user receives a memory type only when it is **both** globally available **and** enabled in that user's own settings.
+
+The three built-in types each have a stable key used in configuration:
+
+| Type key      | Setting label | Controls                                |
+| ------------- | ------------- | --------------------------------------- |
+| `on_this_day` | On this day   | "N years ago" photo memories            |
+| `birthday`    | Birthdays     | Birthday rule memories for named people |
+| `recent_trip` | Recent trips  | Recent trip rule memories               |
+
+All three default to **on**.
+
+### Per-user toggles
+
+Each user manages their own memory types from **Account Settings → Features → Memories**. Below the master memory switch, a toggle appears for every memory type the admin has made available. Turning one off:
+
+- stops new memories of that type from being generated for that user, and
+- immediately hides that user's existing **unsaved** memories of that type from the memory lane and the Memories page.
+
+Saved memories are always kept and shown, even after their type is later disabled.
+
+### Admin settings
+
+You configure global memory availability and retention from **Administration → Settings → Memories**. If you run Gallery with a [config file](/install/config-file), the settings page is read-only and these values must be changed in the config file instead. Per-user toggles are stored per user and stay user-controlled even when a config file is in use — the config file only sets which types are globally available.
+
+| Setting                  | Default | Behavior                                                                                                               |
+| ------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `memories.retentionDays` | `365`   | Number of days to keep unsaved generated memory records. Set to `0` to keep memory records forever.                    |
+| `memories.types`         | `{}`    | Per-type global availability map (`{ "<type key>": true \| false }`). Omitted keys default to on (see the keys above). |
+
+Disabling a type globally (for example `"recent_trip": false`) stops generation for everyone, removes the type from every user's settings, and immediately hides existing **unsaved** memories of that type. Saved memories are exempt.
 
 Memory retention only removes unsaved memory records. Saved memories are kept regardless of age. Cleanup uses the memory display date (`showAt`) when available, otherwise it uses the memory creation date. Cleanup still removes links to hidden, archived, or deleted assets even when `memories.retentionDays` is `0`.
 
-The birthday and recent trip switches only control those rule-memory families. Classic **On this day** memories still run while the nightly **Generate memories** task is enabled. The global `nightlyTasks.generateMemories` setting controls whether any generated memories are created at all.
+The per-type switches only control which memory types are generated and shown. The global `nightlyTasks.generateMemories` setting controls whether the nightly task runs at all — turning it off disables every generated memory type regardless of the per-type and per-user settings.
 
-Example config-file override:
+#### Legacy `birthday` / `recentTrips` fields
+
+Earlier versions exposed two booleans, `memories.birthday` and `memories.recentTrips`. They are **deprecated but still honored** for back-compat as aliases:
+
+- `memories.birthday` ⇒ `memories.types["birthday"]`
+- `memories.recentTrips` ⇒ `memories.types["recent_trip"]`
+
+Resolution precedence per type is: an explicit `types[key]` wins, otherwise the legacy boolean is used, otherwise the type defaults to on. Prefer the `types` map for new configuration — it also covers `on_this_day`, which the legacy fields could not control.
+
+Example config-file override that keeps trips, turns off **On this day**, and keeps memory records forever:
 
 ```json
 {
   "memories": {
     "retentionDays": 0,
-    "birthday": false,
-    "recentTrips": true
+    "types": {
+      "on_this_day": false,
+      "recent_trip": true
+    }
   }
 }
 ```
