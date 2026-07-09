@@ -166,6 +166,35 @@ describe('FilterState utilities', () => {
     expect(cleared.selectedYear).toBeUndefined();
     expect(cleared.selectedMonth).toBeUndefined();
   });
+
+  it('should count description, filename, and ocr text filters as active', () => {
+    const state = createFilterState();
+    state.description = 'beach';
+    expect(getActiveFilterCount(state)).toBe(1);
+
+    state.originalFileName = 'IMG';
+    expect(getActiveFilterCount(state)).toBe(2);
+
+    state.ocr = 'invoice';
+    expect(getActiveFilterCount(state)).toBe(3);
+  });
+
+  it('should not count whitespace-only or empty text filters as active', () => {
+    const state = createFilterState();
+    state.description = '   ';
+    state.originalFileName = '';
+    state.ocr = undefined;
+    expect(getActiveFilterCount(state)).toBe(0);
+  });
+
+  it('should clear text filters on clearFilters', () => {
+    const state = { ...createFilterState(), description: 'beach', originalFileName: 'IMG', ocr: 'invoice' };
+
+    const cleared = clearFilters(state);
+    expect(cleared.description).toBeUndefined();
+    expect(cleared.originalFileName).toBeUndefined();
+    expect(cleared.ocr).toBeUndefined();
+  });
 });
 
 describe('buildFilterContext', () => {
