@@ -25,6 +25,7 @@ export const preferencesFactory = Sync.makeFactory<UserPreferencesResponseDto>({
     enabled: false,
     duration: 5,
     sidebarWeb: false,
+    types: {},
   },
   people: {
     enabled: false,
