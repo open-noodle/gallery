@@ -168,6 +168,9 @@ describe(SyncRequestType.AlbumToAssetsV1, () => {
 
     const { album: sharedAlbum } = await ctx.newAlbum({ ownerId: user2.id });
     await ctx.newAlbumAsset({ albumId: sharedAlbum.id, assetId: sharedAsset1.id });
+    // ensure sharedAsset1's album_asset gets a strictly smaller updateId than sharedAsset2's:
+    // immich_uuid_v7 only encodes a millisecond timestamp, so same-millisecond inserts would
+    // order randomly and the ordered backfill assertion below would flake.
     await wait(2);
     await ctx.newAlbumAsset({ albumId: sharedAlbum.id, assetId: sharedAsset2.id });
 

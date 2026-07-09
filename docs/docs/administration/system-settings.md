@@ -174,6 +174,15 @@ Overrides the domain name in shared links and email notifications. The URL shoul
 
 The administrator can set a custom message on the login screen (the message will be displayed to all users).
 
+### Cross-Owner People Merges
+
+**What it does:** lets users merge people and faces that span different owners and external libraries — for example a [Shared Space](/features/shared-spaces) person assembled from several members' photos, or a person tied to a connected external library. Such a merge re-links the affected faces onto the merged person and rewrites how those people are grouped, so it modifies people and faces owned by other users and may not be cleanly reversible.
+
+**How to enable it:** this is the instance-wide switch for the feature, and it is **off by default**. An administrator turns on **Allow cross-owner people merges** here in Server Settings (`server.mergePeopleAcrossOwners`). Only administrators can change this setting.
+
+- **When off**, cross-owner merges are blocked for everyone, with a message explaining that the person also appears in another user's library.
+- **When on**, cross-owner merging becomes a normal action for any user with merge access. Because it changes other users' people, the user is asked to explicitly confirm each cross-owner merge before it commits.
+
 ## Storage Template
 
 Gallery supports a custom [Storage Template](/administration/storage-template). Learn more about this feature and its configuration [here](/administration/storage-template).
