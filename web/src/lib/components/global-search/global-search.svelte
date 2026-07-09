@@ -829,6 +829,9 @@
                 status={manager.sections.photos}
                 idPrefix="photo"
                 onActivate={(item) => manager.activate('photo', item)}
+                onSeeAll={manager.mode === 'smart' ? undefined : () => void manager.activateSearch(manager.query)}
+                seeAllAlways={manager.mode !== 'smart'}
+                seeAllLabel={$t('cmdk_see_all_results')}
               >
                 {#snippet renderRow(item)}
                   <PhotoRow item={item as never} />
@@ -1236,6 +1239,9 @@
                   status={manager.sections.photos}
                   idPrefix="photo"
                   onActivate={(item) => manager.activate('photo', item)}
+                  onSeeAll={manager.mode === 'smart' ? undefined : () => void manager.activateSearch(manager.query)}
+                  seeAllAlways={manager.mode !== 'smart'}
+                  seeAllLabel={$t('cmdk_see_all_results')}
                 >
                   {#snippet renderRow(item)}
                     <PhotoRow item={item as never} />
