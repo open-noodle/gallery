@@ -41,13 +41,11 @@
     searchSmart,
     type SmartSearchDto,
   } from '@immich/sdk';
-  import { ActionButton, CommandPaletteDefaultProvider, Icon, IconButton, modalManager } from '@immich/ui';
+  import { ActionButton, CommandPaletteDefaultProvider, Icon, IconButton } from '@immich/ui';
   import { mdiArrowLeft, mdiClose, mdiDotsVertical, mdiImageOffOutline, mdiSelectAll } from '@mdi/js';
   import { tick, untrack } from 'svelte';
   import { t } from 'svelte-i18n';
   import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
-  import SearchAddAllButton from '#lib/components/search/SearchAddAllButton.svelte';
-  import SearchAddAllToCollectionModal from '#lib/modals/SearchAddAllToCollectionModal.svelte';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
 
@@ -163,15 +161,6 @@
 
   const handleSelectAll = () => {
     assetMultiSelectManager.selectAssets(searchResultAssets.map((asset) => toTimelineAsset(asset)));
-  };
-
-  const handleAddAllToCollection = () => {
-    void modalManager.show(SearchAddAllToCollectionModal, {
-      terms,
-      total: searchResultTotal,
-      smartSearchEnabled,
-      language: $lang,
-    });
   };
 
   async function onSearchQueryUpdate() {
@@ -387,9 +376,6 @@
 >
   <section id="search-content">
     {#if searchResultAssets.length > 0}
-      <div class="mb-3 flex justify-end px-2">
-        <SearchAddAllButton total={searchResultTotal} onclick={handleAddAllToCollection} />
-      </div>
       <GalleryViewer
         assets={searchResultAssets}
         assetInteraction={assetMultiSelectManager}

@@ -15,13 +15,15 @@
   import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '#lib/components/timeline/Timeline.svelte';
   import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
+  import SearchAddAllToCollectionModal from '#lib/modals/SearchAddAllToCollectionModal.svelte';
+  import { lang } from '#lib/stores/preferences.store.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
   import type { TimelineGrouping, TimelineTemporalAnchor } from '#lib/managers/timeline-manager/types.ts';
   import { getAssetBulkActions } from '#lib/services/asset.service.ts';
   import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '#lib/utils/timeline-zoom-navigation.ts';
   import { getTimelineTopVisibleAnchor } from '#lib/managers/timeline-manager/timeline-anchor.ts';
-  import { ActionButton, CommandPaletteDefaultProvider } from '@immich/ui';
+  import { ActionButton, CommandPaletteDefaultProvider, modalManager } from '@immich/ui';
   import { mdiDotsVertical } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
@@ -33,6 +35,15 @@
   let { data }: Props = $props();
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
+
+  const handleAddAllToCollection = () => {
+    void modalManager.show(SearchAddAllToCollectionModal, {
+      terms: { isFavorite: true },
+      total: timelineManager?.assetCount ?? 0,
+      smartSearchEnabled: false,
+      language: $lang,
+    });
+  };
   let timelineGrouping = $state<TimelineGrouping>('day');
   let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
   const baseTimelineOptions = { isFavorite: true, withStacked: true };
@@ -84,7 +95,9 @@
   <TimelineRouteGroupingBar
     grouping={timelineGrouping}
     hidden={hideGroupingControls}
+    resultCount={timelineManager?.assetCount ?? 0}
     onGroupingChange={handleTimelineGroupingChange}
+    onAddAllToCollection={handleAddAllToCollection}
   />
   <Timeline
     enableRouting={true}

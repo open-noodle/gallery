@@ -110,4 +110,48 @@ describe('TimelineRouteGroupingBar', () => {
     expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
     expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument();
   });
+
+  it('surfaces the add-all-to-collection action when a handler and results are provided (no temporal filter)', async () => {
+    const onAddAllToCollection = vi.fn();
+    render(TimelineRouteGroupingBar, {
+      props: {
+        grouping: 'month',
+        resultCount: 42,
+        onGroupingChange: () => {},
+        onAddAllToCollection,
+      },
+    });
+
+    const button = screen.getByTestId('add-all-to-collection');
+    expect(button).toBeInTheDocument();
+    await fireEvent.click(button);
+    expect(onAddAllToCollection).toHaveBeenCalled();
+  });
+
+  it('does not surface the add-all action without a handler', async () => {
+    render(TimelineRouteGroupingBar, {
+      props: {
+        grouping: 'month',
+        resultCount: 42,
+        onGroupingChange: () => {},
+      },
+    });
+
+    await screen.findByTestId('timeline-desktop-grouping-control');
+    expect(screen.queryByTestId('add-all-to-collection')).not.toBeInTheDocument();
+  });
+
+  it('does not surface the add-all action when there are no results', async () => {
+    render(TimelineRouteGroupingBar, {
+      props: {
+        grouping: 'month',
+        resultCount: 0,
+        onGroupingChange: () => {},
+        onAddAllToCollection: vi.fn(),
+      },
+    });
+
+    await screen.findByTestId('timeline-desktop-grouping-control');
+    expect(screen.queryByTestId('add-all-to-collection')).not.toBeInTheDocument();
+  });
 });
