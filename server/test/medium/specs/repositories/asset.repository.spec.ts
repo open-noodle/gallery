@@ -1115,6 +1115,125 @@ describe(AssetRepository.name, () => {
           id: [time1DSC0001Asset.id, time1DSC0002Asset.id, time2DSC0003Asset.id, time2DSC0004Asset.id],
         }),
       );
+    it('filters bucket assets by description (accent/case-insensitive substring)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user: { id: user.id } });
+
+      const [{ asset: match }, { asset: other }] = await Promise.all([
+        ctx.newAsset({
+          ownerId: user.id,
+          fileCreatedAt: new Date('2026-03-08T12:00:00.000Z'),
+          localDateTime: new Date('2026-03-08T12:00:00.000Z'),
+        }),
+        ctx.newAsset({
+          ownerId: user.id,
+          fileCreatedAt: new Date('2026-03-08T13:00:00.000Z'),
+          localDateTime: new Date('2026-03-08T13:00:00.000Z'),
+        }),
+      ]);
+      await Promise.all([
+        ctx.newExif({ assetId: match.id, description: 'A lovely beach sunset', timeZone: 'UTC' }),
+        ctx.newExif({ assetId: other.id, description: 'Mountain hike', timeZone: 'UTC' }),
+      ]);
+
+      const bucket = await sut.getTimeBucket(
+        '2026-03-01',
+        { userIds: [user.id], visibility: AssetVisibility.Timeline, description: 'BEACH' },
+        auth,
+      );
+      expect(JSON.parse(bucket.assets).id).toEqual([match.id]);
+    });
+
+    it('filters bucket assets by originalFileName (accent/case-insensitive substring)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user: { id: user.id } });
+
+      const [{ asset: match }, { asset: other }] = await Promise.all([
+        ctx.newAsset({
+          ownerId: user.id,
+          originalFileName: 'IMG_beach_0001.jpg',
+          fileCreatedAt: new Date('2026-03-08T12:00:00.000Z'),
+          localDateTime: new Date('2026-03-08T12:00:00.000Z'),
+        }),
+        ctx.newAsset({
+          ownerId: user.id,
+          originalFileName: 'IMG_forest_0002.jpg',
+          fileCreatedAt: new Date('2026-03-08T13:00:00.000Z'),
+          localDateTime: new Date('2026-03-08T13:00:00.000Z'),
+        }),
+      ]);
+      await Promise.all([
+        ctx.newExif({ assetId: match.id, timeZone: 'UTC' }),
+        ctx.newExif({ assetId: other.id, timeZone: 'UTC' }),
+      ]);
+
+      const bucket = await sut.getTimeBucket(
+        '2026-03-01',
+        { userIds: [user.id], visibility: AssetVisibility.Timeline, originalFileName: 'BEACH' },
+        auth,
+      );
+      expect(JSON.parse(bucket.assets).id).toEqual([match.id]);
+    });
+
+    it('filters bucket assets by ocr text', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user: { id: user.id } });
+
+      const [{ asset: match }, { asset: other }] = await Promise.all([
+        ctx.newAsset({
+          ownerId: user.id,
+          fileCreatedAt: new Date('2026-03-08T12:00:00.000Z'),
+          localDateTime: new Date('2026-03-08T12:00:00.000Z'),
+        }),
+        ctx.newAsset({
+          ownerId: user.id,
+          fileCreatedAt: new Date('2026-03-08T13:00:00.000Z'),
+          localDateTime: new Date('2026-03-08T13:00:00.000Z'),
+        }),
+      ]);
+      await Promise.all([
+        ctx.newExif({ assetId: match.id, timeZone: 'UTC' }),
+        ctx.newExif({ assetId: other.id, timeZone: 'UTC' }),
+      ]);
+      await ctx.database
+        .insertInto('ocr_search')
+        .values({ assetId: match.id, text: 'Total amount due invoice receipt' })
+        .execute();
+
+      const bucket = await sut.getTimeBucket(
+        '2026-03-01',
+        { userIds: [user.id], visibility: AssetVisibility.Timeline, ocr: 'invoice receipt' },
+        auth,
+      );
+      expect(JSON.parse(bucket.assets).id).toEqual([match.id]);
+    });
+
+    it('projects owner-scoped isFavorite, isImage and ratio for matched assets', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user: { id: user.id } });
+
+      const { asset } = await ctx.newAsset({
+        ownerId: user.id,
+        type: AssetType.Image,
+        isFavorite: true,
+        fileCreatedAt: new Date('2026-03-08T12:00:00.000Z'),
+        localDateTime: new Date('2026-03-08T12:00:00.000Z'),
+      });
+      await ctx.newExif({ assetId: asset.id, timeZone: 'UTC' });
+
+      const bucket = await sut.getTimeBucket(
+        '2026-03-01',
+        { userIds: [user.id], visibility: AssetVisibility.Timeline },
+        auth,
+      );
+      const parsed = JSON.parse(bucket.assets);
+      expect(parsed.id).toEqual([asset.id]);
+      expect(parsed.isImage).toEqual([true]);
+      expect(parsed.isFavorite).toEqual([true]);
     });
   });
 
