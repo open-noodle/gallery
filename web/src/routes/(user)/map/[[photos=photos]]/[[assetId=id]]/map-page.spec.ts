@@ -271,4 +271,19 @@ describe('Map page query intersection', () => {
       expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
     });
   });
+
+  it('shows the add-all-to-collection button when the map is filtered with markers', async () => {
+    mockPage.url = new URL('https://gallery.test/map?q=beach');
+    sdkMock.getFilteredMapMarkers.mockResolvedValue([{ id: 'asset-1', lat: 1, lon: 2 } as never]);
+    sdkMock.searchSmart.mockResolvedValueOnce({
+      assets: { items: [{ id: 'asset-1' }], nextPage: null },
+      albums: { items: [], nextPage: null },
+    } as never);
+
+    renderPage();
+    await flushQueryDebounce();
+    await flushMapLoad();
+
+    expect(await screen.findByTestId('add-all-to-collection')).toBeInTheDocument();
+  });
 });
