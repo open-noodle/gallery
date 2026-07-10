@@ -416,4 +416,21 @@ describe('album detail filter panel route', () => {
     // grouping wrapper and the bar's flex-1 column share the FilterToolbar root
     expect(grouping.parentElement).toBe(bar.parentElement?.parentElement);
   });
+
+  it('shows the add-all-to-collection button once an album filter is active', async () => {
+    renderPage();
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByTestId('people-item-person-view')).toBeInTheDocument());
+    await user.click(screen.getByTestId('people-item-person-view'));
+
+    expect(await screen.findByTestId('add-all-to-collection')).toBeInTheDocument();
+  });
+
+  it('does not show the add-all-to-collection button without an active album filter', async () => {
+    renderPage();
+
+    await screen.findByTestId('timeline-options');
+    expect(screen.queryByTestId('add-all-to-collection')).not.toBeInTheDocument();
+  });
 });
