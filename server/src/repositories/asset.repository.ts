@@ -1323,9 +1323,24 @@ export class AssetRepository {
     const order = options.order === AssetOrder.Asc ? AssetOrder.Asc : AssetOrder.Desc;
     const bucketSize = options.bucketSize ?? TimeBucketSize.Month;
     const query = this.db
+      // Stage 1 — FILTER: reuse the shared timeline filter chain (the same one
+      // getTimeBuckets/getTimeBucketCovers use) so the asset list can never drift
+      // out of sync with the scrubber counts. Selects ids only; asset_exif is
+      // joined by the helper only when an exif filter is active.
+      .with('filtered', (qb) =>
+        withTimeBucketAssetFilters(
+          qb
+            .selectFrom('asset')
+            .select('asset.id')
+            .where(truncatedDate(options.orderBy, bucketSize), '=', timeBucket.replace(/^[+-]/, '')),
+          options,
+        ),
+      )
+      // Stage 2 — PROJECT: build the columnar row shape for the matched ids.
       .with('cte', (qb) =>
         qb
-          .selectFrom('asset')
+          .selectFrom('filtered')
+          .innerJoin('asset', 'asset.id', 'filtered.id')
           .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
           .select((eb) => [
             'asset.duration',
@@ -1452,18 +1467,10 @@ export class AssetRepository {
             ),
           )
           .$if(options.isFavorite !== undefined, (qb) => qb.where('asset.isFavorite', '=', options.isFavorite!))
+          // withStacked collapses a stack to its primary asset (filtered in Stage 1)
+          // and projects the [stackId, count] array for the columnar output.
           .$if(!!options.withStacked, (qb) =>
             qb
-              .where((eb) =>
-                eb.not(
-                  eb.exists(
-                    eb
-                      .selectFrom('stack')
-                      .whereRef('stack.id', '=', 'asset.stackId')
-                      .whereRef('stack.primaryAssetId', '!=', 'asset.id'),
-                  ),
-                ),
-              )
               .leftJoinLateral(
                 (eb) =>
                   eb
@@ -1478,14 +1485,6 @@ export class AssetRepository {
               )
               .select('stack'),
           )
-          .$if(!!options.assetType, (qb) => qb.where('asset.type', '=', options.assetType!))
-          .$if(options.isDuplicate !== undefined, (qb) =>
-            qb.where('asset.duplicateId', options.isDuplicate ? 'is not' : 'is', null),
-          )
-          .$if(!!options.isTrashed, (qb) => qb.where('asset.status', '!=', AssetStatus.Deleted))
-          .$if(!!options.tagIds?.length, (qb) => withAnyTagId(qb, options.tagIds!))
-          .$if(!!options.takenAfter, (qb) => qb.where('asset.localDateTime', '>=', new Date(options.takenAfter!)))
-          .$if(!!options.takenBefore, (qb) => qb.where('asset.localDateTime', '<=', new Date(options.takenBefore!)))
           .orderBy(
             options.orderBy === AssetOrderBy.CreatedAt
               ? sql`"createdAt"`
