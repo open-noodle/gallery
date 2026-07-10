@@ -977,4 +977,13 @@ describe('Photos page search URL state', () => {
       );
     });
   });
+
+  it('wires the add-all handler into the active filters bar', async () => {
+    mockPage.url = new URL('https://gallery.test/photos?description=beach');
+
+    renderPage();
+
+    const bar = await screen.findByTestId('active-filters-bar-stub');
+    expect(bar).toHaveAttribute('data-has-add-all', 'true');
+  });
 });
