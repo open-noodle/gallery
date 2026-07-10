@@ -12,6 +12,8 @@
   import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '$lib/components/timeline/Timeline.svelte';
   import TimelineRouteGroupingBar from '$lib/components/timeline/TimelineRouteGroupingBar.svelte';
+  import SearchAddAllToCollectionModal from '$lib/modals/SearchAddAllToCollectionModal.svelte';
+  import { lang } from '$lib/stores/preferences.store';
   import { AssetAction } from '$lib/constants';
 
   import SetVisibilityAction from '$lib/components/timeline/actions/SetVisibilityAction.svelte';
@@ -23,7 +25,7 @@
   import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
   import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
   import { AssetVisibility } from '@immich/sdk';
-  import { ActionButton, CommandPaletteDefaultProvider } from '@immich/ui';
+  import { ActionButton, CommandPaletteDefaultProvider, modalManager } from '@immich/ui';
   import { mdiDotsVertical } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
@@ -34,6 +36,15 @@
 
   let { data }: Props = $props();
   let timelineManager = $state<TimelineManager>() as TimelineManager;
+
+  const handleAddAllToCollection = () => {
+    void modalManager.show(SearchAddAllToCollectionModal, {
+      terms: { visibility: AssetVisibility.Archive },
+      total: timelineManager?.assetCount ?? 0,
+      smartSearchEnabled: false,
+      language: $lang,
+    });
+  };
   let timelineGrouping = $state<TimelineGrouping>('day');
   let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
   const baseTimelineOptions = { visibility: AssetVisibility.Archive };
@@ -96,7 +107,9 @@
   <TimelineRouteGroupingBar
     grouping={timelineGrouping}
     hidden={hideGroupingControls}
+    resultCount={timelineManager?.assetCount ?? 0}
     onGroupingChange={handleTimelineGroupingChange}
+    onAddAllToCollection={handleAddAllToCollection}
   />
   <Timeline
     enableRouting={true}
