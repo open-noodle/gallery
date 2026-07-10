@@ -9,10 +9,10 @@ import type { Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import { asBearerAuth, utils } from 'src/utils';
 
-// E2E for the "add all filter results to album/space" feature on the search page.
+// E2E for the "add all filter results to album/space" feature in the filter bar.
 //
-// A header button ("Add all N to…") on the search-results page collects every
-// asset matching the current filter (by paging the search API) and adds them to
+// An "Add all N to…" button in the filter bar collects every asset
+// matching the current filter (by paging the search API) and adds them to
 // the chosen album/space via the existing CollectionPickerModal — without the
 // user hand-selecting anything.
 //
@@ -22,7 +22,6 @@ import { asBearerAuth, utils } from 'src/utils';
 // prove the feature adds only the filter matches, not the whole library.
 
 const MATCHING_COUNT = 3;
-const SEARCH_QUERY = encodeURIComponent(JSON.stringify({ isFavorite: true }));
 
 /** Clicks the "Add all …" header button and returns the opened picker dialog. */
 async function openAddAllPicker(page: Page) {
@@ -37,7 +36,7 @@ async function openAddAllPicker(page: Page) {
   return dialog;
 }
 
-test.describe('Search — add all filter results to album/space', () => {
+test.describe('Add all filter results to album/space (favorites surface)', () => {
   let admin: LoginResponseDto;
   let album: AlbumResponseDto;
   let space: SharedSpaceResponseDto;
@@ -67,7 +66,7 @@ test.describe('Search — add all filter results to album/space', () => {
 
   test('adds every matching result to an album (and excludes non-matches)', async ({ context, page }) => {
     await utils.setAuthCookies(context, admin.accessToken);
-    await page.goto(`/search?query=${SEARCH_QUERY}`);
+    await page.goto(`/favorites`);
 
     const dialog = await openAddAllPicker(page);
 
@@ -87,7 +86,7 @@ test.describe('Search — add all filter results to album/space', () => {
 
   test('adds every matching result to a space', async ({ context, page }) => {
     await utils.setAuthCookies(context, admin.accessToken);
-    await page.goto(`/search?query=${SEARCH_QUERY}`);
+    await page.goto(`/favorites`);
 
     const dialog = await openAddAllPicker(page);
 

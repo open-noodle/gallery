@@ -58,3 +58,73 @@ describe('ActiveFiltersBar search chip', () => {
     expect(screen.queryByTestId('search-chip')).not.toBeInTheDocument();
   });
 });
+
+describe('ActiveFiltersBar add-all-to-collection button', () => {
+  const activeFilters = () => ({ ...createFilterState(), description: 'beach' });
+
+  it('renders when a filter is active, results exist, and a handler is provided', () => {
+    render(ActiveFiltersBar, {
+      props: {
+        filters: activeFilters(),
+        onRemoveFilter: vi.fn(),
+        onClearAll: vi.fn(),
+        resultCount: 42,
+        onAddAllToCollection: vi.fn(),
+      },
+    });
+    expect(screen.getByTestId('add-all-to-collection')).toBeInTheDocument();
+  });
+
+  it('does not render when there are no results', () => {
+    render(ActiveFiltersBar, {
+      props: {
+        filters: activeFilters(),
+        onRemoveFilter: vi.fn(),
+        onClearAll: vi.fn(),
+        resultCount: 0,
+        onAddAllToCollection: vi.fn(),
+      },
+    });
+    expect(screen.queryByTestId('add-all-to-collection')).not.toBeInTheDocument();
+  });
+
+  it('does not render on surfaces that pass no handler', () => {
+    render(ActiveFiltersBar, {
+      props: {
+        filters: activeFilters(),
+        onRemoveFilter: vi.fn(),
+        onClearAll: vi.fn(),
+        resultCount: 42,
+      },
+    });
+    expect(screen.queryByTestId('add-all-to-collection')).not.toBeInTheDocument();
+  });
+
+  it('does not render when no filter is active', () => {
+    render(ActiveFiltersBar, {
+      props: {
+        filters: createFilterState(),
+        onRemoveFilter: vi.fn(),
+        onClearAll: vi.fn(),
+        resultCount: 42,
+        onAddAllToCollection: vi.fn(),
+      },
+    });
+    expect(screen.queryByTestId('add-all-to-collection')).not.toBeInTheDocument();
+  });
+
+  it('calls onAddAllToCollection when clicked', async () => {
+    const onAddAllToCollection = vi.fn();
+    render(ActiveFiltersBar, {
+      props: {
+        filters: activeFilters(),
+        onRemoveFilter: vi.fn(),
+        onClearAll: vi.fn(),
+        resultCount: 42,
+        onAddAllToCollection,
+      },
+    });
+    await userEvent.click(screen.getByTestId('add-all-to-collection'));
+    expect(onAddAllToCollection).toHaveBeenCalled();
+  });
+});

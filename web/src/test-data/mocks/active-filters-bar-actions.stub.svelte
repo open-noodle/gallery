@@ -10,9 +10,10 @@
     onClearSearch?: () => void;
     onClearAll?: () => void;
     onRemoveFilter?: (type: string, id?: string) => void;
+    onAddAllToCollection?: () => void;
   };
 
-  let { filters, searchQuery = '', onClearSearch, onClearAll, onRemoveFilter }: Props = $props();
+  let { filters, searchQuery = '', onClearSearch, onClearAll, onRemoveFilter, onAddAllToCollection }: Props = $props();
 </script>
 
 <div
@@ -21,6 +22,7 @@
   data-selected-month={filters?.selectedMonth ?? ''}
   data-date-after={filters?.dateAfter ?? ''}
   data-date-before={filters?.dateBefore ?? ''}
+  data-has-add-all={String(!!onAddAllToCollection)}
 >
   <button type="button" data-testid="active-filters-clear-search" onclick={() => onClearSearch?.()}>Clear search</button
   >

@@ -239,4 +239,21 @@ describe('Archive page timeline grouping', () => {
       expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
     });
   });
+
+  it('shows the add-all-to-collection button when the surface has results', async () => {
+    timelineStubGlobals.__timelineStubAssetCount = 3;
+
+    renderPage();
+
+    expect(await screen.findByTestId('add-all-to-collection')).toBeInTheDocument();
+  });
+
+  it('hides the add-all-to-collection button when empty', async () => {
+    timelineStubGlobals.__timelineStubAssetCount = 0;
+
+    renderPage();
+
+    await screen.findByTestId('timeline-stub');
+    expect(screen.queryByTestId('add-all-to-collection')).not.toBeInTheDocument();
+  });
 });
