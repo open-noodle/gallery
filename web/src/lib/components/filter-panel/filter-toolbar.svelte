@@ -36,7 +36,10 @@
   -->
   <div
     class={twMerge(
-      'shrink-0 items-center gap-3 bg-transparent px-4 py-2 dark:bg-transparent',
+      // pointer-fine:pe-15 (60px) reserves the timeline Scrubber's DESKTOP_WIDTH on the right so the
+      // bar's right-aligned actions (Clear all, Add-all-to-collection) don't sit under the scrubber and
+      // stay fully clickable. Matches Scrubber's own `pointer: coarse` gate (no scrubber margin on touch).
+      'shrink-0 items-center gap-3 bg-transparent px-4 py-2 pointer-fine:pe-15 dark:bg-transparent',
       showFilters ? 'flex' : 'hidden md:flex',
       className,
     )}

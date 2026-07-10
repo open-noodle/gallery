@@ -14,6 +14,7 @@
     mdiMagnify,
     mdiMapMarker,
     mdiOcr,
+    mdiPlus,
     mdiStar,
     mdiTag,
     mdiTextSearch,
@@ -40,6 +41,12 @@
     searchQuery?: string;
     onClearSearch?: () => void;
     embedded?: boolean;
+    /**
+     * When provided (and there are results), shows an "Add all N to…" action that hands the current
+     * filter result off to a collection picker. Surfaces where adding the visible assets to an
+     * album/space doesn't apply (tags, trash, locked, partners) simply pass no handler.
+     */
+    onAddAllToCollection?: () => void;
   }
 
   let {
@@ -52,6 +59,7 @@
     searchQuery = '',
     onClearSearch,
     embedded = false,
+    onAddAllToCollection,
   }: Props = $props();
 
   interface Chip {
@@ -165,6 +173,7 @@
   });
 
   let hasActiveFilters = $derived(chips.length > 0 || searchQuery.trim().length > 0);
+  let showAddAll = $derived(!!onAddAllToCollection && hasActiveFilters && resultCount !== undefined && resultCount > 0);
   let showCountSeparator = $derived(resultCount !== undefined && (chips.length > 0 || searchQuery.trim().length > 0));
 </script>
 
@@ -181,19 +190,19 @@
   {/if}
 
   {#if showCountSeparator}
-    <span class="h-1 w-1 rounded-full bg-gray-400/60 dark:bg-gray-500/60" aria-hidden="true"></span>
+    <span class="size-1 rounded-full bg-gray-400/60 dark:bg-gray-500/60" aria-hidden="true"></span>
   {/if}
 
   {#if searchQuery.trim()}
     <span
-      class="inline-flex items-center gap-1.5 rounded-full border border-immich-primary/30 bg-immich-primary/10 py-1 pl-2.5 pr-1 text-xs font-medium text-immich-primary dark:border-immich-dark-primary/30 dark:bg-immich-dark-primary/10 dark:text-immich-dark-primary"
+      class="inline-flex items-center gap-1.5 rounded-full border border-immich-primary/30 bg-immich-primary/10 py-1 pr-1 pl-2.5 text-xs font-medium text-immich-primary dark:border-immich-dark-primary/30 dark:bg-immich-dark-primary/10 dark:text-immich-dark-primary"
       data-testid="search-chip"
     >
       <Icon icon={mdiMagnify} size="14" />
       <span>{searchQuery}</span>
       <button
         type="button"
-        class="flex h-[18px] w-[18px] items-center justify-center rounded-full text-immich-primary/60 transition-colors hover:bg-immich-primary/15 hover:text-immich-primary dark:text-immich-dark-primary/60 dark:hover:bg-immich-dark-primary/20 dark:hover:text-immich-dark-primary"
+        class="flex size-[18px] items-center justify-center rounded-full text-immich-primary/60 transition-colors hover:bg-immich-primary/15 hover:text-immich-primary dark:text-immich-dark-primary/60 dark:hover:bg-immich-dark-primary/20 dark:hover:text-immich-dark-primary"
         onclick={() => onClearSearch?.()}
         aria-label={$t('filter_sheet_picker_clear_search')}
         data-testid="search-chip-close"
@@ -206,14 +215,14 @@
   {#each chips as chip (`${chip.type}-${chip.id ?? chip.labelKey ?? chip.label}`)}
     {@const chipLabel = chip.labelKey ? $t(chip.labelKey, { values: chip.labelValues }) : (chip.label ?? '')}
     <span
-      class="inline-flex items-center gap-1.5 rounded-full border border-gray-200/70 bg-gray-100 py-1 pl-2.5 pr-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:border-white/10 dark:bg-white/[0.06] dark:text-gray-200 dark:hover:bg-white/10"
+      class="inline-flex items-center gap-1.5 rounded-full border border-gray-200/70 bg-gray-100 py-1 pr-1 pl-2.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:border-white/10 dark:bg-white/6 dark:text-gray-200 dark:hover:bg-white/10"
       data-testid="active-chip"
     >
       <Icon icon={chip.icon} size="14" class="text-gray-500 dark:text-gray-400" />
       <span>{chipLabel}</span>
       <button
         type="button"
-        class="flex h-[18px] w-[18px] items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-300/70 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-white/10 dark:hover:text-gray-200"
+        class="flex size-[18px] items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-300/70 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-white/10 dark:hover:text-gray-200"
         onclick={() => onRemoveFilter(chip.type, chip.id)}
         aria-label={$t('filter_remove_chip', { values: { label: chipLabel } })}
         data-testid="chip-close"
@@ -223,10 +232,23 @@
     </span>
   {/each}
 
+  {#if showAddAll}
+    <button
+      type="button"
+      class="ml-auto inline-flex items-center gap-1.5 rounded-full bg-immich-primary/10 py-1 ps-2.5 pe-3.5 text-xs font-semibold text-immich-primary transition-colors hover:bg-immich-primary/16 dark:bg-immich-dark-primary/10 dark:text-immich-dark-primary dark:hover:bg-immich-dark-primary/20"
+      onclick={() => onAddAllToCollection?.()}
+      data-testid="add-all-to-collection"
+    >
+      <Icon icon={mdiPlus} size="15" />
+      <span>{$t('add_all_search_results', { values: { count: resultCount ?? 0 } })}</span>
+    </button>
+  {/if}
+
   {#if hasActiveFilters}
     <button
       type="button"
-      class="ml-auto rounded-full px-2.5 py-1 text-xs font-semibold text-immich-primary transition-colors hover:bg-immich-primary/10 dark:text-immich-dark-primary dark:hover:bg-immich-dark-primary/10"
+      class="rounded-full px-2.5 py-1 text-xs font-semibold text-immich-primary transition-colors hover:bg-immich-primary/10 dark:text-immich-dark-primary dark:hover:bg-immich-dark-primary/10"
+      class:ml-auto={!showAddAll}
       onclick={() => {
         onClearAll();
         if (searchQuery) {
