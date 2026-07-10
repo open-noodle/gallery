@@ -316,6 +316,19 @@ describe('Person detail page', () => {
     );
   });
 
+  it('shows the add-all-to-collection button when the surface has results', async () => {
+    renderPage({ statistics: { assets: 3, faces: 6 } });
+
+    expect(await screen.findByTestId('add-all-to-collection')).toBeInTheDocument();
+  });
+
+  it('hides the add-all-to-collection button when empty', async () => {
+    renderPage({ statistics: { assets: 0, faces: 6 } });
+
+    await screen.findByTestId('timeline-stub');
+    expect(screen.queryByTestId('add-all-to-collection')).not.toBeInTheDocument();
+  });
+
   it('keeps the grouping control outside the scrolling timeline so it stays visible while scrolling', async () => {
     const { container } = renderPage();
 

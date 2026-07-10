@@ -20,6 +20,7 @@
   import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '#lib/components/timeline/Timeline.svelte';
   import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
+  import SearchAddAllToCollectionModal from '#lib/modals/SearchAddAllToCollectionModal.svelte';
   import { PersonPageViewMode, QueryParameter, SessionStorageKey } from '#lib/constants.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
@@ -41,7 +42,7 @@
     updatePersonName,
     updatePersonRepresentativeFace,
   } from '#lib/services/person.service.ts';
-  import { locale } from '#lib/stores/preferences.store.ts';
+  import { lang, locale } from '#lib/stores/preferences.store.ts';
   import { websocketEvents } from '#lib/stores/websocket.ts';
   import { createUrl, getPeopleThumbnailUrl } from '#lib/utils.ts';
   import {
@@ -104,6 +105,19 @@
   let timelineGrouping = $state<TimelineGrouping>('day');
   let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
   let numberOfAssets = $derived(timelineManager?.isInitialized ? timelineManager.assetCount : data.statistics.assets);
+
+  const handleAddAllToCollection = () => {
+    void modalManager.show(SearchAddAllToCollectionModal, {
+      terms: {
+        visibility: AssetVisibility.Timeline,
+        personIds: [data.person.filterId ?? data.person.id],
+        withSharedSpaces: true,
+      },
+      total: numberOfAssets,
+      smartSearchEnabled: false,
+      language: $lang,
+    });
+  };
   const baseTimelineOptions = $derived({
     visibility: AssetVisibility.Timeline,
     personIds: [data.person.filterId ?? data.person.id],
@@ -533,7 +547,9 @@
     grouping={timelineGrouping}
     hidden={assetMultiSelectManager.selectionActive || viewMode !== PersonPageViewMode.VIEW_ASSETS}
     class="shrink-0 mt-12"
+    resultCount={numberOfAssets}
     onGroupingChange={handleTimelineGroupingChange}
+    onAddAllToCollection={handleAddAllToCollection}
   />
   <div class="relative flex-1 min-h-0">
     {#key person.id}
