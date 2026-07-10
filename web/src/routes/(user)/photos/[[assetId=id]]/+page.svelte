@@ -82,13 +82,17 @@
   import { toTimelineAsset } from '$lib/utils/timeline-util';
   import {
     AssetTypeEnum,
+    AssetVisibility,
     getFilterSuggestions,
     getSearchSuggestions,
     searchSmartFacets,
     SearchSuggestionType,
     type SmartSearchFacetsResponseDto,
   } from '@immich/sdk';
-  import { ActionButton, CommandPaletteDefaultProvider, ImageCarousel } from '@immich/ui';
+  import { ActionButton, CommandPaletteDefaultProvider, ImageCarousel, modalManager } from '@immich/ui';
+  import SearchAddAllToCollectionModal from '$lib/modals/SearchAddAllToCollectionModal.svelte';
+  import { filterStateToSearchTerms } from '$lib/utils/filter-search-terms';
+  import type { SearchTerms } from '$lib/services/search.service';
   import { mdiDotsVertical } from '@mdi/js';
   import { DateTime } from 'luxon';
   import { untrack } from 'svelte';
@@ -341,6 +345,25 @@
 
   const hasActiveFilters = $derived(getActiveFilterCount(filters) > 0 || showSearchResults);
   const totalAssetCount = $derived(timelineManager?.assetCount ?? 0);
+
+  const handleAddAllToCollection = () => {
+    const query = committedQuery.trim();
+    // Replay the active filters (and free-text query, if any) against search so the collector can
+    // page every matching id. Non-query mode mirrors buildPhotosTimelineOptions' partner/shared-space
+    // scoping so the collected set matches the timeline.
+    const terms: SearchTerms = { ...filterStateToSearchTerms(filters), visibility: AssetVisibility.Timeline };
+    if (query) {
+      terms.query = query;
+    } else if (filters.isFavorite === undefined) {
+      terms.withSharedSpaces = true;
+    }
+    void modalManager.show(SearchAddAllToCollectionModal, {
+      terms,
+      total: showSearchResults ? (smartFacetTotal ?? 0) : totalAssetCount,
+      smartSearchEnabled: !!query,
+      language: $lang,
+    });
+  };
   // Use the timeline's *loaded* result (for the current options) rather than a bare
   // `assetCount === 0`: clearing a filter that had 0 results would otherwise flip this true
   // for a tick (stale count, reload pending), unmounting the filter panel and dropping focus.
@@ -555,6 +578,7 @@
           {tagNames}
           onRemoveFilter={handleRemoveActiveFilter}
           onClearAll={handleClearAllFilters}
+          onAddAllToCollection={handleAddAllToCollection}
         />
       {/snippet}
       <FilterToolbar
