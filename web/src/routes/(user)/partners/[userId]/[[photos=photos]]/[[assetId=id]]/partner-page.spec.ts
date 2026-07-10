@@ -197,4 +197,13 @@ describe('Partner page timeline grouping', () => {
       expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
     });
   });
+
+  it('never shows the add-all-to-collection button (excluded surface)', async () => {
+    timelineStubGlobals.__timelineStubAssetCount = 3;
+
+    renderPage();
+
+    await screen.findByTestId('timeline-desktop-grouping-control');
+    expect(screen.queryByTestId('add-all-to-collection')).not.toBeInTheDocument();
+  });
 });

@@ -21,8 +21,18 @@
   import { navigate } from '#lib/utils/navigation.ts';
   import { mapSettings } from '#lib/stores/preferences.store.ts';
   import { buildSmartSearchParams, SEARCH_FILTER_DEBOUNCE_MS } from '#lib/utils/space-search.ts';
-  import { getFilteredMapMarkers, getTimeBuckets, type MapMarkerResponseDto, searchSmart } from '@immich/sdk';
-  import { Icon, IconButton } from '@immich/ui';
+  import {
+    AssetVisibility,
+    getFilteredMapMarkers,
+    getTimeBuckets,
+    type MapMarkerResponseDto,
+    searchSmart,
+  } from '@immich/sdk';
+  import { Icon, IconButton, modalManager } from '@immich/ui';
+  import SearchAddAllToCollectionModal from '#lib/modals/SearchAddAllToCollectionModal.svelte';
+  import type { SearchTerms } from '#lib/services/search.service.ts';
+  import { filterStateToSearchTerms } from '#lib/utils/filter-search-terms.ts';
+  import { lang } from '#lib/stores/preferences.store.ts';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import { mdiArrowLeft, mdiFilterVariant } from '@mdi/js';
   import { onDestroy, onMount } from 'svelte';
@@ -89,6 +99,31 @@
   });
   const hasActiveFilters = $derived(getActiveFilterCount(filters) > 0 || committedQuery.trim().length > 0);
   const noResults = $derived(mapMarkers.length === 0 && hasActiveFilters);
+
+  const handleAddAllToCollection = () => {
+    const query = committedQuery.trim();
+    const terms: SearchTerms = {
+      ...filterStateToSearchTerms(filters),
+      ...(spaceId ? { spaceId } : { withSharedSpaces: true }),
+      visibility: AssetVisibility.Timeline,
+    };
+    // Space-scoped map searches people via spacePersonIds (mirrors buildMapTimeBucketOptions).
+    if (spaceId && terms.personIds) {
+      terms.spacePersonIds = terms.personIds;
+      delete terms.personIds;
+    }
+    if (query) {
+      terms.query = query;
+    }
+    // Note: map markers are geotagged-only; metadata search has no has-GPS predicate, so the collected
+    // set can exceed the marker count. Acceptable — the picker previews the count before adding.
+    void modalManager.show(SearchAddAllToCollectionModal, {
+      terms,
+      total: mapMarkers.length,
+      smartSearchEnabled: !!query,
+      language: $lang,
+    });
+  };
   const timeBucketOptions = $derived.by(() => buildMapTimeBucketOptions(filters, spaceId));
   const mapMarkerOptions = $derived.by(() => buildMapMarkerOptions(filters, spaceId));
 
@@ -301,6 +336,7 @@
               onClearAll={() => {
                 filters = clearFilters(filters);
               }}
+              onAddAllToCollection={handleAddAllToCollection}
             />
           </div>
         {/if}
