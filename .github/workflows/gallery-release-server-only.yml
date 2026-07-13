@@ -393,28 +393,59 @@ jobs:
           notes="Based on [Immich v${upstream_version}](https://github.com/immich-app/immich/releases/tag/v${upstream_version})"
 
           if [[ -n "$prev_tag" ]]; then
-            all_commits=$(git log --pretty=format:'%s' "${prev_tag}..${SHA}" 2>/dev/null)
+            # Upstream stamps each of its own releases with a `chore: version vX.Y.Z`
+            # commit; the most recent one reachable from a ref is that release's
+            # upstream base, and everything above it is fork work. Diffing the two
+            # bases rather than the raw prev_tag..SHA range is what keeps an upstream
+            # rebase — which rewrites every fork commit's SHA — from re-listing fork
+            # commits that already shipped in the previous release.
+            base_new=$(git log --format=%H --grep='^chore: version v' -1 "$SHA" || true)
+            base_old=$(git log --format=%H --grep='^chore: version v' -1 "$prev_tag" || true)
 
-            gallery_commits=$(echo "$all_commits" | while IFS= read -r line; do
-              [[ -z "$line" ]] && continue
-              pr_num=$(echo "$line" | grep -oP '\(#\K[0-9]+(?=\))' | head -1)
-              if [[ -z "$pr_num" || "$pr_num" -lt 1000 ]]; then
-                echo "- $line"
+            if [[ -n "$base_new" && -n "$base_old" ]]; then
+              shipped=$(mktemp)
+              git log --pretty=format:'%s' "${base_old}..${prev_tag}" > "$shipped"
+              if [[ -s "$shipped" ]]; then
+                gallery_all=$(git log --pretty=format:'%s' "${base_new}..${SHA}" | grep -Fxv -f "$shipped" || true)
+              else
+                gallery_all=$(git log --pretty=format:'%s' "${base_new}..${SHA}" || true)
               fi
-            done)
+              rm -f "$shipped"
 
-            upstream_commits=$(echo "$all_commits" | while IFS= read -r line; do
-              [[ -z "$line" ]] && continue
-              pr_num=$(echo "$line" | grep -oP '\(#\K[0-9]+(?=\))' | head -1)
-              if [[ -n "$pr_num" && "$pr_num" -ge 1000 ]]; then
-                echo "- $line"
-              fi
-            done)
+              upstream_commits=$(git log --pretty=format:'- %s' "${base_old}..${base_new}" || true)
+            else
+              # Fallback if upstream ever changes its release-commit convention:
+              # split the raw range by PR number (fork PRs < 1000, upstream >= 1000).
+              all_commits=$(git log --pretty=format:'%s' "${prev_tag}..${SHA}")
+              gallery_all=$(echo "$all_commits" | awk '{ if (match($0, /\(#[0-9]+\)/)) { n = substr($0, RSTART+2, RLENGTH-3) + 0; if (n >= 1000) next } print }')
+              upstream_commits=$(echo "$all_commits" | awk '{ if (match($0, /\(#[0-9]+\)/)) { n = substr($0, RSTART+2, RLENGTH-3) + 0; if (n >= 1000) print "- " $0 } }')
+            fi
 
+            # A commit reverted within the same range never shipped — drop both it
+            # and its revert, so we never advertise a feature that isn't in the build.
+            gallery_all=$(echo "$gallery_all" | awk '
+              { lines[NR] = $0
+                if (match($0, /^Revert "/)) {
+                  inner = substr($0, 9, length($0) - 9)
+                  reverted[inner] = 1
+                  skip[NR] = 1
+                }
+              }
+              END { for (i = 1; i <= NR; i++) if (!skip[i] && !(lines[i] in reverted)) print lines[i] }
+            ')
+
+            highlights=$(echo "$gallery_all" | grep -E '^(feat|fix|perf)' | sed 's/^/- /' || true)
+            other=$(echo "$gallery_all" | grep -vE '^(feat|fix|perf)' | sed 's/^/- /' || true)
+
+            # Gallery's own changes lead; upstream's go in a collapsed section.
+            if [[ -n "$highlights" ]]; then
+              printf -v notes '%s\n\n## Gallery changes\n\n%s' "$notes" "$highlights"
+            fi
+            if [[ -n "$other" ]]; then
+              printf -v notes '%s\n\n<details>\n<summary>Other Gallery changes</summary>\n\n%s\n\n</details>' "$notes" "$other"
+            fi
             if [[ -n "$upstream_commits" ]]; then
               printf -v notes '%s\n\n<details>\n<summary>Upstream commits</summary>\n\n%s\n\n</details>' "$notes" "$upstream_commits"
-            elif [[ -n "$gallery_commits" ]]; then
-              printf -v notes '%s\n\n## Changes\n\n%s' "$notes" "$gallery_commits"
             fi
           fi
 
