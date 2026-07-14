@@ -18,6 +18,12 @@ BUNDLE_ID=$(jq -r '.mobile.bundle_id' "$CONFIG")
 BUNDLE_ID_DEBUG=$(jq -r '.mobile.bundle_id_debug' "$CONFIG")
 BUNDLE_ID_PROFILE=$(jq -r '.mobile.bundle_id_profile' "$CONFIG")
 DEEP_LINK_SCHEME=$(jq -r '.mobile.deep_link_scheme' "$CONFIG")
+OAUTH_CALLBACK=$(jq -r '.mobile.oauth_callback' "$CONFIG")
+# Not read in this file — patch_oauth_callback() uses ${BUNDLE_ID} directly. Exported as a
+# global so branding/scripts/test-oauth-callback-branding.sh, which sources this script, can
+# use it without recomputing the scheme.
+# shellcheck disable=SC2034
+OAUTH_CALLBACK_SCHEME="${OAUTH_CALLBACK%%:*}"
 SHARED_GROUP=$(jq -r '.mobile.shared_group' "$CONFIG")
 BG_TASK_PREFIX=$(jq -r '.mobile.background_task_prefix' "$CONFIG")
 APPLE_TEAM_ID=$(jq -r '.mobile.apple_team_id' "$CONFIG")
@@ -561,6 +567,49 @@ patch_assets() {
 }
 
 #
+# --- OAuth mobile callback ---
+#
+# OAuth mobile callback scheme. The invariant, in one place:
+#   the URI the app SENDS (oauth.service.dart)
+#     == the URI the server EMITS (constants.ts MOBILE_REDIRECT, used by /api/oauth/mobile-redirect)
+#     == a scheme Android REGISTERS (AndroidManifest.xml)
+#     == the URI shown to admins (AuthSettings.svelte)
+# Breaking that invariant is invisible in dev (dev builds aren't branded, so both halves
+# agree) and fatal in release: the browser lands on a scheme no app claims and hangs on a
+# blank page. verify-branding.sh and test-oauth-callback-branding.sh both enforce it.
+#
+# The manifest registration is ADDITIVE — app.immich must stay registered because every
+# existing IdP config in the wild has app.immich:///oauth-callback as its redirect URI.
+patch_oauth_callback() {
+  local oauth_dart="$REPO_ROOT/mobile/lib/services/oauth.service.dart"
+  local manifest="$REPO_ROOT/mobile/android/app/src/main/AndroidManifest.xml"
+  local server_constants="$REPO_ROOT/server/src/constants.ts"
+  local auth_settings="$REPO_ROOT/web/src/routes/admin/system-settings/AuthSettings.svelte"
+
+  # The redirect URI the app asks the IdP to send the user back to.
+  if [[ -f "$oauth_dart" ]]; then
+    sed -i "s|kOAuthCallbackUri = 'app\.immich:///oauth-callback'|kOAuthCallbackUri = '${OAUTH_CALLBACK}'|g" "$oauth_dart"
+  fi
+
+  # Register the branded scheme ALONGSIDE app.immich (idempotent, mirrors the deep-link block).
+  if [[ -f "$manifest" ]] && ! grep -q "android:scheme=\"${BUNDLE_ID}\" android:pathPrefix=\"/oauth-callback\"" "$manifest"; then
+    sed -i "/<data android:scheme=\"app\.immich\" android:pathPrefix=\"\/oauth-callback\" \/>/a\\        <data android:scheme=\"${BUNDLE_ID}\" android:pathPrefix=\"/oauth-callback\" />" "$manifest"
+  fi
+
+  # Where /api/oauth/mobile-redirect bounces the browser to. Must equal what the app sends.
+  if [[ -f "$server_constants" ]]; then
+    sed -i "s|MOBILE_REDIRECT = 'app\.immich:///oauth-callback'|MOBILE_REDIRECT = '${OAUTH_CALLBACK}'|g" "$server_constants"
+  fi
+
+  # The callback URI admins copy into their IdP.
+  if [[ -f "$auth_settings" ]]; then
+    sed -i "s|callback: 'app\.immich:///oauth-callback'|callback: '${OAUTH_CALLBACK}'|g" "$auth_settings"
+  fi
+
+  echo "  Patched OAuth callback scheme (${OAUTH_CALLBACK})"
+}
+
+#
 # --- Android ---
 #
 patch_android() {
@@ -587,9 +636,6 @@ patch_android() {
 
   # AndroidManifest.xml — deep link host
   sed -i "s|android:host=\"my\.immich\.app\"|android:host=\"my.noodle.gallery\"|g" "$manifest"
-
-  # AndroidManifest.xml — OAuth callback
-  sed -i "s|<data android:scheme=\"app\.immich\"|<data android:scheme=\"${BUNDLE_ID}\"|g" "$manifest"
 
   # AndroidManifest.xml — share intent labels
   sed -i "s/Upload to Immich/Upload to ${NAME}/g" "$manifest"
@@ -835,6 +881,7 @@ main() {
   patch_assets
   patch_android
   patch_ios
+  patch_oauth_callback
   patch_docker
   patch_dockerfiles
   patch_cli
