@@ -176,8 +176,19 @@ describe('/shared-spaces', () => {
       });
       const imageAsset = await utils.createAsset(user3.accessToken);
       await utils.addSpaceAssets(user3.accessToken, space.id, [videoAsset.id, imageAsset.id]);
-      // recent assets are filtered to those with a thumbhash; wait for thumbnail generation
-      await utils.waitForQueueFinish(admin.accessToken, 'thumbnailGeneration');
+      // Recent assets are filtered to those with a thumbhash. Don't wait on the queue: thumbnail
+      // generation is only enqueued once metadata extraction has run, so the queue can still be
+      // empty here and waitForQueueFinish would return immediately, leaving recentAssetIds empty.
+      // Poll the post-condition instead.
+      await expect
+        .poll(
+          async () => {
+            const asset = await utils.getAssetInfo(user3.accessToken, imageAsset.id);
+            return asset.thumbhash;
+          },
+          { timeout: 30_000 },
+        )
+        .not.toBeNull();
 
       const { body } = await request(app)
         .get(`/shared-spaces/${space.id}`)

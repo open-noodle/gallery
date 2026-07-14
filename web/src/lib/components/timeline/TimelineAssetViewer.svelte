@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { lazyComponent } from '$lib/utils/lazy-component.svelte';
   import type { Action } from '$lib/components/asset-viewer/actions/action';
   import type { AssetCursor } from '$lib/components/asset-viewer/AssetViewer.svelte';
   import { AssetAction } from '$lib/constants';
@@ -234,9 +235,14 @@
   onDestroy(() => {
     assetCacheManager.invalidate();
   });
+
+  // Mounting the viewer through `{#await}` leaves it permanently unreactive on reopen.
+  // See lazyComponent().
+  const LazyAssetViewer = lazyComponent(() => import('$lib/components/asset-viewer/AssetViewer.svelte'));
 </script>
 
-{#await import('$lib/components/asset-viewer/AssetViewer.svelte') then { default: AssetViewer }}
+{#if LazyAssetViewer.current}
+  {@const AssetViewer = LazyAssetViewer.current}
   <AssetViewer
     {withStacked}
     cursor={assetCursor}
@@ -257,4 +263,4 @@
     onRemoveFromAlbum={handleRemoveFromAlbum}
     onClose={handleClose}
   />
-{/await}
+{/if}
