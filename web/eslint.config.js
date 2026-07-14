@@ -177,6 +177,27 @@ export default typescriptEslint.config(
     },
   },
   {
+    files: ['**/*.svelte'],
+
+    languageOptions: {
+      parser,
+      parserOptions: {
+        parser: typescriptEslint.parser,
+      },
+    },
+
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'SvelteAwaitBlock[expression.type="ImportExpression"]',
+          message:
+            'Do not mount a lazy-loaded component with `{#await import(...)}`. Once the module is warm, the block resolves while Svelte is mid-flush and orphans a batch, leaving the mounted subtree permanently unreactive (sveltejs/svelte#18546). Use lazyComponent() from $lib/utils/lazy-component.svelte instead.',
+        },
+      ],
+    },
+  },
+  {
     extends: [eslintPluginBetterTailwindcss.configs.recommended],
     settings: {
       'better-tailwindcss': {
