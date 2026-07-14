@@ -58,6 +58,9 @@ branding/scripts/test-app-download-branding.sh
 echo "--- Checking i18n branding overrides (issues #703, #672) ---"
 branding/scripts/test-i18n-branding.sh
 
+echo "--- Checking OAuth mobile callback branding (dual-scheme regression) ---"
+branding/scripts/test-oauth-callback-branding.sh
+
 echo "--- Applying branding overlay ---"
 branding/scripts/apply-branding.sh
 
