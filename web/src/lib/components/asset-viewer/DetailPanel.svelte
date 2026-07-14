@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
   import { goto } from '$app/navigation';
   import DetailPanelDate from '#lib/components/asset-viewer/DetailPanelDate.svelte';
   import DetailPanelDescription from '#lib/components/asset-viewer/DetailPanelDescription.svelte';
@@ -103,6 +104,10 @@
   onDestroy(() => {
     assetViewerManager.closeEditFacesPanel();
   });
+
+  // Mounting the map through `{#await}` can leave the surrounding subtree unreactive.
+  // See lazyComponent().
+  const LazyMap = lazyComponent(() => import('#lib/components/shared-components/map/Map.svelte'));
 </script>
 
 {#if !assetViewerManager.isEditFacesPanelOpen}
@@ -271,14 +276,8 @@
 
   {#if latlng && publicConfig.map.enabled}
     <div class="h-90">
-      {#await import('#lib/components/shared-components/map/Map.svelte')}
-        {#await delay(timeToLoadTheMap) then}
-          <!-- show the loading spinner only if loading the map takes too much time -->
-          <div class="flex size-full items-center justify-center">
-            <LoadingSpinner />
-          </div>
-        {/await}
-      {:then { default: Map }}
+      {#if LazyMap.current}
+        {const Map = $derived(LazyMap.current)}
         <Map
           mapMarkers={[
             {
@@ -313,7 +312,14 @@
             </div>
           {/snippet}
         </Map>
-      {/await}
+      {:else}
+        {#await delay(timeToLoadTheMap) then}
+          <!-- show the loading spinner only if loading the map takes too much time -->
+          <div class="flex size-full items-center justify-center">
+            <LoadingSpinner />
+          </div>
+        {/await}
+      {/if}
     </div>
   {/if}
 
