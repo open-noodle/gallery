@@ -691,6 +691,18 @@ describe(AuthService.name, () => {
     it('should work if called without query params', () => {
       expect(sut.getMobileRedirect('https://immich.app')).toEqual('app.immich:///oauth-callback?');
     });
+
+    it('should preserve every query param, including an error response', () => {
+      expect(sut.getMobileRedirect('http://immich.app?error=access_denied&error_description=nope&state=456')).toEqual(
+        'app.immich:///oauth-callback?error=access_denied&error_description=nope&state=456',
+      );
+    });
+
+    it('should preserve percent-encoded values', () => {
+      expect(sut.getMobileRedirect('http://immich.app?code=a%2Fb%3Dc&state=456')).toEqual(
+        'app.immich:///oauth-callback?code=a%2Fb%3Dc&state=456',
+      );
+    });
   });
 
   describe('authorize', () => {
@@ -2150,6 +2162,108 @@ describe(AuthService.name, () => {
           hasElevatedPermission: false,
         },
       });
+    });
+  });
+
+  describe('resolveRedirectUri (via callback)', () => {
+    // Both the legacy and the branded scheme must map onto the https override,
+    // so an old app and a new app can both talk to the same server.
+    for (const url of [
+      'app.immich:/oauth-callback?code=abc123',
+      'app.immich://oauth-callback?code=abc123',
+      'app.immich:///oauth-callback?code=abc123',
+      'de.opennoodle.gallery:/oauth-callback?code=abc123',
+      'de.opennoodle.gallery://oauth-callback?code=abc123',
+      'de.opennoodle.gallery:///oauth-callback?code=abc123',
+      'com.example.fork:///oauth-callback?code=abc123',
+    ]) {
+      it(`should apply the mobile redirect override to ${url}`, async () => {
+        mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthWithMobileOverride);
+        mocks.user.getByOAuthId.mockResolvedValue(UserFactory.create());
+        mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile: OAuthProfileFactory.create() });
+        mocks.session.create.mockResolvedValue(SessionFactory.create());
+
+        await sut.callback({ url, state: 'xyz789', codeVerifier: 'foo' }, {}, loginDetails);
+
+        expect(mocks.oauth.getProfileAndOAuthSid).toHaveBeenCalledWith(
+          expect.objectContaining({}),
+          'http://mobile-redirect?code=abc123',
+          'xyz789',
+          'foo',
+        );
+      });
+    }
+
+    // The web login flow shares this code path. An https callback must pass through untouched.
+    it('should not rewrite an https callback url even when the override is enabled', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthWithMobileOverride);
+      mocks.user.getByOAuthId.mockResolvedValue(UserFactory.create());
+      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile: OAuthProfileFactory.create() });
+      mocks.session.create.mockResolvedValue(SessionFactory.create());
+
+      await sut.callback(
+        { url: 'https://gallery.example.com/auth/login?code=abc123', state: 'xyz789', codeVerifier: 'foo' },
+        {},
+        loginDetails,
+      );
+
+      expect(mocks.oauth.getProfileAndOAuthSid).toHaveBeenCalledWith(
+        expect.objectContaining({}),
+        'https://gallery.example.com/auth/login?code=abc123',
+        'xyz789',
+        'foo',
+      );
+    });
+
+    // A path that merely starts with /oauth-callback must not be partially rewritten.
+    it('should not rewrite a lookalike path', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthWithMobileOverride);
+      mocks.user.getByOAuthId.mockResolvedValue(UserFactory.create());
+      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile: OAuthProfileFactory.create() });
+      mocks.session.create.mockResolvedValue(SessionFactory.create());
+
+      await sut.callback(
+        { url: 'app.immich:///oauth-callback-not-really?code=abc123', state: 'xyz789', codeVerifier: 'foo' },
+        {},
+        loginDetails,
+      );
+
+      expect(mocks.oauth.getProfileAndOAuthSid).toHaveBeenCalledWith(
+        expect.objectContaining({}),
+        'app.immich:///oauth-callback-not-really?code=abc123',
+        'xyz789',
+        'foo',
+      );
+    });
+  });
+
+  describe('authorize with redirect override', () => {
+    it('should send the branded redirect uri straight through when the override is disabled', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
+      mocks.oauth.authorize.mockResolvedValue({ url: 'http://idp/authorize', state: 's', codeVerifier: 'v' });
+
+      await sut.authorize({ redirectUri: 'de.opennoodle.gallery:///oauth-callback' });
+
+      expect(mocks.oauth.authorize).toHaveBeenCalledWith(
+        expect.objectContaining({}),
+        'de.opennoodle.gallery:///oauth-callback',
+        undefined,
+        undefined,
+      );
+    });
+
+    it('should swap a branded redirect uri for the override when it is enabled', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthWithMobileOverride);
+      mocks.oauth.authorize.mockResolvedValue({ url: 'http://idp/authorize', state: 's', codeVerifier: 'v' });
+
+      await sut.authorize({ redirectUri: 'de.opennoodle.gallery:///oauth-callback' });
+
+      expect(mocks.oauth.authorize).toHaveBeenCalledWith(
+        expect.objectContaining({}),
+        'http://mobile-redirect',
+        undefined,
+        undefined,
+      );
     });
   });
 });
