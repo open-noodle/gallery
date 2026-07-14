@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
   import { goto } from '$app/navigation';
   import type { Action } from '#lib/components/asset-viewer/actions/action.ts';
   import DownloadAction from '#lib/components/timeline/actions/DownloadAction.svelte';
@@ -18,7 +19,7 @@
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
   import { getAssetInfo, type SharedLinkResponseDto } from '@immich/sdk';
   import { IconButton, toastManager } from '@immich/ui';
-  import Logo from '$lib/components/shared-components/Logo.svelte';
+  import Logo from '#lib/components/shared-components/Logo.svelte';
   import { mdiDownload, mdiFileImagePlusOutline, mdiSelectAll } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import ControlAppBar from '../shared-components/ControlAppBar.svelte';
@@ -75,6 +76,10 @@
       // no default
     }
   };
+
+  // Mounting the viewer through `{#await}` leaves it permanently unreactive on reopen.
+  // See lazyComponent().
+  const LazyAssetViewer = lazyComponent(() => import('#lib/components/asset-viewer/AssetViewer.svelte'));
 </script>
 
 {#if sharedLink?.allowUpload || assets.length > 1}
@@ -146,8 +151,9 @@
   </header>
 {:else if assets.length === 1}
   {#await getAssetInfo({ ...authManager.params, id: assets[0].id }) then asset}
-    {#await import('#lib/components/asset-viewer/AssetViewer.svelte') then { default: AssetViewer }}
+    {#if LazyAssetViewer.current}
+      {const AssetViewer = $derived(LazyAssetViewer.current)}
       <AssetViewer cursor={{ current: asset }} onAction={handleAction} />
-    {/await}
+    {/if}
   {/await}
 {/if}
