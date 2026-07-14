@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { lazyComponent } from '$lib/utils/lazy-component.svelte';
   import { goto } from '$app/navigation';
   import { shortcuts, type ShortcutOptions } from '$lib/actions/shortcut';
   import type { Action } from '$lib/components/asset-viewer/actions/action';
@@ -457,6 +458,10 @@
     nextAsset: getNextAsset(navigationAssets, assetViewerManager.asset),
     previousAsset: getPreviousAsset(navigationAssets, assetViewerManager.asset),
   });
+
+  // Mounting the viewer through `{#await}` leaves it permanently unreactive on reopen.
+  // See lazyComponent().
+  const LazyAssetViewer = lazyComponent(() => import('$lib/components/asset-viewer/AssetViewer.svelte'));
 </script>
 
 <svelte:document onselectstart={onSelectStart} use:shortcuts={shortcutList} onscroll={() => updateSlidingWindow()} />
@@ -544,7 +549,8 @@
 <!-- Overlay Asset Viewer -->
 {#if assetViewerManager.isViewing}
   <Portal target="body">
-    {#await import('$lib/components/asset-viewer/AssetViewer.svelte') then { default: AssetViewer }}
+    {#if LazyAssetViewer.current}
+      {@const AssetViewer = LazyAssetViewer.current}
       <AssetViewer
         cursor={assetCursor}
         onAction={handleAction}
@@ -555,6 +561,6 @@
           handlePromiseError(navigate({ targetRoute: 'current', assetId: null }));
         }}
       />
-    {/await}
+    {/if}
   </Portal>
 {/if}
