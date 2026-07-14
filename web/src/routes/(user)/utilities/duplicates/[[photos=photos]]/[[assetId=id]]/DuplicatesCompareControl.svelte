@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { lazyComponent } from '$lib/utils/lazy-component.svelte';
   import { shortcuts } from '$lib/actions/shortcut';
   import DuplicateAsset from './DuplicateAsset.svelte';
   import Portal from '$lib/elements/Portal.svelte';
@@ -102,6 +103,10 @@
     nextAsset: getNextAsset(assets, assetViewerManager.asset),
     previousAsset: getPreviousAsset(assets, assetViewerManager.asset),
   });
+
+  // Mounting the viewer through `{#await}` leaves it permanently unreactive on reopen.
+  // See lazyComponent().
+  const LazyAssetViewer = lazyComponent(() => import('$lib/components/asset-viewer/AssetViewer.svelte'));
 </script>
 
 <svelte:document
@@ -198,7 +203,8 @@
 </div>
 
 {#if assetViewerManager.isViewing}
-  {#await import('$lib/components/asset-viewer/AssetViewer.svelte') then { default: AssetViewer }}
+  {#if LazyAssetViewer.current}
+    {@const AssetViewer = LazyAssetViewer.current}
     <Portal target="body">
       <AssetViewer
         cursor={assetCursor}
@@ -210,5 +216,5 @@
         }}
       />
     </Portal>
-  {/await}
+  {/if}
 {/if}

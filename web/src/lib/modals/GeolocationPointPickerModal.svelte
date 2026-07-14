@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { lazyComponent } from '$lib/utils/lazy-component.svelte';
   import { isDefined } from '$lib';
   import { clickOutside } from '$lib/actions/click-outside';
   import { listNavigation } from '$lib/actions/list-navigation';
@@ -137,6 +138,10 @@
     point = { lat, lng };
     mapElement?.addClipMapMarker(lng, lat);
   };
+
+  // Mounting the map through `{#await}` can leave the surrounding subtree unreactive.
+  // See lazyComponent().
+  const LazyMap = lazyComponent(() => import('$lib/components/shared-components/map/Map.svelte'));
 </script>
 
 <ConfirmModal
@@ -187,14 +192,8 @@
 
       <span>{$t('pick_a_location')}</span>
       <div class="z-0 h-125 min-h-75 w-full">
-        {#await import('$lib/components/shared-components/map/Map.svelte')}
-          {#await delay(timeToLoadTheMap) then}
-            <!-- show the loading spinner only if loading the map takes too much time -->
-            <div class="flex size-full items-center justify-center">
-              <LoadingSpinner />
-            </div>
-          {/await}
-        {:then { default: Map }}
+        {#if LazyMap.current}
+          {@const Map = LazyMap.current}
           <Map
             bind:this={mapElement}
             mapMarkers={asset && assetPoint
@@ -217,7 +216,14 @@
             showSettings={false}
             rounded
           />
-        {/await}
+        {:else}
+          {#await delay(timeToLoadTheMap) then}
+            <!-- show the loading spinner only if loading the map takes too much time -->
+            <div class="flex size-full items-center justify-center">
+              <LoadingSpinner />
+            </div>
+          {/await}
+        {/if}
       </div>
 
       <div class="mt-4 grid gap-4 text-start text-sm sm:grid-cols-2">
