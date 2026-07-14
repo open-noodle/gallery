@@ -9,6 +9,9 @@ CONFIG="$BRANDING_DIR/config.json"
 NAME=$(jq -r '.name' "$CONFIG")
 UPSTREAM_NAME=$(jq -r '.upstream_name' "$CONFIG")
 DEEP_LINK_SCHEME=$(jq -r '.mobile.deep_link_scheme' "$CONFIG")
+BUNDLE_ID=$(jq -r '.mobile.bundle_id' "$CONFIG")
+OAUTH_CALLBACK=$(jq -r '.mobile.oauth_callback' "$CONFIG")
+OAUTH_CALLBACK_SCHEME="${OAUTH_CALLBACK%%:*}"
 EXIT_CODE=0
 
 echo "=== Verifying branding: $NAME ==="
@@ -223,6 +226,65 @@ fi
 
 if [[ $EXIT_CODE -eq 0 ]]; then
   echo "Open-in-app scheme registration verified"
+fi
+
+# OAuth mobile callback: the scheme the app SENDS, the scheme Android REGISTERS and the
+# scheme the server EMITS must all agree, and the legacy app.immich scheme must stay
+# registered so existing IdP configs keep working. Drift here silently breaks Android
+# OIDC login: the browser lands on a scheme no app claims and dead-ends on a blank page.
+echo "--- Checking OAuth mobile callback scheme ---"
+
+oauth_dart="$REPO_ROOT/mobile/lib/services/oauth.service.dart"
+android_manifest="$REPO_ROOT/mobile/android/app/src/main/AndroidManifest.xml"
+server_constants="$REPO_ROOT/server/src/constants.ts"
+
+if [[ -f "$oauth_dart" ]]; then
+  if ! grep -q "kOAuthCallbackUri = '${OAUTH_CALLBACK}'" "$oauth_dart"; then
+    echo "  FAIL: oauth.service.dart does not send '${OAUTH_CALLBACK}'"
+    EXIT_CODE=1
+  else
+    echo "  OK: app sends ${OAUTH_CALLBACK}"
+  fi
+else
+  echo "  FAIL: oauth.service.dart not found at $oauth_dart"
+  EXIT_CODE=1
+fi
+
+if [[ -f "$android_manifest" ]]; then
+  # The scheme the app sends MUST be registered, or the callback can never reach the app.
+  if ! grep -q "android:scheme=\"${OAUTH_CALLBACK_SCHEME}\" android:pathPrefix=\"/oauth-callback\"" "$android_manifest"; then
+    echo "  FAIL: AndroidManifest.xml does not register the scheme the app sends (${OAUTH_CALLBACK_SCHEME}) for /oauth-callback"
+    EXIT_CODE=1
+  # The legacy scheme must stay registered for backwards compatibility.
+  elif ! grep -q "android:scheme=\"app.immich\" android:pathPrefix=\"/oauth-callback\"" "$android_manifest"; then
+    echo "  FAIL: AndroidManifest.xml missing android:scheme=\"app.immich\" for /oauth-callback (legacy scheme must remain)"
+    EXIT_CODE=1
+  # The branded scheme must be registered too, so flipping oauth_callback needs no manifest change.
+  elif ! grep -q "android:scheme=\"${BUNDLE_ID}\" android:pathPrefix=\"/oauth-callback\"" "$android_manifest"; then
+    echo "  FAIL: AndroidManifest.xml missing android:scheme=\"${BUNDLE_ID}\" for /oauth-callback"
+    EXIT_CODE=1
+  else
+    echo "  OK: AndroidManifest.xml registers both app.immich and ${BUNDLE_ID} for /oauth-callback"
+  fi
+else
+  echo "  FAIL: AndroidManifest.xml not found at $android_manifest"
+  EXIT_CODE=1
+fi
+
+if [[ -f "$server_constants" ]]; then
+  if ! grep -q "MOBILE_REDIRECT = '${OAUTH_CALLBACK}'" "$server_constants"; then
+    echo "  FAIL: server MOBILE_REDIRECT is not '${OAUTH_CALLBACK}' — the mobile-redirect override would bounce the browser to a scheme the app does not listen on"
+    EXIT_CODE=1
+  else
+    echo "  OK: server MOBILE_REDIRECT emits ${OAUTH_CALLBACK}"
+  fi
+else
+  echo "  FAIL: constants.ts not found at $server_constants"
+  EXIT_CODE=1
+fi
+
+if [[ $EXIT_CODE -eq 0 ]]; then
+  echo "OAuth mobile callback scheme verified"
 fi
 
 # Email/notification templates must not leak upstream branding (issue #636):
