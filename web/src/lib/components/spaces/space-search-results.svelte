@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { lazyComponent } from '$lib/utils/lazy-component.svelte';
   import { page } from '$app/state';
   import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import Portal from '$lib/elements/Portal.svelte';
@@ -107,6 +108,10 @@
   let dateGroups = $derived(sortMode === 'relevance' ? [] : groupByMonth(results));
   const resultCount = $derived(total ?? totalLoaded);
   const hasExactTotal = $derived(total !== undefined);
+
+  // Mounting the viewer through `{#await}` leaves it permanently unreactive on reopen.
+  // See lazyComponent().
+  const LazyAssetViewer = lazyComponent(() => import('$lib/components/asset-viewer/AssetViewer.svelte'));
 </script>
 
 <section bind:this={scrollContainer} class="immich-scrollbar flex-1 overflow-y-auto px-4 py-4">
@@ -194,8 +199,9 @@
 
 <Portal target="body">
   {#if isViewerOpen && cursor}
-    {#await import('$lib/components/asset-viewer/AssetViewer.svelte') then { default: AssetViewer }}
+    {#if LazyAssetViewer.current}
+      {@const AssetViewer = LazyAssetViewer.current}
       <AssetViewer {cursor} {isShared} {spaceId} onClose={() => handlePromiseError(handleClose())} />
-    {/await}
+    {/if}
   {/if}
 </Portal>
