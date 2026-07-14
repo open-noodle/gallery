@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import ActiveFiltersBar from '#lib/components/filter-panel/active-filters-bar.svelte';
@@ -262,6 +263,14 @@
     assetViewerManager.showAssetViewer(false);
     handlePromiseError(navigate({ targetRoute: 'current', assetId: null }));
   }
+
+  // Mounting the viewer through `{#await}` leaves it permanently unreactive on reopen.
+  // See lazyComponent().
+  const LazyAssetViewer = lazyComponent(() => import('#lib/components/asset-viewer/AssetViewer.svelte'));
+
+  // Mounting the map through `{#await}` can leave the surrounding subtree unreactive.
+  // See lazyComponent().
+  const LazyMap = lazyComponent(() => import('#lib/components/shared-components/map/Map.svelte'));
 </script>
 
 {#if config.map.enabled}
@@ -346,13 +355,8 @@
             isTimelinePanelVisible ? 'h-1/2 w-full pb-2 sm:h-full sm:w-2/3 sm:pe-2 sm:pb-0' : 'h-full w-full',
           ]}
         >
-          {#await import('#lib/components/shared-components/map/Map.svelte')}
-            {#await delay(timeToLoadTheMap) then}
-              <div class="flex size-full items-center justify-center">
-                <LoadingSpinner />
-              </div>
-            {/await}
-          {:then { default: Map }}
+          {#if LazyMap.current}
+            {const Map = $derived(LazyMap.current)}
             <Map
               hash
               onSelect={onViewAssets}
@@ -364,7 +368,13 @@
               showSettings={false}
               {mapMarkers}
             />
-          {/await}
+          {:else}
+            {#await delay(timeToLoadTheMap) then}
+              <div class="flex size-full items-center justify-center">
+                <LoadingSpinner />
+              </div>
+            {/await}
+          {/if}
           {#if noResults}
             <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
               <div
@@ -393,7 +403,8 @@
   </UserPageLayout>
   <Portal target="body">
     {#if assetViewerManager.isViewing && !isTimelinePanelVisible}
-      {#await import('#lib/components/asset-viewer/AssetViewer.svelte') then { default: AssetViewer }}
+      {#if LazyAssetViewer.current}
+        {const AssetViewer = $derived(LazyAssetViewer.current)}
         <AssetViewer
           cursor={{ current: assetViewerManager.asset! }}
           showNavigation={false}
@@ -403,7 +414,7 @@
           }}
           isShared={false}
         />
-      {/await}
+      {/if}
     {/if}
   </Portal>
 {/if}
