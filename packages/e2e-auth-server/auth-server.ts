@@ -12,6 +12,7 @@ export enum OAuthClient {
   DEFAULT = 'client-default',
   RS256_TOKENS = 'client-RS256-tokens',
   RS256_PROFILE = 'client-RS256-profile',
+  MOBILE = 'client-mobile',
 }
 
 export enum OAuthUser {
@@ -108,6 +109,11 @@ const setup = async () => {
     'http://127.0.0.1:2285/auth/login',
     'https://photos.immich.app/oauth/mobile-redirect',
   ];
+
+  // A mobile app is a native client. node-oidc-provider only permits custom-scheme
+  // redirect URIs on application_type: 'native' — a 'web' client throws at init.
+  const mobileRedirectUris = ['app.immich:///oauth-callback', 'de.opennoodle.gallery:///oauth-callback'];
+
   const port = 2286;
   const host = '0.0.0.0';
   const oidc = new Provider(`http://${host}:${port}`, {
@@ -176,6 +182,14 @@ const setup = async () => {
         grant_types: ['authorization_code'],
         userinfo_signed_response_alg: 'RS256',
         jwks: { keys: [await exportJWK(publicKey)] },
+      },
+      {
+        client_id: OAuthClient.MOBILE,
+        client_secret: OAuthClient.MOBILE,
+        application_type: 'native',
+        redirect_uris: mobileRedirectUris,
+        grant_types: ['authorization_code'],
+        response_types: ['code'],
       },
     ],
   });
