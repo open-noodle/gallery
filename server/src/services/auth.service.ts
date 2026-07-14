@@ -5,7 +5,7 @@ import { createReadStream } from 'node:fs';
 import { IncomingHttpHeaders } from 'node:http';
 import { basename } from 'node:path';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
-import { LOGIN_DUMMY_HASH, LOGIN_URL, MOBILE_REDIRECT, SALT_ROUNDS } from 'src/constants';
+import { LOGIN_DUMMY_HASH, LOGIN_URL, MOBILE_CALLBACK_URI, MOBILE_REDIRECT, SALT_ROUNDS } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
 import { AuthSharedLink, AuthUser, UserAdmin } from 'src/database';
 import {
@@ -669,7 +669,7 @@ export class AuthService extends BaseService {
     url: string,
   ) {
     if (mobileOverrideEnabled && mobileRedirectUri) {
-      return url.replace(/app\.immich:\/+oauth-callback/, () => mobileRedirectUri);
+      return url.replace(MOBILE_CALLBACK_URI, () => mobileRedirectUri);
     }
     return url;
   }
