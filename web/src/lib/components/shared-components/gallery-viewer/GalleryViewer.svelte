@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
+  import { goto } from '$app/navigation';
   import { shortcuts, type ShortcutOptions } from '#lib/actions/shortcut.ts';
-  import type { AssetCursor } from '#lib/components/asset-viewer/AssetViewer.svelte';
   import type { Action } from '#lib/components/asset-viewer/actions/action.ts';
+  import type { AssetCursor } from '#lib/components/asset-viewer/AssetViewer.svelte';
   import Thumbnail from '#lib/components/assets/thumbnail/Thumbnail.svelte';
   import TimelineBucketCard from '#lib/components/timeline/TimelineBucketCard.svelte';
   import TimelineRouteGroupingBar from '#lib/components/timeline/TimelineRouteGroupingBar.svelte';
@@ -36,7 +38,6 @@
   import { modalManager } from '@immich/ui';
   import { debounce } from 'lodash-es';
   import { t } from 'svelte-i18n';
-  import { goto } from '$app/navigation';
 
   const {
     TIMELINE: { INTERSECTION_EXPAND_TOP, INTERSECTION_EXPAND_BOTTOM },
@@ -443,6 +444,10 @@
     nextAsset: getNextAsset(navigationAssets, assetViewerManager.asset),
     previousAsset: getPreviousAsset(navigationAssets, assetViewerManager.asset),
   });
+
+  // Mounting the viewer through `{#await}` leaves it permanently unreactive on reopen.
+  // See lazyComponent().
+  const LazyAssetViewer = lazyComponent(() => import('#lib/components/asset-viewer/AssetViewer.svelte'));
 </script>
 
 <svelte:document onselectstart={onSelectStart} use:shortcuts={shortcutList} onscroll={() => updateSlidingWindow()} />
@@ -529,7 +534,8 @@
 <!-- Overlay Asset Viewer -->
 {#if assetViewerManager.isViewing}
   <Portal target="body">
-    {#await import('#lib/components/asset-viewer/AssetViewer.svelte') then { default: AssetViewer }}
+    {#if LazyAssetViewer.current}
+      {const AssetViewer = $derived(LazyAssetViewer.current)}
       <AssetViewer
         cursor={assetCursor}
         onAction={handleAction}
@@ -540,6 +546,6 @@
           handlePromiseError(navigate({ targetRoute: 'current', assetId: null }));
         }}
       />
-    {/await}
+    {/if}
   </Portal>
 {/if}

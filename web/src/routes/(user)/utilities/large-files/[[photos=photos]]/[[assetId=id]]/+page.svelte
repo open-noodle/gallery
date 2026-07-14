@@ -1,7 +1,9 @@
 <script lang="ts">
-  import OnEvents from '#lib/components/OnEvents.svelte';
+  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
   import type { Action } from '#lib/components/asset-viewer/actions/action.ts';
   import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
+  import OnEvents from '#lib/components/OnEvents.svelte';
+  import LargeAssetData from './LargeAssetData.svelte';
   import Portal from '#lib/elements/Portal.svelte';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { handlePromiseError } from '#lib/utils.ts';
@@ -10,7 +12,6 @@
   import type { AssetResponseDto } from '@immich/sdk';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
-  import LargeAssetData from './LargeAssetData.svelte';
 
   interface Props {
     data: PageData;
@@ -59,6 +60,10 @@
     nextAsset: getNextAsset(assets, assetViewerManager.asset),
     previousAsset: getPreviousAsset(assets, assetViewerManager.asset),
   });
+
+  // Mounting the viewer through `{#await}` leaves it permanently unreactive on reopen.
+  // See lazyComponent().
+  const LazyAssetViewer = lazyComponent(() => import('#lib/components/asset-viewer/AssetViewer.svelte'));
 </script>
 
 <OnEvents {onAssetsDelete} />
@@ -78,7 +83,8 @@
 </UserPageLayout>
 
 {#if assetViewerManager.isViewing}
-  {#await import('#lib/components/asset-viewer/AssetViewer.svelte') then { default: AssetViewer }}
+  {#if LazyAssetViewer.current}
+    {const AssetViewer = $derived(LazyAssetViewer.current)}
     <Portal target="body">
       <AssetViewer
         cursor={assetCursor}
@@ -91,5 +97,5 @@
         }}
       />
     </Portal>
-  {/await}
+  {/if}
 {/if}

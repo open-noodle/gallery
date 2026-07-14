@@ -1,10 +1,11 @@
 <script lang="ts">
-  import OnEvents from '#lib/components/OnEvents.svelte';
-  import type { AssetCursor } from '#lib/components/asset-viewer/AssetViewer.svelte';
+  import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
   import type { Action } from '#lib/components/asset-viewer/actions/action.ts';
+  import type { AssetCursor } from '#lib/components/asset-viewer/AssetViewer.svelte';
+  import OnEvents from '#lib/components/OnEvents.svelte';
   import { AssetAction } from '#lib/constants.ts';
-  import { assetCacheManager } from '#lib/managers/AssetCacheManager.svelte.ts';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
+  import { assetCacheManager } from '#lib/managers/AssetCacheManager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
   import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
@@ -14,7 +15,7 @@
   import { handleErrorAsync } from '#lib/utils/handle-error.ts';
   import { navigate } from '#lib/utils/navigation.ts';
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
-  import { getAssetInfo, type AlbumResponseDto, type AssetResponseDto, type PersonResponseDto } from '@immich/sdk';
+  import { type AlbumResponseDto, type AssetResponseDto, type PersonResponseDto, getAssetInfo } from '@immich/sdk';
   import { onDestroy, onMount } from 'svelte';
   import { t } from 'svelte-i18n';
 
@@ -183,11 +184,16 @@
   onDestroy(() => {
     assetCacheManager.invalidate();
   });
+
+  // Mounting the viewer through `{#await}` leaves it permanently unreactive on reopen.
+  // See lazyComponent().
+  const LazyAssetViewer = lazyComponent(() => import('#lib/components/asset-viewer/AssetViewer.svelte'));
 </script>
 
 <OnEvents {onAlbumRemoveAssets} />
 
-{#await import('#lib/components/asset-viewer/AssetViewer.svelte') then { default: AssetViewer }}
+{#if LazyAssetViewer.current}
+  {const AssetViewer = $derived(LazyAssetViewer.current)}
   <AssetViewer
     {withStacked}
     cursor={assetCursor}
@@ -207,4 +213,4 @@
     onRandom={handleRandom}
     onClose={handleClose}
   />
-{/await}
+{/if}
