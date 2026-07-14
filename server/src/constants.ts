@@ -62,6 +62,16 @@ export const citiesFile = 'cities500.txt';
 export const reverseGeocodeMaxDistance = 25_000;
 
 export const MOBILE_REDIRECT = 'app.immich:///oauth-callback';
+
+// Matches the custom-scheme mobile OAuth callback of any Gallery/Immich build:
+//   app.immich:///oauth-callback             (legacy — every existing IdP config has this)
+//   de.opennoodle.gallery:///oauth-callback  (branded)
+// Historically the app has emitted 1, 2 or 3 slashes, so all three are accepted.
+// The http(s) lookahead is load-bearing: the web login flow shares resolveRedirectUri
+// and its callback URL must never be rewritten. The trailing lookahead stops a path
+// like /oauth-callback-not-really from being partially replaced.
+export const MOBILE_CALLBACK_URI = /^(?!https?:)[a-z][a-z0-9+.-]*:\/{1,3}oauth-callback(?=[?#]|$)/i;
+
 export const LOGIN_URL = '/auth/login?autoLaunch=0';
 
 export const excludePaths = ['/.well-known/immich', '/custom.css', '/favicon.ico'];
