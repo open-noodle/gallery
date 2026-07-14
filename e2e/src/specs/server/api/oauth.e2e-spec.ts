@@ -455,6 +455,46 @@ describe(`/oauth`, () => {
     });
   });
 
+  // The flow that was broken in every branded Android release: a custom-scheme redirect
+  // URI with the override DISABLED. Both the legacy and the branded scheme must work.
+  describe('mobile custom scheme (no override)', () => {
+    beforeAll(async () => {
+      await setupOAuth(admin.accessToken, {
+        enabled: true,
+        clientId: OAuthClient.MOBILE,
+        clientSecret: OAuthClient.MOBILE,
+        buttonText: 'Login with Immich',
+        storageLabelClaim: 'immich_username',
+        mobileOverrideEnabled: false,
+        mobileRedirectUri: '',
+      });
+    });
+
+    for (const redirectUri of ['app.immich:///oauth-callback', 'de.opennoodle.gallery:///oauth-callback']) {
+      it(`should pass ${redirectUri} through to the provider untouched`, async () => {
+        const { status, body } = await request(app).post('/oauth/authorize').send({ redirectUri });
+        expect(status).toBe(201);
+
+        const params = new URL(body.url).searchParams;
+        expect(params.get('redirect_uri')).toBe(redirectUri);
+      });
+
+      it(`should complete a full login round-trip via ${redirectUri}`, async () => {
+        const callbackParams = await loginWithOAuth(`oauth-scheme-${redirectUri.split(':')[0]}`, redirectUri);
+        expect(callbackParams.url).toEqual(expect.stringContaining(redirectUri));
+
+        const { status, body } = await request(app).post('/oauth/callback').send(callbackParams);
+        expect(status).toBe(201);
+        expect(body).toMatchObject({
+          accessToken: expect.any(String),
+          isAdmin: false,
+          name: 'OAuth User',
+          userId: expect.any(String),
+        });
+      });
+    }
+  });
+
   describe('idTokenClaims', () => {
     it('should use claims from the ID token if IDP includes them', async () => {
       await setupOAuth(admin.accessToken, {
