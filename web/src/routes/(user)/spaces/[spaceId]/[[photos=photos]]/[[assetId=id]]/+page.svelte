@@ -1131,6 +1131,7 @@
             enableRouting={false}
             bind:timelineManager
             {options}
+            withStacked
             assetInteraction={assetMultiSelectManager}
             {isSelectionMode}
             onEscape={handleEscape}
