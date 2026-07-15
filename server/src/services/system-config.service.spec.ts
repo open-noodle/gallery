@@ -317,6 +317,18 @@ describe(SystemConfigService.name, () => {
       await expect(sut.getAdminConfig()).resolves.toEqual(updatedConfig);
     });
 
+    it('should keep defaults when a partial supplies an empty object for a populated section', async () => {
+      // Guards the deliberate asymmetry: emptyObjectsAsLeaves is used only for the DEFAULTS enumeration,
+      // never for the user-supplied partial. An empty object in the partial must not wipe a populated
+      // default section, and must not be reported as an unknown key.
+      mocks.systemMetadata.get.mockResolvedValue({ machineLearning: {} });
+
+      const result = await sut.getSystemConfig();
+
+      expect(result.machineLearning).toEqual(defaults.machineLearning);
+      expect(mocks.logger.warn).not.toHaveBeenCalled();
+    });
+
     it('should default missing classification faceExclusion to off', () => {
       const result = AdminConfigDto.schema.parse({
         ...defaults,
@@ -447,6 +459,14 @@ describe(SystemConfigService.name, () => {
       const result = await sut.getSystemConfig();
 
       expect(result.memories.types).toEqual({ recent_trip: false });
+    });
+
+    it('should not warn about unknown keys for the default per-type memory availability map', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({});
+
+      await sut.getSystemConfig();
+
+      expect(mocks.logger.warn).not.toHaveBeenCalled();
     });
 
     it('should accept zero generated memory retention from a config file', async () => {
@@ -695,6 +715,21 @@ describe(SystemConfigService.name, () => {
       });
       expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.SystemConfig, {
         memories: { birthday: false, recentTrips: false },
+      });
+    });
+
+    it('should persist per-type memory availability overrides', async () => {
+      const config = structuredClone(defaults);
+      config.memories.types = { recent_trip: false };
+      mocks.systemMetadata.get
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({ memories: { types: { recent_trip: false } } });
+
+      await expect(sut.updateSystemConfig(config)).resolves.toMatchObject({
+        memories: { types: { recent_trip: false } },
+      });
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.SystemConfig, {
+        memories: { types: { recent_trip: false } },
       });
     });
 
