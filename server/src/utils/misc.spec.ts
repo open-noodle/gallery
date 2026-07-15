@@ -50,6 +50,26 @@ describe('getKeysDeep', () => {
   it('should list nested properties', () => {
     expect(getKeysDeep({ foo: 'bar', hello: { world: true } })).toEqual(['foo', 'hello.world']);
   });
+
+  it('should skip empty objects by default', () => {
+    expect(getKeysDeep({ foo: 'bar', empty: {} })).toEqual(['foo']);
+    expect(getKeysDeep({ foo: 'bar', nested: { empty: {} } })).toEqual(['foo']);
+  });
+
+  it('should emit empty objects as leaf paths when emptyObjectsAsLeaves is set', () => {
+    expect(getKeysDeep({ foo: 'bar', empty: {} }, [], { emptyObjectsAsLeaves: true })).toEqual(['foo', 'empty']);
+    expect(getKeysDeep({ foo: 'bar', nested: { empty: {} } }, [], { emptyObjectsAsLeaves: true })).toEqual([
+      'foo',
+      'nested.empty',
+    ]);
+  });
+
+  it('should still recurse into non-empty objects when emptyObjectsAsLeaves is set', () => {
+    expect(getKeysDeep({ foo: 'bar', hello: { world: true } }, [], { emptyObjectsAsLeaves: true })).toEqual([
+      'foo',
+      'hello.world',
+    ]);
+  });
 });
 
 describe('unsetDeep', () => {
