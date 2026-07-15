@@ -12,6 +12,7 @@
     onGroupingChange?: (grouping: TimelineGrouping) => void;
     temporalAnchor?: { year: number; month?: number };
     onTemporalAnchorResolved?: () => void;
+    withStacked?: boolean;
     children?: Snippet;
     [key: string]: unknown;
   }
@@ -25,6 +26,7 @@
     onGroupingChange,
     temporalAnchor,
     onTemporalAnchorResolved,
+    withStacked = false,
     ...rest
   }: Props = $props();
 
@@ -56,6 +58,7 @@
 
 <div {...rest} data-testid="timeline-stub" data-has-timeline={String(timelineManager !== undefined)}>
   <div data-testid="timeline-options">{JSON.stringify(options)}</div>
+  <div data-testid="timeline-withstacked">{String(withStacked)}</div>
   <button
     type="button"
     data-testid="activate-year-bucket"
