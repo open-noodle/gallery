@@ -979,4 +979,18 @@ describe('Spaces page search URL state', () => {
     const bar = await screen.findByTestId('active-filters-bar-stub');
     expect(bar).toHaveAttribute('data-has-add-all', 'true');
   });
+
+  // #751 — the space Timeline must receive the `withStacked` prop, not just the
+  // `withStacked` query option, or the collapsed stack renders as a lone photo
+  // with no stack badge (showStackedIcon is gated on the prop).
+  it('passes the withStacked prop into the space Timeline so stacks show a badge', async () => {
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
+
+    renderPage();
+
+    expect(await screen.findByTestId('timeline-withstacked')).toHaveTextContent('true');
+    // The query option must remain set too (the server only returns stack data
+    // when withStacked is requested).
+    expect(screen.getByTestId('timeline-options')).toHaveTextContent('"withStacked":true');
+  });
 });
