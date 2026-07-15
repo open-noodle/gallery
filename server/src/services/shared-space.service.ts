@@ -563,11 +563,29 @@ export class SharedSpaceService extends BaseService {
     await this.queueSpacePersonMetadataBackfill();
   }
 
+  /**
+   * Expand a set of asset ids to include every live sibling that shares a stack
+   * with them, so shared-space membership stays stack-atomic (discussion #751).
+   * The explicitly-passed ids are always preserved (even if soft-deleted) so an
+   * explicit add/remove is never silently dropped; the added siblings are the
+   * live stack members only.
+   */
+  private async expandStackAssetIds(assetIds: string[]): Promise<string[]> {
+    const stacked = await this.stackRepository.getStackedAssetIds(assetIds);
+    return [...new Set([...assetIds, ...stacked])];
+  }
+
   async addAssets(auth: AuthDto, spaceId: string, dto: SharedSpaceAssetAddDto): Promise<void> {
     await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
-    await this.requireAccess({ auth, permission: Permission.AssetRead, ids: dto.assetIds });
+    // Stacks are atomic in a space: contributing any member contributes the
+    // whole stack. Otherwise a stack child can be added without its
+    // collapse-primary and would count toward the space but never render in the
+    // stack-collapsed timeline (#751). Access is checked on the full expanded
+    // set so we never contribute a sibling the actor cannot read.
+    const assetIds = await this.expandStackAssetIds(dto.assetIds);
+    await this.requireAccess({ auth, permission: Permission.AssetRead, ids: assetIds });
     const inserted = await this.sharedSpaceRepository.addAssets(
-      dto.assetIds.map((assetId) => ({ spaceId, assetId, addedById: auth.user.id })),
+      assetIds.map((assetId) => ({ spaceId, assetId, addedById: auth.user.id })),
     );
 
     await this.sharedSpaceRepository.update(spaceId, { lastActivityAt: new Date() });
@@ -582,7 +600,7 @@ export class SharedSpaceService extends BaseService {
     const space = await this.sharedSpaceRepository.getById(spaceId);
     if (space?.faceRecognitionEnabled) {
       await this.jobRepository.queueAll(
-        dto.assetIds.map((assetId) => ({
+        assetIds.map((assetId) => ({
           name: JobName.SharedSpaceFaceMatch as const,
           data: { spaceId, assetId },
         })),
@@ -676,14 +694,17 @@ export class SharedSpaceService extends BaseService {
     if (!space) {
       throw new NotFoundException('Space not found');
     }
-    await this.sharedSpaceRepository.removeAssets(spaceId, dto.assetIds);
+    // Removal is stack-atomic too — removing any member removes the whole stack
+    // so no orphaned child is left contributed to the space (#751).
+    const assetIds = await this.expandStackAssetIds(dto.assetIds);
+    await this.sharedSpaceRepository.removeAssets(spaceId, assetIds);
 
     const lastAddedAt = await this.sharedSpaceRepository.getLastAssetAddedAt(spaceId);
     const updateData: { lastActivityAt: Date | null; thumbnailAssetId?: null } = {
       lastActivityAt: lastAddedAt ?? null,
     };
 
-    if (space?.thumbnailAssetId && dto.assetIds.includes(space.thumbnailAssetId)) {
+    if (space?.thumbnailAssetId && assetIds.includes(space.thumbnailAssetId)) {
       updateData.thumbnailAssetId = null;
     }
 
@@ -693,10 +714,10 @@ export class SharedSpaceService extends BaseService {
       spaceId,
       userId: auth.user.id,
       type: SharedSpaceActivityType.AssetRemove,
-      data: { count: dto.assetIds.length },
+      data: { count: assetIds.length },
     });
 
-    await this.sharedSpaceRepository.removePersonFacesByAssetIds(spaceId, dto.assetIds);
+    await this.sharedSpaceRepository.removePersonFacesByAssetIds(spaceId, assetIds);
     await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
     await this.queueSpacePersonMetadataBackfill();
   }

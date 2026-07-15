@@ -153,6 +153,43 @@ export class StackRepository {
       .executeTakeFirst();
   }
 
+  /**
+   * Expand a set of asset ids to include every other (non-deleted) asset that
+   * shares a stack with any of them. Assets with no stack map to themselves.
+   * Used to keep shared-space membership stack-atomic: adding/removing any
+   * member of a stack must add/remove the whole stack, otherwise a stack child
+   * can end up contributed to a space while its collapse-primary is not — the
+   * asset then counts toward the space but never renders in the (stack-collapsed)
+   * timeline. See discussion #751.
+   */
+  async getStackedAssetIds(assetIds: string[]): Promise<string[]> {
+    if (assetIds.length === 0) {
+      return [];
+    }
+
+    const rows = await this.db
+      .selectFrom('asset')
+      .select('asset.id')
+      .where('asset.deletedAt', 'is', null)
+      .where((eb) =>
+        eb.or([
+          eb('asset.id', 'in', assetIds),
+          eb(
+            'asset.stackId',
+            'in',
+            eb
+              .selectFrom('asset as seed')
+              .select('seed.stackId')
+              .where('seed.id', 'in', assetIds)
+              .where('seed.stackId', 'is not', null),
+          ),
+        ]),
+      )
+      .execute();
+
+    return rows.map((row) => row.id);
+  }
+
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   getForAssetRemoval(assetId: string) {
     return this.db
