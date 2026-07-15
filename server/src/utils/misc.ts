@@ -52,8 +52,10 @@ export const getMethodNames = (instance: any) => {
 export const getExternalDomain = (server: SystemConfig['server'], defaultDomain = 'https://my.immich.app') =>
   server.externalDomain || defaultDomain;
 
-/** @returns a list of strings representing the keys of the object in dot notation */
-export const getKeysDeep = (target: unknown, path: string[] = []) => {
+/**
+ * @returns a list of strings representing the keys of the object in dot notation
+ */
+export const getKeysDeep = (target: unknown, path: string[] = [], options: { emptyObjectsAsLeaves?: boolean } = {}) => {
   if (!target || typeof target !== 'object') {
     return [];
   }
@@ -68,7 +70,15 @@ export const getKeysDeep = (target: unknown, path: string[] = []) => {
     }
 
     if (isObject(value) && !isArray(value) && !isDate(value)) {
-      properties.push(...getKeysDeep(value, [...path, key]));
+      // An empty object has no leaf paths, so recursing yields nothing and the key vanishes from the
+      // flattened list. When enumerating known defaults (e.g. the sparse `memories.types` override map,
+      // default `{}`), that makes the key look "unknown" on load and drops overrides on save. Treat an
+      // empty object as a leaf so its path is preserved.
+      if (options.emptyObjectsAsLeaves && Object.keys(value).length === 0) {
+        properties.push([...path, key].join('.'));
+      } else {
+        properties.push(...getKeysDeep(value, [...path, key], options));
+      }
       continue;
     }
 
