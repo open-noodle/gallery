@@ -44,7 +44,7 @@ export const updateConfig = async (repos: RepoDeps, newConfig: SystemConfig): Pr
   const { metadataRepo } = repos;
   // get the difference between the new config and the default config
   const partialConfig: DeepPartial<SystemConfig> = {};
-  for (const property of getKeysDeep(defaults)) {
+  for (const property of getKeysDeep(defaults, [], { emptyObjectsAsLeaves: true })) {
     const newValue = _.get(newConfig, property);
     const isEmpty = [undefined, null, ''].includes(newValue);
     const defaultValue = _.get(defaults, property);
@@ -82,15 +82,18 @@ const buildConfig = async (repos: RepoDeps) => {
     ? await loadFromFile(repos, configFile)
     : await metadataRepo.get(SystemMetadataKey.SystemConfig);
 
-  // merge with defaults
+  // merge with defaults. Enumerate the user-supplied partial WITHOUT emptyObjectsAsLeaves: an empty
+  // object in the partial must yield no path so it can't `_.set` over (and wipe) a populated default
+  // section. Only the defaults enumeration below opts into empty-object leaves.
   const rawConfig = _.cloneDeep(defaults);
   for (const property of getKeysDeep(partial)) {
     _.set(rawConfig, property, _.get(partial, property));
   }
 
-  // check for extra properties
+  // check for extra properties. Enumerate defaults with empty objects kept as leaves so sparse-map
+  // defaults (e.g. `memories.types: {}`) count as known keys instead of being reported as unknown.
   const unknownKeys = _.cloneDeep(rawConfig);
-  for (const property of getKeysDeep(defaults)) {
+  for (const property of getKeysDeep(defaults, [], { emptyObjectsAsLeaves: true })) {
     unsetDeep(unknownKeys, property);
   }
 
