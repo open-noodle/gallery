@@ -16,10 +16,7 @@
   const zeros = (value?: number) => '0'.repeat(13 - (value?.toString().length ?? 0));
 </script>
 
-<div
-  class="flex h-35 w-full flex-col justify-between rounded-3xl bg-subtle p-5 text-primary"
-  data-testid="statistic-card"
->
+<div class="flex h-35 w-full flex-col justify-between rounded-3xl bg-subtle p-5 text-primary">
   <div class="flex place-items-center gap-4">
     {#if icon}
       <Icon {icon} size="40" />
@@ -28,19 +25,15 @@
   </div>
 
   {#if value !== undefined}
-    <div
-      class="relative mx-auto font-mono text-2xl font-medium"
-      aria-label="{value} {unit ?? ''}"
-      data-testid="statistic-value"
-    >
-      <span class="text-gray-300 dark:text-gray-600">{zeros(value)}</span><span>{value}</span>
+    <div class="relative mx-auto font-mono text-2xl font-medium" aria-label="{value} {unit ?? ''}">
+      <span class="text-gray-400 dark:text-gray-600">{zeros(value)}</span><span>{value}</span>
       {#if unit}
         <code class="font-mono text-base font-normal">{unit}</code>
       {/if}
     </div>
   {:else}
     <div class="relative mx-auto font-mono text-2xl font-medium" aria-label="0">
-      <span class="shimmer-text text-gray-300 dark:text-gray-600">{zeros()}</span>
+      <span class="shimmer-text text-gray-400 dark:text-gray-600">{zeros()}</span>
     </div>
   {/if}
 
