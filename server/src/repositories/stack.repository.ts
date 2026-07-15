@@ -4,6 +4,7 @@ import { jsonArrayFrom } from 'kysely/helpers/postgres';
 import { InjectKysely } from 'nestjs-kysely';
 import { columns } from 'src/database';
 import { DummyValue, GenerateSql } from 'src/decorators';
+import { AssetVisibility } from 'src/enum';
 import { DB } from 'src/schema';
 import { StackTable } from 'src/schema/tables/stack.table';
 import { asUuid, withDefaultVisibility } from 'src/utils/database';
@@ -162,7 +163,7 @@ export class StackRepository {
    * asset then counts toward the space but never renders in the (stack-collapsed)
    * timeline. See discussion #751.
    */
-  async getStackedAssetIds(assetIds: string[]): Promise<string[]> {
+  async getStackedAssetIds(assetIds: string[], visibilities?: AssetVisibility[]): Promise<string[]> {
     if (assetIds.length === 0) {
       return [];
     }
@@ -171,6 +172,7 @@ export class StackRepository {
       .selectFrom('asset')
       .select('asset.id')
       .where('asset.deletedAt', 'is', null)
+      .$if(!!visibilities && visibilities.length > 0, (qb) => qb.where('asset.visibility', 'in', visibilities!))
       .where((eb) =>
         eb.or([
           eb('asset.id', 'in', assetIds),

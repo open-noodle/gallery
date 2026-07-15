@@ -51,6 +51,7 @@ import {
   UserAvatarColor,
 } from 'src/enum';
 import type { SpaceFaceAssignment } from 'src/repositories/shared-space.repository';
+import { visibleSpaceAssetVisibilities } from 'src/repositories/shared-space.repository';
 import {
   buildAutomaticReconciliationClaim,
   chooseAutomaticTargetIdentity,
@@ -570,8 +571,8 @@ export class SharedSpaceService extends BaseService {
    * explicit add/remove is never silently dropped; the added siblings are the
    * live stack members only.
    */
-  private async expandStackAssetIds(assetIds: string[]): Promise<string[]> {
-    const stacked = await this.stackRepository.getStackedAssetIds(assetIds);
+  private async expandStackAssetIds(assetIds: string[], visibilities?: AssetVisibility[]): Promise<string[]> {
+    const stacked = await this.stackRepository.getStackedAssetIds(assetIds, visibilities);
     return [...new Set([...assetIds, ...stacked])];
   }
 
@@ -580,9 +581,11 @@ export class SharedSpaceService extends BaseService {
     // Stacks are atomic in a space: contributing any member contributes the
     // whole stack. Otherwise a stack child can be added without its
     // collapse-primary and would count toward the space but never render in the
-    // stack-collapsed timeline (#751). Access is checked on the full expanded
-    // set so we never contribute a sibling the actor cannot read.
-    const assetIds = await this.expandStackAssetIds(dto.assetIds);
+    // stack-collapsed timeline (#751). Auto-expanded siblings are restricted to
+    // space-eligible visibility so we never pull a Hidden/Locked frame in, and
+    // access is checked on the full expanded set so we never contribute a
+    // sibling the actor cannot read.
+    const assetIds = await this.expandStackAssetIds(dto.assetIds, visibleSpaceAssetVisibilities);
     await this.requireAccess({ auth, permission: Permission.AssetRead, ids: assetIds });
     const inserted = await this.sharedSpaceRepository.addAssets(
       assetIds.map((assetId) => ({ spaceId, assetId, addedById: auth.user.id })),

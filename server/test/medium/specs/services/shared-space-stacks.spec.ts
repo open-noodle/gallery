@@ -170,4 +170,30 @@ describe(`${SharedSpaceService.name} stacks in spaces (#751)`, () => {
     await expect(spaceRepo.getAssetCount(space.id)).resolves.toBe(1);
     await expect(spaceTimelineCount(assetRepo, space.id)).resolves.toBe(0);
   });
+
+  // RBAC: auto-expansion must not pull a Hidden/Locked stack frame into a space.
+  it('does not contribute a Hidden stack sibling when expanding on add', async () => {
+    const { ctx, sut } = setup();
+    const { user } = await ctx.newUser();
+    const auth = factory.auth({
+      user: { id: user.id, name: user.name, email: user.email, isAdmin: user.isAdmin },
+    });
+    const { space } = await ctx.newSharedSpace({ createdById: user.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+
+    const primary = await createTimelineAsset(ctx, user.id, new Date('2024-03-01T12:00:00.000Z'));
+    const { asset: hidden } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Hidden });
+    await ctx.newStack({ ownerId: user.id }, [primary.id, hidden.id]);
+
+    await sut.addAssets(auth, space.id, { assetIds: [primary.id] });
+
+    const members = await defaultDatabase
+      .selectFrom('shared_space_asset')
+      .select('assetId')
+      .where('spaceId', '=', space.id)
+      .execute();
+    const memberIds = members.map((m) => m.assetId);
+    expect(memberIds).toContain(primary.id);
+    expect(memberIds).not.toContain(hidden.id);
+  });
 });

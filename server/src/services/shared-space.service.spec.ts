@@ -8,6 +8,7 @@ import { MapMarkerResponseDto } from 'src/dtos/map.dto';
 import {
   AssetFileType,
   AssetType,
+  AssetVisibility,
   CacheControl,
   ImageFormat,
   JobName,
@@ -2327,7 +2328,11 @@ describe(SharedSpaceService.name, () => {
 
       await sut.addAssets(auth, spaceId, { assetIds: [primaryId] });
 
-      expect(mocks.stack.getStackedAssetIds).toHaveBeenCalledWith([primaryId]);
+      // Add restricts auto-expanded siblings to space-eligible visibility.
+      expect(mocks.stack.getStackedAssetIds).toHaveBeenCalledWith(
+        [primaryId],
+        [AssetVisibility.Archive, AssetVisibility.Timeline],
+      );
       expect(mocks.sharedSpace.addAssets).toHaveBeenCalledWith([
         { spaceId, assetId: primaryId, addedById: auth.user.id },
         { spaceId, assetId: childId, addedById: auth.user.id },
@@ -2671,7 +2676,8 @@ describe(SharedSpaceService.name, () => {
 
       await sut.removeAssets(auth, spaceId, { assetIds: [primaryId] });
 
-      expect(mocks.stack.getStackedAssetIds).toHaveBeenCalledWith([primaryId]);
+      // Remove reaches every live member regardless of visibility (no whitelist).
+      expect(mocks.stack.getStackedAssetIds).toHaveBeenCalledWith([primaryId], undefined);
       expect(mocks.sharedSpace.removeAssets).toHaveBeenCalledWith(spaceId, [primaryId, childId]);
       expect(mocks.sharedSpace.removePersonFacesByAssetIds).toHaveBeenCalledWith(spaceId, [primaryId, childId]);
     });
