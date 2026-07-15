@@ -151,6 +151,64 @@ void main() {
     });
   });
 
+  group('aggregated-space stack collapse (#751)', () {
+    test('collapses a stack to its primary in the grouped space timeline', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      const stackId = 'space-stack-1';
+      final primary = await ctx.newRemoteAsset(ownerId: user.id, stackId: stackId);
+      final child = await ctx.newRemoteAsset(ownerId: user.id, stackId: stackId);
+      await ctx.insertStack(id: stackId, ownerId: user.id, primaryAssetId: primary.id);
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: primary.id);
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: child.id);
+
+      final query = sut.sharedSpace(space.id, GroupAssetsBy.day);
+
+      final buckets = await query.bucketSource().first;
+      expect(buckets.fold<int>(0, (sum, b) => sum + b.assetCount), 1);
+
+      final assets = await query.assetSource(0, 10);
+      expect(assets, hasLength(1));
+      expect((assets.single as RemoteAsset).id, primary.id);
+    });
+
+    test('collapses the ungrouped (none) space count query', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      const stackId = 'space-stack-2';
+      final primary = await ctx.newRemoteAsset(ownerId: user.id, stackId: stackId);
+      final child = await ctx.newRemoteAsset(ownerId: user.id, stackId: stackId);
+      await ctx.insertStack(id: stackId, ownerId: user.id, primaryAssetId: primary.id);
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: primary.id);
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: child.id);
+
+      final buckets = await sut.sharedSpace(space.id, GroupAssetsBy.none).bucketSource().first;
+      expect(buckets.fold<int>(0, (sum, b) => sum + b.assetCount), 1);
+    });
+
+    test('keeps an un-stacked asset alongside a collapsed stack', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      const stackId = 'space-stack-3';
+      final primary = await ctx.newRemoteAsset(ownerId: user.id, stackId: stackId);
+      final child = await ctx.newRemoteAsset(ownerId: user.id, stackId: stackId);
+      final loner = await ctx.newRemoteAsset(ownerId: user.id);
+      await ctx.insertStack(id: stackId, ownerId: user.id, primaryAssetId: primary.id);
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: primary.id);
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: child.id);
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: loner.id);
+
+      final query = sut.sharedSpace(space.id, GroupAssetsBy.day);
+
+      final buckets = await query.bucketSource().first;
+      expect(buckets.fold<int>(0, (sum, b) => sum + b.assetCount), 2);
+
+      final assets = await query.assetSource(0, 10);
+      expect(assets.map((a) => (a as RemoteAsset).id), containsAll([primary.id, loner.id]));
+      expect(assets.map((a) => (a as RemoteAsset).id), isNot(contains(child.id)));
+    });
+  });
+
   group('live photos', () {
     test('remote-only live photo contains livePhotoVideoId and is marked as a motion photo', () async {
       final user = await ctx.newUser();
