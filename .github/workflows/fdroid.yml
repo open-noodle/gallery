@@ -1,8 +1,13 @@
 name: Update F-Droid Repo
 
+# Fork note: Gallery does NOT publish to Immich's FUTO F-Droid repo
+# (gitlab.futo.org/fdroid/repo-v2 :: apps/Immich/index.yml), and has no
+# FDROID_REPO_TOKEN secret. The upstream trigger (release: published) would
+# fail on every Gallery release, so this workflow is disabled to
+# workflow_dispatch-only (mirrors gallery's disabled docs-deploy.yml). Do NOT
+# restore the release trigger without fork F-Droid infrastructure.
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
 
 permissions: {}
 
