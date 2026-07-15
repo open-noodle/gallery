@@ -58,13 +58,14 @@ describe('branding target paths', () => {
     });
   }
 
-  // M8 — the branch is rebased onto upstream Immich v3.0.2, so
+  // M8 — the branch is rebased onto upstream Immich v3.0.3, so
   // `branding/config.json` upstream.version is bumped to match. The
   // gallery-revert-to-immich-validation workflow boots the Gallery `:main` image
   // (now v3-based) against `ghcr.io/immich-app/immich-server:v${upstream.version}`,
-  // and revert-to-immich.sql reverses no post-v3.0.2 upstream migrations because the
-  // v3.0.1→v3.0.2 delta added none. Keep this pinned to the base Immich version.
-  it('M8: config.json upstream.version is 3.0.2 (base is immich v3.0.2)', () => {
-    expect(CONFIG.upstream.version).toBe('3.0.2');
+  // and revert-to-immich.sql reverses no post-v3.0.3 upstream migrations because the
+  // v3.0.2→v3.0.3 delta's one migration (RestoreLivePhotoStillVisibility) is part of
+  // the v3.0.3 base. Keep this pinned to the base Immich version.
+  it('M8: config.json upstream.version is 3.0.3 (base is immich v3.0.3)', () => {
+    expect(CONFIG.upstream.version).toBe('3.0.3');
   });
 });
