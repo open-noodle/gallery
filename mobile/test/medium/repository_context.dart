@@ -23,6 +23,7 @@ import 'package:immich_mobile/data/db/main/table/remote/shared_space_album_link.
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_asset.entity.drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_library.entity.drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_member.entity.drift.dart';
+import 'package:immich_mobile/data/db/main/table/remote/stack.drift.dart';
 import 'package:immich_mobile/data/db/main/table/user/auth_user.drift.dart';
 import 'package:immich_mobile/data/db/main/table/user/partner.drift.dart';
 import 'package:immich_mobile/data/db/main/table/user/user.drift.dart';
@@ -450,6 +451,12 @@ class MediumRepositoryContext {
     return db
         .into(db.sharedSpaceAssetEntity)
         .insert(SharedSpaceAssetEntityCompanion.insert(spaceId: spaceId, assetId: assetId));
+  }
+
+  Future<void> insertStack({required String id, required String ownerId, required String primaryAssetId}) {
+    return db
+        .into(db.stackEntity)
+        .insert(StackEntityCompanion.insert(id: id, ownerId: ownerId, primaryAssetId: primaryAssetId));
   }
 
   Future<LibraryEntityData> newLibrary({
