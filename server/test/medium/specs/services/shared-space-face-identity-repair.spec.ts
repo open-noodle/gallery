@@ -8,6 +8,7 @@ import { LoggingRepository } from 'src/repositories/logging.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
 import { SearchRepository } from 'src/repositories/search.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
+import { StackRepository } from 'src/repositories/stack.repository';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
 import { DB } from 'src/schema';
 import { SharedSpaceService } from 'src/services/shared-space.service';
@@ -29,6 +30,7 @@ const setup = (db?: Kysely<DB>) => {
       ConfigRepository,
       SystemMetadataRepository,
       SearchRepository,
+      StackRepository,
     ],
     mock: [LoggingRepository, JobRepository],
   });

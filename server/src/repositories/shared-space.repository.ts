@@ -16,7 +16,7 @@ import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.ta
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
 import { anyUuid, searchAssetBuilder } from 'src/utils/database';
 
-const visibleSpaceAssetVisibilities = [AssetVisibility.Archive, AssetVisibility.Timeline];
+export const visibleSpaceAssetVisibilities = [AssetVisibility.Archive, AssetVisibility.Timeline];
 
 type SpacePersonStatistics = {
   assets: number;
