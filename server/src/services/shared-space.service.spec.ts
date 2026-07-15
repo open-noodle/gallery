@@ -8,6 +8,7 @@ import { MapMarkerResponseDto } from 'src/dtos/map.dto';
 import {
   AssetFileType,
   AssetType,
+  AssetVisibility,
   CacheControl,
   ImageFormat,
   JobName,
@@ -227,6 +228,9 @@ describe(SharedSpaceService.name, () => {
       personalProfileConflictCount: 0,
       spaceProfileConflictCount: 0,
     });
+    // Default: no stacks — expansion is the identity. Individual tests override
+    // this to exercise stack-atomic add/remove (#751).
+    mocks.stack.getStackedAssetIds.mockImplementation((ids: string[]) => Promise.resolve(ids));
   });
 
   it('should work', () => {
@@ -2298,6 +2302,89 @@ describe(SharedSpaceService.name, () => {
       );
       expectNoSharedSpaceFaceIdentityRootJobs(mocks);
     });
+
+    // #751 — stacks in spaces must be atomic. Adding any stack member must
+    // contribute the WHOLE stack, otherwise a child can be contributed while
+    // its collapse-primary is not, and it counts but never renders.
+    it('should expand a stacked asset to its whole stack before inserting', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const primaryId = newUuid();
+      const childId = newUuid();
+      const editorMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Editor });
+      const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: false });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
+      // The client only selected the primary, but the stack has a child.
+      mocks.stack.getStackedAssetIds.mockResolvedValue([primaryId, childId]);
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([primaryId, childId]));
+      mocks.sharedSpace.addAssets.mockResolvedValue([
+        { spaceId, assetId: primaryId, addedById: auth.user.id },
+        { spaceId, assetId: childId, addedById: auth.user.id },
+      ] as any);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.update.mockResolvedValue(space);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.addAssets(auth, spaceId, { assetIds: [primaryId] });
+
+      // Add restricts auto-expanded siblings to space-eligible visibility.
+      expect(mocks.stack.getStackedAssetIds).toHaveBeenCalledWith(
+        [primaryId],
+        [AssetVisibility.Archive, AssetVisibility.Timeline],
+      );
+      expect(mocks.sharedSpace.addAssets).toHaveBeenCalledWith([
+        { spaceId, assetId: primaryId, addedById: auth.user.id },
+        { spaceId, assetId: childId, addedById: auth.user.id },
+      ]);
+    });
+
+    it('should reject the add when an expanded stack sibling is not accessible', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const childId = newUuid();
+      const inaccessiblePrimaryId = newUuid();
+      const editorMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Editor });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
+      // Selecting the child expands to a primary the user cannot read.
+      mocks.stack.getStackedAssetIds.mockResolvedValue([childId, inaccessiblePrimaryId]);
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([childId]));
+      mocks.access.asset.checkAlbumAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkPartnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set());
+
+      await expect(sut.addAssets(auth, spaceId, { assetIds: [childId] })).rejects.toThrow();
+
+      expect(mocks.sharedSpace.addAssets).not.toHaveBeenCalled();
+    });
+
+    it('should queue SharedSpaceFaceMatch jobs for every expanded stack member', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const primaryId = newUuid();
+      const childId = newUuid();
+      const editorMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Editor });
+      const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
+      mocks.stack.getStackedAssetIds.mockResolvedValue([primaryId, childId]);
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([primaryId, childId]));
+      mocks.sharedSpace.addAssets.mockResolvedValue([
+        { spaceId, assetId: primaryId, addedById: auth.user.id },
+        { spaceId, assetId: childId, addedById: auth.user.id },
+      ] as any);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.update.mockResolvedValue(space);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.addAssets(auth, spaceId, { assetIds: [primaryId] });
+
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.SharedSpaceFaceMatch, data: { spaceId, assetId: primaryId } },
+        { name: JobName.SharedSpaceFaceMatch, data: { spaceId, assetId: childId } },
+      ]);
+    });
   });
 
   describe('queueBulkAdd', () => {
@@ -2567,6 +2654,78 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.job.queue).not.toHaveBeenCalledWith(
         expect.objectContaining({ name: JobName.FacialRecognitionQueueAll }),
       );
+    });
+
+    // #751 — removal must be stack-atomic too, otherwise removing the visible
+    // (primary) tile leaves an orphaned child contributed to the space: it
+    // counts but never renders.
+    it('should expand removal to the whole stack', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const primaryId = newUuid();
+      const childId = newUuid();
+      const editorMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Editor });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
+      mocks.stack.getStackedAssetIds.mockResolvedValue([primaryId, childId]);
+      mocks.sharedSpace.removeAssets.mockResolvedValue(void 0);
+      mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(void 0);
+      mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.removeAssets(auth, spaceId, { assetIds: [primaryId] });
+
+      // Remove reaches every live member regardless of visibility (no whitelist).
+      expect(mocks.stack.getStackedAssetIds).toHaveBeenCalledWith([primaryId], undefined);
+      expect(mocks.sharedSpace.removeAssets).toHaveBeenCalledWith(spaceId, [primaryId, childId]);
+      expect(mocks.sharedSpace.removePersonFacesByAssetIds).toHaveBeenCalledWith(spaceId, [primaryId, childId]);
+    });
+
+    it('should clear the cover when a removed stack sibling is the cover photo', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const primaryId = newUuid();
+      const childId = newUuid();
+      const editorMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Editor });
+      // The cover is the child; the user removes only the primary tile.
+      const space = factory.sharedSpace({ id: spaceId, thumbnailAssetId: childId });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.stack.getStackedAssetIds.mockResolvedValue([primaryId, childId]);
+      mocks.sharedSpace.removeAssets.mockResolvedValue(void 0);
+      mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(void 0);
+      mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId, thumbnailAssetId: null }));
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.removeAssets(auth, spaceId, { assetIds: [primaryId] });
+
+      expect(mocks.sharedSpace.update).toHaveBeenCalledWith(spaceId, {
+        lastActivityAt: null,
+        thumbnailAssetId: null,
+      });
+    });
+
+    it('should still remove an explicitly requested trashed asset even if the stack query omits it', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const trashedId = newUuid();
+      const editorMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Editor });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
+      // getStackedAssetIds excludes soft-deleted assets, so a trashed input is
+      // absent from its result — the service must still honor the explicit id.
+      mocks.stack.getStackedAssetIds.mockResolvedValue([]);
+      mocks.sharedSpace.removeAssets.mockResolvedValue(void 0);
+      mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(void 0);
+      mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.removeAssets(auth, spaceId, { assetIds: [trashedId] });
+
+      expect(mocks.sharedSpace.removeAssets).toHaveBeenCalledWith(spaceId, [trashedId]);
     });
   });
 
