@@ -26,14 +26,14 @@
 
   {#if value !== undefined}
     <div class="relative mx-auto font-mono text-2xl font-medium" aria-label="{value} {unit ?? ''}">
-      <span class="text-gray-300 dark:text-gray-600">{zeros(value)}</span><span>{value}</span>
+      <span class="text-gray-400 dark:text-gray-600">{zeros(value)}</span><span>{value}</span>
       {#if unit}
         <code class="font-mono text-base font-normal">{unit}</code>
       {/if}
     </div>
   {:else}
     <div class="relative mx-auto font-mono text-2xl font-medium" aria-label="0">
-      <span class="shimmer-text text-gray-300 dark:text-gray-600">{zeros()}</span>
+      <span class="shimmer-text text-gray-400 dark:text-gray-600">{zeros()}</span>
     </div>
   {/if}
 
