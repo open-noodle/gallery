@@ -24,6 +24,38 @@ rootProject.buildDir = '../build'
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
     project.evaluationDependsOn(':app')
+
+    // The home_widget 0.8.1 plugin hardcodes `jvmTarget "1.8"` but depends on
+    // androidx.glance:glance-appwidget:1.1.1, which is compiled at JVM target 11.
+    // On a clean release build Kotlin refuses to inline the JVM-11 glance bytecode
+    // into home_widget's 1.8 compilation ("Cannot inline bytecode built with JVM
+    // target 11 into bytecode that is being built with JVM target 1.8" →
+    // `:home_widget:compileReleaseKotlin` fails). Cached (smoke) builds skip the
+    // recompile and hide it. Force every Android plugin subproject to compile
+    // Java + Kotlin at JVM 17, matching the :app module, so the whole graph is one
+    // JVM target. Java compatibility must go through android.compileOptions (AGP
+    // overrides the raw JavaCompile task), and Kotlin through kotlinOptions — set
+    // both or AGP reports "Inconsistent JVM-target compatibility" per module.
+    // Guard: evaluationDependsOn(':app') above force-evaluates :app, and
+    // afterEvaluate throws on an already-evaluated project. :app is already JVM 17,
+    // so only the not-yet-evaluated plugin subprojects need this.
+    if (!project.state.executed) {
+        project.afterEvaluate { subproject ->
+            if (subproject.hasProperty('android')) {
+                subproject.android {
+                    compileOptions {
+                        sourceCompatibility JavaVersion.VERSION_17
+                        targetCompatibility JavaVersion.VERSION_17
+                    }
+                    if (subproject.plugins.hasPlugin('kotlin-android')) {
+                        kotlinOptions {
+                            jvmTarget = '17'
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 tasks.register("clean", Delete) {
