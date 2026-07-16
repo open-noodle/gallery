@@ -106,4 +106,37 @@ describe('memory viewer source', () => {
     expect(getMemoryViewerExitRoute('history')).toBe('/memories');
     expect(getMemoryViewerExitRoute()).toBe('/photos');
   });
+
+  describe('duplicate assets across memories (#790)', () => {
+    // rule memories (e.g. birthday) sort first and can contain assets that also
+    // appear in a later on-this-day memory
+    const withDuplicates = [
+      memory('birthday', ['b1', 'dup']),
+      memory('one-year-ago', ['a1']),
+      memory('three-years-ago', ['dup', 'a2']),
+    ];
+
+    it('resolves the occurrence inside the requested memory', () => {
+      const selected = findMemoryAsset(withDuplicates, 'dup', 'three-years-ago');
+
+      expect(selected?.memory.id).toBe('three-years-ago');
+      expect(selected?.memoryIndex).toBe(2);
+      expect(selected?.assetIndex).toBe(0);
+      // navigation keeps advancing forward instead of looping back to the birthday memory
+      expect(selected?.next?.asset.id).toBe('a2');
+    });
+
+    it('falls back to the first occurrence without a memory id', () => {
+      const selected = findMemoryAsset(withDuplicates, 'dup');
+
+      expect(selected?.memory.id).toBe('birthday');
+      expect(selected?.memoryIndex).toBe(0);
+    });
+
+    it('falls back to the first occurrence when the requested memory does not contain the asset', () => {
+      const selected = findMemoryAsset(withDuplicates, 'dup', 'one-year-ago');
+
+      expect(selected?.memory.id).toBe('birthday');
+    });
+  });
 });
