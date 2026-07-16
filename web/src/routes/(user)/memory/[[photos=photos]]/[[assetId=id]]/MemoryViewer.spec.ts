@@ -1,6 +1,6 @@
 import { AssetTypeEnum, MemoryType, type MemoryResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { findMemoryAsset } from '$lib/utils/memory-viewer-source';
@@ -46,7 +46,7 @@ const {
   },
   mockPage: {
     url: new URL('https://gallery.test/memory/photos/memory-asset-1'),
-    params: { assetId: 'memory-asset-1' },
+    params: { assetId: 'memory-asset-1' } as { assetId?: string },
   },
 }));
 
@@ -204,6 +204,8 @@ function renderViewer() {
 describe('MemoryViewer GalleryViewer grouping', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPage.url = new URL('https://gallery.test/memory/photos/memory-asset-1');
+    mockPage.params = { assetId: 'memory-asset-1' };
     mockMemoryManager.memories = [memory('memory-1', ['memory-asset-1', 'memory-asset-2'])];
     mockMemoryManager.ready.mockResolvedValue(undefined);
     mockMemoryManager.getMemoryAsset.mockImplementation((assetId: string | undefined) =>
@@ -226,5 +228,49 @@ describe('MemoryViewer GalleryViewer grouping', () => {
     renderViewer();
 
     expect(await screen.findByTestId('gallery-viewer')).toHaveAttribute('data-enable-grouping', 'true');
+  });
+});
+
+describe('MemoryViewer memory-scoped navigation (#790)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // the same asset appears in two memories (e.g. a birthday memory and an on-this-day memory)
+    mockMemoryManager.memories = [memory('memory-1', ['dup-asset', 'm1-b']), memory('memory-2', ['dup-asset', 'm2-b'])];
+    mockMemoryManager.ready.mockResolvedValue(undefined);
+    mockMemoryManager.getMemoryAsset.mockImplementation((assetId: string | undefined, memoryId?: string) =>
+      findMemoryAsset(mockMemoryManager.memories, assetId, memoryId),
+    );
+    mockGetAssetInfo.mockResolvedValue(mockMemoryManager.memories[0].assets[0]);
+    mockPage.url = new URL('https://gallery.test/memory?id=dup-asset&memoryId=memory-2');
+    mockPage.params = {};
+    mockAfterNavigate.mockImplementation((callback) => {
+      callback({ from: null, to: { params: mockPage.params, url: mockPage.url } });
+    });
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+  });
+
+  it('resolves the viewer position within the memory from the url', async () => {
+    renderViewer();
+
+    await waitFor(() => expect(mockMemoryManager.getMemoryAsset).toHaveBeenCalledWith('dup-asset', 'memory-2'));
+  });
+
+  it('links progress bar segments to assets scoped to the current memory', async () => {
+    const { container } = renderViewer();
+
+    await screen.findByTestId('gallery-viewer');
+    await waitFor(() => {
+      const hrefs = [...container.querySelectorAll('a[href^="/memory"]')].map((anchor) => anchor.getAttribute('href'));
+      expect(hrefs.length).toBeGreaterThan(0);
+      for (const href of hrefs) {
+        expect(href).toContain('memoryId=memory-2');
+      }
+    });
   });
 });
