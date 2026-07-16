@@ -593,7 +593,6 @@
         assetInteraction={assetMultiSelectManager}
         slidingWindowOffset={viewerHeight}
         arrowNavigation={false}
-        enableGrouping
       />
     </div>
   </section>
