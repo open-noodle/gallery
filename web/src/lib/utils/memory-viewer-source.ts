@@ -43,9 +43,18 @@ export const buildMemoryAssets = (memories: MemoryResponseDto[]) => {
   return memoryAssets;
 };
 
-export const findMemoryAsset = (memories: MemoryResponseDto[], assetId: string | undefined) => {
+export const findMemoryAsset = (memories: MemoryResponseDto[], assetId: string | undefined, memoryId?: string) => {
   const memoryAssets = buildMemoryAssets(memories);
-  return memoryAssets.find((memoryAsset) => memoryAsset.asset.id === assetId) ?? memoryAssets[0];
+  // the same asset can appear in multiple memories (e.g. a birthday memory and an on-this-day
+  // memory), so prefer the occurrence inside the requested memory to keep navigation from
+  // jumping back to an earlier memory (#790)
+  return (
+    (memoryId
+      ? memoryAssets.find((memoryAsset) => memoryAsset.memory.id === memoryId && memoryAsset.asset.id === assetId)
+      : undefined) ??
+    memoryAssets.find((memoryAsset) => memoryAsset.asset.id === assetId) ??
+    memoryAssets[0]
+  );
 };
 
 export const removeAssetsFromMemoryList = (memories: MemoryResponseDto[], ids: string[]) => {
