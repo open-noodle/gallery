@@ -46,16 +46,7 @@ final class $$SharedSpaceMemberEntityTableReferences
       i5.ReadDatabaseContainer(db)
           .resultSet<i4.$SharedSpaceEntityTable>('shared_space_entity')
           .createAlias(
-            i0.$_aliasNameGenerator(
-              i5.ReadDatabaseContainer(db)
-                  .resultSet<i1.$SharedSpaceMemberEntityTable>(
-                    'shared_space_member_entity',
-                  )
-                  .spaceId,
-              i5.ReadDatabaseContainer(
-                db,
-              ).resultSet<i4.$SharedSpaceEntityTable>('shared_space_entity').id,
-            ),
+            'shared_space_member_entity__space_id__shared_space_entity__id',
           );
 
   i4.$$SharedSpaceEntityTableProcessedTableManager get spaceId {
@@ -79,18 +70,7 @@ final class $$SharedSpaceMemberEntityTableReferences
   static i6.$UserEntityTable _userIdTable(i0.GeneratedDatabase db) =>
       i5.ReadDatabaseContainer(db)
           .resultSet<i6.$UserEntityTable>('user_entity')
-          .createAlias(
-            i0.$_aliasNameGenerator(
-              i5.ReadDatabaseContainer(db)
-                  .resultSet<i1.$SharedSpaceMemberEntityTable>(
-                    'shared_space_member_entity',
-                  )
-                  .userId,
-              i5.ReadDatabaseContainer(
-                db,
-              ).resultSet<i6.$UserEntityTable>('user_entity').id,
-            ),
-          );
+          .createAlias('shared_space_member_entity__user_id__user_entity__id');
 
   i6.$$UserEntityTableProcessedTableManager get userId {
     final $_column = $_itemColumn<String>('user_id')!;
