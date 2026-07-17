@@ -139,6 +139,39 @@ done
 absent_at de admin.theme_settings_description 'de drops admin.theme_settings_description -> falls back to en'
 absent_at fr admin.maintenance_settings_description 'fr drops admin.maintenance_settings_description -> falls back to en'
 
+# Issue #743 item 4: asset_offline_description exists BOTH top-level and under
+# .admin — a top-level-only override recreates the #672 bug shape (the override
+# clobbers the user-facing key with the admin text while admin.* keeps leaking).
+echo "asset_offline_description branded at BOTH nesting levels (issue #743):"
+branded_at en admin.asset_offline_description 'en admin.asset_offline_description branded under .admin'
+top_offline=$(val_at en asset_offline_description)
+if echo "$top_offline" | grep -q "$UPSTREAM_NAME"; then
+  echo "  FAIL: en top-level asset_offline_description still contains '$UPSTREAM_NAME': '$top_offline'"
+  fails=$((fails + 1))
+elif ! echo "$top_offline" | grep -q "administrator"; then
+  echo "  FAIL: en top-level asset_offline_description lost its user-facing text (got the admin text?): '$top_offline'"
+  fails=$((fails + 1))
+else
+  echo "  ok:   en top-level asset_offline_description keeps its user-facing text, branded"
+fi
+
+# Issue #743 item 4: the override-driven checks above only cover keys that HAVE
+# overrides. Scan every string value in the branded en.json so a missing override
+# can never pass silently again.
+echo "Whole-file scan: branded en.json leaks the upstream name nowhere:"
+en_leaks=$(jq -r --arg up "$UPSTREAM_NAME" '
+  paths(scalars) as $p
+  | select((getpath($p) | type) == "string" and (getpath($p) | contains($up)))
+  | ($p | join("."))' "$TMP/i18n/en.json")
+if [[ -n "$en_leaks" ]]; then
+  while IFS= read -r k; do
+    echo "  FAIL: en.json still contains '$UPSTREAM_NAME' in key '$k' (missing from overrides-en.json)"
+    fails=$((fails + 1))
+  done <<<"$en_leaks"
+else
+  echo "  ok:   0 upstream-name values in branded en.json"
+fi
+
 echo "Unrelated localized strings are preserved (no collateral damage):"
 # 'albums' is a generic key the fork does not rebrand; it must keep its German value.
 de_albums=$(jq -r '.albums // " ABSENT"' "$TMP/i18n/de.json")

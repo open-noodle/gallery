@@ -96,6 +96,53 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     });
   });
 
+  it('masks isFavorite for a foreign-owned asset in a shared library', async () => {
+    // The owner's favorite flag must not leak to other library members — same
+    // masking rule as SharedSpaceAssetSync / AlbumAssetSync (issue #743 item 1).
+    const { auth, ctx } = await setup();
+    const { user: owner } = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: owner.id });
+    const { asset } = await ctx.newAsset({ ownerId: owner.id, libraryId: library.id, isFavorite: true });
+
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Editor });
+    await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: owner.id });
+
+    const response = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetsV1]);
+    const assetEvents = response.filter((r) => isAssetEvent(r));
+    expect(assetEvents).toHaveLength(1);
+    expect((assetEvents[0] as { data: { id: string; isFavorite: boolean } }).data).toMatchObject({
+      id: asset.id,
+      isFavorite: false,
+    });
+  });
+
+  it('masks isFavorite on the backfill path for a foreign-owned asset in a late-linked library', async () => {
+    const { auth, ctx } = await setup();
+    const { user: owner } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Editor });
+
+    const syncTypes = [SyncRequestType.LibrariesV1, SyncRequestType.LibraryAssetsV1];
+    const initial = await ctx.syncStream(auth, syncTypes);
+    await ctx.syncAckAll(auth, initial);
+
+    // Link a new library with a foreign favorite asset — it flows via getBackfill.
+    const { library } = await ctx.newLibrary({ ownerId: owner.id });
+    const { asset } = await ctx.newAsset({ ownerId: owner.id, libraryId: library.id, isFavorite: true });
+    await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: owner.id });
+
+    const response = await ctx.syncStream(auth, syncTypes);
+    const assetEvents = response.filter((r) => isAssetEvent(r));
+    expect(assetEvents).toHaveLength(1);
+    expect((assetEvents[0] as { data: { id: string; isFavorite: boolean } }).data).toMatchObject({
+      id: asset.id,
+      isFavorite: false,
+    });
+  });
+
   it('emits a LibraryAssetDeleteV1 event when a library asset is deleted', async () => {
     const { auth, ctx } = await setup();
     const { library } = await ctx.newLibrary({ ownerId: auth.user.id });
