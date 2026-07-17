@@ -10,6 +10,9 @@ trap 'rm -rf "$TEMPLATE_DIR"' EXIT
 openapi-generator-cli author template -g dart -o "$TEMPLATE_DIR"
 patch --no-backup-if-mismatch -u "$TEMPLATE_DIR/api.mustache" <./templates/mobile/api.mustache.patch
 patch --no-backup-if-mismatch -u "$TEMPLATE_DIR/serialization/native/native_class.mustache" <./templates/mobile/serialization/native/native_class.mustache.patch
+# Must apply AFTER native_class.mustache.patch — its hunks are authored against the
+# patched template. Types nullable-item arrays as List<T?> (issue #743 item 3).
+patch --no-backup-if-mismatch -u "$TEMPLATE_DIR/serialization/native/native_class.mustache" <./templates/mobile/serialization/native/native_class_nullable_items_in_arrays.patch
 
 rm -rf ../mobile/generated/openapi
 
