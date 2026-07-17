@@ -1,31 +1,62 @@
 --- a/open-api/templates/mobile/serialization/native/native_class.mustache
 +++ b/open-api/templates/mobile/serialization/native/native_class.mustache
-@@ -32,7 +32,7 @@
-       {{/required}}
+@@ -34,14 +34,44 @@ class {{{classname}}} {
      {{/isNullable}}
    {{/isEnum}}
--  {{{datatypeWithEnum}}}{{#isNullable}}?{{/isNullable}}{{^isNullable}}{{^required}}{{^defaultValue}}?{{/defaultValue}}{{/required}}{{/isNullable}} {{{name}}};
-+  {{#isArray}}{{#uniqueItems}}Set{{/uniqueItems}}{{^uniqueItems}}List{{/uniqueItems}}<{{{items.dataType}}}{{#items.isNullable}}?{{/items.isNullable}}>{{/isArray}}{{^isArray}}{{{datatypeWithEnum}}}{{/isArray}}{{#isNullable}}?{{/isNullable}}{{^isNullable}}{{^required}}{{^defaultValue}}?{{/defaultValue}}{{/required}}{{/isNullable}} {{{name}}};
+   {{#required}}
++    {{#isArray}}
++      {{#items.isNullable}}
++  {{#uniqueItems}}Set{{/uniqueItems}}{{^uniqueItems}}List{{/uniqueItems}}<{{{items.datatypeWithEnum}}}?>{{#isNullable}}?{{/isNullable}} {{{name}}};
++      {{/items.isNullable}}
++      {{^items.isNullable}}
+   {{{datatypeWithEnum}}}{{#isNullable}}?{{/isNullable}} {{{name}}};
++      {{/items.isNullable}}
++    {{/isArray}}
++    {{^isArray}}
++  {{{datatypeWithEnum}}}{{#isNullable}}?{{/isNullable}} {{{name}}};
++    {{/isArray}}
+   {{/required}}
+   {{^required}}
+     {{#vendorExtensions.x-is-optional}}
++      {{#isArray}}
++        {{#items.isNullable}}
++  Optional<{{#uniqueItems}}Set{{/uniqueItems}}{{^uniqueItems}}List{{/uniqueItems}}<{{{items.datatypeWithEnum}}}?>?> {{{name}}};
++        {{/items.isNullable}}
++        {{^items.isNullable}}
+   {{{datatypeWithEnum}}} {{{name}}};
++        {{/items.isNullable}}
++      {{/isArray}}
++      {{^isArray}}
++  {{{datatypeWithEnum}}} {{{name}}};
++      {{/isArray}}
+     {{/vendorExtensions.x-is-optional}}
+     {{^vendorExtensions.x-is-optional}}
++      {{#isArray}}
++        {{#items.isNullable}}
++  {{#uniqueItems}}Set{{/uniqueItems}}{{^uniqueItems}}List{{/uniqueItems}}<{{{items.datatypeWithEnum}}}?>{{#isNullable}}?{{/isNullable}}{{^isNullable}}{{^defaultValue}}?{{/defaultValue}}{{/isNullable}} {{{name}}};
++        {{/items.isNullable}}
++        {{^items.isNullable}}
+   {{{datatypeWithEnum}}}{{#isNullable}}?{{/isNullable}}{{^isNullable}}{{^defaultValue}}?{{/defaultValue}}{{/isNullable}} {{{name}}};
++        {{/items.isNullable}}
++      {{/isArray}}
++      {{^isArray}}
++  {{{datatypeWithEnum}}}{{#isNullable}}?{{/isNullable}}{{^isNullable}}{{^defaultValue}}?{{/defaultValue}}{{/isNullable}} {{{name}}};
++      {{/isArray}}
+     {{/vendorExtensions.x-is-optional}}
+   {{/required}}
  
- {{/vars}}
-   @override
-@@ -191,7 +191,7 @@
-             {{/isEnum}}
+@@ -305,12 +335,12 @@ class {{{classname}}} {
              {{^isEnum}}
+               {{#vendorExtensions.x-is-optional}}
+         {{{name}}}: json.containsKey(r'{{{baseName}}}') ? Optional.present(json[r'{{{baseName}}}'] is Iterable
+-            ? (json[r'{{{baseName}}}'] as Iterable).cast<{{{items.datatype}}}>().{{#uniqueItems}}toSet(){{/uniqueItems}}{{^uniqueItems}}toList(growable: false){{/uniqueItems}}
++            ? (json[r'{{{baseName}}}'] as Iterable).cast<{{{items.datatype}}}{{#items.isNullable}}?{{/items.isNullable}}>().{{#uniqueItems}}toSet(){{/uniqueItems}}{{^uniqueItems}}toList(growable: false){{/uniqueItems}}
+             : {{#defaultValue}}{{{.}}}{{/defaultValue}}{{^defaultValue}}null{{/defaultValue}}) : const Optional.absent(),
+               {{/vendorExtensions.x-is-optional}}
+               {{^vendorExtensions.x-is-optional}}
          {{{name}}}: json[r'{{{baseName}}}'] is Iterable
 -            ? (json[r'{{{baseName}}}'] as Iterable).cast<{{{items.datatype}}}>().{{#uniqueItems}}toSet(){{/uniqueItems}}{{^uniqueItems}}toList(growable: false){{/uniqueItems}}
 +            ? (json[r'{{{baseName}}}'] as Iterable).cast<{{{items.datatype}}}{{#items.isNullable}}?{{/items.isNullable}}>().{{#uniqueItems}}toSet(){{/uniqueItems}}{{^uniqueItems}}toList(growable: false){{/uniqueItems}}
              : {{#defaultValue}}{{{.}}}{{/defaultValue}}{{^defaultValue}}null{{/defaultValue}},
+               {{/vendorExtensions.x-is-optional}}
              {{/isEnum}}
-           {{/isArray}}
-@@ -203,7 +203,9 @@
-               {{#isNumber}}
-         {{{name}}}: {{#isNullable}}json[r'{{{baseName}}}'] == null
-             ? {{#defaultValue}}{{{.}}}{{/defaultValue}}{{^defaultValue}}null{{/defaultValue}}
--            : {{/isNullable}}{{{datatypeWithEnum}}}.parse('${json[r'{{{baseName}}}']}'),
-+            : {{/isNullable}}{{^isNullable}}{{^required}}{{^defaultValue}}json[r'{{{baseName}}}'] == null
-+            ? null
-+            : {{/defaultValue}}{{/required}}{{/isNullable}}{{{datatypeWithEnum}}}.parse('${json[r'{{{baseName}}}']}'),
-               {{/isNumber}}
-               {{#isDouble}}
-         {{{name}}}: (mapValueOfType<num>(json, r'{{{baseName}}}'){{#required}}{{^isNullable}}!{{/isNullable}}{{/required}}{{^required}}{{#defaultValue}} ?? {{{.}}}{{/defaultValue}}{{/required}}){{#isNullable}}?{{/isNullable}}.toDouble(),
