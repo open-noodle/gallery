@@ -15,8 +15,8 @@ UPSTREAM_NAME=$(jq -r '.upstream_name' "$CONFIG")
 
 # Mobile
 BUNDLE_ID=$(jq -r '.mobile.bundle_id' "$CONFIG")
-BUNDLE_ID_DEBUG=$(jq -r '.mobile.bundle_id_debug' "$CONFIG")
-BUNDLE_ID_PROFILE=$(jq -r '.mobile.bundle_id_profile' "$CONFIG")
+# bundle_id_debug / bundle_id_profile are no longer branded directly — #29077 derives
+# the debug/profile ids from IMMICH_BUNDLE_ID_DEV (= BUNDLE_ID) in Signing.xcconfig.
 DEEP_LINK_SCHEME=$(jq -r '.mobile.deep_link_scheme' "$CONFIG")
 OAUTH_CALLBACK=$(jq -r '.mobile.oauth_callback' "$CONFIG")
 # Not read in this file — patch_oauth_callback() uses ${BUNDLE_ID} directly. Exported as a
