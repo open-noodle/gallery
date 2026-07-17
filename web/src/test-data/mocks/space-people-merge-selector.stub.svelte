@@ -33,6 +33,18 @@
     primaryProfile: { type: 'space-person', id: 'space-person-candidate', spaceId: 'space-2' },
   };
 
+  // Unlike `spaceCandidate` above (a different space, driving the scoped-repair branch), this one
+  // carries `assetCount` like a genuine `SharedSpacePersonResponseDto` from the *same* space as
+  // `person`, so the page's `isSharedSpacePerson` type guard treats it as a real space person and
+  // takes the direct in-space `mergeSpacePeople` branch (`canUseSameSpaceMerge`).
+  const sameSpaceCandidate = {
+    id: 'same-space-candidate',
+    name: 'Same Space Candidate',
+    assetCount: 2,
+    faceCount: 3,
+    spaceId: 'space-1',
+  };
+
   const runMerge = async (target: Candidate, sources: Candidate[]) => {
     const merged = await mergePeople(target, sources);
     onMerge(merged ?? target);
@@ -50,6 +62,13 @@
   </button>
   <button type="button" data-testid="merge-space-candidate" onclick={() => void runMerge(person, [spaceCandidate])}>
     merge space candidate
+  </button>
+  <button
+    type="button"
+    data-testid="merge-same-space-candidate"
+    onclick={() => void runMerge(person, [sameSpaceCandidate])}
+  >
+    merge same space candidate
   </button>
   <button
     type="button"
