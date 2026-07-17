@@ -37,7 +37,9 @@ import { Mocked } from 'vitest';
 let defaultDatabase: Kysely<DB>;
 
 const setup = (db?: Kysely<DB>) => {
-  return newMediumService(PersonService, {
+  clearConfigCache();
+
+  const { sut, ctx } = newMediumService(PersonService, {
     database: db || defaultDatabase,
     real: [
       AccessRepository,
@@ -49,10 +51,17 @@ const setup = (db?: Kysely<DB>) => {
       AssetRepository,
       AssetEditRepository,
       SharedSpaceRepository,
-      SystemMetadataRepository,
     ],
-    mock: [JobRepository, LoggingRepository, StorageRepository, MachineLearningRepository],
+    mock: [JobRepository, LoggingRepository, StorageRepository, MachineLearningRepository, SystemMetadataRepository],
   });
+
+  // mergePerson resolves the cross-owner toggle via getConfig() before opening the merge transaction, so the
+  // config plumbing must be present even for a plain own-merge; a bare SystemConfig yields all defaults.
+  ctx
+    .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
+    .get.mockImplementation((key) => (key === SystemMetadataKey.SystemConfig ? ({} as any) : (undefined as any)));
+
+  return { sut, ctx };
 };
 
 const setupFaceDetection = (db?: Kysely<DB>) => {

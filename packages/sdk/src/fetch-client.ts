@@ -1645,7 +1645,7 @@ export type PeopleFaceStatisticsResponseDto = {
     unassignedFaceCount: number;
 };
 export type MergeScopedPeopleDto = {
-    /** Acknowledgement that this merge will modify people/faces owned by other users. Required to commit a cross-owner merge. */
+    /** Acknowledgement that this merge will combine two people belonging to another user, which cannot be undone. Required to commit such a merge. */
     confirmCrossOwner?: boolean;
     /** Source scoped profiles */
     sources: ScopedPersonProfileRefDto[];
@@ -1702,6 +1702,8 @@ export type PersonFacePageResponseDto = {
     hasNextPage: boolean;
 };
 export type MergePersonDto = {
+    /** Acknowledgement that this merge will combine two people belonging to another user, which cannot be undone. Required to commit such a merge. */
+    confirmCrossOwner?: boolean;
     /** Person IDs to merge */
     ids: string[];
 };
@@ -3006,6 +3008,8 @@ export type SharedSpacePersonAliasDto = {
     alias: string;
 };
 export type SharedSpacePersonMergeDto = {
+    /** Acknowledgement that this merge will combine two people belonging to another user, which cannot be undone. Required to commit such a merge. */
+    confirmCrossOwner?: boolean;
     /** Person IDs to merge into target */
     ids: string[];
 };
@@ -3411,7 +3415,7 @@ export type SystemConfigServerDto = {
     externalDomain: string;
     /** Login page message */
     loginPageMessage: string;
-    /** Allow merging people/faces across different owners and external libraries */
+    /** Allow a people merge to combine two of another user's people, or two people in a shared space the actor cannot edit, into one (a destructive collapse). Re-points that only move a single person to another identity are always allowed. When off, such combining merges are blocked; when on, each still requires an explicit confirmation. */
     mergePeopleAcrossOwners: boolean;
     /** Public users */
     publicUsers: boolean;
