@@ -1836,7 +1836,6 @@ select
   "asset"."localDateTime",
   "asset"."type",
   "asset"."deletedAt",
-  "asset"."isFavorite",
   "asset"."visibility",
   "asset"."duration",
   "asset"."livePhotoVideoId",
@@ -1845,14 +1844,18 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
+  case
+    when "asset"."ownerId" = $1 then "asset"."isFavorite"
+    else $2
+  end as "isFavorite",
   "asset"."updateId"
 from
   "asset" as "asset"
 where
-  "asset"."updateId" < $1
-  and "asset"."updateId" <= $2
-  and "asset"."updateId" > $3
-  and "asset"."libraryId" = $4
+  "asset"."updateId" < $3
+  and "asset"."updateId" <= $4
+  and "asset"."updateId" > $5
+  and "asset"."libraryId" = $6
 order by
   "asset"."updateId" asc
 
@@ -1869,7 +1872,6 @@ select
   "asset"."localDateTime",
   "asset"."type",
   "asset"."deletedAt",
-  "asset"."isFavorite",
   "asset"."visibility",
   "asset"."duration",
   "asset"."livePhotoVideoId",
@@ -1878,12 +1880,16 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
+  case
+    when "asset"."ownerId" = $1 then "asset"."isFavorite"
+    else $2
+  end as "isFavorite",
   "asset"."updateId"
 from
   "asset" as "asset"
 where
-  "asset"."updateId" < $1
-  and "asset"."updateId" > $2
+  "asset"."updateId" < $3
+  and "asset"."updateId" > $4
   and "asset"."libraryId" is not null
   and "asset"."libraryId" in (
     select
@@ -1891,7 +1897,7 @@ where
     from
       "library"
     where
-      "library"."ownerId" = $3
+      "library"."ownerId" = $5
       and "library"."deletedAt" is null
     union
     select
@@ -1905,14 +1911,14 @@ where
         from
           "shared_space"
         where
-          "shared_space"."createdById" = $4
+          "shared_space"."createdById" = $6
         union
         select
           "shared_space_member"."spaceId" as "id"
         from
           "shared_space_member"
         where
-          "shared_space_member"."userId" = $5
+          "shared_space_member"."userId" = $7
       )
   )
 order by
