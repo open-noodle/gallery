@@ -10,6 +10,7 @@ import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/person_picker_list.widget.dart';
+import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
 import '../../../../widget_tester_extensions.dart';
@@ -38,15 +39,47 @@ void main() {
     await db.close();
   });
 
-  PersonDto person(String id, String name, {int? numberOfAssets}) =>
-      PersonDto(id: id, name: name, isHidden: false, thumbnailPath: '', numberOfAssets: numberOfAssets);
+  PersonDto person(String id, String name, {int? numberOfAssets, String? spaceId}) => PersonDto(
+    id: id,
+    name: name,
+    isHidden: false,
+    thumbnailPath: '',
+    numberOfAssets: numberOfAssets,
+    spaceId: spaceId,
+  );
+
+  RemoteImageProvider avatarProviderFor(WidgetTester tester, String rowKey) {
+    final avatar = tester.widget<CircleAvatar>(
+      find.descendant(of: find.byKey(Key(rowKey)), matching: find.byType(CircleAvatar)),
+    );
+    return avatar.backgroundImage! as RemoteImageProvider;
+  }
 
   group('PersonPickerList', () {
-    testWidgets('shows a photo-count subtitle when numberOfAssets is present', (tester) async {
+    // A shared-space person's avatar must hit the membership-gated space thumbnail endpoint —
+    // its tokenized id 404s the owner-only /people endpoint (the reported gray-circle bug).
+    testWidgets('shared-space person avatar routes to the space thumbnail endpoint', (tester) async {
       _setLogicalSize(tester, const Size(400, 800));
       await tester.pumpConsumerWidget(
-        PersonPickerList(people: [person('a', 'Alice', numberOfAssets: 1204)]),
+        PersonPickerList(people: [person('space-person:sp-1', 'Zoe', spaceId: 'space-1')]),
       );
+      await tester.pumpAndSettle();
+      expect(
+        avatarProviderFor(tester, 'person-row-space-person:sp-1').url,
+        'http://localhost:0/shared-spaces/space-1/people/sp-1/thumbnail',
+      );
+    });
+
+    testWidgets('personal person avatar routes to the owner thumbnail endpoint', (tester) async {
+      _setLogicalSize(tester, const Size(400, 800));
+      await tester.pumpConsumerWidget(PersonPickerList(people: [person('person:p-1', 'Alice')]));
+      await tester.pumpAndSettle();
+      expect(avatarProviderFor(tester, 'person-row-person:p-1').url, 'http://localhost:0/people/p-1/thumbnail');
+    });
+
+    testWidgets('shows a photo-count subtitle when numberOfAssets is present', (tester) async {
+      _setLogicalSize(tester, const Size(400, 800));
+      await tester.pumpConsumerWidget(PersonPickerList(people: [person('a', 'Alice', numberOfAssets: 1204)]));
       await tester.pumpAndSettle();
       final finder = find.byKey(const Key('person-row-count-a'));
       expect(finder, findsOneWidget);
