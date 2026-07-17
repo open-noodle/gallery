@@ -64,6 +64,23 @@ if [[ -f "$overrides_file" && -f "$i18n_file" ]]; then
   done < <(jq -r '[paths(scalars)] | .[] | join(".")' "$overrides_file")
   echo "  i18n: $((override_count - leaked))/$override_count keys patched"
 
+  # Issue #743: the loop above only checks keys that HAVE overrides — a leaking
+  # key missing from overrides-en.json passed silently. Scan every string value
+  # in the branded en.json so that class can't slip through again.
+  en_leaks=0
+  while IFS= read -r keypath; do
+    [[ -n "$keypath" ]] || continue
+    echo "  WARN: i18n key '$keypath' contains '$UPSTREAM_NAME' but has no override in overrides-en.json"
+    en_leaks=$((en_leaks + 1))
+    EXIT_CODE=1
+  done < <(jq -r --arg up "$UPSTREAM_NAME" '
+    paths(scalars) as $p
+    | select((getpath($p) | type) == "string" and (getpath($p) | contains($up)))
+    | ($p | join("."))' "$i18n_file")
+  if [[ $en_leaks -eq 0 ]]; then
+    echo "  i18n: no unbranded '$UPSTREAM_NAME' values remain in en.json"
+  fi
+
   # Issue #703: the upstream name must not leak through *any* locale for a key
   # the fork rebrands. Non-English locales carry upstream Weblate translations
   # of these keys; patch_i18n() either replaces them with a per-locale override
