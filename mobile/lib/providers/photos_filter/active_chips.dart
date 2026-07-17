@@ -19,6 +19,12 @@ class ActiveChipSpec {
   final String label;
   final ChipVisual visual;
   final List<String>? avatarPersonIds;
+
+  /// Space scope for each avatar in [avatarPersonIds], index-aligned (same length, non-null when
+  /// that avatar is a shared-space person). The chip avatar routes a Space person to the
+  /// membership-gated space thumbnail endpoint via getFilterPersonThumbnailUrl — the tokenized
+  /// avatar id alone doesn't carry the spaceId, so it 404s the owner endpoint without this.
+  final List<String?>? avatarPersonSpaceIds;
   final int? tagDotSeed;
   final IconData? icon;
   final String? semanticsLabel;
@@ -28,6 +34,7 @@ class ActiveChipSpec {
     required this.label,
     required this.visual,
     this.avatarPersonIds,
+    this.avatarPersonSpaceIds,
     this.tagDotSeed,
     this.icon,
     this.semanticsLabel,
@@ -47,6 +54,7 @@ List<ActiveChipSpec> activeChipsFromFilter(SearchFilter filter, {FilterSuggestio
           label: p.name.isEmpty ? 'filter_sheet_unnamed_person' : p.name,
           visual: ChipVisual.person,
           avatarPersonIds: [p.id],
+          avatarPersonSpaceIds: [p.spaceId],
         ),
       );
     }
@@ -59,18 +67,21 @@ List<ActiveChipSpec> activeChipsFromFilter(SearchFilter filter, {FilterSuggestio
           label: p.name.isEmpty ? 'filter_sheet_unnamed_person' : p.name,
           visual: ChipVisual.person,
           avatarPersonIds: [p.id],
+          avatarPersonSpaceIds: [p.spaceId],
         ),
       );
     }
     final tail = people.skip(2).toList();
     final firstTail = tail.first;
     final avatars = <String>[people[0].id, people[1].id, firstTail.id];
+    final avatarSpaceIds = <String?>[people[0].spaceId, people[1].spaceId, firstTail.spaceId];
     out.add(
       ActiveChipSpec(
         id: PersonChipId(firstTail.id),
         label: '${people[0].name}, ${people[1].name} +${tail.length}',
         visual: ChipVisual.person,
         avatarPersonIds: avatars,
+        avatarPersonSpaceIds: avatarSpaceIds,
       ),
     );
   }
