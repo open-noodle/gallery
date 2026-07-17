@@ -5,7 +5,7 @@ import {
   type PersonStatisticsResponseDto,
   type SharedSpaceMemberResponseDto,
 } from '@immich/sdk';
-import { modalManager } from '@immich/ui';
+import { modalManager, toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
@@ -110,7 +110,7 @@ vi.mock('@immich/ui', async (importOriginal) => {
     ...original,
     ContextMenuButton: MockContextMenuButton,
     modalManager: { show: vi.fn(), showDialog: vi.fn() },
-    toastManager: { primary: vi.fn(), success: vi.fn(), warning: vi.fn() },
+    toastManager: { primary: vi.fn(), success: vi.fn(), warning: vi.fn(), danger: vi.fn() },
   };
 });
 
@@ -216,6 +216,53 @@ describe('Person detail page', () => {
       },
     });
     expect(sdkMock.mergePerson).not.toHaveBeenCalled();
+  });
+
+  it('shows the descriptive message and does not merge a classic merge blocked across owners', async () => {
+    vi.mocked(sdkMock.isHttpError).mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
+    sdkMock.mergePerson.mockRejectedValueOnce({
+      __http: true,
+      status: 403,
+      data: { code: 'cross_owner_merge_blocked', message: 'An administrator can enable it.' },
+      message: 'raw',
+    });
+
+    renderPage();
+
+    await userEvent.click(screen.getByText('merge_people'));
+    await userEvent.click(screen.getByTestId('merge-personal-candidate'));
+
+    await waitFor(() => expect(toastManager.danger).toHaveBeenCalled());
+    expect(sdkMock.mergePerson).toHaveBeenCalledTimes(1);
+    expect(modalManager.showDialog).not.toHaveBeenCalled();
+  });
+
+  it('re-runs a classic merge with the cross-owner acknowledgement once the user confirms', async () => {
+    vi.mocked(sdkMock.isHttpError).mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
+    sdkMock.mergePerson
+      .mockRejectedValueOnce({
+        __http: true,
+        status: 409,
+        data: { code: 'cross_owner_merge_confirmation_required', impactedOwnerCount: 1 },
+        message: 'raw',
+      })
+      .mockResolvedValueOnce([{ id: 'person-candidate', success: true }]);
+    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+
+    renderPage();
+
+    await userEvent.click(screen.getByText('merge_people'));
+    await userEvent.click(screen.getByTestId('merge-personal-candidate'));
+
+    await waitFor(() => expect(sdkMock.mergePerson).toHaveBeenCalledTimes(2));
+    expect(sdkMock.mergePerson).toHaveBeenNthCalledWith(1, {
+      id: 'person-1',
+      mergePersonDto: { ids: ['person-candidate'] },
+    });
+    expect(sdkMock.mergePerson).toHaveBeenNthCalledWith(2, {
+      id: 'person-1',
+      mergePersonDto: { ids: ['person-candidate'], confirmCrossOwner: true },
+    });
   });
 
   it('renders asset and face counts in the person header', () => {
@@ -445,6 +492,19 @@ describe('Person detail page', () => {
     await waitFor(() => expect(screen.queryByText('set_date_of_birth')).not.toBeInTheDocument());
     expect(screen.queryByText('hide_person')).not.toBeInTheDocument();
     expect(screen.queryByText('select_representative_face')).not.toBeInTheDocument();
+  });
+
+  it('hides the merge option for a space-primary person the actor cannot edit', async () => {
+    sdkMock.getMembers.mockResolvedValue([makeMember('current-user-id', SharedSpaceRole.Viewer)]);
+    renderPage({
+      person: makePerson({
+        id: 'space-person-1',
+        primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'viewer-space-detail-merge-gate' },
+      }),
+    });
+
+    await waitFor(() => expect(sdkMock.getMembers).toHaveBeenCalledWith({ id: 'viewer-space-detail-merge-gate' }));
+    expect(screen.queryByText('merge_people')).not.toBeInTheDocument();
   });
 
   it('keeps space-person write actions for space editors', async () => {
