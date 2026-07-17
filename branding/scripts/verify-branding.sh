@@ -103,6 +103,19 @@ if [[ -f "$pbxproj" ]]; then
   fi
 fi
 
+# Check iOS signing identity — #29077 moved bundle id / team / app group into
+# mobile/ios/Signing.xcconfig (project.pbxproj now references $(IMMICH_*)), so the
+# pbxproj check above passes trivially; verify the branded values were written here.
+signing_xcconfig="$REPO_ROOT/mobile/ios/Signing.xcconfig"
+if [[ -f "$signing_xcconfig" ]]; then
+  if grep -qE "app\.(alextran|futo)\.immich|2W7AC6T8T5|group\.app\.immich\.share" "$signing_xcconfig"; then
+    echo "  WARN: Upstream signing identity still present in Signing.xcconfig"
+    EXIT_CODE=1
+  else
+    echo "  OK: Signing.xcconfig"
+  fi
+fi
+
 # Check that hardcoded upstream URLs are patched in user-facing frontend
 echo "--- Checking URL replacements ---"
 
