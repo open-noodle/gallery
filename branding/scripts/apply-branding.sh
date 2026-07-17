@@ -182,10 +182,13 @@ patch_web() {
     echo "  Patched ErrorLayout.svelte"
   fi
 
-  # security.txt — hardcoded SECURITY.md policy URL and "Immich instance" comments
+  # security.txt — upstream GitHub URLs (Policy / Contact advisories / old SECURITY.md) and "Immich instance" comments.
+  # Rewrite ANY immich-app/immich GitHub URL to the fork's repo, preserving the path/query suffix, so upstream
+  # reshuffling the security.txt links (e.g. #29940 switched Policy to ?tab=security-ov-file and added an
+  # advisories Contact) can't leak an upstream URL past verify-branding.
   local security_txt="$REPO_ROOT/web/static/.well-known/security.txt"
   if [[ -f "$security_txt" ]]; then
-    sed -i "s|https://github\.com/immich-app/immich/blob/main/SECURITY\.md|${REPO_URL}/blob/main/SECURITY.md|g" "$security_txt"
+    sed -i "s|https://github\.com/immich-app/immich|${REPO_URL}|g" "$security_txt"
     sed -i "s|running an Immich instance|running a ${NAME} instance|g" "$security_txt"
     sed -i "s|Immich-related security problems should be reported to the Immich security team|${NAME}-related security problems should be reported to the ${NAME} security team|g" "$security_txt"
     echo "  Patched security.txt"
