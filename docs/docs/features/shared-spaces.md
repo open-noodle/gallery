@@ -282,10 +282,10 @@ This separation ensures that members' personal libraries remain private while al
 
 Occasionally the same real person is split across more than one owner — for example a space person assembled from several members' photos, or a person tied to a [connected external library](#connected-libraries-admin). Merging those entries crosses an owner boundary, so it modifies people and faces owned by other users and may not be cleanly reversible.
 
-Cross-owner merges are **off by default** and gated by an instance-wide setting:
+Destructive cross-owner merges are **off by default** and gated by an instance-wide setting:
 
-- **When the setting is off**, cross-owner merges are blocked for everyone — the merge stops with a message explaining that the person also appears in another user's library.
-- **A server admin enables the feature** by turning on **Cross-Owner People Merges** in [Server Settings](/administration/system-settings#cross-owner-people-merges). Once enabled, it becomes a normal action for any user with merge access; the user is asked to confirm before the merge commits, since it changes other users' people.
+- **When the setting is off**, a merge that only **re-points** another owner's or a space's single person onto the surviving identity still succeeds — nothing is deleted. What it blocks is a merge that would **combine two** of another user's people, or **combine two people in a space you cannot edit** (you are only a viewer, or not a member of it) — since that deletes one of the rows. This includes merging two people inside a space you cannot edit. Such a merge stops with a message noting that an administrator can enable the feature.
+- **A server admin enables the feature** by turning on **Cross-Owner People Merges** in [Server Settings](/administration/system-settings#cross-owner-people-merges). Once enabled, those combining merges become available to any user with merge access; the user is asked to confirm before the merge commits, since it deletes one of another owner's (or the space's) people.
 
 Merges that stay within a single owner (the usual Editor merge above) are unaffected.
 

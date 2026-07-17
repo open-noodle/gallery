@@ -62,6 +62,7 @@ import { BaseService } from 'src/services/base.service';
 import { JobOf } from 'src/types';
 import { asDateString, asDateTimeString } from 'src/utils/date';
 import { ImmichMediaResponse } from 'src/utils/file';
+import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy';
 import { mimeTypes } from 'src/utils/mime-types';
 
 const ROLE_HIERARCHY: Record<SharedSpaceRole, number> = {
@@ -1321,12 +1322,23 @@ export class SharedSpaceService extends BaseService {
         throw new BadRequestException('Source person not found in this space');
       }
       sources.push(source);
-      if (source.type !== target.type) {
-        throw new BadRequestException('Cannot merge people of different types');
-      }
     }
 
-    await this.identityMergePropagationService.mergeSpacePeople(auth, spaceId, targetPersonId, dto.ids);
+    // Same cross-owner policy as every other merge path (#733). An in-space merge propagates out to every
+    // scope the identities are attached to, including other users' libraries, so if it would combine two of
+    // another user's people it needs the instance toggle and an explicit acknowledgement.
+    //
+    // Resolve the toggle BEFORE the merge transaction opens: the authorizer runs inside that transaction while it
+    // holds the instance-wide advisory lock, and reading config there would query a second pool connection a
+    // saturated pool cannot grant, deadlocking every merge (#595). The authorizer gets an already-resolved value.
+    const { server } = await this.getConfig({ withCache: false });
+    await this.identityMergePropagationService.mergeSpacePeople(
+      auth,
+      spaceId,
+      targetPersonId,
+      dto.ids,
+      createCrossOwnerMergeAuthorizer(() => Promise.resolve(server), dto),
+    );
   }
 
   async setSpacePersonAlias(
