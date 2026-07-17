@@ -19,13 +19,10 @@ import {
   UserMetadataKey,
 } from 'src/enum';
 import { FaceSearchResult } from 'src/repositories/search.repository';
-import {
-  CROSS_OWNER_MERGE_ERROR_CODE,
-  FACE_IDENTITY_BACKFILL_MAX_CONTINUATIONS,
-  PersonService,
-} from 'src/services/person.service';
+import { FACE_IDENTITY_BACKFILL_MAX_CONTINUATIONS, PersonService } from 'src/services/person.service';
 import { StorageService } from 'src/services/storage.service';
 import { ImmichFileResponse, ImmichStreamResponse } from 'src/utils/file';
+import { CROSS_OWNER_MERGE_ERROR_CODE } from 'src/utils/merge-policy';
 import { AssetFaceFactory } from 'test/factories/asset-face.factory';
 import { AssetFactory } from 'test/factories/asset.factory';
 import { AuthFactory } from 'test/factories/auth.factory';
@@ -59,23 +56,28 @@ const recognitionCounts = (overrides: Partial<QueueStatisticsDto> = {}) =>
 const prefsMetadata = (minimumFaces: number) =>
   [{ key: UserMetadataKey.Preferences, value: { people: { minimumFaces } } }] as any;
 
-// Cross-owner scoped-merge (#733) resolution + request fixtures.
-const crossOwnerResolution = (overrides: Record<string, unknown> = {}) =>
-  ({
-    accessible: true,
-    targetIdentityId: 'identity-1',
-    sourceIdentityIds: ['identity-2'],
-    type: 'person',
-    allAttachedProfilesRepairable: false,
-    hasScopedProfileConflict: false,
-    impactedOwnerIds: ['owner-b'],
-    hasInaccessibleAttachedSpaceProfile: false,
-    ...overrides,
-  }) as any;
-
+// Cross-owner scoped-merge (#733) request fixture.
 const crossOwnerMergeDto = (overrides: Record<string, unknown> = {}) => ({
   target: { type: 'person' as const, id: newUuid() },
   sources: [{ type: 'space-person' as const, id: newUuid(), spaceId: newUuid() }],
+  ...overrides,
+});
+
+/** The cross-owner authorizer each merge entry point hands to the planner (src/utils/merge-policy.ts). */
+type MergeAuthorizerFn = (plan: {
+  collapsedOwnerIds: string[];
+  repointedOwnerIds: string[];
+  unrepairableSpaceCollapseIds: string[];
+}) => Promise<void>;
+
+const planWith = (overrides: {
+  collapsedOwnerIds?: string[];
+  repointedOwnerIds?: string[];
+  unrepairableSpaceCollapseIds?: string[];
+}) => ({
+  collapsedOwnerIds: [],
+  repointedOwnerIds: [],
+  unrepairableSpaceCollapseIds: [],
   ...overrides,
 });
 
@@ -175,6 +177,7 @@ describe(PersonService.name, () => {
   const useIdentityMergePropagation = () => {
     const identityMergePropagation = {
       mergePersonalPeople: vi.fn(),
+      mergeScopedProfiles: vi.fn(),
     };
     (
       sut as unknown as { identityMergePropagationService: typeof identityMergePropagation }
@@ -4605,7 +4608,12 @@ describe(PersonService.name, () => {
       ]);
 
       expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalled();
-      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(auth, 'person-x', ['person-y']);
+      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(
+        auth,
+        'person-x',
+        ['person-y'],
+        expect.any(Function),
+      );
       expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
     });
 
@@ -4702,7 +4710,12 @@ describe(PersonService.name, () => {
         { id: mergePerson.id, success: true },
       ]);
 
-      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(auth, person.id, [mergePerson.id]);
+      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(
+        auth,
+        person.id,
+        [mergePerson.id],
+        expect.any(Function),
+      );
       expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
       expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.id]));
     });
@@ -4722,7 +4735,12 @@ describe(PersonService.name, () => {
         { id: mergePerson.id, success: true },
       ]);
 
-      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(auth, person.id, [mergePerson.id]);
+      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(
+        auth,
+        person.id,
+        [mergePerson.id],
+        expect.any(Function),
+      );
       expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
       expect(mocks.job.queue).not.toHaveBeenCalledWith({
         name: JobName.SharedSpacePersonMetadataBackfill,
@@ -4748,7 +4766,12 @@ describe(PersonService.name, () => {
         { id: mergePerson.id, success: true },
       ]);
 
-      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(auth, person.id, [mergePerson.id]);
+      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(
+        auth,
+        person.id,
+        [mergePerson.id],
+        expect.any(Function),
+      );
       expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
       expect(mocks.person.update).not.toHaveBeenCalled();
       expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.id]));
@@ -4795,189 +4818,258 @@ describe(PersonService.name, () => {
 
       await expect(sut.mergePerson(auth, person.id, { ids: [mergePerson.id] })).rejects.toThrow('propagation failed');
 
-      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(auth, person.id, [mergePerson.id]);
+      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(
+        auth,
+        person.id,
+        [mergePerson.id],
+        expect.any(Function),
+      );
       expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
       expect(mocks.person.delete).not.toHaveBeenCalled();
       expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.id]));
     });
   });
 
-  describe('scoped people repair', () => {
-    it('rejects same-person repair for inaccessible scoped profiles', async () => {
+  describe('mergePerson cross-owner policy', () => {
+    // §5.4 parity: merging two of your OWN people still propagates through any identity they share with other
+    // users. Before #733 this endpoint would silently merge two of another user's people. It now hands the
+    // planner the same authorizer the scoped and in-space merges use.
+    it('does not gate a merge that only re-points another owner’s person', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: false } });
+      const identityMergePropagation = useIdentityMergePropagation();
       const auth = AuthFactory.create();
-      mocks.faceIdentity.resolveRepairRefs.mockResolvedValue({
-        accessible: false,
-        allAttachedProfilesRepairable: false,
-      } as any);
+      const [person, mergeTarget] = [
+        PersonFactory.create({ id: 'person-x' }),
+        PersonFactory.create({ id: 'person-y' }),
+      ];
+      identityMergePropagation.mergePersonalPeople.mockResolvedValue([{ id: mergeTarget.id, success: true }]);
+      mocks.person.getById.mockResolvedValueOnce(person);
+      mocks.person.getById.mockResolvedValueOnce(mergeTarget);
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.id]));
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergeTarget.id]));
+      await sut.mergePerson(auth, person.id, { ids: [mergeTarget.id] });
+      const authorize = identityMergePropagation.mergePersonalPeople.mock.calls[0][3] as MergeAuthorizerFn;
 
       await expect(
-        sut.mergeScopedPeople(auth, {
-          target: { type: 'space-person', id: newUuid(), spaceId: newUuid() },
-          sources: [{ type: 'space-person', id: newUuid(), spaceId: newUuid() }],
-        }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-
-      expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
+        authorize({ collapsedOwnerIds: [], repointedOwnerIds: ['owner-b'], unrepairableSpaceCollapseIds: [] }),
+      ).resolves.toBeUndefined();
     });
 
-    it('merges same-person repair only after access and repairability checks', async () => {
-      const auth = AuthFactory.create();
-      mocks.faceIdentity.resolveRepairRefs.mockResolvedValue({
-        accessible: true,
-        targetIdentityId: 'identity-1',
-        sourceIdentityIds: ['identity-2'],
-        type: 'person',
-        allAttachedProfilesRepairable: true,
-      } as any);
-      mocks.faceIdentity.mergeIdentities.mockResolvedValue({
-        personalProfileConflictCount: 0,
-        spaceProfileConflictCount: 0,
-      });
-
-      await sut.mergeScopedPeople(auth, {
-        target: { type: 'person', id: newUuid() },
-        sources: [{ type: 'space-person', id: newUuid(), spaceId: newUuid() }],
-      });
-
-      expect(mocks.faceIdentity.mergeIdentities).toHaveBeenCalledWith({
-        targetIdentityId: 'identity-1',
-        sourceIdentityIds: ['identity-2'],
-        source: 'manual',
-      });
-      expect(mocks.job.queue).toHaveBeenCalledWith({
-        name: JobName.SharedSpacePersonMetadataBackfill,
-        data: {},
-      });
-    });
-
-    it('blocks a cross-owner merge for any user when the toggle is off', async () => {
-      // A non-admin stands in for "any authenticated user with merge access": the gate is the
-      // instance toggle, not admin status (issue #733 revision).
-      const auth = AuthFactory.create({ isAdmin: false });
+    it('blocks a merge that would combine two of another owner’s people when the toggle is off', async () => {
       mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: false } });
-      mocks.faceIdentity.resolveRepairRefs.mockResolvedValue(crossOwnerResolution());
+      const identityMergePropagation = useIdentityMergePropagation();
+      const auth = AuthFactory.create();
+      const [person, mergeTarget] = [
+        PersonFactory.create({ id: 'person-x' }),
+        PersonFactory.create({ id: 'person-y' }),
+      ];
+      identityMergePropagation.mergePersonalPeople.mockResolvedValue([{ id: mergeTarget.id, success: true }]);
+      mocks.person.getById.mockResolvedValueOnce(person);
+      mocks.person.getById.mockResolvedValueOnce(mergeTarget);
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.id]));
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergeTarget.id]));
+      await sut.mergePerson(auth, person.id, { ids: [mergeTarget.id] });
+      const authorize = identityMergePropagation.mergePersonalPeople.mock.calls[0][3] as MergeAuthorizerFn;
 
-      const error = await sut.mergeScopedPeople(auth, crossOwnerMergeDto()).catch((error_: unknown) => error_);
+      await expect(
+        authorize({ collapsedOwnerIds: ['owner-b'], repointedOwnerIds: [], unrepairableSpaceCollapseIds: [] }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('commits a (b) collapse once the toggle is on and the merge is confirmed', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: true } });
+      const identityMergePropagation = useIdentityMergePropagation();
+      const auth = AuthFactory.create();
+      const [person, mergeTarget] = [
+        PersonFactory.create({ id: 'person-x' }),
+        PersonFactory.create({ id: 'person-y' }),
+      ];
+      identityMergePropagation.mergePersonalPeople.mockResolvedValue([{ id: mergeTarget.id, success: true }]);
+      mocks.person.getById.mockResolvedValueOnce(person);
+      mocks.person.getById.mockResolvedValueOnce(mergeTarget);
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.id]));
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergeTarget.id]));
+      await sut.mergePerson(auth, person.id, { ids: [mergeTarget.id], confirmCrossOwner: true });
+      const authorize = identityMergePropagation.mergePersonalPeople.mock.calls[0][3] as MergeAuthorizerFn;
+
+      await expect(
+        authorize({ collapsedOwnerIds: ['owner-b'], repointedOwnerIds: [], unrepairableSpaceCollapseIds: [] }),
+      ).resolves.toBeUndefined();
+    });
+
+    // Parity with the scoped merge's 409 test: with the toggle on but no confirmation on the DTO, the classic
+    // endpoint must surface the confirmation-required conflict, not silently commit (#733).
+    it('requires explicit confirmation for a (b) collapse when the toggle is on but the merge is not confirmed', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: true } });
+      const identityMergePropagation = useIdentityMergePropagation();
+      const auth = AuthFactory.create();
+      const [person, mergeTarget] = [
+        PersonFactory.create({ id: 'person-x' }),
+        PersonFactory.create({ id: 'person-y' }),
+      ];
+      identityMergePropagation.mergePersonalPeople.mockResolvedValue([{ id: mergeTarget.id, success: true }]);
+      mocks.person.getById.mockResolvedValueOnce(person);
+      mocks.person.getById.mockResolvedValueOnce(mergeTarget);
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.id]));
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergeTarget.id]));
+      await sut.mergePerson(auth, person.id, { ids: [mergeTarget.id] });
+      const authorize = identityMergePropagation.mergePersonalPeople.mock.calls[0][3] as MergeAuthorizerFn;
+
+      const error = await authorize({
+        collapsedOwnerIds: ['owner-b'],
+        repointedOwnerIds: [],
+        unrepairableSpaceCollapseIds: [],
+      }).catch((error_: unknown) => error_);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).getResponse()).toMatchObject({
+        code: CROSS_OWNER_MERGE_ERROR_CODE.confirmationRequired,
+      });
+    });
+
+    // #733 review P1: a fan-out that would collapse people in a space the actor cannot edit is now governed by the
+    // same admin toggle as an other-owner collapse — blocked when off, permitted (with confirmation) when on.
+    it('blocks a fan-out collapse of an un-editable space when the toggle is off', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: false } });
+      const identityMergePropagation = useIdentityMergePropagation();
+      const auth = AuthFactory.create();
+      const [person, mergeTarget] = [
+        PersonFactory.create({ id: 'person-x' }),
+        PersonFactory.create({ id: 'person-y' }),
+      ];
+      identityMergePropagation.mergePersonalPeople.mockResolvedValue([{ id: mergeTarget.id, success: true }]);
+      mocks.person.getById.mockResolvedValueOnce(person);
+      mocks.person.getById.mockResolvedValueOnce(mergeTarget);
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.id]));
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergeTarget.id]));
+      await sut.mergePerson(auth, person.id, { ids: [mergeTarget.id] });
+      const authorize = identityMergePropagation.mergePersonalPeople.mock.calls[0][3] as MergeAuthorizerFn;
+
+      const error = await authorize({
+        collapsedOwnerIds: [],
+        repointedOwnerIds: [],
+        unrepairableSpaceCollapseIds: ['space-x'],
+      }).catch((error_: unknown) => error_);
 
       expect(error).toBeInstanceOf(ForbiddenException);
       expect((error as ForbiddenException).getResponse()).toMatchObject({
         code: CROSS_OWNER_MERGE_ERROR_CODE.blocked,
       });
-      expect(String((error as any).getResponse().message)).toMatch(/administrator can enable/i);
-      expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
-      expect(mocks.notification.create).not.toHaveBeenCalled();
     });
 
-    it('requires explicit confirmation before a cross-owner merge commits when the toggle is on', async () => {
-      const auth = AuthFactory.create({ isAdmin: false });
+    it('commits a fan-out collapse of an un-editable space once the toggle is on and confirmed', async () => {
       mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: true } });
-      mocks.faceIdentity.resolveRepairRefs.mockResolvedValue(
-        crossOwnerResolution({ impactedOwnerIds: ['owner-b', 'owner-c'] }),
-      );
+      const identityMergePropagation = useIdentityMergePropagation();
+      const auth = AuthFactory.create();
+      const [person, mergeTarget] = [
+        PersonFactory.create({ id: 'person-x' }),
+        PersonFactory.create({ id: 'person-y' }),
+      ];
+      identityMergePropagation.mergePersonalPeople.mockResolvedValue([{ id: mergeTarget.id, success: true }]);
+      mocks.person.getById.mockResolvedValueOnce(person);
+      mocks.person.getById.mockResolvedValueOnce(mergeTarget);
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.id]));
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergeTarget.id]));
+      await sut.mergePerson(auth, person.id, { ids: [mergeTarget.id], confirmCrossOwner: true });
+      const authorize = identityMergePropagation.mergePersonalPeople.mock.calls[0][3] as MergeAuthorizerFn;
 
-      const error = await sut.mergeScopedPeople(auth, crossOwnerMergeDto()).catch((error_: unknown) => error_);
+      await expect(
+        authorize({ collapsedOwnerIds: [], repointedOwnerIds: [], unrepairableSpaceCollapseIds: ['space-x'] }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('scoped people repair', () => {
+    // The scoped merge now delegates wholesale to the propagation planner: the planner resolves and
+    // RBAC-checks the refs, and collapses profiles that would otherwise land in the same scope. The service's
+    // only remaining job is the cross-owner policy, which it hands to the planner as an authorizer that runs
+    // against the built plan, inside the merge transaction, before anything is written (#733).
+    it('delegates the merge to the propagation planner, with an authorizer', async () => {
+      const identityMergePropagation = useIdentityMergePropagation();
+      const auth = AuthFactory.create();
+      const dto = {
+        target: { type: 'person' as const, id: newUuid() },
+        sources: [{ type: 'space-person' as const, id: newUuid(), spaceId: newUuid() }],
+      };
+
+      await sut.mergeScopedPeople(auth, dto);
+
+      expect(identityMergePropagation.mergeScopedProfiles).toHaveBeenCalledWith(auth, dto, expect.any(Function));
+      expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
+    });
+
+    // #733 review H1: the cross-owner toggle must be resolved BEFORE the merge transaction opens. The authorizer
+    // runs inside that transaction while it holds the instance-wide advisory lock, and a config read there needs a
+    // second pool connection a saturated pool cannot grant — deadlocking every merge (#595). So the service reads
+    // the config eagerly and hands the authorizer an already-resolved value; invoking it does no further config I/O.
+    it('resolves the cross-owner toggle before delegating to the planner (not inside the merge transaction)', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: false } });
+      const identityMergePropagation = useIdentityMergePropagation();
+
+      await sut.mergeScopedPeople(AuthFactory.create(), crossOwnerMergeDto() as never);
+
+      expect(mocks.systemMetadata.get).toHaveBeenCalled();
+      const readsBeforeAuthorize = mocks.systemMetadata.get.mock.calls.length;
+      const authorize = identityMergePropagation.mergeScopedProfiles.mock.calls[0][2] as MergeAuthorizerFn;
+      await authorize(planWith({ collapsedOwnerIds: ['owner-b'] })).catch(() => {});
+      expect(mocks.systemMetadata.get).toHaveBeenCalledTimes(readsBeforeAuthorize);
+    });
+
+    // (a) A merge that only RE-POINTS another owner's person is not destructive — their row keeps its name and
+    // faces, and the recognition job does exactly this unattended. It is never gated, even with the toggle off.
+    it('does not gate a merge that only re-points another owner’s person', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: false } });
+      const identityMergePropagation = useIdentityMergePropagation();
+      await sut.mergeScopedPeople(AuthFactory.create(), crossOwnerMergeDto() as never);
+      const authorize = identityMergePropagation.mergeScopedProfiles.mock.calls[0][2] as MergeAuthorizerFn;
+
+      await expect(authorize(planWith({ repointedOwnerIds: ['owner-b'] }))).resolves.toBeUndefined();
+    });
+
+    // (b) A merge that would COLLAPSE two of another owner's people deletes one of their rows. That is what the
+    // instance toggle and the confirmation exist for.
+    it('blocks a destructive cross-owner merge when the toggle is off', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: false } });
+      const identityMergePropagation = useIdentityMergePropagation();
+      await sut.mergeScopedPeople(AuthFactory.create(), crossOwnerMergeDto() as never);
+      const authorize = identityMergePropagation.mergeScopedProfiles.mock.calls[0][2] as MergeAuthorizerFn;
+
+      const error = await authorize(planWith({ collapsedOwnerIds: ['owner-b'] })).catch((error_: unknown) => error_);
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as ForbiddenException).getResponse()).toMatchObject({
+        code: CROSS_OWNER_MERGE_ERROR_CODE.blocked,
+      });
+    });
+
+    it('requires explicit confirmation for a destructive cross-owner merge when the toggle is on', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: true } });
+      const identityMergePropagation = useIdentityMergePropagation();
+      await sut.mergeScopedPeople(AuthFactory.create(), crossOwnerMergeDto() as never);
+      const authorize = identityMergePropagation.mergeScopedProfiles.mock.calls[0][2] as MergeAuthorizerFn;
+
+      const error = await authorize(planWith({ collapsedOwnerIds: ['owner-b', 'owner-c'] })).catch(
+        (error_: unknown) => error_,
+      );
 
       expect(error).toBeInstanceOf(ConflictException);
       expect((error as ConflictException).getResponse()).toMatchObject({
         code: CROSS_OWNER_MERGE_ERROR_CODE.confirmationRequired,
         impactedOwnerCount: 2,
       });
-      expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
     });
 
-    it('performs a cross-owner merge for any user when the toggle is on and confirmed, without notifying owners', async () => {
-      const auth = AuthFactory.create({ isAdmin: false });
+    it('permits a destructive cross-owner merge once the toggle is on and the user confirms', async () => {
       mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: true } });
-      mocks.faceIdentity.resolveRepairRefs.mockResolvedValue(
-        crossOwnerResolution({ impactedOwnerIds: ['owner-b', 'owner-c'] }),
-      );
-      mocks.faceIdentity.mergeIdentities.mockResolvedValue({
-        personalProfileConflictCount: 0,
-        spaceProfileConflictCount: 0,
-      });
+      const identityMergePropagation = useIdentityMergePropagation();
+      await sut.mergeScopedPeople(AuthFactory.create(), crossOwnerMergeDto({ confirmCrossOwner: true }) as never);
+      const authorize = identityMergePropagation.mergeScopedProfiles.mock.calls[0][2] as MergeAuthorizerFn;
 
-      await sut.mergeScopedPeople(auth, crossOwnerMergeDto({ confirmCrossOwner: true }));
-
-      expect(mocks.faceIdentity.mergeIdentities).toHaveBeenCalledWith({
-        targetIdentityId: 'identity-1',
-        sourceIdentityIds: ['identity-2'],
-        source: 'manual',
-      });
-      // Affected owners are intentionally not notified (issue #733 revision): once the instance opts
-      // in, a cross-owner merge is a normal action and commits silently.
+      await expect(authorize(planWith({ collapsedOwnerIds: ['owner-b'] }))).resolves.toBeUndefined();
+      // Affected owners are intentionally not notified (issue #733 revision): once the instance opts in and the
+      // user acknowledges, the merge commits silently.
       expect(mocks.notification.create).not.toHaveBeenCalled();
       expect(mocks.websocket.clientSend).not.toHaveBeenCalled();
-    });
-
-    it('hard-blocks a merge that is non-repairable only because of a shared-space profile, regardless of the toggle', async () => {
-      const auth = AuthFactory.create({ isAdmin: false });
-      mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: true } });
-      // Non-repairable, but no other-owner personal person is involved (impactedOwnerIds empty).
-      mocks.faceIdentity.resolveRepairRefs.mockResolvedValue(crossOwnerResolution({ impactedOwnerIds: [] }));
-
-      const error = await sut
-        .mergeScopedPeople(auth, crossOwnerMergeDto({ confirmCrossOwner: true }))
-        .catch((error_: unknown) => error_);
-
-      expect(error).toBeInstanceOf(ForbiddenException);
-      expect((error as ForbiddenException).message).toMatch(/inaccessible attached profiles/i);
-      expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
-      expect(mocks.notification.create).not.toHaveBeenCalled();
-    });
-
-    it('hard-blocks a cross-owner merge that also touches a shared-space profile the actor cannot repair, regardless of the toggle', async () => {
-      const auth = AuthFactory.create({ isAdmin: false });
-      mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: true } });
-      // Mixed case: an other-owner personal person (impactedOwnerIds>0) AND a shared-space profile in
-      // a space the actor can only view — the identity cannot be cleanly split, so it stays blocked.
-      mocks.faceIdentity.resolveRepairRefs.mockResolvedValue(
-        crossOwnerResolution({ impactedOwnerIds: ['owner-b'], hasInaccessibleAttachedSpaceProfile: true }),
-      );
-
-      const error = await sut
-        .mergeScopedPeople(auth, crossOwnerMergeDto({ confirmCrossOwner: true }))
-        .catch((error_: unknown) => error_);
-
-      expect(error).toBeInstanceOf(ForbiddenException);
-      expect((error as ForbiddenException).message).toMatch(/inaccessible attached profiles/i);
-      expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
-      expect(mocks.notification.create).not.toHaveBeenCalled();
-    });
-
-    it('surfaces the same-scope conflict (400) before asking for cross-owner confirmation', async () => {
-      const auth = AuthFactory.create({ isAdmin: false });
-      mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: true } });
-      mocks.faceIdentity.resolveRepairRefs.mockResolvedValue(
-        crossOwnerResolution({ impactedOwnerIds: ['owner-b'], hasScopedProfileConflict: true }),
-      );
-
-      const error = await sut.mergeScopedPeople(auth, crossOwnerMergeDto()).catch((error_: unknown) => error_);
-
-      expect(error).toBeInstanceOf(BadRequestException);
-      expect((error as BadRequestException).message).toMatch(/separate profiles in the same scope/i);
-      expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
-      expect(mocks.notification.create).not.toHaveBeenCalled();
-    });
-
-    it('rejects same-person repair when the scoped profiles conflict in the same owner or space', async () => {
-      const auth = AuthFactory.create();
-      mocks.faceIdentity.resolveRepairRefs.mockResolvedValue({
-        accessible: true,
-        targetIdentityId: 'identity-1',
-        sourceIdentityIds: ['identity-2'],
-        type: 'person',
-        allAttachedProfilesRepairable: true,
-        hasScopedProfileConflict: true,
-      } as any);
-
-      await expect(
-        sut.mergeScopedPeople(auth, {
-          target: { type: 'person', id: newUuid() },
-          sources: [{ type: 'person', id: newUuid() }],
-        }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-
-      expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
     });
 
     it('detaches a scoped profile after access and backing-face checks', async () => {
@@ -5108,7 +5200,12 @@ describe(PersonService.name, () => {
         { id: mergePerson.id, success: true },
       ]);
 
-      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(auth, person.id, [mergePerson.id]);
+      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(
+        auth,
+        person.id,
+        [mergePerson.id],
+        expect.any(Function),
+      );
       expect(mocks.person.update).not.toHaveBeenCalled();
     });
 

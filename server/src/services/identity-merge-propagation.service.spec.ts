@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { JobName, SharedSpaceActivityType } from 'src/enum';
 import { PersonRepository } from 'src/repositories/person.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
@@ -420,7 +421,8 @@ const profile = (overrides: Partial<MergeProfile> & Pick<MergeProfile, 'kind' | 
     ...overrides,
   }) as MergeProfile;
 
-const makeService = (profiles: MergeProfile[]) => {
+const makeService = (profiles: MergeProfile[], options: { unrepairableSpaceIds?: string[] } = {}) => {
+  const unrepairableSpaceIds = new Set(options.unrepairableSpaceIds);
   const transaction = { transaction: true };
   const databaseRepository = {
     transaction: vi.fn((callback: (db: typeof transaction) => Promise<unknown>) => callback(transaction)),
@@ -466,12 +468,31 @@ const makeService = (profiles: MergeProfile[]) => {
     ),
     linkPersonFaces: vi.fn().mockResolvedValue(void 0),
     mergeIdentitiesAfterProfileResolution: vi.fn().mockResolvedValue(void 0),
+    // Mirrors the repository contract: a ref resolves only to a profile the actor may repair — their own
+    // person, or a space person in a space where they are Owner/Editor. Anything else resolves to null and
+    // the whole merge is refused.
+    resolveScopedMergeOrigins: vi.fn((actorUserId: string, refs: { type: string; id: string; spaceId?: string }[]) => {
+      const origins = refs.map((ref) => {
+        if (ref.type === 'person') {
+          const found = profiles.find((profile) => profile.kind === 'person' && profile.id === ref.id);
+          return found && found.ownerId === actorUserId ? found : null;
+        }
+
+        const found = profiles.find((profile) => profile.kind === 'space-person' && profile.id === ref.id);
+        return found?.spaceId && found.spaceId === ref.spaceId && !unrepairableSpaceIds.has(found.spaceId)
+          ? found
+          : null;
+      });
+
+      return origins.some((origin) => !origin) ? null : origins;
+    }),
   };
   const jobRepository = {
     queue: vi.fn().mockResolvedValue(void 0),
   };
   const logger = {
     error: vi.fn(),
+    warn: vi.fn(),
   };
   const sharedSpaceRepository = {
     lockSpacePeopleForMerge: vi.fn().mockResolvedValue(void 0),
@@ -493,6 +514,13 @@ const makeService = (profiles: MergeProfile[]) => {
     repairInvalidRepresentativeFaces: vi.fn().mockResolvedValue(void 0),
     repairOrphanedRepresentativeFaces: vi.fn().mockResolvedValue(void 0),
     logActivity: vi.fn().mockResolvedValue(void 0),
+    // Mirrors the repository contract: the actor's role per space (member spaces only). A space in
+    // `unrepairableSpaceIds` models one where the actor is a viewer (cannot repair); every other space is
+    // modelled as owned by the actor.
+    getActorSpaceRoles: vi.fn(
+      (_userId: string, spaceIds: string[]) =>
+        new Map(spaceIds.map((spaceId) => [spaceId, unrepairableSpaceIds.has(spaceId) ? 'viewer' : 'owner'])),
+    ),
   };
 
   const sut = new IdentityMergePropagationService({
@@ -518,6 +546,30 @@ const makeService = (profiles: MergeProfile[]) => {
     faceIdentityRepository,
   };
 };
+
+// A minimal non-destructive personal-merge plan (owner-1 merges their own person-y into person-x). Used by the L2
+// concurrency tests, which mock a repository throw to prove the engine translates a race into a retriable 409.
+const nonDestructivePlan = () => ({
+  actorUserId: 'owner-1',
+  origin: {
+    type: 'person' as const,
+    targetProfileId: 'person-x',
+    sourceProfileIds: ['person-y'],
+    ownerId: 'owner-1',
+  },
+  targetIdentityId: 'identity-x',
+  sourceIdentityIds: ['identity-y'],
+  personalProfileMerges: [{ ownerId: 'owner-1', targetPersonId: 'person-x', sourcePersonIds: ['person-y'] }],
+  spaceProfileMerges: [],
+  profileIdentityUpdates: [],
+  affectedOwnerIds: ['owner-1'],
+  repointedOwnerIds: [],
+  collapsedOwnerIds: [],
+  unrepairableSpaceCollapseIds: [],
+  affectedSpaceIds: [],
+  followUpJobs: [],
+  activityEvents: [],
+});
 
 describe(PersonRepository.name, () => {
   describe('mergePersonProfile', () => {
@@ -931,6 +983,53 @@ describe('IdentityMergePropagationService', () => {
       ]);
     });
 
+    it('flags a fan-out space collapse the actor cannot repair, but not one they can', async () => {
+      const target = profile({ kind: 'person', id: 'person-x', ownerId: 'owner-1', identityId: 'identity-x' });
+      const source = profile({ kind: 'person', id: 'person-y', ownerId: 'owner-1', identityId: 'identity-y' });
+      // space-a (repairable) and space-b (viewer-only) both hold BOTH identities -> both collapse.
+      const spaceAX = profile({ kind: 'space-person', id: 'space-a-x', spaceId: 'space-a', identityId: 'identity-x' });
+      const spaceAY = profile({ kind: 'space-person', id: 'space-a-y', spaceId: 'space-a', identityId: 'identity-y' });
+      const spaceBX = profile({ kind: 'space-person', id: 'space-b-x', spaceId: 'space-b', identityId: 'identity-x' });
+      const spaceBY = profile({ kind: 'space-person', id: 'space-b-y', spaceId: 'space-b', identityId: 'identity-y' });
+      const { sut } = makeService([target, source, spaceAX, spaceAY, spaceBX, spaceBY], {
+        unrepairableSpaceIds: ['space-b'],
+      });
+
+      const plan = await sut.buildPersonalMergePlan({
+        actorUserId: 'owner-1',
+        targetPersonId: 'person-x',
+        sourcePersonIds: ['person-y'],
+      });
+
+      // Both spaces still collapse (the merge cannot leave a duplicate identity), but only the un-editable one
+      // is flagged for the policy to hard-block on.
+      expect(plan.spaceProfileMerges).toEqual([
+        { spaceId: 'space-a', targetPersonId: 'space-a-x', sourcePersonIds: ['space-a-y'] },
+        { spaceId: 'space-b', targetPersonId: 'space-b-x', sourcePersonIds: ['space-b-y'] },
+      ]);
+      expect(plan.unrepairableSpaceCollapseIds).toEqual(['space-b']);
+    });
+
+    it('does not flag a re-point in a space the actor cannot repair (only collapses are destructive)', async () => {
+      const target = profile({ kind: 'person', id: 'person-x', ownerId: 'owner-1', identityId: 'identity-x' });
+      const source = profile({ kind: 'person', id: 'person-y', ownerId: 'owner-1', identityId: 'identity-y' });
+      // space-b (viewer-only) holds ONLY the source identity -> a re-point, not a collapse. Nothing is destroyed.
+      const spaceBY = profile({ kind: 'space-person', id: 'space-b-y', spaceId: 'space-b', identityId: 'identity-y' });
+      const { sut } = makeService([target, source, spaceBY], { unrepairableSpaceIds: ['space-b'] });
+
+      const plan = await sut.buildPersonalMergePlan({
+        actorUserId: 'owner-1',
+        targetPersonId: 'person-x',
+        sourcePersonIds: ['person-y'],
+      });
+
+      expect(plan.spaceProfileMerges).toEqual([]);
+      expect(plan.profileIdentityUpdates).toEqual([
+        { kind: 'space-person', profileId: 'space-b-y', identityId: 'identity-x' },
+      ]);
+      expect(plan.unrepairableSpaceCollapseIds).toEqual([]);
+    });
+
     it('keeps a single affected space profile and updates it to the target identity', async () => {
       const { sut } = makeService([
         profile({ kind: 'person', id: 'person-x', ownerId: 'owner-1', identityId: 'identity-x', faceCount: 10 }),
@@ -970,6 +1069,62 @@ describe('IdentityMergePropagationService', () => {
         { ownerId: 'owner-1', targetPersonId: 'person-x', sourcePersonIds: ['person-z', 'person-y'] },
         { ownerId: 'owner-2', targetPersonId: 'owner-2-high', sourcePersonIds: ['owner-2-low'] },
       ]);
+    });
+
+    // #733 review T1: the whole cross-owner gate keys on collapsedOwnerIds/repointedOwnerIds, so pin the DERIVATION
+    // for a topology with two distinct non-actor owners — one collapsing (two profiles) and one re-pointing (one).
+    it('derives collapsedOwnerIds/repointedOwnerIds per distinct non-actor owner', async () => {
+      const { sut } = makeService([
+        profile({ kind: 'person', id: 'person-x', ownerId: 'owner-1', identityId: 'identity-x', faceCount: 10 }),
+        profile({ kind: 'person', id: 'person-y', ownerId: 'owner-1', identityId: 'identity-y', faceCount: 4 }),
+        // owner-2 holds a person on BOTH merged identities -> a destructive collapse of one of THEIR people.
+        profile({ kind: 'person', id: 'owner-2-a', ownerId: 'owner-2', identityId: 'identity-x', faceCount: 3 }),
+        profile({ kind: 'person', id: 'owner-2-b', ownerId: 'owner-2', identityId: 'identity-y', faceCount: 3 }),
+        // owner-3 holds a person on ONLY the source identity -> a free re-point onto the surviving identity.
+        profile({ kind: 'person', id: 'owner-3-a', ownerId: 'owner-3', identityId: 'identity-y', faceCount: 2 }),
+        // owner-4 holds a person on BOTH -> a second, distinct collapse.
+        profile({ kind: 'person', id: 'owner-4-a', ownerId: 'owner-4', identityId: 'identity-x', faceCount: 1 }),
+        profile({ kind: 'person', id: 'owner-4-b', ownerId: 'owner-4', identityId: 'identity-y', faceCount: 1 }),
+      ]);
+
+      const plan = await sut.buildPersonalMergePlan({
+        actorUserId: 'owner-1',
+        targetPersonId: 'person-x',
+        sourcePersonIds: ['person-y'],
+      });
+
+      // Two distinct other owners collapse; owner-1 (the actor) is never counted; owner-3 only re-points.
+      expect(plan.collapsedOwnerIds).toEqual(['owner-2', 'owner-4']);
+      expect(plan.repointedOwnerIds).toEqual(['owner-3']);
+    });
+
+    // #733 review A1: a cross-owner collapse deletes one of another owner's people; a purely-personal collapse
+    // leaves no space-activity trace, so the merge must record an audit log naming the impacted owners.
+    it('logs an audit warning when a merge collapses another owner’s people', async () => {
+      const { sut, mocks } = makeService([
+        profile({ kind: 'person', id: 'person-x', ownerId: 'owner-1', identityId: 'identity-x' }),
+        profile({ kind: 'person', id: 'person-y', ownerId: 'owner-1', identityId: 'identity-y' }),
+        // owner-2 holds a person on BOTH merged identities -> a destructive collapse of one of THEIR people.
+        profile({ kind: 'person', id: 'owner-2-a', ownerId: 'owner-2', identityId: 'identity-x' }),
+        profile({ kind: 'person', id: 'owner-2-b', ownerId: 'owner-2', identityId: 'identity-y' }),
+      ]);
+
+      await sut.mergePersonalPeople({ user: { id: 'owner-1' } } as never, 'person-x', ['person-y'], () =>
+        Promise.resolve(),
+      );
+
+      expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('owner-2'));
+    });
+
+    it('does not log an audit warning for an own-merge with no cross-owner collapse', async () => {
+      const { sut, mocks } = makeService([
+        profile({ kind: 'person', id: 'person-x', ownerId: 'owner-1', identityId: 'identity-x' }),
+        profile({ kind: 'person', id: 'person-y', ownerId: 'owner-1', identityId: 'identity-y' }),
+      ]);
+
+      await sut.mergePersonalPeople({ user: { id: 'owner-1' } } as never, 'person-x', ['person-y']);
+
+      expect(mocks.logger.warn).not.toHaveBeenCalled();
     });
 
     it('prefers named survivor candidates over unnamed candidates with equal face counts outside the initiating scope', async () => {
@@ -1158,7 +1313,151 @@ describe('IdentityMergePropagationService', () => {
     });
   });
 
+  describe('buildScopedMergePlan', () => {
+    // The #733 shape: the actor's own person and a space person from someone else's connected library, with
+    // BOTH identities also projected into the same space. The raw merge path refused this outright; the
+    // planner collapses the same-space pair and re-points the other owner.
+    it('collapses a same-space profile conflict and re-points the other owner', async () => {
+      const { sut } = makeService([
+        profile({ kind: 'person', id: 'mine-x', ownerId: 'actor-1', identityId: 'identity-x', faceCount: 5 }),
+        profile({ kind: 'space-person', id: 'space-a-x', spaceId: 'space-a', identityId: 'identity-x', faceCount: 3 }),
+        profile({ kind: 'space-person', id: 'space-a-y', spaceId: 'space-a', identityId: 'identity-y', faceCount: 2 }),
+        profile({ kind: 'person', id: 'theirs-y', ownerId: 'owner-2', identityId: 'identity-y', faceCount: 9 }),
+      ]);
+
+      const plan = await sut.buildScopedMergePlan({
+        actorUserId: 'actor-1',
+        target: { type: 'person', id: 'mine-x' },
+        sources: [{ type: 'space-person', id: 'space-a-y', spaceId: 'space-a' }],
+      });
+
+      expect(plan.targetIdentityId).toBe('identity-x');
+      expect(plan.sourceIdentityIds).toEqual(['identity-y']);
+      // The same-space conflict is collapsed rather than refused.
+      expect(plan.spaceProfileMerges).toEqual([
+        { spaceId: 'space-a', targetPersonId: 'space-a-x', sourcePersonIds: ['space-a-y'] },
+      ]);
+      // The other owner keeps their person; only its identity moves (a re-point, not a collapse).
+      expect(plan.personalProfileMerges).toEqual([]);
+      expect(plan.profileIdentityUpdates).toContainEqual({
+        kind: 'person',
+        profileId: 'theirs-y',
+        identityId: 'identity-x',
+      });
+      expect(plan.origin).toEqual({
+        type: 'person',
+        targetProfileId: 'mine-x',
+        sourceProfileIds: ['space-a-y'],
+        ownerId: 'actor-1',
+      });
+    });
+
+    it('pins the survivor to the actor’s target profile even when a sibling has more faces', async () => {
+      const { sut } = makeService([
+        profile({ kind: 'person', id: 'mine-x', ownerId: 'actor-1', identityId: 'identity-x', faceCount: 1 }),
+        profile({ kind: 'person', id: 'mine-y', ownerId: 'actor-1', identityId: 'identity-y', faceCount: 99 }),
+      ]);
+
+      const plan = await sut.buildScopedMergePlan({
+        actorUserId: 'actor-1',
+        target: { type: 'person', id: 'mine-x' },
+        sources: [{ type: 'person', id: 'mine-y' }],
+      });
+
+      expect(plan.personalProfileMerges).toEqual([
+        { ownerId: 'actor-1', targetPersonId: 'mine-x', sourcePersonIds: ['mine-y'] },
+      ]);
+      expect(plan.targetIdentityId).toBe('identity-x');
+    });
+
+    it('treats a space-person target as the initiating space', async () => {
+      const { sut } = makeService([
+        profile({ kind: 'space-person', id: 'space-a-x', spaceId: 'space-a', identityId: 'identity-x' }),
+        profile({ kind: 'space-person', id: 'space-a-y', spaceId: 'space-a', identityId: 'identity-y' }),
+      ]);
+
+      const plan = await sut.buildScopedMergePlan({
+        actorUserId: 'actor-1',
+        target: { type: 'space-person', id: 'space-a-x', spaceId: 'space-a' },
+        sources: [{ type: 'space-person', id: 'space-a-y', spaceId: 'space-a' }],
+      });
+
+      expect(plan.origin).toEqual({
+        type: 'space-person',
+        targetProfileId: 'space-a-x',
+        sourceProfileIds: ['space-a-y'],
+        spaceId: 'space-a',
+      });
+      expect(plan.activityEvents).toEqual([
+        expect.objectContaining({ spaceId: 'space-a', data: expect.objectContaining({ activityRole: 'initiating' }) }),
+      ]);
+    });
+
+    it('refuses a ref the actor cannot repair', async () => {
+      const { sut } = makeService(
+        [
+          profile({ kind: 'person', id: 'mine-x', ownerId: 'actor-1', identityId: 'identity-x' }),
+          profile({ kind: 'space-person', id: 'space-v-y', spaceId: 'space-viewer', identityId: 'identity-y' }),
+        ],
+        { unrepairableSpaceIds: ['space-viewer'] },
+      );
+
+      await expect(
+        sut.buildScopedMergePlan({
+          actorUserId: 'actor-1',
+          target: { type: 'person', id: 'mine-x' },
+          sources: [{ type: 'space-person', id: 'space-v-y', spaceId: 'space-viewer' }],
+        }),
+      ).rejects.toThrow('One or more people were not found or are not accessible');
+    });
+
+    it('mints identities for profiles that have none', async () => {
+      const { sut } = makeService([
+        profile({ kind: 'person', id: 'mine-x', ownerId: 'actor-1', identityId: null }),
+        profile({ kind: 'person', id: 'mine-y', ownerId: 'actor-1', identityId: null }),
+      ]);
+
+      const plan = await sut.buildScopedMergePlan({
+        actorUserId: 'actor-1',
+        target: { type: 'person', id: 'mine-x' },
+        sources: [{ type: 'person', id: 'mine-y' }],
+      });
+
+      expect(plan.targetIdentityId).toBe('identity-for-mine-x');
+      expect(plan.sourceIdentityIds).toEqual(['identity-for-mine-y']);
+    });
+  });
+
   describe('buildSpaceMergePlan', () => {
+    // Mixed person/pet merges are how a mis-classification is corrected, and the target's type wins. The
+    // personal path has always allowed this (pet-detection.e2e-spec.ts pins it); the space path used to be
+    // the odd one out and refused.
+    it('plans mixed person and pet space merges so the target type wins', async () => {
+      const { sut } = makeService([
+        profile({
+          kind: 'space-person',
+          id: 'space-a-x',
+          spaceId: 'space-a',
+          identityId: 'identity-x',
+          type: 'person',
+        }),
+        profile({ kind: 'space-person', id: 'space-a-y', spaceId: 'space-a', identityId: 'identity-y', type: 'pet' }),
+      ]);
+
+      const plan = await sut.buildSpaceMergePlan({
+        actorUserId: 'editor-1',
+        spaceId: 'space-a',
+        targetPersonId: 'space-a-x',
+        sourcePersonIds: ['space-a-y'],
+      });
+
+      expect(plan.targetIdentityId).toBe('identity-x');
+      expect(plan.sourceIdentityIds).toEqual(['identity-y']);
+      expect(plan.spaceProfileMerges).toEqual([
+        { spaceId: 'space-a', targetPersonId: 'space-a-x', sourcePersonIds: ['space-a-y'] },
+      ]);
+    });
+
     it('plans initiating-space merge and personal profile merges for affected owners', async () => {
       const { sut } = makeService([
         profile({ kind: 'space-person', id: 'space-a-x', spaceId: 'space-a', identityId: 'identity-x', faceCount: 10 }),
@@ -1411,6 +1710,9 @@ describe('IdentityMergePropagationService', () => {
           spaceProfileMerges: [],
           profileIdentityUpdates: [],
           affectedOwnerIds: ['owner-1'],
+          repointedOwnerIds: [],
+          collapsedOwnerIds: [],
+          unrepairableSpaceCollapseIds: [],
           affectedSpaceIds: [],
           followUpJobs: [],
           activityEvents: [],
@@ -1428,6 +1730,64 @@ describe('IdentityMergePropagationService', () => {
       expect(mocks.faceIdentity.mergeIdentitiesAfterProfileResolution).toHaveBeenCalledWith(
         { targetIdentityId: 'identity-x', sourceIdentityIds: ['identity-y'], source: 'manual' },
         expect.anything(),
+      );
+    });
+
+    // #733 review L3: executePlan has no authorizer to consult, so it must FAIL CLOSED on a destructive plan
+    // (collapsing another owner's — or an un-editable space's — people) rather than silently committing it. This
+    // is the backstop that keeps a future merge path which forgets the gate from re-opening the cross-owner hole.
+    it('refuses a destructive cross-owner plan because there is no authorizer to gate it', async () => {
+      const { sut, mocks } = makeService([]);
+
+      await expect(
+        sut.executePlan(
+          {
+            actorUserId: 'owner-1',
+            origin: { type: 'person', targetProfileId: 'person-x', sourceProfileIds: ['person-y'], ownerId: 'owner-1' },
+            targetIdentityId: 'identity-x',
+            sourceIdentityIds: ['identity-y'],
+            personalProfileMerges: [{ ownerId: 'owner-b', targetPersonId: 'b-x', sourcePersonIds: ['b-y'] }],
+            spaceProfileMerges: [],
+            profileIdentityUpdates: [],
+            affectedOwnerIds: ['owner-b'],
+            repointedOwnerIds: [],
+            collapsedOwnerIds: ['owner-b'],
+            unrepairableSpaceCollapseIds: [],
+            affectedSpaceIds: [],
+            followUpJobs: [],
+            activityEvents: [],
+          },
+          { actorUserId: 'owner-1' },
+        ),
+      ).rejects.toThrow(/without an authorizer/);
+
+      expect(mocks.person.mergePersonProfile).not.toHaveBeenCalled();
+    });
+
+    // #733 review L2: a concurrent recognition/dedup/detach job (which doesn't take the merge advisory lock) can
+    // collide with the plan's identity move on the unique (scope, identity) index, or trip the post-merge conflict
+    // re-check. The merge must surface a retriable 409, not a 500 — nothing is lost, the caller just tries again.
+    it('translates a concurrent unique-violation (23505) into a retriable conflict, not a 500', async () => {
+      const { sut, mocks } = makeService([]);
+      mocks.faceIdentity.mergeIdentitiesAfterProfileResolution.mockRejectedValueOnce(
+        Object.assign(new Error('duplicate key value violates unique constraint "person_ownerId_identityId_key"'), {
+          code: '23505',
+        }),
+      );
+
+      await expect(sut.executePlan(nonDestructivePlan(), { actorUserId: 'owner-1' })).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it('translates the post-merge conflict re-check into a retriable conflict', async () => {
+      const { sut, mocks } = makeService([]);
+      mocks.faceIdentity.mergeIdentitiesAfterProfileResolution.mockRejectedValueOnce(
+        new Error('Cannot merge face identities with unresolved profile conflicts'),
+      );
+
+      await expect(sut.executePlan(nonDestructivePlan(), { actorUserId: 'owner-1' })).rejects.toBeInstanceOf(
+        ConflictException,
       );
     });
 
@@ -1449,6 +1809,9 @@ describe('IdentityMergePropagationService', () => {
           spaceProfileMerges: [],
           profileIdentityUpdates: [],
           affectedOwnerIds: ['owner-1'],
+          repointedOwnerIds: [],
+          collapsedOwnerIds: [],
+          unrepairableSpaceCollapseIds: [],
           affectedSpaceIds: [],
           followUpJobs: [],
           activityEvents: [],
@@ -1487,6 +1850,9 @@ describe('IdentityMergePropagationService', () => {
           spaceProfileMerges: [],
           profileIdentityUpdates: [],
           affectedOwnerIds: ['owner-1'],
+          repointedOwnerIds: [],
+          collapsedOwnerIds: [],
+          unrepairableSpaceCollapseIds: [],
           affectedSpaceIds: [],
           followUpJobs: [],
           activityEvents: [],
@@ -1523,6 +1889,9 @@ describe('IdentityMergePropagationService', () => {
           spaceProfileMerges: [],
           profileIdentityUpdates: [],
           affectedOwnerIds: ['owner-1'],
+          repointedOwnerIds: [],
+          collapsedOwnerIds: [],
+          unrepairableSpaceCollapseIds: [],
           affectedSpaceIds: [],
           followUpJobs: [],
           activityEvents: [],
@@ -1559,6 +1928,9 @@ describe('IdentityMergePropagationService', () => {
           spaceProfileMerges: [{ spaceId: 'space-a', targetPersonId: 'space-a-x', sourcePersonIds: ['space-a-y'] }],
           profileIdentityUpdates: [],
           affectedOwnerIds: [],
+          repointedOwnerIds: [],
+          collapsedOwnerIds: [],
+          unrepairableSpaceCollapseIds: [],
           affectedSpaceIds: ['space-a'],
           followUpJobs: [],
           activityEvents: [],
@@ -1593,6 +1965,9 @@ describe('IdentityMergePropagationService', () => {
           spaceProfileMerges: [{ spaceId: 'space-a', targetPersonId: 'space-a-x', sourcePersonIds: ['space-a-y'] }],
           profileIdentityUpdates: [],
           affectedOwnerIds: [],
+          repointedOwnerIds: [],
+          collapsedOwnerIds: [],
+          unrepairableSpaceCollapseIds: [],
           affectedSpaceIds: ['space-a'],
           followUpJobs: [{ name: JobName.SharedSpacePersonDedup, data: { spaceId: 'space-a' } }],
           activityEvents: [],
@@ -1631,6 +2006,9 @@ describe('IdentityMergePropagationService', () => {
             { kind: 'space-person', profileId: 'space-a-y', identityId: 'identity-x' },
           ],
           affectedOwnerIds: ['owner-2'],
+          repointedOwnerIds: [],
+          collapsedOwnerIds: [],
+          unrepairableSpaceCollapseIds: [],
           affectedSpaceIds: ['space-a'],
           followUpJobs: [],
           activityEvents: [],
@@ -1668,6 +2046,9 @@ describe('IdentityMergePropagationService', () => {
           spaceProfileMerges: [],
           profileIdentityUpdates: [],
           affectedOwnerIds: [],
+          repointedOwnerIds: [],
+          collapsedOwnerIds: [],
+          unrepairableSpaceCollapseIds: [],
           affectedSpaceIds: ['space-a', 'space-b'],
           followUpJobs: [
             { name: JobName.SharedSpacePersonMetadataBackfill, data: { identityId: 'identity-x' } },
@@ -1716,6 +2097,9 @@ describe('IdentityMergePropagationService', () => {
             { kind: 'space-person', profileId: 'space-a-z', identityId: 'identity-x' },
           ],
           affectedOwnerIds: ['owner-1'],
+          repointedOwnerIds: [],
+          collapsedOwnerIds: [],
+          unrepairableSpaceCollapseIds: [],
           affectedSpaceIds: ['space-a'],
           followUpJobs: [],
           activityEvents: [
@@ -1776,6 +2160,9 @@ describe('IdentityMergePropagationService', () => {
             spaceProfileMerges: [],
             profileIdentityUpdates: [],
             affectedOwnerIds: ['owner-1'],
+            repointedOwnerIds: [],
+            collapsedOwnerIds: [],
+            unrepairableSpaceCollapseIds: [],
             affectedSpaceIds: ['space-a'],
             followUpJobs: [{ name: JobName.SharedSpacePersonMetadataBackfill, data: { identityId: 'identity-x' } }],
             activityEvents: [],
