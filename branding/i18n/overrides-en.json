@@ -1,6 +1,6 @@
 {
-  "asset_offline_description": "This external library asset is no longer found on disk and has been moved to trash. If the file was moved within the library, check your timeline for the new corresponding asset. To restore this asset, please ensure that the file path below can be accessed by Noodle Gallery and scan the library.",
   "admin": {
+    "asset_offline_description": "This external library asset is no longer found on disk and has been moved to trash. If the file was moved within the library, check your timeline for the new corresponding asset. To restore this asset, please ensure that the file path below can be accessed by Noodle Gallery and scan the library.",
     "backup_onboarding_description": "A <backblaze-link>3-2-1 backup strategy</backblaze-link> is recommended to protect your data. You should keep copies of your uploaded photos/videos as well as the Noodle Gallery database for a comprehensive backup solution.",
     "backup_onboarding_footer": "For more information about backing up Noodle Gallery, please refer to the <link>documentation</link>.",
     "confirm_delete_library_assets": "Are you sure you want to delete this library? This will delete {count, plural, one {# contained asset} other {all # contained assets}} from Noodle Gallery and cannot be undone. Files will remain on disk.",
@@ -15,6 +15,7 @@
     "theme_settings_description": "Manage customization of the Noodle Gallery web interface"
   },
   "advanced_settings_proxy_headers_subtitle": "Define proxy headers Noodle Gallery should send with each network request",
+  "asset_offline_description": "This external asset is no longer found on disk. Please contact your Noodle Gallery administrator for help.",
   "assets_deleted_permanently_from_server": "{count} asset(s) deleted permanently from the Noodle Gallery server",
   "assets_trashed_from_server": "{count} asset(s) trashed from the Noodle Gallery server",
   "background_location_permission_content": "Noodle Gallery uses background location permission to keep reading the Wi-Fi network name while automatic server switching runs in the background. The Wi-Fi network name is saved on this device for matching, and your precise device location is not stored or shared.",
@@ -33,13 +34,18 @@
   "ignore_icloud_photos_description": "Photos that are stored on iCloud will not be uploaded to the Noodle Gallery server",
   "immich_logo": "Noodle Gallery Logo",
   "immich_web_interface": "Noodle Gallery Web Interface",
+  "import_option_skip_duplicates": "Skip duplicates already in Noodle Gallery",
+  "install_app_title": "Install Noodle Gallery",
   "location_permission_content": "Android requires precise location permission so Noodle Gallery can read the current Wi-Fi network name for automatic server switching. The Wi-Fi network name is saved on this device for matching, and your precise device location is not stored or shared.",
   "maintenance_description": "Noodle Gallery has been put into <link>maintenance mode</link>.",
   "manage_media_access_subtitle": "Allow the Noodle Gallery app to manage and move media files.",
+  "my_immich_description": "Copy current page as a my.immich.app link",
+  "my_immich_title": "my.immich.app link",
   "notification_enabled_list_tile_content": "Noodle Gallery uses notifications for background backup. Manage them in your device settings.",
   "obtainium_configurator_instructions": "Use Obtainium to install and update the Android app directly from Noodle Gallery GitHub's release. Create an API key and select a variant to create your Obtainium configuration link",
   "ocr_body": "Noodle Gallery now reads the text inside your photos, so you can search for them by what they say.",
   "official_immich_resources": "Official Noodle Gallery Resources",
+  "open_in_app_banner_title": "Open in Noodle Gallery",
   "open_in_immich_body": "Set Noodle Gallery as your gallery on Android to open photos straight from other apps.",
   "open_in_immich_title": "Open photos in Noodle Gallery",
   "permission_onboarding_permission_denied": "Permission denied. To use Noodle Gallery, grant photo and video permissions in Settings.",
@@ -63,10 +69,8 @@
   "sync_upload_album_setting_subtitle": "Create and upload your photos and videos to the selected albums on Noodle Gallery",
   "trash_page_empty_trash_dialog_content": "Do you want to empty your trashed assets? These items will be permanently removed from Noodle Gallery",
   "upload_to_immich": "Upload to Noodle Gallery ({count})",
-  "whats_new_settings_subtitle": "See what's new in Noodle Gallery",
+  "version_announcement_closing": "Your friend, Pierre",
   "version_announcement_message": "Hi there! A new version of Noodle Gallery is available. Please take some time to read the <link>release notes</link> to ensure your setup is up-to-date to prevent any misconfigurations, especially if you use WatchTower or any mechanism that handles updating your Noodle Gallery instance automatically.",
   "welcome_to_immich": "Welcome to Noodle Gallery",
-  "version_announcement_closing": "Your friend, Pierre",
-  "open_in_app_banner_title": "Open in Noodle Gallery",
-  "install_app_title": "Install Noodle Gallery"
+  "whats_new_settings_subtitle": "See what's new in Noodle Gallery"
 }
