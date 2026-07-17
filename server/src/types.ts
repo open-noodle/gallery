@@ -383,7 +383,8 @@ export interface IIntegrityUntrackedFilesJob {
 
 export interface IIntegrityMissingFilesJob {
   items: ({ path: string; reportId: string | null } & (
-    { assetId: string; fileAssetId: null } | { assetId: null; fileAssetId: string }
+    | { assetId: string; fileAssetId: null }
+    | { assetId: null; fileAssetId: string }
   ))[];
 }
 
@@ -678,7 +679,8 @@ export type AnyMemoryData = MemoryDataByType[MemoryType];
 export type VersionCheckMetadata = { checkedAt: string; releaseVersion: string };
 export type SystemFlags = { mountChecks: Record<StorageFolder, boolean> };
 export type MaintenanceModeState =
-  { isMaintenanceMode: true; secret: string; action?: SetMaintenanceModeDto } | { isMaintenanceMode: false };
+  | { isMaintenanceMode: true; secret: string; action?: SetMaintenanceModeDto }
+  | { isMaintenanceMode: false };
 export type MemoriesState = {
   /** memories have already been created through this date */
   lastOnThisDayDate?: string;
