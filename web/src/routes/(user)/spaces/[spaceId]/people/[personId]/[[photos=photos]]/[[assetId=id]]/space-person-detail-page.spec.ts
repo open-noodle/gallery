@@ -6,7 +6,7 @@ import {
   type SharedSpacePersonResponseDto,
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
-import { modalManager } from '@immich/ui';
+import { modalManager, toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
@@ -80,7 +80,7 @@ vi.mock('@immich/ui', async (importOriginal) => {
     ...original,
     ContextMenuButton: MockContextMenuButton,
     modalManager: { show: vi.fn(), showDialog: vi.fn() },
-    toastManager: { primary: vi.fn(), success: vi.fn() },
+    toastManager: { primary: vi.fn(), success: vi.fn(), danger: vi.fn() },
   };
 });
 
@@ -518,6 +518,67 @@ describe('Spaces person detail page', () => {
     expect(sdkMock.mergeSpacePeople).not.toHaveBeenCalled();
   });
 
+  it('merges a genuine same-space candidate through the direct in-space endpoint', async () => {
+    sdkMock.mergeSpacePeople.mockResolvedValue(undefined as never);
+    renderPage({ action: 'merge' });
+
+    await userEvent.click(screen.getByTestId('merge-same-space-candidate'));
+
+    await waitFor(() => {
+      expect(sdkMock.mergeSpacePeople).toHaveBeenCalledWith({
+        id: 'space-1',
+        personId: 'person-1',
+        sharedSpacePersonMergeDto: { ids: ['same-space-candidate'] },
+      });
+    });
+    expect(sdkMock.mergeScopedPeople).not.toHaveBeenCalled();
+  });
+
+  it('shows the descriptive message and does not merge a same-space merge blocked across owners', async () => {
+    sdkMock.isHttpError.mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
+    sdkMock.mergeSpacePeople.mockRejectedValueOnce({
+      __http: true,
+      status: 403,
+      data: { code: 'cross_owner_merge_blocked', message: 'An administrator can enable it.' },
+      message: 'raw',
+    });
+    renderPage({ action: 'merge' });
+
+    await userEvent.click(screen.getByTestId('merge-same-space-candidate'));
+
+    await waitFor(() => expect(toastManager.danger).toHaveBeenCalled());
+    expect(sdkMock.mergeSpacePeople).toHaveBeenCalledTimes(1);
+    expect(gotoMock).not.toHaveBeenCalled();
+  });
+
+  it('re-runs a same-space merge with the cross-owner acknowledgement once the user confirms', async () => {
+    sdkMock.isHttpError.mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
+    sdkMock.mergeSpacePeople
+      .mockRejectedValueOnce({
+        __http: true,
+        status: 409,
+        data: { code: 'cross_owner_merge_confirmation_required', impactedOwnerCount: 1 },
+        message: 'raw',
+      })
+      .mockResolvedValueOnce(undefined as never);
+    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    renderPage({ action: 'merge' });
+
+    await userEvent.click(screen.getByTestId('merge-same-space-candidate'));
+
+    await waitFor(() => expect(sdkMock.mergeSpacePeople).toHaveBeenCalledTimes(2));
+    expect(sdkMock.mergeSpacePeople).toHaveBeenNthCalledWith(1, {
+      id: 'space-1',
+      personId: 'person-1',
+      sharedSpacePersonMergeDto: { ids: ['same-space-candidate'] },
+    });
+    expect(sdkMock.mergeSpacePeople).toHaveBeenNthCalledWith(2, {
+      id: 'space-1',
+      personId: 'person-1',
+      sharedSpacePersonMergeDto: { ids: ['same-space-candidate'], confirmCrossOwner: true },
+    });
+  });
+
   it('searches merge candidates with shared spaces enabled', async () => {
     renderPage({ action: 'merge' });
 
@@ -637,6 +698,62 @@ describe('Spaces person detail page', () => {
     });
     expect(gotoMock).toHaveBeenCalledWith('/spaces/space-1/people/person-2', { replaceState: true });
     expect(invalidateAllMock).not.toHaveBeenCalled();
+  });
+
+  it('shows the descriptive message and stays put when an autosuggest merge is blocked across owners', async () => {
+    sdkMock.isHttpError.mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
+    const person = makePerson({ id: 'person-1', name: '' });
+    const existingPerson = makePerson({ id: 'person-2', name: 'Alice Existing' });
+    sdkMock.getSpacePeople.mockResolvedValue([existingPerson]);
+    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    sdkMock.mergeSpacePeople.mockRejectedValueOnce({
+      __http: true,
+      status: 403,
+      data: { code: 'cross_owner_merge_blocked', message: 'An administrator can enable it.' },
+      message: 'raw',
+    });
+    renderPage({ person });
+
+    await userEvent.click(screen.getByText('add_a_name'));
+    await userEvent.type(screen.getByPlaceholderText('add_a_name'), 'Ali');
+    await userEvent.click(await screen.findByRole('button', { name: 'Alice Existing' }));
+
+    await waitFor(() => expect(toastManager.danger).toHaveBeenCalled());
+    expect(gotoMock).not.toHaveBeenCalledWith('/spaces/space-1/people/person-2', { replaceState: true });
+  });
+
+  it('re-runs an autosuggest merge with the cross-owner acknowledgement once the user confirms', async () => {
+    sdkMock.isHttpError.mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
+    const person = makePerson({ id: 'person-1', name: '' });
+    const existingPerson = makePerson({ id: 'person-2', name: 'Alice Existing' });
+    sdkMock.getSpacePeople.mockResolvedValue([existingPerson]);
+    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    sdkMock.mergeSpacePeople
+      .mockRejectedValueOnce({
+        __http: true,
+        status: 409,
+        data: { code: 'cross_owner_merge_confirmation_required', impactedOwnerCount: 1 },
+        message: 'raw',
+      })
+      .mockResolvedValueOnce(undefined as never);
+    renderPage({ person });
+
+    await userEvent.click(screen.getByText('add_a_name'));
+    await userEvent.type(screen.getByPlaceholderText('add_a_name'), 'Ali');
+    await userEvent.click(await screen.findByRole('button', { name: 'Alice Existing' }));
+
+    await waitFor(() => expect(sdkMock.mergeSpacePeople).toHaveBeenCalledTimes(2));
+    expect(sdkMock.mergeSpacePeople).toHaveBeenNthCalledWith(1, {
+      id: 'space-1',
+      personId: 'person-2',
+      sharedSpacePersonMergeDto: { ids: ['person-1'] },
+    });
+    expect(sdkMock.mergeSpacePeople).toHaveBeenNthCalledWith(2, {
+      id: 'space-1',
+      personId: 'person-2',
+      sharedSpacePersonMergeDto: { ids: ['person-1'], confirmCrossOwner: true },
+    });
+    expect(gotoMock).toHaveBeenCalledWith('/spaces/space-1/people/person-2', { replaceState: true });
   });
 
   it('navigates to the surviving target after a swapped merge instead of reloading the deleted route person', async () => {

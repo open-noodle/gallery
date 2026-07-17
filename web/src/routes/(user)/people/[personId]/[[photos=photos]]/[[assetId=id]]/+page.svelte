@@ -48,6 +48,7 @@
   import { createUrl, getPeopleThumbnailUrl } from '$lib/utils';
   import {
     createCrossOwnerMergeHandlers,
+    runMergeWithCrossOwnerConfirmation,
     runScopedMergeWithCrossOwnerConfirmation,
   } from '$lib/utils/cross-owner-merge';
   import { handleError } from '$lib/utils/handle-error';
@@ -64,6 +65,7 @@
     mergePerson,
     searchPerson,
     Type2 as ScopedPersonProfileType,
+    type BulkIdResponseDto,
     type PersonFaceResponseDto,
     type PersonResponseDto,
   } from '@immich/sdk';
@@ -236,6 +238,25 @@
     return committed ? sourcePeople.length : undefined;
   };
 
+  // Same as above, for the classic `POST /people/:id/merge` endpoint, which can now also 403/409
+  // across an owner boundary. Returns the number of *successfully* merged sources (mirroring the
+  // per-id BulkIdResponseDto results), or `undefined` when nothing was merged (blocked/declined).
+  const mergePersonWithCrossOwnerConfirmation = async (
+    targetPerson: PersonResponseDto,
+    sourcePeople: PersonResponseDto[],
+  ): Promise<number | undefined> => {
+    let results: BulkIdResponseDto[] = [];
+    const committed = await runMergeWithCrossOwnerConfirmation(async (confirmCrossOwner) => {
+      results = await mergePerson({
+        id: targetPerson.id,
+        mergePersonDto: confirmCrossOwner
+          ? { ids: sourcePeople.map(({ id }) => id), confirmCrossOwner: true }
+          : { ids: sourcePeople.map(({ id }) => id) },
+      });
+    }, createCrossOwnerMergeHandlers());
+    return committed ? results.filter(({ success }) => success).length : undefined;
+  };
+
   const mergePeople = async (targetCandidate: PersonResponseDto, selectedPeople: PersonResponseDto[]) => {
     const targetPerson = person;
     const sourcePeople =
@@ -245,19 +266,13 @@
     const usesScopedRepair =
       isSpaceScopedPerson(targetPerson) || sourcePeople.some((sourcePerson) => isSpaceScopedPerson(sourcePerson));
 
-    let mergedCount: number | undefined;
-    if (usesScopedRepair) {
-      mergedCount = await mergeScopedPeopleWithCrossOwnerConfirmation(targetPerson, sourcePeople);
-      if (mergedCount === undefined) {
-        // Cross-owner merge was blocked or the user declined the confirmation — nothing merged.
-        return;
-      }
-    } else {
-      const results = await mergePerson({
-        id: targetPerson.id,
-        mergePersonDto: { ids: sourcePeople.map(({ id }) => id) },
-      });
-      mergedCount = results.filter(({ success }) => success).length;
+    const mergedCount = usesScopedRepair
+      ? await mergeScopedPeopleWithCrossOwnerConfirmation(targetPerson, sourcePeople)
+      : await mergePersonWithCrossOwnerConfirmation(targetPerson, sourcePeople);
+
+    if (mergedCount === undefined) {
+      // Cross-owner merge was blocked or the user declined the confirmation — nothing merged.
+      return;
     }
 
     const mergedPerson = await getPerson({ id: targetPerson.id });
@@ -485,6 +500,7 @@
   const Merge: ActionItem = {
     title: $t('merge_people'),
     icon: mdiAccountMultipleCheckOutline,
+    $if: () => canEditSpacePerson,
     onAction: () => {
       viewMode = PersonPageViewMode.MERGE_PEOPLE;
     },
