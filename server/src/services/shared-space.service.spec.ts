@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { writeFile } from 'node:fs/promises';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
@@ -24,6 +24,7 @@ import {
 import { SHARED_SPACE_DEDUP_MAX_PASSES, SharedSpaceService } from 'src/services/shared-space.service';
 import { StorageService } from 'src/services/storage.service';
 import { ImmichFileResponse, ImmichStreamResponse } from 'src/utils/file';
+import { CROSS_OWNER_MERGE_ERROR_CODE } from 'src/utils/merge-policy';
 import { factory, newDate, newUuid } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
 
@@ -196,6 +197,13 @@ const useIdentityMergePropagation = (sut: SharedSpaceService) => {
 
   return identityMergePropagation;
 };
+
+/** The cross-owner authorizer the in-space merge hands to the planner (src/utils/merge-policy.ts). */
+type SpaceMergeAuthorizerFn = (plan: {
+  collapsedOwnerIds: string[];
+  repointedOwnerIds: string[];
+  unrepairableSpaceCollapseIds: string[];
+}) => Promise<void>;
 
 describe(SharedSpaceService.name, () => {
   let sut: SharedSpaceService;
@@ -7212,8 +7220,12 @@ describe(SharedSpaceService.name, () => {
       expect(identityMergePropagation.mergeSpacePeople).not.toHaveBeenCalled();
     });
 
-    it('rejects mixed person and pet space profiles before delegation', async () => {
+    // A mis-classified pet is corrected by merging it into the right person (and vice versa), with the
+    // target's type surviving — the behaviour the classic merge has always had and that
+    // pet-detection.e2e-spec.ts pins. The space endpoint used to be the odd one out and refused.
+    it('delegates mixed person and pet space merges so the target type wins', async () => {
       const identityMergePropagation = useIdentityMergePropagation(sut);
+      const auth = factory.auth();
       const spaceId = newUuid();
       const targetId = newUuid();
       const sourceId = newUuid();
@@ -7223,11 +7235,180 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
       mocks.sharedSpace.getPersonById.mockResolvedValueOnce(target).mockResolvedValueOnce(source);
 
-      await expect(sut.mergeSpacePeople(factory.auth(), spaceId, targetId, { ids: [sourceId] })).rejects.toThrow(
-        'Cannot merge people of different types',
-      );
+      await expect(sut.mergeSpacePeople(auth, spaceId, targetId, { ids: [sourceId] })).resolves.not.toThrow();
 
-      expect(identityMergePropagation.mergeSpacePeople).not.toHaveBeenCalled();
+      expect(identityMergePropagation.mergeSpacePeople).toHaveBeenCalledWith(
+        auth,
+        spaceId,
+        targetId,
+        [sourceId],
+        expect.any(Function),
+      );
+    });
+
+    // #733 review H1: the cross-owner toggle must be resolved BEFORE the merge transaction opens. The authorizer
+    // runs inside that transaction while it holds the instance-wide advisory lock, and a config read there needs a
+    // second pool connection a saturated pool cannot grant — deadlocking every merge (#595). So the service reads
+    // the config eagerly and hands the authorizer an already-resolved value; invoking it does no further config I/O.
+    it('resolves the cross-owner toggle before delegating to the planner (not inside the merge transaction)', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: false } });
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const targetId = newUuid();
+      const sourceId = newUuid();
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById
+        .mockResolvedValueOnce(factory.sharedSpacePerson({ id: targetId, spaceId }))
+        .mockResolvedValueOnce(factory.sharedSpacePerson({ id: sourceId, spaceId }));
+
+      await sut.mergeSpacePeople(auth, spaceId, targetId, { ids: [sourceId] });
+
+      expect(mocks.systemMetadata.get).toHaveBeenCalled();
+      const readsBeforeAuthorize = mocks.systemMetadata.get.mock.calls.length;
+      const authorize = identityMergePropagation.mergeSpacePeople.mock.calls[0][4] as SpaceMergeAuthorizerFn;
+      await authorize({
+        collapsedOwnerIds: ['owner-b'],
+        repointedOwnerIds: [],
+        unrepairableSpaceCollapseIds: [],
+      }).catch(() => {});
+      expect(mocks.systemMetadata.get).toHaveBeenCalledTimes(readsBeforeAuthorize);
+    });
+
+    // §5.4 parity: the in-space merge propagates out to every scope the identities are attached to, including
+    // other users' libraries. Before #733 it could silently merge two of another user's people — no toggle, no
+    // confirmation. It now hands the planner the same cross-owner authorizer every other merge path uses.
+    it('does not gate an in-space merge that only re-points another owner’s person', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: false } });
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const targetId = newUuid();
+      const sourceId = newUuid();
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById
+        .mockResolvedValueOnce(factory.sharedSpacePerson({ id: targetId, spaceId }))
+        .mockResolvedValueOnce(factory.sharedSpacePerson({ id: sourceId, spaceId }));
+      await sut.mergeSpacePeople(auth, spaceId, targetId, { ids: [sourceId] });
+      const authorize = identityMergePropagation.mergeSpacePeople.mock.calls[0][4] as SpaceMergeAuthorizerFn;
+
+      await expect(
+        authorize({ collapsedOwnerIds: [], repointedOwnerIds: ['owner-b'], unrepairableSpaceCollapseIds: [] }),
+      ).resolves.toBeUndefined();
+    });
+
+    it('blocks an in-space merge that would combine two of another owner’s people when the toggle is off', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: false } });
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const targetId = newUuid();
+      const sourceId = newUuid();
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById
+        .mockResolvedValueOnce(factory.sharedSpacePerson({ id: targetId, spaceId }))
+        .mockResolvedValueOnce(factory.sharedSpacePerson({ id: sourceId, spaceId }));
+      await sut.mergeSpacePeople(auth, spaceId, targetId, { ids: [sourceId] });
+      const authorize = identityMergePropagation.mergeSpacePeople.mock.calls[0][4] as SpaceMergeAuthorizerFn;
+
+      await expect(
+        authorize({ collapsedOwnerIds: ['owner-b'], repointedOwnerIds: [], unrepairableSpaceCollapseIds: [] }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('commits an in-space (b) collapse once the toggle is on and the merge is confirmed', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: true } });
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const targetId = newUuid();
+      const sourceId = newUuid();
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById
+        .mockResolvedValueOnce(factory.sharedSpacePerson({ id: targetId, spaceId }))
+        .mockResolvedValueOnce(factory.sharedSpacePerson({ id: sourceId, spaceId }));
+      await sut.mergeSpacePeople(auth, spaceId, targetId, { ids: [sourceId], confirmCrossOwner: true });
+      const authorize = identityMergePropagation.mergeSpacePeople.mock.calls[0][4] as SpaceMergeAuthorizerFn;
+
+      await expect(
+        authorize({ collapsedOwnerIds: ['owner-b'], repointedOwnerIds: [], unrepairableSpaceCollapseIds: [] }),
+      ).resolves.toBeUndefined();
+    });
+
+    // Parity with the scoped/classic 409 tests: the toggle is on but the merge is not confirmed, so the in-space
+    // endpoint must surface the confirmation-required conflict rather than silently committing (#733).
+    it('requires explicit confirmation for an in-space (b) collapse when the toggle is on but not confirmed', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: true } });
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const targetId = newUuid();
+      const sourceId = newUuid();
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById
+        .mockResolvedValueOnce(factory.sharedSpacePerson({ id: targetId, spaceId }))
+        .mockResolvedValueOnce(factory.sharedSpacePerson({ id: sourceId, spaceId }));
+      await sut.mergeSpacePeople(auth, spaceId, targetId, { ids: [sourceId] });
+      const authorize = identityMergePropagation.mergeSpacePeople.mock.calls[0][4] as SpaceMergeAuthorizerFn;
+
+      const error = await authorize({
+        collapsedOwnerIds: ['owner-b'],
+        repointedOwnerIds: [],
+        unrepairableSpaceCollapseIds: [],
+      }).catch((error_: unknown) => error_);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).getResponse()).toMatchObject({
+        code: CROSS_OWNER_MERGE_ERROR_CODE.confirmationRequired,
+      });
+    });
+
+    // #733 review P1: an in-space merge whose fan-out would collapse a *different* space the actor cannot edit is
+    // now governed by the same admin toggle as an other-owner collapse — blocked when off, permitted (with
+    // confirmation) when on — rather than a toggle-independent hard block.
+    it('blocks an in-space merge whose fan-out collapses an un-editable space when the toggle is off', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: false } });
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const targetId = newUuid();
+      const sourceId = newUuid();
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById
+        .mockResolvedValueOnce(factory.sharedSpacePerson({ id: targetId, spaceId }))
+        .mockResolvedValueOnce(factory.sharedSpacePerson({ id: sourceId, spaceId }));
+      await sut.mergeSpacePeople(auth, spaceId, targetId, { ids: [sourceId] });
+      const authorize = identityMergePropagation.mergeSpacePeople.mock.calls[0][4] as SpaceMergeAuthorizerFn;
+
+      const error = await authorize({
+        collapsedOwnerIds: [],
+        repointedOwnerIds: [],
+        unrepairableSpaceCollapseIds: ['other-space'],
+      }).catch((error_: unknown) => error_);
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as ForbiddenException).getResponse()).toMatchObject({
+        code: CROSS_OWNER_MERGE_ERROR_CODE.blocked,
+      });
+    });
+
+    it('commits an in-space merge whose fan-out collapses an un-editable space once the toggle is on and confirmed', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ server: { mergePeopleAcrossOwners: true } });
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const targetId = newUuid();
+      const sourceId = newUuid();
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById
+        .mockResolvedValueOnce(factory.sharedSpacePerson({ id: targetId, spaceId }))
+        .mockResolvedValueOnce(factory.sharedSpacePerson({ id: sourceId, spaceId }));
+      await sut.mergeSpacePeople(auth, spaceId, targetId, { ids: [sourceId], confirmCrossOwner: true });
+      const authorize = identityMergePropagation.mergeSpacePeople.mock.calls[0][4] as SpaceMergeAuthorizerFn;
+
+      await expect(
+        authorize({ collapsedOwnerIds: [], repointedOwnerIds: [], unrepairableSpaceCollapseIds: ['other-space'] }),
+      ).resolves.toBeUndefined();
     });
 
     it('delegates editor-initiated merges after validating source people belong to the initiating space', async () => {
@@ -7244,7 +7425,13 @@ describe(SharedSpaceService.name, () => {
 
       await sut.mergeSpacePeople(auth, spaceId, targetId, { ids: [sourceId] });
 
-      expect(identityMergePropagation.mergeSpacePeople).toHaveBeenCalledWith(auth, spaceId, targetId, [sourceId]);
+      expect(identityMergePropagation.mergeSpacePeople).toHaveBeenCalledWith(
+        auth,
+        spaceId,
+        targetId,
+        [sourceId],
+        expect.any(Function),
+      );
       expect(mocks.sharedSpace.reassignPersonFaces).not.toHaveBeenCalled();
       expect(mocks.sharedSpace.deletePerson).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
