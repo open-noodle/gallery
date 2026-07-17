@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import AsyncLock from 'async-lock';
+import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { unlink } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
@@ -64,6 +66,11 @@ type ThumbnailAsset = NonNullable<Awaited<ReturnType<AssetJobRepository['getForG
 @Injectable()
 export class MediaService extends BaseService {
   videoInterfaces: VideoInterfaces = { dri: [], mali: false };
+
+  // Serializes video trims per asset id. Rapid re-trims otherwise race: the second
+  // job overwrites `{id}_edited.mp4` while the first may still be probing/reading it,
+  // and both share the trim output as thumbnail input (issue #743 item 2).
+  private videoTrimLock = new AsyncLock();
 
   @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Microservices] })
   async onBootstrap() {
@@ -205,7 +212,9 @@ export class MediaService extends BaseService {
       const trimEdit = asset.edits.find((e) => e.action === AssetEditAction.Trim);
 
       if (asset.type === AssetType.Video && trimEdit) {
-        return await this.handleVideoTrim(asset, config, trimEdit, localPath);
+        return await this.videoTrimLock.acquire(asset.id, () =>
+          this.handleVideoTrim(asset, config, trimEdit, localPath),
+        );
       }
 
       if (asset.type === AssetType.Video && asset.edits.length === 0) {
@@ -280,11 +289,16 @@ export class MediaService extends BaseService {
     const outputPath = StorageCore.getNestedPath(StorageFolder.EncodedVideo, asset.ownerId, `${asset.id}_edited.mp4`);
     this.storageCore.ensureFolders(outputPath);
 
+    // Trim to a unique temp path and atomically rename into place — ffmpeg writing
+    // the final path in place would let a concurrent reader (probe / frame extraction
+    // in another worker process) open a partial file (issue #743 item 2).
+    const trimTempPath = `${outputPath}.tmp-${randomUUID()}.mp4`;
     try {
-      await this.mediaRepository.trim(inputPath, outputPath, params.startTime, duration);
+      await this.mediaRepository.trim(inputPath, trimTempPath, params.startTime, duration);
+      await this.storageRepository.rename(trimTempPath, outputPath);
     } catch (error) {
       this.logger.error(`FFmpeg trim failed for asset ${asset.id}: ${error}`);
-      await unlink(outputPath).catch(() => {});
+      await unlink(trimTempPath).catch(() => {});
       return JobStatus.Failed;
     }
 
@@ -302,9 +316,12 @@ export class MediaService extends BaseService {
       await this.assetRepository.update({ id: asset.id, duration: calculatedDuration });
     }
 
-    // Extract a frame at ~10% into the trimmed video for thumbnail generation
+    // Extract a frame at ~10% into the trimmed video for thumbnail generation.
+    // The path is unique per invocation: the in-process trim lock does not cover
+    // other worker processes, and a fixed name would let one job's cleanup unlink
+    // the frame another job is still reading (issue #743 item 2).
     const frameTime = duration * 0.1;
-    const framePath = `${outputPath}.frame.jpg`;
+    const framePath = `${outputPath}.frame-${randomUUID()}.jpg`;
     await this.mediaRepository.extractFrame(outputPath, framePath, frameTime);
 
     // Generate thumbnail/preview/fullsize from extracted frame
