@@ -46,7 +46,15 @@ const SpaceRepresentativeFaceUpdateSchema = z
 
 const SharedSpacePersonMergeSchema = z
   .object({
-    ids: z.array(z.uuidv4()).describe('Person IDs to merge into target'),
+    // Capped so a single request cannot hold the instance-wide merge advisory lock while doing one DB round-trip
+    // per source (design §5.2 row 6; the web UI caps at 5).
+    ids: z.array(z.uuidv4()).max(20).describe('Person IDs to merge into target'),
+    confirmCrossOwner: z
+      .boolean()
+      .optional()
+      .describe(
+        'Acknowledgement that this merge will combine two people belonging to another user, which cannot be undone. Required to commit such a merge.',
+      ),
   })
   .meta({ id: 'SharedSpacePersonMergeDto' });
 
