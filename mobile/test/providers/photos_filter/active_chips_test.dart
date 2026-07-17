@@ -9,6 +9,9 @@ import 'package:openapi/api.dart';
 
 PersonDto _person(String id, String name) => PersonDto(id: id, name: name, isHidden: false, thumbnailPath: '');
 
+PersonDto _spacePerson(String id, String name, String spaceId) =>
+    PersonDto(id: id, name: name, isHidden: false, thumbnailPath: '', spaceId: spaceId);
+
 SearchFilter _base() => SearchFilter(
   people: <PersonDto>{},
   location: SearchLocationFilter(),
@@ -33,6 +36,35 @@ void main() {
       expect(chips.single.label, 'Alice');
       expect(chips.single.visual, ChipVisual.person);
       expect(chips.single.avatarPersonIds, ['p1']);
+    });
+
+    // The chip avatar must route a shared-space person to the space thumbnail endpoint, which
+    // needs the spaceId — the tokenized avatar id alone doesn't carry it. So each avatar id gets
+    // an index-aligned spaceId slot (null for personal people).
+    test('a shared-space person chip threads its spaceId aligned with the tokenized avatar id', () {
+      final f = _base()..people.add(_spacePerson('space-person:sp-1', 'Zoe', 'space-1'));
+      final chip = activeChipsFromFilter(f).single;
+      expect(chip.avatarPersonIds, ['space-person:sp-1']);
+      expect(chip.avatarPersonSpaceIds, ['space-1']);
+    });
+
+    test('a personal person chip has a null spaceId slot aligned with its avatar id', () {
+      final f = _base()..people.add(_person('person:p-2', 'Bob'));
+      final chip = activeChipsFromFilter(f).single;
+      expect(chip.avatarPersonIds, ['person:p-2']);
+      expect(chip.avatarPersonSpaceIds, [null]);
+    });
+
+    test('spillover chip threads spaceIds for all three preview avatars', () {
+      final f = _base()
+        ..people.addAll({
+          _spacePerson('space-person:s1', 'Amy', 'space-1'),
+          _person('person:p2', 'Bob'),
+          _spacePerson('space-person:s3', 'Cara', 'space-3'),
+        });
+      final spill = activeChipsFromFilter(f).last;
+      expect(spill.avatarPersonIds, ['space-person:s1', 'person:p2', 'space-person:s3']);
+      expect(spill.avatarPersonSpaceIds, ['space-1', null, 'space-3']);
     });
 
     test('2 people → 2 individual chips (no spillover)', () {
