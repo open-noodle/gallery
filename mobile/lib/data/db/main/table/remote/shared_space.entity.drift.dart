@@ -57,16 +57,7 @@ final class $$SharedSpaceEntityTableReferences
   static i4.$UserEntityTable _createdByIdTable(i0.GeneratedDatabase db) =>
       i5.ReadDatabaseContainer(db)
           .resultSet<i4.$UserEntityTable>('user_entity')
-          .createAlias(
-            i0.$_aliasNameGenerator(
-              i5.ReadDatabaseContainer(db)
-                  .resultSet<i1.$SharedSpaceEntityTable>('shared_space_entity')
-                  .createdById,
-              i5.ReadDatabaseContainer(
-                db,
-              ).resultSet<i4.$UserEntityTable>('user_entity').id,
-            ),
-          );
+          .createAlias('shared_space_entity__created_by_id__user_entity__id');
 
   i4.$$UserEntityTableProcessedTableManager get createdById {
     final $_column = $_itemColumn<String>('created_by_id')!;
