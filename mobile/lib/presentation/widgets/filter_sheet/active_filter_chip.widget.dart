@@ -88,6 +88,9 @@ class ActiveFilterChip extends ConsumerWidget {
     switch (spec.visual) {
       case ChipVisual.person:
         final ids = spec.avatarPersonIds ?? const <String>[];
+        // Index-aligned with ids (see ActiveChipSpec.avatarPersonSpaceIds). A shorter/absent list
+        // degrades to null → owner endpoint, matching a personal person.
+        final spaceIds = spec.avatarPersonSpaceIds ?? const <String?>[];
         final width = ids.isEmpty ? 0.0 : 18.0 + (ids.length - 1) * 14.0;
         return SizedBox(
           width: width,
@@ -104,7 +107,9 @@ class ActiveFilterChip extends ConsumerWidget {
                     ),
                     child: CircleAvatar(
                       radius: 9,
-                      backgroundImage: RemoteImageProvider(url: getFaceThumbnailUrl(ids[i])),
+                      backgroundImage: RemoteImageProvider(
+                        url: getFilterPersonThumbnailUrl(ids[i], spaceId: i < spaceIds.length ? spaceIds[i] : null),
+                      ),
                     ),
                   ),
                 ),

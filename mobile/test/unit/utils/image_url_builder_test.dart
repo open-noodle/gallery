@@ -99,4 +99,30 @@ void main() {
       expect(photosFilterPersonThumbnailUrl(person), 'http://localhost:0/people/raw-uuid/thumbnail');
     });
   });
+
+  // The photos-filter picker/recent/chip surfaces store the tokenized filter id
+  // (`person:<uuid>` / `space-person:<uuid>`) on PersonDto.id and the Space scope on
+  // PersonDto.spaceId. This helper de-tokenizes to the raw profile id and routes a Space
+  // person to the membership-gated space endpoint, everyone else to the owner endpoint.
+  // Mirrors web getPhotosPersonFilterThumbnailUrl.
+  group('getFilterPersonThumbnailUrl', () {
+    test('routes a space-person token (with spaceId) to the membership-gated space endpoint', () {
+      expect(
+        getFilterPersonThumbnailUrl('space-person:sp-1', spaceId: 'space-1'),
+        'http://localhost:0/shared-spaces/space-1/people/sp-1/thumbnail',
+      );
+    });
+
+    test('routes a person: token (no spaceId) to the owner endpoint using the de-tokenized id', () {
+      expect(getFilterPersonThumbnailUrl('person:p-1'), 'http://localhost:0/people/p-1/thumbnail');
+    });
+
+    test('routes a bare id (no prefix, no spaceId) to the owner endpoint', () {
+      expect(getFilterPersonThumbnailUrl('p-1'), 'http://localhost:0/people/p-1/thumbnail');
+    });
+
+    test('de-tokenizes a space-person token even when spaceId is unexpectedly null (owner endpoint)', () {
+      expect(getFilterPersonThumbnailUrl('space-person:sp-1'), 'http://localhost:0/people/sp-1/thumbnail');
+    });
+  });
 }
