@@ -2142,21 +2142,27 @@ describe('/shared-spaces', () => {
         expect((body as { message: string }).message).toMatch(/themselves/i);
       });
 
-      it('cannot merge across types (person ↔ pet)', async () => {
-        // shared-space.service.ts:754-756 — service rejects when source.type !==
-        // target.type. UX consequence: pets and persons cannot be merged into each
-        // other, even if they're in the same space.
+      it('merges across types (person ↔ pet), the target type winning', async () => {
+        // A mis-classified pet is corrected by merging it into the right person, and the target's type
+        // survives — the behaviour the classic /people/:id/merge has always had (pet-detection.e2e-spec.ts).
+        // The space endpoint used to be the odd one out and refused.
         const personTarget = await utils.createSpacePerson(spaceId, 'TypeP', owner.userId, spaceAssetId);
         const petSource = await utils.createSpacePerson(spaceId, 'TypePet', owner.userId, spaceAssetId, {
           type: 'pet',
         });
 
-        const { status, body } = await request(app)
+        const { status } = await request(app)
           .post(`/shared-spaces/${spaceId}/people/${personTarget.spacePersonId}/merge`)
           .set('Authorization', `Bearer ${owner.accessToken}`)
           .send({ ids: [petSource.spacePersonId] });
-        expect(status).toBe(400);
-        expect((body as { message: string }).message).toMatch(/different types/i);
+        expect(status).toBe(204);
+
+        const { body } = await request(app)
+          .get(`/shared-spaces/${spaceId}/people`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        const people = body as { id: string; type: string }[];
+        expect(people.find(({ id }) => id === personTarget.spacePersonId)?.type).toBe('person');
+        expect(people.find(({ id }) => id === petSource.spacePersonId)).toBeUndefined();
       });
 
       it('non-existent target or source returns 400', async () => {
