@@ -2,10 +2,14 @@ import type { LoginResponseDto, SystemConfigDto } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
 import { asBearerAuth, utils } from 'src/utils';
 
-// Browser coverage for the cross-owner people-merge UX (issue #733). A regular (non-admin) user
-// drives the real person-detail merge flow; the instance toggle — not admin status — decides the
-// outcome. ML is disabled in the e2e stack, so the cross-owner precondition (one face identity on
-// two owners' people) is seeded directly in SQL, mirroring shared-space-person-profile.e2e-spec.ts.
+// Browser coverage for the cross-owner people-merge UX (issue #733). A regular (non-admin) user drives the
+// real person-detail merge flow; the instance toggle — not admin status — decides the outcome.
+//
+// The seeded merge is a DESTRUCTIVE cross-owner merge: the other owner holds people on BOTH identities, so
+// committing it merges two of their people. That is the only case the gate stops — re-pointing another
+// owner's single person is ungated, and would simply commit here with no dialog to assert.
+//
+// ML is disabled in the e2e stack, so the precondition is seeded directly in SQL.
 //
 // The two scenarios mutate shared seed state (the second one commits the merge), so they run in
 // order: toggle-off (blocked, no mutation) first, then toggle-on (confirm -> commit).
@@ -59,13 +63,21 @@ test.describe('Cross-owner people merge', () => {
     const actorAsset = await utils.createAsset(actor.accessToken);
     const otherAsset = await utils.createAsset(otherOwner.accessToken);
 
-    // Mint identities: targetPerson -> T, otherOwnerPerson -> S. The target's asset is deliberately
-    // NOT added to the space, so identity T has no space profile and the cross-owner merge does not
-    // trip the same-scope-conflict guard.
+    // Mint identities: targetPerson -> T, otherOwnerPerson -> S.
     await utils.createFace({ assetId: actorAsset.id, personId: targetPerson.id });
     const otherFace = await utils.createFace({ assetId: otherAsset.id, personId: otherOwnerPerson.id });
     const otherOwnerRow = await db.query(`SELECT "identityId" FROM "person" WHERE id = $1`, [otherOwnerPerson.id]);
     const identityS = otherOwnerRow.rows[0].identityId as string;
+    const targetRow = await db.query(`SELECT "identityId" FROM "person" WHERE id = $1`, [targetPerson.id]);
+    const identityT = targetRow.rows[0].identityId as string;
+
+    // The other owner ALSO holds a person on identity T. Merging S into T therefore has to merge two of
+    // THEIR people — the destructive case, and the only one the cross-owner gate stops. (Merely re-pointing
+    // their single person is now allowed with no toggle at all, so a one-person fixture would just commit.)
+    const otherOwnerDupe = await utils.createPerson(otherOwner.accessToken, { name: 'Ada Other Owner (dupe)' });
+    const otherDupeAsset = await utils.createAsset(otherOwner.accessToken);
+    await utils.createFace({ assetId: otherDupeAsset.id, personId: otherOwnerDupe.id });
+    await db.query(`UPDATE "person" SET "identityId" = $1 WHERE id = $2`, [identityT, otherOwnerDupe.id]);
 
     // A space-person in the actor's space carries identity S — repairable by the actor, but S also
     // belongs to the other owner's personal person, which makes the merge cross-owner.
@@ -145,7 +157,7 @@ test.describe('Cross-owner people merge', () => {
 
     // The server's descriptive blocked message is surfaced (never a raw error), and the merge
     // selector stays put because nothing committed.
-    await expect(page.getByText(/appears in another user/i)).toBeVisible();
+    await expect(page.getByText(/another user/i)).toBeVisible();
     await expect(page.getByText('Choose matching people to merge')).toBeVisible();
   });
 

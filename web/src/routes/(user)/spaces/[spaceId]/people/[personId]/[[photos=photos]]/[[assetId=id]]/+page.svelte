@@ -30,6 +30,7 @@
   import { createUrl, getPeopleThumbnailUrl } from '$lib/utils';
   import {
     createCrossOwnerMergeHandlers,
+    runMergeWithCrossOwnerConfirmation,
     runScopedMergeWithCrossOwnerConfirmation,
   } from '$lib/utils/cross-owner-merge';
   import { handleError } from '$lib/utils/handle-error';
@@ -243,11 +244,22 @@
     }
 
     try {
-      await mergeSpacePeople({
-        id: space.id,
-        personId: suggestedPerson.id,
-        sharedSpacePersonMergeDto: { ids: [person.id] },
-      });
+      const committed = await runMergeWithCrossOwnerConfirmation(
+        (confirmCrossOwner) =>
+          mergeSpacePeople({
+            id: space.id,
+            personId: suggestedPerson.id,
+            sharedSpacePersonMergeDto: confirmCrossOwner
+              ? { ids: [person.id], confirmCrossOwner: true }
+              : { ids: [person.id] },
+          }),
+        createCrossOwnerMergeHandlers(),
+      );
+      if (!committed) {
+        // Cross-owner merge was blocked or the user declined the confirmation — nothing merged.
+        return;
+      }
+
       toastManager.success($t('spaces_people_merged'));
       // The current route person is the merge source and no longer exists; navigate
       // straight to the surviving suggested person instead of reloading a deleted route.
@@ -303,21 +315,26 @@
       targetRef.spaceId === space.id &&
       sourceRefs.every((ref) => ref.type === ScopedPersonProfileType.SpacePerson && ref.spaceId === space.id);
 
-    if (canUseSameSpaceMerge) {
-      await mergeSpacePeople({
-        id: space.id,
-        personId: targetRef.id,
-        sharedSpacePersonMergeDto: { ids: selectedPeople.map(({ id }) => id) },
-      });
-    } else {
-      const committed = await runScopedMergeWithCrossOwnerConfirmation(
-        { target: targetRef, sources: sourceRefs },
-        createCrossOwnerMergeHandlers(),
-      );
-      if (!committed) {
-        // Cross-owner merge was blocked or the user declined the confirmation — nothing merged.
-        return;
-      }
+    const committed = canUseSameSpaceMerge
+      ? await runMergeWithCrossOwnerConfirmation(
+          (confirmCrossOwner) =>
+            mergeSpacePeople({
+              id: space.id,
+              personId: targetRef.id,
+              sharedSpacePersonMergeDto: confirmCrossOwner
+                ? { ids: selectedPeople.map(({ id }) => id), confirmCrossOwner: true }
+                : { ids: selectedPeople.map(({ id }) => id) },
+            }),
+          createCrossOwnerMergeHandlers(),
+        )
+      : await runScopedMergeWithCrossOwnerConfirmation(
+          { target: targetRef, sources: sourceRefs },
+          createCrossOwnerMergeHandlers(),
+        );
+
+    if (!committed) {
+      // Cross-owner merge was blocked or the user declined the confirmation — nothing merged.
+      return;
     }
 
     toastManager.success($t('spaces_people_merged'));
