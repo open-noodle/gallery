@@ -18,7 +18,7 @@ class MergeScopedPeopleDto {
     required this.target,
   });
 
-  /// Acknowledgement that this merge will modify people/faces owned by other users. Required to commit a cross-owner merge.
+  /// Acknowledgement that this merge will combine two people belonging to another user, which cannot be undone. Required to commit such a merge.
   ///
   /// Please note: This property should have been non-nullable! Since the specification file
   /// does not include a default value (using the "default:" property), however, the generated
