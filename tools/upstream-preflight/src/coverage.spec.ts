@@ -123,6 +123,37 @@ describe('fork ownership coverage', () => {
     ).toEqual([]);
   });
 
+  it('matches SvelteKit route-group globs with literal parentheses', () => {
+    // micromatch parses bare `(user)` as an (empty) regex capture group, so an
+    // unescaped route-group glob silently matches nothing (issue #743 item 6).
+    expect(
+      findUncoveredFiles(
+        ['web/src/routes/(user)/spaces/+page.svelte'],
+        manifestWith({
+          features: {
+            'shared-spaces': {
+              title: 'Shared Spaces',
+              risk: 'high',
+              domains: ['web'],
+              owned_paths: ['web/src/routes/(user)/spaces/**'],
+            },
+          },
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it('honours coverage_ignore globs containing route-group parentheses', () => {
+    expect(
+      classifyCoverage(
+        ['web/src/routes/(user)/legacy/+page.svelte'],
+        manifestWith({
+          coverage_ignore: ['web/src/routes/(user)/legacy/**'],
+        }),
+      ),
+    ).toEqual([]);
+  });
+
   it('classifies explicit, broad optional, narrow optional, and uncovered coverage', () => {
     const classified = classifyCoverage(
       [

@@ -1240,10 +1240,22 @@ export class LibraryAssetSync extends BaseSync {
   // Per-library backfill of asset rows for a specific library. Triggered by the
   // `syncLibraryAssetsV1` service loop when the client has not yet backfilled a
   // newly-accessible library.
-  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID], stream: true })
-  getBackfill(options: SyncBackfillOptions, libraryId: string) {
+  //
+  // isFavorite is masked to the syncing user's own rows (mirrors SharedSpaceAssetSync):
+  // a library member must not learn another owner's favorite flag (issue #743 item 1).
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, libraryId: string, userId: string) {
     return this.backfillQuery('asset', options)
-      .select(columns.syncAsset)
+      .select(columns.syncLibraryAsset)
+      .select((eb) =>
+        eb
+          .case()
+          .when('asset.ownerId', '=', userId)
+          .then(eb.ref('asset.isFavorite'))
+          .else(eb.val(false))
+          .end()
+          .as('isFavorite'),
+      )
       .select('asset.updateId')
       .where('asset.libraryId', '=', libraryId)
       .stream();
@@ -1255,13 +1267,25 @@ export class LibraryAssetSync extends BaseSync {
   // because there's no stable library<->asset join-row updateId to gate on.
   // Both initial syncs and subsequent metadata changes flow through this stream
   // as `LibraryAssetCreateV1` events; the client upserts idempotently.
+  //
+  // isFavorite is masked to the syncing user's own rows — see getBackfill above.
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
   getUpserts(options: SyncQueryOptions) {
+    const userId = options.userId;
     return this.upsertQuery('asset', options)
-      .select(columns.syncAsset)
+      .select(columns.syncLibraryAsset)
+      .select((eb) =>
+        eb
+          .case()
+          .when('asset.ownerId', '=', userId)
+          .then(eb.ref('asset.isFavorite'))
+          .else(eb.val(false))
+          .end()
+          .as('isFavorite'),
+      )
       .select('asset.updateId')
       .where('asset.libraryId', 'is not', null)
-      .where('asset.libraryId', 'in', (eb) => accessibleLibraries(eb, options.userId))
+      .where('asset.libraryId', 'in', (eb) => accessibleLibraries(eb, userId))
       .stream();
   }
 

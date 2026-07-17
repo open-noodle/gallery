@@ -1641,7 +1641,7 @@ describe(MediaService.name, () => {
 
       expect(mocks.media.extractFrame).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('.frame.jpg'),
+        expect.stringMatching(/\.frame-[\w-]+\.jpg$/),
         expect.any(Number),
       );
       expect(mocks.media.generateThumbnail).toHaveBeenCalled();
@@ -1658,6 +1658,92 @@ describe(MediaService.name, () => {
       const result = await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
 
       expect(result).toBe(JobStatus.Failed);
+    });
+
+    it('should serialize concurrent trim jobs for the same asset', async () => {
+      // Rapid re-trims race: the second job overwrites `{id}_edited.mp4` while the
+      // first may still read it, and the first job's temp-frame cleanup deletes the
+      // frame the second just extracted (issue #743 item 2).
+      const asset = AssetFactory.from({ type: AssetType.Video })
+        .exif()
+        .edit({ action: AssetEditAction.Trim, parameters: { startTime: 1, endTime: 3 } as any })
+        .build();
+      mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+      mocks.media.probe.mockResolvedValue({
+        ...videoInfoStub.noAudioStreams,
+        format: { ...videoInfoStub.noAudioStreams.format, duration: 2 },
+      });
+      mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
+
+      const order: string[] = [];
+      let releaseFirstTrim!: () => void;
+      mocks.media.trim
+        .mockImplementationOnce(async () => {
+          order.push('trim1:start');
+          await new Promise<void>((resolve) => (releaseFirstTrim = resolve));
+          order.push('trim1:end');
+        })
+        .mockImplementationOnce(() => {
+          order.push('trim2:start');
+          return Promise.resolve();
+        });
+
+      const first = sut.handleAssetEditThumbnailGeneration({ id: asset.id });
+      await vi.waitFor(() => expect(order).toContain('trim1:start'));
+
+      const second = sut.handleAssetEditThumbnailGeneration({ id: asset.id });
+      // Give the second job time to (incorrectly) reach ffmpeg — it must block instead.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(order).toEqual(['trim1:start']);
+
+      releaseFirstTrim();
+      await Promise.all([first, second]);
+      expect(order).toEqual(['trim1:start', 'trim1:end', 'trim2:start']);
+    });
+
+    it('should use a distinct temp frame path per trim invocation', async () => {
+      // The in-process lock does not cover overlapping trims in different worker
+      // processes — with a fixed frame name, one job's temp-frame cleanup unlinks
+      // the frame another job is still reading (issue #743 item 2).
+      const asset = AssetFactory.from({ type: AssetType.Video })
+        .exif()
+        .edit({ action: AssetEditAction.Trim, parameters: { startTime: 1, endTime: 3 } as any })
+        .build();
+      mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+      mocks.media.probe.mockResolvedValue({
+        ...videoInfoStub.noAudioStreams,
+        format: { ...videoInfoStub.noAudioStreams.format, duration: 2 },
+      });
+      mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
+
+      await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
+      await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
+
+      const framePaths = mocks.media.extractFrame.mock.calls.map(([, framePath]) => framePath);
+      expect(framePaths).toHaveLength(2);
+      expect(framePaths[0]).not.toBe(framePaths[1]);
+    });
+
+    it('should trim to a temporary path and rename into place', async () => {
+      // ffmpeg writing `{id}_edited.mp4` in place lets a concurrent reader (probe /
+      // frame extraction in another worker process) see a partial file; an atomic
+      // rename means readers only ever open a complete video (issue #743 item 2).
+      const asset = AssetFactory.from({ type: AssetType.Video })
+        .exif()
+        .edit({ action: AssetEditAction.Trim, parameters: { startTime: 1, endTime: 3 } as any })
+        .build();
+      mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+      mocks.media.probe.mockResolvedValue({
+        ...videoInfoStub.noAudioStreams,
+        format: { ...videoInfoStub.noAudioStreams.format, duration: 2 },
+      });
+      mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
+
+      await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
+
+      const [, trimOutputPath] = mocks.media.trim.mock.calls[0];
+      expect(trimOutputPath).not.toMatch(/_edited\.mp4$/);
+      expect(mocks.storage.rename).toHaveBeenCalledWith(trimOutputPath, expect.stringMatching(/_edited\.mp4$/));
     });
 
     it('should handle video undo by cleaning up edited files', async () => {
