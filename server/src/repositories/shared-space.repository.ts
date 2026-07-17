@@ -190,6 +190,30 @@ export class SharedSpaceRepository {
       .executeTakeFirst();
   }
 
+  /**
+   * The actor's role in each of the given spaces, for spaces where they are a member (non-members are absent
+   * from the map). Used by the merge propagation planner to decide whether a fan-out space collapse is one the
+   * actor is allowed to perform. Accepts a transaction so the check reads consistently inside a merge.
+   */
+  async getActorSpaceRoles(
+    userId: string,
+    spaceIds: string[],
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<Map<string, string>> {
+    if (spaceIds.length === 0) {
+      return new Map();
+    }
+
+    const rows = await db
+      .selectFrom('shared_space_member')
+      .where('shared_space_member.userId', '=', userId)
+      .where('shared_space_member.spaceId', 'in', spaceIds)
+      .select(['shared_space_member.spaceId', 'shared_space_member.role'])
+      .execute();
+
+    return new Map(rows.map((row) => [row.spaceId, row.role]));
+  }
+
   addMember(values: Insertable<SharedSpaceMemberTable>) {
     return this.db.insertInto('shared_space_member').values(values).returningAll().executeTakeFirstOrThrow();
   }
