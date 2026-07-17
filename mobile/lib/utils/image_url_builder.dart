@@ -43,6 +43,23 @@ String getPersonThumbnailUrl(final String personId, {final String? spaceId, fina
       : getSpacePersonThumbnailUrl(spaceId, personId, updatedAt: updatedAt);
 }
 
+/// Thumbnail URL for a photos-filter [PersonDto] whose id is the tokenized filter id
+/// (`person:<uuid>` / `space-person:<uuid>`) the picker/recent/chip surfaces store, with the
+/// Space scope carried separately in [spaceId]. De-tokenizes to the raw profile id, then routes a
+/// Space person (non-null [spaceId]) to the membership-gated space endpoint and everyone else to
+/// the owner endpoint — the tokenized id 404s the owner endpoint for Space people. Mirrors web
+/// getPhotosPersonFilterThumbnailUrl.
+String getFilterPersonThumbnailUrl(final String filterPersonId, {final String? spaceId}) {
+  const spacePrefix = 'space-person:';
+  const personPrefix = 'person:';
+  final rawId = filterPersonId.startsWith(spacePrefix)
+      ? filterPersonId.substring(spacePrefix.length)
+      : filterPersonId.startsWith(personPrefix)
+      ? filterPersonId.substring(personPrefix.length)
+      : filterPersonId;
+  return getPersonThumbnailUrl(rawId, spaceId: spaceId);
+}
+
 /// Thumbnail URL for a photos-filter suggestion person. When the filter requests shared spaces
 /// (`withSharedSpaces: true`) the server returns a tokenized [FilterSuggestionsPersonDto.id]
 /// (`person:<uuid>` / `space-person:<uuid>`) whose raw form 404s through [getFaceThumbnailUrl];

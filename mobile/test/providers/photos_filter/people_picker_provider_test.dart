@@ -4,7 +4,7 @@ import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/people_picker.provider.dart';
 
-DriftPerson _d(String id, String name, {bool isHidden = false, int? numberOfAssets}) => DriftPerson(
+DriftPerson _d(String id, String name, {bool isHidden = false, int? numberOfAssets, String? spaceId}) => DriftPerson(
   id: id,
   createdAt: DateTime(2024, 1, 1),
   updatedAt: DateTime(2024, 1, 1),
@@ -14,6 +14,7 @@ DriftPerson _d(String id, String name, {bool isHidden = false, int? numberOfAsse
   isHidden: isHidden,
   color: null,
   numberOfAssets: numberOfAssets,
+  spaceId: spaceId,
 );
 
 PersonDto _p(String id, String name) => PersonDto(id: id, name: name, isHidden: false, thumbnailPath: '');
@@ -28,26 +29,51 @@ ProviderContainer _containerWith(List<DriftPerson> people) {
 }
 
 void main() {
+  group('photos-filter id + scope mapping', () {
+    // A shared-space person must carry the tokenized `space-person:<id>` filter id (so the
+    // withSharedSpaces search resolves it) and its Space scope (so the avatar routes to the
+    // membership-gated space thumbnail endpoint instead of 404ing the owner endpoint). The raw
+    // profile id alone breaks both. Mirrors web getPhotosPersonFilterId / primaryProfile.
+    test('a shared-space person maps to a space-person: filter id and carries spaceId', () async {
+      final c = _containerWith([_d('sp-1', 'Zoe', spaceId: 'space-1')]);
+      addTearDown(c.dispose);
+      final result = await c.read(peoplePickerAllProvider.future);
+      expect(result.single.id, 'space-person:sp-1');
+      expect(result.single.spaceId, 'space-1');
+    });
+
+    // A personal/owned person is tokenized `person:<id>` so its filter id matches the collapsed
+    // suggestions strip (which always tokenizes), keeping the same person from being selected
+    // twice across surfaces; spaceId stays null (owner thumbnail endpoint).
+    test('a personal person maps to a person: filter id with null spaceId', () async {
+      final c = _containerWith([_d('a', 'Alice')]);
+      addTearDown(c.dispose);
+      final result = await c.read(peoplePickerAllProvider.future);
+      expect(result.single.id, 'person:a');
+      expect(result.single.spaceId, isNull);
+    });
+  });
+
   group('peoplePickerAllProvider', () {
     test('excludes hidden people', () async {
       final c = _containerWith([_d('a', 'Alice'), _d('b', 'Bob', isHidden: true)]);
       addTearDown(c.dispose);
       final result = await c.read(peoplePickerAllProvider.future);
-      expect(result.map((p) => p.id), ['a']);
+      expect(result.map((p) => p.id), ['person:a']);
     });
 
     test('excludes blank names', () async {
       final c = _containerWith([_d('a', 'Alice'), _d('b', '')]);
       addTearDown(c.dispose);
       final result = await c.read(peoplePickerAllProvider.future);
-      expect(result.map((p) => p.id), ['a']);
+      expect(result.map((p) => p.id), ['person:a']);
     });
 
     test('maps DriftPerson to PersonDto with empty thumbnailPath', () async {
       final c = _containerWith([_d('a', 'Alice')]);
       addTearDown(c.dispose);
       final result = await c.read(peoplePickerAllProvider.future);
-      expect(result.single.id, 'a');
+      expect(result.single.id, 'person:a');
       expect(result.single.name, 'Alice');
       expect(result.single.thumbnailPath, '');
       expect(result.single.isHidden, false);
@@ -63,7 +89,7 @@ void main() {
       );
       addTearDown(c.dispose);
       final result = await c.read(peoplePickerAllProvider.future);
-      expect(result.map((p) => p.id), ['pinned']);
+      expect(result.map((p) => p.id), ['person:pinned']);
     });
 
     // Slice 3: the picker row's photo count reads straight off the already-fetched
@@ -76,9 +102,9 @@ void main() {
       ]);
       addTearDown(c.dispose);
       final result = await c.read(peoplePickerAllProvider.future);
-      expect(result.firstWhere((p) => p.id == 'a').numberOfAssets, 1204);
-      expect(result.firstWhere((p) => p.id == 'b').numberOfAssets, 0);
-      expect(result.firstWhere((p) => p.id == 'c').numberOfAssets, isNull);
+      expect(result.firstWhere((p) => p.id == 'person:a').numberOfAssets, 1204);
+      expect(result.firstWhere((p) => p.id == 'person:b').numberOfAssets, 0);
+      expect(result.firstWhere((p) => p.id == 'person:c').numberOfAssets, isNull);
     });
   });
 
@@ -95,7 +121,7 @@ void main() {
       addTearDown(c.dispose);
       c.read(peoplePickerQueryProvider.notifier).state = 'aL';
       final result = await c.read(peoplePickerFilteredProvider.future);
-      expect(result.map((p) => p.id), ['a']);
+      expect(result.map((p) => p.id), ['person:a']);
     });
 
     test('whitespace-only query returns full list', () async {
@@ -161,7 +187,7 @@ void main() {
       ]);
       addTearDown(c.dispose);
       final recent = await c.read(recentPeopleProvider.future);
-      expect(recent.map((p) => p.id), ['a', 'b']);
+      expect(recent.map((p) => p.id), ['person:a', 'person:b']);
     });
 
     test('caps result at 7 items, newest first', () async {
@@ -173,7 +199,15 @@ void main() {
       final recent = await c.read(recentPeopleProvider.future);
       expect(recent, hasLength(7));
       // p0 is newest, then p1, ..., p6.
-      expect(recent.map((p) => p.id), ['p0', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6']);
+      expect(recent.map((p) => p.id), [
+        'person:p0',
+        'person:p1',
+        'person:p2',
+        'person:p3',
+        'person:p4',
+        'person:p5',
+        'person:p6',
+      ]);
     });
 
     test('empty when no people updated in last 7 days', () async {
