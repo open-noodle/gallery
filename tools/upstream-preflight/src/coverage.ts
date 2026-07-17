@@ -31,7 +31,14 @@ export function classifyCoverage(
   const ignoreGlobs = manifest.coverage_ignore ?? [];
 
   return files
-    .filter((file) => !micromatch.isMatch(file, ignoreGlobs, micromatchOptions))
+    .filter(
+      (file) =>
+        !micromatch.isMatch(
+          file,
+          ignoreGlobs.map(literalParens),
+          micromatchOptions,
+        ),
+    )
     .map((file) => ({
       file,
       explicitGlobs: matchingGlobs(file, coverage.explicit),
@@ -303,9 +310,18 @@ function explicitFeatureCoverageGlobs(feature: FeatureEntry): string[] {
   ];
 }
 
+// None of the manifest's globs use extglob syntax (no `@(`, `!(`, `+(`, `?(`,
+// `*(` group prefixes), so bare parentheses only ever occur here as literal
+// SvelteKit route-group directory names (e.g. `web/src/routes/(user)/**`).
+// Escape them so micromatch treats them as literal characters instead of an
+// (empty) capture group, which otherwise silently fails to match real files.
+function literalParens(glob: string): string {
+  return glob.replaceAll(/[()]/g, String.raw`\$&`);
+}
+
 function matchingGlobs(file: string, globs: string[]): string[] {
   return globs.filter((glob) =>
-    micromatch.isMatch(file, glob, micromatchOptions),
+    micromatch.isMatch(file, literalParens(glob), micromatchOptions),
   );
 }
 
