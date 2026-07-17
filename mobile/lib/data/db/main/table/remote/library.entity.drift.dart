@@ -43,16 +43,7 @@ final class $$LibraryEntityTableReferences
   static i4.$UserEntityTable _ownerIdTable(i0.GeneratedDatabase db) =>
       i5.ReadDatabaseContainer(db)
           .resultSet<i4.$UserEntityTable>('user_entity')
-          .createAlias(
-            i0.$_aliasNameGenerator(
-              i5.ReadDatabaseContainer(
-                db,
-              ).resultSet<i1.$LibraryEntityTable>('library_entity').ownerId,
-              i5.ReadDatabaseContainer(
-                db,
-              ).resultSet<i4.$UserEntityTable>('user_entity').id,
-            ),
-          );
+          .createAlias('library_entity__owner_id__user_entity__id');
 
   i4.$$UserEntityTableProcessedTableManager get ownerId {
     final $_column = $_itemColumn<String>('owner_id')!;
