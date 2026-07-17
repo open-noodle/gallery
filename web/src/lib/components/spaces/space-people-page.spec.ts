@@ -841,6 +841,71 @@ describe('Spaces people page', () => {
     });
   });
 
+  it("shows the descriptive message and does not merge when it would collapse another owner's people with the toggle off", async () => {
+    vi.mocked(sdkMock.isHttpError).mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
+    const people = [makePerson({ id: 'p1', name: 'Alice' }), makePerson({ id: 'p2', name: 'Bob' })];
+    sdkMock.getSpacePeople.mockResolvedValue(people);
+    sdkMock.mergeSpacePeople.mockRejectedValueOnce({
+      __http: true,
+      status: 403,
+      data: { code: 'cross_owner_merge_blocked', message: 'An administrator can enable it.' },
+      message: 'raw',
+    });
+    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    const { baseElement } = renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
+
+    await fireEvent.mouseEnter(baseElement.querySelector('[role="group"]')!);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByLabelText('show_person_options'));
+    await user.click(screen.getByText('merge_people'));
+    await screen.findByText('choose_matching_people_to_merge');
+    await user.click(screen.getByRole('button', { name: 'Bob' }));
+    await user.click(screen.getByRole('button', { name: 'merge' }));
+
+    await waitFor(() => expect(toastManager.danger).toHaveBeenCalled());
+    expect(sdkMock.mergeSpacePeople).toHaveBeenCalledTimes(1);
+    // Still on the merge selector — the merge did not commit and navigate away.
+    expect(screen.getByText('choose_matching_people_to_merge')).toBeInTheDocument();
+  });
+
+  it('re-runs a merge with the cross-owner acknowledgement once the user confirms', async () => {
+    vi.mocked(sdkMock.isHttpError).mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
+    const people = [makePerson({ id: 'p1', name: 'Alice' }), makePerson({ id: 'p2', name: 'Bob' })];
+    sdkMock.getSpacePeople.mockResolvedValue(people);
+    sdkMock.mergeSpacePeople
+      .mockRejectedValueOnce({
+        __http: true,
+        status: 409,
+        data: { code: 'cross_owner_merge_confirmation_required', impactedOwnerCount: 1 },
+        message: 'raw',
+      })
+      .mockResolvedValueOnce(undefined as never);
+    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    const { baseElement } = renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
+
+    await fireEvent.mouseEnter(baseElement.querySelector('[role="group"]')!);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByLabelText('show_person_options'));
+    await user.click(screen.getByText('merge_people'));
+    await screen.findByText('choose_matching_people_to_merge');
+    await user.click(screen.getByRole('button', { name: 'Bob' }));
+    await user.click(screen.getByRole('button', { name: 'merge' }));
+
+    await waitFor(() => expect(sdkMock.mergeSpacePeople).toHaveBeenCalledTimes(2));
+    expect(sdkMock.mergeSpacePeople).toHaveBeenNthCalledWith(1, {
+      id: 'space-1',
+      personId: 'p1',
+      sharedSpacePersonMergeDto: { ids: ['p2'] },
+    });
+    expect(sdkMock.mergeSpacePeople).toHaveBeenNthCalledWith(2, {
+      id: 'space-1',
+      personId: 'p1',
+      sharedSpacePersonMergeDto: { ids: ['p2'], confirmCrossOwner: true },
+    });
+  });
+
   it('name editing calls updateSpacePerson API on blur', async () => {
     const person = makePerson({ id: 'p1', name: 'Alice' });
     sdkMock.updateSpacePerson.mockResolvedValue(person);

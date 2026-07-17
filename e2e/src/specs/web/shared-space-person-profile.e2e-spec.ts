@@ -96,7 +96,10 @@ test.describe('Shared space person in the main People view', () => {
     await expect(page.getByText('Grandma')).toBeVisible();
 
     await page.getByRole('button', { name: 'Open', exact: true }).click();
-    await expect(page.getByText('Merge people')).toBeVisible();
+    // Merge used to be offered here, unlike every other write action — but a viewer cannot name a space person
+    // they may not repair as a merge ref, so the server refused it and the flow could only ever fail. It is now
+    // gated on the same edit check as the rest.
+    await expect(page.getByText('Merge people')).toHaveCount(0);
     await expect(page.getByText('Set date of birth')).toHaveCount(0);
     await expect(page.getByText('Hide person')).toHaveCount(0);
   });
