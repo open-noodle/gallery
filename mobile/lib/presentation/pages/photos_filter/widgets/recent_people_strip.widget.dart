@@ -84,7 +84,9 @@ class _RecentTile extends ConsumerWidget {
               ),
               child: CircleAvatar(
                 radius: 22,
-                backgroundImage: RemoteImageProvider(url: getFaceThumbnailUrl(person.id)),
+                backgroundImage: RemoteImageProvider(
+                  url: getFilterPersonThumbnailUrl(person.id, spaceId: person.spaceId),
+                ),
               ),
             ),
             const SizedBox(height: 4),
