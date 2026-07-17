@@ -1,4 +1,4 @@
-import { applyDecorators, ArgumentMetadata, FileValidator, Injectable, ParseUUIDPipe } from '@nestjs/common';
+import { applyDecorators, FileValidator, Injectable } from '@nestjs/common';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DateTime } from 'luxon';
 import { createZodDto } from 'nestjs-zod';
@@ -71,16 +71,6 @@ export function IsNotSiblingOf<
     },
     { message },
   );
-}
-
-@Injectable()
-export class ParseMeUUIDPipe extends ParseUUIDPipe {
-  async transform(value: string, metadata: ArgumentMetadata) {
-    if (value == 'me') {
-      return value;
-    }
-    return super.transform(value, metadata);
-  }
 }
 
 @Injectable()
