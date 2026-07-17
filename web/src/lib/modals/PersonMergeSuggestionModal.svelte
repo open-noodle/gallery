@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { getPeopleThumbnailUrl } from '$lib/utils';
   import {
     createCrossOwnerMergeHandlers,
+    runMergeWithCrossOwnerConfirmation,
     runScopedMergeWithCrossOwnerConfirmation,
   } from '$lib/utils/cross-owner-merge';
+  import { getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
   import { handleError } from '$lib/utils/handle-error';
   import { isSpaceScopedPerson, toScopedPersonRef } from '$lib/utils/scoped-person-ref';
   import { mergePeople, type PersonResponseDto } from '@immich/sdk';
@@ -40,21 +41,30 @@
 
   const onSubmit = async () => {
     try {
-      if (isSpaceScopedPerson(personToMerge) || isSpaceScopedPerson(personToBeMergedInto)) {
-        const committed = await runScopedMergeWithCrossOwnerConfirmation(
-          {
-            target: toScopedPersonRef(personToBeMergedInto),
-            sources: [toScopedPersonRef(personToMerge)],
-          },
-          createCrossOwnerMergeHandlers(),
-        );
-        if (!committed) {
-          // Cross-owner merge was blocked or the user declined the confirmation — nothing merged.
-          return;
-        }
-      } else {
-        await mergePeople({ mergePersonDto: { ids: [personToBeMergedInto.id, personToMerge.id] } });
+      const committed =
+        isSpaceScopedPerson(personToMerge) || isSpaceScopedPerson(personToBeMergedInto)
+          ? await runScopedMergeWithCrossOwnerConfirmation(
+              {
+                target: toScopedPersonRef(personToBeMergedInto),
+                sources: [toScopedPersonRef(personToMerge)],
+              },
+              createCrossOwnerMergeHandlers(),
+            )
+          : await runMergeWithCrossOwnerConfirmation(
+              (confirmCrossOwner) =>
+                mergePeople({
+                  mergePersonDto: confirmCrossOwner
+                    ? { ids: [personToBeMergedInto.id, personToMerge.id], confirmCrossOwner: true }
+                    : { ids: [personToBeMergedInto.id, personToMerge.id] },
+                }),
+              createCrossOwnerMergeHandlers(),
+            );
+
+      if (!committed) {
+        // Cross-owner merge was blocked or the user declined the confirmation — nothing merged.
+        return;
       }
+
       toastManager.primary($t('merge_people_successfully'));
       onClose([personToMerge, personToBeMergedInto]);
     } catch (error) {
@@ -84,7 +94,7 @@
           <ImageThumbnail
             circle
             shadow
-            url={getPeopleThumbnailUrl(personToMerge)}
+            url={getGlobalPersonThumbnailUrl(personToMerge)}
             altText={personToMerge.name}
             widthStyle="100%"
           />
@@ -125,7 +135,7 @@
             border={potentialMergePeople.length > 0}
             circle
             shadow
-            url={getPeopleThumbnailUrl(personToBeMergedInto)}
+            url={getGlobalPersonThumbnailUrl(personToBeMergedInto)}
             altText={personToBeMergedInto.name}
             widthStyle="100%"
           />
@@ -146,7 +156,7 @@
                     border={true}
                     circle
                     shadow
-                    url={getPeopleThumbnailUrl(person)}
+                    url={getGlobalPersonThumbnailUrl(person)}
                     altText={person.name}
                     widthStyle="100%"
                   />

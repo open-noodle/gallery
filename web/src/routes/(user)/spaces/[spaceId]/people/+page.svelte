@@ -17,6 +17,7 @@
   import PersonEditBirthDateModal from '$lib/modals/PersonEditBirthDateModal.svelte';
   import { locale, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
   import { createUrl, handlePromiseError } from '$lib/utils';
+  import { createCrossOwnerMergeHandlers, runMergeWithCrossOwnerConfirmation } from '$lib/utils/cross-owner-merge';
   import { handleError } from '$lib/utils/handle-error';
   import { clearQueryParam } from '$lib/utils/navigation';
   import { sortPeople } from '$lib/utils/people-utils';
@@ -384,11 +385,22 @@
     targetPerson: SharedSpacePersonResponseDto,
     selectedPeople: SharedSpacePersonResponseDto[],
   ) => {
-    await mergeSpacePeople({
-      id: space.id,
-      personId: targetPerson.id,
-      sharedSpacePersonMergeDto: { ids: selectedPeople.map(({ id }) => id) },
-    });
+    const committed = await runMergeWithCrossOwnerConfirmation(
+      (confirmCrossOwner) =>
+        mergeSpacePeople({
+          id: space.id,
+          personId: targetPerson.id,
+          sharedSpacePersonMergeDto: confirmCrossOwner
+            ? { ids: selectedPeople.map(({ id }) => id), confirmCrossOwner: true }
+            : { ids: selectedPeople.map(({ id }) => id) },
+        }),
+      createCrossOwnerMergeHandlers(),
+    );
+    if (!committed) {
+      // Cross-owner merge was blocked or the user declined the confirmation — nothing merged.
+      return;
+    }
+
     toastManager.success($t('spaces_people_merged'));
     return targetPerson;
   };
