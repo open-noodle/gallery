@@ -655,32 +655,34 @@ patch_ios() {
   local pbxproj="$REPO_ROOT/mobile/ios/Runner.xcodeproj/project.pbxproj"
   local info_plist="$REPO_ROOT/mobile/ios/Runner/Info.plist"
 
-  # project.pbxproj — bundle identifiers.
+  # Signing.xcconfig — bundle identifiers, development team, and shared app group.
   #
-  # Debug + profile targets: upstream (futo rename) moved these from
-  # app.alextran.immich.vdebug / app.alextran.immich.profile to
-  # app.futo.immich.debug / app.futo.immich.profile, and reordered the suffix so
-  # the Widget/ShareExtension debug+profile targets are now app.futo.immich.debug.Widget
-  # / app.futo.immich.profile.ShareExtension etc. A single bare prefix swap covers
-  # every variant because the .Widget / .ShareExtension suffix is preserved after
-  # the prefix is replaced.
-  sed -i "s/app\.futo\.immich\.debug/${BUNDLE_ID_DEBUG}/g" "$pbxproj"
-  sed -i "s/app\.futo\.immich\.profile/${BUNDLE_ID_PROFILE}/g" "$pbxproj"
-  # Release Widget + ShareExtension targets still use app.alextran.immich.*
-  sed -i "s/app\.alextran\.immich\.Widget/${BUNDLE_ID}.Widget/g" "$pbxproj"
-  sed -i "s/app\.alextran\.immich\.ShareExtension/${BUNDLE_ID}.ShareExtension/g" "$pbxproj"
-  # Main bundle ID last (most general pattern)
-  sed -i "s/app\.alextran\.immich/${BUNDLE_ID}/g" "$pbxproj"
+  # Upstream #29077 moved all iOS signing identity into mobile/ios/Signing.xcconfig
+  # ($(IMMICH_*) variables). project.pbxproj now references those variables for the
+  # bundle IDs, DEVELOPMENT_TEAM, and CUSTOM_GROUP_ID (app group), and the
+  # entitlements reference $(CUSTOM_GROUP_ID) — so there are no longer any hardcoded
+  # app.alextran.immich / app.futo.immich / team / group.app.immich.share strings in
+  # project.pbxproj, the entitlements, or the Swift sources to rewrite. Brand the four
+  # Signing.xcconfig values instead; project.pbxproj derives every suffix
+  # (.debug / .profile / .Widget / .ShareExtension) and the per-scheme group from them.
+  #   PROD  → release bundle id (+ .Widget / .ShareExtension)
+  #   DEV   → debug/profile bundle id (+ .debug / .profile, and their extensions)
+  #   GROUP → shared app group (release; .debug / .profile appended for dev schemes)
+  local signing_xcconfig="$REPO_ROOT/mobile/ios/Signing.xcconfig"
+  if [[ -f "$signing_xcconfig" ]]; then
+    sed -i "s|^IMMICH_BUNDLE_ID_PROD = .*|IMMICH_BUNDLE_ID_PROD = ${BUNDLE_ID}|" "$signing_xcconfig"
+    sed -i "s|^IMMICH_BUNDLE_ID_DEV = .*|IMMICH_BUNDLE_ID_DEV = ${BUNDLE_ID}|" "$signing_xcconfig"
+    sed -i "s|^IMMICH_GROUP_ID = .*|IMMICH_GROUP_ID = ${SHARED_GROUP}|" "$signing_xcconfig"
+    if [[ -n "${APPLE_TEAM_ID:-}" && "$APPLE_TEAM_ID" != "null" ]]; then
+      sed -i "s|^IMMICH_TEAM_ID = .*|IMMICH_TEAM_ID = ${APPLE_TEAM_ID}|" "$signing_xcconfig"
+    fi
+    echo "  Patched Signing.xcconfig (bundle id / team / app group)"
+  fi
 
-  # project.pbxproj — product names
+  # project.pbxproj — product names (#29077 left these hardcoded)
   sed -i "s/PRODUCT_NAME = \"Immich-Debug\"/PRODUCT_NAME = \"${NAME}-Debug\"/g" "$pbxproj"
   sed -i "s/PRODUCT_NAME = \"Immich-Profile\"/PRODUCT_NAME = \"${NAME}-Profile\"/g" "$pbxproj"
   sed -i "s/PRODUCT_NAME = Immich/PRODUCT_NAME = \"${NAME}\"/g" "$pbxproj"
-
-  # project.pbxproj — development team
-  if [[ -n "${APPLE_TEAM_ID:-}" && "$APPLE_TEAM_ID" != "null" ]]; then
-    sed -i "s/DEVELOPMENT_TEAM = [A-Z0-9]*;/DEVELOPMENT_TEAM = ${APPLE_TEAM_ID};/g" "$pbxproj"
-  fi
 
   # Info.plist — bundle name
   sed -i "s|<string>immich_mobile</string>|<string>${NAME_SLUG}</string>|g" "$info_plist"
@@ -701,27 +703,10 @@ patch_ios() {
   sed -i "s/app\.alextran\.immich\.backgroundFetch/${BUNDLE_ID}.backgroundFetch/g" "$info_plist"
   sed -i "s/app\.alextran\.immich\.backgroundProcessing/${BUNDLE_ID}.backgroundProcessing/g" "$info_plist"
 
-  # Shared app group — patch entitlements in all targets
-  local entitlements
-  for entitlements in "$REPO_ROOT"/mobile/ios/Runner/*.entitlements \
-                      "$REPO_ROOT"/mobile/ios/ShareExtension/*.entitlements \
-                      "$REPO_ROOT"/mobile/ios/WidgetExtension/*.entitlements; do
-    if [[ -f "$entitlements" ]]; then
-      sed -i "s/group\.app\.immich\.share/${SHARED_GROUP}/g" "$entitlements"
-    fi
-  done
-
-  # Shared app group in project.pbxproj (CUSTOM_GROUP_ID)
-  sed -i "s/group\.app\.immich\.share/${SHARED_GROUP}/g" "$pbxproj"
-
-  # Hardcoded app group in Swift source files
-  local swift_file
-  for swift_file in "$REPO_ROOT/mobile/ios/Runner/Core/URLSessionManager.swift" \
-                    "$REPO_ROOT/mobile/ios/WidgetExtension/ImmichAPI.swift"; do
-    if [[ -f "$swift_file" ]]; then
-      sed -i "s/group\.app\.immich\.share/${SHARED_GROUP}/g" "$swift_file"
-    fi
-  done
+  # Shared app group is branded via IMMICH_GROUP_ID in Signing.xcconfig above (#29077):
+  # project.pbxproj's CUSTOM_GROUP_ID and the entitlements' $(CUSTOM_GROUP_ID) both derive
+  # from it, and the Swift sources no longer hardcode the group. No entitlements / pbxproj /
+  # Swift group rewrites are needed.
 
   # Fastlane — Appfile
   local appfile="$REPO_ROOT/mobile/ios/fastlane/Appfile"
