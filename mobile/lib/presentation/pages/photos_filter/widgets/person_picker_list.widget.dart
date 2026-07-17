@@ -138,7 +138,12 @@ class _PersonRow extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
         child: Row(
           children: [
-            CircleAvatar(radius: 20, backgroundImage: RemoteImageProvider(url: getFaceThumbnailUrl(person.id))),
+            CircleAvatar(
+              radius: 20,
+              backgroundImage: RemoteImageProvider(
+                url: getFilterPersonThumbnailUrl(person.id, spaceId: person.spaceId),
+              ),
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
