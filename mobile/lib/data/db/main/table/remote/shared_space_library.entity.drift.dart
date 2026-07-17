@@ -42,16 +42,7 @@ final class $$SharedSpaceLibraryEntityTableReferences
       i5.ReadDatabaseContainer(db)
           .resultSet<i4.$SharedSpaceEntityTable>('shared_space_entity')
           .createAlias(
-            i0.$_aliasNameGenerator(
-              i5.ReadDatabaseContainer(db)
-                  .resultSet<i1.$SharedSpaceLibraryEntityTable>(
-                    'shared_space_library_entity',
-                  )
-                  .spaceId,
-              i5.ReadDatabaseContainer(
-                db,
-              ).resultSet<i4.$SharedSpaceEntityTable>('shared_space_entity').id,
-            ),
+            'shared_space_library_entity__space_id__shared_space_entity__id',
           );
 
   i4.$$SharedSpaceEntityTableProcessedTableManager get spaceId {
