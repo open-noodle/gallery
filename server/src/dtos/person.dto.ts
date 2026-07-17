@@ -44,7 +44,15 @@ const PeopleUpdateSchema = z
 
 const MergePersonSchema = z
   .object({
-    ids: z.array(z.uuidv4()).describe('Person IDs to merge'),
+    // Capped so a single request cannot hold the instance-wide merge advisory lock while doing one DB round-trip
+    // per source (design §5.2 row 6; the web UI caps at 5).
+    ids: z.array(z.uuidv4()).max(20).describe('Person IDs to merge'),
+    confirmCrossOwner: z
+      .boolean()
+      .optional()
+      .describe(
+        'Acknowledgement that this merge will combine two people belonging to another user, which cannot be undone. Required to commit such a merge.',
+      ),
   })
   .meta({ id: 'MergePersonDto' });
 
@@ -68,12 +76,14 @@ const ScopedPersonProfileRefSchema = z
 const MergeScopedPeopleSchema = z
   .object({
     target: ScopedPersonProfileRefSchema.describe('Target scoped profile'),
-    sources: z.array(ScopedPersonProfileRefSchema).min(1).describe('Source scoped profiles'),
+    // Capped so a single request cannot hold the instance-wide merge advisory lock while doing one DB round-trip
+    // per source (design §5.2 row 6; the web UI caps at 5).
+    sources: z.array(ScopedPersonProfileRefSchema).min(1).max(20).describe('Source scoped profiles'),
     confirmCrossOwner: z
       .boolean()
       .optional()
       .describe(
-        'Acknowledgement that this merge will modify people/faces owned by other users. Required to commit a cross-owner merge.',
+        'Acknowledgement that this merge will combine two people belonging to another user, which cannot be undone. Required to commit such a merge.',
       ),
   })
   .meta({ id: 'MergeScopedPeopleDto' });
