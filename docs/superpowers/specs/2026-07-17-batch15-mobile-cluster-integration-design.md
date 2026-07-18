@@ -41,6 +41,14 @@ Upstream's `project.pbxproj` then derives every suffix (`.debug` / `.profile` / 
 
 **Out of scope / unchanged:** `PRODUCT_NAME` seds (#29077 doesn't touch them); app-group entitlements handling (confirm during implementation whether entitlements reference `$(IMMICH_GROUP_ID)` or stay on the fork's existing group sed).
 
+**App-group resolution — VERIFIED (2026-07-18).** #29077 made the iOS app group fully dynamic through one variable, and the fork brands it at the source:
+
+- `mobile/ios/Signing.xcconfig` `IMMICH_GROUP_ID` (upstream `group.app.immich.share`) → `apply-branding.sh` rewrites it to `config.json` `mobile.shared_group` = `group.de.opennoodle.gallery.share` (the branding-scripts moved to `branding/scripts/`; `verify-branding.sh` gates against the upstream group leaking).
+- `project.pbxproj` derives `CUSTOM_GROUP_ID` per build config: **Release** `$(IMMICH_GROUP_ID)`, **Debug** `$(IMMICH_GROUP_ID).debug`, **Profile** `$(IMMICH_GROUP_ID).profile`.
+- Both the four `*.entitlements` (`application-groups`) **and** the three `Info.plist` `AppGroupId` keys resolve to `$(CUSTOM_GROUP_ID)`, and the Swift runtime reads the group from `Bundle.main.object(forInfoDictionaryKey: "AppGroupId")` (`URLSessionManager`, `NetworkApiImpl`, Widget). No source hardcodes the group. So the main app + ShareExtension + WidgetExtension always agree **within a config** — the group wiring is correct by construction; no code fix needed.
+
+**New behavior to be aware of (from #29077):** Debug/Profile builds now use **suffixed** app groups (`group.de.opennoodle.gallery.share.debug` / `.profile`), whereas Release uses the unsuffixed, registered `group.de.opennoodle.gallery.share`. Release (App Store/TestFlight) is unaffected. The only implication is **local Debug/Profile branded builds signed with the fork team (`77MWNP37MV`)**: they now request the suffixed groups — automatic signing registers them on demand, but manual/CI signing would need `…share.debug` / `…share.profile` registered in the Apple Developer account. Not release-critical.
+
 ### 2. #29780 drop iOS 14 → **adopt**
 
 Bumps `IPHONEOS_DEPLOYMENT_TARGET` 14→15 (Podfile, 6 pbxproj targets, SPM `Package.resolved`). iOS 15 is 4+ years old; low product risk. Bonus: the fork's recurring **SwiftPM min-platform-14 archive failure** disappears when the floor is 15. The fork does not customize deployment targets, so it applies cleanly alongside #29077.
