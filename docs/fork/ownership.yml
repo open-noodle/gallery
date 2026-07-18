@@ -5,7 +5,7 @@ metadata:
   upstream_branch: main
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: 31e7c05bccb37ffd5d161cb1afb9965b7b167bef
+  last_verified_fork_head: e60a6616a0f4f2edd17618b86ba89187f6449c4b
 
 coverage_ignore:
   - docs/superpowers/**
@@ -286,9 +286,11 @@ features:
       - .github/workflows/docs-build.yml
       - .github/workflows/docs-deploy.yml
       - server/src/schema/migrations-gallery/**
+      - server/bin/sync-gallery-migrations.mjs
       - tools/upstream-preflight/**
     upstream_extension_paths:
       - .github/workflows/**
+      - packages/sdk/src/fetch-client.ts
       - server/Dockerfile
       - web/Dockerfile
       - machine-learning/Dockerfile
@@ -300,7 +302,9 @@ features:
       - README.md
     optional_paths:
       - .claude/**
+      - .codex/**
       - .dockerignore
+      - .gitattributes
       - .github/**
       - .gitignore
       - AGENTS.md
@@ -312,21 +316,28 @@ features:
       - Makefile
       - README.md
       - SECURITY.md
-      - cli/**
       - docker/**
       - docs/**
-      - e2e-auth-server/**
       - i18n/**
+      - mise.lock
+      - mise.toml
       - misc/**
       - open-api/**
+      - package.json
+      - packages/cli/**
+      - packages/e2e-auth-server/**
+      - packages/scripts/**
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
       - readme_i18n/**
       - server/Dockerfile
+      - server/bin/immich-dev
       - server/helmet.json
+      - server/mise.toml
       - server/package.json
       - server/src/**
       - web/Dockerfile
+      - web/eslint.config.js
       - web/package.json
       - web/svelte.config.js
     database:
