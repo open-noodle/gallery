@@ -356,11 +356,31 @@ describe(QueueService.name, () => {
         { name: JobName.SessionCleanup },
         { name: JobName.HlsSessionCleanup },
         { name: JobName.AuditTableCleanup },
+        { name: JobName.SharedSpaceAlbumGrantReconcileSweep },
         { name: JobName.MemoryGenerate },
         { name: JobName.UserSyncUsage },
         { name: JobName.AssetGenerateThumbnailsQueueAll, data: { force: false } },
         { name: JobName.FacialRecognitionQueueAll, data: { force: false, nightly: true } },
       ]);
+    });
+
+    it('should run the shared-space album-grant reconcile sweep only when database cleanup is enabled (L8)', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        nightlyTasks: { ...defaults.nightlyTasks, databaseCleanup: true },
+      });
+      await sut.handleNightlyJobs();
+      expect(mocks.job.queueAll.mock.calls[0][0]).toContainEqual({
+        name: JobName.SharedSpaceAlbumGrantReconcileSweep,
+      });
+
+      mocks.job.queueAll.mockClear();
+      mocks.systemMetadata.get.mockResolvedValue({
+        nightlyTasks: { ...defaults.nightlyTasks, databaseCleanup: false },
+      });
+      await sut.handleNightlyJobs();
+      expect(mocks.job.queueAll.mock.calls[0][0]).not.toContainEqual(
+        expect.objectContaining({ name: JobName.SharedSpaceAlbumGrantReconcileSweep }),
+      );
     });
 
     it('should queue nightly facial recognition without forcing recognition or face detection', async () => {

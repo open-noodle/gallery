@@ -3,6 +3,7 @@
   import { navigating } from '$app/state';
   import { scrollMemoryClearer } from '$lib/actions/scroll-memory';
   import AlbumMap from '$lib/components/album-page/AlbumMap.svelte';
+  import AlbumSharedSpaceLinks from '$lib/components/album-page/AlbumSharedSpaceLinks.svelte';
   import AlbumSummary from '$lib/components/album-page/AlbumSummary.svelte';
   import ActivityStatus from '$lib/components/asset-viewer/ActivityStatus.svelte';
   import ActivityViewer from '$lib/components/asset-viewer/ActivityViewer.svelte';
@@ -14,6 +15,7 @@
     clearFilters,
     createFilterState,
     getActiveFilterCount,
+    loadFilterCollapsed,
     type FilterState,
   } from '$lib/components/filter-panel/filter-panel';
   import HeaderActionButton from '$lib/components/HeaderActionButton.svelte';
@@ -49,6 +51,7 @@
     getAlbumActions,
     getAlbumAssetsActions,
     handleDeleteAlbum,
+    handleLinkAlbumToSpace,
     isAlbumEditor,
     isAlbumOwner,
   } from '$lib/services/album.service';
@@ -71,7 +74,14 @@
   } from '$lib/utils/timeline-zoom-navigation';
   import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
   import { AlbumUserRole, getAlbumInfo, updateAlbumInfo, type AlbumResponseDto } from '@immich/sdk';
-  import { ActionButton, CommandPaletteDefaultProvider, Icon, IconButton, toastManager } from '@immich/ui';
+  import {
+    ActionButton,
+    CommandPaletteDefaultProvider,
+    Icon,
+    IconButton,
+    modalManager,
+    toastManager,
+  } from '@immich/ui';
   import {
     mdiAccountEye,
     mdiAccountEyeOutline,
@@ -81,6 +91,7 @@
     mdiImageOutline,
     mdiImagePlusOutline,
     mdiLink,
+    mdiLinkVariantPlus,
     mdiPlus,
     mdiPresentationPlay,
   } from '@mdi/js';
@@ -89,8 +100,8 @@
   import { fly } from 'svelte/transition';
   import { SvelteMap } from 'svelte/reactivity';
   import type { PageData } from './$types';
-  import AlbumDescription from './AlbumDescription.svelte';
-  import AlbumTitle from './AlbumTitle.svelte';
+  import AlbumDescription from '$lib/components/album-page/AlbumDescription.svelte';
+  import AlbumTitle from '$lib/components/album-page/AlbumTitle.svelte';
   import ActionMenuItem from '$lib/components/ActionMenuItem.svelte';
 
   interface Props {
@@ -336,6 +347,9 @@
   const isTimelineEmpty = $derived(
     timelineManager?.isInitialized && !hasTimelineMonths && totalAssetCount === 0 && activeFilterCount === 0,
   );
+
+  // Filter-panel collapse is driven here so a header filter button can reclaim the panel's space.
+  let filterCollapsed = $state(loadFilterCollapsed());
   const showFilteredEmptyState = $derived(
     timelineManager?.isInitialized && !hasTimelineMonths && totalAssetCount === 0 && activeFilterCount > 0,
   );
@@ -506,6 +520,8 @@
             <FilterPanel
               config={albumFilterConfig}
               bind:filters={albumFilters}
+              bind:collapsed={filterCollapsed}
+              externalToggle
               {timeBuckets}
               storageKey="gallery-filter-visible-sections-album-detail"
               hidden={isTimelineEmpty}
@@ -556,6 +572,12 @@
               showGrouping={isBrowseTimeline && !assetMultiSelectManager.selectionActive}
               showFilters={getActiveFilterCount(albumFilters) > 0}
               filters={albumFiltersBar}
+              showFilterButton={filterCollapsed &&
+                isBrowseTimeline &&
+                !assetMultiSelectManager.selectionActive &&
+                !isTimelineEmpty}
+              filterActive={getActiveFilterCount(albumFilters) > 0}
+              onExpandFilters={() => (filterCollapsed = false)}
             />
           {/if}
 
@@ -616,6 +638,10 @@
                     {#if album.assetCount > 0}
                       <AlbumSummary {album} />
                     {/if}
+
+                    <!-- rbac-6: owner-only — the server populates album.sharedSpaceLinks only for
+                         the album owner, so this self-hides for every other caller. -->
+                    <AlbumSharedSpaceLinks {album} />
 
                     <!-- ALBUM SHARING -->
                     {#if album.albumUsers.length > 1 || (album.hasSharedLink && isOwned)}
@@ -726,7 +752,7 @@
             />
             <SetVisibilityAction menuItem onVisibilitySet={handleSetVisibility} />
           {/if}
-          {#if assetMultiSelectManager.assets.length === 1}
+          {#if isEditor && assetMultiSelectManager.assets.length === 1}
             <MenuOption
               text={$t('set_as_album_cover')}
               icon={mdiImageOutline}
@@ -807,6 +833,17 @@
                   />
                 {/if}
 
+                {#if isOwned}
+                  <MenuOption
+                    icon={mdiLinkVariantPlus}
+                    text={$t('link_album_to_space')}
+                    onClick={async () => {
+                      if (await handleLinkAlbumToSpace(album)) {
+                        await refreshAlbum();
+                      }
+                    }}
+                  />
+                {/if}
                 <ActionMenuItem action={Actions.Delete} />
                 <ActionMenuItem action={Actions.Leave} />
               </ButtonContextMenu>

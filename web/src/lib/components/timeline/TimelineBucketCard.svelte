@@ -69,7 +69,13 @@
       cacheKey: bucket.representativeThumbhash ?? undefined,
     });
   });
-  let renderState: 'loading' | 'image' | 'fallback' = $derived(loading ? 'loading' : hasImage ? 'image' : 'fallback');
+  // Only show the big centred title as a genuine fallback (an image that failed to load). While the
+  // representative cover is still being fetched there is no asset id yet — treat that as 'loading' and
+  // render a neutral placeholder so the title doesn't flash in the centre before flicking to the
+  // bottom-left overlay.
+  let renderState: 'loading' | 'image' | 'fallback' = $derived(
+    loading ? 'loading' : hasImage ? 'image' : imageFailed ? 'fallback' : 'loading',
+  );
 
   const activate = () => {
     if (disabled) {
@@ -127,13 +133,17 @@
           onerror={handleImageError}
         />
       {/key}
-    {:else}
+    {:else if imageFailed}
       <div
         class="flex h-full w-full items-center justify-center bg-gray-200 px-3 text-center text-4xl font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300"
         data-testid="timeline-bucket-card-fallback"
       >
         {title}
       </div>
+    {:else}
+      <!-- Representative cover still loading: neutral placeholder, no centred title. The period label
+           lives in the bottom-left overlay below, so nothing needs to render here. -->
+      <div class="size-full bg-gray-200 dark:bg-gray-800" data-testid="timeline-bucket-card-loading"></div>
     {/if}
   </div>
 

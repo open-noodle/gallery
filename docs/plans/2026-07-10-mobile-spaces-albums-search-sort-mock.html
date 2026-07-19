@@ -1,0 +1,1288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gallery mobile — Spaces &amp; Space Albums: search + sort mock</title>
+  </head>
+  <body>
+    <style>
+      :root {
+        --bg: #eef0f4;
+        --panel: #f8f9fb;
+        --ink: #1b1c20;
+        --muted: #63676f;
+        --faint: #9297a1;
+        --accent: #4c5bd4;
+        --accent-ink: #ffffff;
+        --accent-soft: #e6e9fb;
+        --line: #dadce3;
+
+        /* device tokens (the app screen) */
+        --scr: #ffffff;
+        --scr-2: #f1f2f6;
+        --scr-3: #e7e9f0;
+        --scr-ink: #1b1c20;
+        --scr-muted: #6a6e78;
+        --scr-line: #e2e4ec;
+        --scr-accent: #4c5bd4;
+        --scr-accent-soft: #eaecfb;
+        --bezel: #0c0d10;
+        --shadow: 0 24px 60px -28px rgba(20, 22, 40, 0.55), 0 6px 18px -12px rgba(20, 22, 40, 0.3);
+        --card-radius: 14px;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0d0e11;
+          --panel: #16171c;
+          --ink: #e7e8ec;
+          --muted: #9aa0ab;
+          --faint: #6d7178;
+          --accent: #7d89ff;
+          --accent-ink: #0d0e11;
+          --accent-soft: #23253a;
+          --line: #2a2c34;
+
+          --scr: #141519;
+          --scr-2: #1d1f26;
+          --scr-3: #262933;
+          --scr-ink: #e8e9ee;
+          --scr-muted: #9aa0ab;
+          --scr-line: #2c2f38;
+          --scr-accent: #8b95ff;
+          --scr-accent-soft: #262a44;
+          --bezel: #000000;
+          --shadow: 0 30px 70px -30px rgba(0, 0, 0, 0.8), 0 8px 20px -12px rgba(0, 0, 0, 0.6);
+        }
+      }
+
+      :root[data-theme='light'] {
+        --bg: #eef0f4;
+        --panel: #f8f9fb;
+        --ink: #1b1c20;
+        --muted: #63676f;
+        --faint: #9297a1;
+        --accent: #4c5bd4;
+        --accent-ink: #ffffff;
+        --accent-soft: #e6e9fb;
+        --line: #dadce3;
+        --scr: #ffffff;
+        --scr-2: #f1f2f6;
+        --scr-3: #e7e9f0;
+        --scr-ink: #1b1c20;
+        --scr-muted: #6a6e78;
+        --scr-line: #e2e4ec;
+        --scr-accent: #4c5bd4;
+        --scr-accent-soft: #eaecfb;
+        --bezel: #0c0d10;
+        --shadow: 0 24px 60px -28px rgba(20, 22, 40, 0.55), 0 6px 18px -12px rgba(20, 22, 40, 0.3);
+      }
+      :root[data-theme='dark'] {
+        --bg: #0d0e11;
+        --panel: #16171c;
+        --ink: #e7e8ec;
+        --muted: #9aa0ab;
+        --faint: #6d7178;
+        --accent: #7d89ff;
+        --accent-ink: #0d0e11;
+        --accent-soft: #23253a;
+        --line: #2a2c34;
+        --scr: #141519;
+        --scr-2: #1d1f26;
+        --scr-3: #262933;
+        --scr-ink: #e8e9ee;
+        --scr-muted: #9aa0ab;
+        --scr-line: #2c2f38;
+        --scr-accent: #8b95ff;
+        --scr-accent-soft: #262a44;
+        --bezel: #000000;
+        --shadow: 0 30px 70px -30px rgba(0, 0, 0, 0.8), 0 8px 20px -12px rgba(0, 0, 0, 0.6);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(
+            1200px 600px at 15% -10%,
+            color-mix(in srgb, var(--accent) 10%, transparent),
+            transparent 60%
+          ),
+          var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        line-height: 1.5;
+      }
+
+      .wrap {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 56px 24px 80px;
+      }
+
+      .eyebrow {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin: 0 0 14px;
+      }
+      h1 {
+        font-size: clamp(28px, 4.5vw, 42px);
+        line-height: 1.08;
+        letter-spacing: -0.02em;
+        font-weight: 700;
+        margin: 0 0 16px;
+        text-wrap: balance;
+        max-width: 20ch;
+      }
+      .lede {
+        font-size: 17px;
+        color: var(--muted);
+        max-width: 62ch;
+        margin: 0;
+      }
+      .lede b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 26px 0 4px;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--muted);
+        border: 1px solid var(--line);
+        background: var(--panel);
+        padding: 7px 12px;
+        border-radius: 999px;
+      }
+      .chip .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 3px;
+      }
+      .dot.search {
+        background: var(--accent);
+      }
+      .dot.sort {
+        background: #d98a2b;
+      }
+      .dot.same {
+        background: var(--faint);
+      }
+
+      /* ---------- gallery of phones ---------- */
+      .frames {
+        margin-top: 44px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(258px, 1fr));
+        gap: 44px 30px;
+        align-items: start;
+        justify-items: center;
+      }
+      .figure {
+        width: 100%;
+        max-width: 300px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .figure .cap {
+      }
+      .cap .step {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+        display: block;
+        margin-bottom: 5px;
+      }
+      .cap h3 {
+        font-size: 15px;
+        margin: 0 0 5px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+      }
+      .cap p {
+        font-size: 13.5px;
+        color: var(--muted);
+        margin: 0;
+      }
+      .cap .k {
+        color: var(--ink);
+        font-weight: 600;
+        border-bottom: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+        padding-bottom: 0.5px;
+      }
+
+      /* ---------- device ---------- */
+      .device {
+        width: 100%;
+        border-radius: 40px;
+        background: var(--bezel);
+        padding: 9px;
+        box-shadow: var(--shadow);
+        animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+      }
+      .figure:nth-child(2) .device {
+        animation-delay: 0.06s;
+      }
+      .figure:nth-child(3) .device {
+        animation-delay: 0.12s;
+      }
+      .figure:nth-child(4) .device {
+        animation-delay: 0.18s;
+      }
+      .figure:nth-child(5) .device {
+        animation-delay: 0.24s;
+      }
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(14px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .device {
+          animation: none;
+        }
+      }
+
+      .screen {
+        position: relative;
+        overflow: hidden;
+        border-radius: 32px;
+        background: var(--scr);
+        color: var(--scr-ink);
+        height: 592px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .status {
+        height: 30px;
+        flex: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--scr-ink);
+      }
+      .status .sig {
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+      }
+      .status .sig i {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--scr-ink);
+        display: inline-block;
+        opacity: 0.85;
+      }
+      .notch {
+        position: absolute;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 92px;
+        height: 20px;
+        border-radius: 12px;
+        background: var(--bezel);
+      }
+
+      /* app bar */
+      .appbar {
+        flex: none;
+        height: 52px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 8px 0 6px;
+      }
+      .iconbtn {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        color: var(--scr-ink);
+        flex: none;
+      }
+      .iconbtn svg {
+        width: 22px;
+        height: 22px;
+      }
+      .appbar .title {
+        font-size: 20px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        flex: 1;
+      }
+      .linkbtn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 34px;
+        padding: 0 12px 0 9px;
+        border-radius: 999px;
+        color: var(--scr-accent);
+        font-weight: 600;
+        font-size: 13.5px;
+        background: var(--scr-accent-soft);
+      }
+      .linkbtn svg {
+        width: 17px;
+        height: 17px;
+      }
+
+      /* controls area */
+      .controls {
+        flex: none;
+        padding: 2px 14px 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .searchfield {
+        height: 42px;
+        border-radius: 999px;
+        background: var(--scr-2);
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 0 12px;
+        color: var(--scr-muted);
+        font-size: 14px;
+        border: 1px solid transparent;
+      }
+      .searchfield.active {
+        border-color: color-mix(in srgb, var(--scr-accent) 60%, transparent);
+        background: var(--scr);
+      }
+      .searchfield svg {
+        width: 18px;
+        height: 18px;
+        flex: none;
+      }
+      .searchfield .ph {
+        flex: 1;
+      }
+      .searchfield .typed {
+        flex: 1;
+        color: var(--scr-ink);
+      }
+      .searchfield .caret {
+        width: 1.5px;
+        height: 17px;
+        background: var(--scr-accent);
+        margin-left: -6px;
+        animation: blink 1.1s steps(1) infinite;
+      }
+      @keyframes blink {
+        50% {
+          opacity: 0;
+        }
+      }
+      .searchfield .clear {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--scr-3);
+        display: grid;
+        place-items: center;
+      }
+      .searchfield .clear svg {
+        width: 12px;
+        height: 12px;
+        color: var(--scr-muted);
+      }
+
+      .sortrow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .result-count {
+        font-size: 12.5px;
+        color: var(--scr-muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .sortbtn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 34px;
+        padding: 0 8px 0 11px;
+        border-radius: 999px;
+        border: 1px solid var(--scr-line);
+        color: var(--scr-ink);
+        font-size: 13px;
+        font-weight: 500;
+        background: var(--scr);
+      }
+      .sortbtn .lab {
+        color: var(--scr-muted);
+        font-weight: 500;
+      }
+      .sortbtn .val {
+        font-weight: 600;
+      }
+      .sortbtn svg {
+        width: 16px;
+        height: 16px;
+        color: var(--scr-muted);
+      }
+
+      /* grid */
+      .gridscroll {
+        flex: 1;
+        overflow: hidden;
+        padding: 4px 14px 16px;
+        -webkit-mask-image: linear-gradient(var(--scr) 94%, transparent);
+        mask-image: linear-gradient(var(--scr) 94%, transparent);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px 12px;
+      }
+
+      .albumcard {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .cover {
+        aspect-ratio: 1 / 1;
+        border-radius: var(--card-radius);
+        position: relative;
+        overflow: hidden;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+      }
+      .cover::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.22));
+      }
+      .cover .more {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: rgba(15, 16, 22, 0.42);
+        backdrop-filter: blur(4px);
+        display: grid;
+        place-items: center;
+        z-index: 2;
+      }
+      .cover .more svg {
+        width: 16px;
+        height: 16px;
+        color: #fff;
+      }
+      .cover.hidden {
+        opacity: 0.62;
+      }
+      .cover .hideveil {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        z-index: 2;
+      }
+      .cover .hideveil svg {
+        width: 26px;
+        height: 26px;
+        color: rgba(255, 255, 255, 0.92);
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+      }
+      .a-name {
+        font-size: 13px;
+        font-weight: 550;
+        line-height: 1.25;
+        color: var(--scr-ink);
+      }
+      .a-sub {
+        font-size: 11.5px;
+        color: var(--scr-muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .a-sub .hid {
+        color: var(--scr-muted);
+      }
+
+      /* space cards (single column, richer) */
+      .spacelist {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .spacecard {
+        border-radius: 18px;
+        overflow: hidden;
+        background: var(--scr-2);
+        border: 1px solid var(--scr-line);
+      }
+      .spacecover {
+        height: 108px;
+        position: relative;
+      }
+      .spacecover::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.28));
+      }
+      .newbadge {
+        position: absolute;
+        top: 9px;
+        left: 9px;
+        z-index: 2;
+        font-size: 11px;
+        font-weight: 700;
+        color: #fff;
+        background: var(--scr-accent);
+        padding: 3px 8px;
+        border-radius: 999px;
+        letter-spacing: 0.01em;
+      }
+      .spacemeta {
+        padding: 10px 12px 12px;
+      }
+      .s-name {
+        font-size: 15px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+      }
+      .s-sub {
+        font-size: 12.5px;
+        color: var(--scr-muted);
+        margin-top: 2px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-variant-numeric: tabular-nums;
+      }
+      .s-sub .sep {
+        width: 3px;
+        height: 3px;
+        border-radius: 50%;
+        background: var(--scr-muted);
+        opacity: 0.6;
+      }
+      .s-sub svg {
+        width: 13px;
+        height: 13px;
+        opacity: 0.8;
+      }
+
+      /* FAB */
+      .fab {
+        position: absolute;
+        right: 16px;
+        bottom: 18px;
+        width: 52px;
+        height: 52px;
+        border-radius: 18px;
+        background: var(--scr-accent);
+        color: var(--accent-ink);
+        display: grid;
+        place-items: center;
+        box-shadow: 0 10px 22px -8px color-mix(in srgb, var(--scr-accent) 70%, transparent);
+        z-index: 5;
+      }
+      .fab svg {
+        width: 24px;
+        height: 24px;
+      }
+
+      /* sort menu overlay */
+      .scrim {
+        position: absolute;
+        inset: 0;
+        background: rgba(8, 9, 14, 0.42);
+        z-index: 20;
+      }
+      .menu {
+        position: absolute;
+        z-index: 21;
+        right: 14px;
+        top: 150px;
+        width: 214px;
+        background: var(--scr);
+        border: 1px solid var(--scr-line);
+        border-radius: 16px;
+        box-shadow: 0 20px 40px -16px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+        padding: 6px;
+      }
+      .menu .mh {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--scr-muted);
+        padding: 8px 10px 6px;
+      }
+      .mi {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 10px;
+        border-radius: 10px;
+        font-size: 13.5px;
+        color: var(--scr-ink);
+      }
+      .mi .tick {
+        width: 16px;
+        flex: none;
+        display: grid;
+        place-items: center;
+        color: var(--scr-accent);
+      }
+      .mi .tick svg {
+        width: 15px;
+        height: 15px;
+      }
+      .mi .lbl {
+        flex: 1;
+      }
+      .mi .dir {
+        color: var(--scr-accent);
+        display: inline-flex;
+      }
+      .mi .dir svg {
+        width: 15px;
+        height: 15px;
+      }
+      .mi.sel {
+        background: var(--scr-accent-soft);
+        font-weight: 600;
+      }
+      .mi.sel .lbl {
+        color: var(--scr-accent);
+      }
+
+      /* empty search result */
+      .noresult {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        color: var(--scr-muted);
+        padding: 0 30px;
+        text-align: center;
+      }
+      .noresult svg {
+        width: 40px;
+        height: 40px;
+        opacity: 0.5;
+      }
+      .noresult .t {
+        font-size: 14px;
+        font-weight: 550;
+        color: var(--scr-ink);
+      }
+      .noresult .s {
+        font-size: 12.5px;
+      }
+
+      footer {
+        margin-top: 56px;
+        padding-top: 20px;
+        border-top: 1px solid var(--line);
+        color: var(--faint);
+        font-size: 13px;
+      }
+      footer b {
+        color: var(--muted);
+        font-weight: 600;
+      }
+    </style>
+
+    <div class="wrap">
+      <p class="eyebrow">Gallery mobile · design mock</p>
+      <h1>Search &amp; sort for Spaces and Space&nbsp;Albums</h1>
+      <p class="lede">
+        A flat, unsortable list becomes findable. Two new controls — a <b>search field</b> and a
+        <b>reversible sort menu</b> — sit under the app bar on both screens, exactly like the existing Albums page.
+        Everything else (cards, actions, empty states) is unchanged. Real content from the
+        <b>Aurelia&nbsp;und&nbsp;Pierre</b> space.
+      </p>
+
+      <div class="legend">
+        <span class="chip"><span class="dot search"></span> New: search-by-name field</span>
+        <span class="chip"><span class="dot sort"></span> New: reversible sort menu</span>
+        <span class="chip"><span class="dot same"></span> Unchanged: cards, ⋮ menu, FAB, empty states</span>
+      </div>
+
+      <div class="frames">
+        <!-- FRAME 1: space albums browse -->
+        <div class="figure">
+          <div class="device">
+            <div class="screen">
+              <div class="notch"></div>
+              <div class="status">
+                <span>9:41</span><span class="sig"><i></i><i></i><i></i> 5G</span>
+              </div>
+              <div class="appbar">
+                <div class="iconbtn">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M15 18l-6-6 6-6" />
+                  </svg>
+                </div>
+                <div class="title">Albums</div>
+                <div class="linkbtn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                    <path d="M12 5v14M5 12h14" /></svg
+                  >Link
+                </div>
+              </div>
+              <div class="controls">
+                <div class="searchfield">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="M21 21l-4.3-4.3" />
+                  </svg>
+                  <span class="ph">Search albums</span>
+                </div>
+                <div class="sortrow">
+                  <span class="result-count">21 albums</span>
+                  <div class="sortbtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                      <path d="M3 6h13M3 12h9M3 18h5M17 8l4-4 4 4M21 4v16" transform="translate(-3 0)" /></svg
+                    ><span class="lab">Sort:</span> <span class="val">Recently linked</span>
+                  </div>
+                </div>
+              </div>
+              <div class="gridscroll">
+                <div class="grid">
+                  <div class="albumcard">
+                    <div class="cover" style="background: linear-gradient(150deg, #e08a53, #b34a3f)">
+                      <div class="more">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                          <circle cx="12" cy="5" r="1.6" />
+                          <circle cx="12" cy="12" r="1.6" />
+                          <circle cx="12" cy="19" r="1.6" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="a-name">USA Trip</div>
+                    <div class="a-sub">216 photos</div>
+                  </div>
+                  <div class="albumcard">
+                    <div class="cover" style="background: linear-gradient(150deg, #3f8f9c, #215a86)">
+                      <div class="more">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                          <circle cx="12" cy="5" r="1.6" />
+                          <circle cx="12" cy="12" r="1.6" />
+                          <circle cx="12" cy="19" r="1.6" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="a-name">Sicily trip 2024</div>
+                    <div class="a-sub">671 photos</div>
+                  </div>
+                  <div class="albumcard">
+                    <div class="cover" style="background: linear-gradient(150deg, #7b6bb0, #3f3a72)">
+                      <div class="more">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                          <circle cx="12" cy="5" r="1.6" />
+                          <circle cx="12" cy="12" r="1.6" />
+                          <circle cx="12" cy="19" r="1.6" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="a-name">USA 2024</div>
+                    <div class="a-sub">918 photos</div>
+                  </div>
+                  <div class="albumcard">
+                    <div class="cover" style="background: linear-gradient(150deg, #5c9e5f, #2f6b4c)">
+                      <div class="more">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                          <circle cx="12" cy="5" r="1.6" />
+                          <circle cx="12" cy="12" r="1.6" />
+                          <circle cx="12" cy="19" r="1.6" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="a-name">In the woods</div>
+                    <div class="a-sub">87 photos</div>
+                  </div>
+                  <div class="albumcard">
+                    <div class="cover hidden" style="background: linear-gradient(150deg, #b7743f, #7a4a2c)">
+                      <div class="hideveil">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                        >
+                          <path d="M3 3l18 18M10.6 10.7a2 2 0 002.7 2.7" />
+                          <path
+                            d="M9.4 5.2A9.5 9.5 0 0112 5c5 0 9 4.5 9 7a12 12 0 01-2.2 3M6.2 6.2A12.6 12.6 0 003 12c0 2.5 4 7 9 7a9.7 9.7 0 003.4-.6"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="a-name">Us 2022</div>
+                    <div class="a-sub">553 photos · <span class="hid">Hidden</span></div>
+                  </div>
+                  <div class="albumcard">
+                    <div class="cover" style="background: linear-gradient(150deg, #c76b86, #8a3f68)">
+                      <div class="more">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                          <circle cx="12" cy="5" r="1.6" />
+                          <circle cx="12" cy="12" r="1.6" />
+                          <circle cx="12" cy="19" r="1.6" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="a-name">Sining Markus wedding</div>
+                    <div class="a-sub">342 photos</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="cap">
+            <span class="step">Space albums · default</span>
+            <h3>The "See all" albums list, now with controls</h3>
+            <p>
+              A <span class="k">search field</span> and a <span class="k">sort menu</span> slot under the app bar.
+              Default order is <b>Recently linked</b>. Cards, the ⋮ menu and the editor <b>Link</b> action are
+              untouched.
+            </p>
+          </div>
+        </div>
+
+        <!-- FRAME 2: albums sort menu open -->
+        <div class="figure">
+          <div class="device">
+            <div class="screen">
+              <div class="notch"></div>
+              <div class="status">
+                <span>9:41</span><span class="sig"><i></i><i></i><i></i> 5G</span>
+              </div>
+              <div class="appbar">
+                <div class="iconbtn">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M15 18l-6-6 6-6" />
+                  </svg>
+                </div>
+                <div class="title">Albums</div>
+                <div class="linkbtn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                    <path d="M12 5v14M5 12h14" /></svg
+                  >Link
+                </div>
+              </div>
+              <div class="controls">
+                <div class="searchfield">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="M21 21l-4.3-4.3" />
+                  </svg>
+                  <span class="ph">Search albums</span>
+                </div>
+                <div class="sortrow">
+                  <span class="result-count">21 albums</span>
+                  <div class="sortbtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                      <path d="M3 6h10M3 12h7M3 18h4M18 15l3 3 3-3M21 6v12" transform="translate(-3 0)" /></svg
+                    ><span class="lab">Sort:</span> <span class="val">Recently linked</span>
+                  </div>
+                </div>
+              </div>
+              <div class="gridscroll">
+                <div class="grid">
+                  <div class="albumcard">
+                    <div class="cover" style="background: linear-gradient(150deg, #e08a53, #b34a3f)"></div>
+                    <div class="a-name">USA Trip</div>
+                    <div class="a-sub">216 photos</div>
+                  </div>
+                  <div class="albumcard">
+                    <div class="cover" style="background: linear-gradient(150deg, #3f8f9c, #215a86)"></div>
+                    <div class="a-name">Sicily trip 2024</div>
+                    <div class="a-sub">671 photos</div>
+                  </div>
+                  <div class="albumcard">
+                    <div class="cover" style="background: linear-gradient(150deg, #7b6bb0, #3f3a72)"></div>
+                    <div class="a-name">USA 2024</div>
+                    <div class="a-sub">918 photos</div>
+                  </div>
+                  <div class="albumcard">
+                    <div class="cover" style="background: linear-gradient(150deg, #5c9e5f, #2f6b4c)"></div>
+                    <div class="a-name">In the woods</div>
+                    <div class="a-sub">87 photos</div>
+                  </div>
+                </div>
+              </div>
+              <div class="scrim"></div>
+              <div class="menu">
+                <div class="mh">Sort albums by</div>
+                <div class="mi"><span class="tick"></span><span class="lbl">Name</span></div>
+                <div class="mi"><span class="tick"></span><span class="lbl">Photo count</span></div>
+                <div class="mi sel">
+                  <span class="tick"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.4"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M5 12l5 5L20 6" /></svg></span
+                  ><span class="lbl">Recently linked</span
+                  ><span class="dir"
+                    ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                      <path d="M12 5v14M6 13l6 6 6-6" /></svg
+                  ></span>
+                </div>
+                <div class="mi"><span class="tick"></span><span class="lbl">Recently updated</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="cap">
+            <span class="step">Space albums · sort menu</span>
+            <h3>Four curated sort modes</h3>
+            <p>
+              Tap a mode to select it; tap the <b>selected</b> mode again to flip direction (the arrow shows
+              newest-first vs. oldest-first). Mirrors the existing Albums sort menu exactly.
+            </p>
+          </div>
+        </div>
+
+        <!-- FRAME 3: albums searching -->
+        <div class="figure">
+          <div class="device">
+            <div class="screen">
+              <div class="notch"></div>
+              <div class="status">
+                <span>9:41</span><span class="sig"><i></i><i></i><i></i> 5G</span>
+              </div>
+              <div class="appbar">
+                <div class="iconbtn">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M15 18l-6-6 6-6" />
+                  </svg>
+                </div>
+                <div class="title">Albums</div>
+                <div class="linkbtn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                    <path d="M12 5v14M5 12h14" /></svg
+                  >Link
+                </div>
+              </div>
+              <div class="controls">
+                <div class="searchfield active">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="M21 21l-4.3-4.3" />
+                  </svg>
+                  <span class="typed">ita</span><span class="caret"></span>
+                  <span class="clear"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.4"
+                      stroke-linecap="round"
+                    >
+                      <path d="M6 6l12 12M18 6L6 18" /></svg
+                  ></span>
+                </div>
+                <div class="sortrow">
+                  <span class="result-count">2 of 21 · matches "ita"</span>
+                  <div class="sortbtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                      <path d="M3 6h10M3 12h7M3 18h4M18 15l3 3 3-3M21 6v12" transform="translate(-3 0)" /></svg
+                    ><span class="lab">Sort:</span> <span class="val">Name</span>
+                  </div>
+                </div>
+              </div>
+              <div class="gridscroll">
+                <div class="grid">
+                  <div class="albumcard">
+                    <div class="cover" style="background: linear-gradient(150deg, #4f9d86, #2b6a55)">
+                      <div class="more">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                          <circle cx="12" cy="5" r="1.6" />
+                          <circle cx="12" cy="12" r="1.6" />
+                          <circle cx="12" cy="19" r="1.6" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="a-name">Italy 2022</div>
+                    <div class="a-sub">489 photos</div>
+                  </div>
+                  <div class="albumcard">
+                    <div class="cover hidden" style="background: linear-gradient(150deg, #8a86b8, #514c86)">
+                      <div class="hideveil">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                        >
+                          <path d="M3 3l18 18M10.6 10.7a2 2 0 002.7 2.7" />
+                          <path
+                            d="M9.4 5.2A9.5 9.5 0 0112 5c5 0 9 4.5 9 7a12 12 0 01-2.2 3M6.2 6.2A12.6 12.6 0 003 12c0 2.5 4 7 9 7a9.7 9.7 0 003.4-.6"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="a-name">Italy 2022 summary</div>
+                    <div class="a-sub">42 photos · <span class="hid">Hidden</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="cap">
+            <span class="step">Space albums · searching</span>
+            <h3>Type to filter instantly</h3>
+            <p>
+              Client-side filter on the already-loaded list — no waiting. A live <b>count</b> and a
+              <b>clear ✕</b> confirm the query; sort still applies within the results.
+            </p>
+          </div>
+        </div>
+
+        <!-- FRAME 4: spaces browse -->
+        <div class="figure">
+          <div class="device">
+            <div class="screen">
+              <div class="notch"></div>
+              <div class="status">
+                <span>9:41</span><span class="sig"><i></i><i></i><i></i> 5G</span>
+              </div>
+              <div class="appbar">
+                <div class="title" style="padding-left: 12px">Spaces</div>
+              </div>
+              <div class="controls">
+                <div class="searchfield">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="M21 21l-4.3-4.3" />
+                  </svg>
+                  <span class="ph">Search spaces</span>
+                </div>
+                <div class="sortrow">
+                  <span class="result-count">3 spaces</span>
+                  <div class="sortbtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                      <path d="M3 6h10M3 12h7M3 18h4M18 15l3 3 3-3M21 6v12" transform="translate(-3 0)" /></svg
+                    ><span class="lab">Sort:</span> <span class="val">Recent activity</span>
+                  </div>
+                </div>
+              </div>
+              <div class="gridscroll">
+                <div class="spacelist">
+                  <div class="spacecard">
+                    <div class="spacecover" style="background: linear-gradient(135deg, #5566d6, #c76b86 90%)">
+                      <span class="newbadge">2 new</span>
+                    </div>
+                    <div class="spacemeta">
+                      <div class="s-name">Aurelia und Pierre</div>
+                      <div class="s-sub">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <rect x="3" y="4" width="18" height="16" rx="2.5" />
+                          <path d="M3 9h18" /></svg
+                        >21 albums<span class="sep"></span>3,842 photos<span class="sep"></span>2 members
+                      </div>
+                    </div>
+                  </div>
+                  <div class="spacecard">
+                    <div class="spacecover" style="background: linear-gradient(135deg, #3f8f9c, #5c9e5f 90%)"></div>
+                    <div class="spacemeta">
+                      <div class="s-name">Family</div>
+                      <div class="s-sub">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <rect x="3" y="4" width="18" height="16" rx="2.5" />
+                          <path d="M3 9h18" /></svg
+                        >7 albums<span class="sep"></span>1,157 photos<span class="sep"></span>5 members
+                      </div>
+                    </div>
+                  </div>
+                  <div class="spacecard">
+                    <div class="spacecover" style="background: linear-gradient(135deg, #b7743f, #7b6bb0 90%)"></div>
+                    <div class="spacemeta">
+                      <div class="s-name">Hiking crew</div>
+                      <div class="s-sub">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <rect x="3" y="4" width="18" height="16" rx="2.5" />
+                          <path d="M3 9h18" /></svg
+                        >4 albums<span class="sep"></span>604 photos<span class="sep"></span>8 members
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="fab">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div class="cap">
+            <span class="step">Spaces · default</span>
+            <h3>The Spaces list gets the same treatment</h3>
+            <p>
+              Identical search + sort, defaulting to <b>Recent activity</b>. The create <b>＋</b> FAB and empty state
+              stay put. Handy once you have more than a few spaces.
+            </p>
+          </div>
+        </div>
+
+        <!-- FRAME 5: spaces sort menu -->
+        <div class="figure">
+          <div class="device">
+            <div class="screen">
+              <div class="notch"></div>
+              <div class="status">
+                <span>9:41</span><span class="sig"><i></i><i></i><i></i> 5G</span>
+              </div>
+              <div class="appbar">
+                <div class="title" style="padding-left: 12px">Spaces</div>
+              </div>
+              <div class="controls">
+                <div class="searchfield">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="M21 21l-4.3-4.3" />
+                  </svg>
+                  <span class="ph">Search spaces</span>
+                </div>
+                <div class="sortrow">
+                  <span class="result-count">3 spaces</span>
+                  <div class="sortbtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                      <path d="M3 6h10M3 12h7M3 18h4M18 15l3 3 3-3M21 6v12" transform="translate(-3 0)" /></svg
+                    ><span class="lab">Sort:</span> <span class="val">Recent activity</span>
+                  </div>
+                </div>
+              </div>
+              <div class="gridscroll">
+                <div class="spacelist">
+                  <div class="spacecard">
+                    <div class="spacecover" style="background: linear-gradient(135deg, #5566d6, #c76b86 90%)"></div>
+                    <div class="spacemeta">
+                      <div class="s-name">Aurelia und Pierre</div>
+                      <div class="s-sub">21 albums<span class="sep"></span>2 members</div>
+                    </div>
+                  </div>
+                  <div class="spacecard">
+                    <div class="spacecover" style="background: linear-gradient(135deg, #3f8f9c, #5c9e5f 90%)"></div>
+                    <div class="spacemeta">
+                      <div class="s-name">Family</div>
+                      <div class="s-sub">7 albums<span class="sep"></span>5 members</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="scrim"></div>
+              <div class="menu" style="top: 150px">
+                <div class="mh">Sort spaces by</div>
+                <div class="mi"><span class="tick"></span><span class="lbl">Name</span></div>
+                <div class="mi sel">
+                  <span class="tick"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.4"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M5 12l5 5L20 6" /></svg></span
+                  ><span class="lbl">Recent activity</span
+                  ><span class="dir"
+                    ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                      <path d="M12 5v14M6 13l6 6 6-6" /></svg
+                  ></span>
+                </div>
+                <div class="mi"><span class="tick"></span><span class="lbl">Date created</span></div>
+                <div class="mi"><span class="tick"></span><span class="lbl">Members</span></div>
+                <div class="mi"><span class="tick"></span><span class="lbl">Photos</span></div>
+              </div>
+              <div class="fab">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div class="cap">
+            <span class="step">Spaces · sort menu</span>
+            <h3>Five sort modes for spaces</h3>
+            <p>
+              Name, Recent activity, Date created, Members and Photos — all from fields the app already has. Your chosen
+              mode + direction is <b>remembered</b> between visits.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <b>Scope note.</b> No server or sync changes — both lists are already fully loaded on-device, so search and sort
+        run instantly client-side. The album date sorts reuse Drift columns that already exist. This is a mock for
+        sign-off, not the final Flutter build.
+      </footer>
+    </div>
+  </body>
+</html>

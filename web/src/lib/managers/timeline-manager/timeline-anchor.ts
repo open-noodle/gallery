@@ -63,12 +63,20 @@ export function getTimelineTopVisibleAnchor(timelineManager: TimelineManager): T
 
   const { scrollTop } = timelineManager;
 
+  // When the viewport top sits above the first card/month, the top section (e.g. the memories
+  // strip) is showing and there is nothing to anchor to. Return undefined so callers keep the
+  // current top position instead of scrolling down past the top section on a grouping change.
   if (timelineManager.grouping === 'day') {
     const months = timelineManager.months;
     if (!months || months.length === 0) {
       return undefined;
     }
-    const month = months.find((month) => scrollTop >= month.top && scrollTop < month.top + month.height) ?? months[0];
+    const month =
+      months.find((month) => scrollTop >= month.top && scrollTop < month.top + month.height) ??
+      (scrollTop < months[0].top ? undefined : months[0]);
+    if (!month) {
+      return undefined;
+    }
     return { year: month.yearMonth.year, month: month.yearMonth.month };
   }
 
@@ -77,7 +85,11 @@ export function getTimelineTopVisibleAnchor(timelineManager: TimelineManager): T
     return undefined;
   }
   const bucket =
-    buckets.find((bucket) => scrollTop >= bucket.top && scrollTop < bucket.top + bucket.height) ?? buckets[0];
+    buckets.find((bucket) => scrollTop >= bucket.top && scrollTop < bucket.top + bucket.height) ??
+    (scrollTop < buckets[0].top ? undefined : buckets[0]);
+  if (!bucket) {
+    return undefined;
+  }
 
   return bucket.date.month === undefined
     ? { year: bucket.date.year }

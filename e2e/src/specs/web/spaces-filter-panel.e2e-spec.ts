@@ -101,9 +101,9 @@ test.describe('Spaces FilterPanel', () => {
       const { space } = await createPopulatedSpace('Expanded Default');
       await gotoSpace(context, page, space.id);
 
-      // Panel should be expanded (discovery-panel visible, not collapsed-icon-strip)
+      // Panel should be expanded (discovery-panel visible, no filter-toggle-btn)
       await expect(page.locator('[data-testid="discovery-panel"]')).toBeVisible();
-      await expect(page.locator('[data-testid="collapsed-icon-strip"]')).not.toBeVisible();
+      await expect(page.locator('[data-testid="filter-toggle-btn"]')).toHaveCount(0);
     });
   });
 
@@ -1351,19 +1351,18 @@ test.describe('Spaces FilterPanel', () => {
   // Collapsed panel (7 tests)
   // ────────────────────────────────────────────────────────────────────────────
   test.describe('Collapsed panel', () => {
-    test('should shrink to 32px icon strip when clicking collapse button', async ({ context, page }) => {
+    test('should collapse to the header filter button when clicking collapse', async ({ context, page }) => {
       const { space } = await createPopulatedSpace('Collapse Panel');
       await gotoSpace(context, page, space.id);
 
       // Click collapse button
       await page.locator('[data-testid="collapse-panel-btn"]').click();
 
-      // Expanded panel should be hidden, collapsed strip visible
-      await expect(page.locator('[data-testid="discovery-panel"]')).not.toBeVisible();
-      await expect(page.locator('[data-testid="collapsed-icon-strip"]')).toBeVisible();
+      // Collapsed: header filter button should be visible
+      await expect(page.locator('[data-testid="filter-toggle-btn"]')).toBeVisible();
     });
 
-    test('should show badge dot on people icon when person filter is active', async ({ context, page }) => {
+    test('should show an active dot on the filter button when a person filter is active', async ({ context, page }) => {
       const space = await utils.createSpace(admin.accessToken, { name: 'Badge People' });
       const asset = await utils.createAsset(admin.accessToken);
       await utils.addSpaceAssets(admin.accessToken, space.id, [asset.id]);
@@ -1377,17 +1376,14 @@ test.describe('Spaces FilterPanel', () => {
 
         // Collapse panel
         await page.locator('[data-testid="collapse-panel-btn"]').click();
-        await expect(page.locator('[data-testid="collapsed-icon-strip"]')).toBeVisible();
+        await expect(page.locator('[data-testid="filter-toggle-btn"]')).toBeVisible();
 
-        // Badge dot should appear (8x8 circle with primary bg)
-        const badges = page.locator(
-          String.raw`[data-testid="collapsed-icon-strip"] .absolute.rounded-full.bg-\[var\(--primary\)\]`,
-        );
-        expect(await badges.count()).toBeGreaterThan(0);
+        // Active dot should appear on the filter button
+        await expect(page.locator('[data-testid="filter-toggle-btn"] span.rounded-full')).toHaveCount(1);
       }
     });
 
-    test('should show badge dot on location icon when city filter is active', async ({ context, page }) => {
+    test('should show an active dot on the filter button when a city filter is active', async ({ context, page }) => {
       const { space } = await createPopulatedSpace('Badge Location');
       await gotoSpace(context, page, space.id);
 
@@ -1397,43 +1393,39 @@ test.describe('Spaces FilterPanel', () => {
 
         // Collapse panel
         await page.locator('[data-testid="collapse-panel-btn"]').click();
-        await expect(page.locator('[data-testid="collapsed-icon-strip"]')).toBeVisible();
+        await expect(page.locator('[data-testid="filter-toggle-btn"]')).toBeVisible();
 
-        // At least one badge dot should appear
-        const badges = page.locator('[data-testid="collapsed-icon-strip"] .absolute.rounded-full');
-        expect(await badges.count()).toBeGreaterThan(0);
+        // An active dot should appear on the filter button
+        await expect(page.locator('[data-testid="filter-toggle-btn"] span.rounded-full')).toHaveCount(1);
       }
     });
 
-    test('should show no badge on camera icon when no camera filter is active', async ({ context, page }) => {
+    test('should show no active dot on the filter button when no filter is active', async ({ context, page }) => {
       const { space } = await createPopulatedSpace('No Camera Badge');
       await gotoSpace(context, page, space.id);
 
       // Don't apply any filter, just collapse
       await page.locator('[data-testid="collapse-panel-btn"]').click();
-      await expect(page.locator('[data-testid="collapsed-icon-strip"]')).toBeVisible();
+      await expect(page.locator('[data-testid="filter-toggle-btn"]')).toBeVisible();
 
-      // No badges should appear when no filters are active
-      const badges = page.locator(
-        String.raw`[data-testid="collapsed-icon-strip"] .absolute.rounded-full.bg-\[var\(--primary\)\]`,
-      );
-      await expect(badges).toHaveCount(0);
+      // No active dot should appear when no filters are active
+      await expect(page.locator('[data-testid="filter-toggle-btn"] span.rounded-full')).toHaveCount(0);
     });
 
-    test('should expand panel when clicking icon in collapsed strip', async ({ context, page }) => {
+    test('should expand the panel when clicking the header filter button', async ({ context, page }) => {
       const { space } = await createPopulatedSpace('Expand From Strip');
       await gotoSpace(context, page, space.id);
 
       // Collapse
       await page.locator('[data-testid="collapse-panel-btn"]').click();
-      await expect(page.locator('[data-testid="collapsed-icon-strip"]')).toBeVisible();
+      await expect(page.locator('[data-testid="filter-toggle-btn"]')).toBeVisible();
 
-      // Click expand button
-      await page.locator('[data-testid="expand-panel-btn"]').click();
+      // Click the header filter button to expand
+      await page.locator('[data-testid="filter-toggle-btn"]').click();
 
       // Panel should be expanded again
       await expect(page.locator('[data-testid="discovery-panel"]')).toBeVisible();
-      await expect(page.locator('[data-testid="collapsed-icon-strip"]')).not.toBeVisible();
+      await expect(page.locator('[data-testid="filter-toggle-btn"]')).toHaveCount(0);
     });
 
     test('should preserve all filters after expanding from collapsed state', async ({ context, page }) => {
@@ -1447,28 +1439,25 @@ test.describe('Spaces FilterPanel', () => {
 
       // Collapse and expand
       await page.locator('[data-testid="collapse-panel-btn"]').click();
-      await expect(page.locator('[data-testid="collapsed-icon-strip"]')).toBeVisible();
+      await expect(page.locator('[data-testid="filter-toggle-btn"]')).toBeVisible();
 
-      await page.locator('[data-testid="expand-panel-btn"]').click();
+      await page.locator('[data-testid="filter-toggle-btn"]').click();
       await expect(page.locator('[data-testid="discovery-panel"]')).toBeVisible();
 
       // Filters should still be active
       await expect(page.locator('[data-testid="active-chip"]')).toHaveCount(2);
     });
 
-    test('should show no badge dots when collapsed with no filters active', async ({ context, page }) => {
+    test('should show no active dot when collapsed with no filters active', async ({ context, page }) => {
       const { space } = await createPopulatedSpace('No Badges Collapsed');
       await gotoSpace(context, page, space.id);
 
       // Don't apply any filters
       await page.locator('[data-testid="collapse-panel-btn"]').click();
-      await expect(page.locator('[data-testid="collapsed-icon-strip"]')).toBeVisible();
+      await expect(page.locator('[data-testid="filter-toggle-btn"]')).toBeVisible();
 
-      // No badge dots
-      const badges = page.locator(
-        String.raw`[data-testid="collapsed-icon-strip"] .absolute.rounded-full.bg-\[var\(--primary\)\]`,
-      );
-      await expect(badges).toHaveCount(0);
+      // No active dot
+      await expect(page.locator('[data-testid="filter-toggle-btn"] span.rounded-full')).toHaveCount(0);
     });
   });
 
@@ -1529,7 +1518,7 @@ test.describe('Spaces FilterPanel', () => {
 
       // Filter panel should be hidden when space has no assets
       await expect(page.locator('[data-testid="discovery-panel"]')).not.toBeVisible();
-      await expect(page.locator('[data-testid="collapsed-icon-strip"]')).not.toBeVisible();
+      await expect(page.locator('[data-testid="filter-toggle-btn"]')).toHaveCount(0);
     });
 
     test('should show empty messages in location and camera sections when space has no EXIF data', async ({
@@ -1593,9 +1582,9 @@ test.describe('Spaces FilterPanel', () => {
 
       // Rapidly collapse and expand
       await page.locator('[data-testid="collapse-panel-btn"]').click();
-      await page.locator('[data-testid="expand-panel-btn"]').click();
+      await page.locator('[data-testid="filter-toggle-btn"]').click();
       await page.locator('[data-testid="collapse-panel-btn"]').click();
-      await page.locator('[data-testid="expand-panel-btn"]').click();
+      await page.locator('[data-testid="filter-toggle-btn"]').click();
 
       // Filter should still be active
       await expect(page.locator('[data-testid="active-chip"]')).toHaveCount(1);
@@ -1617,7 +1606,7 @@ test.describe('Spaces FilterPanel', () => {
 
       // Navigate back
       await page.goto(`/spaces/${space.id}`);
-      await page.waitForSelector('[data-testid="discovery-panel"], [data-testid="collapsed-icon-strip"]');
+      await page.waitForSelector('[data-testid="discovery-panel"], [data-testid="filter-toggle-btn"]');
 
       // Filters should be reset (not persisted)
       await expect(page.locator('[data-testid="active-chip"]')).toHaveCount(0);

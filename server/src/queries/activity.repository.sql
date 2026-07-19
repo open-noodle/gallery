@@ -25,7 +25,13 @@ from
   left join "asset" on "asset"."id" = "activity"."assetId"
 where
   "activity"."albumId" = $1
-  and "asset"."deletedAt" is null
+  and (
+    (
+      "asset"."deletedAt" is null
+      and "asset"."visibility" in ('archive', 'timeline')
+    )
+    or "asset"."id" is null
+  )
 order by
   "activity"."createdAt" asc
 
@@ -81,7 +87,29 @@ where
   and (
     (
       "asset"."deletedAt" is null
-      and "asset"."visibility" != 'locked'
+      and "asset"."visibility" in ('archive', 'timeline')
     )
     or "asset"."id" is null
+  )
+
+-- ActivityRepository.getStatistics
+select
+  count(*) filter (
+    where
+      "activity"."isLiked" = $1
+  ) as "comments",
+  count(*) filter (
+    where
+      "activity"."isLiked" = $2
+  ) as "likes"
+from
+  "activity"
+  inner join "user" on "user"."id" = "activity"."userId"
+  and "user"."deletedAt" is null
+  left join "asset" on "asset"."id" = "activity"."assetId"
+where
+  "activity"."albumId" = $3
+  and (
+    "asset"."deletedAt" is null
+    and "asset"."visibility" in ('archive', 'timeline')
   )
