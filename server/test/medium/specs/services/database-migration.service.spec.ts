@@ -1,5 +1,5 @@
 import { createPostgres, DatabaseConnectionParams } from '@immich/sql-tools';
-import { FileMigrationProvider, Kysely, Migrator } from 'kysely';
+import { FileMigrationProvider, Kysely, Migrator, sql } from 'kysely';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ConfigRepository } from 'src/repositories/config.repository';
@@ -202,6 +202,37 @@ describe('Database Migration Scenarios', () => {
       const afterRerun = await repo.getMigrations();
 
       expect(afterRerun.length).toBe(afterRevert.length + 1);
+    } finally {
+      await db.destroy();
+    }
+  });
+
+  // Scenario H: the fork migration disables PostgreSQL JIT for the connecting role.
+  // JIT-compiling the high-cost (but fast-executing) cross-space People aggregates
+  // adds a ~2s per-backend LLVM penalty; jit=off makes the People page ~4x faster
+  // and regresses nothing (see 1783628194057-DisablePostgresJit).
+  it('should disable PostgreSQL JIT for the connecting role', async () => {
+    const dbName = 'migration_test_jit';
+    const setup = await createRawDatabase(dbName);
+    await createRepo(setup).runMigrations();
+    await setup.destroy();
+
+    // Open a fresh connection, as the app pool would, after the migration ran.
+    // ALTER ROLE ... SET applies to new connections, so this reflects runtime behavior.
+    const testUrl = process.env.IMMICH_TEST_POSTGRES_URL!;
+    const templateDb = testUrl.split('/').pop()!;
+    const db = new Kysely<DB>(
+      getKyselyConfig({ connectionType: 'url', url: testUrl.replace(`/${templateDb}`, `/${dbName}`) }),
+    );
+    try {
+      const { rows } = await sql<{ jit: string; configured: boolean }>`
+        SELECT current_setting('jit') AS jit,
+               EXISTS (
+                 SELECT 1 FROM pg_roles WHERE rolname = current_user AND 'jit=off' = ANY (rolconfig)
+               ) AS configured
+      `.execute(db);
+      expect(rows[0].configured).toBe(true);
+      expect(rows[0].jit).toBe('off');
     } finally {
       await db.destroy();
     }
