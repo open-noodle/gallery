@@ -77,6 +77,14 @@ jobs:
           # references a not-yet-uploaded asset.
           cd build
 
+          # Safety net: never prune against an empty build. If the artifact ever
+          # unzipped to nothing, the orphan diff (remote - local) would treat the
+          # whole zone as orphans and delete everything → blank site. Refuse
+          # before uploading or deleting anything.
+          if [ -z "$(find . -type f | head -1)" ]; then
+            echo "::error::build/ is empty — refusing to deploy (would wipe the zone)"; exit 1
+          fi
+
           echo "Uploading build/ (assets first, HTML last) ..."
           { find . -type f ! -name '*.html'; find . -type f -name '*.html'; } \
             | sed 's|^\./||' \
