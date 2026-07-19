@@ -11,7 +11,7 @@
   import SearchPeople from '$lib/components/faces-page/PeopleSearch.svelte';
   import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
-  import { QueryParameter, SessionStorageKey } from '$lib/constants';
+  import { PEOPLE_PAGE_SIZE, QueryParameter, SessionStorageKey } from '$lib/constants';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import PersonMergeSuggestionModal from '$lib/modals/PersonMergeSuggestionModal.svelte';
@@ -99,7 +99,12 @@
           handlePromiseError(
             Promise.all(
               Array.from({ length: pagesToLoad }, (_, i) => {
-                return getAllPeople({ withHidden: true, withSharedSpaces: true, page: startingPage + i });
+                return getAllPeople({
+                  withHidden: true,
+                  withSharedSpaces: true,
+                  page: startingPage + i,
+                  size: PEOPLE_PAGE_SIZE,
+                });
               }),
             ).then((pages) => {
               for (const page of pages) {
@@ -127,6 +132,7 @@
         withHidden: true,
         withSharedSpaces: true,
         page: nextPage,
+        size: PEOPLE_PAGE_SIZE,
       });
       people = people.concat(newPeople);
       if (nextPage !== null) {
