@@ -83,6 +83,13 @@ export enum OpenQueryParam {
 
 export const maximumLengthSearchPeople = 100;
 
+// Number of people fetched per page on the global People page. Every `getAllPeople` call that
+// participates in that page's pagination (initial load, infinite-scroll next page, and the
+// restore-on-return catch-up) MUST share this value — the server paginates by `page * size`, so a
+// mismatch between call sites would skip or duplicate people across page boundaries. Kept modest so
+// first paint hydrates/serializes/transfers a small batch; the rest streams in on scroll.
+export const PEOPLE_PAGE_SIZE = 150;
+
 export const MAX_SPACE_ASSETS_PER_REQUEST = 50_000;
 
 // time to load the map before displaying the loading spinner
