@@ -1826,6 +1826,132 @@ describe(AssetRepository.name, () => {
     });
   });
 
+  // C5 investigation resolved SAFE: the album arm is not a divergence surface for trash/stack —
+  // both are filtered/collapsed once at the `asset` root (withTimeBucketAssetFilters), uniformly
+  // across every arm (direct / library / album), matching the normal (non-space) album grid which
+  // uses the same getTimeBucket `albumId` path. Pin it so a future album-arm rewrite can't silently
+  // start over/under-surfacing trashed or stacked album assets in the space timeline.
+  describe('getTimeBucket — C5 album-arm trash + stack parity', () => {
+    it('a soft-deleted album asset drops out of the space timeline bucket (album-linked-into-space path)', async () => {
+      const { ctx, sut } = setup();
+      const sharedSpaceRepo = ctx.get(SharedSpaceRepository);
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const memberAuth = factory.auth({ user: { id: member.id } });
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'C5TrashParityAlbum' });
+      const bucketDate = new Date('2026-04-15T12:00:00.000Z');
+      const alive = await createTimelineAsset(ctx, owner.id, bucketDate);
+      const trashed = await createTimelineAsset(ctx, owner.id, bucketDate, { deletedAt: new Date() });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: alive.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: trashed.id });
+      await sharedSpaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+
+      const bucket = await sut.getTimeBucket(
+        '2026-04-01',
+        {
+          userIds: [member.id],
+          timelineSpaceIds: [space.id],
+          visibility: AssetVisibility.Timeline,
+        },
+        memberAuth,
+      );
+
+      const ids = (JSON.parse(bucket.assets) as TimeBucketAssets).id ?? [];
+      expect(ids).toContain(alive.id);
+      expect(ids).not.toContain(trashed.id);
+    });
+
+    it('collapses a stacked child album asset in the space timeline bucket, matching the normal album grid', async () => {
+      const { ctx, sut } = setup();
+      const sharedSpaceRepo = ctx.get(SharedSpaceRepository);
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const ownerAuth = factory.auth({ user: { id: owner.id } });
+      const memberAuth = factory.auth({ user: { id: member.id } });
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'C5StackParityAlbum' });
+      const bucketDate = new Date('2026-04-15T12:00:00.000Z');
+      const primary = await createTimelineAsset(ctx, owner.id, bucketDate);
+      const child = await createTimelineAsset(ctx, owner.id, bucketDate);
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: primary.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: child.id });
+      await ctx.newStack({ ownerId: owner.id }, [primary.id, child.id]);
+      await sharedSpaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+
+      // Space timeline bucket (album-linked-into-space path), requested by a non-owner member —
+      // isolates the album arm since the member owns nothing directly.
+      const spaceBucket = await sut.getTimeBucket(
+        '2026-04-01',
+        {
+          userIds: [member.id],
+          timelineSpaceIds: [space.id],
+          visibility: AssetVisibility.Timeline,
+          withStacked: true,
+        },
+        memberAuth,
+      );
+      const spaceIds = (JSON.parse(spaceBucket.assets) as TimeBucketAssets).id ?? [];
+
+      // Normal (non-space) album grid for the identical fixture.
+      const albumBucket = await sut.getTimeBucket(
+        '2026-04-01',
+        {
+          userIds: [owner.id],
+          albumId: album.id,
+          visibility: AssetVisibility.Timeline,
+          withStacked: true,
+        },
+        ownerAuth,
+      );
+      const albumIds = (JSON.parse(albumBucket.assets) as TimeBucketAssets).id ?? [];
+
+      expect(spaceIds).toEqual([primary.id]);
+      expect(spaceIds).not.toContain(child.id);
+      expect(albumIds).toEqual(spaceIds);
+    });
+  });
+
+  // H1 belt-and-suspenders: timeline.service.ts's timeBucketChecks already rejects
+  // isTrashed=true on an albumId browse at the service boundary (Slice 1 / H1). This test calls
+  // the repository directly with an options shape that can only reach it if that guard is
+  // bypassed, proving the album arm's own `deletedAt IS NULL` gate holds independently.
+  describe('getTimeBucket — album arm trash gate belt-and-suspenders (Slice 1 / H1)', () => {
+    it('never surfaces a trashed album asset via the explicit albumId arm, even with isTrashed=true', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'H1BeltAlbum' });
+      const bucketDate = new Date('2026-04-15T12:00:00.000Z');
+      const alive = await createTimelineAsset(ctx, owner.id, bucketDate);
+      const trashed = await createTimelineAsset(ctx, owner.id, bucketDate, { deletedAt: new Date() });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: alive.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: trashed.id });
+
+      const ownerAuth = factory.auth({ user: { id: owner.id } });
+
+      const bucket = await sut.getTimeBucket(
+        '2026-04-01',
+        {
+          userIds: [owner.id],
+          albumId: album.id,
+          visibility: AssetVisibility.Timeline,
+          isTrashed: true,
+        },
+        ownerAuth,
+      );
+
+      const ids = (JSON.parse(bucket.assets) as TimeBucketAssets).id ?? [];
+      // The top-level isTrashed ternary already excludes `alive` (no deletedAt); the album arm's
+      // own gate must ALSO exclude `trashed` — pre-fix, the album arm had no deletedAt condition,
+      // so `trashed` alone satisfied `deletedAt IS NOT NULL AND album_asset match`, leaking it.
+      expect(ids).toEqual([]);
+    });
+  });
+
   describe('getTimeBucket with spacePersonIds', () => {
     it('should only return assets whose matching face is visible and not deleted when filtering by spacePersonId', async () => {
       const { ctx, sut } = setup();

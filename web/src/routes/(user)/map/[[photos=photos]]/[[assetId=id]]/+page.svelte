@@ -4,7 +4,13 @@
   import { page } from '$app/state';
   import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
-  import { clearFilters, createFilterState, getActiveFilterCount } from '$lib/components/filter-panel/filter-panel';
+  import FilterToggleButton from '$lib/components/filter-panel/filter-toggle-button.svelte';
+  import {
+    clearFilters,
+    createFilterState,
+    getActiveFilterCount,
+    loadFilterCollapsed,
+  } from '$lib/components/filter-panel/filter-panel';
   import type { FilterState } from '$lib/components/filter-panel/filter-panel';
   import { handlePhotosRemoveFilter } from '$lib/utils/photos-filter-options';
   import { buildMapMarkerOptions, buildMapTimeBucketOptions } from '$lib/utils/map-filter-options';
@@ -95,6 +101,10 @@
     };
   });
   const hasActiveFilters = $derived(getActiveFilterCount(filters) > 0 || committedQuery.trim().length > 0);
+
+  // Desktop filter-panel collapse — driven from a header filter button so the collapsed panel doesn't
+  // float over the map's own controls (mobile keeps its separate drawer toggle).
+  let filterCollapsed = $state(loadFilterCollapsed());
   const noResults = $derived(mapMarkers.length === 0 && hasActiveFilters);
 
   const handleAddAllToCollection = () => {
@@ -290,6 +300,17 @@
         </button>
       {/if}
     {/snippet}
+    {#snippet descriptionTrailing()}
+      <!-- Filter toggle right after the "Map" title: descriptionTrailing renders inside the title
+           cluster, so the button sits next to the title without shifting it (leading) or drifting to
+           the far right (buttons). -ms-6 pulls it back over the title's built-in pe-8 trailing pad so
+           it sits snug against "Map". -->
+      {#if !isMobile && filterCollapsed}
+        <div class="-ms-6">
+          <FilterToggleButton active={getActiveFilterCount(filters) > 0} onExpand={() => (filterCollapsed = false)} />
+        </div>
+      {/if}
+    {/snippet}
     <OnEvents
       onAssetsDelete={() => {
         filters = { ...filters };
@@ -299,6 +320,8 @@
       {#if !isMobile}
         <FilterPanel
           bind:filters
+          bind:collapsed={filterCollapsed}
+          externalToggle
           config={filterConfig}
           {timeBuckets}
           storageKey="gallery-filter-visible-sections-map"

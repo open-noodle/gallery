@@ -16,6 +16,17 @@ const offlineKysely = () =>
 describe(MemoryRepository.name, () => {
   const sut = new MemoryRepository(offlineKysely());
 
+  describe('accessibleSearchBuilder', () => {
+    it('album arm requires showInTimeline on memory projection surfaces', () => {
+      const sut = new MemoryRepository(offlineKysely());
+      const query = (sut as any)
+        .accessibleSearchBuilder('00000000-0000-0000-0000-000000000000', {})
+        .select((eb: any) => eb.lit(1).as('one'))
+        .compile();
+      expect(query.sql).toContain('"showInTimeline" = ');
+    });
+  });
+
   describe('searchBuilder', () => {
     it('excludes future scheduled memories when no date filter is provided', () => {
       const now = vi.spyOn(DateTime, 'now').mockReturnValue(DateTime.fromISO('2026-04-30T12:00:00Z') as DateTime<true>);

@@ -12,6 +12,11 @@ import { PersonGroupTable } from 'src/schema/tables/person-group.table';
 import { PersonTable } from 'src/schema/tables/person.table';
 import { asUuid, dummy, inSharedAlbum, removeUndefinedKeys, withFilePath } from 'src/utils/database';
 import { paginationHelper, PaginationOptions } from 'src/utils/pagination';
+import {
+  spaceAssetPathBranches,
+  spaceVisibilityGate,
+  spaceVisibleAssetVisibilities,
+} from 'src/utils/shared-space-album-scope';
 
 export interface PersonSearchOptions {
   withHidden: boolean;
@@ -62,7 +67,7 @@ export interface PeopleFaceStatisticsOptions {
   minimumFaceCount?: number;
 }
 
-const peopleAssetVisibilities = [AssetVisibility.Archive, AssetVisibility.Timeline];
+const peopleAssetVisibilities = spaceVisibleAssetVisibilities;
 
 const isBlank = (value: string | null | undefined) => !value || value.trim().length === 0;
 
@@ -88,6 +93,12 @@ export interface RepresentativeFaceListOptions {
   personId: string;
   take: number;
   skip: number;
+  /**
+   * Fork RBAC (Slice 2 / M1): when set, restricts results to faces on assets that `memberUserId`
+   * can reach through a shared space AND that pass the shareable-visibility gate. Omit for the
+   * owner's own unscoped picker view.
+   */
+  scope?: { memberUserId: string };
 }
 
 export interface RepresentativeFaceUpdateOptions {
@@ -546,6 +557,24 @@ export class PersonRepository {
           ),
         ),
       )
+      .$if(!!options.scope, (qb) =>
+        qb.where((eb) =>
+          eb.and([
+            // Fork RBAC (Slice 2 / M1): a non-owner (space-granted) caller may only see faces on assets
+            // they can reach through a space AND that pass the shareable visibility gate. Filters faces
+            // matched via BOTH the personId arm and the identity-expansion arm (predicate is on the
+            // joined asset row), so cross-user identity faces are also excluded.
+            spaceVisibilityGate(eb),
+            eb.or(
+              spaceAssetPathBranches(eb, {
+                correlateAssetId: 'asset.id',
+                correlateLibraryId: 'asset.libraryId',
+                scope: { memberUserId: options.scope!.memberUserId },
+              }),
+            ),
+          ]),
+        ),
+      )
       .orderBy('asset.fileCreatedAt', 'desc')
       .orderBy('asset_face.id')
       .offset(options.skip)
@@ -711,8 +740,21 @@ export class PersonRepository {
       .execute();
   }
 
-  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
-  async getStatistics(personGroupId: string, userId: string): Promise<PersonStatistics> {
+  /**
+   * L3: `memberUserId` scopes the count to a space-only reader's reachable assets (own assets are
+   * never included here — a legacy person's assets all belong to `person.ownerId` — so this is a
+   * pure narrowing of the owner's Timeline assets down to the ones the member can actually reach
+   * via a shared space). Omit it for the owner's own unrestricted count.
+   */
+  @GenerateSql(
+    { params: [DummyValue.UUID, DummyValue.UUID] },
+    { params: [DummyValue.UUID, DummyValue.UUID, { memberUserId: DummyValue.UUID }] },
+  )
+  async getStatistics(
+    personGroupId: string,
+    userId: string,
+    options: { memberUserId?: string } = {},
+  ): Promise<PersonStatistics> {
     const result = await this.db
       .selectFrom('asset_face')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
@@ -725,6 +767,17 @@ export class PersonRepository {
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', 'is', true)
       .where('asset_face.personGroupId', '=', personGroupId)
+      .$if(!!options.memberUserId, (qb) =>
+        qb.where((eb) =>
+          eb.or(
+            spaceAssetPathBranches(eb, {
+              correlateAssetId: 'asset.id',
+              correlateLibraryId: 'asset.libraryId',
+              scope: { memberUserId: options.memberUserId! },
+            }),
+          ),
+        ),
+      )
       .executeTakeFirst();
 
     return {

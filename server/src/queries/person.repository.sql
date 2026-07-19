@@ -358,6 +358,72 @@ where
   and "asset_face"."isVisible" is true
   and "asset_face"."personId" = $2
 
+-- PersonRepository.getStatistics
+select
+  count(distinct ("asset"."id")) as "assets",
+  count(distinct ("asset_face"."id")) as "faces"
+from
+  "asset_face"
+  inner join "asset" on "asset"."id" = "asset_face"."assetId"
+where
+  "asset"."visibility" = 'timeline'
+  and "asset"."deletedAt" is null
+  and "asset"."isOffline" = $1
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" is true
+  and "asset_face"."personId" = $2
+  and (
+    exists (
+      select
+        1 as "exists"
+      from
+        "shared_space_asset"
+        inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
+      where
+        "shared_space_member"."userId" = $3::uuid
+        and "shared_space_asset"."assetId" = "asset"."id"
+    )
+    or exists (
+      select
+        1 as "exists"
+      from
+        "shared_space_library"
+        inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_library"."spaceId"
+      where
+        "shared_space_member"."userId" = $4::uuid
+        and "shared_space_library"."libraryId" = "asset"."libraryId"
+    )
+    or (
+      exists (
+        select
+          1 as "exists"
+        from
+          "shared_space_album"
+          inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+          inner join "album" on "album"."id" = "shared_space_album"."albumId"
+          and "album"."deletedAt" is null
+          inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+        where
+          "shared_space_member"."userId" = $5::uuid
+          and "album_asset"."assetId" = "asset"."id"
+      )
+      or exists (
+        select
+          1 as "exists"
+        from
+          "shared_space_album"
+          inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+          and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+          inner join "album" on "album"."id" = "shared_space_album"."albumId"
+          and "album"."deletedAt" is null
+          inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+        where
+          "shared_space_member"."userId" = $6::uuid
+          and "album_space_asset"."assetId" = "asset"."id"
+      )
+    )
+  )
+
 -- PersonRepository.getNumberOfPeople
 WITH
   "eligible_people" AS (
