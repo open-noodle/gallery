@@ -1,6 +1,8 @@
 import type { SharedSpaceResponseDto } from '@immich/sdk';
 import { fireEvent, render, screen } from '@testing-library/svelte';
+import { get } from 'svelte/store';
 import SpaceOnboardingBanner from '$lib/components/spaces/space-onboarding-banner.svelte';
+import { dismissedOnboardingSpaceIds } from '$lib/stores/space-view.store';
 
 const makeSpace = (overrides: Partial<SharedSpaceResponseDto> = {}): SharedSpaceResponseDto => ({
   id: 'space-1',
@@ -29,6 +31,11 @@ const defaultProps = {
 };
 
 describe('SpaceOnboardingBanner', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    dismissedOnboardingSpaceIds.reset();
+  });
+
   it('should render banner when no steps are complete', () => {
     render(SpaceOnboardingBanner, { ...defaultProps, space: makeSpace() });
     expect(screen.getByTestId('onboarding-banner')).toBeInTheDocument();
@@ -226,6 +233,54 @@ describe('SpaceOnboardingBanner', () => {
       expect(screen.getByTestId('step-add-photos-action')).toBeInTheDocument();
       expect(screen.getByTestId('step-invite-members-check')).toBeInTheDocument();
       expect(screen.getByTestId('step-set-cover-check')).toBeInTheDocument();
+    });
+  });
+
+  describe('dismiss', () => {
+    it('should render a dismiss button when the banner is shown', () => {
+      render(SpaceOnboardingBanner, { ...defaultProps, space: makeSpace() });
+      expect(screen.getByTestId('banner-dismiss')).toBeInTheDocument();
+    });
+
+    it('should remove the banner from the DOM when dismiss is clicked', async () => {
+      render(SpaceOnboardingBanner, { ...defaultProps, space: makeSpace() });
+      expect(screen.getByTestId('onboarding-banner')).toBeInTheDocument();
+
+      await fireEvent.click(screen.getByTestId('banner-dismiss'));
+
+      expect(screen.queryByTestId('onboarding-banner')).not.toBeInTheDocument();
+    });
+
+    it('should persist the dismissed space id to localStorage when dismissed', async () => {
+      render(SpaceOnboardingBanner, { ...defaultProps, space: makeSpace({ id: 'space-1' }) });
+
+      await fireEvent.click(screen.getByTestId('banner-dismiss'));
+
+      expect(get(dismissedOnboardingSpaceIds)).toContain('space-1');
+      expect(localStorage.getItem('dismissed-onboarding-space-ids')).toContain('space-1');
+    });
+
+    it('should not render when the space has already been dismissed', () => {
+      dismissedOnboardingSpaceIds.set(['space-1']);
+      render(SpaceOnboardingBanner, { ...defaultProps, space: makeSpace({ id: 'space-1' }) });
+      expect(screen.queryByTestId('onboarding-banner')).not.toBeInTheDocument();
+    });
+
+    it('should be per-space: dismissing one space does not hide another', () => {
+      dismissedOnboardingSpaceIds.set(['space-1']);
+      render(SpaceOnboardingBanner, { ...defaultProps, space: makeSpace({ id: 'space-2' }) });
+      expect(screen.getByTestId('onboarding-banner')).toBeInTheDocument();
+    });
+
+    it('should not add duplicate ids when dismissed twice across renders', async () => {
+      const { unmount } = render(SpaceOnboardingBanner, { ...defaultProps, space: makeSpace({ id: 'space-1' }) });
+      await fireEvent.click(screen.getByTestId('banner-dismiss'));
+      unmount();
+
+      dismissedOnboardingSpaceIds.set(['space-1']);
+      render(SpaceOnboardingBanner, { ...defaultProps, space: makeSpace({ id: 'space-1' }) });
+
+      expect(get(dismissedOnboardingSpaceIds).filter((id) => id === 'space-1')).toHaveLength(1);
     });
   });
 

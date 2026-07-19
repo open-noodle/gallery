@@ -16,6 +16,7 @@ import 'package:immich_mobile/providers/auth.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/current_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/remote_album.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/space_album_actions.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
@@ -99,6 +100,100 @@ class AlbumOptionsPage extends HookConsumerWidget {
 
         ImmichToast.show(context: context, msg: "Failed to add users to album: $e", toastType: ToastType.error);
       }
+    }
+
+    Padding buildSectionTitle(String text) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Text(text, style: context.textTheme.bodySmall),
+      );
+    }
+
+    // M8: mobile album owners can't view/revoke space links. `sharedSpaceLinks` is
+    // owner-only and absent from the Drift sync stream, so it's fetched live via
+    // GET /albums/:id (albumSharedSpaceLinksProvider) purely for owned albums.
+    Future<void> unlinkSpace(String spaceId, String spaceName) async {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text("unlink_album_from_space".t(context: ctx, args: {'space': spaceName})),
+          content: Text("unlink_album_from_space_confirmation".t(context: ctx, args: {'space': spaceName})),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text("cancel".t(context: ctx)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.error),
+              child: Text("spaces_linked_albums_unlink".t(context: ctx)),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) {
+        return;
+      }
+
+      try {
+        await ref.read(spaceAlbumActionsProvider).unlink(spaceId, album.id);
+        ref.invalidate(albumSharedSpaceLinksProvider(album.id));
+        if (context.mounted) {
+          ImmichToast.show(context: context, msg: 'Album unlinked', toastType: ToastType.success);
+        }
+      } catch (_) {
+        if (context.mounted) {
+          ImmichToast.show(
+            context: context,
+            msg: "spaces_linked_albums_error_unlink".t(context: context),
+            toastType: ToastType.error,
+          );
+        }
+      }
+    }
+
+    buildLinkedSpacesList() {
+      final linksAsync = ref.watch(albumSharedSpaceLinksProvider(album.id));
+      return linksAsync.maybeWhen(
+        data: (links) {
+          if (links.isEmpty) {
+            return const SizedBox();
+          }
+
+          return Column(
+            key: const Key('album-linked-spaces-section'),
+            children: [
+              buildSectionTitle("linked_spaces".t(context: context)),
+              ListView.builder(
+                primary: false,
+                shrinkWrap: true,
+                itemCount: links.length,
+                itemBuilder: (context, index) {
+                  final link = links[index];
+                  return ListTile(
+                    key: Key('album-space-link-${link.spaceId}'),
+                    leading: const Icon(Icons.dashboard_customize_rounded),
+                    title: Text(link.spaceName, style: const TextStyle(fontWeight: FontWeight.w500)),
+                    subtitle: link.showInTimeline
+                        ? null
+                        : Text(
+                            "space_albums_hidden_from_timeline".t(context: context),
+                            key: Key('album-space-link-hidden-badge-${link.spaceId}'),
+                            style: TextStyle(color: context.colorScheme.onSurfaceSecondary),
+                          ),
+                    trailing: IconButton(
+                      key: Key('album-space-link-unlink-${link.spaceId}'),
+                      icon: const Icon(Icons.link_off_rounded),
+                      onPressed: () => unlinkSpace(link.spaceId, link.spaceName),
+                    ),
+                  );
+                },
+              ),
+            ],
+          );
+        },
+        orElse: () => const SizedBox(),
+      );
     }
 
     void handleUserClick(UserDto user) {
@@ -195,13 +290,6 @@ class AlbumOptionsPage extends HookConsumerWidget {
       );
     }
 
-    Padding buildSectionTitle(String text) {
-      return Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Text(text, style: context.textTheme.bodySmall),
-      );
-    }
-
     return ProviderScope(
       overrides: [currentRemoteAlbumScopedProvider.overrideWithValue(album)],
       child: Scaffold(
@@ -245,6 +333,10 @@ class AlbumOptionsPage extends HookConsumerWidget {
             ],
             buildOwnerInfo(),
             buildSharedUsersList(),
+            // M8: owner-only recourse to view/revoke the spaces this album is linked into.
+            // Gated on isOwner so non-owners never trigger the GET /albums/:id fetch — the
+            // server would return an empty list for them anyway (rbac-6).
+            if (isOwner) buildLinkedSpacesList(),
           ],
         ),
       ),
