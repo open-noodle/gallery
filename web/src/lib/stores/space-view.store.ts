@@ -19,6 +19,9 @@ export interface SpaceViewSettings {
 
 export const pinnedSpaceIds = persisted<string[]>('pinned-space-ids', []);
 
+// Space ids whose onboarding/setup-steps banner the user has permanently dismissed.
+export const dismissedOnboardingSpaceIds = persisted<string[]>('dismissed-onboarding-space-ids', []);
+
 export const spaceViewSettings = persisted<SpaceViewSettings>('space-view-settings', {
   sortBy: SpaceSortBy.LastActivity,
   sortOrder: SortOrder.Desc,

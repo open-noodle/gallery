@@ -487,6 +487,21 @@ export class JobRepository {
       case JobName.SharedSpaceBulkAddAssets: {
         return { jobId: `bulk-add-${item.data.spaceId}-${item.data.userId}` };
       }
+      case JobName.SharedSpaceAlbumGrantReconcile: {
+        const data = item.data as { albumIds: string[] };
+        return {
+          jobId: `space-album-grant-reconcile-${[...data.albumIds].sort().join(',')}`,
+          removeOnComplete: true,
+          // M6: a hard failure must not leave a permanently-failed job occupying this dedup jobId —
+          // that would silently block every future reconcile for the same album set.
+          removeOnFail: true,
+        };
+      }
+      case JobName.SharedSpaceAlbumGrantReconcileSweep: {
+        // L8: single stable jobId — a nightly trigger while a previous run is still active is a
+        // harmless dedup, and removeOnFail keeps a hard failure from blocking the next run.
+        return { jobId: 'space-album-grant-reconcile-sweep', removeOnComplete: true, removeOnFail: true };
+      }
       case JobName.SharedSpaceFaceMatch: {
         const prefix =
           item.data.source === 'identity-backfill'
@@ -507,6 +522,9 @@ export class JobRepository {
         return {
           jobId: `shared-space-face-match-all/${item.data.spaceId}`,
           removeOnComplete: true,
+          // M6: same rationale as SharedSpaceAlbumGrantReconcile — a failed run must not
+          // permanently occupy the per-space dedup jobId and block later re-projection.
+          removeOnFail: true,
         };
       }
       case JobName.SharedSpaceFaceMatchPage: {

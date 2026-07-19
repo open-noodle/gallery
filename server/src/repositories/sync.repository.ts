@@ -1,10 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { ExpressionBuilder, Kysely, sql } from 'kysely';
+import { Expression, ExpressionBuilder, Kysely, SqlBool, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { columns } from 'src/database';
 import { DummyValue, GenerateSql } from 'src/decorators';
 import { DB } from 'src/schema';
 import { SyncAck } from 'src/types';
+import { asUuid } from 'src/utils/database';
+import { accessibleSpaceAlbums, accessibleSpaces, spaceVisibilityGate } from 'src/utils/shared-space-album-scope';
+
+// Re-export the relocated scoping helpers so existing `sync.repository` importers
+// keep working after the definitions moved to the fork-owned scope module.
 
 export type SyncBackfillOptions = {
   nowId: string;
@@ -78,6 +83,11 @@ export class SyncRepository {
   libraryAsset: LibraryAssetSync;
   libraryAssetExif: LibraryAssetExifSync;
   sharedSpaceLibrary: SharedSpaceLibrarySync;
+  sharedSpaceAlbum: SharedSpaceAlbumSync;
+  sharedSpaceAlbumLink: SharedSpaceAlbumLinkSync;
+  sharedSpaceAlbumToAsset: SharedSpaceAlbumToAssetSync;
+  sharedSpaceAlbumAsset: SharedSpaceAlbumAssetSync;
+  sharedSpaceAlbumAssetExif: SharedSpaceAlbumAssetExifSync;
 
   constructor(@InjectKysely() private db: Kysely<DB>) {
     this.album = new AlbumSync(this.db);
@@ -112,6 +122,11 @@ export class SyncRepository {
     this.libraryAsset = new LibraryAssetSync(this.db);
     this.libraryAssetExif = new LibraryAssetExifSync(this.db);
     this.sharedSpaceLibrary = new SharedSpaceLibrarySync(this.db);
+    this.sharedSpaceAlbum = new SharedSpaceAlbumSync(this.db);
+    this.sharedSpaceAlbumLink = new SharedSpaceAlbumLinkSync(this.db);
+    this.sharedSpaceAlbumToAsset = new SharedSpaceAlbumToAssetSync(this.db);
+    this.sharedSpaceAlbumAsset = new SharedSpaceAlbumAssetSync(this.db);
+    this.sharedSpaceAlbumAssetExif = new SharedSpaceAlbumAssetExifSync(this.db);
   }
 }
 
@@ -862,18 +877,8 @@ class AssetOcrSync extends BaseSync {
 // `SharedSpaceService.create`, so iterating via `shared_space_member` for backfill
 // enumeration is sufficient — the OR'd creator path here is for query filtering
 // only and protects against direct DB inserts that bypass the service.
-export function accessibleSpaces(eb: ExpressionBuilder<DB, keyof DB>, userId: string) {
-  return eb
-    .selectFrom('shared_space')
-    .select('shared_space.id')
-    .where('shared_space.createdById', '=', userId)
-    .union(
-      eb
-        .selectFrom('shared_space_member')
-        .select('shared_space_member.spaceId as id')
-        .where('shared_space_member.userId', '=', userId),
-    );
-}
+// `accessibleSpaces` is defined in the fork-owned scope module and re-exported at
+// the bottom of this file (see the re-export near the imports).
 
 const SHARED_SPACE_SYNC_COLUMNS = [
   'shared_space.id',
@@ -990,21 +995,27 @@ export class SharedSpaceAssetSync extends BaseSync {
   // shared into the space.
   @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID, DummyValue.UUID], stream: true })
   getBackfill(options: SyncBackfillOptions, spaceId: string, userId: string) {
-    return this.backfillQuery('shared_space_asset', options)
-      .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
-      .select(columns.syncSharedSpaceAsset)
-      .select((eb) =>
-        eb
-          .case()
-          .when('asset.ownerId', '=', userId)
-          .then(eb.ref('asset.isFavorite'))
-          .else(eb.val(false))
-          .end()
-          .as('isFavorite'),
-      )
-      .select('shared_space_asset.updateId')
-      .where('shared_space_asset.spaceId', '=', spaceId)
-      .stream();
+    return (
+      this.backfillQuery('shared_space_asset', options)
+        .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+        .select(columns.syncSharedSpaceAsset)
+        .select((eb) =>
+          eb
+            .case()
+            .when('asset.ownerId', '=', userId)
+            .then(eb.ref('asset.isFavorite'))
+            .else(eb.val(false))
+            .end()
+            .as('isFavorite'),
+        )
+        .select('shared_space_asset.updateId')
+        .where('shared_space_asset.spaceId', '=', spaceId)
+        .where((eb) => spaceVisibilityGate(eb))
+        // M-2: never backfill a trashed asset's metadata/thumbhash/EXIF to a space member. getUpdates
+        // stays unfiltered — that's the device-purge convergence channel (asset.updateId bump rides through).
+        .where('asset.deletedAt', 'is', null)
+        .stream()
+    );
   }
 
   // Create-side: stream new (space, asset) pairings the user can access. Each
@@ -1015,21 +1026,27 @@ export class SharedSpaceAssetSync extends BaseSync {
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
   getCreates(options: SyncQueryOptions) {
     const userId = options.userId;
-    return this.upsertQuery('shared_space_asset', options)
-      .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
-      .select(columns.syncSharedSpaceAsset)
-      .select((eb) =>
-        eb
-          .case()
-          .when('asset.ownerId', '=', userId)
-          .then(eb.ref('asset.isFavorite'))
-          .else(eb.val(false))
-          .end()
-          .as('isFavorite'),
-      )
-      .select('shared_space_asset.updateId')
-      .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
-      .stream();
+    return (
+      this.upsertQuery('shared_space_asset', options)
+        .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+        .select(columns.syncSharedSpaceAsset)
+        .select((eb) =>
+          eb
+            .case()
+            .when('asset.ownerId', '=', userId)
+            .then(eb.ref('asset.isFavorite'))
+            .else(eb.val(false))
+            .end()
+            .as('isFavorite'),
+        )
+        .select('shared_space_asset.updateId')
+        .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+        .where((eb) => spaceVisibilityGate(eb))
+        // M-2: getCreates must not introduce a trashed asset a device didn't already have (getUpdates is the
+        // convergence channel for state changes on already-known assets).
+        .where('asset.deletedAt', 'is', null)
+        .stream()
+    );
   }
 
   // Update-side: stream asset metadata changes for assets the client has already
@@ -1055,6 +1072,7 @@ export class SharedSpaceAssetSync extends BaseSync {
       .select('asset.updateId')
       .where('shared_space_asset.updateId', '<=', sharedSpaceToAssetAck.updateId)
       .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+      .where((eb) => spaceVisibilityGate(eb))
       .stream();
   }
   // Note: shared_space_asset_audit cleanup is owned by SharedSpaceToAssetSync below,
@@ -1064,32 +1082,48 @@ export class SharedSpaceAssetSync extends BaseSync {
 export class SharedSpaceAssetExifSync extends BaseSync {
   @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID], stream: true })
   getBackfill(options: SyncBackfillOptions, spaceId: string) {
-    return this.backfillQuery('shared_space_asset', options)
-      .innerJoin('asset_exif', 'asset_exif.assetId', 'shared_space_asset.assetId')
-      .select(columns.syncAssetExif)
-      .select('shared_space_asset.updateId')
-      .where('shared_space_asset.spaceId', '=', spaceId)
-      .stream();
+    return (
+      this.backfillQuery('shared_space_asset', options)
+        .innerJoin('asset_exif', 'asset_exif.assetId', 'shared_space_asset.assetId')
+        .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+        .select(columns.syncAssetExif)
+        .select('shared_space_asset.updateId')
+        .where('shared_space_asset.spaceId', '=', spaceId)
+        .where((eb) => spaceVisibilityGate(eb))
+        // M-2: never backfill a trashed asset's metadata/thumbhash/EXIF to a space member. getUpdates
+        // stays unfiltered — that's the device-purge convergence channel (asset.updateId bump rides through).
+        .where('asset.deletedAt', 'is', null)
+        .stream()
+    );
   }
 
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
   getCreates(options: SyncQueryOptions) {
-    return this.upsertQuery('shared_space_asset', options)
-      .innerJoin('asset_exif', 'asset_exif.assetId', 'shared_space_asset.assetId')
-      .select(columns.syncAssetExif)
-      .select('shared_space_asset.updateId')
-      .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
-      .stream();
+    return (
+      this.upsertQuery('shared_space_asset', options)
+        .innerJoin('asset_exif', 'asset_exif.assetId', 'shared_space_asset.assetId')
+        .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+        .select(columns.syncAssetExif)
+        .select('shared_space_asset.updateId')
+        .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+        .where((eb) => spaceVisibilityGate(eb))
+        // M-2: getCreates must not introduce a trashed asset a device didn't already have (getUpdates is the
+        // convergence channel for state changes on already-known assets).
+        .where('asset.deletedAt', 'is', null)
+        .stream()
+    );
   }
 
   @GenerateSql({ params: [dummyQueryOptions, { updateId: DummyValue.UUID }], stream: true })
   getUpdates(options: SyncQueryOptions, sharedSpaceToAssetAck: SyncAck) {
     return this.upsertQuery('asset_exif', options)
       .innerJoin('shared_space_asset', 'shared_space_asset.assetId', 'asset_exif.assetId')
+      .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
       .select(columns.syncAssetExif)
       .select('asset_exif.updateId')
       .where('shared_space_asset.updateId', '<=', sharedSpaceToAssetAck.updateId)
       .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+      .where((eb) => spaceVisibilityGate(eb))
       .stream();
   }
 }
@@ -1103,18 +1137,32 @@ export class SharedSpaceAssetExifSync extends BaseSync {
 export class SharedSpaceToAssetSync extends BaseSync {
   @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID], stream: true })
   getBackfill(options: SyncBackfillOptions, spaceId: string) {
-    return this.backfillQuery('shared_space_asset', options)
-      .select([
-        'shared_space_asset.assetId as assetId',
-        'shared_space_asset.spaceId as spaceId',
-        'shared_space_asset.updateId',
-      ])
-      .where('shared_space_asset.spaceId', '=', spaceId)
-      .stream();
+    return (
+      this.backfillQuery('shared_space_asset', options)
+        .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+        .select([
+          'shared_space_asset.assetId as assetId',
+          'shared_space_asset.spaceId as spaceId',
+          'shared_space_asset.updateId',
+        ])
+        .where('shared_space_asset.spaceId', '=', spaceId)
+        // correctness-1/security-6: flat visibility gate — never stream a link row for a
+        // Hidden/Locked asset (matches the SharedSpaceAssetSync content sibling; converges on restore).
+        .where((eb) => spaceVisibilityGate(eb))
+        // M-2: don't backfill a link row for a trashed asset either (getUpserts stays the convergence channel).
+        .where('asset.deletedAt', 'is', null)
+        .stream()
+    );
   }
 
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
   getDeletes(options: SyncQueryOptions) {
+    // gaps-5 deliberately NOT owner-gated on this DIRECT arm. shared_space_asset_audit is dual-purpose:
+    // it receives both visibility-purge tombstones (gaps-5 wanted the owner excluded — LOW/benign, restore
+    // round-trips) AND genuine removal tombstones from shared_space_asset_delete_audit (the owner MUST get
+    // these to converge their own other devices). The two are indistinguishable without a discriminator
+    // column (a migration, out of scope), so owner removal-convergence wins and the owner is not gated here.
+    // The owner IS gated on the ALBUM (getDeletes below) and LIBRARY arms, whose audit tables are purge-only.
     return this.auditQuery('shared_space_asset_audit', options)
       .select(['id', 'assetId', 'spaceId'])
       .where('spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
@@ -1127,16 +1175,26 @@ export class SharedSpaceToAssetSync extends BaseSync {
 
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
   getUpserts(options: SyncQueryOptions) {
-    return this.upsertQuery('shared_space_asset', options)
-      .select([
-        'shared_space_asset.assetId as assetId',
-        'shared_space_asset.spaceId as spaceId',
-        'shared_space_asset.updateId',
-      ])
-      .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
-      .stream();
+    return (
+      this.upsertQuery('shared_space_asset', options)
+        .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+        .select([
+          'shared_space_asset.assetId as assetId',
+          'shared_space_asset.spaceId as spaceId',
+          'shared_space_asset.updateId',
+        ])
+        .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+        // correctness-1/security-6: flat visibility gate — a restore's updateId bump must not re-add a
+        // now-Hidden asset after the delete tombstone (resurrection); also blocks the metadata leak.
+        .where((eb) => spaceVisibilityGate(eb))
+        .stream()
+    );
   }
 }
+
+// `accessibleSpaceAlbums` (album-id scope) and `accessibleSpaces` (space-id scope)
+// now live in the fork-owned scope module and are re-exported here for the sync
+// classes below and any other existing importers. See src/utils/shared-space-album-scope.ts.
 
 // `accessibleLibraries` is the source-of-truth scoping subquery used by every
 // library sync class. A user can access a library via direct ownership OR via
@@ -1241,24 +1299,39 @@ export class LibraryAssetSync extends BaseSync {
   // `syncLibraryAssetsV1` service loop when the client has not yet backfilled a
   // newly-accessible library.
   //
-  // isFavorite is masked to the syncing user's own rows (mirrors SharedSpaceAssetSync):
-  // a library member must not learn another owner's favorite flag (issue #743 item 1).
+  // M3 visibility gate: the user always sees ALL visibilities of their own
+  // assets. For OTHER members' assets (reached via the space-link branch of
+  // accessibleLibraries), only Archive and Timeline are streamed.
+  //
+  // L5: isFavorite is masked to the syncing user's own rows (mirrors SharedSpaceAssetSync/
+  // SharedSpaceAlbumAssetSync) — a member syncing another owner's space-linked library must not learn
+  // the owner's true favorite flag for an asset they don't own.
   @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID, DummyValue.UUID], stream: true })
   getBackfill(options: SyncBackfillOptions, libraryId: string, userId: string) {
-    return this.backfillQuery('asset', options)
-      .select(columns.syncLibraryAsset)
-      .select((eb) =>
-        eb
-          .case()
-          .when('asset.ownerId', '=', userId)
-          .then(eb.ref('asset.isFavorite'))
-          .else(eb.val(false))
-          .end()
-          .as('isFavorite'),
-      )
-      .select('asset.updateId')
-      .where('asset.libraryId', '=', libraryId)
-      .stream();
+    return (
+      this.backfillQuery('asset', options)
+        .select(columns.syncLibraryAsset)
+        .select((eb) =>
+          eb
+            .case()
+            .when('asset.ownerId', '=', userId)
+            .then(eb.ref('asset.isFavorite'))
+            .else(eb.val(false))
+            .end()
+            .as('isFavorite'),
+        )
+        .select('asset.updateId')
+        .where('asset.libraryId', '=', libraryId)
+        // M-2: the non-owner (space-link) branch also excludes trashed assets; the owner keeps their own
+        // trashed library assets (owner branch unfiltered). getUpserts stays the convergence channel.
+        .where((eb) =>
+          eb.or([
+            eb('asset.ownerId', '=', userId),
+            eb.and([spaceVisibilityGate(eb), eb('asset.deletedAt', 'is', null)]),
+          ]),
+        )
+        .stream()
+    );
   }
 
   // Single upsert stream for library assets. Mirrors PartnerAssetsSync.getUpserts
@@ -1268,7 +1341,8 @@ export class LibraryAssetSync extends BaseSync {
   // Both initial syncs and subsequent metadata changes flow through this stream
   // as `LibraryAssetCreateV1` events; the client upserts idempotently.
   //
-  // isFavorite is masked to the syncing user's own rows — see getBackfill above.
+  // M3 visibility gate: see getBackfill above.
+  // L5: isFavorite masking — see getBackfill above.
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
   getUpserts(options: SyncQueryOptions) {
     const userId = options.userId;
@@ -1286,6 +1360,7 @@ export class LibraryAssetSync extends BaseSync {
       .select('asset.updateId')
       .where('asset.libraryId', 'is not', null)
       .where('asset.libraryId', 'in', (eb) => accessibleLibraries(eb, userId))
+      .where((eb) => eb.or([eb('asset.ownerId', '=', userId), spaceVisibilityGate(eb)]))
       .stream();
   }
 
@@ -1301,14 +1376,50 @@ export class LibraryAssetSync extends BaseSync {
   // drops all assets locally without needing per-asset events.
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
   getDeletes(options: SyncQueryOptions) {
-    return this.auditQuery('library_asset_audit', options)
+    const { userId, nowId, ack } = options;
+
+    // Existing arm: per-asset deletes from library_asset_audit (triggered when an
+    // asset row is physically deleted from the DB — not a visibility flip).
+    const libraryAssetArm = this.db
+      .selectFrom('library_asset_audit')
       .select(['library_asset_audit.id as id', 'library_asset_audit.assetId as assetId'])
-      .where('library_asset_audit.libraryId', 'in', (eb) => accessibleLibraries(eb, options.userId))
-      .stream();
+      .where('library_asset_audit.id', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('library_asset_audit.id', '>', ack!.updateId))
+      .where('library_asset_audit.libraryId', 'in', (eb) => accessibleLibraries(eb, userId));
+
+    // Space visibility purge arm: tombstones written by emitLibraryAssetVisibilityPurge
+    // when the owner flips a library-linked space asset to Hidden/Locked.
+    // Owner-gated: the library owner never receives a visibility purge for their
+    // own asset — only non-owner space members are purged.
+    const spaceLibraryAssetArm = this.db
+      .selectFrom('shared_space_library_asset_audit')
+      .innerJoin('asset', 'asset.id', 'shared_space_library_asset_audit.assetId')
+      .select(['shared_space_library_asset_audit.id as id', 'shared_space_library_asset_audit.assetId as assetId'])
+      .where('shared_space_library_asset_audit.id', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('shared_space_library_asset_audit.id', '>', ack!.updateId))
+      .where('shared_space_library_asset_audit.libraryId', 'in', (eb) => accessibleLibraries(eb, userId))
+      .where('asset.ownerId', '!=', userId)
+      // security-7: a member who is ALSO the owner's partner keeps partner-entitled access to the asset
+      // (a partner may see Hidden). Do not purge it from their device — exclude assets whose owner shares
+      // with this user via the partner table (sharedById = owner, sharedWithId = this user).
+      .where((eb) =>
+        eb.not(
+          eb.exists(
+            eb
+              .selectFrom('partner')
+              .select(eb.lit(1).as('exists'))
+              .whereRef('partner.sharedById', '=', 'asset.ownerId')
+              .where('partner.sharedWithId', '=', userId),
+          ),
+        ),
+      );
+
+    return libraryAssetArm.union(spaceLibraryAssetArm).orderBy('id', 'asc').stream();
   }
 
-  cleanupAuditTable(daysAgo: number) {
-    return this.auditCleanup('library_asset_audit', daysAgo);
+  async cleanupAuditTable(daysAgo: number) {
+    await this.auditCleanup('library_asset_audit', daysAgo);
+    await this.auditCleanup('shared_space_library_asset_audit', daysAgo);
   }
 }
 
@@ -1318,29 +1429,47 @@ export class LibraryAssetSync extends BaseSync {
 // the album-user boundary. No cleanupAuditTable — there is no dedicated
 // exif audit table (consistent with AlbumAssetExifSync).
 export class LibraryAssetExifSync extends BaseSync {
-  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID], stream: true })
-  getBackfill(options: SyncBackfillOptions, libraryId: string) {
-    return this.backfillQuery('asset', options)
-      .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
-      .select(columns.syncAssetExif)
-      .select('asset.updateId')
-      .where('asset.libraryId', '=', libraryId)
-      .stream();
+  // M3 visibility gate: the user always sees ALL visibilities of their own
+  // assets. For OTHER members' assets (reached via the space-link branch of
+  // accessibleLibraries), only Archive and Timeline are streamed.
+  // backfillQuery('asset', ...) places `asset` as the base table, so the gate
+  // can reference asset.ownerId and asset.visibility directly.
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, libraryId: string, userId: string) {
+    return (
+      this.backfillQuery('asset', options)
+        .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+        .select(columns.syncAssetExif)
+        .select('asset.updateId')
+        .where('asset.libraryId', '=', libraryId)
+        // M-2: the non-owner (space-link) branch also excludes trashed assets; the owner keeps their own
+        // trashed library assets (owner branch unfiltered). getUpserts stays the convergence channel.
+        .where((eb) =>
+          eb.or([
+            eb('asset.ownerId', '=', userId),
+            eb.and([spaceVisibilityGate(eb), eb('asset.deletedAt', 'is', null)]),
+          ]),
+        )
+        .stream()
+    );
   }
 
   // Single upsert stream — same rationale as LibraryAssetSync.getUpserts.
+  //
+  // M3 visibility gate: upsertQuery('asset_exif', ...) places asset_exif as
+  // the base table; we innerJoin asset so asset.ownerId and asset.visibility
+  // are reachable for the M3 gate. The libraryId scope is expressed as a
+  // direct WHERE on asset.libraryId (available after the join) rather than
+  // a subquery, matching the style used by SharedSpaceAssetExifSync.
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
   getUpserts(options: SyncQueryOptions) {
     return this.upsertQuery('asset_exif', options)
+      .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
       .select(columns.syncAssetExif)
       .select('asset_exif.updateId')
-      .where('assetId', 'in', (eb) =>
-        eb
-          .selectFrom('asset')
-          .select('asset.id')
-          .where('asset.libraryId', 'is not', null)
-          .where('asset.libraryId', 'in', (eb2) => accessibleLibraries(eb2, options.userId)),
-      )
+      .where('asset.libraryId', 'is not', null)
+      .where('asset.libraryId', 'in', (eb) => accessibleLibraries(eb, options.userId))
+      .where((eb) => eb.or([eb('asset.ownerId', '=', options.userId), spaceVisibilityGate(eb)]))
       .stream();
   }
 }
@@ -1389,3 +1518,606 @@ export class SharedSpaceLibrarySync extends BaseSync {
       .stream();
   }
 }
+
+// Streams album metadata for albums accessible to the user via the
+// shared_space_album_user grant. The grant table is populated by A2 triggers
+// (create-side) and consumed by A3 triggers (delete-side).
+//
+// NOTE (hybrid-clone gotcha §7): getDeletes reads shared_space_album_user_audit
+// (the gated grant-revocation audit) NOT album_audit. This mirrors
+// LibrarySync.getDeletes which reads library_audit (not album_audit).
+// The grant audit fires when the user LOSES ACCESS to the album
+// (space unlinked or member removed), so it signals "client should drop this
+// album" without requiring the album itself to be deleted.
+export class SharedSpaceAlbumSync extends BaseSync {
+  // Reads shared_space_album_user grant table keyed by createId.
+  // This mirrors AlbumSync.getCreatedAfter (album_user table) and
+  // LibrarySync.getCreatedAfter (library_user table). A fresh grant
+  // row is written for every (userId, albumId) pair when an album is linked
+  // to a space the user belongs to, or when the user joins a space with
+  // existing album links.
+  @GenerateSql({ params: [dummyCreateAfterOptions] })
+  getCreatedAfter({ nowId, userId, afterCreateId }: SyncCreatedAfterOptions) {
+    return this.db
+      .selectFrom('shared_space_album_user')
+      .select(['albumId as id', 'createId'])
+      .where('userId', '=', userId)
+      .where('albumId', 'in', (eb) => accessibleSpaceAlbums(eb, userId))
+      .$if(!!afterCreateId, (qb) => qb.where('createId', '>=', afterCreateId!))
+      .where('createId', '<', nowId)
+      .orderBy('createId', 'asc')
+      .execute();
+  }
+
+  // HYBRID-CLONE: reads shared_space_album_user_audit (grant revocation),
+  // NOT album_audit. Each row signals that the user has lost access to
+  // the album (no other path remains). The client should drop the album.
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getDeletes(options: SyncQueryOptions) {
+    return this.auditQuery('shared_space_album_user_audit', options)
+      .select(['id', 'albumId'])
+      .where('userId', '=', options.userId)
+      .stream();
+  }
+
+  cleanupAuditTable(daysAgo: number) {
+    return this.auditCleanup('shared_space_album_user_audit', daysAgo);
+  }
+
+  // Streams album metadata rows for albums the user can access via
+  // accessibleSpaceAlbums, excluding soft-deleted albums.
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getUpserts(options: SyncQueryOptions) {
+    return this.upsertQuery('album', options)
+      .distinctOn(['album.id', 'album.updateId'])
+      .where('album.id', 'in', (eb) => accessibleSpaceAlbums(eb, options.userId))
+      .select([
+        'album.id',
+        'album.albumName as name',
+        'album.description',
+        'album.createdAt',
+        'album.updatedAt',
+        'album.albumThumbnailAssetId as thumbnailAssetId',
+        'album.isActivityEnabled',
+        'album.order',
+        'album.updateId',
+      ])
+      .stream();
+  }
+}
+
+// Columns emitted for each space→album link join row.
+const SHARED_SPACE_ALBUM_SYNC_COLUMNS = [
+  'shared_space_album.spaceId',
+  'shared_space_album.albumId',
+  'shared_space_album.showInTimeline',
+  'shared_space_album.addedById',
+  'shared_space_album.createdAt',
+  'shared_space_album.updatedAt',
+  'shared_space_album.updateId',
+] as const;
+
+// Streams the shared_space_album join rows — the per-space "which albums are
+// linked" mapping. Scoped by accessibleSpaces (NOT accessibleSpaceAlbums):
+// this is the join row belonging to the space, and the user must have access
+// to the space itself to see its album link set.
+//
+// Clone of SharedSpaceLibrarySync with shared_space_library→shared_space_album
+// and carrying showInTimeline. Owns shared_space_album_audit cleanup.
+export class SharedSpaceAlbumLinkSync extends BaseSync {
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, spaceId: string) {
+    return (
+      this.backfillQuery('shared_space_album', options)
+        .innerJoin('album', 'album.id', 'shared_space_album.albumId')
+        .select(SHARED_SPACE_ALBUM_SYNC_COLUMNS)
+        .where('shared_space_album.spaceId', '=', spaceId)
+        // Slice 8 (correctness-3): never stream a soft-deleted album's link row; the
+        // trigger tombstones it via shared_space_album_audit, and this stops getUpserts/
+        // getBackfill re-adding it before restore.
+        .where('album.deletedAt', 'is', null)
+        .stream()
+    );
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getDeletes(options: SyncQueryOptions) {
+    return this.auditQuery('shared_space_album_audit', options)
+      .select(['id', 'spaceId', 'albumId'])
+      .where('spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+      .stream();
+  }
+
+  cleanupAuditTable(daysAgo: number) {
+    return this.auditCleanup('shared_space_album_audit', daysAgo);
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getUpserts(options: SyncQueryOptions) {
+    return (
+      this.upsertQuery('shared_space_album', options)
+        .innerJoin('album', 'album.id', 'shared_space_album.albumId')
+        .select(SHARED_SPACE_ALBUM_SYNC_COLUMNS)
+        .where('shared_space_album.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+        // Slice 8 (correctness-3): exclude soft-deleted albums so a stale updateId bump
+        // cannot re-add a tombstoned link row (convergence). Restore bumps updateId and
+        // clears deletedAt → the row re-delivers.
+        .where('album.deletedAt', 'is', null)
+        .stream()
+    );
+  }
+}
+
+// #764/§8.3: a contribution is visible to a member ONLY through the SINGLE space it was contributed
+// via. Gate every contributed sync arm on live membership of that space AND the album still being
+// linked to it — mirroring the web read arm (spaceContributedAssetExists). The album_asset grant /
+// accessibleSpaceAlbums are space-agnostic and would otherwise leak an S1 contribution to an
+// S2-only member of a multi-space co-linked album (edge + payload + exif).
+//
+// Correlated subquery: the two whereRefs reference the OUTER `album_space_asset` (the contributed arm
+// this predicate is attached to), exactly as the web read arm correlates album_space_asset.spaceId to
+// the link's space.
+const contributionVisibleToMember = (eb: ExpressionBuilder<DB, keyof DB>, userId: string): Expression<SqlBool> =>
+  eb.exists(
+    eb
+      .selectFrom('shared_space_album')
+      .innerJoin('shared_space_member', (join) =>
+        join
+          .onRef('shared_space_member.spaceId', '=', 'shared_space_album.spaceId')
+          .on('shared_space_member.userId', '=', asUuid(userId)),
+      )
+      .whereRef('shared_space_album.albumId', '=', 'album_space_asset.albumId')
+      .whereRef('shared_space_album.spaceId', '=', 'album_space_asset.spaceId')
+      .select(eb.lit(1).as('one')),
+  );
+
+// Streams album_asset join rows (album membership) for albums accessible via
+// the shared_space_album_user grant. Clone of AlbumToAssetSync with the
+// album_user scoping swapped for the grant. Also unions the album_space_asset
+// contributed arm (#764), gated per-space by contributionVisibleToMember.
+//
+// getDeletes reads album_asset_audit scoped to albums in accessibleSpaceAlbums
+// (not album_user like AlbumToAssetSync) so that access-revocation at the space
+// level stops the user from seeing further delete events.
+class SharedSpaceAlbumToAssetSync extends BaseSync {
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, albumId: string, userId: string) {
+    const { nowId, beforeUpdateId, afterUpdateId } = options;
+    // album_asset arm — the album owner's own membership (unchanged).
+    const albumAssetArm = this.db
+      .selectFrom('album_asset')
+      .innerJoin('asset', 'asset.id', 'album_asset.assetId')
+      .select(['album_asset.assetId as assetId', 'album_asset.albumId as albumId', 'album_asset.updateId'])
+      .where('album_asset.albumId', '=', albumId)
+      .where('album_asset.updateId', '<', nowId)
+      .where('album_asset.updateId', '<=', beforeUpdateId)
+      .$if(!!afterUpdateId, (qb) => qb.where('album_asset.updateId', '>', afterUpdateId!))
+      // correctness-1/security-6: flat visibility gate — never backfill a Hidden/Locked asset's link.
+      .where((eb) => spaceVisibilityGate(eb))
+      // M-2: don't backfill a link row for a trashed album asset either (getUpserts stays convergence).
+      .where('asset.deletedAt', 'is', null);
+
+    // album_space_asset arm — cross-owner contributions (#764). Mechanical mirror keyed on updateId.
+    const contributedArm = this.db
+      .selectFrom('album_space_asset')
+      .innerJoin('asset', 'asset.id', 'album_space_asset.assetId')
+      .select([
+        'album_space_asset.assetId as assetId',
+        'album_space_asset.albumId as albumId',
+        'album_space_asset.updateId',
+      ])
+      .where('album_space_asset.albumId', '=', albumId)
+      .where('album_space_asset.updateId', '<', nowId)
+      .where('album_space_asset.updateId', '<=', beforeUpdateId)
+      .$if(!!afterUpdateId, (qb) => qb.where('album_space_asset.updateId', '>', afterUpdateId!))
+      .where((eb) => spaceVisibilityGate(eb))
+      // #764/§8.3: only members of the space this contribution was made via may receive it.
+      .where((eb) => contributionVisibleToMember(eb, userId))
+      // M-2: don't backfill a link row for a trashed contributed asset either (getUpserts stays convergence).
+      .where('asset.deletedAt', 'is', null);
+
+    return albumAssetArm.union(contributedArm).orderBy('updateId', 'asc').stream();
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getDeletes(options: SyncQueryOptions) {
+    const { userId, nowId, ack } = options;
+    // Union THREE audit sources: the shared album_asset_audit (normal album deletes), the space-only
+    // shared_space_album_asset_audit (owned-asset visibility Hidden purge), and the album_space_asset_audit
+    // (cross-owner contribution removals / delete / Hidden purge — #764). All arms are checkpoint-gated by
+    // the same nowId/ack bounds and scoped to albums accessible to this user via the space. A single
+    // ORDER BY id is applied over the whole union — per-arm ordering is invalid SQL.
+    const albumAssetArm = this.db
+      .selectFrom('album_asset_audit')
+      .select(['id', 'assetId', 'albumId'])
+      .where('id', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('id', '>', ack!.updateId))
+      .where('albumId', 'in', (eb) => accessibleSpaceAlbums(eb, userId));
+
+    const spaceAlbumAssetArm = this.db
+      .selectFrom('shared_space_album_asset_audit')
+      // gaps-5: owner-gate the album visibility-purge arm to match the library arm — the album owner must
+      // never receive a delete for their OWN hidden asset (over-purge). This table is purge-only (no delete
+      // trigger), so the asset row always exists → a plain INNER JOIN is correct.
+      .innerJoin('asset', 'asset.id', 'shared_space_album_asset_audit.assetId')
+      .select([
+        'shared_space_album_asset_audit.id as id',
+        'shared_space_album_asset_audit.assetId as assetId',
+        'shared_space_album_asset_audit.albumId as albumId',
+      ])
+      .where('shared_space_album_asset_audit.id', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('shared_space_album_asset_audit.id', '>', ack!.updateId))
+      .where('shared_space_album_asset_audit.albumId', 'in', (eb) => accessibleSpaceAlbums(eb, userId))
+      .where('asset.ownerId', '!=', userId);
+
+    // album_space_asset_audit — cross-owner contribution removals (#764). Trigger-driven, so the
+    // asset row may already be gone on FK cascade → NO asset join. A contribution is never also an
+    // owner's album_asset row (spec §5.1), so the owner has no independent path → NO ownerId filter:
+    // every member, including the asset's owner, drops the edge on removal/delete/Hidden-purge.
+    const contributedAuditArm = this.db
+      .selectFrom('album_space_asset_audit')
+      .select(['id', 'assetId', 'albumId'])
+      .where('id', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('id', '>', ack!.updateId))
+      .where('albumId', 'in', (eb) => accessibleSpaceAlbums(eb, userId));
+
+    return albumAssetArm.union(spaceAlbumAssetArm).union(contributedAuditArm).orderBy('id', 'asc').stream();
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getUpserts(options: SyncQueryOptions) {
+    const { userId, nowId, ack } = options;
+    const albumAssetArm = this.db
+      .selectFrom('album_asset')
+      .innerJoin('asset', 'asset.id', 'album_asset.assetId')
+      .innerJoin('shared_space_album_user', 'shared_space_album_user.albumId', 'album_asset.albumId')
+      .select(['album_asset.assetId as assetId', 'album_asset.albumId as albumId', 'album_asset.updateId'])
+      .where('shared_space_album_user.userId', '=', userId)
+      .where('album_asset.albumId', 'in', (eb) => accessibleSpaceAlbums(eb, userId))
+      .where('album_asset.updateId', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('album_asset.updateId', '>', ack!.updateId))
+      // correctness-1/security-6: flat visibility gate — a restore's updateId bump must not re-add a
+      // now-Hidden asset after the delete tombstone (resurrection); also blocks the metadata leak.
+      .where((eb) => spaceVisibilityGate(eb));
+
+    const contributedArm = this.db
+      .selectFrom('album_space_asset')
+      .innerJoin('asset', 'asset.id', 'album_space_asset.assetId')
+      .innerJoin('shared_space_album_user', 'shared_space_album_user.albumId', 'album_space_asset.albumId')
+      .select([
+        'album_space_asset.assetId as assetId',
+        'album_space_asset.albumId as albumId',
+        'album_space_asset.updateId',
+      ])
+      .where('shared_space_album_user.userId', '=', userId)
+      .where('album_space_asset.albumId', 'in', (eb) => accessibleSpaceAlbums(eb, userId))
+      .where('album_space_asset.updateId', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('album_space_asset.updateId', '>', ack!.updateId))
+      .where((eb) => spaceVisibilityGate(eb))
+      // #764/§8.3: only members of the space this contribution was made via may receive it.
+      .where((eb) => contributionVisibleToMember(eb, userId));
+
+    return albumAssetArm.union(contributedArm).orderBy('updateId', 'asc').stream();
+  }
+
+  // Prune the space-only audit tables this stream owns. The shared album_asset_audit is pruned by
+  // albumToAsset.cleanupAuditTable (AlbumToAssetSync).
+  async cleanupAuditTable(daysAgo: number) {
+    await this.auditCleanup('shared_space_album_asset_audit', daysAgo);
+    await this.auditCleanup('album_space_asset_audit', daysAgo);
+  }
+}
+
+// Streams full asset metadata rows for albums accessible via the
+// shared_space_album_user grant, unioning the album owner's own album_asset rows
+// with the cross-owner album_space_asset contributions (#764, gated per-space by
+// contributionVisibleToMember). Clone of AlbumAssetSync with the album_user
+// scoping swapped for the grant.
+//
+// Preserves the split getCreates/getUpdates/getBackfill pattern, the
+// isFavorite masking (false for non-owners), and the albumToAssetAck coupling
+// that ensures updates only fire for assets the client already knows about.
+class SharedSpaceAlbumAssetSync extends BaseSync {
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, albumId: string, userId: string) {
+    const { nowId, beforeUpdateId, afterUpdateId } = options;
+
+    // album_asset arm — the album owner's own membership (unchanged).
+    const albumAssetArm = this.db
+      .selectFrom('album_asset')
+      .innerJoin('asset', 'asset.id', 'album_asset.assetId')
+      .innerJoin('album', 'album.id', 'album_asset.albumId')
+      .select(columns.syncAlbumAsset)
+      .select((eb) =>
+        eb
+          .case()
+          .when('asset.ownerId', '=', userId)
+          .then(eb.ref('asset.isFavorite'))
+          .else(eb.val(false))
+          .end()
+          .as('isFavorite'),
+      )
+      .select('album_asset.updateId')
+      .where('album_asset.albumId', '=', albumId)
+      .where('album.deletedAt', 'is', null)
+      .where('album_asset.updateId', '<', nowId)
+      .where('album_asset.updateId', '<=', beforeUpdateId)
+      .$if(!!afterUpdateId, (qb) => qb.where('album_asset.updateId', '>', afterUpdateId!))
+      .where((eb) => spaceVisibilityGate(eb))
+      // M-2: never backfill a trashed owner-arm album asset to a space member either.
+      .where('asset.deletedAt', 'is', null);
+
+    // album_space_asset arm — cross-owner contributions (#764). Mechanical mirror keyed on updateId.
+    const contributedArm = this.db
+      .selectFrom('album_space_asset')
+      .innerJoin('asset', 'asset.id', 'album_space_asset.assetId')
+      .innerJoin('album', 'album.id', 'album_space_asset.albumId')
+      .select(columns.syncAlbumAsset)
+      .select((eb) =>
+        eb
+          .case()
+          .when('asset.ownerId', '=', userId)
+          .then(eb.ref('asset.isFavorite'))
+          .else(eb.val(false))
+          .end()
+          .as('isFavorite'),
+      )
+      .select('album_space_asset.updateId')
+      .where('album_space_asset.albumId', '=', albumId)
+      .where('album.deletedAt', 'is', null)
+      .where('album_space_asset.updateId', '<', nowId)
+      .where('album_space_asset.updateId', '<=', beforeUpdateId)
+      .$if(!!afterUpdateId, (qb) => qb.where('album_space_asset.updateId', '>', afterUpdateId!))
+      .where((eb) => spaceVisibilityGate(eb))
+      // #764/§8.3: only members of the space this contribution was made via may receive it.
+      .where((eb) => contributionVisibleToMember(eb, userId))
+      // M-2: never backfill a trashed contributed asset's metadata/thumbhash/EXIF to a space member.
+      .where('asset.deletedAt', 'is', null);
+
+    return albumAssetArm.union(contributedArm).orderBy('updateId', 'asc').stream();
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions, { updateId: DummyValue.UUID }], stream: true })
+  getUpdates(options: SyncQueryOptions, albumToAssetAck: SyncAck) {
+    const { userId, nowId, ack } = options;
+
+    // album_asset arm — the album owner's own membership (unchanged).
+    const albumAssetArm = this.db
+      .selectFrom('asset')
+      .innerJoin('album_asset', 'album_asset.assetId', 'asset.id')
+      .innerJoin('shared_space_album_user', 'shared_space_album_user.albumId', 'album_asset.albumId')
+      .select(columns.syncAlbumAsset)
+      .select((eb) =>
+        eb
+          .case()
+          .when('asset.ownerId', '=', userId)
+          .then(eb.ref('asset.isFavorite'))
+          .else(eb.val(false))
+          .end()
+          .as('isFavorite'),
+      )
+      .select('asset.updateId')
+      .where('asset.updateId', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('asset.updateId', '>', ack!.updateId))
+      .where('album_asset.updateId', '<=', albumToAssetAck.updateId) // Ensure we only send updates for assets that the client already knows about
+      .where('shared_space_album_user.userId', '=', userId)
+      .where('album_asset.albumId', 'in', (eb) => accessibleSpaceAlbums(eb, userId))
+      .where((eb) => spaceVisibilityGate(eb));
+
+    // album_space_asset arm — cross-owner contributions (#764). Mechanical mirror keyed on updateId.
+    const contributedArm = this.db
+      .selectFrom('asset')
+      .innerJoin('album_space_asset', 'album_space_asset.assetId', 'asset.id')
+      .innerJoin('shared_space_album_user', 'shared_space_album_user.albumId', 'album_space_asset.albumId')
+      .select(columns.syncAlbumAsset)
+      .select((eb) =>
+        eb
+          .case()
+          .when('asset.ownerId', '=', userId)
+          .then(eb.ref('asset.isFavorite'))
+          .else(eb.val(false))
+          .end()
+          .as('isFavorite'),
+      )
+      .select('asset.updateId')
+      .where('asset.updateId', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('asset.updateId', '>', ack!.updateId))
+      .where('album_space_asset.updateId', '<=', albumToAssetAck.updateId)
+      .where('shared_space_album_user.userId', '=', userId)
+      .where('album_space_asset.albumId', 'in', (eb) => accessibleSpaceAlbums(eb, userId))
+      .where((eb) => spaceVisibilityGate(eb))
+      // #764/§8.3: only members of the space this contribution was made via may receive it.
+      .where((eb) => contributionVisibleToMember(eb, userId));
+
+    return albumAssetArm.union(contributedArm).orderBy('updateId', 'asc').stream();
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getCreates(options: SyncQueryOptions) {
+    const { userId, nowId, ack } = options;
+
+    // album_asset arm — the album owner's own membership (unchanged).
+    const albumAssetArm = this.db
+      .selectFrom('album_asset')
+      .innerJoin('asset', 'asset.id', 'album_asset.assetId')
+      .innerJoin('shared_space_album_user', 'shared_space_album_user.albumId', 'album_asset.albumId')
+      .select(columns.syncAlbumAsset)
+      .select((eb) =>
+        eb
+          .case()
+          .when('asset.ownerId', '=', userId)
+          .then(eb.ref('asset.isFavorite'))
+          .else(eb.val(false))
+          .end()
+          .as('isFavorite'),
+      )
+      .select('album_asset.updateId')
+      .where('shared_space_album_user.userId', '=', userId)
+      .where('album_asset.albumId', 'in', (eb) => accessibleSpaceAlbums(eb, userId))
+      .where('album_asset.updateId', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('album_asset.updateId', '>', ack!.updateId))
+      .where((eb) => spaceVisibilityGate(eb))
+      // M-2: getCreates must not introduce a trashed owner-arm album asset a device didn't already have.
+      .where('asset.deletedAt', 'is', null);
+
+    // album_space_asset arm — cross-owner contributions (#764). Mechanical mirror keyed on updateId.
+    const contributedArm = this.db
+      .selectFrom('album_space_asset')
+      .innerJoin('asset', 'asset.id', 'album_space_asset.assetId')
+      .innerJoin('shared_space_album_user', 'shared_space_album_user.albumId', 'album_space_asset.albumId')
+      .select(columns.syncAlbumAsset)
+      .select((eb) =>
+        eb
+          .case()
+          .when('asset.ownerId', '=', userId)
+          .then(eb.ref('asset.isFavorite'))
+          .else(eb.val(false))
+          .end()
+          .as('isFavorite'),
+      )
+      .select('album_space_asset.updateId')
+      .where('shared_space_album_user.userId', '=', userId)
+      .where('album_space_asset.albumId', 'in', (eb) => accessibleSpaceAlbums(eb, userId))
+      .where('album_space_asset.updateId', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('album_space_asset.updateId', '>', ack!.updateId))
+      .where((eb) => spaceVisibilityGate(eb))
+      // #764/§8.3: only members of the space this contribution was made via may receive it.
+      .where((eb) => contributionVisibleToMember(eb, userId))
+      // M-2: getCreates must not introduce a trashed contributed asset a device didn't already have.
+      .where('asset.deletedAt', 'is', null);
+
+    return albumAssetArm.union(contributedArm).orderBy('updateId', 'asc').stream();
+  }
+}
+
+// Streams asset_exif rows for album-accessible assets via the
+// shared_space_album_user grant, unioning the album owner's own album_asset exif
+// with the cross-owner album_space_asset contributions (#764, gated per-space by
+// contributionVisibleToMember). Clone of AlbumAssetExifSync with the album_user
+// scoping swapped for the grant.
+class SharedSpaceAlbumAssetExifSync extends BaseSync {
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, albumId: string, userId: string) {
+    const { nowId, beforeUpdateId, afterUpdateId } = options;
+
+    // album_asset arm — the album owner's own membership (unchanged).
+    const albumAssetArm = this.db
+      .selectFrom('album_asset')
+      .innerJoin('asset_exif', 'asset_exif.assetId', 'album_asset.assetId')
+      .innerJoin('album', 'album.id', 'album_asset.albumId')
+      .innerJoin('asset', 'asset.id', 'album_asset.assetId')
+      .select(columns.syncAssetExif)
+      .select('album_asset.updateId')
+      .where('album_asset.albumId', '=', albumId)
+      .where('album.deletedAt', 'is', null)
+      .where('album_asset.updateId', '<', nowId)
+      .where('album_asset.updateId', '<=', beforeUpdateId)
+      .$if(!!afterUpdateId, (qb) => qb.where('album_asset.updateId', '>', afterUpdateId!))
+      .where((eb) => spaceVisibilityGate(eb))
+      // M-2: never backfill a trashed owner-arm album asset to a space member either.
+      .where('asset.deletedAt', 'is', null);
+
+    // album_space_asset arm — cross-owner contributions (#764). Mechanical mirror keyed on updateId.
+    const contributedArm = this.db
+      .selectFrom('album_space_asset')
+      .innerJoin('asset_exif', 'asset_exif.assetId', 'album_space_asset.assetId')
+      .innerJoin('album', 'album.id', 'album_space_asset.albumId')
+      .innerJoin('asset', 'asset.id', 'album_space_asset.assetId')
+      .select(columns.syncAssetExif)
+      .select('album_space_asset.updateId')
+      .where('album_space_asset.albumId', '=', albumId)
+      .where('album.deletedAt', 'is', null)
+      .where('album_space_asset.updateId', '<', nowId)
+      .where('album_space_asset.updateId', '<=', beforeUpdateId)
+      .$if(!!afterUpdateId, (qb) => qb.where('album_space_asset.updateId', '>', afterUpdateId!))
+      .where((eb) => spaceVisibilityGate(eb))
+      // #764/§8.3: only members of the space this contribution was made via may receive it.
+      .where((eb) => contributionVisibleToMember(eb, userId))
+      // M-2: never backfill a trashed contributed asset's metadata/thumbhash/EXIF to a space member.
+      .where('asset.deletedAt', 'is', null);
+
+    return albumAssetArm.union(contributedArm).orderBy('updateId', 'asc').stream();
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions, { updateId: DummyValue.UUID }], stream: true })
+  getUpdates(options: SyncQueryOptions, albumToAssetAck: SyncAck) {
+    const { userId, nowId, ack } = options;
+
+    // album_asset arm — the album owner's own membership (unchanged).
+    const albumAssetArm = this.db
+      .selectFrom('asset_exif')
+      .innerJoin('album_asset', 'album_asset.assetId', 'asset_exif.assetId')
+      .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
+      .innerJoin('shared_space_album_user', 'shared_space_album_user.albumId', 'album_asset.albumId')
+      .select(columns.syncAssetExif)
+      .select('asset_exif.updateId')
+      .where('asset_exif.updateId', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('asset_exif.updateId', '>', ack!.updateId))
+      .where('album_asset.updateId', '<=', albumToAssetAck.updateId) // Ensure we only send exif updates for assets that the client already knows about
+      .where('shared_space_album_user.userId', '=', userId)
+      .where('album_asset.albumId', 'in', (eb) => accessibleSpaceAlbums(eb, userId))
+      .where((eb) => spaceVisibilityGate(eb));
+
+    // album_space_asset arm — cross-owner contributions (#764). Mechanical mirror keyed on updateId.
+    const contributedArm = this.db
+      .selectFrom('asset_exif')
+      .innerJoin('album_space_asset', 'album_space_asset.assetId', 'asset_exif.assetId')
+      .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
+      .innerJoin('shared_space_album_user', 'shared_space_album_user.albumId', 'album_space_asset.albumId')
+      .select(columns.syncAssetExif)
+      .select('asset_exif.updateId')
+      .where('asset_exif.updateId', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('asset_exif.updateId', '>', ack!.updateId))
+      .where('album_space_asset.updateId', '<=', albumToAssetAck.updateId)
+      .where('shared_space_album_user.userId', '=', userId)
+      .where('album_space_asset.albumId', 'in', (eb) => accessibleSpaceAlbums(eb, userId))
+      .where((eb) => spaceVisibilityGate(eb))
+      // #764/§8.3: only members of the space this contribution was made via may receive it.
+      .where((eb) => contributionVisibleToMember(eb, userId));
+
+    return albumAssetArm.union(contributedArm).orderBy('updateId', 'asc').stream();
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getCreates(options: SyncQueryOptions) {
+    const { userId, nowId, ack } = options;
+
+    // album_asset arm — the album owner's own membership (unchanged).
+    const albumAssetArm = this.db
+      .selectFrom('album_asset')
+      .innerJoin('asset_exif', 'asset_exif.assetId', 'album_asset.assetId')
+      .innerJoin('asset', 'asset.id', 'album_asset.assetId')
+      .innerJoin('shared_space_album_user', 'shared_space_album_user.albumId', 'album_asset.albumId')
+      .select(columns.syncAssetExif)
+      .select('album_asset.updateId')
+      .where('shared_space_album_user.userId', '=', userId)
+      .where('album_asset.albumId', 'in', (eb) => accessibleSpaceAlbums(eb, userId))
+      .where('album_asset.updateId', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('album_asset.updateId', '>', ack!.updateId))
+      .where((eb) => spaceVisibilityGate(eb))
+      // M-2: getCreates must not introduce a trashed owner-arm album asset a device didn't already have.
+      .where('asset.deletedAt', 'is', null);
+
+    // album_space_asset arm — cross-owner contributions (#764). Mechanical mirror keyed on updateId.
+    const contributedArm = this.db
+      .selectFrom('album_space_asset')
+      .innerJoin('asset_exif', 'asset_exif.assetId', 'album_space_asset.assetId')
+      .innerJoin('asset', 'asset.id', 'album_space_asset.assetId')
+      .innerJoin('shared_space_album_user', 'shared_space_album_user.albumId', 'album_space_asset.albumId')
+      .select(columns.syncAssetExif)
+      .select('album_space_asset.updateId')
+      .where('shared_space_album_user.userId', '=', userId)
+      .where('album_space_asset.albumId', 'in', (eb) => accessibleSpaceAlbums(eb, userId))
+      .where('album_space_asset.updateId', '<', nowId)
+      .$if(!!ack, (qb) => qb.where('album_space_asset.updateId', '>', ack!.updateId))
+      .where((eb) => spaceVisibilityGate(eb))
+      // #764/§8.3: only members of the space this contribution was made via may receive it.
+      .where((eb) => contributionVisibleToMember(eb, userId))
+      // M-2: getCreates must not introduce a trashed contributed asset's EXIF a device didn't already have.
+      .where('asset.deletedAt', 'is', null);
+
+    return albumAssetArm.union(contributedArm).orderBy('updateId', 'asc').stream();
+  }
+}
+
+export { accessibleSpaceAlbums, accessibleSpaces } from 'src/utils/shared-space-album-scope';

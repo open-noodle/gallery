@@ -370,6 +370,40 @@ limit
 offset
   $4
 
+-- AssetRepository.getByAlbumIdWithFaces
+select
+  "asset"."id"
+from
+  "asset"
+  inner join (
+    select
+      "album_asset"."assetId" as "assetId"
+    from
+      "album_asset"
+    where
+      "album_asset"."albumId" = $1::uuid
+    union
+    select
+      "album_space_asset"."assetId" as "assetId"
+    from
+      "album_space_asset"
+    where
+      "album_space_asset"."albumId" = $2::uuid
+      and "album_space_asset"."spaceId" = $3::uuid
+  ) as "album_members" on "album_members"."assetId" = "asset"."id"
+  inner join "asset_face" on "asset_face"."assetId" = "asset"."id"
+where
+  "asset"."deletedAt" is null
+  and "asset"."isOffline" = $4
+group by
+  "asset"."id"
+order by
+  "asset"."id"
+limit
+  $5
+offset
+  $6
+
 -- AssetRepository.getByLibraryIdAndOriginalPath
 select
   "asset".*

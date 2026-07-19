@@ -379,6 +379,19 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Free disk space
+        working-directory: ./
+        # The job builds the full server + ML images and loads the geodata (geonames)
+        # dataset into Postgres on the same runner. On a runner image that ships with
+        # little free disk, Postgres fails the geodata_places primary-key build with
+        # "No space left on device" and the server never boots. Reclaim the preinstalled
+        # toolchains we don't use before the build. Paths are absolute and missing paths
+        # are ignored, so this is safe on both the x86 and arm runners.
+        # Runs before the buildx/cache setup below so the image prune cannot discard it.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h /
 
       - name: Start Docker Compose
         env:
@@ -458,6 +471,17 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Install Playwright Browsers
         run: pnpm exec playwright install chromium --only-shell
+      - name: Free disk space
+        working-directory: ./
+        # Same as the server & cli e2e job: the full server + ML image build plus the
+        # geodata (geonames) import into Postgres exhaust a tight runner's disk, crashing
+        # the server on boot ("No space left on device"). Reclaim unused toolchains first.
+        # Paths are absolute and missing paths are ignored, so this is safe on all runners.
+        # Runs before the buildx/cache setup below so the image prune cannot discard it.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h /
 
       - name: Docker build
         env:

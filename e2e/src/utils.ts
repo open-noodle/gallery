@@ -51,6 +51,8 @@ import {
   markSpaceViewed,
   runQueueCommandLegacy,
   scanLibrary,
+  linkAlbum as sdkLinkAlbum,
+  unlinkAlbum as sdkUnlinkAlbum,
   searchAssets,
   setBaseUrl,
   setMaintenanceMode,
@@ -374,11 +376,20 @@ export const utils = {
   addSpaceAssets: (accessToken: string, spaceId: string, assetIds: string[]) =>
     addSpaceAssets({ id: spaceId, sharedSpaceAssetAddDto: { assetIds } }, { headers: asBearerAuth(accessToken) }),
 
-  updateSpace: (accessToken: string, spaceId: string, dto: { thumbnailAssetId?: string; name?: string }) =>
-    updateSpace({ id: spaceId, sharedSpaceUpdateDto: dto }, { headers: asBearerAuth(accessToken) }),
+  updateSpace: (
+    accessToken: string,
+    spaceId: string,
+    dto: { thumbnailAssetId?: string; name?: string; faceRecognitionEnabled?: boolean },
+  ) => updateSpace({ id: spaceId, sharedSpaceUpdateDto: dto }, { headers: asBearerAuth(accessToken) }),
 
   markSpaceViewed: (accessToken: string, spaceId: string) =>
     markSpaceViewed({ id: spaceId }, { headers: asBearerAuth(accessToken) }),
+
+  linkSpaceAlbum: (accessToken: string, spaceId: string, albumId: string) =>
+    sdkLinkAlbum({ id: spaceId, albumId }, { headers: asBearerAuth(accessToken) }),
+
+  unlinkSpaceAlbum: (accessToken: string, spaceId: string, albumId: string) =>
+    sdkUnlinkAlbum({ id: spaceId, albumId }, { headers: asBearerAuth(accessToken) }),
 
   createAsset: async (
     accessToken: string,
@@ -525,6 +536,18 @@ export const utils = {
       [assetId, personGroupId],
     );
     return result.rows[0].id as string;
+  },
+
+  // Slice 3 — M2: PersonResponseDto does not expose `faceAssetId` (only `thumbnailPath`, which is
+  // populated asynchronously via the PersonGenerateThumbnail job). Representative-face write-scope
+  // specs need to assert "left unchanged" / "changed to X" directly, so read the column via SQL.
+  getPersonFaceAssetId: async (personId: string): Promise<string | null> => {
+    if (!client) {
+      throw new Error('Database client not connected');
+    }
+
+    const result = await client.query(`SELECT "faceAssetId" FROM "person" WHERE id = $1`, [personId]);
+    return (result.rows[0]?.faceAssetId as string | undefined) ?? null;
   },
 
   setPersonThumbnail: async (personId: string) => {
