@@ -58,37 +58,73 @@ jobs:
           set -euo pipefail
           base="https://$STORAGE_HOST/$STORAGE_ZONE"
 
-          # True-sync semantics (parity with the old `aws s3 sync --delete`):
-          # wipe the zone's current contents, re-upload the fresh build, then
-          # purge LAST (next step). Because the purge only fires after a fully
-          # successful upload, the Bunny edge keeps serving the previous build
-          # throughout — the wipe window is invisible to visitors, and removed
-          # or renamed pages never linger. Deleting a directory entry (trailing
-          # slash) removes its contents recursively, so wiping the top level
-          # clears the whole zone.
-          echo "Listing existing storage zone contents..."
-          status=$(curl -sS -o /tmp/listing.json -w '%{http_code}' \
-            -H "AccessKey: $STORAGE_PW" -H 'Accept: application/json' "$base/")
-          if [ "$status" = "200" ]; then
-            jq -r '.[] | .ObjectName + (if .IsDirectory then "/" else "" end)' /tmp/listing.json \
-            | while IFS= read -r entry; do
-                [ -z "$entry" ] && continue
-                echo "  delete $entry"
-                curl -fsS -X DELETE -H "AccessKey: $STORAGE_PW" "$base/$entry" -o /dev/null
-              done
-          elif [ "$status" = "404" ]; then
-            echo "Zone is empty (404) — nothing to wipe."
-          else
-            echo "::error::Unexpected list status $status"; cat /tmp/listing.json; exit 1
+          # Upload-then-prune — the real `aws s3 sync --delete` semantics: upload
+          # the fresh build FIRST, then delete only the orphans (files the new
+          # build no longer contains), and purge LAST (next step). The zone is
+          # never emptied, so it stays a complete set the whole time. Reference
+          # implementation: scripts/lib/bunny_deploy.py in the platform repo.
+          #
+          # The previous approach wiped the entire zone *before* re-uploading, on
+          # the assumption that the Bunny edge would keep serving the old build so
+          # the gap was invisible. That's false for a pull CDN: index.html has a
+          # 300s TTL and assets are pulled on demand, so any request during the
+          # wipe/upload window hit missing files, 404'd, and Bunny cached those
+          # 404s — taking docs.opennoodle.de down (blank page: no runtime/CSS) on
+          # every deploy until the final purge. Uploading first avoids the gap;
+          # because Docusaurus asset filenames are content-hashed, new and old
+          # assets coexist without collision. Uploading the immutable assets
+          # before the mutable *.html means a freshly pulled index.html never
+          # references a not-yet-uploaded asset.
+          cd build
+
+          # Safety net: never prune against an empty build. If the artifact ever
+          # unzipped to nothing, the orphan diff (remote - local) would treat the
+          # whole zone as orphans and delete everything → blank site. Refuse
+          # before uploading or deleting anything.
+          if [ -z "$(find . -type f | head -1)" ]; then
+            echo "::error::build/ is empty — refusing to deploy (would wipe the zone)"; exit 1
           fi
 
-          echo "Uploading build/ ..."
-          cd build
-          while IFS= read -r f; do
-            curl -fsS -X PUT -H "AccessKey: $STORAGE_PW" \
-              --data-binary @"$f" "$base/$f" -o /dev/null
-          done < <(find . -type f | sed 's|^\./||')
+          echo "Uploading build/ (assets first, HTML last) ..."
+          { find . -type f ! -name '*.html'; find . -type f -name '*.html'; } \
+            | sed 's|^\./||' \
+            | while IFS= read -r f; do
+                curl -fsS -X PUT -H "AccessKey: $STORAGE_PW" \
+                  --data-binary @"$f" "$base/$f" -o /dev/null
+              done
           echo "Upload complete."
+
+          # Recursively list the storage zone and delete anything the new build no
+          # longer contains. Each directory listing is captured in a variable (no
+          # shared temp file) so the function can recurse safely.
+          list_remote() {
+            local prefix="$1" resp status body dir
+            resp=$(curl -sS -w $'\n%{http_code}' \
+              -H "AccessKey: $STORAGE_PW" -H 'Accept: application/json' "$base/$prefix")
+            status="${resp##*$'\n'}"
+            body="${resp%$'\n'*}"
+            [ "$status" = "404" ] && return 0
+            if [ "$status" != "200" ]; then
+              echo "::error::list '$prefix' -> $status: $body" >&2; exit 1
+            fi
+            printf '%s' "$body" | jq -r --arg p "$prefix" \
+              '.[] | select(.IsDirectory | not) | $p + .ObjectName'
+            while IFS= read -r dir; do
+              [ -z "$dir" ] && continue
+              list_remote "$prefix$dir/"
+            done < <(printf '%s' "$body" | jq -r '.[] | select(.IsDirectory) | .ObjectName')
+          }
+
+          echo "Pruning orphans ..."
+          list_remote "" | sort -u > /tmp/remote.txt
+          find . -type f | sed 's|^\./||' | sort -u > /tmp/local.txt
+          comm -23 /tmp/remote.txt /tmp/local.txt \
+            | while IFS= read -r f; do
+                [ -z "$f" ] && continue
+                echo "  delete $f"
+                curl -fsS -X DELETE -H "AccessKey: $STORAGE_PW" "$base/$f" -o /dev/null
+              done
+          echo "Prune complete."
 
       - name: Purge Bunny cache
         env:
