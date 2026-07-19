@@ -123,10 +123,34 @@ export class SearchService extends BaseService {
     ];
   }
 
+  /**
+   * Fork RBAC (H-1): trash is an owner-private state; a shared-space-scoped search must never enumerate
+   * another member's trashed assets. Reject withDeleted / trashedAfter / trashedBefore / isOffline when a
+   * space scope (spaceId or withSharedSpaces) is set — mirrors timeBucketChecks (timeline.service.ts) and
+   * the caller-proof SQL gate in searchAssetBuilder. trashedAfter/trashedBefore/isOffline implicitly flip
+   * withDeleted (searchAssetBuilder :676), so they are rejected too. StatisticsSearchDto has no withDeleted
+   * field (optional here → undefined); it is still reachable via the implicit-flip params.
+   */
+  private rejectTrashParamsForSpaceScope(dto: {
+    spaceId?: string;
+    withSharedSpaces?: boolean;
+    withDeleted?: boolean;
+    trashedAfter?: Date;
+    trashedBefore?: Date;
+    isOffline?: boolean;
+  }): void {
+    const spaceScope = !!dto.spaceId || !!dto.withSharedSpaces;
+    const wantsTrashOrOffline = !!dto.withDeleted || !!dto.trashedAfter || !!dto.trashedBefore || !!dto.isOffline;
+    if (spaceScope && wantsTrashOrOffline) {
+      throw new BadRequestException('Trashed and offline assets are not available when searching a shared space');
+    }
+  }
+
   async searchMetadata(auth: AuthDto, dto: MetadataSearchDto): Promise<SearchResponseDto> {
     if (isNewShapeRequest(dto)) {
       return this.searchMetadataV3(auth, dto);
     }
+    this.rejectTrashParamsForSpaceScope(dto);
 
     if (dto.visibility === AssetVisibility.Locked) {
       requireElevatedPermission(auth);
@@ -183,6 +207,7 @@ export class SearchService extends BaseService {
     if (isNewShapeRequest(dto)) {
       return this.searchStatisticsV3(auth, dto);
     }
+    this.rejectTrashParamsForSpaceScope(dto);
 
     if (dto.spaceId && dto.withSharedSpaces) {
       throw new BadRequestException('Cannot use both spaceId and withSharedSpaces');
@@ -215,6 +240,7 @@ export class SearchService extends BaseService {
     if (isNewShapeRequest(dto)) {
       return this.searchRandomV3(auth, dto);
     }
+    this.rejectTrashParamsForSpaceScope(dto);
 
     if (dto.visibility === AssetVisibility.Locked) {
       requireElevatedPermission(auth);
@@ -245,6 +271,8 @@ export class SearchService extends BaseService {
   }
 
   async searchLargeAssets(auth: AuthDto, dto: LargeAssetSearchDto): Promise<AssetResponseDto[]> {
+    this.rejectTrashParamsForSpaceScope(dto);
+
     if (dto.visibility === AssetVisibility.Locked) {
       requireElevatedPermission(auth);
     }
@@ -587,6 +615,8 @@ export class SearchService extends BaseService {
     if ('visibility' in dto && dto.visibility === AssetVisibility.Locked) {
       requireElevatedPermission(auth);
     }
+
+    this.rejectTrashParamsForSpaceScope(dto);
 
     if (dto.spaceId && dto.withSharedSpaces) {
       throw new BadRequestException('Cannot use both spaceId and withSharedSpaces');
