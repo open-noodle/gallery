@@ -22,6 +22,11 @@ on:
         description: 'Commit SHA to release up to (default: HEAD of the triggering branch). Pass the SHA the mobile run recorded to ship a matching server build.'
         required: false
         type: string
+      build_ml_rocm:
+        description: 'Build & publish the ROCm ML image (gallery-ml:*-rocm) on the self-hosted `gallery-rocm` runner. Uncheck to skip (e.g. runner offline) — the core release is never blocked by it.'
+        required: false
+        type: boolean
+        default: true
 
 concurrency:
   group: gallery-release-server
@@ -328,6 +333,108 @@ jobs:
           VERSION: ${{ needs.version.outputs.version }}
           MAJOR: ${{ needs.version.outputs.major }}
           SUFFIX: ${{ matrix.suffix }}
+        run: |
+          tags="-t ${IMAGE}:${VERSION}${SUFFIX} -t ${IMAGE}:${MAJOR}${SUFFIX} -t ${IMAGE}:release${SUFFIX}"
+          sources=$(printf "${IMAGE}@sha256:%s " *)
+          docker buildx imagetools create ${tags} ${sources}
+
+  # ── Fork-only: ROCm ML image (self-hosted builder) ──────────────────────
+  # The ROCm image (rocm/dev-ubuntu-24.04:*-complete base, ~40GB) does not fit
+  # a GitHub-hosted runner's disk, so it builds on the self-hosted `gallery-rocm`
+  # runner. These two jobs are DECOUPLED from `tag` on purpose: a ROCm failure
+  # or an offline runner never blocks the core release. Uncheck the
+  # `build_ml_rocm` dispatch input to skip them entirely.
+  build-ml-rocm:
+    name: Build ML rocm (linux/amd64)
+    if: ${{ inputs.build_ml_rocm }}
+    needs: version
+    runs-on: gallery-rocm
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          ref: ${{ needs.version.outputs.sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+
+      - name: Login to GHCR
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply branding
+        uses: ./.github/actions/apply-branding
+        with:
+          version: ${{ needs.version.outputs.version }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: machine-learning
+          file: machine-learning/Dockerfile
+          platforms: linux/amd64
+          build-args: |
+            DEVICE=rocm
+          outputs: type=image,"name=ghcr.io/open-noodle/gallery-ml",push-by-digest=true,name-resolution=short,push=true
+          cache-from: type=gha,scope=ml-rocm-linux-amd64
+          cache-to: type=gha,scope=ml-rocm-linux-amd64,mode=max
+
+      - name: Export digest
+        run: | # zizmor: ignore[template-injection]
+          mkdir -p "${{ runner.temp }}/digests"
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: ml-rocm-digests-linux-amd64
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge-ml-rocm:
+    name: Merge ML Manifest (rocm)
+    if: ${{ inputs.build_ml_rocm }}
+    needs: [version, build-ml-rocm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: ml-rocm-digests-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+
+      - name: Login to GHCR
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create manifest list and push
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          IMAGE: ghcr.io/open-noodle/gallery-ml
+          VERSION: ${{ needs.version.outputs.version }}
+          MAJOR: ${{ needs.version.outputs.major }}
+          SUFFIX: '-rocm'
         run: |
           tags="-t ${IMAGE}:${VERSION}${SUFFIX} -t ${IMAGE}:${MAJOR}${SUFFIX} -t ${IMAGE}:release${SUFFIX}"
           sources=$(printf "${IMAGE}@sha256:%s " *)
