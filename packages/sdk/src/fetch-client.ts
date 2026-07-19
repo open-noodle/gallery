@@ -552,6 +552,16 @@ export type ContributorCountResponseDto = {
     /** User ID */
     userId: string;
 };
+export type AlbumSharedSpaceLinkResponseDto = {
+    /** User who linked the album into the space */
+    linkedById: string | null;
+    /** Whether the album appears in the aggregated space timeline */
+    showInTimeline: boolean;
+    /** Shared space ID this album is linked into */
+    spaceId: string;
+    /** Shared space name */
+    spaceName: string;
+};
 export type AlbumResponseDto = {
     /** Album name */
     albumName: string;
@@ -579,6 +589,7 @@ export type AlbumResponseDto = {
     order?: AssetOrder;
     /** Is shared album */
     shared: boolean;
+    sharedSpaceLinks?: AlbumSharedSpaceLinkResponseDto[];
     /** UTC representation of (local) start date (earliest asset) */
     startDate?: string;
     /** Last update date */
@@ -2919,6 +2930,49 @@ export type SharedSpaceActivityResponseDto = {
     /** User profile image path */
     userProfileImagePath?: string | null;
 };
+export type SharedSpaceLinkedAlbumDto = {
+    /** User who linked the album into the space */
+    addedById: string | null;
+    /** Album name */
+    albumName: string;
+    /** Thumbnail asset ID */
+    albumThumbnailAssetId: string | null;
+    /** Number of assets */
+    assetCount: number;
+    contributorCounts?: ContributorCountResponseDto[];
+    /** Creation date */
+    createdAt: string;
+    /** Album description */
+    description: string;
+    /** End date (latest asset) */
+    endDate?: string;
+    /** Has shared link */
+    hasSharedLink: boolean;
+    /** Album ID */
+    id: string;
+    /** Activity feed enabled */
+    isActivityEnabled: boolean;
+    /** Last modified asset timestamp */
+    lastModifiedAssetTimestamp?: string;
+    /** Link creation timestamp */
+    linkedAt: string;
+    order?: AssetOrder;
+    /** User ID of the album owner (non-PII UUID, for group-by-owner) */
+    ownerId: string;
+    /** Is shared album */
+    shared: boolean;
+    sharedSpaceLinks?: AlbumSharedSpaceLinkResponseDto[];
+    /** Include this album in the space timeline */
+    showInTimeline: boolean;
+    /** Start date (earliest asset) */
+    startDate?: string;
+    /** Last update date */
+    updatedAt: string;
+};
+export type SharedSpaceAlbumLinkUpdateDto = {
+    /** Include this album in the space timeline */
+    showInTimeline: boolean;
+};
 export type SharedSpaceAssetRemoveDto = {
     /** Asset IDs */
     assetIds: string[];
@@ -2926,6 +2980,12 @@ export type SharedSpaceAssetRemoveDto = {
 export type SharedSpaceAssetAddDto = {
     /** Asset IDs */
     assetIds: string[];
+};
+export type SharedSpaceAssetLinkedAlbumDto = {
+    /** Album ID */
+    albumId: string;
+    /** Album name */
+    albumName: string;
 };
 export type SharedSpaceLibraryLinkDto = {
     /** Library ID */
@@ -4225,6 +4285,26 @@ export type SyncPersonV1 = {
     updatedAt: string;
 };
 export type SyncResetV1 = {};
+export type SyncSharedSpaceAlbumLinkDeleteV1 = {
+    /** Album ID */
+    albumId: string;
+    /** Shared space ID */
+    spaceId: string;
+};
+export type SyncSharedSpaceAlbumLinkV1 = {
+    /** User who linked the album to the space */
+    addedById: string | null;
+    /** Album ID */
+    albumId: string;
+    /** Created at */
+    createdAt: string;
+    /** Whether this album appears in the space timeline */
+    showInTimeline: boolean;
+    /** Shared space ID */
+    spaceId: string;
+    /** Updated at */
+    updatedAt: string;
+};
 export type SyncSharedSpaceDeleteV1 = {
     /** Shared space ID */
     spaceId: string;
@@ -7767,13 +7847,67 @@ export function getSpaceActivities({ id, limit, offset }: {
     }));
 }
 /**
+ * List albums linked to a shared space
+ */
+export function getSharedSpaceAlbums({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceLinkedAlbumDto[];
+    }>(`/shared-spaces/${encodeURIComponent(id)}/albums`, {
+        ...opts
+    }));
+}
+/**
+ * Unlink an album from a shared space
+ */
+export function unlinkAlbum({ albumId, id }: {
+    albumId: string;
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/albums/${encodeURIComponent(albumId)}`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Update a space-album link (showInTimeline)
+ */
+export function updateSharedSpaceAlbum({ albumId, id, sharedSpaceAlbumLinkUpdateDto }: {
+    albumId: string;
+    id: string;
+    sharedSpaceAlbumLinkUpdateDto: SharedSpaceAlbumLinkUpdateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/albums/${encodeURIComponent(albumId)}`, oazapfts.json({
+        ...opts,
+        method: "PATCH",
+        body: sharedSpaceAlbumLinkUpdateDto
+    })));
+}
+/**
+ * Link an album to a shared space
+ */
+export function linkAlbum({ albumId, id }: {
+    albumId: string;
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/albums/${encodeURIComponent(albumId)}`, {
+        ...opts,
+        method: "PUT"
+    }));
+}
+/**
  * Remove assets from a shared space
  */
 export function removeAssets({ id, sharedSpaceAssetRemoveDto }: {
     id: string;
     sharedSpaceAssetRemoveDto: SharedSpaceAssetRemoveDto;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/assets`, oazapfts.json({
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: string[];
+    }>(`/shared-spaces/${encodeURIComponent(id)}/assets`, oazapfts.json({
         ...opts,
         method: "DELETE",
         body: sharedSpaceAssetRemoveDto
@@ -7802,6 +7936,22 @@ export function bulkAddAssets({ id }: {
         ...opts,
         method: "POST"
     }));
+}
+/**
+ * List linked albums that contain the given assets
+ */
+export function getSharedSpaceAssetLinkedAlbums({ id, sharedSpaceAssetRemoveDto }: {
+    id: string;
+    sharedSpaceAssetRemoveDto: SharedSpaceAssetRemoveDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: SharedSpaceAssetLinkedAlbumDto[];
+    }>(`/shared-spaces/${encodeURIComponent(id)}/assets/linked-albums`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: sharedSpaceAssetRemoveDto
+    })));
 }
 /**
  * Link a library to a shared space
@@ -9538,6 +9688,9 @@ export enum Permission {
     SharedSpaceAssetDelete = "sharedSpaceAsset.delete",
     SharedSpaceLibraryCreate = "sharedSpaceLibrary.create",
     SharedSpaceLibraryDelete = "sharedSpaceLibrary.delete",
+    SharedSpaceAlbumCreate = "sharedSpaceAlbum.create",
+    SharedSpaceAlbumUpdate = "sharedSpaceAlbum.update",
+    SharedSpaceAlbumDelete = "sharedSpaceAlbum.delete",
     UserGroupCreate = "userGroup.create",
     UserGroupRead = "userGroup.read",
     UserGroupUpdate = "userGroup.update",
@@ -9837,10 +9990,13 @@ export enum JobName {
     SharedSpaceFaceMatchPage = "SharedSpaceFaceMatchPage",
     SharedSpaceFaceMatchFromBackfill = "SharedSpaceFaceMatchFromBackfill",
     SharedSpaceLibraryFaceSync = "SharedSpaceLibraryFaceSync",
+    SharedSpaceAlbumFaceSync = "SharedSpaceAlbumFaceSync",
     SharedSpaceIdentityReconciliation = "SharedSpaceIdentityReconciliation",
     SharedSpacePersonDedup = "SharedSpacePersonDedup",
     SharedSpacePersonMetadataBackfill = "SharedSpacePersonMetadataBackfill",
     SharedSpaceBulkAddAssets = "SharedSpaceBulkAddAssets",
+    SharedSpaceAlbumGrantReconcile = "SharedSpaceAlbumGrantReconcile",
+    SharedSpaceAlbumGrantReconcileSweep = "SharedSpaceAlbumGrantReconcileSweep",
     AssetClassifyQueueAll = "AssetClassifyQueueAll",
     AssetClassify = "AssetClassify"
 }
@@ -9968,6 +10124,21 @@ export enum SyncEntityType {
     SharedSpaceLibraryV1 = "SharedSpaceLibraryV1",
     SharedSpaceLibraryDeleteV1 = "SharedSpaceLibraryDeleteV1",
     SharedSpaceLibraryBackfillV1 = "SharedSpaceLibraryBackfillV1",
+    SharedSpaceAlbumV1 = "SharedSpaceAlbumV1",
+    SharedSpaceAlbumDeleteV1 = "SharedSpaceAlbumDeleteV1",
+    SharedSpaceAlbumBackfillV1 = "SharedSpaceAlbumBackfillV1",
+    SharedSpaceAlbumLinkV1 = "SharedSpaceAlbumLinkV1",
+    SharedSpaceAlbumLinkDeleteV1 = "SharedSpaceAlbumLinkDeleteV1",
+    SharedSpaceAlbumLinkBackfillV1 = "SharedSpaceAlbumLinkBackfillV1",
+    SharedSpaceAlbumToAssetV1 = "SharedSpaceAlbumToAssetV1",
+    SharedSpaceAlbumToAssetDeleteV1 = "SharedSpaceAlbumToAssetDeleteV1",
+    SharedSpaceAlbumToAssetBackfillV1 = "SharedSpaceAlbumToAssetBackfillV1",
+    SharedSpaceAlbumAssetCreateV1 = "SharedSpaceAlbumAssetCreateV1",
+    SharedSpaceAlbumAssetUpdateV1 = "SharedSpaceAlbumAssetUpdateV1",
+    SharedSpaceAlbumAssetBackfillV1 = "SharedSpaceAlbumAssetBackfillV1",
+    SharedSpaceAlbumAssetExifCreateV1 = "SharedSpaceAlbumAssetExifCreateV1",
+    SharedSpaceAlbumAssetExifUpdateV1 = "SharedSpaceAlbumAssetExifUpdateV1",
+    SharedSpaceAlbumAssetExifBackfillV1 = "SharedSpaceAlbumAssetExifBackfillV1",
     SyncAckV1 = "SyncAckV1",
     SyncResetV1 = "SyncResetV1",
     SyncCompleteV1 = "SyncCompleteV1"
@@ -10008,7 +10179,12 @@ export enum SyncRequestType {
     LibrariesV1 = "LibrariesV1",
     LibraryAssetsV1 = "LibraryAssetsV1",
     LibraryAssetExifsV1 = "LibraryAssetExifsV1",
-    SharedSpaceLibrariesV1 = "SharedSpaceLibrariesV1"
+    SharedSpaceLibrariesV1 = "SharedSpaceLibrariesV1",
+    SharedSpaceAlbumsV1 = "SharedSpaceAlbumsV1",
+    SharedSpaceAlbumLinksV1 = "SharedSpaceAlbumLinksV1",
+    SharedSpaceAlbumToAssetsV1 = "SharedSpaceAlbumToAssetsV1",
+    SharedSpaceAlbumAssetsV1 = "SharedSpaceAlbumAssetsV1",
+    SharedSpaceAlbumAssetExifsV1 = "SharedSpaceAlbumAssetExifsV1"
 }
 export enum Action {
     Tag = "tag",

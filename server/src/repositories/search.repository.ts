@@ -27,7 +27,7 @@ import {
 } from 'src/utils/database';
 import { without } from 'src/utils/filter-suggestions';
 import { paginationHelper, PaginationOptions } from 'src/utils/pagination';
-import { spaceAssetPathBranches } from 'src/utils/shared-space-album-scope';
+import { spaceAssetPathBranches, spaceVisibilityGate } from 'src/utils/shared-space-album-scope';
 import z from 'zod';
 
 export interface SearchAssetIdOptions {
@@ -1210,19 +1210,17 @@ export class SearchRepository {
       .$if(!options?.spaceId && !options?.timelineSpaceIds, (qb) => qb.where('asset.ownerId', '=', anyUuid(userIds)))
       .$if(!!options?.spaceId && !options?.timelineSpaceIds, (qb) =>
         qb.where((eb) =>
-          eb.or([
-            eb.exists(
-              eb
-                .selectFrom('shared_space_asset')
-                .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-                .where('shared_space_asset.spaceId', '=', asUuid(options!.spaceId!)),
+          eb.and([
+            eb.or(
+              spaceAssetPathBranches(eb, {
+                correlateAssetId: 'asset.id',
+                correlateLibraryId: 'asset.libraryId',
+                scope: { spaceId: options!.spaceId! },
+                requireShowInTimeline: true,
+              }),
             ),
-            eb.exists(
-              eb
-                .selectFrom('shared_space_library')
-                .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                .where('shared_space_library.spaceId', '=', asUuid(options!.spaceId!)),
-            ),
+            // M3: caller's own assets bypass space-visibility gate; others must be Archive/Timeline.
+            eb.or([eb('asset.ownerId', '=', anyUuid(userIds)), spaceVisibilityGate(eb)]),
           ]),
         ),
       )
@@ -1230,18 +1228,17 @@ export class SearchRepository {
         qb.where((eb) =>
           eb.or([
             eb('asset.ownerId', '=', anyUuid(userIds)),
-            eb.exists(
-              eb
-                .selectFrom('shared_space_asset')
-                .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-                .where('shared_space_asset.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
-            ),
-            eb.exists(
-              eb
-                .selectFrom('shared_space_library')
-                .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                .where('shared_space_library.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
-            ),
+            eb.and([
+              eb('asset.visibility', '=', AssetVisibility.Timeline),
+              eb.or(
+                spaceAssetPathBranches(eb, {
+                  correlateAssetId: 'asset.id',
+                  correlateLibraryId: 'asset.libraryId',
+                  scope: { spaceIds: options!.timelineSpaceIds! },
+                  requireShowInTimeline: true,
+                }),
+              ),
+            ]),
           ]),
         ),
       )
@@ -1319,27 +1316,39 @@ export class SearchRepository {
                   .where('album_asset.albumId', '=', asUuid(options!.albumId!)),
               ),
               eb.or([
-                eb('asset.ownerId', '=', anyUuid(userIds)),
-                eb.exists(
-                  eb
-                    .selectFrom('album_user')
-                    .whereRef('album_user.userId', '=', 'asset.ownerId')
-                    .where('album_user.albumId', '=', asUuid(options!.albumId!)),
-                ),
+                // I1: unlike the plain-asset search path, getFilterSuggestions calls into
+                // applySuggestionScope with no upstream visibility resolution — so "caller's own
+                // assets follow the resolved visibility applied upstream" does NOT hold here. Gate
+                // the owner's own assets too (Archive + Timeline), matching the album grid's
+                // withDefaultVisibility, so the caller's own Hidden/Locked album asset can't feed a
+                // facet value either. albumId arm ONLY — the sibling spaceId/timelineSpaceIds arms
+                // below keep their deliberate M3 own-asset exception.
+                eb.and([spaceVisibilityGate(eb), eb('asset.ownerId', '=', anyUuid(userIds))]),
+                // Other album participants' assets: Archive + Timeline only (mirrors the
+                // album view's withDefaultVisibility — Hidden/Locked never surface for
+                // other members, matching the sibling spaceId/timelineSpaceIds branches).
+                eb.and([
+                  spaceVisibilityGate(eb),
+                  eb.exists(
+                    eb
+                      .selectFrom('album_user')
+                      .whereRef('album_user.userId', '=', 'asset.ownerId')
+                      .where('album_user.albumId', '=', asUuid(options!.albumId!)),
+                  ),
+                ]),
+                // Space-linked assets via timeline opt-in: also gate on Archive + Timeline.
                 ...(options?.timelineSpaceIds?.length
                   ? [
-                      eb.exists(
-                        eb
-                          .selectFrom('shared_space_asset')
-                          .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-                          .where('shared_space_asset.spaceId', '=', anyUuid(options.timelineSpaceIds)),
-                      ),
-                      eb.exists(
-                        eb
-                          .selectFrom('shared_space_library')
-                          .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                          .where('shared_space_library.spaceId', '=', anyUuid(options.timelineSpaceIds)),
-                      ),
+                      eb.and([
+                        spaceVisibilityGate(eb),
+                        eb.or(
+                          spaceAssetPathBranches(eb, {
+                            correlateAssetId: 'asset.id',
+                            correlateLibraryId: 'asset.libraryId',
+                            scope: { spaceIds: options.timelineSpaceIds },
+                          }),
+                        ),
+                      ]),
                     ]
                   : []),
               ]),
@@ -1351,38 +1360,38 @@ export class SearchRepository {
         )
         .$if(!!options?.spaceId && !options?.timelineSpaceIds && !options?.albumId, (qb) =>
           qb.where((eb) =>
-            eb.or([
-              eb.exists(
-                eb
-                  .selectFrom('shared_space_asset')
-                  .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-                  .where('shared_space_asset.spaceId', '=', asUuid(options!.spaceId!)),
+            eb.and([
+              eb.or(
+                spaceAssetPathBranches(eb, {
+                  correlateAssetId: 'asset.id',
+                  correlateLibraryId: 'asset.libraryId',
+                  scope: { spaceId: options!.spaceId! },
+                  requireShowInTimeline: true,
+                }),
               ),
-              eb.exists(
-                eb
-                  .selectFrom('shared_space_library')
-                  .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                  .where('shared_space_library.spaceId', '=', asUuid(options!.spaceId!)),
-              ),
+              // M3: the caller's own assets bypass the space-visibility gate (own-M3);
+              // every other member's asset must be Archive or Timeline.
+              eb.or([eb('asset.ownerId', '=', anyUuid(userIds)), spaceVisibilityGate(eb)]),
             ]),
           ),
         )
         .$if(!!options?.timelineSpaceIds && !options?.albumId, (qb) =>
           qb.where((eb) =>
             eb.or([
+              // Caller's own assets follow the resolved visibility applied above.
               eb('asset.ownerId', '=', anyUuid(userIds)),
-              eb.exists(
-                eb
-                  .selectFrom('shared_space_asset')
-                  .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-                  .where('shared_space_asset.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
-              ),
-              eb.exists(
-                eb
-                  .selectFrom('shared_space_library')
-                  .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                  .where('shared_space_library.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
-              ),
+              // Other members' assets: Timeline only + showInTimeline=true album path.
+              eb.and([
+                eb('asset.visibility', '=', AssetVisibility.Timeline),
+                eb.or(
+                  spaceAssetPathBranches(eb, {
+                    correlateAssetId: 'asset.id',
+                    correlateLibraryId: 'asset.libraryId',
+                    scope: { spaceIds: options!.timelineSpaceIds! },
+                    requireShowInTimeline: true,
+                  }),
+                ),
+              ]),
             ]),
           ),
         )

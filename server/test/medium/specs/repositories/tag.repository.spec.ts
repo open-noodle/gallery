@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import { SharedSpaceRole } from 'src/enum';
+import { AssetVisibility, SharedSpaceRole } from 'src/enum';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { TagRepository } from 'src/repositories/tag.repository';
 import { DB } from 'src/schema';
@@ -38,6 +38,21 @@ const seedDirectSpaceTag = async (ctx: Ctx, role: SharedSpaceRole, value: string
   await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
   await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role });
   return { owner, member, space, asset, tag };
+};
+
+// Seed a tag attached to an asset reachable through an album linked to a space.
+const seedLinkedAlbumTag = async (ctx: Ctx, role: SharedSpaceRole, value: string) => {
+  const { user: owner } = await ctx.newUser();
+  const { user: member } = await ctx.newUser();
+  const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+  const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: `AlbumTag-${value}` });
+  await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+  const { asset } = await ctx.newAsset({ ownerId: owner.id });
+  await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+  const tag = await createTag(ctx, owner.id, value);
+  await ctx.newTagAsset({ tagIds: [tag.id], assetIds: [asset.id] });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role });
+  return { owner, member, space, album, asset, tag };
 };
 
 // Seed a tag attached to an asset reachable through a library linked to a space.
@@ -356,6 +371,15 @@ describe(TagRepository.name, () => {
       expect(result.map((t) => t.id)).toContain(tag.id);
     });
 
+    it.each(ALL_ROLES)('GRANT — space %s sees a tag on an asset in an album linked to the space', async (role) => {
+      const { ctx, sut } = setup();
+      const { member, tag } = await seedLinkedAlbumTag(ctx, role, `album/${role}`);
+
+      const result = await sut.getAll(member.id);
+
+      expect(result.map((t) => t.id)).toContain(tag.id);
+    });
+
     it('GRANT — member sees the tag even when showInTimeline is disabled', async () => {
       const { ctx, sut } = setup();
       const { member, space, tag } = await seedDirectSpaceTag(ctx, SharedSpaceRole.Viewer, 'direct/no-timeline');
@@ -443,6 +467,95 @@ describe(TagRepository.name, () => {
         .execute();
 
       await expect(sut.getAll(member.id).then((r) => r.map((t) => t.id))).resolves.not.toContain(tag.id);
+    });
+
+    // ── Slice 5: visibility gate — Hidden/Locked space assets must not leak their tags ──
+    it('DENY — member does not see a tag on another member Hidden space asset', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+      // Asset is Hidden — must not surface its tag to another member
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Hidden });
+      const tag = await createTag(ctx, owner.id, 'hidden-asset-tag');
+      await ctx.newTagAsset({ tagIds: [tag.id], assetIds: [asset.id] });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+
+      const result = await sut.getAll(member.id);
+
+      expect(result.map((t) => t.id)).not.toContain(tag.id);
+    });
+
+    it('DENY — member does not see a tag on another member Locked space asset', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Locked });
+      const tag = await createTag(ctx, owner.id, 'locked-asset-tag');
+      await ctx.newTagAsset({ tagIds: [tag.id], assetIds: [asset.id] });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+
+      const result = await sut.getAll(member.id);
+
+      expect(result.map((t) => t.id)).not.toContain(tag.id);
+    });
+
+    it('DENY — member does not see a tag on a Hidden asset in a library linked to the space', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      const { library } = await ctx.newLibrary({ ownerId: owner.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+      const { asset } = await ctx.newAsset({
+        ownerId: owner.id,
+        libraryId: library.id,
+        visibility: AssetVisibility.Hidden,
+      });
+      const tag = await createTag(ctx, owner.id, 'hidden-library-tag');
+      await ctx.newTagAsset({ tagIds: [tag.id], assetIds: [asset.id] });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+
+      const result = await sut.getAll(member.id);
+
+      expect(result.map((t) => t.id)).not.toContain(tag.id);
+    });
+
+    it('DENY — member does not see a tag on a Hidden asset in an album linked to the space', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'TagHiddenAlbum' });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Hidden });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+      const tag = await createTag(ctx, owner.id, 'hidden-album-tag');
+      await ctx.newTagAsset({ tagIds: [tag.id], assetIds: [asset.id] });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+
+      const result = await sut.getAll(member.id);
+
+      expect(result.map((t) => t.id)).not.toContain(tag.id);
+    });
+
+    it('GRANT — member sees a tag on an Archive asset (Archive is space-shareable)', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Archive });
+      const tag = await createTag(ctx, owner.id, 'archive-asset-tag');
+      await ctx.newTagAsset({ tagIds: [tag.id], assetIds: [asset.id] });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+
+      const result = await sut.getAll(member.id);
+
+      expect(result.map((t) => t.id)).toContain(tag.id);
     });
 
     it('GRANT — member sees same-value tags from every owner who shared a tagged asset', async () => {

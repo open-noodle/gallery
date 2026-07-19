@@ -1,4 +1,5 @@
 import {
+  AfterUpdateTrigger,
   Column,
   CreateDateColumn,
   DeleteDateColumn,
@@ -11,10 +12,21 @@ import {
 } from '@immich/sql-tools';
 import { UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
 import { AssetOrder } from 'src/enum';
+import { album_soft_delete_shared_space_album } from 'src/schema/functions';
 import { AssetTable } from 'src/schema/tables/asset.table';
 
 @Table({ name: 'album' })
 @UpdatedAtTrigger('album_updatedAt')
+// gallery-fork: on album soft-delete/restore (the user-deletion trash window),
+// tombstone/re-create shared_space_album grants + link rows. Body-guarded to real
+// deletedAt transitions. See the function comment in schema/functions.ts.
+@AfterUpdateTrigger({
+  name: 'album_soft_delete_shared_space_album',
+  scope: 'statement',
+  referencingOldTableAs: 'old_rows',
+  referencingNewTableAs: 'new_rows',
+  function: album_soft_delete_shared_space_album,
+})
 export class AlbumTable {
   @PrimaryGeneratedColumn()
   id!: Generated<string>;

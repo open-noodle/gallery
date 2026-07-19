@@ -296,6 +296,11 @@ export interface ISharedSpaceLibraryFaceSyncJob extends IBaseJob {
   libraryId: string;
 }
 
+export interface ISharedSpaceAlbumFaceSyncJob extends IBaseJob {
+  spaceId: string;
+  albumId: string;
+}
+
 export interface ISharedSpaceIdentityReconciliationJob extends IBaseJob {
   spaceId: string;
   userId?: string;
@@ -317,6 +322,10 @@ export interface ISharedSpacePersonMetadataBackfillJob extends IBaseJob {
 export interface ISharedSpaceBulkAddAssetsJob extends IBaseJob {
   spaceId: string;
   userId: string;
+}
+
+export interface ISharedSpaceAlbumGrantReconcileJob extends IBaseJob {
+  albumIds: string[];
 }
 
 export type EmailImageAttachment = {
@@ -563,12 +572,17 @@ export type JobItem =
   | { name: JobName.SharedSpaceFaceMatchPage; data: ISharedSpaceFaceMatchPageJob }
   | { name: JobName.SharedSpaceFaceMatchFromBackfill; data: ISharedSpaceFaceMatchJob }
   | { name: JobName.SharedSpaceLibraryFaceSync; data: ISharedSpaceLibraryFaceSyncJob }
+  | { name: JobName.SharedSpaceAlbumFaceSync; data: ISharedSpaceAlbumFaceSyncJob }
   | { name: JobName.SharedSpaceIdentityReconciliation; data: ISharedSpaceIdentityReconciliationJob }
   | { name: JobName.SharedSpacePersonDedup; data: ISharedSpacePersonDedupJob }
   | { name: JobName.SharedSpacePersonMetadataBackfill; data: ISharedSpacePersonMetadataBackfillJob }
 
   // Shared Space Bulk Operations
   | { name: JobName.SharedSpaceBulkAddAssets; data: ISharedSpaceBulkAddAssetsJob }
+
+  // Shared Space Album Grant Reconciliation
+  | { name: JobName.SharedSpaceAlbumGrantReconcile; data: ISharedSpaceAlbumGrantReconcileJob }
+  | { name: JobName.SharedSpaceAlbumGrantReconcileSweep; data?: IBaseJob }
 
   // Classification
   | { name: JobName.AssetClassifyQueueAll; data: IBaseJob }

@@ -303,11 +303,14 @@ export class DuplicateService extends BaseService {
 
     response.assetUpdate.isFavorite = assets.some((asset) => asset.isFavorite);
 
-    const visibilityOrder = [AssetVisibility.Locked, AssetVisibility.Archive, AssetVisibility.Timeline];
-    let visibility = visibilityOrder.find((level) => assets.some((asset) => asset.visibility === level));
-    if (!visibility && assets.some((asset) => asset.visibility === AssetVisibility.Hidden)) {
-      visibility = AssetVisibility.Hidden;
-    }
+    // R1: `assets` always comes from duplicateRepository.get, which applies withDefaultVisibility
+    // (Archive+Timeline only) — a duplicate group/keeper can never contain a Locked or Hidden asset, so
+    // there is no branch for either here. Follow-up (out of scope for this cleanup): route the
+    // visibility write through the shared applyVisibilityTransitionSideEffects-style transition helper
+    // instead of a raw assetRepository.updateAll to close the TOCTOU window between this read and the
+    // write below.
+    const visibilityOrder = [AssetVisibility.Archive, AssetVisibility.Timeline];
+    const visibility = visibilityOrder.find((level) => assets.some((asset) => asset.visibility === level));
     if (visibility) {
       response.assetUpdate.visibility = visibility;
     }

@@ -125,6 +125,18 @@ class AlbumApiRepository extends ApiRepository {
     );
     return response.isActivityEnabled;
   }
+
+  /// The shared spaces [albumId] is linked into (M8: owner recourse to view/revoke).
+  ///
+  /// `AlbumResponseDto.sharedSpaceLinks` is owner-only and NOT part of the Drift sync
+  /// stream (see `RemoteAlbum` — no such field), so it must be fetched live via
+  /// `GET /albums/:id`. The server omits the field entirely for non-owner callers and
+  /// for an album with no links (album.service.ts, rbac-6), in which case this returns
+  /// an empty list rather than null.
+  Future<List<AlbumSharedSpaceLinkResponseDto>> getSharedSpaceLinks(String albumId) async {
+    final response = await checkNull(_api.getAlbumInfo(albumId));
+    return response.sharedSpaceLinks.orElse(null) ?? const [];
+  }
 }
 
 extension on AlbumResponseDto {

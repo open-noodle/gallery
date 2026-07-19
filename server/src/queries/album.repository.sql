@@ -166,7 +166,7 @@ where
 
 -- AlbumRepository.getMetadataForIds
 select
-  "album_asset"."albumId" as "albumId",
+  "album_members"."albumId" as "albumId",
   min(
     ("asset"."localDateTime" AT TIME ZONE 'UTC'::text)::date
   ) as "startDate",
@@ -177,13 +177,62 @@ select
   count("asset"."id")::int as "assetCount"
 from
   "asset"
-  inner join "album_asset" on "album_asset"."assetId" = "asset"."id"
+  inner join (
+    select
+      "album_asset"."albumId" as "albumId",
+      "album_asset"."assetId" as "assetId"
+    from
+      "album_asset"
+    where
+      "album_asset"."albumId" in ($1)
+  ) as "album_members" on "album_members"."assetId" = "asset"."id"
 where
   "asset"."visibility" in ('archive', 'timeline')
-  and "album_asset"."albumId" in ($1)
   and "asset"."deletedAt" is null
 group by
-  "album_asset"."albumId"
+  "album_members"."albumId"
+
+-- AlbumRepository.getMetadataForIds
+select
+  "album_members"."albumId" as "albumId",
+  min(
+    ("asset"."localDateTime" AT TIME ZONE 'UTC'::text)::date
+  ) as "startDate",
+  max(
+    ("asset"."localDateTime" AT TIME ZONE 'UTC'::text)::date
+  ) as "endDate",
+  max("asset"."updatedAt") as "lastModifiedAssetTimestamp",
+  count("asset"."id")::int as "assetCount"
+from
+  "asset"
+  inner join (
+    select
+      "album_asset"."albumId" as "albumId",
+      "album_asset"."assetId" as "assetId"
+    from
+      "album_asset"
+    where
+      "album_asset"."albumId" in ($1)
+    union
+    select
+      "album_space_asset"."albumId" as "albumId",
+      "album_space_asset"."assetId" as "assetId"
+    from
+      "album_space_asset"
+      inner join "shared_space_album" on "shared_space_album"."albumId" = "album_space_asset"."albumId"
+      and "shared_space_album"."spaceId" = "album_space_asset"."spaceId"
+      inner join "album" on "album"."id" = "album_space_asset"."albumId"
+      and "album"."deletedAt" is null
+      inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+      and "shared_space_member"."userId" = $2::uuid
+    where
+      "album_space_asset"."albumId" in ($3)
+  ) as "album_members" on "album_members"."assetId" = "asset"."id"
+where
+  "asset"."visibility" in ('archive', 'timeline')
+  and "asset"."deletedAt" is null
+group by
+  "album_members"."albumId"
 
 -- AlbumRepository.getAll
 select
@@ -410,6 +459,9 @@ order by
 delete from "album_asset"
 where
   "album_asset"."assetId" in ($1)
+delete from "album_space_asset"
+where
+  "album_space_asset"."assetId" in ($1)
 
 -- AlbumRepository.getAssetIds
 select
@@ -421,6 +473,7 @@ where
   and "album_asset"."assetId" in ($2)
 
 -- AlbumRepository.addAssetIds
+begin
 insert into
   "album_asset"
 select
@@ -431,6 +484,23 @@ from
     select
       1
   ) as "dummy"
+on conflict do nothing
+rollback
+
+-- AlbumRepository.getContributedAssetIds
+select
+  "album_space_asset"."assetId"
+from
+  "album_space_asset"
+where
+  "album_space_asset"."albumId" = $1
+  and "album_space_asset"."assetId" in ($2)
+
+-- AlbumRepository.addContributedAssets
+insert into
+  "album_space_asset" ("albumId", "assetId", "spaceId", "addedById")
+values
+  ($1, $2, $3, $4)
 on conflict do nothing
 
 -- AlbumRepository.create
@@ -541,6 +611,7 @@ from
 where
   "asset"."deletedAt" is null
   and "album_asset"."albumId" = $1
+  and "asset"."visibility" in ('archive', 'timeline')
 group by
   "asset"."ownerId"
 order by
