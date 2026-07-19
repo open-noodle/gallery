@@ -83,6 +83,92 @@ void main() {
     );
   }
 
+  // Drives one streamChanges call end-to-end (empty response stream), then
+  // reads back the request body the SUT sent so we can assert on `types`.
+  // The request is populated (body set) before client.send, and the mock
+  // captures the object by reference, so reading .body afterwards is valid.
+  Future<List<String>> capturedRequestTypes(SemVer serverVersion) async {
+    final future = streamChanges((_, _, _) async {}, serverVersion);
+    await Future.delayed(const Duration(milliseconds: 50));
+    await responseStreamController.close();
+    await future;
+
+    final captured = verify(() => mockHttpClient.send(captureAny())).captured;
+    final request = captured.single as http.Request; // AbortableRequest extends Request
+    final body = jsonDecode(request.body) as Map<String, dynamic>;
+    return (body['types'] as List).cast<String>();
+  }
+
+  group('mobile-1: SharedSpaceAlbum request-type version gate', () {
+    const albumTypes = <String>[
+      'SharedSpaceAlbumsV1',
+      'SharedSpaceAlbumLinksV1',
+      'SharedSpaceAlbumToAssetsV1',
+      'SharedSpaceAlbumAssetsV1',
+      'SharedSpaceAlbumAssetExifsV1',
+    ];
+
+    test('v5.0.0 (last pre-feature release): EXCLUDES all 5 album types', () async {
+      final types = await capturedRequestTypes(const SemVer(major: 5, minor: 0, patch: 0));
+      expect(albumTypes.any(types.contains), isFalse, reason: 'v5.0.0 has no SharedSpaceAlbum enum values');
+      // Unconditional fork types are unaffected.
+      expect(types, contains('SharedSpacesV1'));
+      expect(types, contains('SharedSpaceLibrariesV1'));
+    });
+
+    test('old upstream-numbered fork server (3.0.1): EXCLUDES all 5 album types (fail-safe to old)', () async {
+      final types = await capturedRequestTypes(const SemVer(major: 3, minor: 0, patch: 1));
+      expect(albumTypes.any(types.contains), isFalse);
+    });
+
+    test('v5.0.1 (first possible post-release): INCLUDES all 5 album types', () async {
+      final types = await capturedRequestTypes(const SemVer(major: 5, minor: 0, patch: 1));
+      expect(albumTypes.every(types.contains), isTrue);
+    });
+
+    test('feature release v5.1.0 (at/above the feature boundary): INCLUDES all 5 album types', () async {
+      final types = await capturedRequestTypes(const SemVer(major: 5, minor: 1, patch: 0));
+      expect(albumTypes.every(types.contains), isTrue);
+    });
+
+    test('feature release-candidate v5.1.0-rc.0: INCLUDES all 5 album types (RC validation)', () async {
+      final types = await capturedRequestTypes(const SemVer(major: 5, minor: 1, patch: 0, prerelease: 0));
+      expect(albumTypes.every(types.contains), isTrue);
+    });
+
+    test('far-future v6.0.0: INCLUDES all 5 album types', () async {
+      final types = await capturedRequestTypes(const SemVer(major: 6, minor: 0, patch: 0));
+      expect(albumTypes.every(types.contains), isTrue);
+    });
+
+    test('M14: every SharedSpaceAlbum* SyncRequestType enum value is inside the version gate', () async {
+      // Guards the invariant the tests above only spot-check with the hardcoded `albumTypes`
+      // list: derives the "must be gated" set from the generated SyncRequestType.values enum
+      // itself, so a future fork-only SharedSpaceAlbum* type landing in the enum without being
+      // added to the `serverVersion > SemVer(5, 0, 0)` gate in sync_api.repository.dart fails
+      // here even if `albumTypes` above is never updated to match — the exact regression class
+      // the mobile-1 gate exists to prevent (a whole-stream 400 outage on an older server).
+      final forkAlbumTypes = SyncRequestType.values
+          .map((t) => t.value)
+          .where((v) => v.startsWith('SharedSpaceAlbum'))
+          .toSet();
+
+      final ungated = (await capturedRequestTypes(const SemVer(major: 5, minor: 0, patch: 0))).toSet();
+      expect(
+        ungated.intersection(forkAlbumTypes),
+        isEmpty,
+        reason: 'every SharedSpaceAlbum* SyncRequestType must be inside the version gate',
+      );
+
+      final gated = (await capturedRequestTypes(const SemVer(major: 6, minor: 0, patch: 0))).toSet();
+      expect(
+        forkAlbumTypes.difference(gated),
+        isEmpty,
+        reason: 'every SharedSpaceAlbum* SyncRequestType must be sent once the version gate is satisfied',
+      );
+    });
+  });
+
   test('streamChanges stops processing stream when abort is called', () async {
     int onDataCallCount = 0;
     bool abortWasCalledInCallback = false;

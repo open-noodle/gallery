@@ -1,8 +1,8 @@
-import { AssetMediaResponseDto, LoginResponseDto, SharedSpaceRole } from '@immich/sdk';
+import { AssetMediaResponseDto, AssetVisibility, LoginResponseDto, SharedSpaceRole, updateAssets } from '@immich/sdk';
 import { authHeaders, forEachActor, type Actor } from 'src/actors';
 import { createUserDto } from 'src/fixtures';
 import { errorDto } from 'src/responses';
-import { app, utils } from 'src/utils';
+import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -525,6 +525,41 @@ describe('/shared-spaces', () => {
 
       expect(status).toBe(403);
     });
+
+    // security-9: a non-UUID path param must 400 (route-param DTO validation), not fall through to
+    // Postgres and surface as a raw 500.
+    it('returns 400 (not 500) for a non-UUID member userId path param', async () => {
+      const space = await utils.createSpace(user1.accessToken, { name: 'Non-UUID Member Param' });
+
+      const { status } = await request(app)
+        .patch(`/shared-spaces/${space.id}/members/not-a-uuid`)
+        .set('Authorization', `Bearer ${user1.accessToken}`)
+        .send({ role: SharedSpaceRole.Editor });
+
+      expect(status).toBe(400);
+    });
+
+    // rbac-4 / testq-6: unit tests for this guard mostly stub the space lookup away entirely (fail-open
+    // happy path); this e2e negative exercises the real DB row so it survives regardless of whether the
+    // service-level guard is fail-open or fail-closed. user1 creates the space (creator); user2 is
+    // promoted to a co-Owner — a co-Owner must still not be able to demote the creator.
+    it('rejects a co-Owner demoting the space creator', async () => {
+      const space = await utils.createSpace(user1.accessToken, { name: 'Co-Owner Demote Creator Neg' });
+      await utils.addSpaceMember(user1.accessToken, space.id, { userId: user2.userId, role: SharedSpaceRole.Owner });
+
+      const { status } = await request(app)
+        .patch(`/shared-spaces/${space.id}/members/${user1.userId}`)
+        .set('Authorization', `Bearer ${user2.accessToken}`)
+        .send({ role: SharedSpaceRole.Viewer });
+
+      expect(status).toBe(403);
+
+      // The creator must still be Owner — the demotion did not apply.
+      const { body: members } = await request(app)
+        .get(`/shared-spaces/${space.id}/members`)
+        .set('Authorization', `Bearer ${user1.accessToken}`);
+      expect(members).toContainEqual(expect.objectContaining({ userId: user1.userId, role: SharedSpaceRole.Owner }));
+    });
   });
 
   describe('GET /shared-spaces/:id/members', () => {
@@ -823,12 +858,13 @@ describe('/shared-spaces', () => {
       const space = await utils.createSpace(user1.accessToken, { name: 'Remove Asset Owner' });
       await utils.addSpaceAssets(user1.accessToken, space.id, [user1Asset1.id]);
 
-      const { status } = await request(app)
+      const { status, body } = await request(app)
         .delete(`/shared-spaces/${space.id}/assets`)
         .set('Authorization', `Bearer ${user1.accessToken}`)
         .send({ assetIds: [user1Asset1.id] });
 
-      expect(status).toBe(204);
+      expect(status).toBe(200);
+      expect(body).toEqual([user1Asset1.id]);
 
       // Verify asset was removed
       const { body: spaceDetail } = await request(app)
@@ -843,12 +879,13 @@ describe('/shared-spaces', () => {
       await utils.addSpaceMember(user1.accessToken, space.id, { userId: user2.userId, role: SharedSpaceRole.Editor });
       await utils.addSpaceAssets(user1.accessToken, space.id, [user1Asset1.id]);
 
-      const { status } = await request(app)
+      const { status, body } = await request(app)
         .delete(`/shared-spaces/${space.id}/assets`)
         .set('Authorization', `Bearer ${user2.accessToken}`)
         .send({ assetIds: [user1Asset1.id] });
 
-      expect(status).toBe(204);
+      expect(status).toBe(200);
+      expect(body).toEqual([user1Asset1.id]);
     });
 
     it('should reject viewer removing assets', async () => {
@@ -1031,6 +1068,30 @@ describe('/shared-spaces', () => {
       expect(spaceIds).not.toContain(space.id);
     });
 
+    it('revokes access to the space people once a member leaves', async () => {
+      const space = await utils.createSpace(user1.accessToken, { name: 'Leave Revokes People Access' });
+      await utils.addSpaceMember(user1.accessToken, space.id, { userId: user2.userId });
+
+      // While still a member, user2 can read the space's people listing.
+      const before = await request(app)
+        .get(`/shared-spaces/${space.id}/people`)
+        .set('Authorization', `Bearer ${user2.accessToken}`);
+      expect(before.status).toBe(200);
+
+      // user2 leaves the space (self-remove).
+      const leave = await request(app)
+        .delete(`/shared-spaces/${space.id}/members/${user2.userId}`)
+        .set('Authorization', `Bearer ${user2.accessToken}`);
+      expect(leave.status).toBe(204);
+
+      // After leaving, user2 is a non-member → people access is forbidden (403), matching the
+      // non-member case of the GET /people access matrix.
+      const after = await request(app)
+        .get(`/shared-spaces/${space.id}/people`)
+        .set('Authorization', `Bearer ${user2.accessToken}`);
+      expect(after.status).toBe(403);
+    });
+
     it('should reject owner leaving own space', async () => {
       const space = await utils.createSpace(user1.accessToken, { name: 'Owner Leave' });
 
@@ -1081,6 +1142,27 @@ describe('/shared-spaces', () => {
         .set('Authorization', `Bearer ${user2.accessToken}`);
 
       expect(status).toBe(403);
+    });
+
+    // rbac-4 / testq-6: unit tests for this guard mostly stub the space lookup away entirely (fail-open
+    // happy path); this e2e negative exercises the real DB row so it survives regardless of whether the
+    // service-level guard is fail-open or fail-closed. user1 creates the space (creator); user2 is
+    // promoted to a co-Owner — a co-Owner must still not be able to remove the creator.
+    it('rejects a co-Owner removing the space creator', async () => {
+      const space = await utils.createSpace(user1.accessToken, { name: 'Co-Owner Remove Creator Neg' });
+      await utils.addSpaceMember(user1.accessToken, space.id, { userId: user2.userId, role: SharedSpaceRole.Owner });
+
+      const { status } = await request(app)
+        .delete(`/shared-spaces/${space.id}/members/${user1.userId}`)
+        .set('Authorization', `Bearer ${user2.accessToken}`);
+
+      expect(status).toBe(403);
+
+      // The creator must still be a member — the removal did not apply.
+      const { body: members } = await request(app)
+        .get(`/shared-spaces/${space.id}/members`)
+        .set('Authorization', `Bearer ${user1.accessToken}`);
+      expect(members).toContainEqual(expect.objectContaining({ userId: user1.userId, role: SharedSpaceRole.Owner }));
     });
   });
 
@@ -1331,6 +1413,115 @@ describe('/shared-spaces', () => {
         .get(`/assets/${user1Asset1.id}/original`)
         .set('Authorization', `Bearer ${user2.accessToken}`);
 
+      expect(status).toBe(200);
+    });
+  });
+
+  // ─── Slice 3: visibility gate — Hidden/Locked assets are never exposed via space ───────────────
+
+  describe('checkSpaceAccess visibility gate (Slice 3) — Hidden/Locked assets blocked', () => {
+    /**
+     * user1 owns the space and assets. user2 is a plain viewer member.
+     * For each test a fresh space + asset pair is created to avoid state leakage.
+     *
+     * Endpoints tested per the brief:
+     *   GET /assets/:id            (AssetRead)
+     *   GET /assets/:id/original   (AssetDownload)
+     *   GET /assets/:id/thumbnail  (AssetView)
+     */
+
+    it('member CANNOT read a Locked direct-space asset (GET /assets/:id → 400)', async () => {
+      // Add while Timeline (the add-assets endpoint rejects Locked and filters Hidden), THEN flip —
+      // the real "added-then-locked" scenario the checkSpaceAccess gate must catch.
+      const asset = await utils.createAsset(user1.accessToken);
+      const space = await utils.createSpace(user1.accessToken, { name: 'Locked Read Block' });
+      await utils.addSpaceMember(user1.accessToken, space.id, { userId: user2.userId });
+      await utils.addSpaceAssets(user1.accessToken, space.id, [asset.id]);
+      await updateAssets(
+        { assetBulkUpdateDto: { ids: [asset.id], visibility: AssetVisibility.Locked } },
+        { headers: asBearerAuth(user1.accessToken) },
+      );
+
+      const { status } = await request(app)
+        .get(`/assets/${asset.id}`)
+        .set('Authorization', `Bearer ${user2.accessToken}`);
+      expect(status).toBe(400);
+    });
+
+    it('member CANNOT download a Locked direct-space asset (GET /assets/:id/original → 400)', async () => {
+      const asset = await utils.createAsset(user1.accessToken);
+      const space = await utils.createSpace(user1.accessToken, { name: 'Locked Download Block' });
+      await utils.addSpaceMember(user1.accessToken, space.id, { userId: user2.userId });
+      await utils.addSpaceAssets(user1.accessToken, space.id, [asset.id]);
+      await updateAssets(
+        { assetBulkUpdateDto: { ids: [asset.id], visibility: AssetVisibility.Locked } },
+        { headers: asBearerAuth(user1.accessToken) },
+      );
+
+      const { status } = await request(app)
+        .get(`/assets/${asset.id}/original`)
+        .set('Authorization', `Bearer ${user2.accessToken}`);
+      expect(status).toBe(400);
+    });
+
+    it('member CANNOT view thumbnail of a Locked direct-space asset (GET /assets/:id/thumbnail → 400)', async () => {
+      const asset = await utils.createAsset(user1.accessToken);
+      const space = await utils.createSpace(user1.accessToken, { name: 'Locked Thumb Block' });
+      await utils.addSpaceMember(user1.accessToken, space.id, { userId: user2.userId });
+      await utils.addSpaceAssets(user1.accessToken, space.id, [asset.id]);
+      await updateAssets(
+        { assetBulkUpdateDto: { ids: [asset.id], visibility: AssetVisibility.Locked } },
+        { headers: asBearerAuth(user1.accessToken) },
+      );
+
+      const { status } = await request(app)
+        .get(`/assets/${asset.id}/thumbnail`)
+        .set('Authorization', `Bearer ${user2.accessToken}`);
+      expect(status).toBe(400);
+    });
+
+    it('member CANNOT read a Hidden direct-space asset (GET /assets/:id → 400)', async () => {
+      const asset = await utils.createAsset(user1.accessToken);
+      const space = await utils.createSpace(user1.accessToken, { name: 'Hidden Read Block' });
+      await utils.addSpaceMember(user1.accessToken, space.id, { userId: user2.userId });
+      await utils.addSpaceAssets(user1.accessToken, space.id, [asset.id]);
+      await updateAssets(
+        { assetBulkUpdateDto: { ids: [asset.id], visibility: AssetVisibility.Hidden } },
+        { headers: asBearerAuth(user1.accessToken) },
+      );
+
+      const { status } = await request(app)
+        .get(`/assets/${asset.id}`)
+        .set('Authorization', `Bearer ${user2.accessToken}`);
+      expect(status).toBe(400);
+    });
+
+    it('member CAN read a Timeline direct-space asset (GET /assets/:id → 200)', async () => {
+      const asset = await utils.createAsset(user1.accessToken);
+      // Default visibility is Timeline; no update needed
+      const space = await utils.createSpace(user1.accessToken, { name: 'Timeline Read Allow' });
+      await utils.addSpaceMember(user1.accessToken, space.id, { userId: user2.userId });
+      await utils.addSpaceAssets(user1.accessToken, space.id, [asset.id]);
+
+      const { status } = await request(app)
+        .get(`/assets/${asset.id}`)
+        .set('Authorization', `Bearer ${user2.accessToken}`);
+      expect(status).toBe(200);
+    });
+
+    it('member CAN read an Archive direct-space asset (GET /assets/:id → 200)', async () => {
+      const asset = await utils.createAsset(user1.accessToken);
+      await updateAssets(
+        { assetBulkUpdateDto: { ids: [asset.id], visibility: AssetVisibility.Archive } },
+        { headers: asBearerAuth(user1.accessToken) },
+      );
+      const space = await utils.createSpace(user1.accessToken, { name: 'Archive Read Allow' });
+      await utils.addSpaceMember(user1.accessToken, space.id, { userId: user2.userId });
+      await utils.addSpaceAssets(user1.accessToken, space.id, [asset.id]);
+
+      const { status } = await request(app)
+        .get(`/assets/${asset.id}`)
+        .set('Authorization', `Bearer ${user2.accessToken}`);
       expect(status).toBe(200);
     });
   });

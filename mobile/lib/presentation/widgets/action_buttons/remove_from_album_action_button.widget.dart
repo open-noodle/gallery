@@ -16,12 +16,17 @@ class RemoveFromAlbumActionButton extends ConsumerWidget {
   final bool iconOnly;
   final bool menuItem;
 
+  /// Optional callback invoked after a successful remove-from-album action.
+  /// Used by [SpaceAlbumBottomSheet] to fire the sync-nudge (B6).
+  final VoidCallback? onComplete;
+
   const RemoveFromAlbumActionButton({
     super.key,
     required this.albumId,
     required this.source,
     this.iconOnly = false,
     this.menuItem = false,
+    this.onComplete,
   });
 
   Future<void> _onTap(BuildContext context, WidgetRef ref) async {
@@ -35,6 +40,7 @@ class RemoveFromAlbumActionButton extends ConsumerWidget {
 
     final result = await ref.read(actionProvider.notifier).removeFromAlbum(source, albumId);
     ref.read(multiSelectProvider.notifier).reset();
+    if (result.success) onComplete?.call();
     if (!context.mounted) {
       return;
     }

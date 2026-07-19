@@ -12,11 +12,13 @@ import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/album/pending_uploads_banner.widget.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/remote_album_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/remote_album/album_option.widget.dart';
+import 'package:immich_mobile/presentation/widgets/remote_album/space_link_picker.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/current_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/remote_album.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/space_album_actions.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
@@ -188,6 +190,34 @@ class _RemoteAlbumPageState extends ConsumerState<RemoteAlbumPage> {
     unawaited(context.pushRoute(ActivitiesRoute(album: _album)));
   }
 
+  /// L15 — "Link to space" entry point from the album itself: opens the
+  /// space picker (Owner/Editor spaces) and links this album to the selected
+  /// space via the same [SpaceAlbumActions.link] path already used from
+  /// inside a space (B6 / [SpaceDetailPage._onAlbumsPicked]).
+  Future<void> linkToSpace(BuildContext context) async {
+    final space = await SpaceLinkPickerSheet.show(context);
+    if (space == null || !context.mounted) return;
+
+    try {
+      await ref.read(spaceAlbumActionsProvider).link(space.id, [_album.id]);
+      if (context.mounted) {
+        ImmichToast.show(
+          context: context,
+          msg: 'album_linked_to_space'.t(context: context, args: {'space': space.name}),
+          toastType: ToastType.success,
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ImmichToast.show(
+          context: context,
+          msg: 'spaces_linked_albums_error_link'.t(context: context),
+          toastType: ToastType.error,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
@@ -222,6 +252,7 @@ class _RemoteAlbumPageState extends ConsumerState<RemoteAlbumPage> {
                 onEditAlbum: canEdit ? () => showEditTitleAndDescription(context) : null,
                 onCreateSharedLink: () => unawaited(context.pushRoute(SharedLinkEditRoute(albumId: _album.id))),
                 onShowOptions: () => context.pushRoute(AlbumOptionsRoute(album: _album)),
+                onLinkToSpace: () => unawaited(linkToSpace(context)),
               ),
               onEditTitle: canEdit ? () => showEditTitleAndDescription(context) : null,
               onActivity: () => showActivity(context),
@@ -393,6 +424,7 @@ class _AlbumKebabMenu extends ConsumerWidget {
   final VoidCallback? onEditAlbum;
   final VoidCallback? onCreateSharedLink;
   final VoidCallback? onShowOptions;
+  final VoidCallback? onLinkToSpace;
 
   const _AlbumKebabMenu({
     required this.album,
@@ -403,6 +435,7 @@ class _AlbumKebabMenu extends ConsumerWidget {
     this.onEditAlbum,
     this.onCreateSharedLink,
     this.onShowOptions,
+    this.onLinkToSpace,
   });
 
   double _calculateScrollProgress(FlexibleSpaceBarSettings? settings) {
@@ -444,6 +477,8 @@ class _AlbumKebabMenu extends ConsumerWidget {
       onEditAlbum: onEditAlbum,
       onCreateSharedLink: isOwner ? onCreateSharedLink : null,
       onShowOptions: onShowOptions,
+      // L15: gated to owned albums (mirrors web's isOwned gate on the same affordance).
+      onLinkToSpace: isOwner ? onLinkToSpace : null,
     );
   }
 }

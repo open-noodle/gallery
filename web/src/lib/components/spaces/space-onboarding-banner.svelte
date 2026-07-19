@@ -6,11 +6,13 @@
     mdiChevronDown,
     mdiChevronRight,
     mdiChevronUp,
+    mdiClose,
     mdiImageFilterHdrOutline,
     mdiImagePlusOutline,
   } from '@mdi/js';
   import { Icon } from '@immich/ui';
   import { t } from 'svelte-i18n';
+  import { dismissedOnboardingSpaceIds } from '$lib/stores/space-view.store';
 
   interface Props {
     space: SharedSpaceResponseDto;
@@ -23,6 +25,12 @@
   let { space, gradientClass = '', onAddPhotos, onInviteMembers, onSetCover }: Props = $props();
 
   let collapsed = $state(false);
+
+  const dismissed = $derived($dismissedOnboardingSpaceIds.includes(space.id));
+
+  const dismiss = () => {
+    dismissedOnboardingSpaceIds.update((ids) => (ids.includes(space.id) ? ids : [...ids, space.id]));
+  };
 
   const hasPhotos = $derived((space.assetCount ?? 0) > 0);
   const hasMembers = $derived((space.memberCount ?? 0) > 1);
@@ -60,7 +68,7 @@
   ]);
 </script>
 
-{#if !allComplete}
+{#if !allComplete && !dismissed}
   <div
     class="mx-4 mt-4 mb-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-immich-dark-gray"
     data-testid="onboarding-banner"
@@ -80,15 +88,26 @@
       <p class="text-sm font-medium text-gray-600 dark:text-gray-300" data-testid="progress-text">
         {$t('spaces_setup_steps_done', { values: { completed: completedCount, total: 3 } })}
       </p>
-      <button
-        type="button"
-        class="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-        onclick={() => (collapsed = !collapsed)}
-        data-testid="banner-collapse-toggle"
-        aria-label={collapsed ? 'Expand' : 'Collapse'}
-      >
-        <Icon icon={collapsed ? mdiChevronDown : mdiChevronUp} size="20" />
-      </button>
+      <div class="flex items-center gap-1">
+        <button
+          type="button"
+          class="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+          onclick={() => (collapsed = !collapsed)}
+          data-testid="banner-collapse-toggle"
+          aria-label={collapsed ? 'Expand' : 'Collapse'}
+        >
+          <Icon icon={collapsed ? mdiChevronDown : mdiChevronUp} size="20" />
+        </button>
+        <button
+          type="button"
+          class="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+          onclick={dismiss}
+          data-testid="banner-dismiss"
+          aria-label="Dismiss"
+        >
+          <Icon icon={mdiClose} size="20" />
+        </button>
+      </div>
     </div>
 
     <!-- Steps (collapsible) -->
