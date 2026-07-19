@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Insertable } from 'kysely';
+import { Insertable, NoResultError } from 'kysely';
 import { isAbsolute } from 'node:path';
 import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants';
 import { Chunked, OnEvent, OnJob } from 'src/decorators';
@@ -298,7 +298,7 @@ export class PersonService extends BaseService {
   }
 
   async reassignFaces(auth: AuthDto, personId: string, dto: AssetFaceUpdateDto): Promise<PersonResponseDto[]> {
-    await this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [personId] });
+    await this.requireReassignTargetAccess(auth, personId);
     const person = await this.findOrFail(personId);
     const result: PersonResponseDto[] = [];
     const changeFeaturePhoto: string[] = [];
@@ -306,7 +306,7 @@ export class PersonService extends BaseService {
       const faces = await this.personRepository.getFacesByIds([{ personId: data.personId, assetId: data.assetId }]);
 
       for (const face of faces) {
-        await this.requireAccess({ auth, permission: Permission.PersonCreate, ids: [face.id] });
+        await this.requireReassignFaceAccess(auth, face.id, face.assetId);
         if (person.faceAssetId === null) {
           changeFeaturePhoto.push(person.id);
         }
@@ -321,6 +321,7 @@ export class PersonService extends BaseService {
         // durable rejected/ignored row for this SAME target — the newer human decision wins. Scoped to
         // `personId` only: a negative recorded against a DIFFERENT person for this face must survive.
         await this.facePersonVerdictRepository.clearNegativeForTarget({ personId, identityId }, [face.id]);
+        await this.refreshSharedSpaceFacesAfterReassign(face.assetId, face.id);
       }
 
       result.push(mapPerson(person));
@@ -333,9 +334,16 @@ export class PersonService extends BaseService {
   }
 
   async reassignFacesById(auth: AuthDto, personId: string, dto: FaceDto): Promise<PersonResponseDto> {
-    await this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [personId] });
-    await this.requireAccess({ auth, permission: Permission.PersonCreate, ids: [dto.id] });
-    const face = await this.personRepository.getFaceById(dto.id);
+    await this.requireReassignTargetAccess(auth, personId);
+    // Resolved before the face-level check so the space-Editor fallback can see its asset. A
+    // missing row must stay a 400, indistinguishable from a face the caller may not touch.
+    const face = await this.personRepository.getFaceById(dto.id).catch((error: unknown) => {
+      if (error instanceof NoResultError) {
+        throw new BadRequestException('Not found or no person.create access');
+      }
+      throw error;
+    });
+    await this.requireReassignFaceAccess(auth, face.id, face.assetId);
     const person = await this.findOrFail(personId);
 
     await this.personRepository.reassignFace(face.id, personId);
@@ -344,6 +352,7 @@ export class PersonService extends BaseService {
     // Slice 8 (F15): same clearing as reassignFaces above — scoped to `personId`, so a negative recorded
     // against a DIFFERENT person for this face survives.
     await this.facePersonVerdictRepository.clearNegativeForTarget({ personId, identityId }, [face.id]);
+    await this.refreshSharedSpaceFacesAfterReassign(face.assetId, face.id);
     if (person.faceAssetId === null) {
       await this.createNewFeaturePhoto([person.id]);
     }
@@ -1322,6 +1331,70 @@ export class PersonService extends BaseService {
         continue;
       }
       queuedSpaceIds.add(spaceId);
+      await this.jobRepository.queue({
+        name: JobName.SharedSpaceFaceMatch,
+        data: { spaceId, assetId },
+      });
+    }
+  }
+
+  // Fork RBAC (#765): reassigning a face is a shared-space Editor capability, not an owner-only
+  // one. Mirror updateRepresentativeFace — owner fast path, then Editor/Owner of a space the
+  // person is shared through. Viewers hold PersonRead only and stay denied.
+  private async requireReassignTargetAccess(auth: AuthDto, personId: string): Promise<void> {
+    const ids = new Set([personId]);
+    const isOwner = await this.accessRepository.person.checkOwnerAccess(auth.user.id, ids);
+    if (isOwner.has(personId)) {
+      return;
+    }
+
+    const canEdit = await this.accessRepository.person.checkSharedSpaceEditAccess(auth.user.id, ids);
+    if (!canEdit.has(personId)) {
+      throw new BadRequestException('Not found or no person.update access');
+    }
+  }
+
+  // The face being corrected often sits on another member's asset. asset.update already resolves
+  // to owner-or-space-Editor, so fall back to it when the caller does not own the asset itself.
+  private async requireReassignFaceAccess(auth: AuthDto, assetFaceId: string, assetId: string): Promise<void> {
+    const isFaceOwner = await this.accessRepository.person.checkFaceOwnerAccess(auth.user.id, new Set([assetFaceId]));
+    if (isFaceOwner.has(assetFaceId)) {
+      return;
+    }
+
+    await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: [assetId] });
+  }
+
+  // A reassign rewrites asset_face.personId, but every space-scoped person view reads the
+  // shared_space_person_face projection instead. Without this the corrected photo keeps showing
+  // under the original person (#765). Evict the stale assignment synchronously so the face leaves
+  // the wrong person immediately, then queue the match job to re-add it under the correct one.
+  //
+  // Must run AFTER replaceFaceIdentity: the match job resolves the target space person from
+  // face_identity_face, so evicting before the identity swap would re-add the OLD person.
+  private async refreshSharedSpaceFacesAfterReassign(assetId: string, assetFaceId: string): Promise<void> {
+    const spaceIds = await this.sharedSpaceRepository.getSpaceIdsForAsset(assetId);
+    const refreshedSpaceIds = new Set<string>();
+    for (const { spaceId } of spaceIds) {
+      if (refreshedSpaceIds.has(spaceId)) {
+        continue;
+      }
+      refreshedSpaceIds.add(spaceId);
+
+      // getSpaceIdsForAsset is broader than the match job's own isAssetInSpace guard, which also
+      // requires the asset to be present, online and visible. Only evict where that guard will
+      // pass, otherwise the face would be dropped from the space with nothing to re-add it.
+      if (await this.sharedSpaceRepository.isAssetInSpace(spaceId, assetId)) {
+        const vacatedPersonIds = await this.sharedSpaceRepository.removePersonFaceAssignmentsForSpaceFace(
+          spaceId,
+          assetFaceId,
+        );
+        if (vacatedPersonIds.length > 0) {
+          await this.sharedSpaceRepository.recountPersons(vacatedPersonIds);
+          await this.sharedSpaceRepository.deleteOrphanedPersonsByIds(spaceId, vacatedPersonIds);
+        }
+      }
+
       await this.jobRepository.queue({
         name: JobName.SharedSpaceFaceMatch,
         data: { spaceId, assetId },

@@ -491,6 +491,55 @@ const setupJoinAfterDuplicatesFixture = async (
   };
 };
 
+const spacePersonFacesFor = (ctx: ReturnType<typeof setup>['ctx'], input: { spaceId: string; assetFaceId: string }) =>
+  ctx.database
+    .selectFrom('shared_space_person_face')
+    .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_face.personId')
+    .select(['shared_space_person.id as personId', 'shared_space_person.identityId as identityId'])
+    .where('shared_space_person_face.assetFaceId', '=', input.assetFaceId)
+    .where('shared_space_person.spaceId', '=', input.spaceId)
+    .execute();
+
+// drainSharedSpaceFaceJobs above covers the rebuild jobs; a reassign only ever queues the targeted
+// per-asset SharedSpaceFaceMatch, and it is queued through the PersonService context.
+const drainReassignFaceMatchJobs = async (sharedSpaceService: SharedSpaceService, jobs: Mocked<JobRepository>) => {
+  for (const [job] of jobs.queue.mock.calls) {
+    if (job.name === JobName.SharedSpaceFaceMatch) {
+      await sharedSpaceService.handleSharedSpaceFaceMatch(job.data);
+    }
+  }
+};
+
+// Both faces live on assets owned by the space owner, so the actor never owns the asset or the
+// face: reassign has to resolve through the space's Editor grant to succeed.
+const setupSpaceReassignFixture = async (actorRole: SharedSpaceRole) => {
+  const { ctx, sut, faceIdentityRepository } = setup();
+  const { sut: sharedSpaceService } = setupSharedSpace();
+  const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const { user: owner } = await ctx.newUser();
+  const { user: actor } = await ctx.newUser();
+  const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: actor.id, role: actorRole });
+
+  const wrong = await createIdentityBackedFace(ctx, faceIdentityRepository, {
+    ownerId: owner.id,
+    personName: 'Wrong Match',
+    spaceId: space.id,
+  });
+  const correct = await createIdentityBackedFace(ctx, faceIdentityRepository, {
+    ownerId: owner.id,
+    personName: 'Correct Match',
+    spaceId: space.id,
+  });
+
+  await sharedSpaceService.handleSharedSpaceFaceMatch({ spaceId: space.id, assetId: wrong.asset.id });
+  await sharedSpaceService.handleSharedSpaceFaceMatch({ spaceId: space.id, assetId: correct.asset.id });
+  jobs.queue.mockClear();
+
+  return { ctx, sut, sharedSpaceService, jobs, owner, actor, space, wrong, correct };
+};
+
 describe('People identity RBAC projection', () => {
   it('returns one row per accessible identity for a member of multiple spaces', async () => {
     const fx = await setupPeopleIdentityMatrix();
@@ -3946,6 +3995,103 @@ describe('People identity RBAC projection', () => {
         .where('spaceId', '=', viewerSpace.id)
         .executeTakeFirstOrThrow();
       expect(Number(count)).toBe(2);
+    });
+  });
+
+  // #765: "Fix incorrect match" rewrote asset_face.personId + face_identity_face but left the
+  // shared_space_person_face projection — which every space-scoped person view reads from —
+  // pointing at the old person, so the photo never moved inside a Shared Space.
+  describe('reassign faces', () => {
+    it('evicts the stale space projection immediately and re-projects under the corrected person', async () => {
+      const fx = await setupSpaceReassignFixture(SharedSpaceRole.Viewer);
+
+      const before = await spacePersonFacesFor(fx.ctx, { spaceId: fx.space.id, assetFaceId: fx.wrong.faceId });
+      expect(before).toEqual([expect.objectContaining({ identityId: fx.wrong.identity.id })]);
+
+      await fx.sut.reassignFacesById(authFor(fx.owner), fx.correct.person.id, { id: fx.wrong.faceId });
+
+      // Synchronous eviction: the face must have left the wrong space person before any job runs.
+      const afterCall = await spacePersonFacesFor(fx.ctx, { spaceId: fx.space.id, assetFaceId: fx.wrong.faceId });
+      expect(afterCall).toEqual([]);
+      expect(fx.jobs.queue.mock.calls.map(([job]) => job)).toContainEqual({
+        name: JobName.SharedSpaceFaceMatch,
+        data: { spaceId: fx.space.id, assetId: fx.wrong.asset.id },
+      });
+
+      await drainReassignFaceMatchJobs(fx.sharedSpaceService, fx.jobs);
+
+      const afterDrain = await spacePersonFacesFor(fx.ctx, { spaceId: fx.space.id, assetFaceId: fx.wrong.faceId });
+      expect(afterDrain).toEqual([expect.objectContaining({ identityId: fx.correct.identity.id })]);
+    });
+
+    it('lets a space editor reassign a face on another member’s asset', async () => {
+      const fx = await setupSpaceReassignFixture(SharedSpaceRole.Editor);
+
+      await expect(
+        fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.id, { id: fx.wrong.faceId }),
+      ).resolves.toEqual(expect.objectContaining({ id: fx.correct.person.id }));
+
+      const face = await fx.ctx.database
+        .selectFrom('asset_face')
+        .select('personId')
+        .where('id', '=', fx.wrong.faceId)
+        .executeTakeFirstOrThrow();
+      expect(face.personId).toBe(fx.correct.person.id);
+
+      await drainReassignFaceMatchJobs(fx.sharedSpaceService, fx.jobs);
+
+      const projected = await spacePersonFacesFor(fx.ctx, { spaceId: fx.space.id, assetFaceId: fx.wrong.faceId });
+      expect(projected).toEqual([expect.objectContaining({ identityId: fx.correct.identity.id })]);
+    });
+
+    it('rejects a space viewer reassigning a face on another member’s asset', async () => {
+      const fx = await setupSpaceReassignFixture(SharedSpaceRole.Viewer);
+
+      await expect(
+        fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.id, { id: fx.wrong.faceId }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      const face = await fx.ctx.database
+        .selectFrom('asset_face')
+        .select('personId')
+        .where('id', '=', fx.wrong.faceId)
+        .executeTakeFirstOrThrow();
+      expect(face.personId).toBe(fx.wrong.person.id);
+
+      const projected = await spacePersonFacesFor(fx.ctx, { spaceId: fx.space.id, assetFaceId: fx.wrong.faceId });
+      expect(projected).toEqual([expect.objectContaining({ identityId: fx.wrong.identity.id })]);
+    });
+
+    it('reassigns a face on an asset in no space without touching any projection', async () => {
+      const { ctx, sut, faceIdentityRepository } = setup();
+      const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+      const { user: owner } = await ctx.newUser();
+      const wrong = await createIdentityBackedFace(ctx, faceIdentityRepository, {
+        ownerId: owner.id,
+        personName: 'Private Wrong Match',
+      });
+      const correct = await createIdentityBackedFace(ctx, faceIdentityRepository, {
+        ownerId: owner.id,
+        personName: 'Private Correct Match',
+      });
+      jobs.queue.mockClear();
+
+      await sut.reassignFacesById(authFor(owner), correct.person.id, { id: wrong.faceId });
+
+      const face = await ctx.database
+        .selectFrom('asset_face')
+        .select('personId')
+        .where('id', '=', wrong.faceId)
+        .executeTakeFirstOrThrow();
+      expect(face.personId).toBe(correct.person.id);
+
+      const projected = await ctx.database
+        .selectFrom('shared_space_person_face')
+        .selectAll()
+        .where('assetFaceId', '=', wrong.faceId)
+        .execute();
+      expect(projected).toEqual([]);
+      expect(jobs.queue.mock.calls.map(([job]) => job.name)).not.toContain(JobName.SharedSpaceFaceMatch);
     });
   });
 });
