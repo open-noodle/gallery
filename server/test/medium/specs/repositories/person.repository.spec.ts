@@ -1,5 +1,5 @@
 import { Kysely, sql } from 'kysely';
-import { AssetFileType, AssetVisibility, SourceType } from 'src/enum';
+import { AssetFileType, AssetVisibility, SharedSpaceRole, SourceType } from 'src/enum';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
@@ -653,6 +653,36 @@ describe(PersonRepository.name, () => {
 
       await expect(sut.getStatistics(person.id)).resolves.toEqual({ assets: 0, faces: 0 });
     });
+
+    // L3: memberUserId scopes the count to what a space-only reader can actually reach, instead of
+    // the owner's entire Timeline-visible library for that person.
+    it('scopes the count to space-reachable assets when memberUserId is provided (L3)', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: reader } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'Shared' });
+
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: reader.id, role: SharedSpaceRole.Viewer });
+
+      // Asset shared into the space — reachable by `reader`, should count.
+      const { asset: sharedAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.newAssetFace({ assetId: sharedAsset.id, personId: person.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: sharedAsset.id });
+
+      // Asset NOT shared into any space `reader` belongs to — unreachable, must not count.
+      const { asset: privateAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.newAssetFace({ assetId: privateAsset.id, personId: person.id });
+
+      // Unscoped (owner) count sees both assets.
+      await expect(sut.getStatistics(person.id)).resolves.toEqual({ assets: 2, faces: 2 });
+
+      // memberUserId-scoped count only sees the space-reachable asset.
+      await expect(sut.getStatistics(person.id, { memberUserId: reader.id })).resolves.toEqual({
+        assets: 1,
+        faces: 1,
+      });
+    });
   });
 
   describe('representative face picker queries', () => {
@@ -718,6 +748,102 @@ describe(PersonRepository.name, () => {
       await expect(
         sut.getRepresentativeFaceForUpdate({ personId: targetPerson.id, assetFaceId: faceId }),
       ).resolves.toBeUndefined();
+    });
+
+    // M1: a non-owner (space-granted) caller must only see faces on assets reachable through a space
+    // they belong to AND that pass the shareable-visibility gate — never the owner's Hidden/never-shared
+    // faces. The owner (no scope) keeps the full, unscoped list.
+    it('scopes non-owner callers to space-reachable, shareable-visibility faces only', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: owner.id });
+
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id, role: SharedSpaceRole.Viewer });
+
+      // A1: Timeline, added to the space the viewer belongs to -> space-reachable + shareable.
+      const { asset: spaceAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: spaceAsset.id, addedById: owner.id });
+      const { result: spaceFaceId } = await ctx.newAssetFace({ assetId: spaceAsset.id, personId: person.id });
+
+      // A2: added to the SAME space (so it is space-reachable) but Hidden -> fails spaceVisibilityGate.
+      const { asset: hiddenAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Hidden });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: hiddenAsset.id, addedById: owner.id });
+      const { result: hiddenFaceId } = await ctx.newAssetFace({ assetId: hiddenAsset.id, personId: person.id });
+
+      // A3: Timeline (shareable visibility) but never added to any space -> not space-reachable.
+      const { asset: neverSharedAsset } = await ctx.newAsset({
+        ownerId: owner.id,
+        visibility: AssetVisibility.Timeline,
+      });
+      const { result: neverSharedFaceId } = await ctx.newAssetFace({
+        assetId: neverSharedAsset.id,
+        personId: person.id,
+      });
+
+      const scopedFaces = await sut.getRepresentativeFaces({
+        personId: person.id,
+        take: 50,
+        skip: 0,
+        scope: { memberUserId: viewer.id },
+      });
+      expect(scopedFaces.map((face) => face.id)).toEqual([spaceFaceId]);
+      expect(scopedFaces.map((face) => face.id)).not.toContain(hiddenFaceId);
+      expect(scopedFaces.map((face) => face.id)).not.toContain(neverSharedFaceId);
+
+      // Regression: the unscoped (owner) path is unchanged and still returns all three.
+      const ownerFaces = await sut.getRepresentativeFaces({ personId: person.id, take: 50, skip: 0 });
+      expect(new Set(ownerFaces.map((face) => face.id))).toEqual(
+        new Set([spaceFaceId, hiddenFaceId, neverSharedFaceId]),
+      );
+    });
+
+    it('excludes cross-user identity-fan-out faces from a scoped (non-owner) caller', async () => {
+      const { ctx, sut } = setup();
+      const faceIdentityRepository = ctx.get(FaceIdentityRepository);
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { user: otherUser } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: owner.id });
+
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id, role: SharedSpaceRole.Viewer });
+
+      // Give `person` a shared identity, with its own (space-reachable) face.
+      const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+      const { asset: ownAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: ownAsset.id, addedById: owner.id });
+      const { assetFace: ownFace } = await ctx.newAssetFace({ assetId: ownAsset.id, personId: person.id });
+      await faceIdentityRepository.linkFace({ assetFaceId: ownFace.id, identityId: identity.id, source: 'manual' });
+
+      // A DIFFERENT user's own person shares the same identity (e.g. a merged identity), with a face on
+      // that other user's own asset -- never shared into any space the viewer belongs to.
+      const { person: otherPerson } = await ctx.newPerson({ ownerId: otherUser.id });
+      await ctx.database
+        .updateTable('person')
+        .set({ identityId: identity.id })
+        .where('id', '=', otherPerson.id)
+        .execute();
+      const { asset: otherAsset } = await ctx.newAsset({ ownerId: otherUser.id, visibility: AssetVisibility.Timeline });
+      const { assetFace: otherFace } = await ctx.newAssetFace({ assetId: otherAsset.id, personId: otherPerson.id });
+      await faceIdentityRepository.linkFace({ assetFaceId: otherFace.id, identityId: identity.id, source: 'manual' });
+
+      // Owner (unscoped) sees both -- the identity fan-out is intentional for the owner's own picker.
+      const ownerFaces = await sut.getRepresentativeFaces({ personId: person.id, take: 50, skip: 0 });
+      expect(new Set(ownerFaces.map((face) => face.id))).toEqual(new Set([ownFace.id, otherFace.id]));
+
+      // The space viewer must NOT see the other user's face pulled in via the shared identity.
+      const scopedFaces = await sut.getRepresentativeFaces({
+        personId: person.id,
+        take: 50,
+        skip: 0,
+        scope: { memberUserId: viewer.id },
+      });
+      expect(scopedFaces.map((face) => face.id)).toEqual([ownFace.id]);
+      expect(scopedFaces.map((face) => face.id)).not.toContain(otherFace.id);
     });
   });
 

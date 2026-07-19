@@ -35,28 +35,28 @@ test.describe('Photos FilterPanel', () => {
     await page.goto('/photos');
     await page.evaluate(() => localStorage.clear());
     await page.reload();
-    await page.waitForSelector('[data-testid="collapsed-icon-strip"], [data-testid="discovery-panel"]');
+    await page.waitForSelector('[data-testid="filter-toggle-btn"], [data-testid="discovery-panel"]');
   }
 
   test('should render FilterPanel expanded by default on /photos', async ({ context, page }) => {
     await gotoPhotos(context, page);
 
     await expect(page.locator('[data-testid="discovery-panel"]')).toBeVisible();
-    await expect(page.locator('[data-testid="collapsed-icon-strip"]')).not.toBeVisible();
+    await expect(page.locator('[data-testid="filter-toggle-btn"]')).toHaveCount(0);
   });
 
   test('should collapse FilterPanel and persist state', async ({ context, page }) => {
     await gotoPhotos(context, page);
 
-    // Panel starts expanded — collapse it
+    // Panel starts expanded — collapse it. externalToggle mode clips the panel to width 0 and the
+    // header exposes the filter-toggle button instead of an inline collapsed strip.
     await page.locator('[data-testid="collapse-panel-btn"]').click();
-    await expect(page.locator('[data-testid="collapsed-icon-strip"]')).toBeVisible();
-    await expect(page.locator('[data-testid="discovery-panel"]')).not.toBeVisible();
+    await expect(page.locator('[data-testid="filter-toggle-btn"]')).toBeVisible();
 
     // Reload — should still be collapsed (persisted in localStorage)
     await page.reload();
-    await page.waitForSelector('[data-testid="collapsed-icon-strip"]');
-    await expect(page.locator('[data-testid="collapsed-icon-strip"]')).toBeVisible();
+    await page.waitForSelector('[data-testid="filter-toggle-btn"]');
+    await expect(page.locator('[data-testid="filter-toggle-btn"]')).toBeVisible();
   });
 
   test('should show all 7 filter sections when expanded', async ({ context, page }) => {

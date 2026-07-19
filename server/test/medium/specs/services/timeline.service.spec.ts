@@ -427,10 +427,12 @@ describe(TimelineService.name, () => {
     const sharedLinkRepo = ctx.get(SharedLinkRepository);
 
     const { user } = await ctx.newUser();
+    // Not trashed: Slice 1 / H1 now flatly rejects isTrashed=true on any album/space browse
+    // (including a shared link, which is a third party relative to the album owner) — this test's
+    // intent is EXIF stripping, which doesn't require the trash path.
     const { asset } = await ctx.newAsset({
       ownerId: user.id,
       localDateTime: new Date('1970-02-12'),
-      deletedAt: new Date(),
     });
     const { album } = await ctx.newAlbum({ ownerId: user.id });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
@@ -445,8 +447,35 @@ describe(TimelineService.name, () => {
 
     await ctx.newExif({ assetId: asset.id, city: 'Austin', country: 'USA' });
     const auth = factory.auth({ sharedLink: { id: sharedLinkId, showExif: false } });
-    const rawResponse = await sut.getTimeBucket(auth, { albumId: album.id, timeBucket: '1970-02-01', isTrashed: true });
+    const rawResponse = await sut.getTimeBucket(auth, { albumId: album.id, timeBucket: '1970-02-01' });
     const response = JSON.parse(rawResponse);
     expect(response).not.toEqual(expect.objectContaining({ city: expect.any(Array), country: expect.any(Array) }));
+  });
+
+  // Slice 1 / H1: a shared link is a third party relative to the album owner — the same flat
+  // isTrashed=true rejection that protects a space Viewer must also protect a shared-link holder.
+  it('rejects isTrashed=true on an albumId browse via a shared link', async () => {
+    const { sut, ctx } = setup();
+    const sharedLinkRepo = ctx.get(SharedLinkRepository);
+
+    const { user } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime: new Date('1970-02-12') });
+    const { album } = await ctx.newAlbum({ ownerId: user.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+    await ctx.softDeleteAsset(asset.id);
+
+    const { id: sharedLinkId } = await sharedLinkRepo.create({
+      allowUpload: false,
+      key: Buffer.from('456'),
+      type: SharedLinkType.Album,
+      userId: user.id,
+      albumId: album.id,
+    });
+
+    const auth = factory.auth({ sharedLink: { id: sharedLinkId, showExif: true } });
+
+    await expect(
+      sut.getTimeBucket(auth, { albumId: album.id, timeBucket: '1970-02-01', isTrashed: true }),
+    ).rejects.toThrow(BadRequestException);
   });
 });

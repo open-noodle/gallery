@@ -3,8 +3,12 @@
 // Mirrors the main-timeline filter in merged_asset.drift: an asset is visible
 // to a viewer if it's owned by one of the viewer's timeline users (self +
 // partners with inTimeline=true), OR if it's linked to a shared space whose
-// member row for the viewer has showInTimeline=true (directly via
-// shared_space_asset, or transitively via shared_space_library).
+// member row for the viewer has showInTimeline=true — directly via
+// shared_space_asset, transitively via shared_space_library, or transitively
+// via an album linked into the space (shared_space_album_asset ⋈
+// shared_space_album_link) whose OWN showInTimeline toggle is also true.
+// Mirrors the server's timelineSpaceIds album leg (asset.repository.ts /
+// map.repository.ts).
 //
 // Two functions, one per Drift access mode:
 //   * buildViewerVisibilityJoins — for .watch() bucket queries. Returns
@@ -26,17 +30,19 @@ typedef ViewerVisibilityJoinSpec = ({
   List<Join> joins,
   $SharedSpaceMemberEntityTable assetMember,
   $SharedSpaceMemberEntityTable libraryMember,
+  $SharedSpaceMemberEntityTable albumMember,
 });
 
-/// Builds the four LEFT OUTER JOINs needed to evaluate shared-space visibility
-/// against an asset row, plus the two aliased `shared_space_member` tables the
-/// caller uses to write the WHERE predicate.
+/// Builds the seven LEFT OUTER JOINs needed to evaluate shared-space
+/// visibility against an asset row, plus the three aliased
+/// `shared_space_member` tables the caller uses to write the WHERE predicate.
 ///
 /// Use for `.watch()` bucket queries where Drift reactivity must track the
 /// shared_space_* tables. Caller merges the returned `joins` into its own
 /// `.join([...existing, ...viz.joins])` call and adds
-/// `viz.assetMember.userId.isNotNull() | viz.libraryMember.userId.isNotNull()`
-/// to its WHERE predicate (OR-ed with `rae.ownerId.isIn(userIds)`).
+/// `viz.assetMember.userId.isNotNull() | viz.libraryMember.userId.isNotNull() |
+/// viz.albumMember.userId.isNotNull()` to its WHERE predicate (OR-ed with
+/// `rae.ownerId.isIn(userIds)`).
 ViewerVisibilityJoinSpec buildViewerVisibilityJoins(
   Drift db,
   $RemoteAssetEntityTable assetTable,
@@ -44,6 +50,7 @@ ViewerVisibilityJoinSpec buildViewerVisibilityJoins(
 ) {
   final assetMember = db.alias(db.sharedSpaceMemberEntity, 'ssm_asset');
   final libraryMember = db.alias(db.sharedSpaceMemberEntity, 'ssm_lib');
+  final albumMember = db.alias(db.sharedSpaceMemberEntity, 'ssm_album');
 
   final joins = <Join>[
     leftOuterJoin(
@@ -70,9 +77,27 @@ ViewerVisibilityJoinSpec buildViewerVisibilityJoins(
           libraryMember.showInTimeline.equals(true),
       useColumns: false,
     ),
+    leftOuterJoin(
+      db.sharedSpaceAlbumAssetEntity,
+      db.sharedSpaceAlbumAssetEntity.assetId.equalsExp(assetTable.id),
+      useColumns: false,
+    ),
+    leftOuterJoin(
+      db.sharedSpaceAlbumLinkEntity,
+      db.sharedSpaceAlbumLinkEntity.albumId.equalsExp(db.sharedSpaceAlbumAssetEntity.albumId) &
+          db.sharedSpaceAlbumLinkEntity.showInTimeline.equals(true),
+      useColumns: false,
+    ),
+    leftOuterJoin(
+      albumMember,
+      albumMember.spaceId.equalsExp(db.sharedSpaceAlbumLinkEntity.spaceId) &
+          albumMember.userId.equals(currentUserId) &
+          albumMember.showInTimeline.equals(true),
+      useColumns: false,
+    ),
   ];
 
-  return (joins: joins, assetMember: assetMember, libraryMember: libraryMember);
+  return (joins: joins, assetMember: assetMember, libraryMember: libraryMember, albumMember: albumMember);
 }
 
 /// Returns an `Expression<bool>` matching assets visible to the viewer:
@@ -115,5 +140,25 @@ Expression<bool> viewerVisibilityPredicate(
       ]),
   );
 
-  return assetTable.ownerId.isIn(userIds) | inSpaceAsset | inSpaceLibrary;
+  final inSpaceAlbum = assetTable.id.isInQuery(
+    db.sharedSpaceAlbumAssetEntity.selectOnly()
+      ..addColumns([db.sharedSpaceAlbumAssetEntity.assetId])
+      ..join([
+        innerJoin(
+          db.sharedSpaceAlbumLinkEntity,
+          db.sharedSpaceAlbumLinkEntity.albumId.equalsExp(db.sharedSpaceAlbumAssetEntity.albumId) &
+              db.sharedSpaceAlbumLinkEntity.showInTimeline.equals(true),
+          useColumns: false,
+        ),
+        innerJoin(
+          db.sharedSpaceMemberEntity,
+          db.sharedSpaceMemberEntity.spaceId.equalsExp(db.sharedSpaceAlbumLinkEntity.spaceId) &
+              db.sharedSpaceMemberEntity.userId.equals(currentUserId) &
+              db.sharedSpaceMemberEntity.showInTimeline.equals(true),
+          useColumns: false,
+        ),
+      ]),
+  );
+
+  return assetTable.ownerId.isIn(userIds) | inSpaceAsset | inSpaceLibrary | inSpaceAlbum;
 }

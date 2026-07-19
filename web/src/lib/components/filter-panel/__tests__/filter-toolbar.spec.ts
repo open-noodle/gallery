@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { render } from '@testing-library/svelte';
+import { render, screen } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import FilterToolbar from '../filter-toolbar.svelte';
@@ -85,5 +85,36 @@ describe('FilterToolbar', () => {
     const root = getByTestId('timeline-desktop-grouping-control').parentElement!;
     expect(root.className).toContain('hidden');
     expect(root.className).toContain('md:flex');
+  });
+
+  describe('collapsed-panel reopen button', () => {
+    it('renders the reopen button without responsive hiding so phones can reopen the panel', () => {
+      render(FilterToolbar, {
+        grouping: 'day',
+        onGroupingChange: vi.fn(),
+        showFilterButton: true,
+        filterActive: false,
+        onExpandFilters: vi.fn(),
+      });
+
+      const root = screen.getByTestId('filter-toolbar-root');
+      expect(root.className).toContain('flex');
+      expect(root.className).not.toMatch(/(?:^|\s)hidden(?:\s|$)/);
+
+      const wrapper = screen.getByTestId('filter-toolbar-reopen');
+      expect(wrapper.className).not.toMatch(/(?:^|\s)hidden(?:\s|$)/);
+    });
+
+    it('keeps the grouping control desktop-only', () => {
+      render(FilterToolbar, {
+        grouping: 'day',
+        onGroupingChange: vi.fn(),
+        showFilterButton: true,
+        filterActive: false,
+        onExpandFilters: vi.fn(),
+      });
+
+      expect(screen.getByTestId('timeline-desktop-grouping-control').className).toContain('hidden');
+    });
   });
 });
