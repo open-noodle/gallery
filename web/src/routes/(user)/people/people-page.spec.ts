@@ -15,6 +15,7 @@ import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info-cache';
+import { PEOPLE_PAGE_SIZE } from '$lib/constants';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
 import { personFactory } from '@test-data/factories/person-factory';
@@ -116,6 +117,7 @@ function getDefaultPeopleStatistics(people: PersonResponseDto[]): PeopleStatisti
 function renderPage(
   people: PersonResponseDto[] = [makePerson()],
   peopleStatistics: PeopleStatisticsResponseDto | null = getDefaultPeopleStatistics(people),
+  hasNextPage = false,
 ) {
   return render(PeoplePage, {
     props: {
@@ -124,7 +126,7 @@ function renderPage(
           people,
           total: people.length,
           hidden: people.filter((person) => person.isHidden).length,
-          hasNextPage: false,
+          hasNextPage,
         },
         peopleStatistics,
         meta: { title: 'People' },
@@ -596,5 +598,69 @@ describe('Global people page', () => {
     expect(screen.queryByLabelText('show_person_options')).not.toBeInTheDocument();
     expect(screen.queryByText('to_favorite')).not.toBeInTheDocument();
     expect(screen.queryByText('hide_person')).not.toBeInTheDocument();
+  });
+
+  it('requests the next page at the shared size and merges the rows across the boundary', async () => {
+    // The initial load fetched page 1 at PEOPLE_PAGE_SIZE; infinite scroll must continue with the
+    // SAME size or the page*size offset would skip or duplicate people across the boundary.
+    sdkMock.getAllPeople.mockResolvedValue({
+      people: [
+        makePerson({ id: 'p3', name: 'Carol', numberOfAssets: 3 }),
+        makePerson({ id: 'p4', name: 'Dave', numberOfAssets: 2 }),
+      ],
+      total: 4,
+      hidden: 0,
+      hasNextPage: false,
+    });
+
+    // Drive the infinite-scroll sentinel deterministically: capture the grid's IntersectionObserver
+    // callback and the element it observes, then report an intersection.
+    let intersectionCallback: IntersectionObserverCallback | undefined;
+    let observedSentinel: Element | undefined;
+    vi.stubGlobal(
+      'IntersectionObserver',
+      vi.fn(function (callback: IntersectionObserverCallback) {
+        intersectionCallback = callback;
+        return {
+          observe: (element: Element) => (observedSentinel = element),
+          disconnect: vi.fn(),
+          unobserve: vi.fn(),
+          takeRecords: vi.fn(),
+        };
+      }),
+    );
+
+    renderPage(
+      [
+        makePerson({ id: 'p1', name: 'Alice', numberOfAssets: 5 }),
+        makePerson({ id: 'p2', name: 'Bob', numberOfAssets: 4 }),
+      ],
+      { total: 4, hidden: 0, detectedFaceCount: 0 },
+      true,
+    );
+
+    await waitFor(() => expect(observedSentinel).toBeDefined());
+    intersectionCallback?.(
+      [{ target: observedSentinel, isIntersecting: true } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    );
+
+    await waitFor(() => {
+      expect(sdkMock.getAllPeople).toHaveBeenCalledWith({
+        withHidden: true,
+        withSharedSpaces: true,
+        page: 2,
+        size: PEOPLE_PAGE_SIZE,
+      });
+    });
+
+    // Page 2's rows are appended to page 1's — all four render, none dropped or duplicated.
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Carol')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Dave')).toBeInTheDocument();
+    });
+    expect(screen.getByDisplayValue('Alice')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Bob')).toBeInTheDocument();
+    expect(screen.getAllByPlaceholderText('add_a_name')).toHaveLength(4);
   });
 });
