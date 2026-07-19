@@ -385,8 +385,13 @@ jobs:
           build-args: |
             DEVICE=rocm
           outputs: type=image,"name=ghcr.io/open-noodle/gallery-ml",push-by-digest=true,name-resolution=short,push=true
-          cache-from: type=gha,scope=ml-rocm-linux-amd64
-          cache-to: type=gha,scope=ml-rocm-linux-amd64,mode=max
+          # No GHA cache here (unlike the GitHub-hosted ML jobs): the Actions
+          # cache backend hands out an Azure SAS token valid for only ~1h, but
+          # the ROCm image (~40GB base) builds for >1h on the self-hosted runner
+          # — the final `cache-to` blob PUT then 403s ("Signature not valid in
+          # the specified time frame") and fails the whole build. The self-hosted
+          # builder is ephemeral (torn down each run), so a persistent GHA cache
+          # bought nothing here anyway.
 
       - name: Export digest
         run: | # zizmor: ignore[template-injection]
@@ -401,6 +406,19 @@ jobs:
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
+
+      # The `gallery-rocm` runner is a shared self-hosted machine — reclaim the
+      # large ROCm build cache after every run (incl. failures/cancels) so it
+      # can't fill the disk. Prunes build cache + dangling layers only; never
+      # removes tagged images. The image is already pushed to GHCR by digest, so
+      # this is safe and does not affect the merge-ml-rocm step.
+      - name: Reclaim disk space
+        if: always()
+        run: |
+          echo "Disk before prune:"; df -h / | tail -1
+          docker buildx prune --all --force || true
+          docker image prune --force || true
+          echo "Disk after prune:"; df -h / | tail -1
 
   merge-ml-rocm:
     name: Merge ML Manifest (rocm)
