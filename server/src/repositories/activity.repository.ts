@@ -9,6 +9,9 @@ import { DB } from 'src/schema';
 import { ActivityTable } from 'src/schema/tables/activity.table';
 import { asUuid, dummy } from 'src/utils/database';
 
+/** Visibility values surfaced by withDefaultVisibility (Archive + Timeline). */
+const DEFAULT_VISIBILITY = [sql.lit(AssetVisibility.Archive), sql.lit(AssetVisibility.Timeline)] as const;
+
 export interface ActivitySearch {
   albumId?: string;
   assetId?: string | null;
@@ -41,7 +44,12 @@ export class ActivityRepository {
       .$if(!!assetId, (qb) => qb.where('activity.assetId', '=', assetId!))
       .$if(!!albumId, (qb) => qb.where('activity.albumId', '=', albumId!))
       .$if(isLiked !== undefined, (qb) => qb.where('activity.isLiked', '=', isLiked!))
-      .where('asset.deletedAt', 'is', null)
+      .where(({ or, and, eb }) =>
+        or([
+          and([eb('asset.deletedAt', 'is', null), eb('asset.visibility', 'in', DEFAULT_VISIBILITY)]),
+          eb('asset.id', 'is', null),
+        ]),
+      )
       .orderBy('activity.createdAt', 'asc')
       .execute();
   }
@@ -66,13 +74,20 @@ export class ActivityRepository {
     await this.db.deleteFrom('activity').where('id', '=', asUuid(id)).execute();
   }
 
-  @GenerateSql({ params: [{ albumId: DummyValue.UUID, assetId: DummyValue.UUID }] })
+  @GenerateSql(
+    { params: [{ albumId: DummyValue.UUID, assetId: DummyValue.UUID }] },
+    { params: [{ albumId: DummyValue.UUID, excludeAlbumLevel: true }] },
+  )
   async getStatistics({
     albumId,
     assetId,
+    excludeAlbumLevel,
   }: {
     albumId: string;
     assetId?: string;
+    /** I2: when true, drop album-level (assetId IS NULL) rows from the counts — for space-only
+     * readers, who must not learn album-level comment/like totals. */
+    excludeAlbumLevel?: boolean;
   }): Promise<{ comments: number; likes: number }> {
     const result = await this.db
       .selectFrom('activity')
@@ -86,8 +101,8 @@ export class ActivityRepository {
       .where('activity.albumId', '=', albumId)
       .where(({ or, and, eb }) =>
         or([
-          and([eb('asset.deletedAt', 'is', null), eb('asset.visibility', '!=', sql.lit(AssetVisibility.Locked))]),
-          eb('asset.id', 'is', null),
+          and([eb('asset.deletedAt', 'is', null), eb('asset.visibility', 'in', DEFAULT_VISIBILITY)]),
+          ...(excludeAlbumLevel ? [] : [eb('asset.id', 'is', null)]),
         ]),
       )
       .executeTakeFirstOrThrow();

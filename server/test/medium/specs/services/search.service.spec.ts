@@ -4,6 +4,7 @@ import { AlbumUserRole, AssetOrder, AssetVisibility, SearchOrderField } from 'sr
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { DatabaseRepository } from 'src/repositories/database.repository';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { PartnerRepository } from 'src/repositories/partner.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
@@ -28,6 +29,10 @@ const setup = (db?: Kysely<DB>) => {
       AccessRepository,
       AssetRepository,
       DatabaseRepository,
+      // Slice 1: the albumIds+personIds edge-case test exercises searchMetadata's person path, which calls
+      // faceIdentityRepository.resolveScopedPersonTokens — wire it real so the resolver runs (returns no
+      // scoped tokens for a plain personId) instead of throwing on an undefined repo.
+      FaceIdentityRepository,
       SearchRepository,
       SharedSpaceRepository,
       PartnerRepository,
@@ -75,6 +80,25 @@ const expectFacetsAbsent = (result: FilterSuggestionsResponseDto, marker: string
   expect(JSON.stringify(result)).not.toContain(`${marker}-`);
 };
 
+// Like expectFacetsPresent but omits the people check — used for space-scoped suggestions
+// where people come from shared_space_person / face_identity_face (not plain person rows)
+// and seeding those requires additional setup outside the scope of the visibility leak tests.
+const expectNonPersonFacetsPresent = (result: FilterSuggestionsResponseDto, marker: string) => {
+  expect(result.countries).toContain(`${marker}-Country`);
+  expect(result.cameraMakes).toContain(`${marker}-Make`);
+  expect(result.tags.map((tag) => tag.value)).toContain(`${marker}-Tag`);
+};
+
+// Mirror: assert absence of non-person facets for space-scoped tests.
+const expectNonPersonFacetsAbsent = (result: FilterSuggestionsResponseDto, marker: string) => {
+  expect(result.countries).not.toContain(`${marker}-Country`);
+  expect(result.cameraMakes).not.toContain(`${marker}-Make`);
+  expect(result.tags.map((tag) => tag.value)).not.toContain(`${marker}-Tag`);
+  expect(JSON.stringify(result)).not.toContain(`${marker}-Country`);
+  expect(JSON.stringify(result)).not.toContain(`${marker}-Make`);
+  expect(JSON.stringify(result)).not.toContain(`${marker}-Tag`);
+};
+
 // M3: elevation only unlocks the CALLER'S OWN locked/archived folder. Other shared-space
 // members' assets must always be Timeline-only in space-scoped search — the v3
 // `undefined`-for-elevated visibility default must not leak their Archived/Hidden/Locked assets.
@@ -95,9 +119,82 @@ const shareAsset = async (ctx: SearchCtx, spaceId: string, ownerId: string, visi
 
 const elevated = (userId: string) => factory.auth({ user: { id: userId }, session: { hasElevatedPermission: true } });
 
+// Slice 5: seed a directly-shared space asset with distinct facet values for each type.
+// `visibility` controls whether this asset is Hidden/Locked/etc. Returns the asset.
+const seedSpaceAssetWithFacets = async (
+  ctx: SearchCtx,
+  spaceId: string,
+  ownerId: string,
+  marker: string,
+  visibility: AssetVisibility,
+) => {
+  const { asset } = await ctx.newAsset({ ownerId, visibility });
+  await ctx.newSharedSpaceAsset({ spaceId, assetId: asset.id, addedById: ownerId });
+  await ctx.newExif({
+    assetId: asset.id,
+    country: `${marker}-Country`,
+    city: `${marker}-City`,
+    make: `${marker}-Make`,
+    model: `${marker}-Model`,
+  });
+  const [tag] = await upsertTags(ctx.get(TagRepository), { userId: ownerId, tags: [`${marker}-Tag`] });
+  await ctx.newTagAsset({ tagIds: [tag.id], assetIds: [asset.id] });
+  const { person } = await ctx.newPerson({ ownerId, name: `${marker}-Person` });
+  await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  return asset;
+};
+
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
+
+// Owner's album carrying one asset per visibility, linked into a space with a Viewer member.
+const seedAlbumWithVisibilities = async (ctx: SearchCtx) => {
+  const { user: owner } = await ctx.newUser();
+  const { user: member } = await ctx.newUser();
+  const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'VisAlbum' });
+
+  const { asset: timelineAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+  const { asset: archiveAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Archive });
+  const { asset: hiddenAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Hidden });
+  const { asset: lockedAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Locked });
+  for (const asset of [timelineAsset, archiveAsset, hiddenAsset, lockedAsset]) {
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+  }
+
+  const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+  await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+  return { owner, member, album, space, timelineAsset, archiveAsset, hiddenAsset, lockedAsset };
+};
+
+// Owner's album carrying a trashed asset (still linked via album_asset) alongside a live
+// sibling, linked into a space with a Viewer member. H1: the album-granted search scope had
+// no `deletedAt` gate, so a Viewer could read the owner's TRASHED asset metadata (ids, EXIF,
+// people, thumbhash) via `withDeleted` / `trashedBefore` / `trashedAfter`.
+const seedAlbumWithTrashedAsset = async (ctx: SearchCtx) => {
+  const { user: owner } = await ctx.newUser();
+  const { user: member } = await ctx.newUser();
+  const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'TrashAlbum' });
+
+  const { asset: trashedAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+  const { asset: liveAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+  await ctx.newAlbumAsset({ albumId: album.id, assetId: trashedAsset.id });
+  await ctx.newAlbumAsset({ albumId: album.id, assetId: liveAsset.id });
+  await ctx.softDeleteAsset(trashedAsset.id);
+
+  const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+  await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+  return { owner, member, album, space, trashedAsset, liveAsset };
+};
+
+const itemIds = (response: Awaited<ReturnType<SearchService['searchMetadata']>>) =>
+  response.assets.items.map((item) => item.id);
 
 describe(SearchService.name, () => {
   it('should work', () => {
@@ -291,6 +388,88 @@ describe(SearchService.name, () => {
     });
   });
 
+  describe('album-linked space assets', () => {
+    it('should include album-linked assets in getSearchSuggestions for countries', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+
+      // Create an album and an asset belonging to that album
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'SearchAlbumCountry' });
+      const { asset: albumAsset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: albumAsset.id });
+      await ctx.newExif({ assetId: albumAsset.id, country: 'France' });
+
+      // Create a space, add member, link the album
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      const auth = factory.auth({ user: { id: member.id } });
+
+      const result = await sut.getSearchSuggestions(auth, {
+        type: SearchSuggestionType.COUNTRY,
+        spaceId: space.id,
+        includeNull: false,
+      });
+
+      expect(result).toContain('France');
+    });
+
+    it('should include album-linked assets in getSearchSuggestions for cities', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'SearchAlbumCity' });
+      const { asset: albumAsset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: albumAsset.id });
+      await ctx.newExif({ assetId: albumAsset.id, city: 'Paris', country: 'France' });
+
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      const auth = factory.auth({ user: { id: member.id } });
+
+      const result = await sut.getSearchSuggestions(auth, {
+        type: SearchSuggestionType.CITY,
+        spaceId: space.id,
+        includeNull: false,
+      });
+
+      expect(result).toContain('Paris');
+    });
+
+    it('should include album-linked assets in getSearchSuggestions for camera makes', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'SearchAlbumMake' });
+      const { asset: albumAsset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: albumAsset.id });
+      await ctx.newExif({ assetId: albumAsset.id, make: 'Nikon' });
+
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      const auth = factory.auth({ user: { id: member.id } });
+
+      const result = await sut.getSearchSuggestions(auth, {
+        type: SearchSuggestionType.CAMERA_MAKE,
+        spaceId: space.id,
+        includeNull: false,
+      });
+
+      expect(result).toContain('Nikon');
+    });
+  });
+
   describe('withStacked option', () => {
     it('should exclude stacked assets when withStacked is false', async () => {
       const { sut, ctx } = setup();
@@ -373,6 +552,258 @@ describe(SearchService.name, () => {
       await expect(sut.searchMetadata(auth, { size: 250, albumIds: [album.id] })).rejects.toThrow(
         'Not found or no album.read access',
       );
+    });
+  });
+
+  describe('albumIds option — visibility gate (Slice 1 / security-1)', () => {
+    it('hides a Hidden album asset from a Viewer member (default visibility); Timeline+Archive present, Locked absent', async () => {
+      const { sut, ctx } = setup();
+      const s = await seedAlbumWithVisibilities(ctx);
+      const auth = factory.auth({ user: { id: s.member.id } });
+
+      const response = await sut.searchMetadata(auth, { albumIds: [s.album.id] });
+      const ids = itemIds(response);
+
+      expect(ids).toContain(s.timelineAsset.id);
+      expect(ids).toContain(s.archiveAsset.id); // Archive is shareable — not stripped
+      expect(ids).not.toContain(s.hiddenAsset.id); // security-1: Hidden gated on the album path
+      expect(ids).not.toContain(s.lockedAsset.id); // Locked never present
+    });
+
+    it('hides a Hidden album asset even when the member explicitly requests visibility=hidden', async () => {
+      const { sut, ctx } = setup();
+      const s = await seedAlbumWithVisibilities(ctx);
+      const auth = factory.auth({ user: { id: s.member.id } });
+
+      const response = await sut.searchMetadata(auth, { albumIds: [s.album.id], visibility: AssetVisibility.Hidden });
+
+      expect(itemIds(response)).not.toContain(s.hiddenAsset.id);
+    });
+
+    it("hides the OWNER's own Hidden album asset via the album path (flat gate, matches the grid)", async () => {
+      const { sut, ctx } = setup();
+      const s = await seedAlbumWithVisibilities(ctx);
+      const ownerAuth = factory.auth({ user: { id: s.owner.id } });
+
+      const response = await sut.searchMetadata(ownerAuth, {
+        albumIds: [s.album.id],
+        visibility: AssetVisibility.Hidden,
+      });
+
+      expect(itemIds(response)).not.toContain(s.hiddenAsset.id);
+    });
+
+    it('OWNER still finds their Hidden asset via the non-album userIds search path (untouched)', async () => {
+      const { sut, ctx } = setup();
+      const s = await seedAlbumWithVisibilities(ctx);
+      const ownerAuth = factory.auth({ user: { id: s.owner.id } });
+
+      // No albumIds -> userIds = [owner], scoped to ownerId + explicit Hidden. This path keeps its
+      // own `own OR gate` and is untouched by the fix.
+      const response = await sut.searchMetadata(ownerAuth, { visibility: AssetVisibility.Hidden });
+
+      expect(itemIds(response)).toContain(s.hiddenAsset.id);
+    });
+
+    it('gates a Hidden asset reachable via an album linked into TWO spaces (member of one)', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'TwoSpaceAlbum' });
+
+      const { asset: timelineAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      const { asset: hiddenAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Hidden });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: timelineAsset.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: hiddenAsset.id });
+
+      const { space: spaceA } = await ctx.newSharedSpace({ createdById: owner.id });
+      const { space: spaceB } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: spaceA.id, userId: owner.id, role: 'owner' });
+      await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: owner.id, role: 'owner' });
+      // member belongs ONLY to spaceA
+      await ctx.newSharedSpaceMember({ spaceId: spaceA.id, userId: member.id, role: 'viewer' });
+      await ctx.newSharedSpaceAlbum({ spaceId: spaceA.id, albumId: album.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: spaceB.id, albumId: album.id });
+
+      const auth = factory.auth({ user: { id: member.id } });
+      const response = await sut.searchMetadata(auth, { albumIds: [album.id] });
+      const ids = itemIds(response);
+
+      expect(ids).toContain(timelineAsset.id);
+      expect(ids).not.toContain(hiddenAsset.id);
+    });
+
+    it('a member of NEITHER space has no album.read access (403-empty)', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: stranger } = await ctx.newUser();
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'NoAccessAlbum' });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      const strangerAuth = factory.auth({ user: { id: stranger.id } });
+
+      await expect(sut.searchMetadata(strangerAuth, { albumIds: [album.id] })).rejects.toThrow(
+        'Not found or no album.read access',
+      );
+    });
+
+    it('gate still applies when albumIds is combined with a personIds filter', async () => {
+      const { sut, ctx } = setup();
+      const s = await seedAlbumWithVisibilities(ctx);
+
+      // A person whose face sits on BOTH the Timeline and the Hidden album asset. The OWNER searches
+      // (they hold PersonRead on their own person — a member could not filter by it). Combining the album
+      // scope with the person scope must not open a bypass: the flat album gate still hides the Hidden
+      // asset from the owner too (matches the album grid), while the Timeline asset comes through.
+      const { person } = await ctx.newPerson({ ownerId: s.owner.id, name: 'ComboPerson' });
+      await ctx.newAssetFace({ assetId: s.timelineAsset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: s.hiddenAsset.id, personId: person.id });
+
+      const auth = factory.auth({ user: { id: s.owner.id } });
+      const response = await sut.searchMetadata(auth, { albumIds: [s.album.id], personIds: [person.id] });
+      const ids = itemIds(response);
+
+      expect(ids).toContain(s.timelineAsset.id);
+      expect(ids).not.toContain(s.hiddenAsset.id);
+    });
+  });
+
+  describe('albumIds option — trash gate (Slice 1 / H1)', () => {
+    it('excludes a trashed album asset from a Viewer member when withDeleted is requested', async () => {
+      const { sut, ctx } = setup();
+      const s = await seedAlbumWithTrashedAsset(ctx);
+      const auth = factory.auth({ user: { id: s.member.id } });
+
+      const response = await sut.searchMetadata(auth, { albumIds: [s.album.id], withDeleted: true });
+      const ids = itemIds(response);
+
+      expect(ids).toContain(s.liveAsset.id);
+      expect(ids).not.toContain(s.trashedAsset.id); // H1: trashed album asset must never leak via withDeleted
+    });
+
+    it('excludes the trashed album asset with no trash params too (regression)', async () => {
+      const { sut, ctx } = setup();
+      const s = await seedAlbumWithTrashedAsset(ctx);
+      const auth = factory.auth({ user: { id: s.member.id } });
+
+      const response = await sut.searchMetadata(auth, { albumIds: [s.album.id] });
+      const ids = itemIds(response);
+
+      expect(ids).toContain(s.liveAsset.id);
+      expect(ids).not.toContain(s.trashedAsset.id);
+    });
+
+    it('excludes the trashed album asset when queried via a matching trashedBefore/trashedAfter range', async () => {
+      const { sut, ctx } = setup();
+      const s = await seedAlbumWithTrashedAsset(ctx);
+      const auth = factory.auth({ user: { id: s.member.id } });
+
+      const response = await sut.searchMetadata(auth, {
+        albumIds: [s.album.id],
+        trashedAfter: new Date('2000-01-01T00:00:00.000Z'),
+        trashedBefore: new Date('2999-01-01T00:00:00.000Z'),
+      });
+      const ids = itemIds(response);
+
+      // Note: liveAsset (deletedAt IS NULL) never matches a trashedBefore/After range on its
+      // own — that's plain SQL null-comparison semantics, not the fix under test here. The
+      // assertion that matters is that the flat `deletedAt IS NULL` album gate wins over a
+      // trashedAfter/trashedBefore range that WOULD otherwise match the trashed asset.
+      expect(ids).not.toContain(s.trashedAsset.id);
+    });
+
+    it("excludes the OWNER's own trashed album asset via the album path too (flat gate, no owner exception)", async () => {
+      const { sut, ctx } = setup();
+      const s = await seedAlbumWithTrashedAsset(ctx);
+      const ownerAuth = factory.auth({ user: { id: s.owner.id } });
+
+      const response = await sut.searchMetadata(ownerAuth, { albumIds: [s.album.id], withDeleted: true });
+
+      expect(itemIds(response)).not.toContain(s.trashedAsset.id);
+    });
+
+    it('OWNER still finds their trashed asset via the non-album userIds search path (untouched)', async () => {
+      const { sut, ctx } = setup();
+      const s = await seedAlbumWithTrashedAsset(ctx);
+      const ownerAuth = factory.auth({ user: { id: s.owner.id } });
+
+      // No albumIds -> userIds = [owner]; this path keeps its own withDeleted handling and is
+      // untouched by the fix.
+      const response = await sut.searchMetadata(ownerAuth, { withDeleted: true });
+
+      expect(itemIds(response)).toContain(s.trashedAsset.id);
+    });
+
+    it('gates a trashed asset reachable via an album linked into TWO spaces (member of one)', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'TwoSpaceTrashAlbum' });
+
+      const { asset: liveAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      const { asset: trashedAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: liveAsset.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: trashedAsset.id });
+      await ctx.softDeleteAsset(trashedAsset.id);
+
+      const { space: spaceA } = await ctx.newSharedSpace({ createdById: owner.id });
+      const { space: spaceB } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: spaceA.id, userId: owner.id, role: 'owner' });
+      await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: owner.id, role: 'owner' });
+      // member belongs ONLY to spaceA
+      await ctx.newSharedSpaceMember({ spaceId: spaceA.id, userId: member.id, role: 'viewer' });
+      await ctx.newSharedSpaceAlbum({ spaceId: spaceA.id, albumId: album.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: spaceB.id, albumId: album.id });
+
+      const auth = factory.auth({ user: { id: member.id } });
+      const response = await sut.searchMetadata(auth, { albumIds: [album.id], withDeleted: true });
+      const ids = itemIds(response);
+
+      expect(ids).toContain(liveAsset.id);
+      expect(ids).not.toContain(trashedAsset.id);
+    });
+
+    it('gate still applies when albumIds is combined with a personIds filter', async () => {
+      const { sut, ctx } = setup();
+      const s = await seedAlbumWithTrashedAsset(ctx);
+
+      // A person whose face sits on BOTH the live and the trashed album asset. Combining the
+      // album scope with the person scope must not open a bypass: the trash gate still hides
+      // the trashed asset even for the owner, while the live asset comes through.
+      const { person } = await ctx.newPerson({ ownerId: s.owner.id, name: 'TrashComboPerson' });
+      await ctx.newAssetFace({ assetId: s.liveAsset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: s.trashedAsset.id, personId: person.id });
+
+      const auth = factory.auth({ user: { id: s.owner.id } });
+      const response = await sut.searchMetadata(auth, {
+        albumIds: [s.album.id],
+        personIds: [person.id],
+        withDeleted: true,
+      });
+      const ids = itemIds(response);
+
+      expect(ids).toContain(s.liveAsset.id);
+      expect(ids).not.toContain(s.trashedAsset.id);
+    });
+
+    it('a Hidden album asset stays excluded alongside the new trash gate (both gates hold)', async () => {
+      const { sut, ctx } = setup();
+      const s = await seedAlbumWithVisibilities(ctx);
+      await ctx.softDeleteAsset(s.timelineAsset.id);
+      const auth = factory.auth({ user: { id: s.member.id } });
+
+      const response = await sut.searchMetadata(auth, { albumIds: [s.album.id], withDeleted: true });
+      const ids = itemIds(response);
+
+      expect(ids).not.toContain(s.hiddenAsset.id); // visibility gate still holds
+      expect(ids).not.toContain(s.lockedAsset.id);
+      expect(ids).not.toContain(s.timelineAsset.id); // now trashed -> excluded by the new gate
+      expect(ids).toContain(s.archiveAsset.id); // untouched, live Archive asset still present
     });
   });
 
@@ -913,11 +1344,10 @@ describe(SearchService.name, () => {
     });
   });
 
-  // M3: elevation only unlocks the CALLER'S OWN locked/archived folder. Other shared-space
-  // members' assets must always be Timeline-only in space-scoped search — the v3
-  // `undefined`-for-elevated visibility default must not leak their Archived/Hidden/Locked assets.
-  describe('space-scoped visibility (M3)', () => {
-    it('hides another member archived asset from an elevated spaceId metadata search', async () => {
+  // Slice 10: Archive assets of other space members now surface in space-scoped search
+  // (matching the browse / timeline gate). Hidden and Locked remain excluded always.
+  describe('space-scoped visibility (Slice 10 — Archive exposed, Hidden/Locked blocked)', () => {
+    it('shows another member archived asset in an elevated spaceId metadata search (spaceId path)', async () => {
       const { sut, ctx } = setup();
       const { owner, member, space } = await setupSpace(ctx);
       const archived = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Archive);
@@ -927,7 +1357,7 @@ describe(SearchService.name, () => {
       const ids = result.assets.items.map((a) => a.id);
 
       expect(ids).toContain(timeline.id);
-      expect(ids).not.toContain(archived.id);
+      expect(ids).toContain(archived.id);
     });
 
     it('hides another member hidden and locked assets from an elevated spaceId metadata search', async () => {
@@ -956,7 +1386,7 @@ describe(SearchService.name, () => {
       expect(ids).toContain(ownArchived.id);
     });
 
-    it('never exposes another member Archived/Hidden/Locked to a non-elevated member', async () => {
+    it('shows another member Archive but hides Hidden/Locked for a non-elevated member (spaceId path)', async () => {
       const { sut, ctx } = setup();
       const { owner, member, space } = await setupSpace(ctx);
       const archived = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Archive);
@@ -969,12 +1399,12 @@ describe(SearchService.name, () => {
       const ids = result.assets.items.map((a) => a.id);
 
       expect(ids).toContain(timeline.id);
-      expect(ids).not.toContain(archived.id);
+      expect(ids).toContain(archived.id);
       expect(ids).not.toContain(hidden.id);
       expect(ids).not.toContain(locked.id);
     });
 
-    it('does not expose another member archived even when the caller explicitly requests visibility=Archive', async () => {
+    it('exposes another member archived when the caller explicitly requests visibility=Archive (spaceId path)', async () => {
       const { sut, ctx } = setup();
       const { owner, member, space } = await setupSpace(ctx);
       const otherArchived = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Archive);
@@ -987,10 +1417,10 @@ describe(SearchService.name, () => {
       const ids = result.assets.items.map((a) => a.id);
 
       expect(ids).toContain(ownArchived.id);
-      expect(ids).not.toContain(otherArchived.id);
+      expect(ids).toContain(otherArchived.id);
     });
 
-    it('hides another member archived asset in the withSharedSpaces (timeline) path for an elevated caller', async () => {
+    it('shows another member archived asset in the withSharedSpaces (timeline) path for an elevated caller', async () => {
       const { sut, ctx } = setup();
       const { owner, member, space } = await setupSpace(ctx);
       const archived = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Archive);
@@ -1000,10 +1430,10 @@ describe(SearchService.name, () => {
       const ids = result.assets.items.map((a) => a.id);
 
       expect(ids).toContain(timeline.id);
-      expect(ids).not.toContain(archived.id);
+      expect(ids).toContain(archived.id);
     });
 
-    it('excludes another member archived asset from elevated spaceId statistics', async () => {
+    it('includes another member archived asset in elevated spaceId statistics', async () => {
       const { sut, ctx } = setup();
       const { owner, member, space } = await setupSpace(ctx);
       await shareAsset(ctx, space.id, owner.id, AssetVisibility.Archive);
@@ -1011,11 +1441,11 @@ describe(SearchService.name, () => {
 
       const result = await sut.searchStatistics(elevated(member.id), { spaceId: space.id });
 
-      // Only the Timeline asset counts — the other member's archived asset is excluded.
-      expect(result).toEqual({ total: 1 });
+      // Both Archive and Timeline count — Slice 10 aligns search with browse.
+      expect(result).toEqual({ total: 2 });
     });
 
-    it('hides archived assets of every other owner in a mixed-owner space (elevated)', async () => {
+    it('shows archived assets of every other owner in a mixed-owner space (elevated)', async () => {
       const { sut, ctx } = setup();
       const { owner, member, space } = await setupSpace(ctx);
       const { user: secondOwner } = await ctx.newUser();
@@ -1029,8 +1459,219 @@ describe(SearchService.name, () => {
       const ids = result.assets.items.map((a) => a.id);
 
       expect(ids).toContain(timelineA.id);
-      expect(ids).not.toContain(archivedA.id);
-      expect(ids).not.toContain(archivedC.id);
+      expect(ids).toContain(archivedA.id);
+      expect(ids).toContain(archivedC.id);
+    });
+
+    it('shows another member archived asset in searchLargeAssets (spaceId path)', async () => {
+      const { sut, ctx } = setup();
+      const { owner, member, space } = await setupSpace(ctx);
+      const { asset: archived } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Archive });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: archived.id, addedById: owner.id });
+      await ctx.newExif({ assetId: archived.id, fileSizeInByte: 999_999 });
+
+      const auth = factory.auth({ user: { id: member.id } });
+      const result = await sut.searchLargeAssets(auth, { spaceId: space.id });
+
+      expect(result.map((a) => a.id)).toContain(archived.id);
+    });
+
+    it('shows another member archived asset in searchLargeAssets (withSharedSpaces path)', async () => {
+      const { sut, ctx } = setup();
+      const { owner, member, space } = await setupSpace(ctx);
+      const { asset: archived } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Archive });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: archived.id, addedById: owner.id });
+      await ctx.newExif({ assetId: archived.id, fileSizeInByte: 999_999 });
+
+      const result = await sut.searchLargeAssets(elevated(member.id), { withSharedSpaces: true });
+
+      expect(result.map((a) => a.id)).toContain(archived.id);
+    });
+
+    it('hides another member Hidden/Locked from searchLargeAssets (spaceId path)', async () => {
+      const { sut, ctx } = setup();
+      const { owner, member, space } = await setupSpace(ctx);
+      const { asset: hidden } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Hidden });
+      const { asset: locked } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Locked });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: hidden.id, addedById: owner.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: locked.id, addedById: owner.id });
+      await ctx.newExif({ assetId: hidden.id, fileSizeInByte: 999_999 });
+      await ctx.newExif({ assetId: locked.id, fileSizeInByte: 999_999 });
+
+      const result = await sut.searchLargeAssets(elevated(member.id), { spaceId: space.id });
+      const ids = result.map((a) => a.id);
+
+      expect(ids).not.toContain(hidden.id);
+      expect(ids).not.toContain(locked.id);
+    });
+  });
+
+  // ── Slice 5: facets / suggestions must apply the same M3 visibility gate as search ──
+  describe('space-scoped facet/suggestion visibility (M3 — Slice 5)', () => {
+    // getFilterSuggestions (spaceId path)
+    // NOTE: people facets in the spaceId path come from shared_space_person rows (not plain person
+    // rows), so seedSpaceAssetWithFacets is insufficient to populate them. We assert non-person
+    // facets (country/make/tag) which are enough to prove the visibility gate fires.
+    it('hides another member Hidden asset from spaceId getFilterSuggestions', async () => {
+      const { sut, ctx } = setup();
+      const { owner, member, space } = await setupSpace(ctx);
+      await seedSpaceAssetWithFacets(ctx, space.id, owner.id, 'HiddenOwner', AssetVisibility.Hidden);
+      // Positive control: owner's Timeline asset is present
+      await seedSpaceAssetWithFacets(ctx, space.id, owner.id, 'TimelineOwner', AssetVisibility.Timeline);
+
+      const result = await sut.getFilterSuggestions(factory.auth({ user: { id: member.id } }), {
+        spaceId: space.id,
+      });
+
+      expectNonPersonFacetsAbsent(result, 'HiddenOwner');
+      expectNonPersonFacetsPresent(result, 'TimelineOwner');
+    });
+
+    it('hides another member Locked asset from spaceId getFilterSuggestions (elevated)', async () => {
+      const { sut, ctx } = setup();
+      const { owner, member, space } = await setupSpace(ctx);
+      await seedSpaceAssetWithFacets(ctx, space.id, owner.id, 'LockedOwner', AssetVisibility.Locked);
+      await seedSpaceAssetWithFacets(ctx, space.id, owner.id, 'TimelineOwner2', AssetVisibility.Timeline);
+
+      const result = await sut.getFilterSuggestions(elevated(member.id), { spaceId: space.id });
+
+      expectNonPersonFacetsAbsent(result, 'LockedOwner');
+      expectNonPersonFacetsPresent(result, 'TimelineOwner2');
+    });
+
+    it("exposes the caller's own Locked asset from spaceId getFilterSuggestions (elevated, own-M3)", async () => {
+      const { sut, ctx } = setup();
+      const { member, space } = await setupSpace(ctx);
+      await seedSpaceAssetWithFacets(ctx, space.id, member.id, 'OwnLocked', AssetVisibility.Locked);
+
+      const result = await sut.getFilterSuggestions(elevated(member.id), { spaceId: space.id });
+
+      expectNonPersonFacetsPresent(result, 'OwnLocked');
+    });
+
+    it('hides showInTimeline=false album asset from spaceId getFilterSuggestions', async () => {
+      const { sut, ctx } = setup();
+      const { owner, member, space } = await setupSpace(ctx);
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'NoTimelineAlbumFacet' });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+      await ctx.newExif({ assetId: asset.id, country: 'NoTimeline-Country', make: 'NoTimeline-Make' });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, showInTimeline: false });
+
+      const result = await sut.getFilterSuggestions(factory.auth({ user: { id: member.id } }), {
+        spaceId: space.id,
+      });
+
+      expect(result.countries).not.toContain('NoTimeline-Country');
+      expect(result.cameraMakes).not.toContain('NoTimeline-Make');
+    });
+
+    // getFilterSuggestions (timelineSpaceIds / withSharedSpaces path)
+    // NOTE: people in this path come from getFilteredIdentityPeople (face_identity_face linkage),
+    // not plain person rows, so we assert non-person facets only.
+    it('hides another member Hidden asset from withSharedSpaces getFilterSuggestions', async () => {
+      const { sut, ctx } = setup();
+      const { owner, member, space } = await setupSpace(ctx);
+      await seedSpaceAssetWithFacets(ctx, space.id, owner.id, 'TLHiddenOwner', AssetVisibility.Hidden);
+      await seedSpaceAssetWithFacets(ctx, space.id, owner.id, 'TLTimelineOwner', AssetVisibility.Timeline);
+
+      const result = await sut.getFilterSuggestions(elevated(member.id), { withSharedSpaces: true });
+
+      expectNonPersonFacetsAbsent(result, 'TLHiddenOwner');
+      expectNonPersonFacetsPresent(result, 'TLTimelineOwner');
+    });
+
+    it('hides showInTimeline=false album asset from withSharedSpaces getFilterSuggestions', async () => {
+      const { sut, ctx } = setup();
+      const { owner, member, space } = await setupSpace(ctx);
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'TLNoTimelineAlbum' });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+      await ctx.newExif({ assetId: asset.id, country: 'TLNoTimeline-Country' });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, showInTimeline: false });
+
+      const result = await sut.getFilterSuggestions(factory.auth({ user: { id: member.id } }), {
+        withSharedSpaces: true,
+      });
+
+      expect(result.countries).not.toContain('TLNoTimeline-Country');
+    });
+
+    // getSearchSuggestions (spaceId path)
+    it('hides another member Hidden city from spaceId getSearchSuggestions', async () => {
+      const { sut, ctx } = setup();
+      const { owner, member, space } = await setupSpace(ctx);
+      await seedSpaceAssetWithFacets(ctx, space.id, owner.id, 'SugHidden', AssetVisibility.Hidden);
+      await seedSpaceAssetWithFacets(ctx, space.id, owner.id, 'SugTimeline', AssetVisibility.Timeline);
+
+      const cities = await sut.getSearchSuggestions(factory.auth({ user: { id: member.id } }), {
+        type: SearchSuggestionType.CITY,
+        spaceId: space.id,
+      });
+
+      expect(cities).not.toContain('SugHidden-City');
+      expect(cities).toContain('SugTimeline-City');
+    });
+
+    it('hides showInTimeline=false album city from spaceId getSearchSuggestions', async () => {
+      const { sut, ctx } = setup();
+      const { owner, member, space } = await setupSpace(ctx);
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'SugNoTimelineAlbum' });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+      await ctx.newExif({ assetId: asset.id, city: 'SugNoTimeline-City', country: 'France' });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, showInTimeline: false });
+
+      const cities = await sut.getSearchSuggestions(factory.auth({ user: { id: member.id } }), {
+        type: SearchSuggestionType.CITY,
+        spaceId: space.id,
+      });
+
+      expect(cities).not.toContain('SugNoTimeline-City');
+    });
+  });
+
+  describe('album-linked space assets', () => {
+    it('should include album-linked assets in searchMetadata when filtering by spaceId (showInTimeline=true)', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+
+      const { album } = await ctx.newAlbum({ ownerId: owner.id });
+      const { asset: albumAsset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: albumAsset.id });
+
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, showInTimeline: true });
+
+      const auth = factory.auth({ user: { id: member.id } });
+
+      const result = await sut.searchMetadata(auth, { spaceId: space.id });
+
+      expect(result.assets.items).toEqual([expect.objectContaining({ id: albumAsset.id })]);
+    });
+
+    it('should NOT include album-linked assets in searchMetadata when showInTimeline=false', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+
+      const { album } = await ctx.newAlbum({ ownerId: owner.id });
+      const { asset: albumAsset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: albumAsset.id });
+
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, showInTimeline: false });
+
+      const auth = factory.auth({ user: { id: member.id } });
+
+      const result = await sut.searchMetadata(auth, { spaceId: space.id });
+
+      expect(result.assets.items.find((a) => a.id === albumAsset.id)).toBeUndefined();
     });
   });
 });

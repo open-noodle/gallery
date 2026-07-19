@@ -1325,6 +1325,8 @@ where
   and "shared_space_asset"."updateId" <= $4
   and "shared_space_asset"."updateId" > $5
   and "shared_space_asset"."spaceId" = $6
+  and "asset"."visibility" in ($7, $8)
+  and "asset"."deletedAt" is null
 order by
   "shared_space_asset"."updateId" asc
 
@@ -1375,6 +1377,8 @@ where
     where
       "shared_space_member"."userId" = $6
   )
+  and "asset"."visibility" in ($7, $8)
+  and "asset"."deletedAt" is null
 order by
   "shared_space_asset"."updateId" asc
 
@@ -1426,6 +1430,7 @@ where
     where
       "shared_space_member"."userId" = $7
   )
+  and "asset"."visibility" in ($8, $9)
 order by
   "asset"."updateId" asc
 
@@ -1460,11 +1465,14 @@ select
 from
   "shared_space_asset" as "shared_space_asset"
   inner join "asset_exif" on "asset_exif"."assetId" = "shared_space_asset"."assetId"
+  inner join "asset" on "asset"."id" = "shared_space_asset"."assetId"
 where
   "shared_space_asset"."updateId" < $1
   and "shared_space_asset"."updateId" <= $2
   and "shared_space_asset"."updateId" > $3
   and "shared_space_asset"."spaceId" = $4
+  and "asset"."visibility" in ($5, $6)
+  and "asset"."deletedAt" is null
 order by
   "shared_space_asset"."updateId" asc
 
@@ -1499,6 +1507,7 @@ select
 from
   "shared_space_asset" as "shared_space_asset"
   inner join "asset_exif" on "asset_exif"."assetId" = "shared_space_asset"."assetId"
+  inner join "asset" on "asset"."id" = "shared_space_asset"."assetId"
 where
   "shared_space_asset"."updateId" < $1
   and "shared_space_asset"."updateId" > $2
@@ -1517,6 +1526,8 @@ where
     where
       "shared_space_member"."userId" = $4
   )
+  and "asset"."visibility" in ($5, $6)
+  and "asset"."deletedAt" is null
 order by
   "shared_space_asset"."updateId" asc
 
@@ -1551,6 +1562,7 @@ select
 from
   "asset_exif" as "asset_exif"
   inner join "shared_space_asset" on "shared_space_asset"."assetId" = "asset_exif"."assetId"
+  inner join "asset" on "asset"."id" = "asset_exif"."assetId"
 where
   "asset_exif"."updateId" < $1
   and "asset_exif"."updateId" > $2
@@ -1570,6 +1582,7 @@ where
     where
       "shared_space_member"."userId" = $5
   )
+  and "asset"."visibility" in ($6, $7)
 order by
   "asset_exif"."updateId" asc
 
@@ -1580,11 +1593,14 @@ select
   "shared_space_asset"."updateId"
 from
   "shared_space_asset" as "shared_space_asset"
+  inner join "asset" on "asset"."id" = "shared_space_asset"."assetId"
 where
   "shared_space_asset"."updateId" < $1
   and "shared_space_asset"."updateId" <= $2
   and "shared_space_asset"."updateId" > $3
   and "shared_space_asset"."spaceId" = $4
+  and "asset"."visibility" in ($5, $6)
+  and "asset"."deletedAt" is null
 order by
   "shared_space_asset"."updateId" asc
 
@@ -1623,6 +1639,7 @@ select
   "shared_space_asset"."updateId"
 from
   "shared_space_asset" as "shared_space_asset"
+  inner join "asset" on "asset"."id" = "shared_space_asset"."assetId"
 where
   "shared_space_asset"."updateId" < $1
   and "shared_space_asset"."updateId" > $2
@@ -1641,6 +1658,7 @@ where
     where
       "shared_space_member"."userId" = $4
   )
+  and "asset"."visibility" in ($5, $6)
 order by
   "shared_space_asset"."updateId" asc
 
@@ -1779,6 +1797,13 @@ where
   and "asset"."updateId" <= $4
   and "asset"."updateId" > $5
   and "asset"."libraryId" = $6
+  and (
+    "asset"."ownerId" = $7
+    or (
+      "asset"."visibility" in ($8, $9)
+      and "asset"."deletedAt" is null
+    )
+  )
 order by
   "asset"."updateId" asc
 
@@ -1844,6 +1869,10 @@ where
           "shared_space_member"."userId" = $7
       )
   )
+  and (
+    "asset"."ownerId" = $8
+    or "asset"."visibility" in ($9, $10)
+  )
 order by
   "asset"."updateId" asc
 
@@ -1852,7 +1881,7 @@ select
   "library_asset_audit"."id" as "id",
   "library_asset_audit"."assetId" as "assetId"
 from
-  "library_asset_audit" as "library_asset_audit"
+  "library_asset_audit"
 where
   "library_asset_audit"."id" < $1
   and "library_asset_audit"."id" > $2
@@ -1886,8 +1915,58 @@ where
           "shared_space_member"."userId" = $5
       )
   )
+union
+select
+  "shared_space_library_asset_audit"."id" as "id",
+  "shared_space_library_asset_audit"."assetId" as "assetId"
+from
+  "shared_space_library_asset_audit"
+  inner join "asset" on "asset"."id" = "shared_space_library_asset_audit"."assetId"
+where
+  "shared_space_library_asset_audit"."id" < $6
+  and "shared_space_library_asset_audit"."id" > $7
+  and "shared_space_library_asset_audit"."libraryId" in (
+    select
+      "library"."id"
+    from
+      "library"
+    where
+      "library"."ownerId" = $8
+      and "library"."deletedAt" is null
+    union
+    select
+      "shared_space_library"."libraryId" as "id"
+    from
+      "shared_space_library"
+    where
+      "shared_space_library"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $9
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $10
+      )
+  )
+  and "asset"."ownerId" != $11
+  and not exists (
+    select
+      1 as "exists"
+    from
+      "partner"
+    where
+      "partner"."sharedById" = "asset"."ownerId"
+      and "partner"."sharedWithId" = $12
+  )
 order by
-  "library_asset_audit"."id" asc
+  "id" asc
 
 -- SyncRepository.libraryAssetExif.getBackfill
 select
@@ -1925,6 +2004,13 @@ where
   and "asset"."updateId" <= $2
   and "asset"."updateId" > $3
   and "asset"."libraryId" = $4
+  and (
+    "asset"."ownerId" = $5
+    or (
+      "asset"."visibility" in ($6, $7)
+      and "asset"."deletedAt" is null
+    )
+  )
 order by
   "asset"."updateId" asc
 
@@ -1958,46 +2044,44 @@ select
   "asset_exif"."updateId"
 from
   "asset_exif" as "asset_exif"
+  inner join "asset" on "asset"."id" = "asset_exif"."assetId"
 where
   "asset_exif"."updateId" < $1
   and "asset_exif"."updateId" > $2
-  and "assetId" in (
+  and "asset"."libraryId" is not null
+  and "asset"."libraryId" in (
     select
-      "asset"."id"
+      "library"."id"
     from
-      "asset"
+      "library"
     where
-      "asset"."libraryId" is not null
-      and "asset"."libraryId" in (
+      "library"."ownerId" = $3
+      and "library"."deletedAt" is null
+    union
+    select
+      "shared_space_library"."libraryId" as "id"
+    from
+      "shared_space_library"
+    where
+      "shared_space_library"."spaceId" in (
         select
-          "library"."id"
+          "shared_space"."id"
         from
-          "library"
+          "shared_space"
         where
-          "library"."ownerId" = $3
-          and "library"."deletedAt" is null
+          "shared_space"."createdById" = $4
         union
         select
-          "shared_space_library"."libraryId" as "id"
+          "shared_space_member"."spaceId" as "id"
         from
-          "shared_space_library"
+          "shared_space_member"
         where
-          "shared_space_library"."spaceId" in (
-            select
-              "shared_space"."id"
-            from
-              "shared_space"
-            where
-              "shared_space"."createdById" = $4
-            union
-            select
-              "shared_space_member"."spaceId" as "id"
-            from
-              "shared_space_member"
-            where
-              "shared_space_member"."userId" = $5
-          )
+          "shared_space_member"."userId" = $5
       )
+  )
+  and (
+    "asset"."ownerId" = $6
+    or "asset"."visibility" in ($7, $8)
   )
 order by
   "asset_exif"."updateId" asc
@@ -2078,3 +2162,1154 @@ where
   )
 order by
   "shared_space_library"."updateId" asc
+
+-- SyncRepository.sharedSpaceAlbum.getCreatedAfter
+select
+  "albumId" as "id",
+  "createId"
+from
+  "shared_space_album_user"
+where
+  "userId" = $1
+  and "albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $2
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $3
+      )
+  )
+  and "createId" >= $4
+  and "createId" < $5
+order by
+  "createId" asc
+
+-- SyncRepository.sharedSpaceAlbum.getDeletes
+select
+  "id",
+  "albumId"
+from
+  "shared_space_album_user_audit" as "shared_space_album_user_audit"
+where
+  "shared_space_album_user_audit"."id" < $1
+  and "shared_space_album_user_audit"."id" > $2
+  and "userId" = $3
+order by
+  "shared_space_album_user_audit"."id" asc
+
+-- SyncRepository.sharedSpaceAlbum.getUpserts
+select distinct
+  on ("album"."id", "album"."updateId") "album"."id",
+  "album"."albumName" as "name",
+  "album"."description",
+  "album"."createdAt",
+  "album"."updatedAt",
+  "album"."albumThumbnailAssetId" as "thumbnailAssetId",
+  "album"."isActivityEnabled",
+  "album"."order",
+  "album"."updateId"
+from
+  "album" as "album"
+where
+  "album"."updateId" < $1
+  and "album"."updateId" > $2
+  and "album"."id" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $3
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $4
+      )
+  )
+order by
+  "album"."updateId" asc
+
+-- SyncRepository.sharedSpaceAlbumLink.getBackfill
+select
+  "shared_space_album"."spaceId",
+  "shared_space_album"."albumId",
+  "shared_space_album"."showInTimeline",
+  "shared_space_album"."addedById",
+  "shared_space_album"."createdAt",
+  "shared_space_album"."updatedAt",
+  "shared_space_album"."updateId"
+from
+  "shared_space_album" as "shared_space_album"
+  inner join "album" on "album"."id" = "shared_space_album"."albumId"
+where
+  "shared_space_album"."updateId" < $1
+  and "shared_space_album"."updateId" <= $2
+  and "shared_space_album"."updateId" > $3
+  and "shared_space_album"."spaceId" = $4
+  and "album"."deletedAt" is null
+order by
+  "shared_space_album"."updateId" asc
+
+-- SyncRepository.sharedSpaceAlbumLink.getDeletes
+select
+  "id",
+  "spaceId",
+  "albumId"
+from
+  "shared_space_album_audit" as "shared_space_album_audit"
+where
+  "shared_space_album_audit"."id" < $1
+  and "shared_space_album_audit"."id" > $2
+  and "spaceId" in (
+    select
+      "shared_space"."id"
+    from
+      "shared_space"
+    where
+      "shared_space"."createdById" = $3
+    union
+    select
+      "shared_space_member"."spaceId" as "id"
+    from
+      "shared_space_member"
+    where
+      "shared_space_member"."userId" = $4
+  )
+order by
+  "shared_space_album_audit"."id" asc
+
+-- SyncRepository.sharedSpaceAlbumLink.getUpserts
+select
+  "shared_space_album"."spaceId",
+  "shared_space_album"."albumId",
+  "shared_space_album"."showInTimeline",
+  "shared_space_album"."addedById",
+  "shared_space_album"."createdAt",
+  "shared_space_album"."updatedAt",
+  "shared_space_album"."updateId"
+from
+  "shared_space_album" as "shared_space_album"
+  inner join "album" on "album"."id" = "shared_space_album"."albumId"
+where
+  "shared_space_album"."updateId" < $1
+  and "shared_space_album"."updateId" > $2
+  and "shared_space_album"."spaceId" in (
+    select
+      "shared_space"."id"
+    from
+      "shared_space"
+    where
+      "shared_space"."createdById" = $3
+    union
+    select
+      "shared_space_member"."spaceId" as "id"
+    from
+      "shared_space_member"
+    where
+      "shared_space_member"."userId" = $4
+  )
+  and "album"."deletedAt" is null
+order by
+  "shared_space_album"."updateId" asc
+
+-- SyncRepository.sharedSpaceAlbumToAsset.getBackfill
+select
+  "album_asset"."assetId" as "assetId",
+  "album_asset"."albumId" as "albumId",
+  "album_asset"."updateId"
+from
+  "album_asset"
+  inner join "asset" on "asset"."id" = "album_asset"."assetId"
+where
+  "album_asset"."albumId" = $1
+  and "album_asset"."updateId" < $2
+  and "album_asset"."updateId" <= $3
+  and "album_asset"."updateId" > $4
+  and "asset"."visibility" in ($5, $6)
+  and "asset"."deletedAt" is null
+union
+select
+  "album_space_asset"."assetId" as "assetId",
+  "album_space_asset"."albumId" as "albumId",
+  "album_space_asset"."updateId"
+from
+  "album_space_asset"
+  inner join "asset" on "asset"."id" = "album_space_asset"."assetId"
+where
+  "album_space_asset"."albumId" = $7
+  and "album_space_asset"."updateId" < $8
+  and "album_space_asset"."updateId" <= $9
+  and "album_space_asset"."updateId" > $10
+  and "asset"."visibility" in ($11, $12)
+  and exists (
+    select
+      1 as "one"
+    from
+      "shared_space_album"
+      inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+      and "shared_space_member"."userId" = $13::uuid
+    where
+      "shared_space_album"."albumId" = "album_space_asset"."albumId"
+      and "shared_space_album"."spaceId" = "album_space_asset"."spaceId"
+  )
+  and "asset"."deletedAt" is null
+order by
+  "updateId" asc
+
+-- SyncRepository.sharedSpaceAlbumToAsset.getDeletes
+select
+  "id",
+  "assetId",
+  "albumId"
+from
+  "album_asset_audit"
+where
+  "id" < $1
+  and "id" > $2
+  and "albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $3
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $4
+      )
+  )
+union
+select
+  "shared_space_album_asset_audit"."id" as "id",
+  "shared_space_album_asset_audit"."assetId" as "assetId",
+  "shared_space_album_asset_audit"."albumId" as "albumId"
+from
+  "shared_space_album_asset_audit"
+  inner join "asset" on "asset"."id" = "shared_space_album_asset_audit"."assetId"
+where
+  "shared_space_album_asset_audit"."id" < $5
+  and "shared_space_album_asset_audit"."id" > $6
+  and "shared_space_album_asset_audit"."albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $7
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $8
+      )
+  )
+  and "asset"."ownerId" != $9
+union
+select
+  "id",
+  "assetId",
+  "albumId"
+from
+  "album_space_asset_audit"
+where
+  "id" < $10
+  and "id" > $11
+  and "albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $12
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $13
+      )
+  )
+order by
+  "id" asc
+
+-- SyncRepository.sharedSpaceAlbumToAsset.getUpserts
+select
+  "album_asset"."assetId" as "assetId",
+  "album_asset"."albumId" as "albumId",
+  "album_asset"."updateId"
+from
+  "album_asset"
+  inner join "asset" on "asset"."id" = "album_asset"."assetId"
+  inner join "shared_space_album_user" on "shared_space_album_user"."albumId" = "album_asset"."albumId"
+where
+  "shared_space_album_user"."userId" = $1
+  and "album_asset"."albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $2
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $3
+      )
+  )
+  and "album_asset"."updateId" < $4
+  and "album_asset"."updateId" > $5
+  and "asset"."visibility" in ($6, $7)
+union
+select
+  "album_space_asset"."assetId" as "assetId",
+  "album_space_asset"."albumId" as "albumId",
+  "album_space_asset"."updateId"
+from
+  "album_space_asset"
+  inner join "asset" on "asset"."id" = "album_space_asset"."assetId"
+  inner join "shared_space_album_user" on "shared_space_album_user"."albumId" = "album_space_asset"."albumId"
+where
+  "shared_space_album_user"."userId" = $8
+  and "album_space_asset"."albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $9
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $10
+      )
+  )
+  and "album_space_asset"."updateId" < $11
+  and "album_space_asset"."updateId" > $12
+  and "asset"."visibility" in ($13, $14)
+  and exists (
+    select
+      1 as "one"
+    from
+      "shared_space_album"
+      inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+      and "shared_space_member"."userId" = $15::uuid
+    where
+      "shared_space_album"."albumId" = "album_space_asset"."albumId"
+      and "shared_space_album"."spaceId" = "album_space_asset"."spaceId"
+  )
+order by
+  "updateId" asc
+
+-- SyncRepository.sharedSpaceAlbumAsset.getBackfill
+select
+  "asset"."id",
+  "asset"."ownerId",
+  "asset"."originalFileName",
+  "asset"."thumbhash",
+  "asset"."checksum",
+  "asset"."fileCreatedAt",
+  "asset"."fileModifiedAt",
+  "asset"."createdAt",
+  "asset"."localDateTime",
+  "asset"."type",
+  "asset"."deletedAt",
+  "asset"."visibility",
+  "asset"."duration",
+  "asset"."livePhotoVideoId",
+  "asset"."stackId",
+  "asset"."libraryId",
+  "asset"."width",
+  "asset"."height",
+  "asset"."isEdited",
+  case
+    when "asset"."ownerId" = $1 then "asset"."isFavorite"
+    else $2
+  end as "isFavorite",
+  "album_asset"."updateId"
+from
+  "album_asset"
+  inner join "asset" on "asset"."id" = "album_asset"."assetId"
+  inner join "album" on "album"."id" = "album_asset"."albumId"
+where
+  "album_asset"."albumId" = $3
+  and "album"."deletedAt" is null
+  and "album_asset"."updateId" < $4
+  and "album_asset"."updateId" <= $5
+  and "album_asset"."updateId" > $6
+  and "asset"."visibility" in ($7, $8)
+  and "asset"."deletedAt" is null
+union
+select
+  "asset"."id",
+  "asset"."ownerId",
+  "asset"."originalFileName",
+  "asset"."thumbhash",
+  "asset"."checksum",
+  "asset"."fileCreatedAt",
+  "asset"."fileModifiedAt",
+  "asset"."createdAt",
+  "asset"."localDateTime",
+  "asset"."type",
+  "asset"."deletedAt",
+  "asset"."visibility",
+  "asset"."duration",
+  "asset"."livePhotoVideoId",
+  "asset"."stackId",
+  "asset"."libraryId",
+  "asset"."width",
+  "asset"."height",
+  "asset"."isEdited",
+  case
+    when "asset"."ownerId" = $9 then "asset"."isFavorite"
+    else $10
+  end as "isFavorite",
+  "album_space_asset"."updateId"
+from
+  "album_space_asset"
+  inner join "asset" on "asset"."id" = "album_space_asset"."assetId"
+  inner join "album" on "album"."id" = "album_space_asset"."albumId"
+where
+  "album_space_asset"."albumId" = $11
+  and "album"."deletedAt" is null
+  and "album_space_asset"."updateId" < $12
+  and "album_space_asset"."updateId" <= $13
+  and "album_space_asset"."updateId" > $14
+  and "asset"."visibility" in ($15, $16)
+  and exists (
+    select
+      1 as "one"
+    from
+      "shared_space_album"
+      inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+      and "shared_space_member"."userId" = $17::uuid
+    where
+      "shared_space_album"."albumId" = "album_space_asset"."albumId"
+      and "shared_space_album"."spaceId" = "album_space_asset"."spaceId"
+  )
+  and "asset"."deletedAt" is null
+order by
+  "updateId" asc
+
+-- SyncRepository.sharedSpaceAlbumAsset.getUpdates
+select
+  "asset"."id",
+  "asset"."ownerId",
+  "asset"."originalFileName",
+  "asset"."thumbhash",
+  "asset"."checksum",
+  "asset"."fileCreatedAt",
+  "asset"."fileModifiedAt",
+  "asset"."createdAt",
+  "asset"."localDateTime",
+  "asset"."type",
+  "asset"."deletedAt",
+  "asset"."visibility",
+  "asset"."duration",
+  "asset"."livePhotoVideoId",
+  "asset"."stackId",
+  "asset"."libraryId",
+  "asset"."width",
+  "asset"."height",
+  "asset"."isEdited",
+  case
+    when "asset"."ownerId" = $1 then "asset"."isFavorite"
+    else $2
+  end as "isFavorite",
+  "asset"."updateId"
+from
+  "asset"
+  inner join "album_asset" on "album_asset"."assetId" = "asset"."id"
+  inner join "shared_space_album_user" on "shared_space_album_user"."albumId" = "album_asset"."albumId"
+where
+  "asset"."updateId" < $3
+  and "asset"."updateId" > $4
+  and "album_asset"."updateId" <= $5
+  and "shared_space_album_user"."userId" = $6
+  and "album_asset"."albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $7
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $8
+      )
+  )
+  and "asset"."visibility" in ($9, $10)
+union
+select
+  "asset"."id",
+  "asset"."ownerId",
+  "asset"."originalFileName",
+  "asset"."thumbhash",
+  "asset"."checksum",
+  "asset"."fileCreatedAt",
+  "asset"."fileModifiedAt",
+  "asset"."createdAt",
+  "asset"."localDateTime",
+  "asset"."type",
+  "asset"."deletedAt",
+  "asset"."visibility",
+  "asset"."duration",
+  "asset"."livePhotoVideoId",
+  "asset"."stackId",
+  "asset"."libraryId",
+  "asset"."width",
+  "asset"."height",
+  "asset"."isEdited",
+  case
+    when "asset"."ownerId" = $11 then "asset"."isFavorite"
+    else $12
+  end as "isFavorite",
+  "asset"."updateId"
+from
+  "asset"
+  inner join "album_space_asset" on "album_space_asset"."assetId" = "asset"."id"
+  inner join "shared_space_album_user" on "shared_space_album_user"."albumId" = "album_space_asset"."albumId"
+where
+  "asset"."updateId" < $13
+  and "asset"."updateId" > $14
+  and "album_space_asset"."updateId" <= $15
+  and "shared_space_album_user"."userId" = $16
+  and "album_space_asset"."albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $17
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $18
+      )
+  )
+  and "asset"."visibility" in ($19, $20)
+  and exists (
+    select
+      1 as "one"
+    from
+      "shared_space_album"
+      inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+      and "shared_space_member"."userId" = $21::uuid
+    where
+      "shared_space_album"."albumId" = "album_space_asset"."albumId"
+      and "shared_space_album"."spaceId" = "album_space_asset"."spaceId"
+  )
+order by
+  "updateId" asc
+
+-- SyncRepository.sharedSpaceAlbumAsset.getCreates
+select
+  "asset"."id",
+  "asset"."ownerId",
+  "asset"."originalFileName",
+  "asset"."thumbhash",
+  "asset"."checksum",
+  "asset"."fileCreatedAt",
+  "asset"."fileModifiedAt",
+  "asset"."createdAt",
+  "asset"."localDateTime",
+  "asset"."type",
+  "asset"."deletedAt",
+  "asset"."visibility",
+  "asset"."duration",
+  "asset"."livePhotoVideoId",
+  "asset"."stackId",
+  "asset"."libraryId",
+  "asset"."width",
+  "asset"."height",
+  "asset"."isEdited",
+  case
+    when "asset"."ownerId" = $1 then "asset"."isFavorite"
+    else $2
+  end as "isFavorite",
+  "album_asset"."updateId"
+from
+  "album_asset"
+  inner join "asset" on "asset"."id" = "album_asset"."assetId"
+  inner join "shared_space_album_user" on "shared_space_album_user"."albumId" = "album_asset"."albumId"
+where
+  "shared_space_album_user"."userId" = $3
+  and "album_asset"."albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $4
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $5
+      )
+  )
+  and "album_asset"."updateId" < $6
+  and "album_asset"."updateId" > $7
+  and "asset"."visibility" in ($8, $9)
+  and "asset"."deletedAt" is null
+union
+select
+  "asset"."id",
+  "asset"."ownerId",
+  "asset"."originalFileName",
+  "asset"."thumbhash",
+  "asset"."checksum",
+  "asset"."fileCreatedAt",
+  "asset"."fileModifiedAt",
+  "asset"."createdAt",
+  "asset"."localDateTime",
+  "asset"."type",
+  "asset"."deletedAt",
+  "asset"."visibility",
+  "asset"."duration",
+  "asset"."livePhotoVideoId",
+  "asset"."stackId",
+  "asset"."libraryId",
+  "asset"."width",
+  "asset"."height",
+  "asset"."isEdited",
+  case
+    when "asset"."ownerId" = $10 then "asset"."isFavorite"
+    else $11
+  end as "isFavorite",
+  "album_space_asset"."updateId"
+from
+  "album_space_asset"
+  inner join "asset" on "asset"."id" = "album_space_asset"."assetId"
+  inner join "shared_space_album_user" on "shared_space_album_user"."albumId" = "album_space_asset"."albumId"
+where
+  "shared_space_album_user"."userId" = $12
+  and "album_space_asset"."albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $13
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $14
+      )
+  )
+  and "album_space_asset"."updateId" < $15
+  and "album_space_asset"."updateId" > $16
+  and "asset"."visibility" in ($17, $18)
+  and exists (
+    select
+      1 as "one"
+    from
+      "shared_space_album"
+      inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+      and "shared_space_member"."userId" = $19::uuid
+    where
+      "shared_space_album"."albumId" = "album_space_asset"."albumId"
+      and "shared_space_album"."spaceId" = "album_space_asset"."spaceId"
+  )
+  and "asset"."deletedAt" is null
+order by
+  "updateId" asc
+
+-- SyncRepository.sharedSpaceAlbumAssetExif.getBackfill
+select
+  "asset_exif"."assetId",
+  "asset_exif"."description",
+  "asset_exif"."exifImageWidth",
+  "asset_exif"."exifImageHeight",
+  "asset_exif"."fileSizeInByte",
+  "asset_exif"."orientation",
+  "asset_exif"."dateTimeOriginal",
+  "asset_exif"."modifyDate",
+  "asset_exif"."timeZone",
+  "asset_exif"."latitude",
+  "asset_exif"."longitude",
+  "asset_exif"."projectionType",
+  "asset_exif"."city",
+  "asset_exif"."state",
+  "asset_exif"."country",
+  "asset_exif"."make",
+  "asset_exif"."model",
+  "asset_exif"."lensModel",
+  "asset_exif"."fNumber",
+  "asset_exif"."focalLength",
+  "asset_exif"."iso",
+  "asset_exif"."exposureTime",
+  "asset_exif"."profileDescription",
+  "asset_exif"."rating",
+  "asset_exif"."fps",
+  "album_asset"."updateId"
+from
+  "album_asset"
+  inner join "asset_exif" on "asset_exif"."assetId" = "album_asset"."assetId"
+  inner join "album" on "album"."id" = "album_asset"."albumId"
+  inner join "asset" on "asset"."id" = "album_asset"."assetId"
+where
+  "album_asset"."albumId" = $1
+  and "album"."deletedAt" is null
+  and "album_asset"."updateId" < $2
+  and "album_asset"."updateId" <= $3
+  and "album_asset"."updateId" > $4
+  and "asset"."visibility" in ($5, $6)
+  and "asset"."deletedAt" is null
+union
+select
+  "asset_exif"."assetId",
+  "asset_exif"."description",
+  "asset_exif"."exifImageWidth",
+  "asset_exif"."exifImageHeight",
+  "asset_exif"."fileSizeInByte",
+  "asset_exif"."orientation",
+  "asset_exif"."dateTimeOriginal",
+  "asset_exif"."modifyDate",
+  "asset_exif"."timeZone",
+  "asset_exif"."latitude",
+  "asset_exif"."longitude",
+  "asset_exif"."projectionType",
+  "asset_exif"."city",
+  "asset_exif"."state",
+  "asset_exif"."country",
+  "asset_exif"."make",
+  "asset_exif"."model",
+  "asset_exif"."lensModel",
+  "asset_exif"."fNumber",
+  "asset_exif"."focalLength",
+  "asset_exif"."iso",
+  "asset_exif"."exposureTime",
+  "asset_exif"."profileDescription",
+  "asset_exif"."rating",
+  "asset_exif"."fps",
+  "album_space_asset"."updateId"
+from
+  "album_space_asset"
+  inner join "asset_exif" on "asset_exif"."assetId" = "album_space_asset"."assetId"
+  inner join "album" on "album"."id" = "album_space_asset"."albumId"
+  inner join "asset" on "asset"."id" = "album_space_asset"."assetId"
+where
+  "album_space_asset"."albumId" = $7
+  and "album"."deletedAt" is null
+  and "album_space_asset"."updateId" < $8
+  and "album_space_asset"."updateId" <= $9
+  and "album_space_asset"."updateId" > $10
+  and "asset"."visibility" in ($11, $12)
+  and exists (
+    select
+      1 as "one"
+    from
+      "shared_space_album"
+      inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+      and "shared_space_member"."userId" = $13::uuid
+    where
+      "shared_space_album"."albumId" = "album_space_asset"."albumId"
+      and "shared_space_album"."spaceId" = "album_space_asset"."spaceId"
+  )
+  and "asset"."deletedAt" is null
+order by
+  "updateId" asc
+
+-- SyncRepository.sharedSpaceAlbumAssetExif.getUpdates
+select
+  "asset_exif"."assetId",
+  "asset_exif"."description",
+  "asset_exif"."exifImageWidth",
+  "asset_exif"."exifImageHeight",
+  "asset_exif"."fileSizeInByte",
+  "asset_exif"."orientation",
+  "asset_exif"."dateTimeOriginal",
+  "asset_exif"."modifyDate",
+  "asset_exif"."timeZone",
+  "asset_exif"."latitude",
+  "asset_exif"."longitude",
+  "asset_exif"."projectionType",
+  "asset_exif"."city",
+  "asset_exif"."state",
+  "asset_exif"."country",
+  "asset_exif"."make",
+  "asset_exif"."model",
+  "asset_exif"."lensModel",
+  "asset_exif"."fNumber",
+  "asset_exif"."focalLength",
+  "asset_exif"."iso",
+  "asset_exif"."exposureTime",
+  "asset_exif"."profileDescription",
+  "asset_exif"."rating",
+  "asset_exif"."fps",
+  "asset_exif"."updateId"
+from
+  "asset_exif"
+  inner join "album_asset" on "album_asset"."assetId" = "asset_exif"."assetId"
+  inner join "asset" on "asset"."id" = "asset_exif"."assetId"
+  inner join "shared_space_album_user" on "shared_space_album_user"."albumId" = "album_asset"."albumId"
+where
+  "asset_exif"."updateId" < $1
+  and "asset_exif"."updateId" > $2
+  and "album_asset"."updateId" <= $3
+  and "shared_space_album_user"."userId" = $4
+  and "album_asset"."albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $5
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $6
+      )
+  )
+  and "asset"."visibility" in ($7, $8)
+union
+select
+  "asset_exif"."assetId",
+  "asset_exif"."description",
+  "asset_exif"."exifImageWidth",
+  "asset_exif"."exifImageHeight",
+  "asset_exif"."fileSizeInByte",
+  "asset_exif"."orientation",
+  "asset_exif"."dateTimeOriginal",
+  "asset_exif"."modifyDate",
+  "asset_exif"."timeZone",
+  "asset_exif"."latitude",
+  "asset_exif"."longitude",
+  "asset_exif"."projectionType",
+  "asset_exif"."city",
+  "asset_exif"."state",
+  "asset_exif"."country",
+  "asset_exif"."make",
+  "asset_exif"."model",
+  "asset_exif"."lensModel",
+  "asset_exif"."fNumber",
+  "asset_exif"."focalLength",
+  "asset_exif"."iso",
+  "asset_exif"."exposureTime",
+  "asset_exif"."profileDescription",
+  "asset_exif"."rating",
+  "asset_exif"."fps",
+  "asset_exif"."updateId"
+from
+  "asset_exif"
+  inner join "album_space_asset" on "album_space_asset"."assetId" = "asset_exif"."assetId"
+  inner join "asset" on "asset"."id" = "asset_exif"."assetId"
+  inner join "shared_space_album_user" on "shared_space_album_user"."albumId" = "album_space_asset"."albumId"
+where
+  "asset_exif"."updateId" < $9
+  and "asset_exif"."updateId" > $10
+  and "album_space_asset"."updateId" <= $11
+  and "shared_space_album_user"."userId" = $12
+  and "album_space_asset"."albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $13
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $14
+      )
+  )
+  and "asset"."visibility" in ($15, $16)
+  and exists (
+    select
+      1 as "one"
+    from
+      "shared_space_album"
+      inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+      and "shared_space_member"."userId" = $17::uuid
+    where
+      "shared_space_album"."albumId" = "album_space_asset"."albumId"
+      and "shared_space_album"."spaceId" = "album_space_asset"."spaceId"
+  )
+order by
+  "updateId" asc
+
+-- SyncRepository.sharedSpaceAlbumAssetExif.getCreates
+select
+  "asset_exif"."assetId",
+  "asset_exif"."description",
+  "asset_exif"."exifImageWidth",
+  "asset_exif"."exifImageHeight",
+  "asset_exif"."fileSizeInByte",
+  "asset_exif"."orientation",
+  "asset_exif"."dateTimeOriginal",
+  "asset_exif"."modifyDate",
+  "asset_exif"."timeZone",
+  "asset_exif"."latitude",
+  "asset_exif"."longitude",
+  "asset_exif"."projectionType",
+  "asset_exif"."city",
+  "asset_exif"."state",
+  "asset_exif"."country",
+  "asset_exif"."make",
+  "asset_exif"."model",
+  "asset_exif"."lensModel",
+  "asset_exif"."fNumber",
+  "asset_exif"."focalLength",
+  "asset_exif"."iso",
+  "asset_exif"."exposureTime",
+  "asset_exif"."profileDescription",
+  "asset_exif"."rating",
+  "asset_exif"."fps",
+  "album_asset"."updateId"
+from
+  "album_asset"
+  inner join "asset_exif" on "asset_exif"."assetId" = "album_asset"."assetId"
+  inner join "asset" on "asset"."id" = "album_asset"."assetId"
+  inner join "shared_space_album_user" on "shared_space_album_user"."albumId" = "album_asset"."albumId"
+where
+  "shared_space_album_user"."userId" = $1
+  and "album_asset"."albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $2
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $3
+      )
+  )
+  and "album_asset"."updateId" < $4
+  and "album_asset"."updateId" > $5
+  and "asset"."visibility" in ($6, $7)
+  and "asset"."deletedAt" is null
+union
+select
+  "asset_exif"."assetId",
+  "asset_exif"."description",
+  "asset_exif"."exifImageWidth",
+  "asset_exif"."exifImageHeight",
+  "asset_exif"."fileSizeInByte",
+  "asset_exif"."orientation",
+  "asset_exif"."dateTimeOriginal",
+  "asset_exif"."modifyDate",
+  "asset_exif"."timeZone",
+  "asset_exif"."latitude",
+  "asset_exif"."longitude",
+  "asset_exif"."projectionType",
+  "asset_exif"."city",
+  "asset_exif"."state",
+  "asset_exif"."country",
+  "asset_exif"."make",
+  "asset_exif"."model",
+  "asset_exif"."lensModel",
+  "asset_exif"."fNumber",
+  "asset_exif"."focalLength",
+  "asset_exif"."iso",
+  "asset_exif"."exposureTime",
+  "asset_exif"."profileDescription",
+  "asset_exif"."rating",
+  "asset_exif"."fps",
+  "album_space_asset"."updateId"
+from
+  "album_space_asset"
+  inner join "asset_exif" on "asset_exif"."assetId" = "album_space_asset"."assetId"
+  inner join "asset" on "asset"."id" = "album_space_asset"."assetId"
+  inner join "shared_space_album_user" on "shared_space_album_user"."albumId" = "album_space_asset"."albumId"
+where
+  "shared_space_album_user"."userId" = $8
+  and "album_space_asset"."albumId" in (
+    select
+      "shared_space_album"."albumId" as "id"
+    from
+      "shared_space_album"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+    where
+      "album"."deletedAt" is null
+      and "shared_space_album"."spaceId" in (
+        select
+          "shared_space"."id"
+        from
+          "shared_space"
+        where
+          "shared_space"."createdById" = $9
+        union
+        select
+          "shared_space_member"."spaceId" as "id"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."userId" = $10
+      )
+  )
+  and "album_space_asset"."updateId" < $11
+  and "album_space_asset"."updateId" > $12
+  and "asset"."visibility" in ($13, $14)
+  and exists (
+    select
+      1 as "one"
+    from
+      "shared_space_album"
+      inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+      and "shared_space_member"."userId" = $15::uuid
+    where
+      "shared_space_album"."albumId" = "album_space_asset"."albumId"
+      and "shared_space_album"."spaceId" = "album_space_asset"."spaceId"
+  )
+  and "asset"."deletedAt" is null
+order by
+  "updateId" asc

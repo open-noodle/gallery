@@ -23,6 +23,8 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:immich_mobile/infrastructure/entities/exif.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_album_asset.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_album_link.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_library.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_member.entity.drift.dart';
@@ -111,6 +113,23 @@ void main() {
   Future<void> linkLibraryToSpace(String spaceId, String libraryId) => db
       .into(db.sharedSpaceLibraryEntity)
       .insert(SharedSpaceLibraryEntityCompanion.insert(spaceId: spaceId, libraryId: libraryId));
+
+  // Links an album into a space (shared_space_album_link) and adds an asset to that
+  // album (shared_space_album_asset) — the M4 "space-ALBUM arm".
+  Future<void> linkAlbumToSpace(String spaceId, String albumId, String assetId, {bool showInTimeline = true}) async {
+    await db
+        .into(db.sharedSpaceAlbumLinkEntity)
+        .insert(
+          SharedSpaceAlbumLinkEntityCompanion.insert(
+            spaceId: spaceId,
+            albumId: albumId,
+            showInTimeline: Value(showInTimeline),
+          ),
+        );
+    await db
+        .into(db.sharedSpaceAlbumAssetEntity)
+        .insert(SharedSpaceAlbumAssetEntityCompanion.insert(albumId: albumId, assetId: assetId));
+  }
 
   Future<int> videoBucketCount(List<String> userIds, String currentUserId) async {
     final first = await sut.video(userIds, currentUserId, GroupAssetsBy.day).bucketSource().first;
@@ -256,6 +275,79 @@ void main() {
       await insertMember('space1', 'viewer');
       await linkAssetToSpace('space1', 'space');
       expect(await videoBucketCount(['viewer'], 'viewer'), 2);
+    });
+
+    // M4: the space-ALBUM arm. An asset reachable ONLY via an album linked into a
+    // space (no direct shared_space_asset row, no shared_space_library row) must
+    // still show up on the personal timeline — gated on BOTH the per-album link's
+    // showInTimeline and the viewer's own member showInTimeline.
+    test('15. album-linked asset, link + member showInTimeline=true → visible', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner');
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer', showInTimeline: true);
+      await linkAlbumToSpace('space1', 'album1', 'a1', showInTimeline: true);
+      expect(await videoBucketCount(['viewer'], 'viewer'), 1);
+      expect(await videoBucketAssets(['viewer'], 'viewer'), hasLength(1));
+    });
+
+    test('16. album-linked asset, album LINK showInTimeline=false → hidden', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner');
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer', showInTimeline: true);
+      await linkAlbumToSpace('space1', 'album1', 'a1', showInTimeline: false);
+      expect(await videoBucketCount(['viewer'], 'viewer'), 0);
+      expect(await videoBucketAssets(['viewer'], 'viewer'), isEmpty);
+    });
+
+    test('17. album-linked asset, MEMBER showInTimeline=false → hidden', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner');
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer', showInTimeline: false);
+      await linkAlbumToSpace('space1', 'album1', 'a1', showInTimeline: true);
+      expect(await videoBucketCount(['viewer'], 'viewer'), 0);
+      expect(await videoBucketAssets(['viewer'], 'viewer'), isEmpty);
+    });
+
+    test('18. asset reachable via BOTH the album arm and a direct link → counted once', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner');
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer', showInTimeline: true);
+      await linkAlbumToSpace('space1', 'album1', 'a1', showInTimeline: true);
+      await linkAssetToSpace('space1', 'a1');
+      expect(await videoBucketCount(['viewer'], 'viewer'), 1);
+      expect(await videoBucketAssets(['viewer'], 'viewer'), hasLength(1));
+    });
+
+    test('video() bucket stream re-emits when the album link showInTimeline toggles', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner');
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer', showInTimeline: true);
+      await linkAlbumToSpace('space1', 'album1', 'a1', showInTimeline: true);
+
+      final emissions = <List<Bucket>>[];
+      final sub = sut.video(['viewer'], 'viewer', GroupAssetsBy.day).bucketSource().listen(emissions.add);
+
+      await _waitFor(() => emissions.isNotEmpty);
+      expect(emissions.last, hasLength(1));
+
+      await (db.update(db.sharedSpaceAlbumLinkEntity)
+            ..where((t) => t.spaceId.equals('space1') & t.albumId.equals('album1')))
+          .write(const SharedSpaceAlbumLinkEntityCompanion(showInTimeline: Value(false)));
+
+      await _waitFor(() => emissions.length >= 2);
+      expect(emissions.last, isEmpty);
+
+      await sub.cancel();
     });
 
     test('video() bucket stream re-emits when a shared_space_asset row is deleted', () async {
@@ -1198,6 +1290,53 @@ void main() {
       // No face rows sync for the viewer and the assets are owned by admin, so the existing
       // owner-scoped person timeline returns nothing — the "0 items" bug on the detail page.
       final assets = await sut.person('viewer', 'space-person-1', GroupAssetsBy.day).assetSource(0, 100);
+      expect(assets, isEmpty);
+    });
+  });
+
+  group('DriftTimelineRepository.sharedSpacePerson() archive inclusion (L12)', () {
+    // The space-person timeline's visibility filter historically allowed only
+    // AssetVisibility.timeline, the 7th site commit 9185ff58e2 missed when it fixed the
+    // other 6 (video/place/map/sharedSpace watch+get). The server (getPersonAssetIds)
+    // resolves both Timeline and Archive assets for a space person, so mobile was
+    // silently dropping the person's archived photos.
+    test('archived space-person asset is returned', () async {
+      await insertUser('admin');
+      await insertUser('viewer');
+      await insertVideo('a1', 'admin', type: AssetType.image, visibility: AssetVisibility.archive);
+      await insertSpace('s1', 'admin');
+      await insertMember('s1', 'viewer', showInTimeline: true);
+      await linkAssetToSpace('s1', 'a1');
+
+      final assets = await sut.sharedSpacePerson(['a1'], GroupAssetsBy.day).assetSource(0, 100);
+      expect(assets.map((a) => (a as RemoteAsset).id), ['a1']);
+
+      final buckets = await sut.sharedSpacePerson(['a1'], GroupAssetsBy.day).bucketSource().first;
+      final total = buckets.fold<int>(0, (sum, b) => sum + (b as TimeBucket).assetCount);
+      expect(total, 1);
+    });
+
+    test('positive control: Hidden space-person asset stays excluded', () async {
+      await insertUser('admin');
+      await insertUser('viewer');
+      await insertVideo('a1', 'admin', type: AssetType.image, visibility: AssetVisibility.hidden);
+      await insertSpace('s1', 'admin');
+      await insertMember('s1', 'viewer', showInTimeline: true);
+      await linkAssetToSpace('s1', 'a1');
+
+      final assets = await sut.sharedSpacePerson(['a1'], GroupAssetsBy.day).assetSource(0, 100);
+      expect(assets, isEmpty);
+    });
+
+    test('positive control: Locked space-person asset stays excluded', () async {
+      await insertUser('admin');
+      await insertUser('viewer');
+      await insertVideo('a1', 'admin', type: AssetType.image, visibility: AssetVisibility.locked);
+      await insertSpace('s1', 'admin');
+      await insertMember('s1', 'viewer', showInTimeline: true);
+      await linkAssetToSpace('s1', 'a1');
+
+      final assets = await sut.sharedSpacePerson(['a1'], GroupAssetsBy.day).assetSource(0, 100);
       expect(assets, isEmpty);
     });
   });
