@@ -283,6 +283,11 @@ DELETE FROM "migration_overrides"
 DROP INDEX IF EXISTS "idx_asset_exif_description_trigram";
 DELETE FROM "migration_overrides" WHERE "name" = 'index_idx_asset_exif_description_trigram';
 
+-- 1783628194057-DisablePostgresJit set jit=off on the application role. Restore
+-- the PostgreSQL default so the reverted database carries no Gallery-specific
+-- planner tuning.
+ALTER ROLE CURRENT_USER RESET jit;
+
 -- -----------------------------------------------------------------------------
 -- 8. Delete Gallery + post-v<branding upstream.version> upstream migration rows
 --    from kysely_migrations.
@@ -329,6 +334,7 @@ DELETE FROM "kysely_migrations"
    '1778800000000-ReconcileFaceIdentityIndexOverrides',
    '1778800000000-TrimSpacePersonNameIndex',
    '1782000000000-AddAssetExifDescriptionTrigramIndex',
+   '1783628194057-DisablePostgresJit',
 
    -- Build-time compatibility alias (server/bin/sync-gallery-migrations.mjs).
    -- Gallery's postbuild records ChangeDurationToInteger under BOTH its current
