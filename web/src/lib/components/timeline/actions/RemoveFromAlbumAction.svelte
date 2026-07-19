@@ -12,9 +12,11 @@
     onRemove: ((assetIds: string[]) => void) | undefined;
     assetIds?: string[];
     menuItem?: boolean;
+    /** Playwright hook for the album-path control bar (rbac-5/albums-8, C4). */
+    'data-testid'?: string;
   }
 
-  let { album = $bindable(), onRemove, assetIds, menuItem = false }: Props = $props();
+  let { album = $bindable(), onRemove, assetIds, menuItem = false, 'data-testid': testId }: Props = $props();
 
   const removeFromAlbum = async () => {
     const ids = assetIds ?? assetMultiSelectManager.assets.map(({ id }) => id) ?? [];
@@ -35,10 +37,22 @@
 
       album = await getAlbumInfo({ id: album.id });
 
-      onRemove?.(ids);
+      // #752 launch review: the server answers per-asset (a space editor may not remove another
+      // member's own album_asset rows) — prune and report only what was actually removed.
+      const removedIds = results.filter(({ success }) => success).map(({ id }) => id);
+      onRemove?.(removedIds);
 
-      const count = results.filter(({ success }) => success).length;
-      toastManager.primary($t('assets_removed_count', { values: { count } }));
+      if (removedIds.length === ids.length) {
+        toastManager.primary($t('assets_removed_count', { values: { count: removedIds.length } }));
+      } else if (removedIds.length > 0) {
+        toastManager.info(
+          $t('assets_removed_partial_count', {
+            values: { removedCount: removedIds.length, totalCount: ids.length },
+          }),
+        );
+      } else {
+        toastManager.warning($t('assets_remove_failed_count', { values: { count: ids.length } }));
+      }
 
       assetMultiSelectManager.clear();
     } catch (error) {
@@ -57,5 +71,6 @@
     aria-label={$t('remove_from_album')}
     icon={mdiDeleteOutline}
     onclick={removeFromAlbum}
+    data-testid={testId}
   />
 {/if}

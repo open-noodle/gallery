@@ -13,6 +13,8 @@ import 'package:immich_mobile/domain/models/config/network_config.dart';
 import 'package:immich_mobile/domain/models/config/people_config.dart';
 import 'package:immich_mobile/domain/models/config/share_config.dart';
 import 'package:immich_mobile/domain/models/config/slideshow_config.dart';
+import 'package:immich_mobile/domain/models/config/space_albums_config.dart';
+import 'package:immich_mobile/domain/models/config/spaces_config.dart';
 import 'package:immich_mobile/domain/models/config/theme_config.dart';
 import 'package:immich_mobile/domain/models/config/timeline_config.dart';
 import 'package:immich_mobile/domain/models/config/viewer_config.dart';
@@ -20,6 +22,7 @@ import 'package:immich_mobile/domain/models/log.model.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/pages/library/spaces/collection_sort.dart';
 import 'package:immich_mobile/providers/album/album_sort_by_options.provider.dart';
 import 'package:immich_mobile/utils/semver.dart';
 
@@ -42,6 +45,8 @@ abstract class AppConfig with _$AppConfig {
     @Default(SlideshowConfig()) SlideshowConfig slideshow,
     @Default(AlbumConfig()) AlbumConfig album,
     @Default(PeopleConfig()) PeopleConfig people,
+    @Default(SpaceAlbumsConfig()) SpaceAlbumsConfig spaceAlbums,
+    @Default(SpacesConfig()) SpacesConfig spaces,
     @Default(BackupConfig()) BackupConfig backup,
     @Default(NetworkConfig()) NetworkConfig network,
     @Default(ShareConfig()) ShareConfig share,
@@ -70,6 +75,10 @@ abstract class AppConfig with _$AppConfig {
             .albumIsReverse => album.isReverse,
             .albumIsGrid => album.isGrid,
             .peopleSortBy => people.sortBy,
+            .spaceAlbumsSortMode => spaceAlbums.sortMode,
+            .spaceAlbumsIsReverse => spaceAlbums.isReverse,
+            .spacesSortMode => spaces.sortMode,
+            .spacesIsReverse => spaces.isReverse,
             .backupEnabled => backup.enabled,
             .backupUseCellularForVideos => backup.useCellularForVideos,
             .backupUseCellularForPhotos => backup.useCellularForPhotos,
@@ -127,6 +136,10 @@ abstract class AppConfig with _$AppConfig {
       .albumIsReverse => copyWith(album: album.copyWith(isReverse: value as bool)),
       .albumIsGrid => copyWith(album: album.copyWith(isGrid: value as bool)),
       .peopleSortBy => copyWith(people: people.copyWith(sortBy: value as PeopleSortBy)),
+      .spaceAlbumsSortMode => copyWith(spaceAlbums: spaceAlbums.copyWith(sortMode: value as SpaceAlbumSortMode)),
+      .spaceAlbumsIsReverse => copyWith(spaceAlbums: spaceAlbums.copyWith(isReverse: value as bool)),
+      .spacesSortMode => copyWith(spaces: spaces.copyWith(sortMode: value as SpaceSortMode)),
+      .spacesIsReverse => copyWith(spaces: spaces.copyWith(isReverse: value as bool)),
       .backupEnabled => copyWith(backup: backup.copyWith(enabled: value as bool)),
       .backupUseCellularForVideos => copyWith(backup: backup.copyWith(useCellularForVideos: value as bool)),
       .backupUseCellularForPhotos => copyWith(backup: backup.copyWith(useCellularForPhotos: value as bool)),

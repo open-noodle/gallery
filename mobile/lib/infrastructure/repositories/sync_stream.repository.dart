@@ -83,6 +83,21 @@ class SyncStreamRepository extends DatabaseAccessor<Drift> with $SyncStreamRepos
             await _db.remoteAssetCloudIdEntity.deleteAll();
             await _db.assetEditEntity.deleteAll();
             await _db.assetOcrEntity.deleteAll();
+
+            // --- gallery-fork: clear fork space + library tables (mobile-4) ---
+            // SyncResetV1 must wipe every fork-only remote table too, or a stale
+            // shared_space_album_asset + link row joined to a re-synced remote_asset
+            // wrongly re-places assets in space timelines after a reset. Runs under
+            // PRAGMA foreign_keys = OFF (see reset() preamble), so ordering is free;
+            // children-before-parents kept for readability.
+            await _db.sharedSpaceAlbumAssetEntity.deleteAll();
+            await _db.sharedSpaceAlbumLinkEntity.deleteAll();
+            await _db.sharedSpaceAlbumEntity.deleteAll();
+            await _db.sharedSpaceAssetEntity.deleteAll();
+            await _db.sharedSpaceLibraryEntity.deleteAll();
+            await _db.sharedSpaceMemberEntity.deleteAll();
+            await _db.sharedSpaceEntity.deleteAll();
+            await _db.libraryEntity.deleteAll();
           });
         } finally {
           // re-enable FK even if the transaction throws, otherwise the connection
@@ -797,13 +812,19 @@ class SyncStreamRepository extends DatabaseAccessor<Drift> with $SyncStreamRepos
           await _db.libraryEntity.deleteWhere((row) => row.id.equals(libraryId));
         }
 
-        // Sweep orphan library assets in chunks to stay under the SQLite
-        // parameter limit. Preserves user-owned, partner-shared, and direct-add
-        // (shared_space_asset) paths. Uses snake_case because Drift generates
-        // snake_case table/column names from camelCase Dart identifiers — see
-        // remote_asset.entity.dart for the `libraryId` column declaration that
-        // becomes `library_id`. The chunks all run inside the same transaction
-        // so the entire sweep is still atomic with the libraryEntity deletes.
+        // Sweep orphan library assets in chunks to stay under the SQLite parameter
+        // limit. Preserves every path that still legitimately reaches the asset:
+        // user-owned, partner-shared, direct-add (shared_space_asset), space-album
+        // membership (shared_space_album_asset) and classic-album membership
+        // (remote_album_asset). mobile-2: unlinking a library while an asset is also
+        // in a linked album must NOT delete the shared remote_asset row, or the asset
+        // vanishes from album detail + the space timeline (the "swap a library link
+        // for curated album links" workflow the feature encourages). remote_album_asset
+        // is the adjacent pre-existing classic-album gap. Uses snake_case because Drift
+        // generates snake_case table/column names from camelCase Dart identifiers — see
+        // remote_asset.entity.dart for the `libraryId` column that becomes `library_id`.
+        // The chunks all run inside the same transaction so the entire sweep stays
+        // atomic with the libraryEntity deletes.
         for (var offset = 0; offset < libraryIds.length; offset += _kSweepChunkSize) {
           final chunk = libraryIds.sublist(offset, (offset + _kSweepChunkSize).clamp(0, libraryIds.length));
           final placeholders = chunk.map((_) => '?').join(',');
@@ -817,6 +838,8 @@ class SyncStreamRepository extends DatabaseAccessor<Drift> with $SyncStreamRepos
                 SELECT shared_by_id FROM partner_entity WHERE shared_with_id = ?
               )
               AND id NOT IN (SELECT asset_id FROM shared_space_asset_entity)
+              AND id NOT IN (SELECT asset_id FROM shared_space_album_asset_entity)
+              AND id NOT IN (SELECT asset_id FROM remote_album_asset_entity)
             ''',
             [...chunk, currentUserId, currentUserId],
           );
@@ -892,6 +915,133 @@ class SyncStreamRepository extends DatabaseAccessor<Drift> with $SyncStreamRepos
       rethrow;
     }
   }
+
+  // --- gallery-fork: SharedSpaceAlbum sync handlers (Phase 2B, Slice B1) ---
+  //
+  // These handlers mirror the library/shared-space-library path exactly.
+  // None of them touch the personal remote_album / remote_album_asset tables
+  // (the absorbed invariant on device, §10.2 of the spec).
+
+  // Metadata (SharedSpaceAlbumV1 → SyncAlbumV2). Upsert into shared_space_album,
+  // keyed by albumId. Mirrors updateSharedSpaceLibrariesV1's batch+DoUpdate shape.
+  Future<void> updateSharedSpaceAlbumsV1(Iterable<SyncAlbumV2> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final album in data) {
+          final companion = SharedSpaceAlbumEntityCompanion(
+            id: Value(album.id),
+            name: Value(album.name),
+            description: Value(album.description),
+            thumbnailAssetId: Value(album.thumbnailAssetId),
+            createdAt: Value(album.createdAt),
+            updatedAt: Value(album.updatedAt),
+            isActivityEnabled: Value(album.isActivityEnabled),
+            order: Value(album.order.toAlbumAssetOrder().index),
+          );
+          batch.insert(_db.sharedSpaceAlbumEntity, companion, onConflict: DoUpdate((_) => companion));
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: updateSharedSpaceAlbumsV1', error, stack);
+      rethrow;
+    }
+  }
+
+  // Metadata delete (gated — album fully gone for this user) → reuse the B0 sweep.
+  // §4.4: sweeps shared_space_album_asset rows for this albumId; remote_asset blobs
+  // are NOT swept (shared, possibly reachable by another path).
+  Future<void> deleteSharedSpaceAlbumsV1(Iterable<SyncAlbumDeleteV1> data) async {
+    final repo = SpaceAlbumRepository(_db);
+    try {
+      for (final d in data) {
+        await repo.deleteAlbumMetadata(d.albumId);
+      }
+    } catch (error, stack) {
+      _logger.severe('Error: deleteSharedSpaceAlbumsV1', error, stack);
+      rethrow;
+    }
+  }
+
+  // Link (SharedSpaceAlbumLinkV1). Clone of updateSharedSpaceLibrariesV1.
+  Future<void> updateSharedSpaceAlbumLinksV1(Iterable<SyncSharedSpaceAlbumLinkV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final join in data) {
+          final companion = SharedSpaceAlbumLinkEntityCompanion(
+            spaceId: Value(join.spaceId),
+            albumId: Value(join.albumId),
+            showInTimeline: Value(join.showInTimeline),
+            addedById: Value(join.addedById),
+            createdAt: Value(join.createdAt),
+            updatedAt: Value(join.updatedAt),
+          );
+          batch.insert(_db.sharedSpaceAlbumLinkEntity, companion, onConflict: DoUpdate((_) => companion));
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: updateSharedSpaceAlbumLinksV1', error, stack);
+      rethrow;
+    }
+  }
+
+  Future<void> deleteSharedSpaceAlbumLinksV1(Iterable<SyncSharedSpaceAlbumLinkDeleteV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final join in data) {
+          batch.delete(
+            _db.sharedSpaceAlbumLinkEntity,
+            SharedSpaceAlbumLinkEntityCompanion(spaceId: Value(join.spaceId), albumId: Value(join.albumId)),
+          );
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: deleteSharedSpaceAlbumLinksV1', error, stack);
+      rethrow;
+    }
+  }
+
+  // Membership (SharedSpaceAlbumToAssetV1 → SyncAlbumToAssetV1). Clone of
+  // updateSharedSpaceToAssetsV1 (onConflict DoNothing — membership is idempotent).
+  Future<void> updateSharedSpaceAlbumToAssetsV1(Iterable<SyncAlbumToAssetV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final m in data) {
+          batch.insert(
+            _db.sharedSpaceAlbumAssetEntity,
+            SharedSpaceAlbumAssetEntityCompanion(albumId: Value(m.albumId), assetId: Value(m.assetId)),
+            onConflict: DoNothing(),
+          );
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: updateSharedSpaceAlbumToAssetsV1', error, stack);
+      rethrow;
+    }
+  }
+
+  Future<void> deleteSharedSpaceAlbumToAssetsV1(Iterable<SyncAlbumToAssetDeleteV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final m in data) {
+          batch.delete(
+            _db.sharedSpaceAlbumAssetEntity,
+            SharedSpaceAlbumAssetEntityCompanion(albumId: Value(m.albumId), assetId: Value(m.assetId)),
+          );
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: deleteSharedSpaceAlbumToAssetsV1', error, stack);
+      rethrow;
+    }
+  }
+
+  // Asset / exif blobs delegate to the shared remote_asset store (never a
+  // space-album table). Mirrors updateSharedSpaceAssetsV1 / updateSharedSpaceAssetExifsV1.
+  Future<void> updateSharedSpaceAlbumAssetsV1(Iterable<SyncAssetV2> data) =>
+      updateAssetsV2(data, debugLabel: 'space-album');
+
+  Future<void> updateSharedSpaceAlbumAssetExifsV1(Iterable<SyncAssetExifV1> data) =>
+      updateAssetsExifV1(data, debugLabel: 'space-album');
 
   Future<void> updateMemoriesV1(Iterable<SyncMemoryV1> data) async {
     try {
@@ -1222,13 +1372,41 @@ class SyncStreamRepository extends DatabaseAccessor<Drift> with $SyncStreamRepos
 
         final validUsers = {currentUserId, ...partnerIds.nonNulls};
 
-        // Asset is not owned by the current user or any of their partners and is not part of any (shared) album
-        // Likely a stale asset that was previously shared but has been removed
+        // Delete assets no longer reachable by ANY path. Keep-set:
+        //   owned ∪ partner ∪ remote_album_asset (classic album)
+        //   ∪ shared_space_asset (direct) ∪ shared_space_album_asset (granted album)
+        //   ∪ library-reachable (library_id ∈ shared_space_library).
+        // mobile-3/gaps-1: without the space/album/library arms a member's Drift DB
+        // keeps remote_asset (filename, checksum, thumbhash) + remote_exif (GPS, city,
+        // camera) forever after a purge/unlink, defeating the purge's privacy goal.
+        //
+        // remote_exif rows are removed automatically: remote_exif_entity.assetId has
+        // ON DELETE CASCADE and this transaction runs with foreign_keys = ON.
+        //
+        // DEFERRED (follow-up): evicting cached thumbnail BYTES (in-memory
+        // CustomImageCache — a PaintingBinding.imageCache singleton keyed by
+        // ImageProvider instances, not asset ids — and the URL-keyed disk cache) is a
+        // UI/service-layer concern not reachable from this Drift repository. Row-level
+        // GC (remote_asset + cascaded remote_exif) is done here; byte eviction is a
+        // future service-layer step (resolve pruned ids → provider keys / disk URLs).
         await _db.remoteAssetEntity.deleteWhere((asset) {
           return asset.ownerId.isNotIn(validUsers) &
               asset.id.isNotInQuery(
                 _db.remoteAlbumAssetEntity.selectOnly()..addColumns([_db.remoteAlbumAssetEntity.assetId]),
-              );
+              ) &
+              asset.id.isNotInQuery(
+                _db.sharedSpaceAssetEntity.selectOnly()..addColumns([_db.sharedSpaceAssetEntity.assetId]),
+              ) &
+              asset.id.isNotInQuery(
+                _db.sharedSpaceAlbumAssetEntity.selectOnly()..addColumns([_db.sharedSpaceAlbumAssetEntity.assetId]),
+              ) &
+              // Library-reachable exclusion. NULL-safe: `library_id NOT IN (...)` is NULL
+              // (not TRUE) when library_id is NULL, so a null-library orphan would never
+              // be deleted — guard with `IS NULL OR ...` so it still prunes.
+              (asset.libraryId.isNull() |
+                  asset.libraryId.isNotInQuery(
+                    _db.sharedSpaceLibraryEntity.selectOnly()..addColumns([_db.sharedSpaceLibraryEntity.libraryId]),
+                  ));
         });
       });
     } catch (error, stack) {

@@ -1,7 +1,7 @@
 import { Kysely } from 'kysely';
 import { StorageCore } from 'src/cores/storage.core';
 import { AssetEditAction } from 'src/dtos/editing.dto';
-import { AssetFileType, AssetMetadataKey, AssetStatus, JobName, SharedLinkType } from 'src/enum';
+import { AssetFileType, AssetMetadataKey, AssetStatus, AssetVisibility, JobName, SharedLinkType } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AlbumRepository } from 'src/repositories/album.repository';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository';
@@ -14,6 +14,7 @@ import { MapRepository } from 'src/repositories/map.repository';
 import { OcrRepository } from 'src/repositories/ocr.repository';
 import { SharedLinkAssetRepository } from 'src/repositories/shared-link-asset.repository';
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { StackRepository } from 'src/repositories/stack.repository';
 import { StorageRepository } from 'src/repositories/storage.repository';
 import { UserRepository } from 'src/repositories/user.repository';
@@ -35,6 +36,7 @@ const setup = (db?: Kysely<DB>) => {
       AlbumRepository,
       AccessRepository,
       SharedLinkAssetRepository,
+      SharedSpaceRepository,
       StackRepository,
       UserRepository,
     ],
@@ -492,6 +494,30 @@ describe(AssetService.name, () => {
       ).resolves.toEqual({
         lockedProperties: ['timeZone', 'rating', 'description', 'latitude', 'longitude', 'dateTimeOriginal'],
       });
+    });
+
+    it('re-locking an already-Locked asset strips its surviving album_asset rows (M-1 retry-convergence)', async () => {
+      const { sut, ctx } = setup();
+      ctx.getMock(JobRepository).queueAll.mockResolvedValue();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user, session: { hasElevatedPermission: true } });
+      const { album } = await ctx.newAlbum({ ownerId: user.id });
+      // Simulate the crash window: the visibility UPDATE committed (asset is already Locked) but the album
+      // strip never ran, so the album_asset row survived — exactly the state the old lock-once gate could
+      // never recover from (a re-lock read prior=Locked and skipped removeAssetsFromAll forever).
+      const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+
+      const before = await ctx.database.selectFrom('album_asset').selectAll().where('assetId', '=', asset.id).execute();
+      expect(before).toHaveLength(1);
+
+      // Retry the lock. With the M-1 fix the strip is unconditional on Locked.
+      await sut.updateAll(auth, { ids: [asset.id], visibility: AssetVisibility.Locked });
+
+      // The surviving album_asset row is deleted (recovering the crashed first attempt); the album
+      // delete-audit trigger fires the tombstone that reaches synced members via getDeletes.
+      const after = await ctx.database.selectFrom('album_asset').selectAll().where('assetId', '=', asset.id).execute();
+      expect(after).toHaveLength(0);
     });
 
     it('should relatively update assets', async () => {
