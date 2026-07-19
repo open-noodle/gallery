@@ -19,6 +19,7 @@ Gallery enforces strict role-based access on every endpoint. Three roles — Own
 - **Map view** — Browse geotagged photos from a space on an interactive map.
 - **Search within a space** — Smart search scoped to a single space's assets.
 - **Connected libraries** — Admins can link external libraries to spaces, automatically including all library photos.
+- **Space albums** — Link whole albums into a space and collaborate across owners. See [Space Albums](space-albums.md).
 
 ## Roles and Permissions
 
@@ -44,6 +45,8 @@ Gallery enforces strict role-based access on every endpoint. Three roles — Own
 | Link/unlink libraries\*     | Yes   | Yes    | No     |
 
 \* Requires server admin privileges in addition to the space role.
+
+For album-specific permissions — linking and creating albums, contributing photos across owners, and controlling which albums appear in the space timeline — see [Space Albums](space-albums.md#roles-and-permissions).
 
 ## Creating a Space
 
@@ -133,6 +136,14 @@ If you're a server admin, you can [link an external library](#connected-librarie
 | Future photos included | No — run again to catch up  | Yes, automatically                 |
 | Can disconnect later   | Remove photos manually      | Unlink in one click                |
 | Best for               | One-time "share everything" | Ongoing sync of an external source |
+
+## Albums in a Space
+
+Beyond adding individual photos, Owners and Editors can link whole **albums** into a space. A linked album's photos appear in the space for all members and are organised on a dedicated **Albums** tab (with the same search / sort / group / view controls as your personal Albums page). Members can even collaborate across libraries by contributing photos they don't own into a shared album, and each album has its own switch for whether its photos join the space timeline.
+
+Viewers browse space albums read-only; linking, creating, editing, and contributing are Editor/Owner actions.
+
+For the full walkthrough — linking vs creating, cross-owner contributions, per-album timeline control, and the complete permissions table — see **[Space Albums](space-albums.md)**.
 
 ## Removing Photos from a Space
 

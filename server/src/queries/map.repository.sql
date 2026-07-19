@@ -17,6 +17,7 @@ from
 where
   "asset"."deletedAt" is null
   and "album_asset"."albumId" = $1
+  and "asset"."visibility" in ($2, $3)
 order by
   "fileCreatedAt" desc
 

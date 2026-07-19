@@ -4,8 +4,7 @@
   import { SvelteSet } from 'svelte/reactivity';
   import { t } from 'svelte-i18n';
   import {
-    mdiChevronLeft,
-    mdiChevronRight,
+    mdiClose,
     mdiCalendar,
     mdiAccount,
     mdiMapMarker,
@@ -16,6 +15,7 @@
     mdiHeart,
     mdiImageAlbum,
     mdiTextSearch,
+    mdiTune,
   } from '@mdi/js';
   import { untrack } from 'svelte';
   import type {
@@ -25,7 +25,7 @@
     PersonOption,
     TagOption,
   } from './filter-panel';
-  import { buildFilterContext, createFilterState } from './filter-panel';
+  import { buildFilterContext, createFilterState, loadFilterCollapsed, saveFilterCollapsed } from './filter-panel';
   import FilterSection from './filter-section.svelte';
   import TemporalPicker from './temporal-picker.svelte';
   import PeopleFilter from './people-filter.svelte';
@@ -48,9 +48,13 @@
     persistCollapsed?: boolean;
     storageKey?: string;
     hidden?: boolean;
+    // Two-way collapsed state so a page can drive it from an external header filter button.
+    collapsed?: boolean;
+    // When true, the collapsed panel renders nothing — the page supplies a header filter button and
+    // reclaims the horizontal space (used on timeline pages). When false, the built-in collapsed
+    // button is shown (default; used e.g. by the map's filter drawer).
+    externalToggle?: boolean;
   }
-
-  const COLLAPSED_KEY = 'gallery-filter-collapsed';
 
   let {
     config,
@@ -62,23 +66,14 @@
     storageKey = 'gallery-filter-visible-sections',
     hidden = false,
     persistCollapsed = true,
+    collapsed = $bindable(),
+    externalToggle = false,
   }: Props = $props();
 
-  function loadCollapsed(): boolean {
-    if (persistCollapsed && browser) {
-      try {
-        const raw = localStorage.getItem(COLLAPSED_KEY);
-        if (raw !== null) {
-          return JSON.parse(raw) as boolean;
-        }
-      } catch {
-        /* corrupted — fall through */
-      }
-    }
-    return false;
+  // Respect persistCollapsed for the initial value when the parent doesn't control `collapsed`.
+  if (collapsed === undefined) {
+    collapsed = persistCollapsed ? loadFilterCollapsed() : false;
   }
-
-  let collapsed = $state(loadCollapsed());
 
   const providers = config.providers ?? {};
 
@@ -500,12 +495,10 @@
   });
 
   $effect(() => {
-    if (persistCollapsed && browser) {
-      try {
-        localStorage.setItem(COLLAPSED_KEY, JSON.stringify(collapsed));
-      } catch {
-        /* localStorage unavailable */
-      }
+    if (persistCollapsed) {
+      // `collapsed` is a bindable with no default (`boolean | undefined`) so the `=== undefined`
+      // init above can decide whether to seed from storage; it's always a boolean by here.
+      saveFilterCollapsed(collapsed ?? false);
     }
   });
 
@@ -661,44 +654,53 @@
       }
     }
   }
+
+  // Whether any section has an active filter — surfaced as a single dot on the collapsed filter button.
+  let anyActiveFilter = $derived(config.sections.some((section) => hasActiveFilter(section)));
 </script>
 
 {#if hidden}
-  <!-- FilterPanel hidden: no assets to filter -->
+  <!-- No assets to filter — nothing to render. -->
 {:else}
+  <!-- The shell stays mounted even when collapsed so the width transition animates open/close. In
+       externalToggle mode it collapses to w-0 (space reclaimed, content clipped + inert); otherwise it
+       collapses to the w-12 built-in filter button. -->
   <div
-    class="flex h-full flex-shrink-0 overflow-hidden border-r border-gray-200/60 bg-light transition-[width] duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none dark:border-white/5 {collapsed
-      ? 'w-14'
-      : 'w-64'}"
+    class="flex h-full flex-shrink-0 overflow-hidden transition-[width] duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none {collapsed
+      ? externalToggle
+        ? 'w-0'
+        : 'w-12'
+      : 'w-64 border-r border-gray-200/60 bg-light dark:border-white/5'}"
     data-testid="filter-panel-shell"
   >
-    {#if collapsed}
-      <div class="flex h-full w-full flex-shrink-0 flex-col items-center gap-3 py-2" data-testid="collapsed-icon-strip">
+    {#if collapsed && !externalToggle}
+      <!-- Collapsed (built-in): a single filter button. Clicking it re-opens the panel; a dot marks any
+           active filter. Keeps the collapsed-icon-strip / expand-panel-btn testids. -->
+      <div class="flex flex-shrink-0 items-start p-1.5" data-testid="collapsed-icon-strip">
         <button
           type="button"
-          class="flex h-6 w-6 items-center justify-center rounded-full text-gray-500 hover:bg-subtle dark:text-gray-400"
+          class="relative flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-subtle dark:text-gray-400"
           onclick={() => (collapsed = false)}
           data-testid="expand-panel-btn"
+          aria-label={$t('filters')}
+          title={$t('filters')}
         >
-          <Icon icon={mdiChevronRight} size="16" />
+          <Icon icon={mdiTune} size="20" />
+          {#if anyActiveFilter}
+            <span
+              class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border-[1.5px] border-light bg-immich-primary dark:bg-immich-dark-primary"
+            ></span>
+          {/if}
         </button>
-        {#each config.sections as section (section)}
-          <button
-            type="button"
-            class="relative flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:bg-subtle dark:text-gray-400"
-            onclick={() => (collapsed = false)}
-          >
-            <Icon icon={sectionIcons[section]} size="16" />
-            {#if hasActiveFilter(section)}
-              <span
-                class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border-[1.5px] border-light bg-immich-primary dark:bg-immich-dark-primary"
-              ></span>
-            {/if}
-          </button>
-        {/each}
       </div>
     {:else}
-      <div class="immich-scrollbar flex h-full w-64 flex-col overflow-y-auto bg-light" data-testid="discovery-panel">
+      <!-- inert while collapsed: in externalToggle mode this panel stays mounted at w-0 (clipped) so the
+           open/close animates, but its inputs must not be focusable/announced while hidden. -->
+      <div
+        class="immich-scrollbar flex h-full w-64 flex-col overflow-y-auto bg-light"
+        data-testid="discovery-panel"
+        inert={collapsed}
+      >
         <div
           class="sticky top-0 z-5 flex items-center justify-between border-b border-gray-200 bg-light px-4 py-2.5 dark:border-gray-700"
         >
@@ -708,8 +710,9 @@
             class="flex h-6 w-6 items-center justify-center rounded-full text-gray-500 hover:bg-subtle dark:text-gray-400"
             onclick={() => (collapsed = true)}
             data-testid="collapse-panel-btn"
+            aria-label={$t('collapse')}
           >
-            <Icon icon={mdiChevronLeft} size="14" />
+            <Icon icon={mdiClose} size="16" />
           </button>
         </div>
 

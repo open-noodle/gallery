@@ -454,6 +454,7 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       const faceIds: string[] = [];
       for (let i = 0; i < 3; i++) {
         const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
         const faceId = await createFaceWithEmbedding(ctx, { assetId: asset.id, personId: person.id });
         faceIds.push(faceId);
       }
@@ -540,7 +541,15 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       await ctx.database.deleteFrom('person').where('id', '=', person5.id).execute();
 
       const persons = await sut.getPersonsBySpaceId(space.id, { withHidden: true, petsEnabled: true });
-      expect(persons).toHaveLength(5);
+      const personIds = persons.map((p) => p.id);
+      // SP1, SP2, SP3, SP5 have visible in-scope faces → listed (4 persons).
+      // SP4's only face is soft-deleted → excluded by the unconditional visibility gate.
+      expect(personIds).toContain(sp1.id);
+      expect(personIds).toContain(sp2.id);
+      expect(personIds).toContain(sp3.id);
+      expect(personIds).not.toContain(sp4.id); // all faces soft-deleted → no visible face
+      expect(personIds).toContain(sp5.id); // face is visible even though global person was deleted
+      expect(persons).toHaveLength(4);
     });
 
     it('should return correct results with takenAfter temporal filter', async () => {
@@ -595,6 +604,7 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       const { user } = await ctx.newUser();
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
       const { result: person } = await ctx.newPerson({ ownerId: user.id, thumbnailPath: '' });
       const faceId = await createFaceWithEmbedding(ctx, { assetId: asset.id, personId: person.id });
 
@@ -616,6 +626,7 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       const { user } = await ctx.newUser();
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
       const faceId = await createFaceWithEmbedding(ctx, { assetId: asset.id, personId: null });
 
       const sp = await sut.createPerson({
@@ -636,6 +647,7 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       const { user } = await ctx.newUser();
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
       const { result: person } = await ctx.newPerson({
         ownerId: user.id,
         name: 'Soon Deleted',
@@ -1359,6 +1371,50 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       const byP2 = await sut.findSpacePersonByLinkedPersonId(space.id, personP2.id);
       expect(byP2).toBeDefined();
       expect(byP2!.id).toBe(sp1.id);
+    });
+  });
+
+  // ==========================================
+  // Group E: Album-leg coverage
+  // ==========================================
+
+  describe('album-linked asset coverage in face pipeline', () => {
+    it('getSharedSpaceFaceMatchBackfillTargets includes an album-only asset with a face in a recognition-enabled space', async () => {
+      const { ctx, faceIdentityRepository } = setup();
+      const { user } = await ctx.newUser();
+
+      // Space S with face recognition enabled (newSharedSpace enables it by default)
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+
+      // Enable face recognition on the space explicitly
+      await ctx.database
+        .updateTable('shared_space')
+        .set({ faceRecognitionEnabled: true })
+        .where('id', '=', space.id)
+        .execute();
+
+      // Album A linked to the space
+      const { result: album } = await ctx.newAlbum({ ownerId: user.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      // Asset only in the album (NOT directly in the space, NOT in a library)
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+
+      // Create a global person and link a face on the asset to it
+      const { result: person } = await ctx.newPerson({ ownerId: user.id, name: 'Album Person' });
+      const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+      const faceId = await createFaceWithEmbedding(ctx, { assetId: asset.id, personId: person.id });
+      await faceIdentityRepository.linkFace({ assetFaceId: faceId, identityId: identity.id, source: 'owner-person' });
+
+      // The asset is NOT directly added to the space, NOT in a shared library
+      // — album is its only path into S
+
+      const targets = await faceIdentityRepository.getSharedSpaceFaceMatchBackfillTargets({ limit: 100 });
+
+      const spaceTargets = targets.filter((t) => t.spaceId === space.id);
+      const assetIds = spaceTargets.map((t) => t.assetId);
+      expect(assetIds).toContain(asset.id);
     });
   });
 });

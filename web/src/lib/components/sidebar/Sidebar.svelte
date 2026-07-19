@@ -45,7 +45,7 @@
   use:clickOutside={{ onOutclick: closeSidebar, onEscape: isExpanded ? closeSidebar : undefined }}
   use:focusTrap={{ active: isExpanded }}
 >
-  <div class="flex h-max min-h-full flex-col gap-1 pe-6">
+  <div class="flex h-max min-h-full flex-col gap-1 ps-2 pe-0">
     {@render children?.()}
   </div>
 </nav>

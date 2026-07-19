@@ -294,7 +294,11 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     const after = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetsV1]);
     const events = after.filter((r) => isAssetEvent(r));
     expect(events).toHaveLength(1);
-    expect((events[0] as { data: { id: string } }).data.id).toBe(asset.id);
+    const data = (events[0] as { data: { id: string; isFavorite: boolean } }).data;
+    expect(data.id).toBe(asset.id);
+    // L5: `auth` is a space member, not the asset owner — the owner's true isFavorite flag must not
+    // leak to a non-owning library sync arm reader (mirrors the direct/album arms' masking).
+    expect(data.isFavorite).toBe(false);
   });
 
   it('streams archived library assets as upserts (visibility change propagates)', async () => {

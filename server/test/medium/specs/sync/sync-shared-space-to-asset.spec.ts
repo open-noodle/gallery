@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import { SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum';
+import { AssetVisibility, SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum';
 import { DB } from 'src/schema';
 import { SyncTestContext } from 'test/medium.factory';
 import { getKyselyDB, wait } from 'test/utils';
@@ -150,5 +150,73 @@ describe(SyncRequestType.SharedSpaceToAssetsV1, () => {
     const response = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceToAssetsV1]);
     const deleteEvents = response.filter((r: { type: string }) => r.type === SyncEntityType.SharedSpaceToAssetDeleteV1);
     expect(deleteEvents).toHaveLength(0);
+  });
+
+  it('security-6: does NOT emit a join row for a Hidden direct-space asset (upsert path)', async () => {
+    const { auth: ownerAuth, ctx } = await setup();
+    const { auth: memberAuth } = await ctx.newSyncAuthUser();
+    const { space } = await ctx.newSharedSpace({ createdById: ownerAuth.user.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: ownerAuth.user.id, role: SharedSpaceRole.Owner });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: memberAuth.user.id, role: SharedSpaceRole.Editor });
+    const { asset } = await ctx.newAsset({ ownerId: ownerAuth.user.id, visibility: AssetVisibility.Hidden });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+    const response = await ctx.syncStream(memberAuth, [SyncRequestType.SharedSpaceToAssetsV1]);
+    const joinEvents = response.filter(
+      (r: { type: string }) =>
+        r.type === SyncEntityType.SharedSpaceToAssetV1 || r.type === SyncEntityType.SharedSpaceToAssetBackfillV1,
+    );
+    const assetIds = joinEvents.map((e) => (e as { data: { assetId: string } }).data.assetId);
+    expect(assetIds).not.toContain(asset.id);
+  });
+
+  it('security-6: does NOT backfill a Hidden direct-space link row to a newly-added member', async () => {
+    const { auth: ownerAuth, ctx } = await setup();
+    const { auth: memberAuth } = await ctx.newSyncAuthUser();
+    const { space } = await ctx.newSharedSpace({ createdById: ownerAuth.user.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: ownerAuth.user.id, role: SharedSpaceRole.Owner });
+    const { asset: hiddenAsset } = await ctx.newAsset({
+      ownerId: ownerAuth.user.id,
+      visibility: AssetVisibility.Hidden,
+    });
+    const { asset: timelineAsset } = await ctx.newAsset({
+      ownerId: ownerAuth.user.id,
+      visibility: AssetVisibility.Timeline,
+    });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: hiddenAsset.id });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: timelineAsset.id });
+
+    // Member joins the pre-existing space → triggers the per-space backfill loop.
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: memberAuth.user.id, role: SharedSpaceRole.Editor });
+
+    const next = await ctx.syncStream(memberAuth, [
+      SyncRequestType.SharedSpacesV1,
+      SyncRequestType.SharedSpaceToAssetsV1,
+    ]);
+    const joinEvents = next.filter(
+      (r: { type: string }) =>
+        r.type === SyncEntityType.SharedSpaceToAssetV1 || r.type === SyncEntityType.SharedSpaceToAssetBackfillV1,
+    );
+    const assetIds = joinEvents.map((e) => (e as { data: { assetId: string } }).data.assetId);
+    expect(assetIds).toContain(timelineAsset.id); // shareable link still delivered
+    expect(assetIds).not.toContain(hiddenAsset.id); // Hidden link withheld
+  });
+
+  it('regression: an Archive direct-space asset link row is still emitted (flat gate keeps Archive)', async () => {
+    const { auth: ownerAuth, ctx } = await setup();
+    const { auth: memberAuth } = await ctx.newSyncAuthUser();
+    const { space } = await ctx.newSharedSpace({ createdById: ownerAuth.user.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: ownerAuth.user.id, role: SharedSpaceRole.Owner });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: memberAuth.user.id, role: SharedSpaceRole.Editor });
+    const { asset } = await ctx.newAsset({ ownerId: ownerAuth.user.id, visibility: AssetVisibility.Archive });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+    const response = await ctx.syncStream(memberAuth, [SyncRequestType.SharedSpaceToAssetsV1]);
+    const joinEvents = response.filter(
+      (r: { type: string }) =>
+        r.type === SyncEntityType.SharedSpaceToAssetV1 || r.type === SyncEntityType.SharedSpaceToAssetBackfillV1,
+    );
+    const assetIds = joinEvents.map((e) => (e as { data: { assetId: string } }).data.assetId);
+    expect(assetIds).toContain(asset.id);
   });
 });
