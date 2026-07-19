@@ -72,6 +72,23 @@
       case 'space_color_change': {
         return $t('spaces_changed_color');
       }
+      case 'album_link': {
+        return $t('spaces_activity_linked_album', { values: { name, albumName: String(data.albumName ?? '') } });
+      }
+      case 'album_unlink': {
+        return $t('spaces_activity_unlinked_album', { values: { name, albumName: String(data.albumName ?? '') } });
+      }
+      case 'person_update': {
+        return $t('spaces_activity_updated_person', { values: { name, personName: String(data.personName ?? '') } });
+      }
+      case 'person_delete': {
+        return $t('spaces_activity_deleted_person', { values: { name, personName: String(data.personName ?? '') } });
+      }
+      case 'person_merge': {
+        return $t('spaces_activity_merged_people', {
+          values: { name, count: Number(data.count ?? 0), personName: String(data.personName ?? '') },
+        });
+      }
       default: {
         return $t('spaces_activity_default', { values: { name } });
       }

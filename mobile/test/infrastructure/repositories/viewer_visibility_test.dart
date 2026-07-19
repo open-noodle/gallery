@@ -15,13 +15,16 @@ void main() {
     await db.close();
   });
 
-  test('buildViewerVisibilityJoins returns 4 joins and both aliased members', () {
+  test('buildViewerVisibilityJoins returns 7 joins and all three aliased members', () {
     final spec = buildViewerVisibilityJoins(db, db.remoteAssetEntity, 'viewer-1');
-    expect(spec.joins, hasLength(4));
+    expect(spec.joins, hasLength(7));
     expect(spec.assetMember, isNot(equals(null)));
     expect(spec.libraryMember, isNot(equals(null)));
-    // The two aliases must be distinct instances so their column refs don't collide.
+    expect(spec.albumMember, isNot(equals(null)));
+    // The three aliases must be distinct instances so their column refs don't collide.
     expect(identical(spec.assetMember, spec.libraryMember), isFalse);
+    expect(identical(spec.assetMember, spec.albumMember), isFalse);
+    expect(identical(spec.libraryMember, spec.albumMember), isFalse);
   });
 
   test('viewerVisibilityPredicate returns a non-null Expression', () {

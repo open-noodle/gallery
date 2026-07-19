@@ -4,10 +4,14 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/space_bottom_sheet.widget.dart';
+import 'package:immich_mobile/presentation/widgets/spaces/space_top_sliver.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/background_sync.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/space_album_actions.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/sync_status.provider.dart';
@@ -232,6 +236,123 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     }
   }
 
+  /// Opens the [SpaceLinkAlbumPage] picker with the current linked-album ids
+  /// pre-excluded. The picker returns the selected ids via [context.maybePop];
+  /// this method calls [_onAlbumsPicked] once on the returned list to loop the
+  /// PUT endpoint and fire the sync-nudge.
+  Future<void> _openLinkPicker() async {
+    // Collect the ids of albums already linked to this space so the picker
+    // can exclude them from the candidate list.
+    final linkedAlbumIds =
+        ref
+            .read(spaceAlbumsProvider(widget.spaceId))
+            .whenData((albums) => albums.map((a) => a.id).toList())
+            .valueOrNull ??
+        <String>[];
+
+    if (!mounted) return;
+    final picked = await context.pushRoute<List<String>>(
+      SpaceLinkAlbumRoute(spaceId: widget.spaceId, linkedAlbumIds: linkedAlbumIds),
+    );
+    if (picked == null || picked.isEmpty) return;
+    await _onAlbumsPicked(picked);
+  }
+
+  /// B6: Loop PUT /shared-spaces/:id/albums/:albumId for each picked album,
+  /// then fire the sync-nudge and show a success toast.
+  Future<void> _onAlbumsPicked(List<String> ids) async {
+    if (ids.isEmpty) return;
+    try {
+      await ref.read(spaceAlbumActionsProvider).link(widget.spaceId, ids);
+      if (context.mounted) {
+        ImmichToast.show(
+          context: context,
+          msg: 'space_album_linked_success'.t(context: context, args: {'count': ids.length.toString()}),
+          toastType: ToastType.success,
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ImmichToast.show(
+          context: context,
+          msg: 'spaces_linked_albums_error_link'.t(context: context),
+          toastType: ToastType.error,
+        );
+      }
+    }
+  }
+
+  /// B6: Toggle `showInTimeline` for a linked album from the list/manage page.
+  Future<void> _onToggleAlbumTimeline(String albumId) async {
+    final albumsAsync = ref.read(spaceAlbumsProvider(widget.spaceId));
+    final album = albumsAsync.valueOrNull?.where((a) => a.id == albumId).firstOrNull;
+    if (album == null) return;
+
+    try {
+      await ref.read(spaceAlbumActionsProvider).toggleTimeline(widget.spaceId, albumId, current: album.showInTimeline);
+      if (context.mounted) {
+        ImmichToast.show(
+          context: context,
+          msg: album.showInTimeline
+              ? 'space_album_timeline_hidden'.t(context: context)
+              : 'space_album_timeline_shown'.t(context: context),
+          toastType: ToastType.success,
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ImmichToast.show(
+          context: context,
+          msg: 'space_album_timeline_update_failed'.t(context: context),
+          toastType: ToastType.error,
+        );
+      }
+    }
+  }
+
+  /// B6: Confirm + unlink an album from the list/manage page.
+  Future<void> _onUnlinkAlbum(String albumId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('space_album_unlink_title'.t(context: ctx)),
+        content: Text('space_album_unlink_confirmation'.t(context: ctx)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('cancel'.t(context: ctx)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.error),
+            child: Text('space_album_unlink_action'.t(context: ctx)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await ref.read(spaceAlbumActionsProvider).unlink(widget.spaceId, albumId);
+      if (context.mounted) {
+        ImmichToast.show(
+          context: context,
+          msg: 'space_album_unlinked_success'.t(context: context),
+          toastType: ToastType.success,
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ImmichToast.show(
+          context: context,
+          msg: 'spaces_linked_albums_error_unlink'.t(context: context),
+          toastType: ToastType.error,
+        );
+      }
+    }
+  }
+
   void _navigateToMembers() {
     context.pushRoute<String>(SpaceMembersRoute(spaceId: widget.spaceId)).then((result) async {
       if (!mounted) return;
@@ -290,8 +411,31 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
           .sharedSpace(spaceId: widget.spaceId, groupBy: groupBy, temporalScope: scope),
       child: Timeline(
         withGroupingPill: true,
-        topSliverWidget: const SyncStatusBannerSliver(),
-        topSliverWidgetHeight: SpaceDetailPage.syncBannerTopSliverHeight(isRemoteSyncing: isRemoteSyncing),
+        topSliverWidget: SpaceTopSliver(
+          spaceId: widget.spaceId,
+          canEdit: _canEdit,
+          // B5: opens the link picker.
+          onLinkTap: _openLinkPicker,
+          // B4: tapping an album tile pushes the detail page.
+          onAlbumTap: (albumId) =>
+              context.pushRoute(SpaceAlbumDetailRoute(spaceId: widget.spaceId, albumId: albumId, canEdit: _canEdit)),
+          // B3: "See all ▸" pushes the list/manage page; B5/B6 pass the real callbacks.
+          onSeeAll: () => context.pushRoute(
+            SpaceAlbumsRoute(
+              spaceId: widget.spaceId,
+              canEdit: _canEdit,
+              onLink: _openLinkPicker,
+              onToggle: _onToggleAlbumTimeline,
+              onUnlink: _onUnlinkAlbum,
+            ),
+          ),
+        ),
+        topSliverWidgetHeight: computeTopSliverHeight(
+          ref: ref,
+          spaceId: widget.spaceId,
+          canEdit: _canEdit,
+          isRemoteSyncing: isRemoteSyncing,
+        ),
         appBar: SliverAppBar(
           title: Text(_space!.name),
           centerTitle: false,

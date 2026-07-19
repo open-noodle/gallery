@@ -68,43 +68,34 @@ test.describe('Spaces P2', () => {
     });
   });
 
-  test.describe('Slide-out Members Panel', () => {
-    test('should open panel when members button clicked', async ({ context, page }) => {
-      const space = await utils.createSpace(admin.accessToken, { name: 'Panel Test' });
+  test.describe('Members Tab', () => {
+    // The slide-out Members panel was replaced by a dedicated Members tab route
+    // (/spaces/<id>/members). The member-list + contribution behaviour moved there;
+    // these tests assert it via the tab rather than the deleted panel.
+    test('should reach the member list via the Members tab', async ({ context, page }) => {
+      const space = await utils.createSpace(admin.accessToken, { name: 'Members Tab' });
 
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto(`/spaces/${space.id}`);
 
-      await page.locator('[data-testid="space-members-button"]').click();
-      await expect(page.locator('[data-testid="space-panel"]')).toHaveClass(/translate-x-0/);
-      await expect(page.locator('[data-testid="tab-members"]')).toContainText('Members');
+      await page.getByTestId('space-tab-members').click();
+      await page.waitForURL(`/spaces/${space.id}/members`);
+      await expect(page.getByTestId('member-list')).toBeVisible();
+      // The owner is always a member, so the list contains their entry.
+      await expect(page.getByTestId('member-list')).toContainText(admin.name);
     });
 
-    test('should close panel when close button clicked', async ({ context, page }) => {
-      const space = await utils.createSpace(admin.accessToken, { name: 'Close Panel' });
-
-      await utils.setAuthCookies(context, admin.accessToken);
-      await page.goto(`/spaces/${space.id}`);
-
-      await page.locator('[data-testid="space-members-button"]').click();
-      await expect(page.locator('[data-testid="space-panel"]')).toHaveClass(/translate-x-0/);
-
-      await page.locator('[data-testid="panel-close"]').click();
-      await expect(page.locator('[data-testid="space-panel"]')).toHaveClass(/translate-x-full/);
-    });
-
-    test('should show member contribution data', async ({ context, page }) => {
+    test('should show member contribution data on the Members tab', async ({ context, page }) => {
       const space = await utils.createSpace(admin.accessToken, { name: 'Contributions' });
       const asset = await utils.createAsset(admin.accessToken);
       await utils.addSpaceAssets(admin.accessToken, space.id, [asset.id]);
 
       await utils.setAuthCookies(context, admin.accessToken);
-      await page.goto(`/spaces/${space.id}`);
-      await page.locator('[data-testid="space-members-button"]').click();
+      await page.goto(`/spaces/${space.id}/members`);
 
-      // Switch to Members tab to see contribution data
-      await page.locator('[data-testid="tab-members"]').click();
-      await expect(page.locator('[data-testid="space-panel"]')).toContainText('1 photos added');
+      // The member row shows the contribution count ("<n> Photos") for contributors
+      // (i18n "photos" => "Photos"; toContainText is case-sensitive).
+      await expect(page.getByTestId('member-list')).toContainText(/1 Photos/);
     });
   });
 

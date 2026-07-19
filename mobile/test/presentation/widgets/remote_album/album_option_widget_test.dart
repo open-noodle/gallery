@@ -171,6 +171,31 @@ void main() {
       expect(find.byIcon(Icons.link), findsNothing);
     });
 
+    testWidgets('shows link to space option when onLinkToSpace is provided', (tester) async {
+      bool linkToSpaceCalled = false;
+
+      await tester.pumpConsumerWidget(DriftRemoteAlbumOption(onLinkToSpace: () => linkToSpaceCalled = true));
+
+      await tester.tap(find.byIcon(Icons.more_vert_rounded));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.add_link), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.add_link));
+      await tester.pumpAndSettle();
+
+      expect(linkToSpaceCalled, isTrue);
+    });
+
+    testWidgets('hides link to space option when onLinkToSpace is null', (tester) async {
+      await tester.pumpConsumerWidget(DriftRemoteAlbumOption(onEditAlbum: () {}));
+
+      await tester.tap(find.byIcon(Icons.more_vert_rounded));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.add_link), findsNothing);
+    });
+
     testWidgets('shows options option when onShowOptions is provided', (tester) async {
       bool showOptionsCalled = false;
 
@@ -240,6 +265,7 @@ void main() {
           onToggleAlbumOrder: () {},
           onCreateSharedLink: () {},
           onShowOptions: () {},
+          onLinkToSpace: () {},
           onDeleteAlbum: () {},
         ),
       );
@@ -254,6 +280,7 @@ void main() {
       expect(find.byIcon(Icons.swap_vert_rounded), findsOneWidget);
       expect(find.byIcon(Icons.link), findsOneWidget);
       expect(find.byIcon(Icons.settings), findsOneWidget);
+      expect(find.byIcon(Icons.add_link), findsOneWidget);
       expect(find.byIcon(Icons.delete), findsOneWidget);
       expect(find.byType(Divider), findsOneWidget);
     });
@@ -271,6 +298,7 @@ void main() {
       expect(find.byIcon(Icons.swap_vert_rounded), findsNothing);
       expect(find.byIcon(Icons.link), findsNothing);
       expect(find.byIcon(Icons.settings), findsNothing);
+      expect(find.byIcon(Icons.add_link), findsNothing);
       expect(find.byIcon(Icons.delete), findsNothing);
     });
 

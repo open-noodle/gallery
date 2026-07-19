@@ -176,6 +176,36 @@ describe('getTimelineTopVisibleAnchor', () => {
     expect(getTimelineTopVisibleAnchor(timelineManager)).toEqual({ year: 2020 });
   });
 
+  it('returns undefined when scrolled within the top section above the first month (day grouping)', () => {
+    // The first month starts at topSectionHeight (e.g. below the memories strip); a scrollTop above
+    // it means the top section is visible, so there is no month to anchor to.
+    const timelineManager = buildManager({
+      isInitialized: true,
+      grouping: 'day',
+      scrollTop: 0,
+      months: [
+        { yearMonth: { year: 2026, month: 2 }, top: 260, height: 300 },
+        { yearMonth: { year: 2017, month: 11 }, top: 560, height: 300 },
+      ] as TimelineManager['months'],
+    });
+
+    expect(getTimelineTopVisibleAnchor(timelineManager)).toBeUndefined();
+  });
+
+  it('returns undefined when scrolled within the top section above the first card (year grouping)', () => {
+    const timelineManager = buildManager({
+      isInitialized: true,
+      grouping: 'year',
+      scrollTop: 120,
+      timelineBuckets: [
+        { date: { year: 2026 }, top: 260, height: 296 },
+        { date: { year: 2020 }, top: 556, height: 296 },
+      ] as TimelineManager['timelineBuckets'],
+    });
+
+    expect(getTimelineTopVisibleAnchor(timelineManager)).toBeUndefined();
+  });
+
   it('returns undefined when the timeline is not initialized', () => {
     expect(getTimelineTopVisibleAnchor(buildManager({ isInitialized: false }))).toBeUndefined();
   });

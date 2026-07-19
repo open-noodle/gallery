@@ -1,4 +1,11 @@
-import { SharedSpaceAssetAddDto, SharedSpaceAssetRemoveDto } from 'src/dtos/shared-space.dto';
+import {
+  SharedSpaceAssetAddDto,
+  SharedSpaceAssetRemoveDto,
+  SharedSpaceLibraryParamDto,
+  SharedSpaceMemberParamDto,
+  SharedSpacePersonFaceParamDto,
+  SharedSpacePersonParamDto,
+} from 'src/dtos/shared-space.dto';
 
 // Generates valid v4 UUIDs by varying the last 12 hex chars
 const makeUUIDs = (count: number) =>
@@ -43,5 +50,33 @@ describe('SharedSpaceAssetRemoveDto', () => {
   it('should reject 50,001 asset IDs', () => {
     const result = SharedSpaceAssetRemoveDto.schema.safeParse({ assetIds: makeUUIDs(50_001) });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('shared-space param DTOs (security-9)', () => {
+  const uuid = '11111111-1111-4111-8111-111111111111';
+
+  it('SharedSpaceMemberParamDto rejects a non-UUID userId', () => {
+    expect(SharedSpaceMemberParamDto.schema.safeParse({ id: uuid, userId: 'not-a-uuid' }).success).toBe(false);
+    expect(SharedSpaceMemberParamDto.schema.safeParse({ id: uuid, userId: uuid }).success).toBe(true);
+  });
+
+  it('SharedSpacePersonParamDto rejects a non-UUID personId', () => {
+    expect(SharedSpacePersonParamDto.schema.safeParse({ id: uuid, personId: 'nope' }).success).toBe(false);
+    expect(SharedSpacePersonParamDto.schema.safeParse({ id: uuid, personId: uuid }).success).toBe(true);
+  });
+
+  it('SharedSpacePersonFaceParamDto rejects a non-UUID faceId', () => {
+    expect(SharedSpacePersonFaceParamDto.schema.safeParse({ id: uuid, personId: uuid, faceId: 'nope' }).success).toBe(
+      false,
+    );
+    expect(SharedSpacePersonFaceParamDto.schema.safeParse({ id: uuid, personId: uuid, faceId: uuid }).success).toBe(
+      true,
+    );
+  });
+
+  it('SharedSpaceLibraryParamDto rejects a non-UUID libraryId', () => {
+    expect(SharedSpaceLibraryParamDto.schema.safeParse({ id: uuid, libraryId: 'nope' }).success).toBe(false);
+    expect(SharedSpaceLibraryParamDto.schema.safeParse({ id: uuid, libraryId: uuid }).success).toBe(true);
   });
 });

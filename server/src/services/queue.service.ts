@@ -310,6 +310,11 @@ export class QueueService extends BaseService {
         { name: JobName.AuthChallengeCleanup },
         { name: JobName.HlsSessionCleanup },
         { name: JobName.AuditTableCleanup },
+        // L8: low-frequency backstop for the album-grant reconcile mechanism — sweeps every
+        // album with a live grant, independent of which code path created/removed it. Grouped
+        // with the other cleanup/maintenance jobs so disabling nightlyTasks.databaseCleanup
+        // opts out of this too, matching the existing all-maintenance-off admin contract.
+        { name: JobName.SharedSpaceAlbumGrantReconcileSweep },
       );
     }
 

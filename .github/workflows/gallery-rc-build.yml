@@ -22,6 +22,10 @@ on:
         description: 'Git ref (branch/tag/SHA) to build. Leave empty to use the ref this workflow was dispatched on.'
         required: false
         type: string
+      fork_version:
+        description: 'Override the stamped fork version (e.g. 5.1.0). Use to test version-gated features on a pre-release branch. Leave empty to derive from the latest v<N>.<N>.<N> git tag.'
+        required: false
+        type: string
       build_ml:
         description: 'Also build the CPU machine-learning image under the same RC tag.'
         required: false
@@ -100,7 +104,11 @@ jobs:
         # in branding/scripts/apply-branding.sh) so the package version stamped into
         # the image is always a real semver. The RC docker tag is applied later in
         # merge-server and is independent of the stamped package version.
+        # `fork_version` (optional) overrides the git-describe fallback so a
+        # pre-release branch can stamp a version that clears mobile's version gates.
         uses: ./.github/actions/apply-branding
+        with:
+          version: ${{ inputs.fork_version }}
 
       - name: Prepare platform pair
         id: prepare
@@ -211,6 +219,8 @@ jobs:
 
       - name: Apply branding
         uses: ./.github/actions/apply-branding
+        with:
+          version: ${{ inputs.fork_version }}
 
       - name: Prepare platform pair
         id: prepare
