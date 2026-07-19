@@ -79,7 +79,7 @@
 
 <UserPageLayout title={data.meta.title}>
   {#if hasPeople}
-    <div class="mt-2 mb-6">
+    <div class="mt-2 mb-6 px-2 md:px-4">
       <div class="flex justify-between">
         <p class="mb-4 font-medium dark:text-immich-dark-fg">{$t('people')}</p>
         <a
@@ -107,7 +107,7 @@
   {/if}
 
   {#if places.length > 0}
-    <div class="mt-2 mb-6">
+    <div class="mt-2 mb-6 px-2 md:px-4">
       <div class="flex justify-between">
         <p class="mb-4 font-medium dark:text-immich-dark-fg">{$t('places')}</p>
         <a
@@ -158,7 +158,7 @@
   {/if}
 
   {#if recents.length > 0}
-    <div class="mt-2 mb-6">
+    <div class="mt-2 mb-6 px-2 md:px-4">
       <div class="flex justify-between">
         <p class="mb-4 font-medium dark:text-immich-dark-fg">{$t('recently_added')}</p>
         <a

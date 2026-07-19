@@ -1,7 +1,23 @@
 import { Kysely } from 'kysely';
-import { SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum';
+import { AssetVisibility, SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum';
+import { AccessRepository } from 'src/repositories/access.repository';
+import { AlbumRepository } from 'src/repositories/album.repository';
+import { AssetEditRepository } from 'src/repositories/asset-edit.repository';
+import { AssetJobRepository } from 'src/repositories/asset-job.repository';
+import { AssetRepository } from 'src/repositories/asset.repository';
+import { EventRepository } from 'src/repositories/event.repository';
+import { JobRepository } from 'src/repositories/job.repository';
+import { LoggingRepository } from 'src/repositories/logging.repository';
+import { MapRepository } from 'src/repositories/map.repository';
+import { OcrRepository } from 'src/repositories/ocr.repository';
+import { SharedLinkAssetRepository } from 'src/repositories/shared-link-asset.repository';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
+import { StackRepository } from 'src/repositories/stack.repository';
+import { StorageRepository } from 'src/repositories/storage.repository';
+import { UserRepository } from 'src/repositories/user.repository';
 import { DB } from 'src/schema';
-import { SyncTestContext } from 'test/medium.factory';
+import { AssetService } from 'src/services/asset.service';
+import { newMediumService, SyncTestContext } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 
 let defaultDatabase: Kysely<DB>;
@@ -10,6 +26,29 @@ const setup = async (db?: Kysely<DB>) => {
   const ctx = new SyncTestContext(db || defaultDatabase);
   const { auth, user, session } = await ctx.newSyncAuthUser();
   return { auth, user, session, ctx };
+};
+
+// Drives the real AssetService.updateAll (not raw repo mutation) so the visibility-restore wiring in
+// asset.service.ts's applyVisibilityTransitionSideEffects is actually exercised end-to-end. Mirrors
+// setupAssetService in sync-space-visibility-purge-cross-path.spec.ts.
+const setupAssetService = (db?: Kysely<DB>) => {
+  const { sut, ctx } = newMediumService(AssetService, {
+    database: db || defaultDatabase,
+    real: [
+      AssetRepository,
+      AssetEditRepository,
+      AssetJobRepository,
+      AlbumRepository,
+      AccessRepository,
+      SharedLinkAssetRepository,
+      SharedSpaceRepository,
+      StackRepository,
+      UserRepository,
+    ],
+    mock: [EventRepository, LoggingRepository, JobRepository, StorageRepository, OcrRepository, MapRepository],
+  });
+  ctx.getMock(JobRepository).queueAll.mockResolvedValue();
+  return { sut, ctx };
 };
 
 beforeAll(async () => {
@@ -188,5 +227,58 @@ describe(SyncRequestType.LibraryAssetExifsV1, () => {
       assetId: asset.id,
       make: 'LibB',
     });
+  });
+
+  // L4: direct/album restore bump their join-row updateId (EXIF, keyed on it, re-delivers). The library
+  // arm has no join row — the asset row re-upserts automatically (its own updateId is bumped by the
+  // visibility UPDATE), but asset_exif.updateId is never touched by a visibility flip, so
+  // LibraryAssetExifSync.getUpserts (gated on asset_exif.updateId > ack) never re-streams it: a restored
+  // library asset shows empty EXIF forever on an already-synced member device. Drives the real
+  // AssetService.updateAll (not raw repo mutation) so the actual restore-branch wiring is exercised.
+  it('L4: re-delivers a library asset EXIF to a member after a hide -> restore round trip', async () => {
+    const owner = await setup();
+    const member = await owner.ctx.newSyncAuthUser();
+    const { sut: assetSut } = setupAssetService(owner.ctx.database);
+
+    const { library } = await owner.ctx.newLibrary({ ownerId: owner.auth.user.id });
+    const { asset } = await owner.ctx.newAsset({
+      ownerId: owner.auth.user.id,
+      libraryId: library.id,
+      visibility: AssetVisibility.Timeline,
+    });
+    await owner.ctx.newExif({ assetId: asset.id, make: 'L4Make' });
+
+    const { space } = await owner.ctx.newSharedSpace({ createdById: owner.auth.user.id });
+    await owner.ctx.newSharedSpaceMember({
+      spaceId: space.id,
+      userId: owner.auth.user.id,
+      role: SharedSpaceRole.Owner,
+    });
+    await owner.ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.user.id, role: SharedSpaceRole.Editor });
+    await owner.ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: owner.auth.user.id });
+
+    const types = [SyncRequestType.LibraryAssetsV1, SyncRequestType.LibraryAssetExifsV1];
+
+    // Member already synced the asset + its EXIF (already-synced device).
+    const initial = await owner.ctx.syncStream(member.auth, types);
+    expect(initial.filter((r) => isExifEvent(r))).toHaveLength(1);
+    await owner.ctx.syncAckAll(member.auth, initial);
+    await owner.ctx.assertSyncIsComplete(member.auth, types);
+
+    // Owner hides through the real service — the library purge tombstone fires and the member drops it.
+    await assetSut.updateAll(owner.auth, { ids: [asset.id], visibility: AssetVisibility.Hidden });
+    const afterHide = await owner.ctx.syncStream(member.auth, types);
+    await owner.ctx.syncAckAll(member.auth, afterHide);
+    await owner.ctx.assertSyncIsComplete(member.auth, types);
+
+    // Owner un-hides through the real service.
+    await assetSut.updateAll(owner.auth, { ids: [asset.id], visibility: AssetVisibility.Timeline });
+
+    const restored = await owner.ctx.syncStream(member.auth, types);
+    const restoredExif = restored.filter((r) => isExifEvent(r));
+    expect(
+      restoredExif.some((e) => (e as { data: { assetId: string } }).data.assetId === asset.id),
+      "member's next /sync must re-deliver the asset's EXIF after the restore",
+    ).toBe(true);
   });
 });

@@ -74,6 +74,8 @@ const setupSharedSpace = (db?: Kysely<DB>) => {
       AccessRepository,
       AssetRepository,
       ConfigRepository,
+      // L7: removeMember wraps the membership delete + owned-album unlink in
+      // this.databaseRepository.transaction() — needs a real connection to the test DB.
       DatabaseRepository,
       FaceIdentityRepository,
       PersonRepository,
