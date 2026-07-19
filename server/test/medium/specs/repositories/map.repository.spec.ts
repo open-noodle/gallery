@@ -18,6 +18,12 @@ const setup = (db?: Kysely<DB>) => {
   return { ctx, sut: ctx.get(MapRepository) };
 };
 
+const withGps = (ctx: ReturnType<typeof setup>['ctx'], assetId: string, latitude: number, longitude: number) =>
+  ctx.database
+    .insertInto('asset_exif')
+    .values({ assetId, latitude, longitude, city: 'Vienna', state: 'Vienna', country: 'Austria' })
+    .execute();
+
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
@@ -243,6 +249,91 @@ describe(MapRepository.name, () => {
 
       expect(hidden.find((marker) => marker.id === asset.id)).toBeUndefined();
       expect(visible.find((marker) => marker.id === asset.id)).toBeDefined();
+    });
+
+    it('should include album-linked asset with GPS when space album showInTimeline=true', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
+      const { album } = await ctx.newAlbum({ ownerId: owner.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+      await ctx.database
+        .insertInto('asset_exif')
+        .values({ assetId: asset.id, latitude: 51.5, longitude: -0.12 })
+        .execute();
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, showInTimeline: true });
+
+      const results = await sut.getMapMarkers(member.id, [member.id], [], { timelineSpaceIds: [space.id] });
+
+      expect(results.find((r) => r.id === asset.id)).toBeDefined();
+    });
+
+    it('should NOT include album-linked asset when space album showInTimeline=false', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
+      const { album } = await ctx.newAlbum({ ownerId: owner.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+      await ctx.database
+        .insertInto('asset_exif')
+        .values({ assetId: asset.id, latitude: 52.5, longitude: 13.4 })
+        .execute();
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, showInTimeline: false });
+
+      const results = await sut.getMapMarkers(member.id, [member.id], [], { timelineSpaceIds: [space.id] });
+
+      expect(results.find((r) => r.id === asset.id)).toBeUndefined();
+    });
+  });
+
+  describe('getAlbumMapMarkers', () => {
+    it('excludes Hidden and Locked album assets; includes Timeline and Archive (flat gate, security-2)', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { album } = await ctx.newAlbum({ ownerId: owner.id });
+
+      const { asset: timeline } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      const { asset: archive } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Archive });
+      const { asset: hidden } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Hidden });
+      const { asset: locked } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Locked });
+
+      await withGps(ctx, timeline.id, 48.2, 16.3);
+      await withGps(ctx, archive.id, 48.3, 16.4);
+      await withGps(ctx, hidden.id, 48.4, 16.5);
+      await withGps(ctx, locked.id, 48.5, 16.6);
+
+      for (const assetId of [timeline.id, archive.id, hidden.id, locked.id]) {
+        await ctx.newAlbumAsset({ albumId: album.id, assetId });
+      }
+
+      const markers = await sut.getAlbumMapMarkers(album.id);
+      const ids = markers.map((m) => m.id);
+
+      expect(ids).toContain(timeline.id);
+      expect(ids).toContain(archive.id); // Archive is shareable — not stripped
+      expect(ids).not.toContain(hidden.id);
+      expect(ids).not.toContain(locked.id);
+    });
+
+    it("omits the album OWNER's own Hidden asset too (flat gate, matches the grid)", async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { album } = await ctx.newAlbum({ ownerId: owner.id });
+      const { asset: hidden } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Hidden });
+      await withGps(ctx, hidden.id, 40.7, -74);
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: hidden.id });
+
+      const markers = await sut.getAlbumMapMarkers(album.id);
+      const ids = markers.map((m) => m.id);
+      expect(ids).not.toContain(hidden.id);
     });
   });
 });

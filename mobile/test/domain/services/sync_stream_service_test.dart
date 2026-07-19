@@ -170,6 +170,15 @@ void main() {
     when(() => mockSyncStreamRepo.updateLibraryAssetExifsV1(any())).thenAnswer(successHandler);
     when(() => mockSyncStreamRepo.updateSharedSpaceLibrariesV1(any())).thenAnswer(successHandler);
     when(() => mockSyncStreamRepo.deleteSharedSpaceLibrariesV1(any())).thenAnswer(successHandler);
+    // SharedSpaceAlbum sync handlers — Phase 2B Slice B1.
+    when(() => mockSyncStreamRepo.updateSharedSpaceAlbumsV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.deleteSharedSpaceAlbumsV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.updateSharedSpaceAlbumLinksV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.deleteSharedSpaceAlbumLinksV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.updateSharedSpaceAlbumToAssetsV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.deleteSharedSpaceAlbumToAssetsV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetsV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetExifsV1(any())).thenAnswer(successHandler);
     when(() => mockSyncMigrationRepo.v20260128CopyExifWidthHeightToAsset()).thenAnswer(successHandler);
 
     sut = SyncStreamService(
@@ -250,6 +259,16 @@ void main() {
       verifyNever(() => mockSyncStreamRepo.deletePartnerV1(any()));
       verifyNever(() => mockAbortCallbackWrapper());
       verifyNever(() => mockSyncApiRepo.ack(any()));
+    });
+
+    test("syncCompleteV1 triggers pruneAssets (mobile-3)", () async {
+      when(() => mockSyncStreamRepo.pruneAssets()).thenAnswer((_) async {});
+
+      await simulateEvents([
+        const SyncEvent(type: SyncEntityType.syncCompleteV1, data: 'complete', ack: 'ack-complete'),
+      ]);
+
+      verify(() => mockSyncStreamRepo.pruneAssets()).called(1);
     });
 
     test("aborts and stops processing if cancelled during iteration", () async {
@@ -523,6 +542,105 @@ void main() {
         await simulateEvents([SyncStreamStub.sharedSpaceMemberDeleteV1]);
         verify(() => mockSyncStreamRepo.deleteSharedSpaceMembersV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['shared-space-member-delete-ack'])).called(1);
+      });
+    });
+
+    // --- gallery-fork: SharedSpaceAlbum dispatch arm tests (Phase 2B) ---
+    //
+    // Parameterized tests, one per handler arm (plus backfill variants and
+    // deletes), asserting that each of the 15 entity types routes to the
+    // correct SyncStreamRepository method and is acked. The absorbed-invariant
+    // assertion (personal album handlers never called) is in the handler-level
+    // test (sync_stream_repository_test.dart).
+    group('SyncStreamService - shared space album dispatch arms', () {
+      test('sharedSpaceAlbumV1 → updateSharedSpaceAlbumsV1', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumsV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-album-v1-ack'])).called(1);
+      });
+
+      test('sharedSpaceAlbumBackfillV1 → updateSharedSpaceAlbumsV1 (same handler as create)', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumBackfillV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumsV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-album-backfill-ack'])).called(1);
+      });
+
+      test('sharedSpaceAlbumDeleteV1 → deleteSharedSpaceAlbumsV1', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumDeleteV1]);
+        verify(() => mockSyncStreamRepo.deleteSharedSpaceAlbumsV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-album-delete-ack'])).called(1);
+      });
+
+      test('sharedSpaceAlbumLinkV1 → updateSharedSpaceAlbumLinksV1', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumLinkV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumLinksV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-album-link-v1-ack'])).called(1);
+      });
+
+      test('sharedSpaceAlbumLinkBackfillV1 → updateSharedSpaceAlbumLinksV1 (same handler)', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumLinkBackfillV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumLinksV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-album-link-backfill-ack'])).called(1);
+      });
+
+      test('sharedSpaceAlbumLinkDeleteV1 → deleteSharedSpaceAlbumLinksV1', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumLinkDeleteV1]);
+        verify(() => mockSyncStreamRepo.deleteSharedSpaceAlbumLinksV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-album-link-delete-ack'])).called(1);
+      });
+
+      test('sharedSpaceAlbumToAssetV1 → updateSharedSpaceAlbumToAssetsV1', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumToAssetV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumToAssetsV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-album-to-asset-v1-ack'])).called(1);
+      });
+
+      test('sharedSpaceAlbumToAssetBackfillV1 → updateSharedSpaceAlbumToAssetsV1 (same handler)', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumToAssetBackfillV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumToAssetsV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-album-to-asset-backfill-ack'])).called(1);
+      });
+
+      test('sharedSpaceAlbumToAssetDeleteV1 → deleteSharedSpaceAlbumToAssetsV1', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumToAssetDeleteV1]);
+        verify(() => mockSyncStreamRepo.deleteSharedSpaceAlbumToAssetsV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-album-to-asset-delete-ack'])).called(1);
+      });
+
+      test('sharedSpaceAlbumAssetCreateV1 → updateSharedSpaceAlbumAssetsV1', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumAssetCreateV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetsV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-asset-create-ack'])).called(1);
+      });
+
+      test('sharedSpaceAlbumAssetUpdateV1 → updateSharedSpaceAlbumAssetsV1 (same handler)', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumAssetUpdateV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetsV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-asset-update-ack'])).called(1);
+      });
+
+      test('sharedSpaceAlbumAssetBackfillV1 → updateSharedSpaceAlbumAssetsV1 (same handler)', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumAssetBackfillV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetsV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-asset-backfill-ack'])).called(1);
+      });
+
+      test('sharedSpaceAlbumAssetExifCreateV1 → updateSharedSpaceAlbumAssetExifsV1', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumAssetExifCreateV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetExifsV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-exif-create-ack'])).called(1);
+      });
+
+      test('sharedSpaceAlbumAssetExifUpdateV1 → updateSharedSpaceAlbumAssetExifsV1 (same handler)', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumAssetExifUpdateV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetExifsV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-exif-update-ack'])).called(1);
+      });
+
+      test('sharedSpaceAlbumAssetExifBackfillV1 → updateSharedSpaceAlbumAssetExifsV1 (same handler)', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumAssetExifBackfillV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetExifsV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-exif-backfill-ack'])).called(1);
       });
     });
   });

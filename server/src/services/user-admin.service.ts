@@ -103,7 +103,21 @@ export class UserAdminService extends BaseService {
       throw new ForbiddenException('Cannot delete your own account');
     }
 
+    // Enumerate owned album ids BEFORE soft-deleting them: getAllIds filters out
+    // soft-deleted albums, so capturing them after softDeleteAll would return nothing.
+    const ownedAlbumIds = await this.albumRepository.getAllIds(id, { isOwned: true });
+
     await this.albumRepository.softDeleteAll(id);
+
+    // Eagerly clean the space-face projection for each soft-deleted owned album so
+    // album-sourced space people disappear immediately (and getSpacePersonThumbnail stops
+    // serving trashed crops). Reuses onAlbumDelete — the only AlbumDelete handler — which
+    // reads album_asset directly and so still works after the album row is soft-deleted.
+    // Runs for both force and non-force, since softDeleteAll always runs; on force the later
+    // UserDelete hard-delete is a harmless no-op because the faces are already cleaned.
+    for (const albumId of ownedAlbumIds) {
+      await this.eventRepository.emit('AlbumDelete', { albumId });
+    }
 
     const status = force ? UserStatus.Removing : UserStatus.Deleted;
     const user = await this.userRepository.update(id, { status, deletedAt: new Date() });
@@ -120,6 +134,26 @@ export class UserAdminService extends BaseService {
   async restore(auth: AuthDto, id: string): Promise<UserAdminResponseDto> {
     await this.findOrFail(id, { withDeleted: true });
     await this.albumRepository.restoreAll(id);
+
+    // Re-queue face matching for every face-enabled space linked to a restored album so the
+    // album-sourced space people re-converge (mirrors addMember). Albums are non-deleted again
+    // after restoreAll, so getAllIds now surfaces them.
+    const restoredAlbumIds = await this.albumRepository.getAllIds(id, { isOwned: true });
+    let anyFaceEnabledSpace = false;
+    for (const albumId of restoredAlbumIds) {
+      const spaces = await this.sharedSpaceRepository.getSpacesLinkedToAlbum(albumId);
+      for (const space of spaces) {
+        if (!space.faceRecognitionEnabled) {
+          continue;
+        }
+        await this.jobRepository.queue({ name: JobName.SharedSpaceFaceMatchAll, data: { spaceId: space.spaceId } });
+        anyFaceEnabledSpace = true;
+      }
+    }
+    if (anyFaceEnabledSpace) {
+      await this.jobRepository.queue({ name: JobName.SharedSpacePersonMetadataBackfill, data: {} });
+    }
+
     const user = await this.userRepository.restore(id);
     await this.eventRepository.emit('UserRestore', user);
     return mapUserAdmin(user);

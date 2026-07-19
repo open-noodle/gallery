@@ -1,3 +1,36 @@
+import { browser } from '$app/environment';
+
+const COLLAPSED_KEY = 'gallery-filter-collapsed';
+
+/**
+ * Load the persisted filter-panel collapsed preference. Shared by the panel itself and the header
+ * filter button (external toggle), so a page can initialise its bound `collapsed` state to match.
+ */
+export function loadFilterCollapsed(): boolean {
+  if (browser) {
+    try {
+      const raw = localStorage.getItem(COLLAPSED_KEY);
+      if (raw !== null) {
+        return JSON.parse(raw) as boolean;
+      }
+    } catch {
+      /* corrupted — fall through */
+    }
+  }
+  return false;
+}
+
+/** Persist the filter-panel collapsed preference. */
+export function saveFilterCollapsed(collapsed: boolean): void {
+  if (browser) {
+    try {
+      localStorage.setItem(COLLAPSED_KEY, JSON.stringify(collapsed));
+    } catch {
+      /* localStorage unavailable */
+    }
+  }
+}
+
 export type FilterSection =
   | 'timeline'
   | 'people'

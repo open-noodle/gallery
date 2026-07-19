@@ -570,6 +570,55 @@ describe(SearchRepository.name, () => {
       expect(sql).toContain('"shared_space_library"');
       expect(sql).toContain('"shared_space_library"."spaceId"');
     });
+
+    // Fix I: album-scoped branches must gate other participants' assets on visibility
+    // (Archive + Timeline only) to prevent Hidden asset facets from leaking to album viewers.
+    it('buildFilteredAssetIds gates album_user participant arm on Archive+Timeline visibility', () => {
+      // Without the fix, the album_user EXISTS arm has no visibility predicate and the
+      // album-scoped facets expose Hidden assets contributed by another participant.
+      const sql = compileFilteredAssetIds(sut, {
+        albumId: '11111111-1111-1111-1111-111111111111',
+      });
+
+      // The visibility gate ("asset"."visibility" in ($N, $N)) must appear in the SQL
+      // emitted for the album branch — it restricts the album_user participant arm so
+      // Hidden/Locked assets owned by OTHER participants are not surfaced.
+      expect(sql).toMatch(/"asset"\."visibility" in \(\$\d+(?:, \$\d+)*\)/);
+    });
+
+    it('getExifField gates album_user participant arm on Archive+Timeline visibility', () => {
+      const sql = compileExifField(sut, 'country', {
+        albumId: '11111111-1111-1111-1111-111111111111',
+      });
+
+      expect(sql).toMatch(/"asset"\."visibility" in \(\$\d+(?:, \$\d+)*\)/);
+    });
+
+    it('searchAssetBuilder album-scoped branch gates space assets on Archive+Timeline visibility', () => {
+      // albumSharedSpaceScope is activated when albumIds is set and userIds is absent.
+      // Without the fix, the space asset/library EXISTS arms have no visibility predicate.
+      const sql = buildAssetSearchSql({
+        albumIds: ['11111111-1111-1111-1111-111111111111'],
+        timelineSpaceIds: ['33333333-3333-3333-3333-333333333333'],
+      });
+
+      expect(sql).toContain('"shared_space_asset"');
+      expect(sql).toContain('"shared_space_library"');
+      // Visibility gate must appear alongside the space membership check.
+      expect(sql).toMatch(/"asset"\."visibility" in \(\$\d+(?:, \$\d+)*\)/);
+    });
+
+    it('searchAssetBuilder plain-album branch (no timelineSpaceIds) gates on Archive+Timeline visibility (security-1)', () => {
+      // albumSharedSpaceScope's FIRST OR-branch (plain non-shared-space album assets) had NO
+      // visibility gate, so a Hidden asset reachable only via a linked album leaked. With ONLY
+      // albumIds set (no timelineSpaceIds, no userIds) that branch is the sole album predicate —
+      // it must now carry the flat visibility gate.
+      const sql = buildAssetSearchSql({
+        albumIds: ['11111111-1111-1111-1111-111111111111'],
+      });
+
+      expect(sql).toMatch(/"asset"\."visibility" in \(\$\d+(?:, \$\d+)*\)/);
+    });
   });
 
   describe('searchAssetBuilder rating semantics', () => {

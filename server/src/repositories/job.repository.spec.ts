@@ -430,6 +430,35 @@ describe(JobRepository.name, () => {
     );
   });
 
+  it('sets removeOnFail on the shared-space album-grant reconcile job (M6)', async () => {
+    // A hard failure must not leave a permanently-failed job occupying the dedup jobId key —
+    // that would silently block every future reconcile for the same album set (fire-and-forget
+    // durability hole). Mirrors FaceIdentityBackfill's removeOnFail precedent.
+    const { sut, queue } = setup();
+    setHandlers(sut, [JobName.SharedSpaceAlbumGrantReconcile]);
+
+    await sut.queue({ name: JobName.SharedSpaceAlbumGrantReconcile, data: { albumIds: ['album-1'] } });
+
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SharedSpaceAlbumGrantReconcile,
+      { albumIds: ['album-1'] },
+      { jobId: 'space-album-grant-reconcile-album-1', removeOnComplete: true, removeOnFail: true },
+    );
+  });
+
+  it('sets removeOnFail on the shared-space face-match-all job (M6)', async () => {
+    const { sut, queue } = setup();
+    setHandlers(sut, [JobName.SharedSpaceFaceMatchAll]);
+
+    await sut.queue({ name: JobName.SharedSpaceFaceMatchAll, data: { spaceId: 'space-1' } });
+
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SharedSpaceFaceMatchAll,
+      { spaceId: 'space-1' },
+      { jobId: 'shared-space-face-match-all/space-1', removeOnComplete: true, removeOnFail: true },
+    );
+  });
+
   it('removes a failed stable facial-recognition coordinator before requeueing it', async () => {
     const { sut, queue } = setup();
     const failedJob = {
@@ -727,6 +756,7 @@ describe(JobRepository.name, () => {
       {
         jobId: 'shared-space-face-match-all/space-1',
         removeOnComplete: true,
+        removeOnFail: true,
       },
     );
     expect(queue.add).toHaveBeenCalledWith(
@@ -762,6 +792,12 @@ describe(JobRepository.name, () => {
       },
     );
     for (const call of queue.add.mock.calls) {
+      if (call[0] === JobName.SharedSpaceFaceMatchAll) {
+        // M6: this one intentionally clears on failure (removeOnFail) so a hard failure can't
+        // permanently occupy its dedup jobId and block a later re-projection — see the
+        // dedicated M6 tests above. The rest of the shared-space face pipeline is unchanged.
+        continue;
+      }
       expect(call[2]).not.toHaveProperty('removeOnFail', true);
     }
   });
@@ -880,24 +916,34 @@ describe(JobRepository.name, () => {
       JobName.SharedSpaceFaceMatchFromBackfill,
       { spaceId: 'space-1', assetId: 'asset-1' },
       'shared-space-face-match/from-backfill/space-1/asset-1',
+      {},
     ],
     [
       JobName.SharedSpaceFaceMatch,
       { spaceId: 'space-1', assetId: 'asset-1', source: 'identity-backfill' },
       'shared-space-face-match/identity-backfill/space-1/asset-1',
+      {},
     ],
     [
       JobName.SharedSpaceFaceMatchFromBackfill,
       { spaceId: 'space-1', assetId: 'asset-1' },
       'shared-space-face-match/from-backfill/space-1/asset-1',
+      {},
     ],
-    [JobName.SharedSpaceFaceMatchAll, { spaceId: 'space-1' }, 'shared-space-face-match-all/space-1'],
+    // M6: SharedSpaceFaceMatchAll now also sets removeOnFail (see the dedicated M6 tests above).
+    [
+      JobName.SharedSpaceFaceMatchAll,
+      { spaceId: 'space-1' },
+      'shared-space-face-match-all/space-1',
+      { removeOnFail: true },
+    ],
     [
       JobName.SharedSpaceFaceMatchPage,
       { spaceId: 'space-1', afterAssetId: 'asset-9' },
       'shared-space-face-match-page/space-1/after/asset-9',
+      {},
     ],
-  ])('replaces paused stable %s jobs before requeueing them', async (name, data, jobId) => {
+  ])('replaces paused stable %s jobs before requeueing them', async (name, data, jobId, extraOptions) => {
     const { sut, queue } = setup();
     const pausedJob = {
       getState: vi.fn().mockResolvedValue('paused'),
@@ -914,6 +960,7 @@ describe(JobRepository.name, () => {
     expect(queue.add).toHaveBeenCalledWith(name, data, {
       jobId,
       removeOnComplete: true,
+      ...extraOptions,
     });
   });
 });

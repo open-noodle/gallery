@@ -365,4 +365,172 @@ abstract final class SyncStreamStub {
     data: SyncSharedSpaceMemberDeleteV1(spaceId: 'space-3', userId: 'user-3'),
     ack: 'shared-space-member-delete-ack',
   );
+
+  // --- gallery-fork: shared-space album sync stubs (Phase 2B) ---
+
+  static SyncAlbumV2 _makeAlbumV2({String id = 'album-stub-1'}) => SyncAlbumV2(
+    id: id,
+    name: 'Stub Album',
+    description: '',
+    isActivityEnabled: true,
+    order: AssetOrder.asc,
+    thumbnailAssetId: null,
+    createdAt: DateTime(2026, 6, 1),
+    updatedAt: DateTime(2026, 6, 1),
+  );
+
+  static final sharedSpaceAlbumV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumV1,
+    data: _makeAlbumV2(),
+    ack: 'sa-album-v1-ack',
+  );
+
+  static final sharedSpaceAlbumBackfillV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumBackfillV1,
+    data: _makeAlbumV2(id: 'album-stub-2'),
+    ack: 'sa-album-backfill-ack',
+  );
+
+  static final sharedSpaceAlbumDeleteV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumDeleteV1,
+    data: SyncAlbumDeleteV1(albumId: 'album-stub-del'),
+    ack: 'sa-album-delete-ack',
+  );
+
+  static final sharedSpaceAlbumLinkV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumLinkV1,
+    data: SyncSharedSpaceAlbumLinkV1(
+      spaceId: 'space-1',
+      albumId: 'album-stub-1',
+      showInTimeline: true,
+      addedById: null,
+      createdAt: DateTime(2026, 6, 1),
+      updatedAt: DateTime(2026, 6, 1),
+    ),
+    ack: 'sa-album-link-v1-ack',
+  );
+
+  static final sharedSpaceAlbumLinkBackfillV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumLinkBackfillV1,
+    data: SyncSharedSpaceAlbumLinkV1(
+      spaceId: 'space-2',
+      albumId: 'album-stub-2',
+      showInTimeline: false,
+      addedById: null,
+      createdAt: DateTime(2026, 6, 1),
+      updatedAt: DateTime(2026, 6, 1),
+    ),
+    ack: 'sa-album-link-backfill-ack',
+  );
+
+  static final sharedSpaceAlbumLinkDeleteV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumLinkDeleteV1,
+    data: SyncSharedSpaceAlbumLinkDeleteV1(spaceId: 'space-3', albumId: 'album-stub-3'),
+    ack: 'sa-album-link-delete-ack',
+  );
+
+  static final sharedSpaceAlbumToAssetV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumToAssetV1,
+    data: SyncAlbumToAssetV1(albumId: 'album-stub-1', assetId: 'asset-stub-1'),
+    ack: 'sa-album-to-asset-v1-ack',
+  );
+
+  static final sharedSpaceAlbumToAssetBackfillV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumToAssetBackfillV1,
+    data: SyncAlbumToAssetV1(albumId: 'album-stub-2', assetId: 'asset-stub-2'),
+    ack: 'sa-album-to-asset-backfill-ack',
+  );
+
+  static final sharedSpaceAlbumToAssetDeleteV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumToAssetDeleteV1,
+    data: SyncAlbumToAssetDeleteV1(albumId: 'album-stub-3', assetId: 'asset-stub-3'),
+    ack: 'sa-album-to-asset-delete-ack',
+  );
+
+  static SyncAssetV2 _makeAssetV2({String id = 'sa-asset-stub-1'}) => SyncAssetV2(
+    id: id,
+    checksum: 'cStub$id',
+    originalFileName: '$id.jpg',
+    type: AssetTypeEnum.IMAGE,
+    ownerId: 'owner',
+    isFavorite: false,
+    fileCreatedAt: DateTime(2026, 6, 1),
+    fileModifiedAt: DateTime(2026, 6, 1),
+    createdAt: DateTime(2026, 6, 1),
+    localDateTime: DateTime(2026, 6, 1),
+    visibility: AssetVisibility.timeline,
+    width: null,
+    height: null,
+    deletedAt: null,
+    duration: null,
+    libraryId: null,
+    livePhotoVideoId: null,
+    stackId: null,
+    thumbhash: null,
+    isEdited: false,
+  );
+
+  static final sharedSpaceAlbumAssetCreateV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumAssetCreateV1,
+    data: _makeAssetV2(),
+    ack: 'sa-asset-create-ack',
+  );
+
+  static final sharedSpaceAlbumAssetUpdateV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumAssetUpdateV1,
+    data: _makeAssetV2(id: 'sa-asset-stub-2'),
+    ack: 'sa-asset-update-ack',
+  );
+
+  static final sharedSpaceAlbumAssetBackfillV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumAssetBackfillV1,
+    data: _makeAssetV2(id: 'sa-asset-stub-3'),
+    ack: 'sa-asset-backfill-ack',
+  );
+
+  static SyncAssetExifV1 _makeExifV1({String assetId = 'sa-asset-stub-1'}) => SyncAssetExifV1(
+    assetId: assetId,
+    exifImageWidth: null,
+    exifImageHeight: null,
+    orientation: null,
+    city: null,
+    country: null,
+    dateTimeOriginal: null,
+    description: null,
+    exposureTime: null,
+    fNumber: null,
+    fileSizeInByte: null,
+    focalLength: null,
+    fps: null,
+    iso: null,
+    latitude: null,
+    lensModel: null,
+    longitude: null,
+    make: null,
+    model: null,
+    modifyDate: null,
+    profileDescription: null,
+    projectionType: null,
+    rating: null,
+    state: null,
+    timeZone: null,
+  );
+
+  static final sharedSpaceAlbumAssetExifCreateV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumAssetExifCreateV1,
+    data: _makeExifV1(),
+    ack: 'sa-exif-create-ack',
+  );
+
+  static final sharedSpaceAlbumAssetExifUpdateV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumAssetExifUpdateV1,
+    data: _makeExifV1(assetId: 'sa-asset-stub-2'),
+    ack: 'sa-exif-update-ack',
+  );
+
+  static final sharedSpaceAlbumAssetExifBackfillV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumAssetExifBackfillV1,
+    data: _makeExifV1(assetId: 'sa-asset-stub-3'),
+    ack: 'sa-exif-backfill-ack',
+  );
 }

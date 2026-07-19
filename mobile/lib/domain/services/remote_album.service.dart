@@ -55,12 +55,12 @@ class RemoteAlbumService {
     return _repository.watchAlbum(albumId);
   }
 
-  Future<List<RemoteAlbum>> getAll() {
-    return _repository.getAll();
+  Future<List<RemoteAlbum>> getAll({String? currentUserId}) {
+    return _repository.getAll(currentUserId: currentUserId);
   }
 
-  Future<RemoteAlbum?> get(String albumId) {
-    return _repository.get(albumId);
+  Future<RemoteAlbum?> get(String albumId, {String? currentUserId}) {
+    return _repository.get(albumId, currentUserId: currentUserId);
   }
 
   Future<List<RemoteAlbum>> sortAlbums(

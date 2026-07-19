@@ -338,13 +338,24 @@ test.describe('Timeline', () => {
         await page.mouse.down();
         await page.mouse.move(segmentBox.x + segmentBox.width / 2, segmentBox.y + segmentBox.height / 2, { steps: 5 });
         await page.mouse.up();
+        // With a dense timeline (~300 months), a month's scrubber segment can be ~1px tall, so
+        // dragging to its centre resolves — under pixel hit-testing — to the target or an
+        // immediately adjacent month. Accept landing within one month; anything further is a real
+        // mis-navigation. `yearMonths` is contiguous (newest→oldest), so index ±1 are the neighbours.
+        const monthIndex = yearMonths.indexOf(month);
+        const acceptableMonths = new Set(
+          [monthIndex - 1, monthIndex, monthIndex + 1]
+            .filter((index) => index >= 0 && index < yearMonths.length)
+            .map((index) => yearMonths[index]),
+        );
         const matchingMonth = await poll(page, async () => {
           for (const thumb of await thumbnailUtils.locator(page).all()) {
             const box = await thumb.boundingBox();
             if (box) {
               const assetId = await thumb.evaluate((e) => e.dataset.asset);
-              if (assetId && getYearMonth(assets, assetId) === month) {
-                return month;
+              const yearMonth = assetId ? getYearMonth(assets, assetId) : undefined;
+              if (yearMonth && acceptableMonths.has(yearMonth)) {
+                return yearMonth;
               }
             }
           }
@@ -353,7 +364,7 @@ test.describe('Timeline', () => {
         if (page.isClosed()) {
           return;
         }
-        expect(matchingMonth).toBe(month);
+        expect(matchingMonth, `Scrubber drag targeting ${month} landed outside the ±1-month window`).toBeTruthy();
       }
     });
     test.skip('Deep link to last photo, scroll up', async ({ page }) => {

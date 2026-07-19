@@ -14,6 +14,7 @@ class RemoteAlbumOption extends StatelessWidget {
     this.onToggleAlbumOrder,
     this.onEditAlbum,
     this.onShowOptions,
+    this.onLinkToSpace,
     this.iconColor,
     this.iconShadows,
   });
@@ -26,6 +27,11 @@ class RemoteAlbumOption extends StatelessWidget {
   final VoidCallback? onToggleAlbumOrder;
   final VoidCallback? onEditAlbum;
   final VoidCallback? onShowOptions;
+
+  /// L15 — "Link to space": opens the space picker and links this album to
+  /// the selected space. Null hides the menu item (gated to owned albums by
+  /// the caller, mirroring the other owner-only options here).
+  final VoidCallback? onLinkToSpace;
   final Color? iconColor;
   final List<Shadow>? iconShadows;
 
@@ -98,6 +104,17 @@ class RemoteAlbumOption extends StatelessWidget {
     if (onShowOptions != null) {
       menuChildren.add(
         BaseActionButton(label: context.t.options, iconData: Icons.settings, onPressed: onShowOptions, menuItem: true),
+      );
+    }
+
+    if (onLinkToSpace != null) {
+      menuChildren.add(
+        BaseActionButton(
+          label: 'link_album_to_space'.t(context: context),
+          iconData: Icons.add_link,
+          onPressed: onLinkToSpace,
+          menuItem: true,
+        ),
       );
     }
 

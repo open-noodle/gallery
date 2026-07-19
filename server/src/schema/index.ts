@@ -31,6 +31,8 @@ import { ActivityTable } from 'src/schema/tables/activity.table.js';
 import { AlbumAssetAuditTable } from 'src/schema/tables/album-asset-audit.table.js';
 import { AlbumAssetTable } from 'src/schema/tables/album-asset.table.js';
 import { AlbumAuditTable } from 'src/schema/tables/album-audit.table.js';
+import { AlbumSpaceAssetAuditTable } from 'src/schema/tables/album-space-asset-audit.table.js';
+import { AlbumSpaceAssetTable } from 'src/schema/tables/album-space-asset.table.js';
 import { AlbumUserAuditTable } from 'src/schema/tables/album-user-audit.table.js';
 import { AlbumUserTable } from 'src/schema/tables/album-user.table.js';
 import { AlbumTable } from 'src/schema/tables/album.table.js';
@@ -81,10 +83,16 @@ import { SessionTable } from 'src/schema/tables/session.table.js';
 import { SharedLinkAssetTable } from 'src/schema/tables/shared-link-asset.table.js';
 import { SharedLinkTable } from 'src/schema/tables/shared-link.table.js';
 import { SharedSpaceActivityTable } from 'src/schema/tables/shared-space-activity.table.js';
+import { SharedSpaceAlbumAssetAuditTable } from 'src/schema/tables/shared-space-album-asset-audit.table.js';
+import { SharedSpaceAlbumAuditTable } from 'src/schema/tables/shared-space-album-audit.table.js';
+import { SharedSpaceAlbumUserAuditTable } from 'src/schema/tables/shared-space-album-user-audit.table.js';
+import { SharedSpaceAlbumUserTable } from 'src/schema/tables/shared-space-album-user.table.js';
+import { SharedSpaceAlbumTable } from 'src/schema/tables/shared-space-album.table.js';
 import { SharedSpaceAssetAuditTable } from 'src/schema/tables/shared-space-asset-audit.table.js';
 import { SharedSpaceAssetTable } from 'src/schema/tables/shared-space-asset.table.js';
 import { SharedSpaceAuditTable } from 'src/schema/tables/shared-space-audit.table.js';
 import { SharedSpaceFaceMatchBackfillTargetTable } from 'src/schema/tables/shared-space-face-match-backfill-target.table.js';
+import { SharedSpaceLibraryAssetAuditTable } from 'src/schema/tables/shared-space-library-asset-audit.table.js';
 import { SharedSpaceLibraryAuditTable } from 'src/schema/tables/shared-space-library-audit.table.js';
 import { SharedSpaceLibraryTable } from 'src/schema/tables/shared-space-library.table.js';
 import { SharedSpaceMemberAuditTable } from 'src/schema/tables/shared-space-member-audit.table.js';
@@ -125,6 +133,8 @@ export class ImmichDatabase {
     ActivityTable,
     AlbumAssetTable,
     AlbumAssetAuditTable,
+    AlbumSpaceAssetTable,
+    AlbumSpaceAssetAuditTable,
     AlbumAuditTable,
     AlbumUserAuditTable,
     AlbumUserTable,
@@ -179,8 +189,14 @@ export class ImmichDatabase {
     SharedSpaceAssetTable,
     SharedSpaceAssetAuditTable,
     SharedSpaceFaceMatchBackfillTargetTable,
+    SharedSpaceAlbumTable,
+    SharedSpaceAlbumAuditTable,
+    SharedSpaceAlbumAssetAuditTable,
+    SharedSpaceAlbumUserTable,
+    SharedSpaceAlbumUserAuditTable,
     SharedSpaceLibraryTable,
     SharedSpaceLibraryAuditTable,
+    SharedSpaceLibraryAssetAuditTable,
     SharedSpaceActivityTable,
     SharedSpacePersonTable,
     SharedSpacePersonFaceTable,
@@ -251,6 +267,8 @@ export interface DB {
   album_audit: AlbumAuditTable;
   album_asset: AlbumAssetTable;
   album_asset_audit: AlbumAssetAuditTable;
+  album_space_asset: AlbumSpaceAssetTable;
+  album_space_asset_audit: AlbumSpaceAssetAuditTable;
   album_user: AlbumUserTable;
   album_user_audit: AlbumUserAuditTable;
 
@@ -325,8 +343,14 @@ export interface DB {
   shared_space_asset: SharedSpaceAssetTable;
   shared_space_asset_audit: SharedSpaceAssetAuditTable;
   shared_space_face_match_backfill_target: SharedSpaceFaceMatchBackfillTargetTable;
+  shared_space_album: SharedSpaceAlbumTable;
+  shared_space_album_audit: SharedSpaceAlbumAuditTable;
+  shared_space_album_asset_audit: SharedSpaceAlbumAssetAuditTable;
+  shared_space_album_user: SharedSpaceAlbumUserTable;
+  shared_space_album_user_audit: SharedSpaceAlbumUserAuditTable;
   shared_space_library: SharedSpaceLibraryTable;
   shared_space_library_audit: SharedSpaceLibraryAuditTable;
+  shared_space_library_asset_audit: SharedSpaceLibraryAssetAuditTable;
   shared_space_activity: SharedSpaceActivityTable;
   shared_space_person: SharedSpacePersonTable;
   shared_space_person_face: SharedSpacePersonFaceTable;

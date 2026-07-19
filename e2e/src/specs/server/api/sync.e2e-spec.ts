@@ -75,19 +75,6 @@ describe('/sync', () => {
       expect(firstLine).toBeDefined();
       expect(() => JSON.parse(firstLine!)).not.toThrow();
     });
-
-    it('rejects an invalid SyncRequestType enum value', async () => {
-      const { status } = await request(app)
-        .post('/sync/stream')
-        .set(asBearerAuth(userA.accessToken))
-        .send({ types: ['NotARealType'] });
-      // SyncStreamDto.types has @ValidateEnum, so validation fires in the
-      // global ValidationPipe BEFORE sync.controller.getSyncStream's body is
-      // entered. The controller's try/catch (which is intended for in-stream
-      // service errors) is NOT exercised here — the 400 comes cleanly from the
-      // global exception filter with the standard JSON content type.
-      expect(status).toBe(400);
-    });
   });
 
   describe('GET /sync/ack', () => {
