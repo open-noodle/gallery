@@ -9,6 +9,7 @@ import { AssetOrderWithRandom, AssetVisibility, MemoryType } from 'src/enum';
 import { DB } from 'src/schema';
 import { MemoryTable } from 'src/schema/tables/memory.table';
 import { IBulkAsset } from 'src/types';
+import { spaceAlbumAssetExists } from 'src/utils/shared-space-album-scope';
 
 @Injectable()
 export class MemoryRepository implements IBulkAsset {
@@ -96,6 +97,11 @@ export class MemoryRepository implements IBulkAsset {
                     .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
                     .where('asset.isOffline', '=', false),
                 ),
+                spaceAlbumAssetExists(eb, {
+                  correlateAssetId: 'asset.id',
+                  scope: { memberUserId: userId },
+                  requireShowInTimeline: true,
+                }),
               ]),
             ),
         ),

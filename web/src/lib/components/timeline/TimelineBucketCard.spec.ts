@@ -206,7 +206,7 @@ describe('TimelineBucketCard component', () => {
     expect(onActivate).not.toHaveBeenCalled();
   });
 
-  it('renders fallback without requesting a URL when no representative asset exists', () => {
+  it('renders a loading placeholder without a centred title or URL request while the cover is not yet loaded', () => {
     render(TimelineBucketCard, {
       bucket: makeBucket({
         representativeAssetId: null,
@@ -215,8 +215,10 @@ describe('TimelineBucketCard component', () => {
       onActivate: vi.fn(),
     });
 
-    expect(screen.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'fallback');
-    expect(screen.getByTestId('timeline-bucket-card-fallback')).toHaveTextContent('2015');
+    expect(screen.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'loading');
+    expect(screen.getByTestId('timeline-bucket-card-loading')).toBeInTheDocument();
+    // The period label lives only in the bottom-left overlay — no big centred title to flash.
+    expect(screen.queryByTestId('timeline-bucket-card-fallback')).not.toBeInTheDocument();
     expect(screen.queryByTestId('timeline-bucket-card-image')).not.toBeInTheDocument();
     expect(utilsMock.getAssetMediaUrl).not.toHaveBeenCalled();
   });
@@ -241,7 +243,7 @@ describe('TimelineBucketCard component', () => {
     expect(onActivate).toHaveBeenCalledWith({ grouping: 'year', date: { year: 2015 } });
   });
 
-  it('renders the loading fallback without requesting a representative image URL', () => {
+  it('renders a loading placeholder without a centred title while the loading prop is set', () => {
     render(TimelineBucketCard, {
       bucket: makeBucket(),
       loading: true,
@@ -249,7 +251,8 @@ describe('TimelineBucketCard component', () => {
     });
 
     expect(screen.getByTestId('timeline-bucket-card')).toHaveAttribute('data-state', 'loading');
-    expect(screen.getByTestId('timeline-bucket-card-fallback')).toHaveTextContent('2015');
+    expect(screen.getByTestId('timeline-bucket-card-loading')).toBeInTheDocument();
+    expect(screen.queryByTestId('timeline-bucket-card-fallback')).not.toBeInTheDocument();
     expect(screen.queryByTestId('timeline-bucket-card-image')).not.toBeInTheDocument();
     expect(utilsMock.getAssetMediaUrl).not.toHaveBeenCalled();
   });
