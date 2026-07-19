@@ -1295,9 +1295,17 @@ describe(MetadataService.name, () => {
       await sut.handleMetadataExtraction({ id: asset.id });
       expect(mocks.asset.create).not.toHaveBeenCalled();
       expect(mocks.storage.createOrOverwriteFile).not.toHaveBeenCalled();
-      // The still asset gets saved by handleMetadataExtraction, but not the video
+      // The still asset gets saved by handleMetadataExtraction, but not the video (no-op write skipped
+      // since the motion asset is already Hidden).
       expect(mocks.asset.update).toHaveBeenCalledTimes(1);
       expect(mocks.job.queue).not.toHaveBeenCalled();
+      // M3: AssetHide must still be emitted on a re-extract of an already-Hidden motion asset (e.g. a
+      // retry after a prior emit failed) so asset.service.onAssetHide re-affirms the #757 space purge —
+      // otherwise a retry after a failed emit would silently never converge for this path.
+      expect(mocks.event.emit).toHaveBeenCalledWith('AssetHide', {
+        assetId: motionAsset.id,
+        userId: motionAsset.ownerId,
+      });
     });
 
     it('should link and hide motion video asset to still asset if the hash of the extracted video matches an existing asset', async () => {
@@ -1325,6 +1333,10 @@ describe(MetadataService.name, () => {
         livePhotoVideoId: motionAsset.id,
       });
       expect(mocks.asset.update).toHaveBeenCalledTimes(4);
+      expect(mocks.event.emit).toHaveBeenCalledWith('AssetHide', {
+        assetId: motionAsset.id,
+        userId: motionAsset.ownerId,
+      });
     });
 
     it('should not update storage usage if motion photo is external', async () => {

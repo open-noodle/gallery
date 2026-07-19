@@ -5,6 +5,8 @@ import 'package:immich_mobile/data/db/main/database.dart';
 import 'package:immich_mobile/data/db/main/query/merged_asset.drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/asset.drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space.entity.drift.dart';
+import 'package:immich_mobile/data/db/main/table/remote/shared_space_album_asset.entity.drift.dart';
+import 'package:immich_mobile/data/db/main/table/remote/shared_space_album_link.entity.drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_asset.entity.drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_library.entity.drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_member.entity.drift.dart';
@@ -642,5 +644,162 @@ void main() {
     expect(GroupAssetsBy.auto.index, 2);
     expect(GroupAssetsBy.none.index, 3);
     expect(GroupAssetsBy.year.index, 4);
+  });
+
+  group('M4: space-ALBUM arm (shared_space_album_asset ⋈ shared_space_album_link)', () {
+    // Before this fix, mergedAsset/mergedBucket covered only the direct
+    // (shared_space_asset) and library (shared_space_library) arms — an asset
+    // reachable ONLY via an album linked into a space (no direct link, no
+    // library link) never appeared on the personal main timeline, even though
+    // the same asset is visible in the space's own grid. Gating requires BOTH
+    // the per-album link's showInTimeline AND the viewer's own member
+    // showInTimeline, mirroring the server's timelineSpaceIds album leg.
+    Future<void> setUpUsers() async {
+      await db
+          .into(db.userEntity)
+          .insert(UserEntityCompanion.insert(id: 'owner-1', email: 'owner@test.dev', name: 'Owner'));
+      await db
+          .into(db.userEntity)
+          .insert(UserEntityCompanion.insert(id: 'viewer-1', email: 'viewer@test.dev', name: 'Viewer'));
+    }
+
+    Future<void> insertAlbumAsset(DateTime createdAt) => db
+        .into(db.remoteAssetEntity)
+        .insert(
+          RemoteAssetEntityCompanion.insert(
+            id: 'asset-1',
+            name: 'asset-1.jpg',
+            type: AssetType.image,
+            checksum: 'checksum-1',
+            ownerId: 'owner-1',
+            visibility: AssetVisibility.timeline,
+            createdAt: Value(createdAt),
+            updatedAt: Value(createdAt),
+            localDateTime: Value(createdAt),
+          ),
+        );
+
+    Future<void> setUpSpaceAndMember({required bool memberShowInTimeline}) async {
+      await db
+          .into(db.sharedSpaceEntity)
+          .insert(SharedSpaceEntityCompanion.insert(id: 'space-1', name: 'Album Space', createdById: 'owner-1'));
+      await db
+          .into(db.sharedSpaceMemberEntity)
+          .insert(
+            SharedSpaceMemberEntityCompanion.insert(
+              spaceId: 'space-1',
+              userId: 'viewer-1',
+              role: 'viewer',
+              showInTimeline: Value(memberShowInTimeline),
+            ),
+          );
+    }
+
+    Future<void> linkAlbum({required bool linkShowInTimeline}) async {
+      await db
+          .into(db.sharedSpaceAlbumLinkEntity)
+          .insert(
+            SharedSpaceAlbumLinkEntityCompanion.insert(
+              spaceId: 'space-1',
+              albumId: 'album-1',
+              showInTimeline: Value(linkShowInTimeline),
+            ),
+          );
+      await db
+          .into(db.sharedSpaceAlbumAssetEntity)
+          .insert(SharedSpaceAlbumAssetEntityCompanion.insert(albumId: 'album-1', assetId: 'asset-1'));
+    }
+
+    test('mergedBucket includes an album-linked asset when BOTH the link and member showInTimeline are true', () async {
+      final createdAt = DateTime(2024, 1, 1, 12);
+      await setUpUsers();
+      await insertAlbumAsset(createdAt);
+      await setUpSpaceAndMember(memberShowInTimeline: true);
+      await linkAlbum(linkShowInTimeline: true);
+
+      final buckets = await db.mergedAssetDrift
+          .mergedBucket(groupBy: GroupAssetsBy.day.index, userIds: ['viewer-1'], currentUserId: 'viewer-1')
+          .get();
+
+      expect(buckets, hasLength(1));
+      expect(buckets.single.assetCount, 1);
+
+      final rows = await db.mergedAssetDrift
+          .mergedAsset(userIds: ['viewer-1'], currentUserId: 'viewer-1', limit: (_) => Limit(50, 0))
+          .get();
+      expect(rows, hasLength(1));
+      expect(rows.single.remoteId, 'asset-1');
+    });
+
+    test('mergedBucket excludes an album-linked asset when the album LINK showInTimeline is false', () async {
+      final createdAt = DateTime(2024, 1, 1, 12);
+      await setUpUsers();
+      await insertAlbumAsset(createdAt);
+      await setUpSpaceAndMember(memberShowInTimeline: true);
+      await linkAlbum(linkShowInTimeline: false);
+
+      final buckets = await db.mergedAssetDrift
+          .mergedBucket(groupBy: GroupAssetsBy.day.index, userIds: ['viewer-1'], currentUserId: 'viewer-1')
+          .get();
+
+      expect(buckets, isEmpty);
+    });
+
+    test('mergedBucket excludes an album-linked asset when the MEMBER showInTimeline is false', () async {
+      final createdAt = DateTime(2024, 1, 1, 12);
+      await setUpUsers();
+      await insertAlbumAsset(createdAt);
+      await setUpSpaceAndMember(memberShowInTimeline: false);
+      await linkAlbum(linkShowInTimeline: true);
+
+      final buckets = await db.mergedAssetDrift
+          .mergedBucket(groupBy: GroupAssetsBy.day.index, userIds: ['viewer-1'], currentUserId: 'viewer-1')
+          .get();
+
+      expect(buckets, isEmpty);
+    });
+
+    test('mergedBucket excludes an album-linked asset when the viewer is not a member of the linked space', () async {
+      final createdAt = DateTime(2024, 1, 1, 12);
+      await setUpUsers();
+      await insertAlbumAsset(createdAt);
+      // Space exists, but no member row for viewer-1 at all.
+      await db
+          .into(db.sharedSpaceEntity)
+          .insert(SharedSpaceEntityCompanion.insert(id: 'space-1', name: 'Album Space', createdById: 'owner-1'));
+      await linkAlbum(linkShowInTimeline: true);
+
+      final buckets = await db.mergedAssetDrift
+          .mergedBucket(groupBy: GroupAssetsBy.day.index, userIds: ['viewer-1'], currentUserId: 'viewer-1')
+          .get();
+
+      expect(buckets, isEmpty);
+    });
+
+    test('mergedBucket watch stream re-emits when the album link showInTimeline toggles', () async {
+      final createdAt = DateTime(2024, 1, 1, 12);
+      await setUpUsers();
+      await insertAlbumAsset(createdAt);
+      await setUpSpaceAndMember(memberShowInTimeline: true);
+      await linkAlbum(linkShowInTimeline: true);
+
+      final emissions = <List<MergedBucketResult>>[];
+      final subscription = db.mergedAssetDrift
+          .mergedBucket(groupBy: GroupAssetsBy.day.index, userIds: ['viewer-1'], currentUserId: 'viewer-1')
+          .watch()
+          .listen(emissions.add);
+
+      await _waitFor(() => emissions.isNotEmpty);
+      expect(emissions.last, hasLength(1));
+
+      await (db.update(db.sharedSpaceAlbumLinkEntity)
+            ..where((t) => t.spaceId.equals('space-1') & t.albumId.equals('album-1')))
+          .write(const SharedSpaceAlbumLinkEntityCompanion(showInTimeline: Value(false)));
+
+      await _waitFor(() => emissions.length >= 2);
+      expect(emissions.last, isEmpty);
+
+      await subscription.cancel();
+    });
   });
 }

@@ -194,7 +194,12 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
         setDifference(ids, isOwner),
         AlbumUserRole.Viewer,
       );
-      return setUnion(isOwner, isShared);
+      const granted = setUnion(isOwner, isShared);
+      const isSpaceLinked = await access.album.checkSpaceLinkedAlbumReadAccess(
+        auth.user.id,
+        setDifference(ids, granted),
+      );
+      return setUnion(granted, isSpaceLinked);
     }
 
     case Permission.AlbumAssetCreate: {
@@ -204,7 +209,9 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
         setDifference(ids, isOwner),
         AlbumUserRole.Editor,
       );
-      return setUnion(isOwner, isShared);
+      const granted = setUnion(isOwner, isShared);
+      const isSpaceLinked = await access.album.checkSpaceLinkedAlbumAccess(auth.user.id, setDifference(ids, granted));
+      return setUnion(granted, isSpaceLinked);
     }
 
     case Permission.AlbumUpdate: {
@@ -238,7 +245,12 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
         setDifference(ids, isOwner),
         AlbumUserRole.Viewer,
       );
-      return setUnion(isOwner, isShared);
+      const granted = setUnion(isOwner, isShared);
+      const isSpaceLinked = await access.album.checkSpaceLinkedAlbumReadAccess(
+        auth.user.id,
+        setDifference(ids, granted),
+      );
+      return setUnion(granted, isSpaceLinked);
     }
 
     case Permission.AlbumAssetDelete: {
@@ -248,7 +260,9 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
         setDifference(ids, isOwner),
         AlbumUserRole.Editor,
       );
-      return setUnion(isOwner, isShared);
+      const granted = setUnion(isOwner, isShared);
+      const isSpaceLinked = await access.album.checkSpaceLinkedAlbumAccess(auth.user.id, setDifference(ids, granted));
+      return setUnion(granted, isSpaceLinked);
     }
 
     case Permission.AssetUpload: {
@@ -389,6 +403,30 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
       return new Set<string>();
     }
   }
+};
+
+/**
+ * True when the caller reaches an album through a DIRECT grant — album owner or a shared album_user
+ * (Viewer+) — as opposed to ONLY via shared-space membership (checkSpaceLinkedAlbumReadAccess, no role
+ * filter). Mirrors the `granted` set computed in the AlbumRead case above, i.e. everything AlbumRead
+ * grants BEFORE the space-linked arm is unioned in.
+ *
+ * When AlbumRead passed but this returns false, the caller is a "space-only reader". Used to deny
+ * album-level activity (C1) and strip participant PII (security-8) for those callers, while leaving
+ * genuine owners/participants untouched.
+ */
+export const hasDirectAlbumReadAccess = async (
+  access: AccessRepository,
+  userId: string,
+  albumId: string,
+): Promise<boolean> => {
+  const ids = new Set([albumId]);
+  const isOwner = await access.album.checkOwnerAccess(userId, ids);
+  if (isOwner.has(albumId)) {
+    return true;
+  }
+  const isShared = await access.album.checkSharedAlbumAccess(userId, ids, AlbumUserRole.Viewer);
+  return isShared.has(albumId);
 };
 
 export const requireElevatedPermission = (auth: AuthDto) => {

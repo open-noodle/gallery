@@ -9,6 +9,8 @@ import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/remote_album.provider.dart';
 import 'package:immich_mobile/repositories/album_api_repository.dart';
 import 'package:immich_mobile/services/foreground_upload.service.dart';
+// ignore: import_rule_openapi
+import 'package:openapi/api.dart' show AlbumSharedSpaceLinkResponseDto;
 
 final localAlbumProvider = FutureProvider<List<LocalAlbum>>(
   (ref) => LocalAlbumService(ref.watch(driftProvider).localAlbumRepository)
@@ -35,4 +37,11 @@ final remoteAlbumProvider = NotifierProvider<RemoteAlbumNotifier, RemoteAlbumSta
 
 final albumsContainingAssetProvider = FutureProvider.family<List<RemoteAlbum>, String>(
   (ref, assetId) => ref.watch(remoteAlbumServiceProvider).getAlbumsContainingAsset(assetId),
+);
+
+/// M8: the shared spaces an OWNED album is linked into, fetched on demand (owner-only field,
+/// not in the Drift sync stream). Callers should only watch this for albums the current user
+/// owns — see [DriftAlbumApiRepository.getSharedSpaceLinks].
+final albumSharedSpaceLinksProvider = FutureProvider.autoDispose.family<List<AlbumSharedSpaceLinkResponseDto>, String>(
+  (ref, albumId) => ref.watch(driftAlbumApiRepositoryProvider).getSharedSpaceLinks(albumId),
 );
