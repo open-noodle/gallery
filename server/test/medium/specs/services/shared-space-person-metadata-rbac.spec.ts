@@ -2,6 +2,7 @@ import { Kysely } from 'kysely';
 import { AssetVisibility, JobStatus, SharedSpaceRole } from 'src/enum';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { ConfigRepository } from 'src/repositories/config.repository';
+import { DatabaseRepository } from 'src/repositories/database.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
@@ -23,6 +24,9 @@ const setup = (db?: Kysely<DB>) => {
     database: db || defaultDatabase,
     real: [
       AssetRepository,
+      // L7: removeMember wraps the membership delete + owned-album unlink in
+      // this.databaseRepository.transaction() — needs a real connection to the test DB.
+      DatabaseRepository,
       SharedSpaceRepository,
       FaceIdentityRepository,
       PersonRepository,

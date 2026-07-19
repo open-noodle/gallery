@@ -336,10 +336,17 @@ export class PersonService extends BaseService {
   async getFacesForPicker(auth: AuthDto, id: string, dto: PersonFacePageQueryDto): Promise<PersonFacePageResponseDto> {
     const person = await this.findOrFail(id);
     const take = dto.size;
+    // Fork RBAC (Slice 2 / M1): PersonRead also admits non-owner space-granted callers. Scope those
+    // callers to space-reachable, shareable-visibility faces only — never the owner's Hidden/
+    // never-shared faces or faces pulled in via another user's identity. The owner keeps the full,
+    // unscoped list.
+    const isOwner = await this.accessRepository.person.checkOwnerAccess(auth.user.id, new Set([id]));
+    const scope = isOwner.has(id) ? undefined : { memberUserId: auth.user.id };
     const rows = await this.personRepository.getRepresentativeFaces({
       personId: id,
       take,
       skip: (dto.page - 1) * dto.size,
+      scope,
     });
     const faces = rows.slice(0, take);
 
@@ -382,11 +389,24 @@ export class PersonService extends BaseService {
     id: string,
     dto: RepresentativeFaceUpdateDto,
   ): Promise<PersonResponseDto> {
-    // Setting the representative face manages the person's thumbnail, which shared-space members
+    // Setting the representative face manages the person's thumbnail, which shared-space Editors
     // can also do — so gate on person.read (owner | shared space) rather than owner-only
     // person.update. The chosen face is still gated on asset.read below.
     await this.requireAccess({ auth, permission: Permission.PersonRead, ids: [id] });
     const current = await this.findOrFail(id);
+
+    // Fork RBAC (Slice 3 / M2): PersonRead only proves reachability (viewers included). Mutating the
+    // owner's GLOBAL representative face must be limited to the owner or an Editor/Owner of a space
+    // the person is shared through — mirror album writes. A viewer is denied.
+    const ids = new Set([id]);
+    const isOwner = await this.accessRepository.person.checkOwnerAccess(auth.user.id, ids);
+    if (!isOwner.has(id)) {
+      const canEdit = await this.accessRepository.person.checkSharedSpaceEditAccess(auth.user.id, ids);
+      if (!canEdit.has(id)) {
+        throw new ForbiddenException('Not authorized to change this person');
+      }
+    }
+
     const face = await this.personRepository.getRepresentativeFaceForUpdate({
       personId: id,
       assetFaceId: dto.assetFaceId,
@@ -414,6 +434,14 @@ export class PersonService extends BaseService {
       const person = await this.findOrFail(auth, id);
       if (person.identityId) {
         return this.faceIdentityRepository.getAccessiblePersonStatistics(auth.user.id, person.identityId);
+      }
+
+      // L3: a legacy (null-identityId) person's statistics are otherwise unscoped — fine for the
+      // owner (their own library), but a space-only reader (PersonRead granted only via
+      // checkSharedSpaceAccess, never checkOwnerAccess) must only see the count reachable through
+      // the space(s) they're a member of, not the owner's whole library.
+      if (auth.user.id !== person.ownerId) {
+        return this.personRepository.getStatistics(id, auth.user.id, { memberUserId: auth.user.id });
       }
 
       return this.personRepository.getStatistics(id, auth.user.id);
