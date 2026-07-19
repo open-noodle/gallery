@@ -18,6 +18,12 @@ describe(AlbumService.name, () => {
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(AlbumService));
+    // #764 cross-owner contribution defaults: no denied asset is contributable / already contributed
+    // unless a test opts in, so add/remove behave exactly as before for the non-space cases.
+    mocks.sharedSpace.getContributableAssetSpaces.mockResolvedValue([]);
+    mocks.album.getContributedAssetIds.mockResolvedValue(new Set());
+    mocks.album.addContributedAssets.mockResolvedValue();
+    mocks.album.removeContributedAssetIds.mockResolvedValue();
   });
 
   it('should work', () => {
@@ -827,6 +833,7 @@ describe(AlbumService.name, () => {
       const { user: owner } = album.albumUsers.find(({ role }) => role === AlbumUserRole.Owner)!;
       mocks.album.getById.mockResolvedValue(getForAlbum(album));
       mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
+      mocks.sharedSpace.getAlbumSpaceLinks.mockResolvedValue([]);
       mocks.album.getMetadataForIds.mockResolvedValue([
         {
           albumId: album.id,
@@ -864,6 +871,50 @@ describe(AlbumService.name, () => {
       expect(mocks.access.album.checkSharedLinkAccess).toHaveBeenCalledWith(auth.sharedLink!.id, new Set([album.id]));
     });
 
+    // #752 P1-5: pins the `auth.sharedLink ? undefined : auth.user.id` ternary in album.service.ts
+    // get() — a future refactor that drops it would leak cross-owner contribution counts to
+    // anonymous shared-link viewers (the member-gate for getMetadataForIds's contributed arm).
+    it('excludes contributions (forUserId: undefined) from the metadata query for a shared-link viewer', async () => {
+      const album = AlbumFactory.from().albumUser().build();
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.access.album.checkSharedLinkAccess.mockResolvedValue(new Set([album.id]));
+      mocks.album.getMetadataForIds.mockResolvedValue([
+        {
+          albumId: album.id,
+          assetCount: 1,
+          startDate: new Date('1970-01-01'),
+          endDate: new Date('1970-01-01'),
+          lastModifiedAssetTimestamp: new Date('1970-01-01'),
+        },
+      ]);
+
+      const auth = AuthFactory.from().sharedLink().build();
+      await sut.get(auth, album.id);
+
+      expect(mocks.album.getMetadataForIds).toHaveBeenCalledWith([album.id], { forUserId: undefined });
+    });
+
+    it('includes contributions (forUserId: <user id>) in the metadata query for a normal authenticated viewer', async () => {
+      const album = AlbumFactory.from().albumUser().build();
+      const { user: owner } = album.albumUsers.find(({ role }) => role === AlbumUserRole.Owner)!;
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
+      mocks.sharedSpace.getAlbumSpaceLinks.mockResolvedValue([]);
+      mocks.album.getMetadataForIds.mockResolvedValue([
+        {
+          albumId: album.id,
+          assetCount: 1,
+          startDate: new Date('1970-01-01'),
+          endDate: new Date('1970-01-01'),
+          lastModifiedAssetTimestamp: new Date('1970-01-01'),
+        },
+      ]);
+
+      await sut.get(AuthFactory.create(owner), album.id);
+
+      expect(mocks.album.getMetadataForIds).toHaveBeenCalledWith([album.id], { forUserId: owner.id });
+    });
+
     it('should get a shared album via shared with user', async () => {
       const user = UserFactory.create();
       const album = AlbumFactory.from().albumUser({ userId: user.id }).build();
@@ -899,6 +950,193 @@ describe(AlbumService.name, () => {
         new Set(['album-123']),
         AlbumUserRole.Viewer,
       );
+    });
+
+    it('strips albumUsers to the owner (email redacted) when access is via space grant only (security-8)', async () => {
+      // spaceViewer is NOT in album.albumUsers — access granted only via checkSpaceLinkedAlbumReadAccess.
+      const spaceViewer = UserFactory.create();
+      const album = AlbumFactory.from().albumUser().build(); // owner + 1 extra participant
+      const otherParticipant = album.albumUsers.find(({ role }) => role !== AlbumUserRole.Owner)!;
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set());
+      mocks.access.album.checkSpaceLinkedAlbumReadAccess.mockResolvedValue(new Set([album.id]));
+      mocks.album.getMetadataForIds.mockResolvedValue([
+        { albumId: album.id, assetCount: 0, startDate: null, endDate: null, lastModifiedAssetTimestamp: null },
+      ]);
+
+      const result = await sut.get(AuthFactory.create(spaceViewer), album.id);
+
+      // Only the owner survives (DTO requires albumUsers.min(1)); other participants are gone.
+      expect(result.albumUsers).toHaveLength(1);
+      expect(result.albumUsers[0].role).toBe(AlbumUserRole.Owner);
+      expect(result.albumUsers.map((u) => u.user.id)).not.toContain(otherParticipant.user.id);
+      // Owner display name kept; email still redacted.
+      expect(result.albumUsers[0].user.email).toBe('');
+    });
+
+    it('does NOT redact emails when the caller is an album participant (album_user)', async () => {
+      const user = UserFactory.create();
+      const album = AlbumFactory.from().albumUser({ userId: user.id }).build();
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([album.id]));
+      mocks.album.getMetadataForIds.mockResolvedValue([
+        {
+          albumId: album.id,
+          assetCount: 0,
+          startDate: null,
+          endDate: null,
+          lastModifiedAssetTimestamp: null,
+        },
+      ]);
+
+      const result = await sut.get(AuthFactory.create(user), album.id);
+
+      // Participant should see real emails
+      for (const albumUser of result.albumUsers) {
+        expect(albumUser.user.email).not.toBe('');
+        expect(albumUser.user.email).toContain('@');
+      }
+    });
+
+    it('does NOT redact emails when the caller is the album owner', async () => {
+      const album = AlbumFactory.from().albumUser().build();
+      const { user: owner } = album.albumUsers.find(({ role }) => role === AlbumUserRole.Owner)!;
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
+      mocks.sharedSpace.getAlbumSpaceLinks.mockResolvedValue([]);
+      mocks.album.getMetadataForIds.mockResolvedValue([
+        {
+          albumId: album.id,
+          assetCount: 0,
+          startDate: null,
+          endDate: null,
+          lastModifiedAssetTimestamp: null,
+        },
+      ]);
+
+      const result = await sut.get(AuthFactory.create(owner), album.id);
+
+      for (const albumUser of result.albumUsers) {
+        expect(albumUser.user.email).not.toBe('');
+        expect(albumUser.user.email).toContain('@');
+      }
+    });
+  });
+
+  describe('get — contributorCounts (L1)', () => {
+    it('omits contributorCounts for a space-only reader (no direct album access)', async () => {
+      // spaceViewer is NOT in album.albumUsers — access granted only via checkSpaceLinkedAlbumReadAccess,
+      // mirroring the security-8 "space grant only" fixture above.
+      const spaceViewer = UserFactory.create();
+      const album = AlbumFactory.from().albumUser().build(); // owner + 1 extra participant -> isShared
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set());
+      mocks.access.album.checkSpaceLinkedAlbumReadAccess.mockResolvedValue(new Set([album.id]));
+      mocks.album.getMetadataForIds.mockResolvedValue([
+        { albumId: album.id, assetCount: 0, startDate: null, endDate: null, lastModifiedAssetTimestamp: null },
+      ]);
+
+      const result = await sut.get(AuthFactory.create(spaceViewer), album.id);
+
+      expect(result.contributorCounts).toBeUndefined();
+      expect(mocks.album.getContributorCounts).not.toHaveBeenCalled();
+    });
+
+    it('includes contributorCounts for a direct reader (album participant) of a shared album', async () => {
+      const user = UserFactory.create();
+      const album = AlbumFactory.from().albumUser({ userId: user.id }).build(); // owner + user -> isShared
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([album.id]));
+      mocks.album.getMetadataForIds.mockResolvedValue([
+        { albumId: album.id, assetCount: 0, startDate: null, endDate: null, lastModifiedAssetTimestamp: null },
+      ]);
+      mocks.album.getContributorCounts.mockResolvedValue([{ userId: user.id, assetCount: 3 }]);
+
+      const result = await sut.get(AuthFactory.create(user), album.id);
+
+      expect(result.contributorCounts).toEqual([{ userId: user.id, assetCount: 3 }]);
+      expect(mocks.album.getContributorCounts).toHaveBeenCalledWith(album.id);
+    });
+  });
+
+  describe('get — sharedSpaceLinks (rbac-6)', () => {
+    it('returns sharedSpaceLinks to the album owner', async () => {
+      const auth = AuthFactory.create();
+      const album = AlbumFactory.from().owner(auth.user).build();
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.album.getMetadataForIds.mockResolvedValue([
+        { albumId: album.id, assetCount: 0, startDate: null, endDate: null, lastModifiedAssetTimestamp: null },
+      ]);
+      mocks.sharedSpace.getAlbumSpaceLinks.mockResolvedValue([
+        { spaceId: 'space-1', spaceName: 'Trip', linkedById: 'editor-1', showInTimeline: true },
+        { spaceId: 'space-2', spaceName: 'Zoo', linkedById: 'editor-2', showInTimeline: false },
+      ]);
+
+      const result = await sut.get(auth, album.id);
+
+      expect(result.sharedSpaceLinks).toEqual([
+        { spaceId: 'space-1', spaceName: 'Trip', linkedById: 'editor-1', showInTimeline: true },
+        { spaceId: 'space-2', spaceName: 'Zoo', linkedById: 'editor-2', showInTimeline: false },
+      ]);
+      expect(mocks.sharedSpace.getAlbumSpaceLinks).toHaveBeenCalledWith(album.id);
+    });
+
+    it('omits sharedSpaceLinks for a non-owner space-linked reader', async () => {
+      const auth = AuthFactory.create();
+      const album = AlbumFactory.from().albumUser().build(); // owned by someone else
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set()); // not the owner
+      mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set()); // not a shared album_user
+      mocks.access.album.checkSpaceLinkedAlbumReadAccess.mockResolvedValue(new Set([album.id])); // reaches via space
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.album.getMetadataForIds.mockResolvedValue([
+        { albumId: album.id, assetCount: 0, startDate: null, endDate: null, lastModifiedAssetTimestamp: null },
+      ]);
+
+      const result = await sut.get(auth, album.id);
+
+      expect(result.sharedSpaceLinks).toBeUndefined();
+      expect(mocks.sharedSpace.getAlbumSpaceLinks).not.toHaveBeenCalled();
+    });
+
+    it('omits sharedSpaceLinks for a non-owner album EDITOR (owner-only policy)', async () => {
+      const auth = AuthFactory.create();
+      const album = AlbumFactory.from().albumUser().build();
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set()); // not the owner
+      mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([album.id])); // album editor/viewer
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.album.getMetadataForIds.mockResolvedValue([
+        { albumId: album.id, assetCount: 0, startDate: null, endDate: null, lastModifiedAssetTimestamp: null },
+      ]);
+
+      const result = await sut.get(auth, album.id);
+
+      expect(result.sharedSpaceLinks).toBeUndefined();
+      expect(mocks.sharedSpace.getAlbumSpaceLinks).not.toHaveBeenCalled();
+    });
+
+    it('omits sharedSpaceLinks for a shared-link viewer, even though the link resolves to the album owner', async () => {
+      // Shared-link AuthDto.user.id is the link creator's real id (the album owner), so
+      // checkOwnerAccess alone would resolve true here — the explicit `!auth.sharedLink` guard is
+      // what keeps a public link from exposing the owner-only space-link list.
+      const album = AlbumFactory.create();
+      const { user: owner } = album.albumUsers.find(({ role }) => role === AlbumUserRole.Owner)!;
+      const auth = AuthFactory.from(owner).sharedLink().build();
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
+      mocks.access.album.checkSharedLinkAccess.mockResolvedValue(new Set([album.id]));
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.album.getMetadataForIds.mockResolvedValue([
+        { albumId: album.id, assetCount: 0, startDate: null, endDate: null, lastModifiedAssetTimestamp: null },
+      ]);
+
+      const result = await sut.get(auth, album.id);
+
+      expect(result.sharedSpaceLinks).toBeUndefined();
+      expect(mocks.sharedSpace.getAlbumSpaceLinks).not.toHaveBeenCalled();
     });
   });
 
@@ -1572,4 +1810,91 @@ describe(AlbumService.name, () => {
 
   //   await expect(sut.removeAssets(auth, albumId, { ids: ['1'] })).rejects.toBeInstanceOf(ForbiddenException);
   // });
+
+  describe('AlbumAssets events (space sync)', () => {
+    it('addAssets emits AlbumAssetsAdd with the successfully added asset ids', async () => {
+      const owner = UserFactory.create({ isAdmin: true });
+      const album = AlbumFactory.from().owner(owner).build();
+      const [asset1, asset2] = [AssetFactory.create(), AssetFactory.create()];
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset1.id, asset2.id]));
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.album.getAssetIds.mockResolvedValueOnce(new Set());
+
+      await sut.addAssets(AuthFactory.create(owner), album.id, { ids: [asset1.id, asset2.id] });
+
+      expect(mocks.event.emit).toHaveBeenCalledWith('AlbumAssetsAdd', {
+        albumId: album.id,
+        assetIds: [asset1.id, asset2.id],
+      });
+    });
+
+    it('addAssets does not emit AlbumAssetsAdd when nothing was added', async () => {
+      const owner = UserFactory.create({ isAdmin: true });
+      const album = AlbumFactory.from().owner(owner).build();
+      const asset1 = AssetFactory.create();
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset1.id]));
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.album.getAssetIds.mockResolvedValueOnce(new Set([asset1.id])); // already present → no success
+
+      await sut.addAssets(AuthFactory.create(owner), album.id, { ids: [asset1.id] });
+
+      expect(mocks.event.emit).not.toHaveBeenCalledWith('AlbumAssetsAdd', expect.anything());
+    });
+
+    it('addAssetsToAlbums emits one AlbumAssetsAdd per album with its added ids', async () => {
+      const album1 = AlbumFactory.create();
+      const { user: owner } = album1.albumUsers.find(({ role }) => role === AlbumUserRole.Owner)!;
+      const album2 = AlbumFactory.create();
+      const [asset1, asset2] = [AssetFactory.create(), AssetFactory.create()];
+      mocks.access.album.checkOwnerAccess.mockResolvedValueOnce(new Set([album1.id, album2.id]));
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset1.id, asset2.id]));
+      mocks.album.getById.mockResolvedValueOnce(getForAlbum(album1)).mockResolvedValueOnce(getForAlbum(album2));
+      mocks.album.getAssetIds.mockResolvedValueOnce(new Set()).mockResolvedValueOnce(new Set());
+
+      await sut.addAssetsToAlbums(AuthFactory.create(owner), {
+        albumIds: [album1.id, album2.id],
+        assetIds: [asset1.id, asset2.id],
+      });
+
+      expect(mocks.event.emit).toHaveBeenCalledWith('AlbumAssetsAdd', {
+        albumId: album1.id,
+        assetIds: [asset1.id, asset2.id],
+      });
+      expect(mocks.event.emit).toHaveBeenCalledWith('AlbumAssetsAdd', {
+        albumId: album2.id,
+        assetIds: [asset1.id, asset2.id],
+      });
+    });
+
+    it('removeAssets emits AlbumAssetsRemove with the removed ids', async () => {
+      const owner = UserFactory.create({ isAdmin: true });
+      const album = AlbumFactory.from().owner(owner).build();
+      const [asset1, asset2] = [AssetFactory.create(), AssetFactory.create()];
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.album.getAssetIds.mockResolvedValueOnce(new Set([asset1.id, asset2.id]));
+
+      await sut.removeAssets(AuthFactory.create(owner), album.id, { ids: [asset1.id, asset2.id] });
+
+      expect(mocks.event.emit).toHaveBeenCalledWith('AlbumAssetsRemove', {
+        albumId: album.id,
+        assetIds: [asset1.id, asset2.id],
+      });
+    });
+
+    it('removeAssets does not emit AlbumAssetsRemove when nothing was removed', async () => {
+      const owner = UserFactory.create({ isAdmin: true });
+      const album = AlbumFactory.from().owner(owner).build();
+      const asset1 = AssetFactory.create();
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.album.getAssetIds.mockResolvedValueOnce(new Set()); // asset not in album → not removed
+
+      await sut.removeAssets(AuthFactory.create(owner), album.id, { ids: [asset1.id] });
+
+      expect(mocks.event.emit).not.toHaveBeenCalledWith('AlbumAssetsRemove', expect.anything());
+    });
+  });
 });

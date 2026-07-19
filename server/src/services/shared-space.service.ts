@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { AssetFace, SharedSpacePerson } from 'src/database';
-import { OnJob } from 'src/decorators';
+import { OnEvent, OnJob } from 'src/decorators';
+import { MapAlbumDto, mapAlbum } from 'src/dtos/album.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
 import type { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto';
 import type { MapMarkerResponseDto } from 'src/dtos/map.dto';
@@ -22,10 +23,13 @@ import {
 } from 'src/dtos/shared-space-person.dto';
 import {
   SharedSpaceActivityResponseDto,
+  SharedSpaceAlbumLinkUpdateDto,
   SharedSpaceAssetAddDto,
+  SharedSpaceAssetLinkedAlbumDto,
   SharedSpaceAssetRemoveDto,
   SharedSpaceCreateDto,
   SharedSpaceLibraryLinkDto,
+  SharedSpaceLinkedAlbumDto,
   SharedSpaceLinkedLibraryDto,
   SharedSpaceMemberCreateDto,
   SharedSpaceMemberMetadataContributionDto,
@@ -50,6 +54,8 @@ import {
   SharedSpaceRole,
   UserAvatarColor,
 } from 'src/enum';
+import { AlbumAssetCount } from 'src/repositories/album.repository';
+import type { ArgOf } from 'src/repositories/event.repository';
 import type { SpaceFaceAssignment } from 'src/repositories/shared-space.repository';
 import { visibleSpaceAssetVisibilities } from 'src/repositories/shared-space.repository';
 import {
@@ -358,7 +364,11 @@ export class SharedSpaceService extends BaseService {
 
   async remove(auth: AuthDto, id: string): Promise<void> {
     await this.requireRole(auth, id, SharedSpaceRole.Owner);
+    // Capture the space's linked albums BEFORE the cascade delete removes the link rows,
+    // so the post-commit reconcile can target them.
+    const affectedAlbumIds = (await this.sharedSpaceRepository.getLinkedAlbumIds(id)) ?? [];
     await this.sharedSpaceRepository.remove(id);
+    await this.queueAlbumGrantReconcile(affectedAlbumIds);
     await this.queueSpacePersonMetadataBackfill();
   }
 
@@ -420,6 +430,11 @@ export class SharedSpaceService extends BaseService {
     });
 
     await this.queueSpacePersonMetadataBackfill();
+    // M7: this member-join can race a concurrent album-link into this space (each create-side
+    // trigger fans out from its own row only and can miss the other's just-committed one), so
+    // reconcile over the space's currently-linked albums to self-heal any missed grant.
+    const linkedAlbumIds = (await this.sharedSpaceRepository.getLinkedAlbumIds(spaceId)) ?? [];
+    await this.queueAlbumGrantReconcile(linkedAlbumIds);
     const space = await this.sharedSpaceRepository.getById(spaceId);
     if (space?.faceRecognitionEnabled) {
       await this.jobRepository.queue({
@@ -447,6 +462,22 @@ export class SharedSpaceService extends BaseService {
     const existingMember = await this.sharedSpaceRepository.getMember(spaceId, userId);
     if (!existingMember) {
       throw new BadRequestException('Member not found');
+    }
+
+    // rbac-4: a promoted co-Owner must not be able to demote the space creator.
+    // The creator is always an Owner member (create() inserts them); keeping the
+    // role at Owner is a harmless no-op, anything lower is a demotion → reject.
+    // testq-6: fail-closed, not fail-open — existingMember above already proves a member row exists for
+    // this spaceId, and the membership FK guarantees its space row exists too, so a missing getById
+    // result here is a data-integrity fault, not a legitimate "no space" case. Silently skipping the
+    // creator-demotion guard on a lookup miss (the previous `space &&` short-circuit) would let a
+    // repository-shape refactor that changed how getById fails disable this guard with no test noticing.
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    if (!space) {
+      throw new NotFoundException('Space not found');
+    }
+    if (userId === space.createdById && dto.role !== SharedSpaceRole.Owner) {
+      throw new ForbiddenException('Cannot demote the space creator');
     }
 
     const oldRole = existingMember.role;
@@ -537,32 +568,76 @@ export class SharedSpaceService extends BaseService {
 
   async removeMember(auth: AuthDto, spaceId: string, userId: string): Promise<void> {
     const isSelf = auth.user.id === userId;
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    const affectedAlbumIds = (await this.sharedSpaceRepository.getLinkedAlbumIds(spaceId)) ?? [];
 
     if (isSelf) {
       const member = await this.requireMembership(auth, spaceId);
       if (member.role === SharedSpaceRole.Owner) {
         throw new BadRequestException('Owner cannot leave the space');
       }
-      await this.sharedSpaceRepository.removeMember(spaceId, userId);
+      const unlinkedAlbumIds = await this.removeMemberAndOwnedAlbumsAtomically(spaceId, userId);
+      await this.cleanupDepartingMemberFaces(spaceId, unlinkedAlbumIds, space?.faceRecognitionEnabled ?? false);
       await this.sharedSpaceRepository.logActivity({
         spaceId,
         userId,
         type: SharedSpaceActivityType.MemberLeave,
         data: {},
       });
+      await this.logDepartingMemberAlbumUnlinks(spaceId, userId, unlinkedAlbumIds);
       await this.queueSpacePersonMetadataBackfill();
+      await this.queueAlbumGrantReconcile(affectedAlbumIds);
       return;
     }
 
     await this.requireRole(auth, spaceId, SharedSpaceRole.Owner);
-    await this.sharedSpaceRepository.removeMember(spaceId, userId);
+    // rbac-4: a promoted co-Owner must not be able to remove the space creator
+    // (the creator is always an Owner member, so their sync/grants would otherwise
+    // survive removal forever). Deleting the whole space via remove() is still allowed.
+    // testq-6: fail-closed here too (see the identical guard in updateMember) — requireRole above
+    // already proves a member row exists for this spaceId, so the membership FK guarantees the space
+    // row exists; a missing getById result is a data-integrity fault, not license to skip the guard.
+    if (!space) {
+      throw new NotFoundException('Space not found');
+    }
+    if (space.createdById === userId) {
+      throw new ForbiddenException('Cannot remove the space creator');
+    }
+    const unlinkedAlbumIds = await this.removeMemberAndOwnedAlbumsAtomically(spaceId, userId);
+    await this.cleanupDepartingMemberFaces(spaceId, unlinkedAlbumIds, space?.faceRecognitionEnabled ?? false);
     await this.sharedSpaceRepository.logActivity({
       spaceId,
       userId: auth.user.id,
       type: SharedSpaceActivityType.MemberRemove,
       data: { removedUserId: userId },
     });
+    await this.logDepartingMemberAlbumUnlinks(spaceId, auth.user.id, unlinkedAlbumIds);
     await this.queueSpacePersonMetadataBackfill();
+    await this.queueAlbumGrantReconcile(affectedAlbumIds);
+  }
+
+  // L16: cleanupDepartingMemberAlbums (removeMemberAndOwnedAlbumsAtomically /
+  // removeOwnedAlbumLinksAddedBy) silently auto-unlinked a departing member's own albums —
+  // remaining members had no record in the activity feed of which album vanished or why. Log
+  // one AlbumUnlink per auto-removed album, alongside the MemberLeave/MemberRemove entry
+  // already logged by the caller. `actingUserId` mirrors that entry's `userId` (the leaver on
+  // self-leave, the removing Owner on an admin removal). Album lookup can miss (M9: the
+  // departing member's own album may already be TRASHED by the time we log) — fall back to a
+  // generic name rather than an empty string.
+  private async logDepartingMemberAlbumUnlinks(
+    spaceId: string,
+    actingUserId: string,
+    unlinkedAlbumIds: string[],
+  ): Promise<void> {
+    for (const albumId of unlinkedAlbumIds) {
+      const album = await this.albumRepository.getById(albumId, { withAssets: false });
+      await this.sharedSpaceRepository.logActivity({
+        spaceId,
+        userId: actingUserId,
+        type: SharedSpaceActivityType.AlbumUnlink,
+        data: { albumId, albumName: album?.albumName ?? 'Deleted album' },
+      });
+    }
   }
 
   /**
@@ -587,7 +662,12 @@ export class SharedSpaceService extends BaseService {
     // access is checked on the full expanded set so we never contribute a
     // sibling the actor cannot read.
     const assetIds = await this.expandStackAssetIds(dto.assetIds, visibleSpaceAssetVisibilities);
-    await this.requireAccess({ auth, permission: Permission.AssetRead, ids: assetIds });
+    // rbac-2: AssetRead's space arm (checkSpaceAccess) includes an un-role-gated shared_space_album branch,
+    // so a space Viewer of a space linking album X could read X's assets and re-add them as DIRECT assets
+    // into a space they own — gaining AssetUpdate over the owner's assets via checkSpaceEditAccess. AssetShare
+    // (owner ∪ partner only, no album/space arm) is the same permission album-add already requires and closes
+    // the read→re-share→write escalation.
+    await this.requireAccess({ auth, permission: Permission.AssetShare, ids: assetIds });
     const inserted = await this.sharedSpaceRepository.addAssets(
       assetIds.map((assetId) => ({ spaceId, assetId, addedById: auth.user.id })),
     );
@@ -651,6 +731,124 @@ export class SharedSpaceService extends BaseService {
     }
   }
 
+  async linkAlbum(auth: AuthDto, spaceId: string, albumId: string): Promise<void> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+    // Actor must own or be an editor of the album (cannot re-share a read-only album).
+    // AlbumUpdate = owner ∪ album_user-editor and is NOT extended by the space grant → no circularity.
+    await this.requireAccess({ auth, permission: Permission.AlbumUpdate, ids: [albumId] });
+
+    const result = await this.sharedSpaceRepository.addAlbum({
+      spaceId,
+      albumId,
+      addedById: auth.user.id,
+    });
+
+    // Only queue face sync for newly created links (not idempotent re-links).
+    if (result) {
+      const space = await this.sharedSpaceRepository.getById(spaceId);
+      if (space?.faceRecognitionEnabled) {
+        await this.jobRepository.queue({
+          name: JobName.SharedSpaceAlbumFaceSync,
+          data: { spaceId, albumId },
+        });
+      }
+      const album = await this.albumRepository.getById(albumId, { withAssets: false });
+      await this.sharedSpaceRepository.logActivity({
+        spaceId,
+        userId: auth.user.id,
+        type: SharedSpaceActivityType.AlbumLink,
+        data: { albumId, albumName: album?.albumName ?? '' },
+      });
+      // M7: a member-join and this album-link can land in overlapping transactions and each
+      // create-side trigger can miss the other's just-committed row, leaving a member of this
+      // space without a grant for the newly-linked album. The reconcile self-heals it.
+      await this.queueAlbumGrantReconcile([albumId]);
+    }
+  }
+
+  async unlinkAlbum(auth: AuthDto, spaceId: string, albumId: string): Promise<void> {
+    // rbac-6: current-space Editors curate space links; ADDITIONALLY the album owner can always
+    // revoke a link to their own album, even without space membership (otherwise an owner cannot
+    // discover or undo an editor's link). The Editor path short-circuits, so it is not weakened.
+    const member = await this.sharedSpaceRepository.getMember(spaceId, auth.user.id);
+    const isSpaceEditor = !!member && getSharedSpaceRoleScore(member.role) >= ROLE_HIERARCHY[SharedSpaceRole.Editor];
+    if (!isSpaceEditor) {
+      const ownedAlbums = await this.checkAccess({ auth, permission: Permission.AlbumDelete, ids: [albumId] });
+      if (!ownedAlbums.has(albumId)) {
+        throw new ForbiddenException('Insufficient role');
+      }
+    }
+
+    // Fork RBAC (Slice 4 / M11): the owner arm authorizes on album ownership only and never verified
+    // the album is actually linked to this space. Without this guard, logActivity below injects an
+    // AlbumUnlink row into an arbitrary space's feed (activity spam via a leaked spaceId), and a
+    // nonexistent spaceId 500s on the FK. Guard both paths: no link -> 404, before any side effect.
+    const linked = await this.sharedSpaceRepository.hasAlbumLink(spaceId, albumId);
+    if (!linked) {
+      throw new NotFoundException('Album is not linked to this space');
+    }
+
+    const album = await this.albumRepository.getById(albumId, { withAssets: false });
+    const orphanedAssetIds = await this.sharedSpaceRepository.getAlbumAssetIdsWithoutOtherSpacePath(spaceId, albumId);
+    await this.sharedSpaceRepository.removeAlbum(spaceId, albumId);
+    await this.sharedSpaceRepository.logActivity({
+      spaceId,
+      userId: auth.user.id,
+      type: SharedSpaceActivityType.AlbumUnlink,
+      data: { albumId, albumName: album?.albumName ?? '' },
+    });
+    if (orphanedAssetIds.length > 0) {
+      await this.sharedSpaceRepository.removePersonFacesByAssetIds(spaceId, orphanedAssetIds);
+      await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
+      await this.queueSpacePersonMetadataBackfill();
+    }
+    // correctness-4: reconcile grants for the just-unlinked album (its grant revocation
+    // in shared_space_album_delete_audit could have lost a delete to a concurrent revocation).
+    await this.queueAlbumGrantReconcile([albumId]);
+  }
+
+  async updateAlbumLink(
+    auth: AuthDto,
+    spaceId: string,
+    albumId: string,
+    dto: SharedSpaceAlbumLinkUpdateDto,
+  ): Promise<void> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+    await this.sharedSpaceRepository.setAlbumShowInTimeline(spaceId, albumId, dto.showInTimeline);
+  }
+
+  async getLinkedAlbums(auth: AuthDto, spaceId: string): Promise<SharedSpaceLinkedAlbumDto[]> {
+    await this.requireMembership(auth, spaceId);
+    const rows = await this.sharedSpaceRepository.getLinkedAlbums(spaceId);
+    if (rows.length === 0) {
+      return [];
+    }
+    const metadata = await this.albumRepository.getMetadataForIds(
+      rows.map((row) => row.id),
+      {
+        forUserId: auth.user.id,
+      },
+    );
+    const byId: Record<string, AlbumAssetCount> = {};
+    for (const m of metadata) {
+      byId[m.albumId] = m;
+    }
+    return rows.map((row) => {
+      const { albumUsers: _albumUsers, ...albumFields } = mapAlbum(row as unknown as MapAlbumDto);
+      return {
+        ...albumFields,
+        ownerId: (row as unknown as { ownerId: string }).ownerId,
+        startDate: asDateTimeString(byId[row.id]?.startDate ?? undefined),
+        endDate: asDateTimeString(byId[row.id]?.endDate ?? undefined),
+        assetCount: byId[row.id]?.assetCount ?? 0,
+        lastModifiedAssetTimestamp: asDateTimeString(byId[row.id]?.lastModifiedAssetTimestamp ?? undefined),
+        showInTimeline: row.showInTimeline,
+        addedById: row.addedById,
+        linkedAt: (row.linkedAt as unknown as Date).toISOString(),
+      };
+    });
+  }
+
   async unlinkLibrary(auth: AuthDto, spaceId: string, libraryId: string): Promise<void> {
     if (!auth.user.isAdmin) {
       throw new ForbiddenException('Only admins can unlink libraries from spaces');
@@ -669,6 +867,24 @@ export class SharedSpaceService extends BaseService {
     await this.sharedSpaceRepository.updateMemberLastViewed(spaceId, auth.user.id);
   }
 
+  // C3: the space activity feed is readable by any member (SharedSpaceRead + membership). Most
+  // activity `data` blobs are space-scoped ids/names members can already see, but a *propagated*
+  // PersonMerge (written by identity-merge-propagation when a user merges people in another space
+  // or their personal library) carries cross-space + personal-library UUIDs. Redact PersonMerge
+  // down to the member-safe fields the in-space direct merge already uses.
+  private redactActivityData(type: SharedSpaceActivityType, data: Record<string, unknown>): Record<string, unknown> {
+    if (type !== SharedSpaceActivityType.PersonMerge) {
+      return data;
+    }
+    const safe: Record<string, unknown> = {};
+    for (const key of ['personName', 'count', 'activityRole'] as const) {
+      if (data[key] !== undefined) {
+        safe[key] = data[key];
+      }
+    }
+    return safe;
+  }
+
   async getActivities(
     auth: AuthDto,
     spaceId: string,
@@ -678,37 +894,83 @@ export class SharedSpaceService extends BaseService {
 
     const activities = await this.sharedSpaceRepository.getActivities(spaceId, query.limit ?? 50, query.offset ?? 0);
 
-    return activities.map((a) => ({
-      id: a.id,
-      type: a.type,
-      data: a.data as Record<string, unknown>,
-      createdAt: (a.createdAt as unknown as Date).toISOString(),
-      userId: a.userId,
-      userName: a.name,
-      userEmail: a.email,
-      userProfileImagePath: a.profileImagePath,
-      userAvatarColor: a.avatarColor,
-    }));
+    // Resolve the CURRENT album name for link/unlink activities. The name is captured at link time,
+    // which is empty for the create-album flow (create empty → link → name later) and stale after a
+    // rename; resolving it live from the stored albumId keeps the feed accurate.
+    const albumIds = [
+      ...new Set(
+        activities
+          .filter((a) => a.type === SharedSpaceActivityType.AlbumLink || a.type === SharedSpaceActivityType.AlbumUnlink)
+          .map((a) => (a.data as Record<string, unknown>)?.albumId)
+          .filter((id): id is string => typeof id === 'string'),
+      ),
+    ];
+    const albumNameRows = albumIds.length > 0 ? await this.sharedSpaceRepository.getAlbumNamesByIds(albumIds) : [];
+    const albumNames = new Map(albumNameRows.map((a) => [a.id, a.albumName]));
+
+    return activities
+      .filter((a) => {
+        // Drop album link/unlink activities whose album no longer exists — e.g. an abandoned create-flow
+        // album that was auto-deleted on navigate-away. Otherwise it lingers with a stale/empty name for
+        // an album that's gone. Albums that still exist (incl. unlinked ones) keep their history.
+        if (a.type === SharedSpaceActivityType.AlbumLink || a.type === SharedSpaceActivityType.AlbumUnlink) {
+          const albumId = (a.data as Record<string, unknown>)?.albumId;
+          return typeof albumId === 'string' && albumNames.has(albumId);
+        }
+        return true;
+      })
+      .map((a) => {
+        const data = this.redactActivityData(a.type as SharedSpaceActivityType, a.data as Record<string, unknown>);
+        if (
+          (a.type === SharedSpaceActivityType.AlbumLink || a.type === SharedSpaceActivityType.AlbumUnlink) &&
+          typeof data.albumId === 'string' &&
+          albumNames.has(data.albumId)
+        ) {
+          data.albumName = albumNames.get(data.albumId);
+        }
+        return {
+          id: a.id,
+          type: a.type,
+          data,
+          createdAt: (a.createdAt as unknown as Date).toISOString(),
+          userId: a.userId,
+          userName: a.name,
+          userEmail: a.email,
+          userProfileImagePath: a.profileImagePath,
+          userAvatarColor: a.avatarColor,
+        };
+      });
   }
 
-  async removeAssets(auth: AuthDto, spaceId: string, dto: SharedSpaceAssetRemoveDto): Promise<void> {
+  async removeAssets(auth: AuthDto, spaceId: string, dto: SharedSpaceAssetRemoveDto): Promise<string[]> {
     await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
 
     const space = await this.sharedSpaceRepository.getById(spaceId);
     if (!space) {
       throw new NotFoundException('Space not found');
     }
-    // Removal is stack-atomic too — removing any member removes the whole stack
-    // so no orphaned child is left contributed to the space (#751).
-    const assetIds = await this.expandStackAssetIds(dto.assetIds);
-    await this.sharedSpaceRepository.removeAssets(spaceId, assetIds);
+    // Only DIRECT space members can be removed here. Stack atomicity (#751) then expands from those
+    // direct selections — never from an album-projected asset, which would otherwise drag a
+    // directly-added stack sibling out of the space (S5). removeAssets deletes only shared_space_asset
+    // rows and returns exactly the ids it deleted, so any album-only sibling in the expanded set is a
+    // harmless no-op and never counted as removed.
+    const directAssetIds = await this.sharedSpaceRepository.getDirectAssetIds(spaceId, dto.assetIds);
+    const expandedAssetIds = await this.expandStackAssetIds(directAssetIds);
+    const removedAssetIds = await this.sharedSpaceRepository.removeAssets(spaceId, expandedAssetIds);
+
+    // Nothing was actually a direct member (e.g. only album-projected assets were selected) — the
+    // removal is a true no-op, so we skip the activity log and thumbnail/face bookkeeping and report
+    // that zero assets were removed (the client must not claim success it did not achieve).
+    if (removedAssetIds.length === 0) {
+      return [];
+    }
 
     const lastAddedAt = await this.sharedSpaceRepository.getLastAssetAddedAt(spaceId);
     const updateData: { lastActivityAt: Date | null; thumbnailAssetId?: null } = {
       lastActivityAt: lastAddedAt ?? null,
     };
 
-    if (space?.thumbnailAssetId && assetIds.includes(space.thumbnailAssetId)) {
+    if (space?.thumbnailAssetId && removedAssetIds.includes(space.thumbnailAssetId)) {
       updateData.thumbnailAssetId = null;
     }
 
@@ -718,12 +980,41 @@ export class SharedSpaceService extends BaseService {
       spaceId,
       userId: auth.user.id,
       type: SharedSpaceActivityType.AssetRemove,
-      data: { count: assetIds.length },
+      data: { count: removedAssetIds.length },
     });
 
-    await this.sharedSpaceRepository.removePersonFacesByAssetIds(spaceId, assetIds);
-    await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
-    await this.queueSpacePersonMetadataBackfill();
+    // Multi-path face retention: an asset removed as a DIRECT space asset may still
+    // be in the space via a linked album or library — only sweep faces for assets
+    // that have no other path into the space (space-album feature).
+    const orphanedAssetIds = await this.sharedSpaceRepository.getAssetIdsWithoutOtherSpacePath(
+      spaceId,
+      removedAssetIds,
+    );
+    if (orphanedAssetIds.length > 0) {
+      await this.sharedSpaceRepository.removePersonFacesByAssetIds(spaceId, orphanedAssetIds);
+      await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
+      await this.queueSpacePersonMetadataBackfill();
+    }
+
+    return removedAssetIds;
+  }
+
+  /**
+   * The linked albums that project the given assets into this space. The web uses this to explain why
+   * "Remove from space" removed nothing for an album-projected asset (it's present via a linked album,
+   * not as a direct member) and to name the album the user should manage it in. Membership-gated: only
+   * surfaces albums linked to a space the caller belongs to (the same visibility as `getLinkedAlbums`).
+   */
+  async getAssetLinkedAlbums(
+    auth: AuthDto,
+    spaceId: string,
+    dto: SharedSpaceAssetRemoveDto,
+  ): Promise<SharedSpaceAssetLinkedAlbumDto[]> {
+    await this.requireMembership(auth, spaceId);
+    if (dto.assetIds.length === 0) {
+      return [];
+    }
+    return this.sharedSpaceRepository.getLinkedAlbumsContainingAssets(spaceId, dto.assetIds);
   }
 
   async getMapMarkers(auth: AuthDto, id: string) {
@@ -1190,17 +1481,17 @@ export class SharedSpaceService extends BaseService {
 
     const alias = await this.sharedSpaceRepository.getAlias(personId, auth.user.id);
 
-    await this.sharedSpaceRepository.logActivity({
-      spaceId,
-      userId: auth.user.id,
-      type: SharedSpaceActivityType.PersonUpdate,
-      data: { personId },
-    });
-
     const enriched = await this.sharedSpaceRepository.getPersonById(personId);
     if (!enriched) {
       throw new BadRequestException('Person not found');
     }
+
+    await this.sharedSpaceRepository.logActivity({
+      spaceId,
+      userId: auth.user.id,
+      type: SharedSpaceActivityType.PersonUpdate,
+      data: { personId, personName: enriched.name ?? '' },
+    });
 
     return this.mapSpacePerson(enriched, alias?.alias ?? null);
   }
@@ -1283,6 +1574,85 @@ export class SharedSpaceService extends BaseService {
     });
   }
 
+  @OnJob({ name: JobName.SharedSpaceAlbumGrantReconcile, queue: QueueName.BackgroundTask })
+  async handleSharedSpaceAlbumGrantReconcile(job: JobOf<JobName.SharedSpaceAlbumGrantReconcile>): Promise<JobStatus> {
+    await this.sharedSpaceRepository.reconcileAlbumGrants(job.albumIds ?? []);
+    return JobStatus.Success;
+  }
+
+  // L8: low-frequency nightly backstop (see queue.service.ts's handleNightlyJobs). Sweeps every
+  // album with a live grant, independent of which code path linked/unlinked it — this is what
+  // catches cascade-deletion strands and any residual gap M6/L7's targeted fixes don't reach.
+  @OnJob({ name: JobName.SharedSpaceAlbumGrantReconcileSweep, queue: QueueName.BackgroundTask })
+  async handleSharedSpaceAlbumGrantReconcileSweep(): Promise<JobStatus> {
+    const albumIds = await this.sharedSpaceRepository.getAllGrantedAlbumIds();
+    await this.sharedSpaceRepository.reconcileAlbumGrants(albumIds);
+    return JobStatus.Success;
+  }
+
+  // correctness-4: enqueue a post-commit reconciliation for the given albums. Idempotent
+  // and deadlock-free — it runs after the triggering transaction commits, resolving the
+  // TOCTOU race in the delete-side grant-revocation triggers. No-op for an empty set.
+  private async queueAlbumGrantReconcile(albumIds: string[]): Promise<void> {
+    const unique = [...new Set(albumIds)];
+    if (unique.length === 0) {
+      return;
+    }
+    await this.jobRepository.queue({
+      name: JobName.SharedSpaceAlbumGrantReconcile,
+      data: { albumIds: unique },
+    });
+  }
+
+  /**
+   * L7: delete the membership row and unlink the departing user's OWNED albums (albums-6)
+   * in ONE transaction, so a failure between the two can never leave the ex-member's own
+   * album linked with no membership row backing it (or vice versa). Fork rule: never run
+   * `this.db` queries inside a Kysely transaction() callback — both repo calls thread the
+   * `trx` handle instead (mirrors recountPersons). Returns the unlinked album ids so the
+   * caller can run face cleanup (outside the transaction — see cleanupDepartingMemberFaces)
+   * and enqueue grant reconciliation.
+   */
+  private async removeMemberAndOwnedAlbumsAtomically(spaceId: string, userId: string): Promise<string[]> {
+    return this.databaseRepository.transaction(async (trx) => {
+      await this.sharedSpaceRepository.removeMember(spaceId, userId, trx);
+      return (await this.sharedSpaceRepository.removeOwnedAlbumLinksAddedBy(spaceId, userId, trx)) ?? [];
+    });
+  }
+
+  /**
+   * albums-6 / L6: clean up any now-orphaned space person faces for the departing member's
+   * just-unlinked albums (mirrors unlinkAlbum's cleanup). Deliberately OUTSIDE the membership
+   * transaction (no `this.db` inside a Kysely transaction()) and re-drivable: a failure here
+   * doesn't roll back the already-committed membership/album-link removal — it falls back to
+   * the durable per-space reconcile (enqueueSpaceFaceProjectionReconcile / L6's stale-face
+   * sweep) instead of silently leaving stale face rows.
+   */
+  private async cleanupDepartingMemberFaces(
+    spaceId: string,
+    unlinkedAlbumIds: string[],
+    faceRecognitionEnabled: boolean,
+  ): Promise<void> {
+    if (!faceRecognitionEnabled || unlinkedAlbumIds.length === 0) {
+      return;
+    }
+    try {
+      for (const albumId of unlinkedAlbumIds) {
+        const orphanedAssetIds = await this.sharedSpaceRepository.getAlbumAssetIdsWithoutOtherSpacePath(
+          spaceId,
+          albumId,
+        );
+        if (orphanedAssetIds.length > 0) {
+          await this.sharedSpaceRepository.removePersonFacesByAssetIds(spaceId, orphanedAssetIds);
+        }
+      }
+      await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
+    } catch (error) {
+      this.logger.error(`Failed to clean up departing-member space person faces for space ${spaceId}: ${error}`);
+      await this.enqueueSpaceFaceProjectionReconcile([spaceId]);
+    }
+  }
+
   private async queueSpaceIdentityReconciliation(input: {
     spaceId: string;
     userId?: string;
@@ -1339,6 +1709,12 @@ export class SharedSpaceService extends BaseService {
       dto.ids,
       createCrossOwnerMergeAuthorizer(() => Promise.resolve(server), dto),
     );
+    await this.sharedSpaceRepository.logActivity({
+      spaceId,
+      userId: auth.user.id,
+      type: SharedSpaceActivityType.PersonMerge,
+      data: { personName: target.name ?? '', count: dto.ids.length },
+    });
   }
 
   async setSpacePersonAlias(
@@ -1701,6 +2077,56 @@ export class SharedSpaceService extends BaseService {
     return JobStatus.Success;
   }
 
+  @OnJob({ name: JobName.SharedSpaceAlbumFaceSync, queue: QueueName.FacialRecognition })
+  async handleSharedSpaceAlbumFaceSync(job: JobOf<JobName.SharedSpaceAlbumFaceSync>): Promise<JobStatus> {
+    const space = await this.sharedSpaceRepository.getById(job.spaceId);
+    if (!space || !space.faceRecognitionEnabled) {
+      return JobStatus.Skipped;
+    }
+
+    const linkExists = await this.sharedSpaceRepository.hasAlbumLink(job.spaceId, job.albumId);
+    if (!linkExists) {
+      return JobStatus.Skipped;
+    }
+
+    const batchSize = 1000;
+    let offset = 0;
+    let affectedAny = false;
+
+    while (true) {
+      // Re-check link each batch to handle concurrent unlink
+      const stillLinked = await this.sharedSpaceRepository.hasAlbumLink(job.spaceId, job.albumId);
+      if (!stillLinked) {
+        this.logger.log(`Album ${job.albumId} was unlinked from space ${job.spaceId} during sync, stopping`);
+        break;
+      }
+
+      const assets = await this.assetRepository.getByAlbumIdWithFaces(job.albumId, job.spaceId, batchSize, offset);
+      if (assets.length === 0) {
+        break;
+      }
+
+      for (const asset of assets) {
+        const affectedPersonIds = await this.processSpaceFaceMatch(job.spaceId, asset.id);
+        affectedAny ||= affectedPersonIds.length > 0;
+      }
+
+      offset += assets.length;
+    }
+
+    if (affectedAny) {
+      await this.queueSpaceIdentityReconciliation({ spaceId: job.spaceId });
+    }
+
+    // Queue dedup pass after album sync completes
+    await this.jobRepository.queue({
+      name: JobName.SharedSpacePersonDedup,
+      data: { spaceId: job.spaceId },
+    });
+
+    return JobStatus.Success;
+  }
+
   @OnJob({ name: JobName.SharedSpaceFaceMatchAll, queue: QueueName.FacialRecognition })
   async handleSharedSpaceFaceMatchAll({ spaceId }: JobOf<JobName.SharedSpaceFaceMatchAll>): Promise<JobStatus> {
     const space = await this.sharedSpaceRepository.getById(spaceId);
@@ -1708,12 +2134,33 @@ export class SharedSpaceService extends BaseService {
       return JobStatus.Skipped;
     }
 
+    // L6: this is the durable per-space reconcile's entry point — sweep any
+    // shared_space_person_face row left behind by a space-path removal that didn't go through
+    // unlinkAlbum/removeMember's synchronous cleanup (cascade delete, failed fire-and-forget job).
+    await this.sweepStaleSpacePersonFaces(spaceId);
+
     await this.jobRepository.queue({
       name: JobName.SharedSpaceFaceMatchPage,
       data: { spaceId },
     });
 
     return JobStatus.Success;
+  }
+
+  // L6: delete shared_space_person_face rows whose asset has no remaining space path in this
+  // space, then recount + drop any person left with zero faces. Reuses the same
+  // getAssetIdsWithoutOtherSpacePath "any live path?" check the synchronous cleanup paths use.
+  private async sweepStaleSpacePersonFaces(spaceId: string): Promise<void> {
+    const candidateAssetIds = await this.sharedSpaceRepository.getSpacePersonFaceAssetIds(spaceId);
+    if (candidateAssetIds.length === 0) {
+      return;
+    }
+    const staleAssetIds = await this.sharedSpaceRepository.getAssetIdsWithoutOtherSpacePath(spaceId, candidateAssetIds);
+    if (staleAssetIds.length === 0) {
+      return;
+    }
+    await this.sharedSpaceRepository.removePersonFacesByAssetIds(spaceId, staleAssetIds);
+    await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
   }
 
   @OnJob({ name: JobName.SharedSpaceFaceMatchPage, queue: QueueName.FacialRecognition })
@@ -2669,5 +3116,149 @@ export class SharedSpaceService extends BaseService {
       updatedAt: (person.updatedAt as unknown as Date).toISOString(),
       type: person.type,
     };
+  }
+
+  // C2: after a transient failure in a best-effort face-people projection handler, enqueue the
+  // durable per-space reconcile (SharedSpaceFaceMatchAll → paged re-projection + dedup recount +
+  // deleteOrphanedPersons) so the projection converges. Idempotent (jobId is per-space); never throws.
+  private async enqueueSpaceFaceProjectionReconcile(spaceIds: string[]): Promise<void> {
+    const uniqueSpaceIds = [...new Set(spaceIds)];
+    if (uniqueSpaceIds.length === 0) {
+      return;
+    }
+    try {
+      await this.jobRepository.queueAll(
+        uniqueSpaceIds.map((spaceId) => ({ name: JobName.SharedSpaceFaceMatchAll as const, data: { spaceId } })),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to enqueue space face-projection reconcile for spaces ${uniqueSpaceIds.join(', ')}: ${error}`,
+      );
+    }
+  }
+
+  // Space people sync is a best-effort side effect of an album mutation. EventRepository.onEvent
+  // awaits handlers inline and does not isolate their errors, so a throw here would bubble up and
+  // fail the user's album add/remove. Guard the whole body in try/catch: face matches are also
+  // recoverable via the post-detection backfill, so logging and moving on is correct. On failure,
+  // fall back to the durable per-space reconcile (C2) so the projection still converges.
+  @OnEvent({ name: 'AlbumAssetsAdd' })
+  async onAlbumAssetsAdd({ albumId, assetIds }: ArgOf<'AlbumAssetsAdd'>): Promise<void> {
+    if (assetIds.length === 0) {
+      return;
+    }
+    let faceEnabledSpaceIds: string[];
+    try {
+      const spaces = await this.sharedSpaceRepository.getSpacesLinkedToAlbum(albumId);
+      faceEnabledSpaceIds = spaces.filter((space) => space.faceRecognitionEnabled).map((space) => space.spaceId);
+    } catch (error) {
+      this.logger.error(`Failed to resolve spaces for album ${albumId} face-people sync: ${error}`);
+      return;
+    }
+    try {
+      const jobs = faceEnabledSpaceIds.flatMap((spaceId) =>
+        assetIds.map((assetId) => ({ name: JobName.SharedSpaceFaceMatch as const, data: { spaceId, assetId } })),
+      );
+      if (jobs.length > 0) {
+        await this.jobRepository.queueAll(jobs);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to sync space people after adding assets to album ${albumId}: ${error}`);
+      await this.enqueueSpaceFaceProjectionReconcile(faceEnabledSpaceIds);
+    }
+  }
+
+  // Emit-timing note: AssetDelete fires AFTER the asset row and its DB cascade
+  // (asset → asset_face → shared_space_person_face) have already run.  By the time this
+  // handler executes, those rows are gone.  The affected (spaceId, personId) pairs are
+  // therefore captured at the emit site in asset.service.ts BEFORE deletion via
+  // sharedSpaceRepository.getSpacePersonsForAsset() and forwarded in the payload.
+  @OnEvent({ name: 'AssetDelete' })
+  async onAssetDelete({ assetId, affectedSpacePersons }: ArgOf<'AssetDelete'>): Promise<void> {
+    if (!affectedSpacePersons || affectedSpacePersons.length === 0) {
+      return;
+    }
+    // Group personIds by spaceId: one recount + orphan-cleanup pass per space.
+    const spacePersonMap = new Map<string, string[]>();
+    for (const { spaceId, personId } of affectedSpacePersons) {
+      let ids = spacePersonMap.get(spaceId);
+      if (!ids) {
+        ids = [];
+        spacePersonMap.set(spaceId, ids);
+      }
+      ids.push(personId);
+    }
+    try {
+      for (const [spaceId, personIds] of spacePersonMap) {
+        await this.sharedSpaceRepository.recountPersons(personIds);
+        await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to sync space people after deleting asset ${assetId}: ${error}`);
+      await this.enqueueSpaceFaceProjectionReconcile([...spacePersonMap.keys()]);
+    }
+  }
+
+  @OnEvent({ name: 'AlbumDelete' })
+  async onAlbumDelete({ albumId }: ArgOf<'AlbumDelete'>): Promise<void> {
+    let faceEnabledSpaceIds: string[];
+    try {
+      const spaces = await this.sharedSpaceRepository.getSpacesLinkedToAlbum(albumId);
+      faceEnabledSpaceIds = spaces.filter((space) => space.faceRecognitionEnabled).map((space) => space.spaceId);
+    } catch (error) {
+      this.logger.error(`Failed to resolve spaces for album ${albumId} face-people sync: ${error}`);
+      return;
+    }
+    try {
+      let anyOrphanWork = false;
+      for (const spaceId of faceEnabledSpaceIds) {
+        const orphaned = await this.sharedSpaceRepository.getAlbumAssetIdsWithoutOtherSpacePath(spaceId, albumId);
+        if (orphaned.length === 0) {
+          continue;
+        }
+        await this.sharedSpaceRepository.removePersonFacesByAssetIds(spaceId, orphaned);
+        await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
+        anyOrphanWork = true;
+      }
+      if (anyOrphanWork) {
+        await this.queueSpacePersonMetadataBackfill();
+      }
+    } catch (error) {
+      this.logger.error(`Failed to sync space people after deleting album ${albumId}: ${error}`);
+      await this.enqueueSpaceFaceProjectionReconcile(faceEnabledSpaceIds);
+    }
+  }
+
+  @OnEvent({ name: 'AlbumAssetsRemove' })
+  async onAlbumAssetsRemove({ albumId, assetIds }: ArgOf<'AlbumAssetsRemove'>): Promise<void> {
+    if (assetIds.length === 0) {
+      return;
+    }
+    let faceEnabledSpaceIds: string[];
+    try {
+      const spaces = await this.sharedSpaceRepository.getSpacesLinkedToAlbum(albumId);
+      faceEnabledSpaceIds = spaces.filter((space) => space.faceRecognitionEnabled).map((space) => space.spaceId);
+    } catch (error) {
+      this.logger.error(`Failed to resolve spaces for album ${albumId} face-people sync: ${error}`);
+      return;
+    }
+    try {
+      let anyOrphanWork = false;
+      for (const spaceId of faceEnabledSpaceIds) {
+        const orphaned = await this.sharedSpaceRepository.getAssetIdsWithoutOtherSpacePath(spaceId, assetIds);
+        if (orphaned.length === 0) {
+          continue;
+        }
+        await this.sharedSpaceRepository.removePersonFacesByAssetIds(spaceId, orphaned);
+        await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
+        anyOrphanWork = true;
+      }
+      if (anyOrphanWork) {
+        await this.queueSpacePersonMetadataBackfill();
+      }
+    } catch (error) {
+      this.logger.error(`Failed to sync space people after removing assets from album ${albumId}: ${error}`);
+      await this.enqueueSpaceFaceProjectionReconcile(faceEnabledSpaceIds);
+    }
   }
 }
