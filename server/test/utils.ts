@@ -321,6 +321,11 @@ export const getMocks = () => {
   const databaseMock = automock(DatabaseRepository, { args: [, loggerMock], strict: false });
 
   databaseMock.withLock.mockImplementation((_type, fn) => fn());
+  // L7: default `transaction` to a passthrough that just invokes the callback with the mock
+  // itself standing in for the trx handle — every repo method the callback calls is ALSO a mock,
+  // so it behaves identically regardless of what's passed as `trx`. Mirrors withLock above.
+  // Individual tests never need to configure this unless they want to assert on the trx arg.
+  databaseMock.transaction.mockImplementation((fn: (trx: any) => Promise<unknown>) => fn(databaseMock));
   databaseMock.getPostgresVersion = vitest.fn().mockResolvedValue('14.10 (Debian 14.10-1.pgdg120+1)');
   databaseMock.getPostgresVersionRange = vitest.fn().mockReturnValue('>=14.0.0');
   databaseMock.createExtension = vitest.fn().mockResolvedValue(void 0);

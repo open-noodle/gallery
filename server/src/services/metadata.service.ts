@@ -870,13 +870,24 @@ export class MetadataService extends BaseService {
         });
       }
 
-      // Hide the motion photo video asset if it's not already hidden to prepare for linking
+      // Hide the motion photo video asset if it's not already hidden to prepare for linking.
       if (motionAsset.visibility === AssetVisibility.Timeline) {
         await this.assetRepository.update({
           id: motionAsset.id,
           visibility: AssetVisibility.Hidden,
         });
         this.logger.log(`Hid unlinked motion photo video asset (${motionAsset.id})`);
+      }
+
+      // motion bypass: route through the same AssetHide handler the other motion paths use so the
+      // #757 space purge fires for a motion video hidden via extraction (asset.service.onAssetHide).
+      // M3: emit whenever the motion asset ends up Hidden here — not only on the write that performed
+      // the Timeline->Hidden transition — so a re-extract on an already-Hidden motion asset (e.g. a
+      // retry after a prior emit failed) still re-affirms the purge. Idempotent tombstones make
+      // re-emitting harmless; a retry-convergent re-affirm beats a silent no-op that leaves stale bytes
+      // on a member device.
+      if (motionAsset.visibility === AssetVisibility.Timeline || motionAsset.visibility === AssetVisibility.Hidden) {
+        await this.eventRepository.emit('AssetHide', { assetId: motionAsset.id, userId: motionAsset.ownerId });
       }
 
       if (asset.livePhotoVideoId !== motionAsset.id) {

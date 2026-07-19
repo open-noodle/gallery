@@ -1,6 +1,13 @@
+// `hide isNull`: drift and flutter_test both export `isNull`; this test uses
+// drift's Value()/.equals() (space-album link writes) and flutter_test's isNull
+// matcher (live-photos group merged in from main), so drift's must yield.
+import 'package:drift/drift.dart' hide isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/services/timeline.service.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_album_link.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/stack.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/repositories/timeline.repository.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -282,6 +289,261 @@ void main() {
 
       expect(buckets, hasLength(1));
       expect(buckets.single.assetCount, 1);
+    });
+  });
+
+  group('spaceAlbum query', () {
+    test('returns exactly the album assets regardless of showInTimeline', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final album = await ctx.newSharedSpaceAlbum();
+      final inAlbum = await ctx.newRemoteAsset(ownerId: user.id);
+      final notInAlbum = await ctx.newRemoteAsset(ownerId: user.id);
+      // off-timeline link → still returned by the detail query
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: album.id, showInTimeline: false);
+      await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: inAlbum.id);
+
+      final assets = await sut.spaceAlbum(space.id, album.id, .none).assetSource(0, 100);
+      final ids = assets.map((a) => (a as RemoteAsset).id);
+      expect(ids, contains(inAlbum.id));
+      expect(ids, isNot(contains(notInAlbum.id)));
+    });
+  });
+
+  group('sharedSpace album branch', () {
+    test('includes an album asset when its link showInTimeline = true', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final album = await ctx.newSharedSpaceAlbum();
+      final asset = await ctx.newRemoteAsset(ownerId: user.id);
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: album.id, showInTimeline: true);
+      await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: asset.id);
+
+      final assets = await sut.sharedSpace(space.id, .none).assetSource(0, 100);
+      final ids = assets.map((a) => (a as RemoteAsset).id);
+      expect(ids, contains(asset.id));
+    });
+
+    test('excludes an album asset when its link showInTimeline = false', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final album = await ctx.newSharedSpaceAlbum();
+      final asset = await ctx.newRemoteAsset(ownerId: user.id);
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: album.id, showInTimeline: false);
+      await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: asset.id);
+
+      final assets = await sut.sharedSpace(space.id, .none).assetSource(0, 100);
+      final ids = assets.map((a) => (a as RemoteAsset).id);
+      expect(ids, isNot(contains(asset.id)));
+    });
+
+    test('counts an asset once when it is both album-linked and direct-added', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final album = await ctx.newSharedSpaceAlbum();
+      final asset = await ctx.newRemoteAsset(ownerId: user.id);
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: album.id, showInTimeline: true);
+      await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: asset.id);
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: asset.id);
+
+      final assets = await sut.sharedSpace(space.id, .none).assetSource(0, 100);
+      final matching = assets.where((a) => (a as RemoteAsset).id == asset.id);
+      expect(matching, hasLength(1));
+    });
+
+    test('an album in two spaces shows its asset in each space timeline', () async {
+      final user = await ctx.newUser();
+      final s1 = await ctx.newSharedSpace(createdById: user.id);
+      final s2 = await ctx.newSharedSpace(createdById: user.id);
+      final album = await ctx.newSharedSpaceAlbum();
+      final asset = await ctx.newRemoteAsset(ownerId: user.id);
+      await ctx.insertSharedSpaceAlbumLink(spaceId: s1.id, albumId: album.id, showInTimeline: true);
+      await ctx.insertSharedSpaceAlbumLink(spaceId: s2.id, albumId: album.id, showInTimeline: true);
+      await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: asset.id);
+
+      final a1 = await sut.sharedSpace(s1.id, .none).assetSource(0, 100);
+      final a2 = await sut.sharedSpace(s2.id, .none).assetSource(0, 100);
+      expect(a1.map((a) => (a as RemoteAsset).id), contains(asset.id));
+      expect(a2.map((a) => (a as RemoteAsset).id), contains(asset.id));
+    });
+
+    // B6 regression pin: flipping showInTimeline on the link row removes the
+    // album's asset from the space timeline (and re-adding it brings it back).
+    //
+    // This test was ALREADY GREEN on first run from B0 (the union query already
+    // honours the showInTimeline filter). It is pinned here as an explicit
+    // regression guard so that future query refactors can't silently break this
+    // data contract.
+    test('toggle-flip regression: updating showInTimeline flips asset in/out of space timeline', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final album = await ctx.newSharedSpaceAlbum();
+      final asset = await ctx.newRemoteAsset(ownerId: user.id);
+
+      // Start: showInTimeline = true → asset is in the space timeline.
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: album.id, showInTimeline: true);
+      await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: asset.id);
+
+      final before = await sut.sharedSpace(space.id, .none).assetSource(0, 100);
+      expect(before.map((a) => (a as RemoteAsset).id), contains(asset.id));
+
+      // Simulate the sync-nudge delivering the toggled PATCH result:
+      // update the link row to showInTimeline = false.
+      await (ctx.db.update(ctx.db.sharedSpaceAlbumLinkEntity)
+            ..where((t) => t.spaceId.equals(space.id) & t.albumId.equals(album.id)))
+          .write(const SharedSpaceAlbumLinkEntityCompanion(showInTimeline: Value(false)));
+
+      // After toggle: asset must be excluded from the space timeline.
+      final after = await sut.sharedSpace(space.id, .none).assetSource(0, 100);
+      expect(after.map((a) => (a as RemoteAsset).id), isNot(contains(asset.id)));
+
+      // Re-enable: asset returns.
+      await (ctx.db.update(ctx.db.sharedSpaceAlbumLinkEntity)
+            ..where((t) => t.spaceId.equals(space.id) & t.albumId.equals(album.id)))
+          .write(const SharedSpaceAlbumLinkEntityCompanion(showInTimeline: Value(true)));
+
+      final restored = await sut.sharedSpace(space.id, .none).assetSource(0, 100);
+      expect(restored.map((a) => (a as RemoteAsset).id), contains(asset.id));
+    });
+  });
+
+  group('mobile-6: archived visibility', () {
+    // Sum of per-bucket assetCount == number of visible assets in the timeline.
+    Future<int> bucketTotal(TimelineQuery q) async {
+      final buckets = await q.bucketSource().first;
+      return buckets.fold<int>(0, (sum, b) => sum + b.assetCount);
+    }
+
+    test('spaceAlbum detail returns an Archived album asset (sites 4-6)', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final album = await ctx.newSharedSpaceAlbum();
+      final archived = await ctx.newRemoteAsset(ownerId: user.id, visibility: AssetVisibility.archive);
+      final hidden = await ctx.newRemoteAsset(ownerId: user.id, visibility: AssetVisibility.hidden);
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: album.id, showInTimeline: true);
+      await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: archived.id);
+      await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: hidden.id);
+
+      // Site 6: assetSource.
+      final assets = await sut.spaceAlbum(space.id, album.id, GroupAssetsBy.none).assetSource(0, 100);
+      final ids = assets.map((a) => (a as RemoteAsset).id).toList();
+      expect(ids, contains(archived.id), reason: 'archived album asset must surface on mobile');
+      expect(ids, isNot(contains(hidden.id)), reason: 'hidden must never leak');
+
+      // Site 4 (groupBy none count) + Site 5 (groupBy day): 1 visible (archived) only.
+      expect(await bucketTotal(sut.spaceAlbum(space.id, album.id, GroupAssetsBy.none)), 1);
+      expect(await bucketTotal(sut.spaceAlbum(space.id, album.id, GroupAssetsBy.day)), 1);
+    });
+
+    test('sharedSpace timeline returns an Archived direct-added asset (sites 1-3)', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final archived = await ctx.newRemoteAsset(ownerId: user.id, visibility: AssetVisibility.archive);
+      final hidden = await ctx.newRemoteAsset(ownerId: user.id, visibility: AssetVisibility.hidden);
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: archived.id);
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: hidden.id);
+
+      // Site 3: assetSource.
+      final assets = await sut.sharedSpace(space.id, GroupAssetsBy.none).assetSource(0, 100);
+      final ids = assets.map((a) => (a as RemoteAsset).id).toList();
+      expect(ids, contains(archived.id), reason: 'archived direct-added asset must surface on mobile');
+      expect(ids, isNot(contains(hidden.id)), reason: 'hidden must never leak');
+
+      // Site 1 (groupBy none count) + Site 2 (groupBy day): 1 visible (archived) only.
+      expect(await bucketTotal(sut.sharedSpace(space.id, GroupAssetsBy.none)), 1);
+      expect(await bucketTotal(sut.sharedSpace(space.id, GroupAssetsBy.day)), 1);
+    });
+  });
+
+  group('aggregated-space stack collapse (S3)', () {
+    const stackId = 'stack-1';
+    final createdAt = DateTime(2024, 1, 1, 12);
+
+    Future<void> insertStack(String id, String ownerId, String primaryAssetId) => ctx.db
+        .into(ctx.db.stackEntity)
+        .insert(StackEntityCompanion.insert(id: id, ownerId: ownerId, primaryAssetId: primaryAssetId));
+
+    test('collapses a 3-frame stack to its cover in assetSource + bucket count (E20/E23)', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final primary = await ctx.newRemoteAsset(ownerId: user.id, stackId: stackId, createdAt: createdAt);
+      final child1 = await ctx.newRemoteAsset(ownerId: user.id, stackId: stackId, createdAt: createdAt);
+      final child2 = await ctx.newRemoteAsset(ownerId: user.id, stackId: stackId, createdAt: createdAt);
+      await insertStack(stackId, user.id, primary.id);
+      for (final a in [primary, child1, child2]) {
+        await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: a.id);
+      }
+
+      // asset query: only the cover survives
+      final assets = await sut.sharedSpace(space.id, GroupAssetsBy.none).assetSource(0, 100);
+      expect(assets.map((a) => (a as RemoteAsset).id).toList(), [primary.id]);
+
+      // bucket-count query agrees: one day bucket with count 1
+      final buckets = await sut.sharedSpace(space.id, GroupAssetsBy.day).bucketSource().first;
+      expect(buckets, hasLength(1));
+      expect((buckets.single as TimeBucket).assetCount, 1);
+
+      // the flat (none) count builder also collapses (sum of segment counts == 1)
+      final noneBuckets = await sut.sharedSpace(space.id, GroupAssetsBy.none).bucketSource().first;
+      expect(noneBuckets.fold<int>(0, (sum, b) => sum + b.assetCount), 1);
+    });
+
+    test('does NOT collapse the space-album detail timeline (E21)', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final album = await ctx.newSharedSpaceAlbum();
+      final primary = await ctx.newRemoteAsset(ownerId: user.id, stackId: stackId, createdAt: createdAt);
+      final child1 = await ctx.newRemoteAsset(ownerId: user.id, stackId: stackId, createdAt: createdAt);
+      final child2 = await ctx.newRemoteAsset(ownerId: user.id, stackId: stackId, createdAt: createdAt);
+      await insertStack(stackId, user.id, primary.id);
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: album.id, showInTimeline: true);
+      for (final a in [primary, child1, child2]) {
+        await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: a.id);
+      }
+
+      final assets = await sut.spaceAlbum(space.id, album.id, GroupAssetsBy.none).assetSource(0, 100);
+      expect(assets.map((a) => (a as RemoteAsset).id).toSet(), {primary.id, child1.id, child2.id});
+
+      // the album count builder likewise stays uncollapsed (all 3 counted)
+      final albumBuckets = await sut.spaceAlbum(space.id, album.id, GroupAssetsBy.none).bucketSource().first;
+      expect(albumBuckets.fold<int>(0, (sum, b) => sum + b.assetCount), 3);
+    });
+
+    test('legacy partial stack (only non-primary frames are members) yields zero (E22)', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final primary = await ctx.newRemoteAsset(ownerId: user.id, stackId: stackId, createdAt: createdAt);
+      final child1 = await ctx.newRemoteAsset(ownerId: user.id, stackId: stackId, createdAt: createdAt);
+      final child2 = await ctx.newRemoteAsset(ownerId: user.id, stackId: stackId, createdAt: createdAt);
+      await insertStack(stackId, user.id, primary.id);
+      // Only the NON-primary frames are direct members; the primary is absent.
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: child1.id);
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: child2.id);
+
+      final assets = await sut.sharedSpace(space.id, GroupAssetsBy.none).assetSource(0, 100);
+      // non-primary frames are collapsed out; the primary isn't a member → nothing shows
+      // (consistent with server/web timeline; documented limitation).
+      expect(assets, isEmpty);
+    });
+
+    test('shows a stack flat (not vanished) when its stack row is not synced locally', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      // A viewer sees another member's stacked frames with stack_id set, but no
+      // stack_entity row (stack_entity only syncs for own/partner stacks). The
+      // collapse must degrade to a flat view, never hide the frames.
+      final frame1 = await ctx.newRemoteAsset(ownerId: user.id, stackId: 'unsynced-stack', createdAt: createdAt);
+      final frame2 = await ctx.newRemoteAsset(ownerId: user.id, stackId: 'unsynced-stack', createdAt: createdAt);
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: frame1.id);
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: frame2.id);
+      // Deliberately NO insertStack(...) — the stack_entity row is absent.
+
+      final assets = await sut.sharedSpace(space.id, GroupAssetsBy.none).assetSource(0, 100);
+      expect(assets.map((a) => (a as RemoteAsset).id).toSet(), {frame1.id, frame2.id});
+
+      // count builder agrees: both frames counted, none dropped
+      final buckets = await sut.sharedSpace(space.id, GroupAssetsBy.none).bucketSource().first;
+      expect(buckets.fold<int>(0, (sum, b) => sum + b.assetCount), 2);
     });
   });
 }

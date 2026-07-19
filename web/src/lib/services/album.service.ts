@@ -5,6 +5,7 @@ import {
   AlbumUserRole,
   BulkIdErrorReason,
   deleteAlbum,
+  linkAlbum,
   removeUserFromAlbum,
   updateAlbumInfo,
   updateAlbumUser,
@@ -12,6 +13,7 @@ import {
   type AlbumsAddAssetsResponseDto,
   type AssetResponseDto,
   type BulkIdResponseDto,
+  type SharedSpaceResponseDto,
   type UpdateAlbumDto,
   type UserResponseDto,
 } from '@immich/sdk';
@@ -25,6 +27,7 @@ import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
 import AlbumAddUsersModal from '$lib/modals/AlbumAddUsersModal.svelte';
 import AlbumOptionsModal from '$lib/modals/AlbumOptionsModal.svelte';
 import SharedLinkCreateModal from '$lib/modals/SharedLinkCreateModal.svelte';
+import SpacePickerModal from '$lib/modals/SpacePickerModal.svelte';
 import { Route } from '$lib/route';
 import { createAlbumAndRedirect } from '$lib/utils/album-utils';
 import { downloadArchive } from '$lib/utils/asset-utils';
@@ -130,29 +133,49 @@ export const addAssetsToAlbums = async (albumIds: string[], assetIds: string[], 
   }
 };
 
-const notifyAddToAlbum = ($t: MessageFormatter, albumId: string, assetIds: string[], results: BulkIdResponseDto[]) => {
+/**
+ * Toast the outcome of an add-to-album call truthfully (#764). The server returns HTTP 200 with
+ * per-asset failures, so severity must follow the result counts — a green "Successful" heading is
+ * reserved for the all-succeeded case; nothing-added is a warning; partial / already-present is info.
+ * Exported for unit testing.
+ */
+export const notifyAddToAlbum = (
+  $t: MessageFormatter,
+  albumId: string,
+  assetIds: string[],
+  results: BulkIdResponseDto[],
+) => {
   const successCount = results.filter(({ success }) => success).length;
   const duplicateCount = results.filter(({ error }) => error === 'duplicate').length;
-  let description: string | undefined;
+  const total = assetIds.length;
+  const viewButton = { label: $t('view_album'), onclick: () => goto(Route.viewAlbum({ id: albumId })) };
+  const options = { timeout: 5000 };
 
-  if (duplicateCount === assetIds.length) {
-    description = $t('assets_were_part_of_album_count', { values: { count: duplicateCount } });
-  } else if (successCount === assetIds.length) {
-    description = $t('assets_added_to_album_count', { values: { count: successCount } });
+  if (successCount === total) {
+    toastManager.primary(
+      { description: $t('assets_added_to_album_count', { values: { count: successCount } }), button: viewButton },
+      options,
+    );
+  } else if (duplicateCount === total) {
+    toastManager.info(
+      { description: $t('assets_were_part_of_album_count', { values: { count: duplicateCount } }), button: viewButton },
+      options,
+    );
   } else if (successCount > 0) {
-    description = $t('assets_added_to_album_partial_count', { values: { successCount, totalCount: assetIds.length } });
+    toastManager.info(
+      {
+        description: $t('assets_added_to_album_partial_count', { values: { successCount, totalCount: total } }),
+        button: viewButton,
+      },
+      options,
+    );
+  } else {
+    // Nothing was added (no_permission and/or a mix that netted zero) — never render as success.
+    toastManager.warning(
+      { description: $t('assets_cannot_be_added_to_album_count', { values: { count: total } }) },
+      options,
+    );
   }
-
-  const button = { label: $t('view_album'), onclick: () => goto(Route.viewAlbum({ id: albumId })) };
-  if (description) {
-    toastManager.primary({ description, button }, { timeout: 5000 });
-    return;
-  }
-
-  toastManager.danger(
-    { description: $t('assets_cannot_be_added_to_album_count', { values: { count: assetIds.length } }), button },
-    { timeout: 5000 },
-  );
 };
 
 const notifyAddToAlbums = (
@@ -292,3 +315,26 @@ export const handleDeleteAlbum = async (album: AlbumResponseDto, options?: { pro
 export const handleDownloadAlbum = async (album: AlbumResponseDto) => {
   await downloadArchive(album.albumName, { albumId: album.id });
 };
+
+// L15: "Link to space" entry point from the album itself (mirrors the existing "link an album"
+// flow already available from inside a space — see SpaceLinkAlbumModal / the space albums page).
+// Reuses the existing SpacePickerModal (built for cmdk selection, never wired up) and the existing
+// `linkAlbum` PUT /shared-spaces/{id}/albums/{albumId} SDK call — no new backend, no new modal.
+export const handleLinkAlbumToSpace = async (album: AlbumResponseDto) => {
+  const $t = await getFormatter();
+
+  const space = await modalManager.show<{ onClose: (space?: SharedSpaceResponseDto) => void }>(SpacePickerModal, {});
+  if (!space) {
+    return false;
+  }
+
+  try {
+    await linkAlbum({ id: space.id, albumId: album.id });
+    toastManager.primary($t('album_linked_to_space', { values: { space: space.name } }));
+    return true;
+  } catch (error) {
+    handleError(error, $t('spaces_linked_albums_error_link'));
+    return false;
+  }
+};
+

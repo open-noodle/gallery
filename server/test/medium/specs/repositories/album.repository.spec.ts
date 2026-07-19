@@ -1,4 +1,5 @@
 import { Kysely } from 'kysely';
+import { AssetVisibility } from 'src/enum';
 import { AlbumRepository } from 'src/repositories/album.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { DB } from 'src/schema';
@@ -105,6 +106,67 @@ describe(AlbumRepository.name, () => {
       // Owner's "shared" query returns the album too (they share it out)
       const ownerShared = await sut.getSharedNames(owner.id);
       expect(ownerShared.map((r) => r.id)).toContain(album.id);
+    });
+  });
+
+  // L1: getContributorCounts previously counted every non-deleted asset regardless of visibility,
+  // letting a caller infer a contributor's Hidden/Locked asset count from the per-user totals even
+  // though the service layer (album.service.get) now gates the whole field to direct readers. Close
+  // the leak in the repo itself so no future caller re-opens it.
+  describe('getContributorCounts', () => {
+    it('excludes a contributor Hidden/Locked assets from their count (L1)', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: contributor } = await ctx.newUser();
+      const { album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'ContributorCounts' });
+
+      const { asset: timelineAsset } = await ctx.newAsset({
+        ownerId: contributor.id,
+        visibility: AssetVisibility.Timeline,
+      });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: timelineAsset.id });
+
+      const { asset: hiddenAsset } = await ctx.newAsset({
+        ownerId: contributor.id,
+        visibility: AssetVisibility.Hidden,
+      });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: hiddenAsset.id });
+
+      const { asset: lockedAsset } = await ctx.newAsset({
+        ownerId: contributor.id,
+        visibility: AssetVisibility.Locked,
+      });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: lockedAsset.id });
+
+      const rows = await sut.getContributorCounts(album.id);
+
+      const contributorRow = rows.find((row) => row.userId === contributor.id);
+      // Only the Timeline asset counts — Hidden/Locked must not inflate (or reveal) the total.
+      expect(contributorRow?.assetCount).toBe(1);
+    });
+
+    it('includes a contributor Timeline and Archive assets in their count (positive control)', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: contributor } = await ctx.newUser();
+      const { album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'ContributorCounts2' });
+
+      const { asset: timelineAsset } = await ctx.newAsset({
+        ownerId: contributor.id,
+        visibility: AssetVisibility.Timeline,
+      });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: timelineAsset.id });
+
+      const { asset: archiveAsset } = await ctx.newAsset({
+        ownerId: contributor.id,
+        visibility: AssetVisibility.Archive,
+      });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: archiveAsset.id });
+
+      const rows = await sut.getContributorCounts(album.id);
+
+      const contributorRow = rows.find((row) => row.userId === contributor.id);
+      expect(contributorRow?.assetCount).toBe(2);
     });
   });
 });

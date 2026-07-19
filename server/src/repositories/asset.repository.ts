@@ -60,6 +60,7 @@ import {
   withTags,
 } from 'src/utils/database';
 import { globToPostgresRegex } from 'src/utils/misc';
+import { spaceAssetPathBranches, spaceVisibilityGate } from 'src/utils/shared-space-album-scope';
 
 export type AssetStats = Record<AssetType, number>;
 
@@ -91,6 +92,13 @@ interface AssetBuilderOptions {
   isTrashed?: boolean;
   isDuplicate?: boolean;
   albumId?: string;
+  /**
+   * #752 P0-2: live member-spaces of the viewer that currently link `albumId` — resolved by
+   * timeline.service (getMemberSpaceIdsLinkingAlbum), NEVER for shared-link auth. When set, the
+   * albumId arm unions member-gated album_space_asset contributions. Distinct from
+   * timelineSpaceIds (home-timeline preference set, separate consumers — PR #778).
+   */
+  albumSpaceIds?: string[];
   spaceId?: string;
   tagId?: string;
   personId?: string;
@@ -320,8 +328,48 @@ export function withTimeBucketAssetFilters<O>(
     .$if(!!options.visibility, (qb) => qb.where('asset.visibility', '=', options.visibility!))
     .$if(!!options.albumId, (qb) =>
       qb
-        .innerJoin('album_asset', 'asset.id', 'album_asset.assetId')
-        .where('album_asset.albumId', '=', asUuid(options.albumId!)),
+        // Fork RBAC (Slice 1 / security-3 defense-in-depth): an explicit visibility=HIDDEN/LOCKED
+        // bypasses the top-level withDefaultVisibility (which only fires when visibility is
+        // undefined). Flat-gate the album arm so Hidden/Locked album assets never surface via the
+        // timeline bucket, even if the service-level guard is bypassed. Idempotent for the default
+        // album grid view (withDefaultVisibility is the same Archive+Timeline predicate).
+        //
+        // Applied BEFORE the innerJoin below (WHERE is conjunctive, so the SQL is identical either
+        // order) so `eb` here stays `ExpressionBuilder<DB, 'asset'>` — spaceVisibilityGate expects
+        // `ExpressionBuilder<DB, keyof DB>`, which the post-join builder (extended with the
+        // `album_members` subquery alias) no longer satisfies.
+        .where((eb) => spaceVisibilityGate(eb))
+        // Fork RBAC (Slice 1 / H1 defense-in-depth): the top-level `options.isTrashed` ternary
+        // (line 253) flips `deletedAt IS NOT NULL` for the whole query, and the service-layer
+        // guard (timeline.service.ts timeBucketChecks) already rejects isTrashed=true on an
+        // album/space browse — but flat-gate here too so the album arm never surfaces a trashed
+        // asset even if that guard is bypassed.
+        .where('asset.deletedAt', 'is', null)
+        .innerJoin(
+          (eb) => {
+            // #764/#752 P0-2: album content = the owner's album_asset rows ∪ member-gated
+            // cross-owner contributions. The contributed arm is included ONLY when the service
+            // resolved albumSpaceIds (live member-spaces linking this album) — album_user shares,
+            // shared links and departed members resolve to none, so a blind-union leak is
+            // impossible. UNION (not ALL) dedupes a P1-6 coexistence-window pair.
+            const ownerRows = eb
+              .selectFrom('album_asset')
+              .select('album_asset.assetId as assetId')
+              .where('album_asset.albumId', '=', asUuid(options.albumId!));
+            return (
+              options.albumSpaceIds?.length
+                ? ownerRows.union(
+                    eb
+                      .selectFrom('album_space_asset')
+                      .select('album_space_asset.assetId as assetId')
+                      .where('album_space_asset.albumId', '=', asUuid(options.albumId!))
+                      .where('album_space_asset.spaceId', '=', anyUuid(options.albumSpaceIds!)),
+                  )
+                : ownerRows
+            ).as('album_members');
+          },
+          (join) => join.onRef('album_members.assetId', '=', 'asset.id'),
+        ),
     )
     .$if(!!options.isNotInAlbum && !options.albumId, (qb) =>
       qb.where((eb) =>
@@ -335,24 +383,39 @@ export function withTimeBucketAssetFilters<O>(
     )
     .$if(!!options.spaceId, (qb) =>
       qb.where((eb) =>
-        eb.or([
-          eb.exists(
-            eb
-              .selectFrom('shared_space_asset')
-              .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-              .where('shared_space_asset.spaceId', '=', asUuid(options.spaceId!)),
+        // Fork RBAC (Fix A): the space-membership predicate is intersected with an
+        // INDEPENDENT visibility gate — `own OR (Archive|Timeline)` — so an explicit
+        // `visibility=HIDDEN`/`LOCKED` cannot surface OTHER members' Hidden/Locked in-space
+        // assets. Mirrors searchAssetBuilder. `userIds` may be undefined (pure spaceId browse):
+        // then the `own` term is absent and the gate is purely other-members-Archive/Timeline.
+        eb.and([
+          eb.or(
+            spaceAssetPathBranches(eb, {
+              correlateAssetId: 'asset.id',
+              correlateLibraryId: 'asset.libraryId',
+              scope: { spaceId: options.spaceId! },
+              requireShowInTimeline: true,
+            }),
           ),
-          eb.exists(
-            eb
-              .selectFrom('shared_space_library')
-              .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-              .where('shared_space_library.spaceId', '=', asUuid(options.spaceId!)),
-          ),
+          eb.or([
+            ...(options.userIds ? [eb('asset.ownerId', '=', anyUuid(options.userIds))] : []),
+            spaceVisibilityGate(eb),
+          ]),
         ]),
       ),
     )
     .$if(!!options.personIds?.length, (qb) => hasPeople(qb, options.personIds!))
-    .$if(!!options.spacePersonIds?.length, (qb) => hasSpacePeople(qb, options.spacePersonIds!))
+    .$if(!!options.spacePersonIds?.length, (qb) =>
+      hasSpacePeople(qb, options.spacePersonIds!).where((eb) =>
+        // The space-person face narrowing must ALSO carry the independent visibility gate:
+        // a space person's face on ANOTHER member's Hidden/Locked asset must not surface it
+        // via an explicit `visibility=HIDDEN`. Caller's own rows follow the resolved visibility.
+        eb.or([
+          ...(options.userIds ? [eb('asset.ownerId', '=', anyUuid(options.userIds))] : []),
+          spaceVisibilityGate(eb),
+        ]),
+      ),
+    )
     .$if(!!options.identityIds?.length, (qb) => hasFaceIdentities(qb, options.identityIds!))
     .$if(!!options.withStacked, (qb) =>
       qb
@@ -371,21 +434,24 @@ export function withTimeBucketAssetFilters<O>(
     .$if(!!options.userIds && !!options.timelineSpaceIds, (qb) =>
       qb.where((eb) =>
         eb.or([
+          // Caller's own (and partner) rows follow the resolved top-level visibility.
           options.personId && viewerId
             ? eb.or([eb('asset.ownerId', '=', anyUuid(options.userIds!)), inSharedAlbum(eb, viewerId)])
             : eb('asset.ownerId', '=', anyUuid(options.userIds!)),
-          eb.exists(
-            eb
-              .selectFrom('shared_space_asset')
-              .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-              .where('shared_space_asset.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
-          ),
-          eb.exists(
-            eb
-              .selectFrom('shared_space_library')
-              .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-              .where('shared_space_library.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
-          ),
+          // Fork RBAC (Fix A): other members' rows are constrained to Archive+Timeline via the
+          // INDEPENDENT gate, so an explicit `visibility=HIDDEN`/`LOCKED` can't surface their
+          // Hidden/Locked in-space assets. Mirrors searchAssetBuilder's timelineSpaceIds arm.
+          eb.and([
+            spaceVisibilityGate(eb),
+            eb.or(
+              spaceAssetPathBranches(eb, {
+                correlateAssetId: 'asset.id',
+                correlateLibraryId: 'asset.libraryId',
+                scope: { spaceIds: options.timelineSpaceIds! },
+                requireShowInTimeline: true,
+              }),
+            ),
+          ]),
         ]),
       ),
     )
@@ -931,6 +997,43 @@ export class AssetRepository {
       .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
       .select('asset.id')
       .where('asset.libraryId', '=', libraryId)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', '=', false)
+      .groupBy('asset.id')
+      .orderBy('asset.id')
+      .limit(limit)
+      .offset(offset)
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, 1000, 0] })
+  getByAlbumIdWithFaces(albumId: string, spaceId: string, limit = 1000, offset = 0) {
+    return this.db
+      .selectFrom('asset')
+      .innerJoin(
+        (eb) => {
+          // #752 P1-7 / D1-b: link-time face sync must also page retained contributions on
+          // re-link — album_asset alone would skip faces cleaned up while the album was unlinked.
+          // The contributed arm is correlated to the syncing space: contributions are reachable
+          // only through their tether space (mirrors contributionVisibleToMember's albumId+spaceId
+          // gate), so an S2 link-sync never pages an S1-tethered contribution into S2's people.
+          return eb
+            .selectFrom('album_asset')
+            .select('album_asset.assetId as assetId')
+            .where('album_asset.albumId', '=', asUuid(albumId))
+            .union(
+              eb
+                .selectFrom('album_space_asset')
+                .select('album_space_asset.assetId as assetId')
+                .where('album_space_asset.albumId', '=', asUuid(albumId))
+                .where('album_space_asset.spaceId', '=', asUuid(spaceId)),
+            )
+            .as('album_members');
+        },
+        (join) => join.onRef('album_members.assetId', '=', 'asset.id'),
+      )
+      .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
+      .select('asset.id')
       .where('asset.deletedAt', 'is', null)
       .where('asset.isOffline', '=', false)
       .groupBy('asset.id')

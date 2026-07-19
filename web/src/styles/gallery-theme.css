@@ -145,6 +145,27 @@ body {
 #sidebar {
   background-color: var(--gallery-chrome);
 }
+/* Google-Photos-style sidebar nav pills: fully-rounded on BOTH sides for the hover/active background,
+ * instead of @immich/ui's rounded-e-full (right-only). Scoped to the NavbarItem links via their
+ * rounded-e-full class so the bottom-info links (ServerStatus / PurchaseInfo) keep their own styling. */
+#sidebar a[class~='rounded-e-full'] {
+  border-radius: 9999px;
+}
+/* Reserve the scrollbar gutter so expanding Spaces/Albums (which overflows the sidebar and shows the
+ * thin scrollbar) doesn't shrink the pill width and shift the side margins. */
+#sidebar {
+  scrollbar-gutter: stable;
+}
+/* The Spaces/Albums expand-collapse caret is an absolute sibling of the pill link — it shouldn't carry
+ * its own hover background. Kill it, and instead highlight the parent item's pill when the caret is
+ * hovered, so the caret and label share a single hover state. */
+#sidebar div.relative > button.absolute:hover {
+  background-color: transparent;
+}
+#sidebar div.relative:has(> button.absolute:hover) > a {
+  background-color: var(--color-subtle);
+  color: var(--color-primary);
+}
 /* Drop the navbar's bottom divider — the chrome/content two-tone already
  * separates it (targets the navbar's inner grid row that carries `border-b`). */
 #dashboard-navbar > div {
@@ -223,14 +244,6 @@ main > div:has([data-testid='page-header-title-row']) {
 }
 [data-testid='discovery-panel']::-webkit-scrollbar-thumb:hover {
   background-color: color-mix(in oklab, var(--immich-ui-muted) 65%, transparent);
-}
-
-/* Collapsed filter panel: the w-14 strip leaves a lot of empty space around the
- * 24px icons. Tighten it so the icons read as centered, and drop the now-
- * redundant right divider. Scoped to the collapsed state via :has. */
-[data-testid='filter-panel-shell']:has(> [data-testid='collapsed-icon-strip']) {
-  width: 3rem;
-  border-inline-end-width: 0;
 }
 
 /* Admin pages use @immich/ui's AppShell (not the <main> layout above), so they

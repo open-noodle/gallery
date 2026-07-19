@@ -14,7 +14,7 @@ test.describe('Map FilterPanel', () => {
   async function gotoMap(context: import('@playwright/test').BrowserContext, page: import('@playwright/test').Page) {
     await utils.setAuthCookies(context, admin.accessToken);
     await page.goto('/map');
-    await page.waitForSelector('[data-testid="discovery-panel"], [data-testid="collapsed-icon-strip"]');
+    await page.waitForSelector('[data-testid="discovery-panel"], [data-testid="filter-toggle-btn"]');
   }
 
   test('should show filter panel on map page', async ({ context, page }) => {
@@ -27,11 +27,14 @@ test.describe('Map FilterPanel', () => {
 
     await expect(page.getByTestId('discovery-panel')).toBeVisible();
 
+    // externalToggle mode: collapsing clips the panel to width 0 and surfaces the header filter button
+    // (FilterToggleButton) instead of an inline collapsed strip.
     await page.getByTestId('collapse-panel-btn').click();
-    await expect(page.getByTestId('collapsed-icon-strip')).toBeVisible();
+    await expect(page.getByTestId('filter-toggle-btn')).toBeVisible();
 
-    await page.getByTestId('expand-panel-btn').click();
+    await page.getByTestId('filter-toggle-btn').click();
     await expect(page.getByTestId('discovery-panel')).toBeVisible();
+    await expect(page.getByTestId('filter-toggle-btn')).toHaveCount(0);
   });
 
   test('should show favorites filter section', async ({ context, page }) => {

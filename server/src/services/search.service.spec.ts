@@ -1521,6 +1521,43 @@ describe(SearchService.name, () => {
       );
     });
 
+    // testq-4: the test above was rebased-in with checkOwnerAccess granting the actor OWNER access to
+    // the album (needed to satisfy #29352's requireAccess(AlbumRead) gate), which lost coverage of the
+    // space-MEMBER path (checkSharedAlbumAccess, not checkOwnerAccess) — the actor who most needs the
+    // person-filter guard below, since they don't own the album's assets. A member combining albumIds
+    // with personIds must not be able to bypass person-filter RBAC: resolveScopedPersonFilters routes
+    // every personIds token through faceIdentityRepository.resolveScopedPersonTokens whenever albumIds
+    // is set (isGlobalSharedScope), and an inaccessible token forces the whole search empty.
+    it('forces an empty result for a space-member actor who person-filters an album-scoped search with an inaccessible token', async () => {
+      const albumId = newUuid();
+      const spaceId = newUuid();
+      const personId = newUuid();
+      // Member access via the album's own share grant, NOT ownership.
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([albumId]));
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
+      mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
+      (mocks.faceIdentity as any).resolveScopedPersonTokens.mockResolvedValue({
+        identityIds: [],
+        legacyPersonIds: [],
+        legacySpacePersonIds: [],
+        hasInaccessibleToken: true,
+      });
+
+      await sut.searchMetadata(authStub.user1, { albumIds: [albumId], personIds: [personId] });
+
+      expect(mocks.access.album.checkSharedAlbumAccess).toHaveBeenCalled();
+      expect((mocks.faceIdentity as any).resolveScopedPersonTokens).toHaveBeenCalledWith({
+        userId: authStub.user1.user.id,
+        tokens: [personId],
+        scope: { withSharedSpaces: true, timelineSpaceIds: [spaceId], spaceId: undefined },
+      });
+      expect(mocks.search.searchMetadata).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ forceEmptyResult: true }),
+      );
+    });
+
     it('deduplicates resolved scoped person filters before repository search', async () => {
       const token = `person:${newUuid()}`;
       mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
@@ -1767,6 +1804,68 @@ describe(SearchService.name, () => {
         250,
         expect.objectContaining({ albumIds: [albumId], timelineSpaceIds: [spaceId] }),
       );
+    });
+  });
+
+  describe('H-1: trash / offline params rejected under a shared-space scope', () => {
+    const runners: Array<{ name: string; run: (dto: Record<string, unknown>) => Promise<unknown> }> = [
+      { name: 'searchMetadata', run: (dto) => sut.searchMetadata(authStub.user1, dto) },
+      { name: 'searchRandom', run: (dto) => sut.searchRandom(authStub.user1, dto) },
+      { name: 'searchLargeAssets', run: (dto) => sut.searchLargeAssets(authStub.user1, dto) },
+      { name: 'searchStatistics', run: (dto) => sut.searchStatistics(authStub.user1, dto) },
+      { name: 'searchSmart', run: (dto) => sut.searchSmart(authStub.user1, { query: 'test', ...dto }) },
+    ];
+
+    const trashParams: Array<{ label: string; param: Record<string, unknown>; needsWithDeleted?: boolean }> = [
+      { label: 'withDeleted', param: { withDeleted: true }, needsWithDeleted: true },
+      { label: 'trashedAfter', param: { trashedAfter: new Date('1970-01-01T00:00:00.000Z') } },
+      { label: 'trashedBefore', param: { trashedBefore: new Date('2999-01-01T00:00:00.000Z') } },
+      { label: 'isOffline', param: { isOffline: true } },
+    ];
+
+    const scopes: Array<{ label: string; scope: Record<string, unknown> }> = [
+      { label: 'spaceId', scope: { spaceId: newUuid() } },
+      { label: 'withSharedSpaces', scope: { withSharedSpaces: true } },
+    ];
+
+    const message = 'Trashed and offline assets are not available when searching a shared space';
+
+    for (const runner of runners) {
+      for (const scope of scopes) {
+        for (const tp of trashParams) {
+          // StatisticsSearchDto has no `withDeleted` field (zod strips it); it can only be reached
+          // via the implicit-flip params (trashedAfter/trashedBefore/isOffline), so withDeleted is
+          // not a real code path there.
+          if (runner.name === 'searchStatistics' && tp.needsWithDeleted) {
+            continue;
+          }
+          it(`${runner.name} rejects ${tp.label} with ${scope.label}`, async () => {
+            await expect(runner.run({ ...scope.scope, ...tp.param })).rejects.toThrow(message);
+          });
+        }
+      }
+    }
+
+    it('does not reject a plain space search with no trash params (searchMetadata)', async () => {
+      const spaceId = newUuid();
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
+      mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
+
+      await expect(sut.searchMetadata(authStub.user1, { spaceId })).resolves.toBeDefined();
+    });
+
+    it('does not reject withDeleted outside a space scope (searchMetadata)', async () => {
+      mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
+
+      await expect(sut.searchMetadata(authStub.user1, { withDeleted: true })).resolves.toBeDefined();
+    });
+
+    it('does not over-block isOffline=false under a space scope (searchMetadata)', async () => {
+      const spaceId = newUuid();
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
+      mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
+
+      await expect(sut.searchMetadata(authStub.user1, { spaceId, isOffline: false })).resolves.toBeDefined();
     });
   });
 

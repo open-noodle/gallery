@@ -9,8 +9,10 @@ import { AssetRepository } from 'src/repositories/asset.repository';
 import { ConfigRepository } from 'src/repositories/config.repository';
 import { CryptoRepository } from 'src/repositories/crypto.repository';
 import { DatabaseRepository } from 'src/repositories/database.repository';
+import { EventRepository } from 'src/repositories/event.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { PluginRepository } from 'src/repositories/plugin.repository';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { StorageRepository } from 'src/repositories/storage.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 import { WorkflowRepository } from 'src/repositories/workflow.repository';
@@ -35,11 +37,16 @@ class WorkflowTestContext extends MediumTestContext<typeof WorkflowExecutionServ
         DatabaseRepository,
         LoggingRepository,
         PluginRepository,
+        // Slice 3: AssetService.update() now routes visibility through applyVisibilityTransitionSideEffects,
+        // which uses this.sharedSpaceRepository (space purge/restore emits). The plugin-host AssetService is
+        // built via BaseService.create(AssetService, this), reading repos off this WorkflowExecutionService —
+        // so the harness must wire SharedSpaceRepository (real: no-op for the non-space assets used here).
+        SharedSpaceRepository,
         StorageRepository,
         UserRepository,
         WorkflowRepository,
       ],
-      mock: [ConfigRepository],
+      mock: [ConfigRepository, EventRepository],
     });
   }
 
@@ -52,6 +59,9 @@ class WorkflowTestContext extends MediumTestContext<typeof WorkflowExecutionServ
     mockData.resourcePaths.corePlugin = '../packages/plugin-core';
     mockData.plugins.external.allow = false;
     this.getMock(ConfigRepository).getEnv.mockReturnValue(mockData);
+    // album.service emits AlbumAssetsAdd/Remove on asset mutations; this harness doesn't exercise
+    // space sync, so stub the emit to a no-op (automock throws on unimplemented calls).
+    this.getMock(EventRepository).emit.mockResolvedValue();
     this.get(LoggingRepository).setLogLevel(LogLevel.Verbose);
 
     await this.sut.onPluginSync();

@@ -4,7 +4,6 @@
   import { QueryParameter, timeBeforeShowLoadingSpinner } from '$lib/constants';
   import Dropdown from '$lib/elements/Dropdown.svelte';
   import SearchBar from '$lib/elements/SearchBar.svelte';
-  import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
   import PeopleFaceStatisticsInfo from '$lib/components/people/people-face-statistics-info.svelte';
   import PeopleManagementGrid from '$lib/components/people/people-management-grid.svelte';
   import PeopleMergeSelector from '$lib/components/people/people-merge-selector.svelte';
@@ -34,12 +33,11 @@
     type SharedSpacePersonResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
-  import { Button, Icon, IconButton, modalManager, toastManager } from '@immich/ui';
+  import { Button, Icon, modalManager, toastManager } from '@immich/ui';
   import {
     mdiAccountGroupOutline,
     mdiAccountMultipleCheckOutline,
     mdiCalendarEditOutline,
-    mdiArrowLeft,
     mdiDotsVertical,
     mdiEyeOffOutline,
     mdiEyeOutline,
@@ -454,58 +452,56 @@
   }
 </script>
 
-<UserPageLayout title={$t('spaces_people_title')} description={headerDescription}>
-  {#snippet descriptionTrailing()}
-    {#if showFaceStatisticsInfo}
-      <PeopleFaceStatisticsInfo cacheKey={spaceFaceStatisticsCacheKey} loadStatistics={loadSpaceFaceStatistics} />
-    {/if}
-  {/snippet}
-
-  {#snippet leading()}
-    <IconButton
-      variant="ghost"
-      shape="round"
-      color="secondary"
-      aria-label={$t('back')}
-      onclick={() => goto(`/spaces/${space.id}`)}
-      icon={mdiArrowLeft}
-    />
-  {/snippet}
-  {#snippet buttons()}
-    {#if hasSearchablePeople || canManageVisibility}
-      <div class="flex gap-2 items-center justify-center">
-        {#if hasSearchablePeople}
-          <div class="hidden sm:block">
-            <div class="w-40 lg:w-80 h-10">
-              <SearchBar
-                bind:name={searchName}
-                {showLoadingSpinner}
-                placeholder={$t('search_people')}
-                onReset={() => void onResetSearchBar()}
-                onSearch={() => void searchPeople()}
-              />
+<div class="flex h-full flex-col">
+  {#if headerDescription || hasSearchablePeople || canManageVisibility}
+    <div class="flex items-center justify-between gap-2 px-4 py-2">
+      {#if headerDescription}
+        <div class="flex min-w-0 items-center gap-1">
+          <p class="truncate text-sm text-gray-500" data-testid="space-people-heading-description">
+            {headerDescription}
+          </p>
+          {#if showFaceStatisticsInfo}
+            <PeopleFaceStatisticsInfo cacheKey={spaceFaceStatisticsCacheKey} loadStatistics={loadSpaceFaceStatistics} />
+          {/if}
+        </div>
+      {:else}
+        <div></div>
+      {/if}
+      {#if hasSearchablePeople || canManageVisibility}
+        <div class="flex shrink-0 items-center justify-center gap-2">
+          {#if hasSearchablePeople}
+            <div class="hidden sm:block">
+              <div class="h-10 w-40 lg:w-80">
+                <SearchBar
+                  bind:name={searchName}
+                  {showLoadingSpinner}
+                  placeholder={$t('search_people')}
+                  onReset={() => void onResetSearchBar()}
+                  onSearch={() => void searchPeople()}
+                />
+              </div>
             </div>
-          </div>
-          <Dropdown
-            title={$t('sort_people_by')}
-            options={peopleSortOptions}
-            selectedOption={peopleSortBy}
-            onSelect={(sortBy) => ($peopleViewSettings.sortBy = sortBy)}
-            render={(sortBy) => ({ title: peopleSortByNames[sortBy], icon: peopleSortIcons[sortBy] })}
-          />
-        {/if}
-        {#if canManageVisibility}
-          <Button
-            leadingIcon={mdiEyeOutline}
-            onclick={openVisibilityModal}
-            size="small"
-            variant="ghost"
-            color="secondary">{$t('show_and_hide_people')}</Button
-          >
-        {/if}
-      </div>
-    {/if}
-  {/snippet}
+            <Dropdown
+              title={$t('sort_people_by')}
+              options={peopleSortOptions}
+              selectedOption={peopleSortBy}
+              onSelect={(sortBy) => ($peopleViewSettings.sortBy = sortBy)}
+              render={(sortBy) => ({ title: peopleSortByNames[sortBy], icon: peopleSortIcons[sortBy] })}
+            />
+          {/if}
+          {#if canManageVisibility}
+            <Button
+              leadingIcon={mdiEyeOutline}
+              onclick={openVisibilityModal}
+              size="small"
+              variant="ghost"
+              color="secondary">{$t('show_and_hide_people')}</Button
+            >
+          {/if}
+        </div>
+      {/if}
+    </div>
+  {/if}
 
   {#if visiblePeople.length === 0}
     <div class="flex min-h-[calc(66vh-11rem)] w-full place-content-center items-center dark:text-white">
@@ -574,12 +570,12 @@
       mergeErrorMessage={$t('spaces_error_merging_people')}
     />
   {/if}
-</UserPageLayout>
+</div>
 
 {#if selectHidden}
   <dialog
     transition:fly={{ y: 500, duration: 150, easing: quintOut, opacity: 0 }}
-    class="fixed inset-0 h-full w-full max-w-none max-h-none bg-light"
+    class="fixed inset-0 size-full max-h-none max-w-none bg-light"
     aria-labelledby="manage-visibility-title"
     {@attach (dialog) => dialog.showModal()}
   >

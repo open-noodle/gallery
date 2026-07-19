@@ -59,6 +59,7 @@
     spaceId?: string;
     onSelect?: (asset: TimelineAsset) => void;
     onEscape?: () => void;
+    onScroll?: (scrollTop: number) => void;
     onTimelineBucketActivate?: (bucket: ActivatableTimelineBucket) => void;
     grouping?: TimelineGrouping;
     onGroupingChange?: (grouping: TimelineGrouping) => void;
@@ -97,6 +98,7 @@
     spaceId,
     onSelect = () => {},
     onEscape = () => {},
+    onScroll,
     onTimelineBucketActivate,
     grouping = 'day',
     onGroupingChange,
@@ -128,6 +130,18 @@
   const maxMd = $derived(mediaQueryManager.maxMd);
   const usingMobileDevice = $derived(mediaQueryManager.pointerCoarse);
   const activeGrouping = $derived(options?.grouping ?? timelineManager.grouping ?? grouping);
+  // Suspend layout transitions the instant the grouping changes — before the day/grouped views swap.
+  // Otherwise the outgoing day thumbnails play their scale-out exit animation (a delayed "collapse to
+  // the inside") because updateOptions() only sets suspendTransitions from a post-render effect, after
+  // the exit transition has already been created. $effect.pre runs before that DOM update;
+  // updateOptions() clears the flag again once the reload settles.
+  let lastActiveGrouping = activeGrouping;
+  $effect.pre(() => {
+    if (activeGrouping !== lastActiveGrouping) {
+      lastActiveGrouping = activeGrouping;
+      timelineManager.suspendTransitions = true;
+    }
+  });
   const showMobileGroupingControl = $derived(
     Boolean(onGroupingChange) &&
       (maxMd || usingMobileDevice) &&
@@ -711,7 +725,12 @@
   bind:clientHeight={timelineManager.viewportHeight}
   bind:clientWidth={timelineManager.viewportWidth}
   bind:this={scrollableElement}
-  onscroll={() => (handleTimelineScroll(), timelineManager.updateSlidingWindow(), updateIsScrolling())}
+  onscroll={() => (
+    handleTimelineScroll(),
+    timelineManager.updateSlidingWindow(),
+    updateIsScrolling(),
+    onScroll?.(scrollableElement?.scrollTop ?? 0)
+  )}
 >
   <section
     bind:this={timelineElement}

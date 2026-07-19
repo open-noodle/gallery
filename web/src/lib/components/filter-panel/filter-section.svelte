@@ -50,7 +50,7 @@
   </button>
   {#if isOpen}
     <div transition:slide|local={slideMotion(mediaQueryManager.reducedMotion)}>
-      <div class="filter-section-content px-3 pb-3.5" class:refetching>
+      <div class="filter-section-content px-3 pt-2 pb-3.5" class:refetching>
         {@render children()}
       </div>
     </div>

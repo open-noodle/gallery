@@ -286,10 +286,11 @@ class SyncStreamService {
       // to acknowledge that the client has processed all the backfill events
       case SyncEntityType.syncAckV1:
         return;
-      // SyncCompleteV1 is used to signal the completion of the sync process. Cleanup stale assets and signal completion
+      // SyncCompleteV1 signals the end of the sync process. mobile-3/gaps-1: run the
+      // space-aware GC to drop remote_asset/remote_exif rows no longer reachable by
+      // any path (owner/partner/classic-album/direct/space-album/space-library).
       case SyncEntityType.syncCompleteV1:
-        return;
-      // return _syncStreamRepository.pruneAssets();
+        return _syncStreamRepository.pruneAssets();
       // Request to reset the client state. Clear everything related to remote entities
       case SyncEntityType.syncResetV1:
         return _syncStreamRepository.reset();
@@ -379,6 +380,29 @@ class SyncStreamService {
       case SyncEntityType.sharedSpaceLibraryDeleteV1:
         return _syncStreamRepository.deleteSharedSpaceLibrariesV1(data.cast());
       // --- gallery-fork: SharedSpaceAlbum dispatch (Phase 2B) ---
+      case SyncEntityType.sharedSpaceAlbumV1:
+      case SyncEntityType.sharedSpaceAlbumBackfillV1:
+        return _syncStreamRepository.updateSharedSpaceAlbumsV1(data.cast());
+      case SyncEntityType.sharedSpaceAlbumDeleteV1:
+        return _syncStreamRepository.deleteSharedSpaceAlbumsV1(data.cast());
+      case SyncEntityType.sharedSpaceAlbumLinkV1:
+      case SyncEntityType.sharedSpaceAlbumLinkBackfillV1:
+        return _syncStreamRepository.updateSharedSpaceAlbumLinksV1(data.cast());
+      case SyncEntityType.sharedSpaceAlbumLinkDeleteV1:
+        return _syncStreamRepository.deleteSharedSpaceAlbumLinksV1(data.cast());
+      case SyncEntityType.sharedSpaceAlbumToAssetV1:
+      case SyncEntityType.sharedSpaceAlbumToAssetBackfillV1:
+        return _syncStreamRepository.updateSharedSpaceAlbumToAssetsV1(data.cast());
+      case SyncEntityType.sharedSpaceAlbumToAssetDeleteV1:
+        return _syncStreamRepository.deleteSharedSpaceAlbumToAssetsV1(data.cast());
+      case SyncEntityType.sharedSpaceAlbumAssetCreateV1:
+      case SyncEntityType.sharedSpaceAlbumAssetUpdateV1:
+      case SyncEntityType.sharedSpaceAlbumAssetBackfillV1:
+        return _syncStreamRepository.updateSharedSpaceAlbumAssetsV1(data.cast());
+      case SyncEntityType.sharedSpaceAlbumAssetExifCreateV1:
+      case SyncEntityType.sharedSpaceAlbumAssetExifUpdateV1:
+      case SyncEntityType.sharedSpaceAlbumAssetExifBackfillV1:
+        return _syncStreamRepository.updateSharedSpaceAlbumAssetExifsV1(data.cast());
       // Forward-compat: openapi-generator v7.24 emits SyncEntityType as a real
       // exhaustive Dart enum, so upstream dropped the `default:` arm here (it is
       // now unreachable and trips `unreachable_switch_default`). The plan's

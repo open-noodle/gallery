@@ -424,6 +424,30 @@ describe(DuplicateService.name, () => {
       expect(mocks.job.queueAll).toHaveBeenCalledWith([{ name: JobName.SidecarWrite, data: { id: asset1.id } }]);
     });
 
+    // R1: duplicateRepository.get always applies withDefaultVisibility (Archive+Timeline only), so a
+    // duplicate group's assets — and therefore the keeper — can never be Hidden/Locked. The merge only
+    // ever has to pick between the two remaining shareable levels, with Archive outranking Timeline.
+    it('merges the keeper to Archive visibility when the group mixes Archive and Timeline assets', async () => {
+      const asset1 = AssetFactory.create({ visibility: AssetVisibility.Timeline });
+      const asset2 = AssetFactory.create({ visibility: AssetVisibility.Archive });
+      mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset2.id]));
+      mocks.duplicateRepository.get.mockResolvedValue({
+        duplicateId: 'group-1',
+        assets: [asset1 as unknown as MapAsset, asset2 as unknown as MapAsset],
+      });
+
+      const result = await sut.resolve(authStub.admin, {
+        groups: [{ duplicateId: 'group-1', keepAssetIds: [asset1.id], trashAssetIds: [asset2.id] }],
+      });
+
+      expect(result[0].success).toBe(true);
+      expect(mocks.asset.updateAll).toHaveBeenCalledWith(
+        [asset1.id],
+        expect.objectContaining({ visibility: AssetVisibility.Archive }),
+      );
+    });
+
     it('should not merge metadata when multiple assets are kept', async () => {
       const asset1 = AssetFactory.create({ isFavorite: true });
       const asset2 = AssetFactory.create();

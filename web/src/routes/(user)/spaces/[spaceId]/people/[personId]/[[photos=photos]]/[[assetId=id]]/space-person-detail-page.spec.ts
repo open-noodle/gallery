@@ -395,6 +395,8 @@ describe('Spaces person detail page', () => {
     mockAssetMultiSelectManager.selectionActive = true;
     mockAssetMultiSelectManager.assets = [{ id: 'asset-1' }, { id: 'asset-2' }] as never[];
     vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    // The server returns exactly the ids it removed (direct members); both selected assets are direct here.
+    sdkMock.removeAssets.mockResolvedValue(['asset-1', 'asset-2']);
 
     renderPage({ statistics: { assets: 5, faces: 10 } });
 
