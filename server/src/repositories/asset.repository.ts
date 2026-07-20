@@ -62,7 +62,7 @@ import {
   withSmartSearch,
   withTags,
 } from 'src/utils/database';
-import { favoriteExistsFor } from 'src/utils/favorite';
+import { favoriteExistsFor, favoriteExistsForOwner } from 'src/utils/favorite';
 import { globToSqlPattern } from 'src/utils/misc';
 import {
   hiddenFromOwnTimeline,
@@ -1303,6 +1303,12 @@ export class AssetRepository {
         .select(withFacesAndPeople)
         .select(withTags)
         .$call(withExif)
+        // #763: `isFavorite` is resolved from the OWNER's overlay row (favoriteExistsForOwner), NOT
+        // the raw asset."isFavorite" column selectAll('asset') would otherwise surface — see the
+        // matching comment on getById above for the full rationale (same owner-semantics decision;
+        // job.service.ts's AssetEditReadyV2/AssetUploadReadyV2 payloads are this method's only
+        // direct `.isFavorite` reader, and always send to the asset's OWNER).
+        .select((eb) => favoriteExistsForOwner(eb).as('isFavorite'))
         // #763: authUserId is optional and deliberately omitted by job.service.ts (background job)
         // and notification.service.ts (synthetic partial auth) — see the comments at their mapAsset
         // call sites. Only search.service.ts's getExploreData passes it (real caller identity).
@@ -1423,50 +1429,64 @@ export class AssetRepository {
     // reach mapAsset and so have no per-user value to resolve.
     authUserId?: string,
   ) {
-    return this.db
-      .selectFrom('asset')
-      .selectAll('asset')
-      .where('asset.id', '=', asUuid(id))
-      .$if(!!exifInfo, withExif)
-      .$if(!!faces, (qb) => qb.select(faces?.person ? withFacesAndPeople : withFaces).$narrowType<{ faces: NotNull }>())
-      .$if(!!library, (qb) => qb.select(withLibrary))
-      .$if(!!owner, (qb) => qb.select(withOwner))
-      .$if(!!smartSearch, withSmartSearch)
-      .$if(!!stack, (qb) =>
-        qb
-          .leftJoin('stack', 'stack.id', 'asset.stackId')
-          .$if(!stack!.assets, (qb) =>
-            qb.select((eb) => eb.fn.toJson(eb.table('stack')).$castTo<Stack | null>().as('stack')),
-          )
-          .$if(!!stack!.assets, (qb) =>
-            qb
-              .leftJoinLateral(
-                (eb) =>
-                  eb
-                    .selectFrom('asset as stacked')
-                    .selectAll('stack')
-                    .select((eb) =>
-                      eb
-                        .fn<ShallowDehydrateObject<Selectable<AssetTable>>>('array_agg', [eb.table('stacked')])
-                        .as('assets'),
-                    )
-                    .whereRef('stacked.stackId', '=', 'stack.id')
-                    .whereRef('stacked.id', '!=', 'stack.primaryAssetId')
-                    .where('stacked.deletedAt', 'is', null)
-                    .where('stacked.visibility', '=', AssetVisibility.Timeline)
-                    .groupBy('stack.id')
-                    .as('stacked_assets'),
-                (join) => join.on('stack.id', 'is not', null),
-              )
-              .select((eb) => eb.fn.toJson(eb.table('stacked_assets')).as('stack')),
-          ),
-      )
-      .$if(!!files, (qb) => qb.select(withFiles))
-      .$if(!!tags, (qb) => qb.select(withTags))
-      .$if(!!edits, (qb) => qb.select(withEdits))
-      .$if(!!authUserId, (qb) => qb.select((eb) => favoriteExistsFor(eb, authUserId!).as('isFavoriteForUser')))
-      .limit(1)
-      .executeTakeFirst();
+    return (
+      this.db
+        .selectFrom('asset')
+        .selectAll('asset')
+        // #763: `isFavorite` is resolved from the OWNER's overlay row (favoriteExistsForOwner), NOT
+        // the raw asset."isFavorite" column selectAll('asset') would otherwise surface — that column
+        // is a frozen legacy value the overlay write path no longer updates (dropped outright in
+        // slice 3). Projected unconditionally (not gated on authUserId, unlike isFavoriteForUser
+        // below) because every consumer that reads `.isFavorite` directly off this method's result
+        // (job.service.ts's AssetEditReadyV2/AssetUploadReadyV2 payloads) sends its event to the
+        // asset's OWNER, so owner semantics is always correct here — see favoriteExistsForOwner's doc
+        // comment. mapAsset-facing callers (asset.service.ts `get`/`update`) never read this field;
+        // they use isFavoriteForUser instead.
+        .select((eb) => favoriteExistsForOwner(eb).as('isFavorite'))
+        .where('asset.id', '=', asUuid(id))
+        .$if(!!exifInfo, withExif)
+        .$if(!!faces, (qb) =>
+          qb.select(faces?.person ? withFacesAndPeople : withFaces).$narrowType<{ faces: NotNull }>(),
+        )
+        .$if(!!library, (qb) => qb.select(withLibrary))
+        .$if(!!owner, (qb) => qb.select(withOwner))
+        .$if(!!smartSearch, withSmartSearch)
+        .$if(!!stack, (qb) =>
+          qb
+            .leftJoin('stack', 'stack.id', 'asset.stackId')
+            .$if(!stack!.assets, (qb) =>
+              qb.select((eb) => eb.fn.toJson(eb.table('stack')).$castTo<Stack | null>().as('stack')),
+            )
+            .$if(!!stack!.assets, (qb) =>
+              qb
+                .leftJoinLateral(
+                  (eb) =>
+                    eb
+                      .selectFrom('asset as stacked')
+                      .selectAll('stack')
+                      .select((eb) =>
+                        eb
+                          .fn<ShallowDehydrateObject<Selectable<AssetTable>>>('array_agg', [eb.table('stacked')])
+                          .as('assets'),
+                      )
+                      .whereRef('stacked.stackId', '=', 'stack.id')
+                      .whereRef('stacked.id', '!=', 'stack.primaryAssetId')
+                      .where('stacked.deletedAt', 'is', null)
+                      .where('stacked.visibility', '=', AssetVisibility.Timeline)
+                      .groupBy('stack.id')
+                      .as('stacked_assets'),
+                  (join) => join.on('stack.id', 'is not', null),
+                )
+                .select((eb) => eb.fn.toJson(eb.table('stacked_assets')).as('stack')),
+            ),
+        )
+        .$if(!!files, (qb) => qb.select(withFiles))
+        .$if(!!tags, (qb) => qb.select(withTags))
+        .$if(!!edits, (qb) => qb.select(withEdits))
+        .$if(!!authUserId, (qb) => qb.select((eb) => favoriteExistsFor(eb, authUserId!).as('isFavoriteForUser')))
+        .limit(1)
+        .executeTakeFirst()
+    );
   }
 
   @GenerateSql({ params: [[DummyValue.UUID], {}] })
