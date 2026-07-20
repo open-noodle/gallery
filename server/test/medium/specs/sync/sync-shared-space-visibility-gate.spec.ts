@@ -18,6 +18,7 @@
 
 import { Kysely } from 'kysely';
 import { AssetVisibility, SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository';
 import { DB } from 'src/schema';
 import { SyncTestContext } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
@@ -134,8 +135,8 @@ describe('SharedSpaceAssetSync — visibility gate', () => {
     expect(emittedIds).not.toContain(asset.id);
   });
 
-  it('masks isFavorite for a Hidden-to-Timeline asset with a foreign owner (unchanged behaviour)', async () => {
-    // Regression guard: isFavorite masking must be unaffected by the visibility gate.
+  it("does not leak the peer's favorite for a Hidden-to-Timeline asset with a foreign owner (unchanged behaviour, #763)", async () => {
+    // Regression guard: isFavorite overlay resolution must be unaffected by the visibility gate.
     const { auth, ctx } = await setup();
     const { user: peer } = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: peer.id });
@@ -145,9 +146,9 @@ describe('SharedSpaceAssetSync — visibility gate', () => {
     const { asset } = await ctx.newAsset({
       ownerId: peer.id,
       visibility: AssetVisibility.Timeline,
-      isFavorite: true,
     });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+    await ctx.get(AssetFavoriteRepository).addAll(peer.id, [asset.id]);
 
     const response = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetsV1]);
     const assetEvents = response.filter((r) => isSharedSpaceAssetEvent(r));

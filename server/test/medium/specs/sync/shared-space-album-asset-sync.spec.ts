@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { SharedSpaceRole, SyncEntityType } from 'src/enum';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository';
 import { SyncRepository } from 'src/repositories/sync.repository';
 import { DB } from 'src/schema';
 import { SyncTestContext } from 'test/medium.factory';
@@ -14,7 +15,7 @@ const drain = async (stream: AsyncIterable<any>) => {
 //   - getBackfill: per-album backfill of full asset rows
 //   - getCreates: new album_asset join rows via grant
 //   - getUpdates: asset metadata changes gated by albumToAssetAck coupling
-//   - isFavorite masking: false for non-owner members
+//   - isFavorite: recipient's own asset_favorite overlay row (#763), never the owner's
 
 let defaultDatabase: Kysely<DB>;
 
@@ -67,28 +68,48 @@ describe('SharedSpaceAlbumAssetSync.getBackfill', () => {
     expect(result).toHaveLength(0);
   });
 
-  it('masks isFavorite to false for non-owners', async () => {
-    const { ctx, db, sut } = setup();
+  it("does not leak the owner's favorite to a non-owner member's backfill (#763)", async () => {
+    const { ctx, sut } = setup();
     const { user: owner } = await ctx.newUser();
     const { user: member } = await ctx.newUser();
     const { album } = await ctx.newAlbum({ ownerId: owner.id });
     const { asset } = await ctx.newAsset({ ownerId: owner.id });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
 
-    // Set isFavorite to true on the asset (owner's perspective)
-    await db.updateTable('asset').set({ isFavorite: true }).where('id', '=', asset.id).execute();
+    // Owner favorites the asset — this must never leak to another member's stream.
+    await ctx.get(AssetFavoriteRepository).addAll(owner.id, [asset.id]);
 
-    // Backfill as member (non-owner) — should see isFavorite=false
+    // Backfill as member (non-owner, never favorited) — should see isFavorite=false.
     const stream = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id, member.id);
     const result: any[] = await Array.fromAsync(stream);
     const row = result.find((r: any) => r.id === asset.id);
     expect(row).toBeDefined();
     expect(row.isFavorite).toBe(false);
 
-    // Backfill as owner — should see true isFavorite
+    // Backfill as owner — resolves the owner's own favorite, true.
     const ownerStream = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id, owner.id);
     const ownerResult: any[] = await Array.fromAsync(ownerStream);
     expect(ownerResult.find((r: any) => r.id === asset.id)?.isFavorite).toBe(true);
+  });
+
+  it("syncs the recipient's own favorite of a foreign-owned asset on backfill (#763, E25)", async () => {
+    const { ctx, sut } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { user: member } = await ctx.newUser();
+    const { album } = await ctx.newAlbum({ ownerId: owner.id });
+    const { asset } = await ctx.newAsset({ ownerId: owner.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+
+    // Member favorites an asset they don't own — their own stream must reflect it as true, not
+    // the old hardcoded/masked false.
+    await ctx.get(AssetFavoriteRepository).addAll(member.id, [asset.id]);
+
+    const stream = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id, member.id);
+    const result: any[] = [];
+    for await (const row of stream) {
+      result.push(row);
+    }
+    expect(result.find((r: any) => r.id === asset.id)?.isFavorite).toBe(true);
   });
 });
 
@@ -150,8 +171,8 @@ describe('SharedSpaceAlbumAssetSync.getCreates', () => {
     expect(result.map((r: any) => r.id)).not.toContain(asset.id);
   });
 
-  it('masks isFavorite to false for non-owner members in getCreates', async () => {
-    const { ctx, db, sut } = setup();
+  it("does not leak the owner's favorite to a non-owner member in getCreates (#763)", async () => {
+    const { ctx, sut } = setup();
     const { user: owner } = await ctx.newUser();
     const { user: member } = await ctx.newUser();
     const { album } = await ctx.newAlbum({ ownerId: owner.id });
@@ -160,12 +181,33 @@ describe('SharedSpaceAlbumAssetSync.getCreates', () => {
     const { space } = await ctx.newSharedSpace({ createdById: owner.id });
     await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Editor });
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
-    await db.updateTable('asset').set({ isFavorite: true }).where('id', '=', asset.id).execute();
+    await ctx.get(AssetFavoriteRepository).addAll(owner.id, [asset.id]);
 
     const stream = sut.getCreates({ nowId: NOW_ID, userId: member.id });
     const result: any[] = await Array.fromAsync(stream);
     const row = result.find((r: any) => r.id === asset.id);
     expect(row?.isFavorite).toBe(false);
+  });
+
+  it("syncs the recipient's own favorite of a foreign-owned asset in getCreates (#763, E25)", async () => {
+    const { ctx, sut } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { user: member } = await ctx.newUser();
+    const { album } = await ctx.newAlbum({ ownerId: owner.id });
+    const { asset } = await ctx.newAsset({ ownerId: owner.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Editor });
+    await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+    await ctx.get(AssetFavoriteRepository).addAll(member.id, [asset.id]);
+
+    const stream = sut.getCreates({ nowId: NOW_ID, userId: member.id });
+    const result: any[] = [];
+    for await (const row of stream) {
+      result.push(row);
+    }
+    const row = result.find((r: any) => r.id === asset.id);
+    expect(row?.isFavorite).toBe(true);
   });
 });
 

@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { AlbumUserRole, SyncEntityType, SyncRequestType } from 'src/enum';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { DB } from 'src/schema';
 import { SyncTestContext } from 'test/medium.factory';
@@ -303,13 +304,15 @@ describe(SyncRequestType.AlbumAssetsV2, () => {
     ]);
   });
 
-  it('should hide isFavorite for album assets owned by another user', async () => {
+  it("does not leak another user's favorite for album assets owned by that user (#763)", async () => {
     const { auth, ctx } = await setup();
     const { user: user2 } = await ctx.newUser();
-    const { asset } = await ctx.newAsset({ ownerId: user2.id, isFavorite: true });
+    const { asset } = await ctx.newAsset({ ownerId: user2.id });
     const { album } = await ctx.newAlbum({ ownerId: user2.id });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
     await ctx.newAlbumUser({ albumId: album.id, userId: auth.user.id, role: AlbumUserRole.Viewer });
+    // Owner favorites the asset — this must never leak to the viewer's stream.
+    await ctx.get(AssetFavoriteRepository).addAll(user2.id, [asset.id]);
 
     const response = await ctx.syncStream(auth, [SyncRequestType.AlbumAssetsV2]);
     expect(response).toEqual([
@@ -323,13 +326,35 @@ describe(SyncRequestType.AlbumAssetsV2, () => {
     ]);
   });
 
-  it('should sync isFavorite for album assets owned by the requesting user', async () => {
+  it("syncs the recipient's own favorite for an album asset owned by another user (#763, E25)", async () => {
     const { auth, ctx } = await setup();
     const { user: user2 } = await ctx.newUser();
-    const { asset } = await ctx.newAsset({ ownerId: auth.user.id, isFavorite: true });
+    const { asset } = await ctx.newAsset({ ownerId: user2.id });
     const { album } = await ctx.newAlbum({ ownerId: user2.id });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
     await ctx.newAlbumUser({ albumId: album.id, userId: auth.user.id, role: AlbumUserRole.Viewer });
+    // The viewer favorites an asset they don't own — their own stream must reflect it as true.
+    await ctx.get(AssetFavoriteRepository).addAll(auth.user.id, [asset.id]);
+
+    const response = await ctx.syncStream(auth, [SyncRequestType.AlbumAssetsV2]);
+    expect(response).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          data: expect.objectContaining({ id: asset.id, isFavorite: true }),
+          type: SyncEntityType.AlbumAssetCreateV2,
+        }),
+      ]),
+    );
+  });
+
+  it('should sync isFavorite for album assets owned by the requesting user', async () => {
+    const { auth, ctx } = await setup();
+    const { user: user2 } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: auth.user.id });
+    const { album } = await ctx.newAlbum({ ownerId: user2.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+    await ctx.newAlbumUser({ albumId: album.id, userId: auth.user.id, role: AlbumUserRole.Viewer });
+    await ctx.get(AssetFavoriteRepository).addAll(auth.user.id, [asset.id]);
 
     const response = await ctx.syncStream(auth, [SyncRequestType.AlbumAssetsV2]);
     expect(response).toEqual(

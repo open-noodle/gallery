@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { SyncEntityType, SyncRequestType } from 'src/enum';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { PartnerRepository } from 'src/repositories/partner.repository';
 import { UserRepository } from 'src/repositories/user.repository';
@@ -341,11 +342,13 @@ describe(SyncRequestType.PartnerAssetsV2, () => {
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.PartnerAssetsV2]);
   });
 
-  it('should hide isFavorite for partner assets', async () => {
+  it("does not leak the partner's own favorite for partner assets (#763)", async () => {
     const { auth, ctx } = await setup();
     const { user: user2 } = await ctx.newUser();
-    const { asset } = await ctx.newAsset({ ownerId: user2.id, isFavorite: true });
+    const { asset } = await ctx.newAsset({ ownerId: user2.id });
     await ctx.newPartner({ sharedById: user2.id, sharedWithId: auth.user.id });
+    // The partner (owner) favorites their own asset — must never leak to the recipient's stream.
+    await ctx.get(AssetFavoriteRepository).addAll(user2.id, [asset.id]);
 
     const response = await ctx.syncStream(auth, [SyncRequestType.PartnerAssetsV2]);
     expect(response).toEqual([
@@ -356,5 +359,60 @@ describe(SyncRequestType.PartnerAssetsV2, () => {
       },
       expect.objectContaining({ type: SyncEntityType.SyncCompleteV1 }),
     ]);
+  });
+
+  it("syncs the recipient's own favorite for a partner asset (#763, E25 — was hardcoded false)", async () => {
+    const { auth, ctx } = await setup();
+    const { user: user2 } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: user2.id });
+    await ctx.newPartner({ sharedById: user2.id, sharedWithId: auth.user.id });
+    // The recipient favorites a partner asset they don't own — their own stream must reflect it.
+    await ctx.get(AssetFavoriteRepository).addAll(auth.user.id, [asset.id]);
+
+    const response = await ctx.syncStream(auth, [SyncRequestType.PartnerAssetsV2]);
+    expect(response).toEqual([
+      {
+        ack: expect.any(String),
+        data: expect.objectContaining({ id: asset.id, isFavorite: true }),
+        type: SyncEntityType.PartnerAssetV2,
+      },
+      expect.objectContaining({ type: SyncEntityType.SyncCompleteV1 }),
+    ]);
+  });
+
+  it("syncs the recipient's own favorite for a partner asset on the backfill path (#763, E25)", async () => {
+    // Exercises PartnerAssetsSync.getBackfill specifically (getBackfill and getUpserts are
+    // separate CASE-WHEN/overlay call sites in sync.repository.ts). Mirrors "should backfill
+    // partner assets when a partner shared their library with you" above: the asset must exist
+    // BEFORE the checkpoint-establishing initial sync so the later partner share routes it
+    // through the backfill loop rather than the regular upsert stream.
+    const { auth, ctx } = await setup();
+    const { user: user2 } = await ctx.newUser();
+    const { user: user3 } = await ctx.newUser();
+    const { asset: backfillAsset } = await ctx.newAsset({ ownerId: user3.id });
+    await wait(2);
+    const { asset: initialAsset } = await ctx.newAsset({ ownerId: user2.id });
+    await ctx.newPartner({ sharedById: user2.id, sharedWithId: auth.user.id });
+
+    const setupResponse = await ctx.syncStream(auth, [SyncRequestType.PartnerAssetsV2]);
+    expect(setupResponse).toEqual([
+      expect.objectContaining({
+        data: expect.objectContaining({ id: initialAsset.id }),
+        type: SyncEntityType.PartnerAssetV2,
+      }),
+      expect.objectContaining({ type: SyncEntityType.SyncCompleteV1 }),
+    ]);
+    await ctx.syncAckAll(auth, setupResponse);
+
+    await ctx.newPartner({ sharedById: user3.id, sharedWithId: auth.user.id });
+    // The recipient favorites the historical partner asset before it backfills.
+    await ctx.get(AssetFavoriteRepository).addAll(auth.user.id, [backfillAsset.id]);
+
+    const response = await ctx.syncStream(auth, [SyncRequestType.PartnerAssetsV2]);
+    const backfillEvents = response.filter((r: { type: string }) => r.type === SyncEntityType.PartnerAssetBackfillV2);
+    const backfillRow = backfillEvents.find((r: { data: { id: string } }) => r.data.id === backfillAsset.id) as
+      | { data: { id: string; isFavorite: boolean } }
+      | undefined;
+    expect(backfillRow?.data.isFavorite).toBe(true);
   });
 });
