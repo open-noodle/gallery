@@ -362,6 +362,7 @@ features:
         - server/src/schema/migrations-gallery/1775000000000-AddPetsEnabledToSharedSpace.ts
         - server/src/schema/migrations-gallery/1775100000000-AddAssetDuplicateChecksum.ts
         - server/src/schema/migrations-gallery/1775100000000-DropSpacePersonThumbnailPath.ts
+        - server/src/schema/migrations-gallery/1775300000000-AddSharedSpaceAlbumTable.ts
         - server/src/schema/migrations-gallery/1776000000000-AddClassificationTables.ts
         - server/src/schema/migrations-gallery/1777000000000-AddSpacePersonCounts.ts
         - server/src/schema/migrations-gallery/1777000000000-AdminScopedClassification.ts
@@ -378,7 +379,20 @@ features:
         - server/src/schema/migrations-gallery/1778700000000-AddSharedSpaceFaceMatchBackfillTarget.ts
         - server/src/schema/migrations-gallery/1778800000000-ReconcileFaceIdentityIndexOverrides.ts
         - server/src/schema/migrations-gallery/1778800000000-TrimSpacePersonNameIndex.ts
+        - server/src/schema/migrations-gallery/1779000000000-AddSharedSpaceAlbumUserTables.ts
+        - server/src/schema/migrations-gallery/1779100000000-AddSharedSpaceAlbumCreateSideTriggers.ts
+        - server/src/schema/migrations-gallery/1779200000000-AddSharedSpaceAlbumDeleteSideTriggers.ts
+        - server/src/schema/migrations-gallery/1779300000000-FixUserHasAlbumPathSoftDeleted.ts
+        - server/src/schema/migrations-gallery/1779309791424-SharedSpaceAlbumAssetAuditTable.ts
+        - server/src/schema/migrations-gallery/1781181889688-SharedSpaceLibraryAssetAuditTable.ts
         - server/src/schema/migrations-gallery/1782000000000-AddAssetExifDescriptionTrigramIndex.ts
+        - server/src/schema/migrations-gallery/1782050000000-AddAlbumSoftDeleteSharedSpaceAlbumTrigger.ts
+        - server/src/schema/migrations-gallery/1782100000000-FixSharedSpaceAlbumGrantRelinkCreateId.ts
+        - server/src/schema/migrations-gallery/1782300000000-AddSharedSpaceAlbumAuditSyncIndexes.ts
+        - server/src/schema/migrations-gallery/1783000000000-AddAlbumSpaceAssetTable.ts
+        - server/src/schema/migrations-gallery/1783100000000-AddAlbumSpaceAssetSyncAndAudit.ts
+        - server/src/schema/migrations-gallery/1783628194057-DisablePostgresJit.ts
+        - server/src/schema/migrations-gallery/1783700000000-FixSharedSpaceMemberJoinGrantCreateId.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
 checks:
