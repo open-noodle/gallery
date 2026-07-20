@@ -385,4 +385,33 @@ describe('favorite rows survive access loss and re-derive on read (#763 slice 4)
     const graceInfo = await utils.getAssetInfo(grace.accessToken, frankAsset.id);
     expect(graceInfo.isFavorite).toBe(true);
   });
+
+  it('concurrent favorite + unfavorite of the same (user, asset) converges deterministically — no PK violation, no 500, no orphaned row (E27)', async () => {
+    // A fresh asset, untouched by the other tests in this describe.
+    const assetConcurrent = await utils.createAsset(dave.accessToken);
+
+    // addAll is an INSERT ... ON CONFLICT DO NOTHING, removeAll a plain DELETE keyed on
+    // (userId, assetId) (asset-favorite.repository.ts) — racing PUTs must never surface a PK
+    // violation as a 500, on either side of the race.
+    for (let i = 0; i < 10; i++) {
+      const [favorite, unfavorite] = await Promise.all([
+        putFavorites(dave.accessToken, { ids: [assetConcurrent.id], isFavorite: true }),
+        putFavorites(dave.accessToken, { ids: [assetConcurrent.id], isFavorite: false }),
+      ]);
+      expect(favorite.status).toBe(204);
+      expect(unfavorite.status).toBe(204);
+    }
+
+    // Converge deterministically: an explicit final write in each direction must land, proving no
+    // orphaned/stuck row survived the race.
+    const favoriteRes = await putFavorites(dave.accessToken, { ids: [assetConcurrent.id], isFavorite: true });
+    expect(favoriteRes.status).toBe(204);
+    let daveInfo = await utils.getAssetInfo(dave.accessToken, assetConcurrent.id);
+    expect(daveInfo.isFavorite).toBe(true);
+
+    const unfavoriteRes = await putFavorites(dave.accessToken, { ids: [assetConcurrent.id], isFavorite: false });
+    expect(unfavoriteRes.status).toBe(204);
+    daveInfo = await utils.getAssetInfo(dave.accessToken, assetConcurrent.id);
+    expect(daveInfo.isFavorite).toBe(false);
+  });
 });
