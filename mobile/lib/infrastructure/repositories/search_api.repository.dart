@@ -58,9 +58,9 @@ class SearchApiRepository extends ApiRepository {
         page: Optional.present(page),
         size: const Optional.present(100),
         // Include shared-space assets so a viewer's selected facet returns results (and a
-        // space-person token resolves). Gated on favourite — favourites are owner-only, mirroring
-        // web buildPhotosTimelineOptions (`includeSharedTimelineAssets = isFavorite === undefined`).
-        withSharedSpaces: filter.display.isFavorite ? const Optional.absent() : const Optional.present(true),
+        // space-person token resolves). #763: favorites are per-user, so the server composes
+        // shared-space visibility with the favorite filter (slice 4) — no need to suppress it here.
+        withSharedSpaces: const Optional.present(true),
       );
       return _api.searchSmart(filter.display.isUntagged ? _ExplicitNullTagIdsSmartSearchDto(dto) : dto);
     }
@@ -93,9 +93,9 @@ class SearchApiRepository extends ApiRepository {
       page: Optional.present(page),
       size: const Optional.present(1000),
       // Include shared-space assets so a viewer's selected facet returns results (and a
-      // space-person token resolves). Gated on favourite — favourites are owner-only, mirroring
-      // web buildPhotosTimelineOptions (`includeSharedTimelineAssets = isFavorite === undefined`).
-      withSharedSpaces: filter.display.isFavorite ? const Optional.absent() : const Optional.present(true),
+      // space-person token resolves). #763: favorites are per-user, so the server composes
+      // shared-space visibility with the favorite filter (slice 4) — no need to suppress it here.
+      withSharedSpaces: const Optional.present(true),
     );
     return _api.searchAssets(filter.display.isUntagged ? _ExplicitNullTagIdsMetadataSearchDto(dto) : dto);
   }

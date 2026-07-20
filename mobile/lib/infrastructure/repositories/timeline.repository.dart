@@ -829,20 +829,90 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
     sortBy: SortAssetsBy.uploaded,
   );
 
+  // #763: favorites are per-viewer, not per-owner — a shared-space viewer's favorite flag on
+  // someone else's asset must still surface on their Favorites page. This drops the old
+  // row.ownerId.equals(userId) scoping and instead mirrors the map favorite filter's
+  // viewer-visibility join/predicate (own + space/album/library-shared), diverging intentionally
+  // from the previous owner-only semantics. Can't reuse `_remoteQueryBuilder` here since it has
+  // no join support, so this mirrors `_watchMapBucket`/`_getMapBucketAssets` instead.
   TimelineQuery favorite(
     String userId,
     GroupAssetsBy groupBy, {
     TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
-  }) => _remoteQueryBuilder(
-    filter: (row) =>
-        row.deletedAt.isNull() &
-        row.isFavorite.equals(true) &
-        row.ownerId.equals(userId) &
-        (row.visibility.equalsValue(AssetVisibility.timeline) | row.visibility.equalsValue(AssetVisibility.archive)),
-    groupBy: groupBy,
-    temporalScope: temporalScope,
+  }) => (
+    bucketSource: () => _watchFavoriteBucket(userId, groupBy: groupBy, temporalScope: temporalScope),
+    assetSource: (offset, count) =>
+        _getFavoriteAssets(userId, offset: offset, count: count, temporalScope: temporalScope),
     origin: TimelineOrigin.favorite,
   );
+
+  Stream<List<Bucket>> _watchFavoriteBucket(
+    String userId, {
+    GroupAssetsBy groupBy = GroupAssetsBy.day,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) {
+    final viz = buildViewerVisibilityJoins(_db, _db.remoteAssetEntity, userId);
+    final visible =
+        _db.remoteAssetEntity.deletedAt.isNull() &
+        _db.remoteAssetEntity.isFavorite.equals(true) &
+        (_db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) |
+            _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.archive)) &
+        _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) &
+        (_db.remoteAssetEntity.ownerId.equals(userId) |
+            viz.assetMember.userId.isNotNull() |
+            viz.libraryMember.userId.isNotNull() |
+            viz.albumMember.userId.isNotNull());
+
+    if (groupBy == GroupAssetsBy.none) {
+      final countExp = _db.remoteAssetEntity.id.count(distinct: true);
+      final query = _db.remoteAssetEntity.selectOnly()
+        ..addColumns([countExp])
+        ..join(viz.joins)
+        ..where(visible);
+
+      return query.map((row) => row.read(countExp) ?? 0).map(_generateBuckets).watchSingle();
+    }
+
+    final assetCountExp = _db.remoteAssetEntity.id.count(distinct: true);
+    final dateExp = _db.remoteAssetEntity.effectiveCreatedAt(groupBy);
+
+    final query = _db.remoteAssetEntity.selectOnly()
+      ..addColumns([assetCountExp, dateExp])
+      ..join(viz.joins)
+      ..where(visible)
+      ..groupBy([dateExp])
+      ..orderBy([OrderingTerm.desc(dateExp)]);
+
+    return query.map((row) {
+      final timeline = row.read(dateExp)!.truncateDate(groupBy);
+      final assetCount = row.read(assetCountExp)!;
+      return TimeBucket(date: timeline, assetCount: assetCount);
+    }).watch();
+  }
+
+  Future<List<BaseAsset>> _getFavoriteAssets(
+    String userId, {
+    required int offset,
+    required int count,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) {
+    final visibilityPredicate = viewerVisibilityPredicate(_db, _db.remoteAssetEntity, [userId], userId);
+
+    final query = _db.remoteAssetEntity.select()
+      ..where(
+        (row) =>
+            row.deletedAt.isNull() &
+            row.isFavorite.equals(true) &
+            (row.visibility.equalsValue(AssetVisibility.timeline) |
+                row.visibility.equalsValue(AssetVisibility.archive)) &
+            _remoteWithinTemporalScope(row, temporalScope) &
+            visibilityPredicate,
+      )
+      ..orderBy([(row) => OrderingTerm.desc(row.createdAt)])
+      ..limit(count, offset: offset);
+
+    return query.map((row) => row.toDto()).get();
+  }
 
   TimelineQuery trash(
     String userId,
