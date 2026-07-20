@@ -396,4 +396,51 @@ describe(MemoryRepository.name, () => {
       await expect(sut.getOldestMemoryDate()).resolves.toEqual(new Date('2025-12-25T00:00:00Z'));
     });
   });
+
+  // #763 slice 1b Task 2 — mapMemory feeds mapAsset with each memory's `assets` array, so the
+  // overlay must be projected onto those rows keyed to the CALLER (the viewer), not the memory
+  // owner — memories are frequently viewed by someone other than their owner (partner/space share).
+  describe('searchAccessible (#763)', () => {
+    it('projects isFavoriteForUser for the requesting user, independent of the memory owner', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id });
+      const { memory } = await ctx.newMemory({ ownerId: owner.id });
+      await ctx.newMemoryAsset({ memoryId: memory.id, assetId: asset.id });
+
+      await ctx.database.insertInto('asset_favorite').values({ userId: viewer.id, assetId: asset.id }).execute();
+
+      const [asOwner] = await sut.searchAccessible(owner.id, {});
+      expect(asOwner.assets[0].isFavoriteForUser).toBe(false);
+
+      const [asViewer] = await sut.searchAccessible(viewer.id, {});
+      expect(asViewer.assets[0].isFavoriteForUser).toBe(true);
+    });
+  });
+
+  describe('get (#763)', () => {
+    it('projects isFavoriteForUser for the supplied authUserId', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      const { memory } = await ctx.newMemory({ ownerId: owner.id });
+      await ctx.newMemoryAsset({ memoryId: memory.id, assetId: asset.id });
+
+      await ctx.database.insertInto('asset_favorite').values({ userId: viewer.id, assetId: asset.id }).execute();
+
+      const asOwner = await sut.get(memory.id, owner.id);
+      expect(asOwner?.assets[0].isFavoriteForUser).toBe(false);
+
+      const asViewer = await sut.get(memory.id, viewer.id);
+      expect(asViewer?.assets[0].isFavoriteForUser).toBe(true);
+
+      const withoutAuthUserId = await sut.get(memory.id);
+      expect(withoutAuthUserId?.assets[0].isFavoriteForUser).toBeUndefined();
+    });
+  });
 });
