@@ -583,5 +583,17 @@ abstract final class SyncStreamStub {
     type: SyncEntityType.sharedSpaceAlbumHiddenDeleteV1,
     data: SyncSharedSpaceAlbumHiddenDeleteV1(spaceId: 'space-3', albumId: 'album-stub-3', userId: 'user-1'),
     ack: 'sa-album-hidden-delete-ack',
+  // --- gallery-fork: per-user favorites sync stubs (#763) ---
+
+  static final assetFavoriteV1 = SyncEvent(
+    type: SyncEntityType.assetFavoriteV1,
+    data: SyncAssetFavoriteV1(assetId: 'asset-favorite-1'),
+    ack: 'asset-favorite-v1-ack',
+  );
+
+  static final assetFavoriteDeleteV1 = SyncEvent(
+    type: SyncEntityType.assetFavoriteDeleteV1,
+    data: SyncAssetFavoriteDeleteV1(assetId: 'asset-favorite-2'),
+    ack: 'asset-favorite-delete-ack',
   );
 }
