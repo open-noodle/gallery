@@ -652,7 +652,8 @@ describe(AssetService.name, () => {
 
       await sut.update(authStub.admin, asset.id, { isFavorite: true });
 
-      expect(mocks.asset.update).toHaveBeenCalledWith({ id: asset.id, isFavorite: true });
+      // #763: the update return path now threads the caller's id to project isFavoriteForUser.
+      expect(mocks.asset.update).toHaveBeenCalledWith({ id: asset.id, isFavorite: true }, authStub.admin.user.id);
     });
 
     it('should update the exif description', async () => {
@@ -783,7 +784,11 @@ describe(AssetService.name, () => {
 
       expect(mocks.asset.update).toHaveBeenCalledWith({ id: motionAsset.id, visibility: AssetVisibility.Hidden });
       expect(mocks.event.emit).toHaveBeenCalledWith('AssetHide', { assetId: motionAsset.id, userId: auth.user.id });
-      expect(mocks.asset.update).toHaveBeenCalledWith({ id: stillAsset.id, livePhotoVideoId: motionAsset.id });
+      // #763: the update return path now threads the caller's id to project isFavoriteForUser.
+      expect(mocks.asset.update).toHaveBeenCalledWith(
+        { id: stillAsset.id, livePhotoVideoId: motionAsset.id },
+        auth.user.id,
+      );
     });
 
     it('should throw an error if asset could not be found after update', async () => {
@@ -807,10 +812,14 @@ describe(AssetService.name, () => {
 
       await sut.update(auth, asset.id, { livePhotoVideoId: null });
 
-      expect(mocks.asset.update).toHaveBeenCalledWith({
-        id: asset.id,
-        livePhotoVideoId: null,
-      });
+      // #763: the update return path now threads the caller's id to project isFavoriteForUser.
+      expect(mocks.asset.update).toHaveBeenCalledWith(
+        {
+          id: asset.id,
+          livePhotoVideoId: null,
+        },
+        auth.user.id,
+      );
       expect(mocks.asset.update).toHaveBeenCalledWith({
         id: motionAsset.id,
         visibility: asset.visibility,
@@ -843,7 +852,8 @@ describe(AssetService.name, () => {
 
       await sut.update(auth, asset.id, { livePhotoVideoId: null });
 
-      expect(mocks.asset.update).toHaveBeenCalledWith({ id: asset.id, livePhotoVideoId: null });
+      // #763: the update return path now threads the caller's id to project isFavoriteForUser.
+      expect(mocks.asset.update).toHaveBeenCalledWith({ id: asset.id, livePhotoVideoId: null }, auth.user.id);
     });
 
     it('should update latitude and longitude', async () => {
@@ -996,9 +1006,14 @@ describe(AssetService.name, () => {
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
       mocks.asset.update.mockResolvedValue({ ...getForAsset(asset), visibility: AssetVisibility.Archive });
 
-      await sut.update(AuthFactory.create({ id: asset.ownerId }), asset.id, { visibility: AssetVisibility.Archive });
+      const auth = AuthFactory.create({ id: asset.ownerId });
+      await sut.update(auth, asset.id, { visibility: AssetVisibility.Archive });
 
-      expect(mocks.asset.update).toHaveBeenCalledWith({ id: asset.id, visibility: AssetVisibility.Archive });
+      // #763: the update return path now threads the caller's id to project isFavoriteForUser.
+      expect(mocks.asset.update).toHaveBeenCalledWith(
+        { id: asset.id, visibility: AssetVisibility.Archive },
+        auth.user.id,
+      );
     });
   });
 

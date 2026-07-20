@@ -1275,23 +1275,35 @@ export class AssetRepository {
       .execute();
   }
 
+  // #763: no isFavoriteForUser projection here — the only caller (asset.service.ts updateAll, via
+  // priorAssets) reads `visibility` only, to snapshot the pre-write value for the #757 transition
+  // helper. The rows never reach mapAsset, so there is nothing to project.
   @GenerateSql({ params: [[DummyValue.UUID]] })
   @ChunkedArray()
   getByIds(ids: string[]) {
     return this.db.selectFrom('asset').selectAll('asset').where('asset.id', '=', anyUuid(ids)).execute();
   }
 
-  @GenerateSql({ params: [[DummyValue.UUID]] })
+  @GenerateSql(
+    { params: [[DummyValue.UUID]] },
+    { name: 'with authUserId', params: [[DummyValue.UUID], DummyValue.UUID] },
+  )
   @ChunkedArray()
-  getByIdsWithAllRelationsButStacks(ids: string[]) {
-    return this.db
-      .selectFrom('asset')
-      .selectAll('asset')
-      .select(withFacesAndPeople)
-      .select(withTags)
-      .$call(withExif)
-      .where('asset.id', '=', anyUuid(ids))
-      .execute();
+  getByIdsWithAllRelationsButStacks(ids: string[], authUserId?: string) {
+    return (
+      this.db
+        .selectFrom('asset')
+        .selectAll('asset')
+        .select(withFacesAndPeople)
+        .select(withTags)
+        .$call(withExif)
+        // #763: authUserId is optional and deliberately omitted by job.service.ts (background job)
+        // and notification.service.ts (synthetic partial auth) — see the comments at their mapAsset
+        // call sites. Only search.service.ts's getExploreData passes it (real caller identity).
+        .$if(!!authUserId, (qb) => qb.select((eb) => favoriteExistsFor(eb, authUserId!).as('isFavoriteForUser')))
+        .where('asset.id', '=', anyUuid(ids))
+        .execute()
+    );
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
@@ -1393,10 +1405,18 @@ export class AssetRepository {
     );
   }
 
-  @GenerateSql({ params: [DummyValue.UUID] })
+  @GenerateSql(
+    { params: [DummyValue.UUID] },
+    { name: 'with authUserId', params: [DummyValue.UUID, {}, DummyValue.UUID] },
+  )
   getById(
     id: string,
     { exifInfo, faces, files, library, owner, smartSearch, stack, tags, edits }: GetByIdsRelations = {},
+    // #763: the CALLER's id — used only to project `isFavoriteForUser` (favoriteExistsFor).
+    // Optional and omitted by every non-mapAsset-facing caller (asset.util.ts motion lookups,
+    // background jobs, person.service.ts createFace, classification.service.ts), which never
+    // reach mapAsset and so have no per-user value to resolve.
+    authUserId?: string,
   ) {
     return this.db
       .selectFrom('asset')
@@ -1439,6 +1459,7 @@ export class AssetRepository {
       .$if(!!files, (qb) => qb.select(withFiles))
       .$if(!!tags, (qb) => qb.select(withTags))
       .$if(!!edits, (qb) => qb.select(withEdits))
+      .$if(!!authUserId, (qb) => qb.select((eb) => favoriteExistsFor(eb, authUserId!).as('isFavoriteForUser')))
       .limit(1)
       .executeTakeFirst();
   }
@@ -1456,7 +1477,11 @@ export class AssetRepository {
     await this.db.updateTable('asset').set(options).where('libraryId', '=', asUuid(libraryId)).execute();
   }
 
-  async update(asset: Updateable<AssetTable> & { id: string }) {
+  // #763: authUserId is the CALLER's id, used only to project `isFavoriteForUser` onto the
+  // returned row. Optional and omitted by the many write-only callers (thumbnail/duration/stack
+  // bookkeeping etc.) whose result is never fed to mapAsset — only asset.service.ts's `update`
+  // (the PUT /assets/:id response) passes it.
+  async update(asset: Updateable<AssetTable> & { id: string }, authUserId?: string) {
     const value = omitBy(asset, isUndefined);
     delete value.id;
     if (!isEmpty(value)) {
@@ -1467,10 +1492,20 @@ export class AssetRepository {
         .$call(withExif)
         .$call((qb) => qb.select(withFacesAndPeople))
         .$call((qb) => qb.select(withEdits))
+        .$if(!!authUserId, (qb) =>
+          qb.select((eb) =>
+            // The `.with('asset', ...)` CTE above shadows the real `asset` table with the same
+            // name, so `eb` here is scoped to `DB & { asset: <cte-shape> }` rather than the plain
+            // `ExpressionBuilder<DB, keyof DB>` favoriteExistsFor expects. Safe cast: at runtime
+            // `favoriteExistsFor` only emits `sql.ref('asset.id')`, which resolves to the CTE's
+            // `id` column identically to the base table (same mechanism as getTimeBucket above).
+            favoriteExistsFor(eb as unknown as ExpressionBuilder<DB, keyof DB>, authUserId!).as('isFavoriteForUser'),
+          ),
+        )
         .executeTakeFirst();
     }
 
-    return this.getById(asset.id, { exifInfo: true, faces: { person: true }, edits: true });
+    return this.getById(asset.id, { exifInfo: true, faces: { person: true }, edits: true }, authUserId);
   }
 
   async remove(asset: { id: string }): Promise<void> {

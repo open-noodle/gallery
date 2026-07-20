@@ -2008,7 +2008,13 @@ describe(SearchService.name, () => {
 
       const result = await sut.getAssetsByCity(authStub.user1);
 
-      expect(mocks.search.getAssetsByCity).toHaveBeenCalledWith([authStub.user1.user.id], undefined);
+      // #763: getAssetsByCity also threads the caller's id to project isFavoriteForUser; the
+      // undefined is #867's timelineSpaceIds, which this stub has none of.
+      expect(mocks.search.getAssetsByCity).toHaveBeenCalledWith(
+        [authStub.user1.user.id],
+        undefined,
+        authStub.user1.user.id,
+      );
       expect(result).toHaveLength(1);
     });
 

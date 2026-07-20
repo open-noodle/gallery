@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  ExpressionBuilder,
   expressionBuilder,
   Kysely,
   OrderByDirection,
@@ -458,6 +459,12 @@ export class SearchRepository {
     const orderDirection = (options.orderDirection?.toLowerCase() || 'desc') as OrderByDirection;
     const items = await searchAssetBuilderLegacy(this.db, options)
       .select(columns.searchAsset)
+      // #763: project the per-user overlay onto the rows feeding mapAsset. Not folded into
+      // searchAssetBuilderLegacy itself — searchStatistics also builds on it with an aggregate
+      // countAll() and no GROUP BY, so an unconditional row-level SELECT there would break it.
+      .$if(!!options.authUserId, (qb) =>
+        qb.select((eb) => favoriteExistsFor(eb, options.authUserId!).as('isFavoriteForUser')),
+      )
       .orderBy('asset.fileCreatedAt', orderDirection)
       .orderBy('asset.id', orderDirection)
       .limit(pagination.size + 1)
@@ -498,11 +505,17 @@ export class SearchRepository {
     ],
   })
   async searchRandom(size: number, options: AssetSearchOptions) {
-    return searchAssetBuilderLegacy(this.db, options)
-      .select(columns.searchAsset)
-      .orderBy(sql`random()`)
-      .limit(size)
-      .execute();
+    return (
+      searchAssetBuilderLegacy(this.db, options)
+        .select(columns.searchAsset)
+        // #763: see searchMetadata above for why this lives per-caller rather than in searchAssetBuilderLegacy.
+        .$if(!!options.authUserId, (qb) =>
+          qb.select((eb) => favoriteExistsFor(eb, options.authUserId!).as('isFavoriteForUser')),
+        )
+        .orderBy(sql`random()`)
+        .limit(size)
+        .execute()
+    );
   }
 
   @GenerateSql({
@@ -520,13 +533,19 @@ export class SearchRepository {
   })
   searchLargeAssets(size: number, options: LargeAssetSearchOptions) {
     const orderDirection = (options.orderDirection?.toLowerCase() || 'desc') as OrderByDirection;
-    return searchAssetBuilderLegacy(this.db, options)
-      .select(columns.searchAsset)
-      .$call(withExifInner)
-      .where('asset_exif.fileSizeInByte', '>', options.minFileSize || 0)
-      .orderBy('asset_exif.fileSizeInByte', orderDirection)
-      .limit(size)
-      .execute();
+    return (
+      searchAssetBuilderLegacy(this.db, options)
+        .select(columns.searchAsset)
+        // #763: see searchMetadata above for why this lives per-caller rather than in searchAssetBuilderLegacy.
+        .$if(!!options.authUserId, (qb) =>
+          qb.select((eb) => favoriteExistsFor(eb, options.authUserId!).as('isFavoriteForUser')),
+        )
+        .$call(withExifInner)
+        .where('asset_exif.fileSizeInByte', '>', options.minFileSize || 0)
+        .orderBy('asset_exif.fileSizeInByte', orderDirection)
+        .limit(size)
+        .execute()
+    );
   }
 
   private buildSearchSmartQueries(
@@ -543,6 +562,12 @@ export class SearchRepository {
       ratingIsMinimum: true,
     })
       .selectAll('asset')
+      // #763: project the per-user overlay onto the rows feeding mapAsset via searchSmart's
+      // mapResponse. Flows through both the 'cte' (candidates.selectAll()) and 'simple' outer
+      // query paths below since both select every column baseQuery projects.
+      .$if(!!options.authUserId, (qb) =>
+        qb.select((eb) => favoriteExistsFor(eb, options.authUserId!).as('isFavoriteForUser')),
+      )
       .innerJoin('smart_search', 'asset.id', 'smart_search.assetId')
       .$if(!!options.forceEmptyResult, (qb) => qb.where(sql<SqlBool>`false`))
       .$if(hasDistanceThreshold, (qb) =>
@@ -1268,8 +1293,11 @@ export class SearchRepository {
       .execute();
   }
 
-  @GenerateSql({ params: [[DummyValue.UUID], [DummyValue.UUID]] })
-  getAssetsByCity(userIds: string[], timelineSpaceIds?: string[]) {
+  @GenerateSql(
+    { params: [[DummyValue.UUID], [DummyValue.UUID]] },
+    { name: 'with authUserId', params: [[DummyValue.UUID], [DummyValue.UUID], DummyValue.UUID] },
+  )
+  getAssetsByCity(userIds: string[], timelineSpaceIds?: string[], authUserId?: string) {
     // #867: the places page is the "view all" of the Explore strip, so it carries the same scope —
     // own (and partner) assets, plus anything reachable through a space the viewer kept on their
     // timeline. Built from a detached expression builder because the recursive `cte` widens the
@@ -1290,53 +1318,67 @@ export class SearchRepository {
       ]);
     };
 
-    return this.db
-      .withRecursive('cte', (qb) => {
-        const base = qb
-          .selectFrom('asset_exif')
-          .select(['city', 'assetId'])
-          .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
-          .where(viewerScope())
-          .where('asset.visibility', '=', AssetVisibility.Timeline)
-          .where('asset.type', '=', AssetType.Image)
-          .where('asset.deletedAt', 'is', null)
-          .orderBy('city')
-          .limit(1);
+    return (
+      this.db
+        .withRecursive('cte', (qb) => {
+          const base = qb
+            .selectFrom('asset_exif')
+            .select(['city', 'assetId'])
+            .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
+            .where(viewerScope())
+            .where('asset.visibility', '=', AssetVisibility.Timeline)
+            .where('asset.type', '=', AssetType.Image)
+            .where('asset.deletedAt', 'is', null)
+            .orderBy('city')
+            .limit(1);
 
-        const recursive = qb
-          .selectFrom('cte')
-          .select(['l.city', 'l.assetId'])
-          .innerJoinLateral(
-            (qb) =>
-              qb
-                .selectFrom('asset_exif')
-                .select(['city', 'assetId'])
-                .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
-                .where(viewerScope())
-                .where('asset.visibility', '=', AssetVisibility.Timeline)
-                .where('asset.type', '=', AssetType.Image)
-                .where('asset.deletedAt', 'is', null)
-                .whereRef('asset_exif.city', '>', 'cte.city')
-                .orderBy('city')
-                .limit(1)
-                .as('l'),
-            (join) => join.onTrue(),
-          );
+          const recursive = qb
+            .selectFrom('cte')
+            .select(['l.city', 'l.assetId'])
+            .innerJoinLateral(
+              (qb) =>
+                qb
+                  .selectFrom('asset_exif')
+                  .select(['city', 'assetId'])
+                  .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
+                  .where(viewerScope())
+                  .where('asset.visibility', '=', AssetVisibility.Timeline)
+                  .where('asset.type', '=', AssetType.Image)
+                  .where('asset.deletedAt', 'is', null)
+                  .whereRef('asset_exif.city', '>', 'cte.city')
+                  .orderBy('city')
+                  .limit(1)
+                  .as('l'),
+              (join) => join.onTrue(),
+            );
 
-        return sql<{ city: string; assetId: string }>`(${base} union all ${recursive})`;
-      })
-      .selectFrom('asset')
-      .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
-      .innerJoin('cte', 'asset.id', 'cte.assetId')
-      .select(columns.searchAsset)
-      .select((eb) =>
-        eb
-          .fn('to_jsonb', [eb.table('asset_exif')])
-          .$castTo<ShallowDehydrateObject<Selectable<AssetExifTable>>>()
-          .as('exifInfo'),
-      )
-      .orderBy('asset_exif.city')
-      .execute();
+          return sql<{ city: string; assetId: string }>`(${base} union all ${recursive})`;
+        })
+        .selectFrom('asset')
+        .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
+        .innerJoin('cte', 'asset.id', 'cte.assetId')
+        .select(columns.searchAsset)
+        .select((eb) =>
+          eb
+            .fn('to_jsonb', [eb.table('asset_exif')])
+            .$castTo<ShallowDehydrateObject<Selectable<AssetExifTable>>>()
+            .as('exifInfo'),
+        )
+        // #763: project the per-user overlay for the CALLER onto the rows feeding
+        // search.service.ts's getAssetsByCity -> mapAsset. The `eb` here is scoped to
+        // `DB & { cte: ... }` (the `withRecursive('cte', ...)` above), which Kysely's
+        // ExpressionBuilder generics don't consider assignable to the plain
+        // `ExpressionBuilder<DB, keyof DB>` favoriteExistsFor expects, even though the
+        // 'asset_favorite' table it queries is unaffected by the extra CTE in scope. Safe cast
+        // (same mechanism as asset.repository.ts's getTimeBucket).
+        .$if(!!authUserId, (qb) =>
+          qb.select((eb) =>
+            favoriteExistsFor(eb as unknown as ExpressionBuilder<DB, keyof DB>, authUserId!).as('isFavoriteForUser'),
+          ),
+        )
+        .orderBy('asset_exif.city')
+        .execute()
+    );
   }
 
   async upsert(assetId: string, embedding: string): Promise<void> {

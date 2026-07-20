@@ -246,6 +246,9 @@ export class JobService extends BaseService {
           !asset.isExternal &&
           (asset.visibility === AssetVisibility.Timeline || asset.visibility === AssetVisibility.Archive)
         ) {
+          // #763: deliberately NOT projecting isFavoriteForUser — this is a background job with no
+          // auth (the asset came from getByIdsWithAllRelationsButStacks called with no authUserId
+          // above), so `false` is correct and matches pre-#763 behavior for this synthetic path.
           this.websocketRepository.clientSend('on_upload_success', asset.ownerId, mapAsset(asset));
           if (asset.exifInfo) {
             const exif = asset.exifInfo;

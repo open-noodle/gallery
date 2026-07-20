@@ -173,6 +173,10 @@ export class NotificationService extends BaseService {
 
     const [asset] = await this.assetRepository.getByIdsWithAllRelationsButStacks([assetId]);
     if (asset) {
+      // #763: deliberately NOT projecting isFavoriteForUser — `getByIdsWithAllRelationsButStacks`
+      // above is called with no authUserId, and this synthetic `auth` (a partial cast, not a real
+      // AuthDto) exists only for other mapAsset options, not for the overlay. `false` is correct
+      // and matches pre-#763 behavior for this background-notification path.
       this.websocketRepository.clientSend(
         'on_asset_update',
         userId,

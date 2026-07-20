@@ -8,13 +8,19 @@ import { AssetVisibility } from 'src/enum';
 import { DB } from 'src/schema';
 import { StackTable } from 'src/schema/tables/stack.table';
 import { asUuid, withDefaultVisibility } from 'src/utils/database';
+import { favoriteExistsFor } from 'src/utils/favorite';
 
 export interface StackSearch {
   ownerId: string;
   primaryAssetId?: string;
 }
 
-const withAssets = (eb: ExpressionBuilder<DB, 'stack'>, withTags = false) => {
+// #763: authUserId is the CALLER's id, threaded from stack.service.ts (search/create/update/
+// getById are all owner-only — see AccessRepository's StackAccess.checkOwnerAccess — so the
+// caller and the stack's ownerId are always the same user; still passed explicitly rather than
+// read off the entity, per the slice 1 caller-id convention). Optional and only used to project
+// `isFavoriteForUser` onto each stack asset for mapAsset (via stack.dto.ts's mapStack).
+const withAssets = (eb: ExpressionBuilder<DB, 'stack'>, withTags = false, authUserId?: string) => {
   return jsonArrayFrom(
     eb
       .selectFrom('asset')
@@ -40,6 +46,16 @@ const withAssets = (eb: ExpressionBuilder<DB, 'stack'>, withTags = false) => {
         ),
       )
       .select((eb) => eb.fn.toJson('exifInfo').as('exifInfo'))
+      // #763: the `eb` here is scoped to `DB & { exifInfo: ... }` (the innerJoinLateral above),
+      // which Kysely's ExpressionBuilder generics don't consider assignable to the plain
+      // `ExpressionBuilder<DB, keyof DB>` favoriteExistsFor expects, even though the
+      // 'asset_favorite' table it queries is unaffected by the extra lateral join in scope. Safe
+      // cast (same mechanism as asset.repository.ts's getTimeBucket).
+      .$if(!!authUserId, (qb) =>
+        qb.select((eb) =>
+          favoriteExistsFor(eb as unknown as ExpressionBuilder<DB, keyof DB>, authUserId!).as('isFavoriteForUser'),
+        ),
+      )
       .where('asset.deletedAt', 'is', null)
       .whereRef('asset.stackId', '=', 'stack.id')
       .$call(withDefaultVisibility),
@@ -50,18 +66,21 @@ const withAssets = (eb: ExpressionBuilder<DB, 'stack'>, withTags = false) => {
 export class StackRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
 
-  @GenerateSql({ params: [{ ownerId: DummyValue.UUID }] })
-  search(query: StackSearch) {
+  @GenerateSql(
+    { params: [{ ownerId: DummyValue.UUID }] },
+    { name: 'with authUserId', params: [{ ownerId: DummyValue.UUID }, DummyValue.UUID] },
+  )
+  search(query: StackSearch, authUserId?: string) {
     return this.db
       .selectFrom('stack')
       .selectAll('stack')
-      .select(withAssets)
+      .select((eb) => withAssets(eb, false, authUserId))
       .where('stack.ownerId', '=', query.ownerId)
       .$if(!!query.primaryAssetId, (eb) => eb.where('stack.primaryAssetId', '=', query.primaryAssetId!))
       .execute();
   }
 
-  async create(entity: Omit<Insertable<StackTable>, 'primaryAssetId'>, assetIds: string[]) {
+  async create(entity: Omit<Insertable<StackTable>, 'primaryAssetId'>, assetIds: string[], authUserId?: string) {
     return this.db.transaction().execute(async (tx) => {
       const stacks = await tx
         .selectFrom('stack')
@@ -119,7 +138,7 @@ export class StackRepository {
       return tx
         .selectFrom('stack')
         .selectAll('stack')
-        .select(withAssets)
+        .select((eb) => withAssets(eb, false, authUserId))
         .where('id', '=', newRecord.id)
         .executeTakeFirstOrThrow();
     });
@@ -134,22 +153,22 @@ export class StackRepository {
     await this.db.deleteFrom('stack').where('id', 'in', ids).execute();
   }
 
-  update(id: string, entity: Updateable<StackTable>) {
+  update(id: string, entity: Updateable<StackTable>, authUserId?: string) {
     return this.db
       .updateTable('stack')
       .set(entity)
       .where('id', '=', asUuid(id))
       .returningAll('stack')
-      .returning((eb) => withAssets(eb, true))
+      .returning((eb) => withAssets(eb, true, authUserId))
       .executeTakeFirstOrThrow();
   }
 
-  @GenerateSql({ params: [DummyValue.UUID] })
-  getById(id: string) {
+  @GenerateSql({ params: [DummyValue.UUID] }, { name: 'with authUserId', params: [DummyValue.UUID, DummyValue.UUID] })
+  getById(id: string, authUserId?: string) {
     return this.db
       .selectFrom('stack')
       .selectAll()
-      .select((eb) => withAssets(eb, true))
+      .select((eb) => withAssets(eb, true, authUserId))
       .where('id', '=', asUuid(id))
       .executeTakeFirst();
   }

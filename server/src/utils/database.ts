@@ -993,12 +993,12 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
       )
       .$if(!!options.type, (qb) => qb.where('asset.type', '=', options.type!))
       .$if(options.isFavorite !== undefined, (qb) =>
-      qb.where((eb) =>
-        options.isFavorite
-          ? favoriteExistsFor(eb, options.authUserId!)
-          : eb.not(favoriteExistsFor(eb, options.authUserId!)),
-      ),
-    )
+        qb.where((eb) =>
+          options.isFavorite
+            ? favoriteExistsFor(eb, options.authUserId!)
+            : eb.not(favoriteExistsFor(eb, options.authUserId!)),
+        ),
+      )
       .$if(options.isOffline !== undefined, (qb) => qb.where('asset.isOffline', '=', options.isOffline!))
       .$if(options.isEncoded !== undefined, (qb) =>
         qb.where((eb) => {

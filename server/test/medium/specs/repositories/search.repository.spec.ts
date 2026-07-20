@@ -701,6 +701,79 @@ describe(SearchRepository.name, () => {
     });
   });
 
+  // #763 slice 1b Task 2 — mapAsset now reads `isFavoriteForUser` exclusively (slice 1b Task 1),
+  // so every row-returning search path must project the per-user asset_favorite overlay keyed to
+  // the CALLER (authUserId) — never to userIds[0] or the asset owner (slice 1 proved that wrong
+  // for the space-browse path, where userIds can be undefined entirely).
+  describe('isFavoriteForUser projection (#763 slice 1b)', () => {
+    it('searchMetadata projects isFavoriteForUser from authUserId, not from userIds[0] or the owner', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.database.insertInto('asset_favorite').values({ userId: viewer.id, assetId: asset.id }).execute();
+
+      const { items: asOwner } = await sut.searchMetadata(
+        { page: 1, size: 100 },
+        { userIds: [owner.id], authUserId: owner.id },
+      );
+      expect(asOwner.find((item) => item.id === asset.id)?.isFavoriteForUser).toBe(false);
+
+      const { items: asViewer } = await sut.searchMetadata(
+        { page: 1, size: 100 },
+        { userIds: [owner.id], authUserId: viewer.id },
+      );
+      expect(asViewer.find((item) => item.id === asset.id)?.isFavoriteForUser).toBe(true);
+    });
+
+    it('searchRandom projects isFavoriteForUser for the requesting user', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.database.insertInto('asset_favorite').values({ userId: viewer.id, assetId: asset.id }).execute();
+
+      const asViewer = await sut.searchRandom(100, { userIds: [owner.id], authUserId: viewer.id });
+      expect(asViewer.find((item) => item.id === asset.id)?.isFavoriteForUser).toBe(true);
+
+      const asOwner = await sut.searchRandom(100, { userIds: [owner.id], authUserId: owner.id });
+      expect(asOwner.find((item) => item.id === asset.id)?.isFavoriteForUser).toBe(false);
+    });
+
+    it('searchLargeAssets projects isFavoriteForUser for the requesting user', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newExif({ assetId: asset.id, fileSizeInByte: 5000 });
+      await ctx.database.insertInto('asset_favorite').values({ userId: viewer.id, assetId: asset.id }).execute();
+
+      const asViewer = await sut.searchLargeAssets(100, { userIds: [owner.id], authUserId: viewer.id });
+      expect(asViewer.find((item) => item.id === asset.id)?.isFavoriteForUser).toBe(true);
+
+      const asOwner = await sut.searchLargeAssets(100, { userIds: [owner.id], authUserId: owner.id });
+      expect(asOwner.find((item) => item.id === asset.id)?.isFavoriteForUser).toBe(false);
+    });
+
+    it('getAssetsByCity projects isFavoriteForUser for the requesting user', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, type: AssetType.Image });
+      await ctx.newExif({ assetId: asset.id, city: 'Berlin' });
+      await ctx.database.insertInto('asset_favorite').values({ userId: viewer.id, assetId: asset.id }).execute();
+
+      const asViewer = await sut.getAssetsByCity([owner.id], viewer.id);
+      expect(asViewer.find((item) => item.id === asset.id)?.isFavoriteForUser).toBe(true);
+
+      const asOwner = await sut.getAssetsByCity([owner.id], owner.id);
+      expect(asOwner.find((item) => item.id === asset.id)?.isFavoriteForUser).toBe(false);
+
+      const withoutAuthUserId = await sut.getAssetsByCity([owner.id]);
+      expect(withoutAuthUserId.find((item) => item.id === asset.id)?.isFavoriteForUser).toBeUndefined();
+    });
+  });
+
   describe('getFilterSuggestions', () => {
     it('returns album facets for a viewer who owns none of the shared album assets', async () => {
       const { ctx, sut } = setup();

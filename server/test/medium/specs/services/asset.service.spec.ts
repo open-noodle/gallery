@@ -86,6 +86,29 @@ describe(AssetService.name, () => {
     });
   });
 
+  // #763 slice 1b Task 2 — mapAsset now reads `isFavoriteForUser` exclusively (slice 1b Task 1);
+  // `get` must thread the CALLER's id (auth.user.id) into the repository projection, not the
+  // asset owner's.
+  describe('get (#763)', () => {
+    it('E1 — a space member sees their own favorite, independent of the owner', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+
+      await ctx.database.insertInto('asset_favorite').values({ userId: member.id, assetId: asset.id }).execute();
+
+      const memberAuth = factory.auth({ user: { id: member.id } });
+      await expect(sut.get(memberAuth, asset.id)).resolves.toMatchObject({ isFavorite: true });
+
+      const ownerAuth = factory.auth({ user: { id: owner.id } });
+      await expect(sut.get(ownerAuth, asset.id)).resolves.toMatchObject({ isFavorite: false });
+    });
+  });
+
   describe('copy', () => {
     it('should copy albums', async () => {
       const { sut, ctx } = setup();
@@ -372,6 +395,22 @@ describe(AssetService.name, () => {
   });
 
   describe('update', () => {
+    // #763 slice 1b Task 2 — the update return path feeds mapAsset, which now reads
+    // `isFavoriteForUser` exclusively; `update` must thread auth.user.id into the repository
+    // projection so the response reflects the CALLER's own overlay, not the owner's.
+    it('projects isFavoriteForUser for the requesting user (#763)', async () => {
+      const { sut, ctx } = setup();
+      ctx.getMock(JobRepository).queue.mockResolvedValue();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: asset.id }).execute();
+
+      await expect(sut.update(auth, asset.id, { description: 'updated' })).resolves.toMatchObject({
+        isFavorite: true,
+      });
+    });
+
     it('should automatically lock lockable columns', async () => {
       const { sut, ctx } = setup();
       ctx.getMock(JobRepository).queue.mockResolvedValue();

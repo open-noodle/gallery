@@ -111,12 +111,14 @@ export class SearchService extends BaseService {
     const cities = await this.assetRepository.getAssetIdByCity(auth.user.id, options);
     const cityAssets = await this.assetRepository.getByIdsWithAllRelationsButStacks(
       cities.items.map(({ data }) => data),
+      auth.user.id,
     );
     const cityItems = cityAssets.map((asset) => ({ value: asset.exifInfo!.city!, data: mapAsset(asset, { auth }) }));
 
     const recents = await this.assetRepository.getRecentlyCreatedAssetIds(auth.user.id, options.maxFields);
     const recentAssets = await this.assetRepository.getByIdsWithAllRelationsButStacks(
       recents.items.map((item) => item.data),
+      auth.user.id,
     );
     const recentItems = recentAssets.map((asset) => ({
       value: asset.createdAt.toISOString(),
@@ -353,8 +355,8 @@ export class SearchService extends BaseService {
   async getAssetsByCity(auth: AuthDto): Promise<AssetResponseDto[]> {
     const userIds = await this.getUserIdsToSearch(auth);
     const timelineSpaceIds = await this.getTimelineSpaceIds(auth, true);
-    const assets = await this.searchRepository.getAssetsByCity(userIds, timelineSpaceIds);
-    return assets.map((asset) => mapAsset(asset));
+    const assets = await this.searchRepository.getAssetsByCity(userIds, timelineSpaceIds, auth.user.id);
+    return assets.map((asset) => mapAsset(asset, { auth }));
   }
 
   async getSearchSuggestions(auth: AuthDto, dto: SearchSuggestionRequestDto) {

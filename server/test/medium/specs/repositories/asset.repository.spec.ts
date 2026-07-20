@@ -2407,4 +2407,87 @@ describe(AssetRepository.name, () => {
       await expect(sut.getExternalAssetIds(user.id)).resolves.toEqual(new Set());
     });
   });
+
+  // #763 slice 1b Task 2 — mapAsset now reads `isFavoriteForUser` exclusively (slice 1b Task 1).
+  // These queries must project the per-user asset_favorite overlay onto the returned row, keyed
+  // to the CALLER (authUserId), not to the asset owner.
+  describe('getById (#763)', () => {
+    it('projects isFavoriteForUser for the requesting user, independent of the owner', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+
+      await ctx.database.insertInto('asset_favorite').values({ userId: viewer.id, assetId: asset.id }).execute();
+
+      const asOwner = await sut.getById(asset.id, {}, owner.id);
+      expect(asOwner?.isFavoriteForUser).toBe(false);
+
+      const asViewer = await sut.getById(asset.id, {}, viewer.id);
+      expect(asViewer?.isFavoriteForUser).toBe(true);
+    });
+
+    it('leaves isFavoriteForUser unset when no authUserId is supplied (fail-safe)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: asset.id }).execute();
+
+      const result = await sut.getById(asset.id);
+      expect(result?.isFavoriteForUser).toBeUndefined();
+    });
+  });
+
+  describe('getByIdsWithAllRelationsButStacks (#763)', () => {
+    it('projects isFavoriteForUser for the requesting user, independent of the owner', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+
+      await ctx.database.insertInto('asset_favorite').values({ userId: viewer.id, assetId: asset.id }).execute();
+
+      const [asOwner] = await sut.getByIdsWithAllRelationsButStacks([asset.id], owner.id);
+      expect(asOwner.isFavoriteForUser).toBe(false);
+
+      const [asViewer] = await sut.getByIdsWithAllRelationsButStacks([asset.id], viewer.id);
+      expect(asViewer.isFavoriteForUser).toBe(true);
+    });
+
+    it('leaves isFavoriteForUser unset without an authUserId, matching background-job callers', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: asset.id }).execute();
+
+      const [result] = await sut.getByIdsWithAllRelationsButStacks([asset.id]);
+      expect(result.isFavoriteForUser).toBeUndefined();
+    });
+  });
+
+  describe('update (#763)', () => {
+    it('projects isFavoriteForUser for the supplied authUserId after writing a column', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, isOffline: false });
+      await ctx.database.insertInto('asset_favorite').values({ userId: viewer.id, assetId: asset.id }).execute();
+
+      const asOwner = await sut.update({ id: asset.id, isOffline: false }, owner.id);
+      expect(asOwner?.isFavoriteForUser).toBe(false);
+
+      const asViewer = await sut.update({ id: asset.id, isOffline: false }, viewer.id);
+      expect(asViewer?.isFavoriteForUser).toBe(true);
+    });
+
+    it('projects isFavoriteForUser via the getById fallback when there is nothing to set', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: asset.id }).execute();
+
+      const result = await sut.update({ id: asset.id }, user.id);
+      expect(result?.isFavoriteForUser).toBe(true);
+    });
+  });
 });
