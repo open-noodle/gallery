@@ -51,7 +51,7 @@ class SharedSpaceLinkedLibraryDto {
     if (this.addedById != null) {
       json[r'addedById'] = this.addedById;
     } else {
-    //  json[r'addedById'] = null;
+      json[r'addedById'] = null;
     }
       json[r'createdAt'] = this.createdAt.toUtc().toIso8601String();
       json[r'libraryId'] = this.libraryId;
