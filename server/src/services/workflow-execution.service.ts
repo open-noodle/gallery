@@ -339,8 +339,16 @@ export class WorkflowExecutionService extends BaseService {
           return {
             read: async () => {
               const asset = await this.workflowRepository.getForAssetV1(assetId);
+              // #763: workflowAssetV1 (database.ts) still selects the legacy asset.isFavorite
+              // column, which the write path no longer populates — favorites are now a per-user
+              // overlay (asset_favorite). The workflow engine always acts AS the asset owner
+              // (authUserId below), so project isFavoriteForUser for that owner onto the
+              // plugin-facing `asset.isFavorite` field. Without this, a toggle step
+              // (assetFavorite with `inverse: true`) would always read a stale `false` and never
+              // converge to "unfavorite".
+              const ownerFavorite = await this.assetRepository.getById(assetId, {}, asset.ownerId);
               return {
-                data: { asset } as any,
+                data: { asset: { ...asset, isFavorite: !!ownerFavorite?.isFavoriteForUser } } as any,
                 authUserId: asset.ownerId,
               };
             },

@@ -1402,6 +1402,55 @@ class AssetsApi {
     return null;
   }
 
+  /// Set favorite state for the requesting user
+  ///
+  /// Favorites are per-user. Requires only read access to the assets; a space viewer may favorite an asset they do not own. Never affects any other user.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [AssetFavoriteUpdateDto] assetFavoriteUpdateDto (required):
+  Future<Response> updateAssetFavoritesWithHttpInfo(AssetFavoriteUpdateDto assetFavoriteUpdateDto, { Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/assets/favorites';
+
+    // ignore: prefer_final_locals
+    Object? postBody = assetFavoriteUpdateDto;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>['application/json'];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'PUT',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Set favorite state for the requesting user
+  ///
+  /// Favorites are per-user. Requires only read access to the assets; a space viewer may favorite an asset they do not own. Never affects any other user.
+  ///
+  /// Parameters:
+  ///
+  /// * [AssetFavoriteUpdateDto] assetFavoriteUpdateDto (required):
+  Future<void> updateAssetFavorites(AssetFavoriteUpdateDto assetFavoriteUpdateDto, { Future<void>? abortTrigger, }) async {
+    final response = await updateAssetFavoritesWithHttpInfo(assetFavoriteUpdateDto, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
   /// Update asset metadata
   ///
   /// Update or add metadata key-value pairs for the specified asset.

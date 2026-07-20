@@ -6,6 +6,7 @@ import { ApiKeyRepository } from 'src/repositories/api-key.repository';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository';
 import { AppRepository } from 'src/repositories/app.repository';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { ClassificationRepository } from 'src/repositories/classification.repository';
@@ -72,6 +73,7 @@ export const repositories = [
   AppRepository,
   AssetRepository,
   AssetEditRepository,
+  AssetFavoriteRepository,
   AssetJobRepository,
   ClassificationRepository,
   ConfigRepository,

@@ -261,6 +261,8 @@ class ApiClient {
           return AssetFaceUpdateDto.fromJson(value);
         case 'AssetFaceUpdateItem':
           return AssetFaceUpdateItem.fromJson(value);
+        case 'AssetFavoriteUpdateDto':
+          return AssetFavoriteUpdateDto.fromJson(value);
         case 'AssetIdErrorReason':
           return AssetIdErrorReasonTypeTransformer().decode(value);
         case 'AssetIdsDto':

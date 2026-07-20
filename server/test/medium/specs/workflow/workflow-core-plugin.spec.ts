@@ -5,6 +5,7 @@ import { PluginManifestDto } from 'src/dtos/plugin-manifest.dto';
 import { AssetType, AssetVisibility, LogLevel } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AlbumRepository } from 'src/repositories/album.repository';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { ConfigRepository } from 'src/repositories/config.repository';
 import { CryptoRepository } from 'src/repositories/crypto.repository';
@@ -33,6 +34,11 @@ class WorkflowTestContext extends MediumTestContext<WorkflowExecutionService> {
         AccessRepository,
         AlbumRepository,
         AssetRepository,
+        // #763: the assetFavorite core-plugin action calls AssetService.update() with isFavorite set,
+        // which now routes through AssetFavoriteRepository (asset_favorite is the per-user overlay,
+        // not the legacy asset.isFavorite column). Same wiring reason as SharedSpaceRepository below —
+        // the plugin-host AssetService is built via BaseService.create(AssetService, this).
+        AssetFavoriteRepository,
         CryptoRepository,
         DatabaseRepository,
         LoggingRepository,
@@ -223,12 +229,20 @@ describe('core plugin', () => {
 
       await expect(ctx.sut.handleAssetTrigger({ workflowId: workflow.id, assetId: asset.id })).resolves.toBeUndefined();
 
-      await expect(ctx.get(AssetRepository).getById(asset.id)).resolves.toMatchObject({ isFavorite: true });
+      // #763: favorites are a per-user overlay (asset_favorite), not the legacy asset.isFavorite
+      // column — the workflow's synthesized auth acts AS the asset owner, so isFavoriteForUser
+      // resolved for that same owner is the correct place to assert the write landed.
+      await expect(ctx.get(AssetRepository).getById(asset.id, {}, user.id)).resolves.toMatchObject({
+        isFavoriteForUser: true,
+      });
     });
 
     it('should unfavorite an asset', async () => {
       const { user } = await ctx.newUser();
-      const { asset } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      // #763: seed the per-user overlay row directly — ctx.newAsset's isFavorite option only sets
+      // the legacy column, which the read path no longer consults.
+      await ctx.get(AssetFavoriteRepository).addAll(user.id, [asset.id]);
 
       const workflow = await createWorkflow({
         ownerId: user.id,
@@ -238,7 +252,9 @@ describe('core plugin', () => {
 
       await expect(ctx.sut.handleAssetTrigger({ workflowId: workflow.id, assetId: asset.id })).resolves.toBeUndefined();
 
-      await expect(ctx.get(AssetRepository).getById(asset.id)).resolves.toMatchObject({ isFavorite: false });
+      await expect(ctx.get(AssetRepository).getById(asset.id, {}, user.id)).resolves.toMatchObject({
+        isFavoriteForUser: false,
+      });
     });
   });
 
@@ -364,7 +380,10 @@ describe('core plugin', () => {
       });
 
       await expect(ctx.sut.handleAssetTrigger({ workflowId: workflow.id, assetId: asset.id })).resolves.toBeUndefined();
-      await expect(ctx.get(AssetRepository).getById(asset.id)).resolves.toMatchObject({ isFavorite: true });
+      // #763: per-user overlay — the workflow acts as the asset owner.
+      await expect(ctx.get(AssetRepository).getById(asset.id, {}, user.id)).resolves.toMatchObject({
+        isFavoriteForUser: true,
+      });
     });
 
     it('should not favorite asset outside a given radius', async () => {
@@ -387,7 +406,10 @@ describe('core plugin', () => {
       });
 
       await expect(ctx.sut.handleAssetTrigger({ workflowId: workflow.id, assetId: asset.id })).resolves.toBeUndefined();
-      await expect(ctx.get(AssetRepository).getById(asset.id)).resolves.toMatchObject({ isFavorite: false });
+      // #763: per-user overlay — the workflow acts as the asset owner.
+      await expect(ctx.get(AssetRepository).getById(asset.id, {}, user.id)).resolves.toMatchObject({
+        isFavoriteForUser: false,
+      });
     });
 
     it('should favorite asset by location name', async () => {
@@ -410,7 +432,10 @@ describe('core plugin', () => {
       });
 
       await expect(ctx.sut.handleAssetTrigger({ workflowId: workflow.id, assetId: asset.id })).resolves.toBeUndefined();
-      await expect(ctx.get(AssetRepository).getById(asset.id)).resolves.toMatchObject({ isFavorite: true });
+      // #763: per-user overlay — the workflow acts as the asset owner.
+      await expect(ctx.get(AssetRepository).getById(asset.id, {}, user.id)).resolves.toMatchObject({
+        isFavoriteForUser: true,
+      });
     });
   });
 
@@ -434,7 +459,10 @@ describe('core plugin', () => {
       });
 
       await expect(ctx.sut.handleAssetTrigger({ workflowId: workflow.id, assetId: asset.id })).resolves.toBeUndefined();
-      await expect(ctx.get(AssetRepository).getById(asset.id)).resolves.toMatchObject({ isFavorite: true });
+      // #763: per-user overlay — the workflow acts as the asset owner.
+      await expect(ctx.get(AssetRepository).getById(asset.id, {}, user.id)).resolves.toMatchObject({
+        isFavoriteForUser: true,
+      });
     });
   });
 

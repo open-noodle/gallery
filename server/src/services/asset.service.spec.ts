@@ -54,6 +54,12 @@ describe(AssetService.name, () => {
     // dedicated EXIF-restore emit (asset_exif.updateId is untouched by a visibility flip).
     mocks.sharedSpace.emitLibraryAssetVisibilityPurge.mockResolvedValue(void 0);
     mocks.sharedSpace.emitLibraryAssetVisibilityRestore.mockResolvedValue(void 0);
+
+    // #763: update/updateAll now reroute the deprecated `isFavorite` alias through
+    // AssetFavoriteRepository instead of writing the asset column directly; default to a no-op so
+    // unrelated update/updateAll tests that merely pass isFavorite through a fixture don't break.
+    mocks.assetFavorite.addAll.mockResolvedValue(void 0);
+    mocks.assetFavorite.removeAll.mockResolvedValue(void 0);
   });
 
   describe('getStatistics', () => {
@@ -635,6 +641,71 @@ describe(AssetService.name, () => {
     });
   });
 
+  describe('updateFavorites', () => {
+    it('rejects a shared-link session outright — no repository write happens (E6, §5.1)', async () => {
+      const auth = AuthFactory.from().sharedLink().build();
+
+      await expect(sut.updateFavorites(auth, { ids: ['asset-1'], isFavorite: true })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(mocks.access.asset.checkOwnerAccess).not.toHaveBeenCalled();
+      expect(mocks.assetFavorite.addAll).not.toHaveBeenCalled();
+      expect(mocks.assetFavorite.removeAll).not.toHaveBeenCalled();
+    });
+
+    it('requires read access to every id — denial creates no row', async () => {
+      const auth = AuthFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+
+      await expect(sut.updateFavorites(auth, { ids: ['asset-1'], isFavorite: true })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(mocks.assetFavorite.addAll).not.toHaveBeenCalled();
+    });
+
+    it('calls addAll for the CALLER only when isFavorite is true', async () => {
+      const auth = AuthFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1', 'asset-2']));
+
+      await sut.updateFavorites(auth, { ids: ['asset-1', 'asset-2'], isFavorite: true });
+
+      expect(mocks.assetFavorite.addAll).toHaveBeenCalledWith(auth.user.id, ['asset-1', 'asset-2']);
+      expect(mocks.assetFavorite.removeAll).not.toHaveBeenCalled();
+    });
+
+    it('calls removeAll for the CALLER only when isFavorite is false', async () => {
+      const auth = AuthFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+
+      await sut.updateFavorites(auth, { ids: ['asset-1'], isFavorite: false });
+
+      expect(mocks.assetFavorite.removeAll).toHaveBeenCalledWith(auth.user.id, ['asset-1']);
+      expect(mocks.assetFavorite.addAll).not.toHaveBeenCalled();
+    });
+
+    it('favorites an asset the caller only has space-read (not owner/editor) access to (E3)', async () => {
+      const auth = AuthFactory.create();
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set(['asset-1']));
+
+      await sut.updateFavorites(auth, { ids: ['asset-1'], isFavorite: true });
+
+      expect(mocks.assetFavorite.addAll).toHaveBeenCalledWith(auth.user.id, ['asset-1']);
+    });
+
+    it('elevated session permission does not change WHO the write is attributed to (E7)', async () => {
+      const auth = AuthFactory.from().session({ hasElevatedPermission: true }).build();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+
+      await sut.updateFavorites(auth, { ids: ['asset-1'], isFavorite: true });
+
+      // Still always the caller — elevated permission only ever widens the caller's OWN read
+      // access (e.g. their own Locked assets), never lets them write on someone else's behalf.
+      expect(mocks.assetFavorite.addAll).toHaveBeenCalledWith(auth.user.id, ['asset-1']);
+    });
+  });
+
   describe('update', () => {
     it('should require asset write access for the id', async () => {
       await expect(
@@ -652,8 +723,11 @@ describe(AssetService.name, () => {
 
       await sut.update(authStub.admin, asset.id, { isFavorite: true });
 
-      // #763: the update return path now threads the caller's id to project isFavoriteForUser.
-      expect(mocks.asset.update).toHaveBeenCalledWith({ id: asset.id, isFavorite: true }, authStub.admin.user.id);
+      // #763: isFavorite is stripped from the direct column write and rerouted to the caller's own
+      // AssetFavoriteRepository row — the update return path still threads the caller's id to
+      // project isFavoriteForUser from the (now up to date) asset_favorite table.
+      expect(mocks.asset.update).toHaveBeenCalledWith({ id: asset.id }, authStub.admin.user.id);
+      expect(mocks.assetFavorite.addAll).toHaveBeenCalledWith(authStub.admin.user.id, [asset.id]);
     });
 
     it('should update the exif description', async () => {
@@ -1075,14 +1149,17 @@ describe(AssetService.name, () => {
     });
 
     it('allows a space editor to change a NON-visibility field on a non-owned asset (existing policy) (rbac-3)', async () => {
+      // #763: isFavorite no longer exercises this path (it's rerouted to updateFavorites, gated on
+      // Permission.AssetRead instead) — duplicateId is a plain non-visibility column write and stays
+      // gated on the top-level Permission.AssetUpdate check this test exercises.
       const auth = AuthFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set(['asset-2']));
 
-      await sut.updateAll(auth, { ids: ['asset-2'], isFavorite: true });
+      await sut.updateAll(auth, { ids: ['asset-2'], duplicateId: 'dup-1' });
 
       // No visibility → owner-split guard never runs → editor keeps their metadata-edit capability.
-      expect(mocks.asset.updateAll).toHaveBeenCalledWith(['asset-2'], { isFavorite: true });
+      expect(mocks.asset.updateAll).toHaveBeenCalledWith(['asset-2'], { duplicateId: 'dup-1' });
     });
 
     it('should not update Assets table if no relevant fields are provided', async () => {
@@ -1134,11 +1211,12 @@ describe(AssetService.name, () => {
         latitude: 30,
         longitude: 50,
         dateTimeOriginal,
-        isFavorite: false,
         duplicateId: undefined,
         rating: undefined,
       });
-      expect(mocks.asset.updateAll).toHaveBeenCalled();
+      // #763: no visibility/duplicateId set → assetDto is empty → assetRepository.updateAll is
+      // correctly NOT called (isFavorite no longer keeps it non-empty, see the test above).
+      expect(mocks.asset.updateAll).not.toHaveBeenCalled();
       expect(mocks.asset.updateAllExif).toHaveBeenCalledWith(['asset-1'], {
         dateTimeOriginal,
         latitude: 30,

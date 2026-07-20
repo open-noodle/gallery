@@ -975,7 +975,7 @@ export type AssetBulkUpdateDto = {
     duplicateId?: string | null;
     /** Asset IDs to update */
     ids: string[];
-    /** Mark as favorite */
+    /** Mark as favorite. Deprecated: use PUT /assets/favorites instead (favorites are per-user). */
     isFavorite?: boolean;
     /** Latitude coordinate */
     latitude?: number;
@@ -1026,6 +1026,12 @@ export type AssetCopyDto = {
     stack?: boolean;
     /** Target asset ID */
     targetId: string;
+};
+export type AssetFavoriteUpdateDto = {
+    /** Asset IDs */
+    ids: string[];
+    /** Favorite state for the requesting user */
+    isFavorite: boolean;
 };
 export type AssetJobsDto = {
     /** Asset IDs */
@@ -1239,7 +1245,7 @@ export type UpdateAssetDto = {
     dateTimeOriginal?: string;
     /** Asset description */
     description?: string;
-    /** Mark as favorite */
+    /** Mark as favorite. Deprecated: use PUT /assets/favorites instead (favorites are per-user). */
     isFavorite?: boolean;
     /** Latitude coordinate */
     latitude?: number;
@@ -5693,6 +5699,18 @@ export function copyAsset({ assetCopyDto }: {
         ...opts,
         method: "PUT",
         body: assetCopyDto
+    })));
+}
+/**
+ * Set favorite state for the requesting user
+ */
+export function updateAssetFavorites({ assetFavoriteUpdateDto }: {
+    assetFavoriteUpdateDto: AssetFavoriteUpdateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText("/assets/favorites", oazapfts.json({
+        ...opts,
+        method: "PUT",
+        body: assetFavoriteUpdateDto
     })));
 }
 /**
