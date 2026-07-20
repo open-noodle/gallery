@@ -144,13 +144,13 @@ describe('buildPhotosTimelineOptions', () => {
     expect(options.withSharedSpaces).toBe(true);
   });
 
-  it('should include isFavorite and omit shared timeline inclusions when favorites is selected', () => {
+  it('should include isFavorite and keep partner/shared-space scope active when favorites is selected (#763 slice 4)', () => {
     const filters = { ...createFilterState(), isFavorite: true };
     const options = buildPhotosTimelineOptions(filters, MY_USER_ID);
 
     expect(options.isFavorite).toBe(true);
-    expect(options).not.toHaveProperty('withPartners');
-    expect(options).not.toHaveProperty('withSharedSpaces');
+    expect(options.withPartners).toBe(true);
+    expect(options.withSharedSpaces).toBe(true);
   });
 
   it('should include has-no-album when selected', () => {
