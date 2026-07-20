@@ -441,6 +441,7 @@ export class SearchRepository {
           withStacked: true,
           isFavorite: true,
           userIds: [DummyValue.UUID],
+          authUserId: DummyValue.UUID,
         },
       ],
     },
@@ -478,6 +479,7 @@ export class SearchRepository {
         lensModel: DummyValue.STRING,
         isFavorite: true,
         userIds: [DummyValue.UUID],
+        authUserId: DummyValue.UUID,
       },
     ],
   })
@@ -497,6 +499,7 @@ export class SearchRepository {
         withStacked: true,
         isFavorite: true,
         userIds: [DummyValue.UUID],
+        authUserId: DummyValue.UUID,
       },
     ],
   })
@@ -518,6 +521,7 @@ export class SearchRepository {
         withStacked: true,
         isFavorite: true,
         userIds: [DummyValue.UUID],
+        authUserId: DummyValue.UUID,
       },
     ],
   })
@@ -629,6 +633,7 @@ export class SearchRepository {
         withStacked: true,
         isFavorite: true,
         userIds: [DummyValue.UUID],
+        authUserId: DummyValue.UUID,
         spacePersonIds: [DummyValue.UUID],
         timelineSpaceIds: [DummyValue.UUID, DummyValue.UUID],
         orderDirection: 'desc',
