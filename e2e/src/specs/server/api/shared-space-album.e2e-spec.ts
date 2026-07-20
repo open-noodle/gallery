@@ -701,9 +701,22 @@ describe('rbac-3: visibility writes are restricted to owned assets', () => {
     expect(status).toBe(204);
   });
 
-  it('editor CAN still set a non-visibility field on the victim asset (existing policy) → 204', async () => {
+  // #763: previously framed as "existing policy → 204", asserting only that the editor's bulk
+  // isFavorite write succeeded — which, under the OLD single-column isFavorite semantics, meant the
+  // editor's write flipped the SAME asset.isFavorite bit the victim (asset owner) would read too:
+  // an editor could favorite an asset on the owner's behalf. Favorites are now a per-user overlay
+  // (asset_favorite): the write still succeeds (AssetUpdate via checkSpaceEditAccess still permits
+  // it — the alias's authz is unchanged), but it must create ONLY the editor's own row and leave
+  // the victim's (owner's) favorite state completely untouched.
+  it("editor bulk-favoriting the victim's asset creates only the EDITOR'S OWN favorite row, leaving the victim's state untouched (#763 per-user favorites)", async () => {
     const { status } = await bulkUpdateAssets(editor.accessToken, { ids: [victimAsset.id], isFavorite: true });
     expect(status).toBe(204);
+
+    const editorView = await utils.getAssetInfo(editor.accessToken, victimAsset.id);
+    expect(editorView.isFavorite).toBe(true);
+
+    const victimView = await utils.getAssetInfo(victim.accessToken, victimAsset.id);
+    expect(victimView.isFavorite).toBe(false);
   });
 });
 
