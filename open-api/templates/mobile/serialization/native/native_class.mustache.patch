@@ -1,5 +1,31 @@
---- native_class.mustache	2026-06-03 12:23:39
-+++ native_class.mustache	2026-06-03 12:21:49
+--- native_class.mustache
++++ native_class.mustache
+@@ -82,10 +82,10 @@
+         {{#pattern}}
+       json[r'{{{baseName}}}'] = value == null ? null : (_isEpochMarker(r'{{{pattern}}}')
+         ? value.millisecondsSinceEpoch
+-        : _dateFormatter.format(value.toUtc()));
++        : _dateFormatter.format(value));
+         {{/pattern}}
+         {{^pattern}}
+-      json[r'{{{baseName}}}'] = value == null ? null : _dateFormatter.format(value.toUtc());
++      json[r'{{{baseName}}}'] = value == null ? null : _dateFormatter.format(value);
+         {{/pattern}}
+       {{/isDate}}
+       {{^isDateTime}}
+@@ -120,10 +120,10 @@
+       {{#pattern}}
+       json[r'{{{baseName}}}'] = _isEpochMarker(r'{{{pattern}}}')
+         ? this.{{{name}}}{{#isNullable}}!{{/isNullable}}{{^isNullable}}{{^required}}{{^defaultValue}}!{{/defaultValue}}{{/required}}{{/isNullable}}.millisecondsSinceEpoch
+-        : _dateFormatter.format(this.{{{name}}}{{#isNullable}}!{{/isNullable}}{{^isNullable}}{{^required}}{{^defaultValue}}!{{/defaultValue}}{{/required}}{{/isNullable}}.toUtc());
++        : _dateFormatter.format(this.{{{name}}}{{#isNullable}}!{{/isNullable}}{{^isNullable}}{{^required}}{{^defaultValue}}!{{/defaultValue}}{{/required}}{{/isNullable}});
+       {{/pattern}}
+       {{^pattern}}
+-      json[r'{{{baseName}}}'] = _dateFormatter.format(this.{{{name}}}{{#isNullable}}!{{/isNullable}}{{^isNullable}}{{^required}}{{^defaultValue}}!{{/defaultValue}}{{/required}}{{/isNullable}}.toUtc());
++      json[r'{{{baseName}}}'] = _dateFormatter.format(this.{{{name}}}{{#isNullable}}!{{/isNullable}}{{^isNullable}}{{^required}}{{^defaultValue}}!{{/defaultValue}}{{/required}}{{/isNullable}});
+       {{/pattern}}
+     {{/isDate}}
+     {{^isDateTime}}
 @@ -154,24 +154,10 @@
    /// [value] if it's a [Map], null otherwise.
    // ignore: prefer_constructors_over_static_methods
