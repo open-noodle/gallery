@@ -364,7 +364,7 @@ a slice is not done while a row in it is unasserted.
 | E7   | System admin (`hasElevatedPermission`) favorites another user's asset | Creates the **admin's own** row only; target user unaffected                           | 2     |
 | E8   | Favorite twice (idempotency)                                          | Second call is a no-op, not a 500 (`onConflict do nothing`)                            | 2     |
 | E9   | Unfavorite something never favorited                                  | No-op, 200, not 404                                                                    | 2     |
-| E10  | Member favorites, then leaves the space                               | Row persists; asset absent from their `/favorites` and from `isFavorite: true` filters | 1, 4  |
+| E10  | Member favorites, then leaves the space                               | Row persists; asset absent from their `/favorites` and from `isFavorite: true` filters | 4     |
 | E11  | …then rejoins the space                                               | Asset reappears in their favorites                                                     | 4     |
 | E12  | Asset deleted                                                         | Rows CASCADE for all users                                                             | 0     |
 | E13  | User deleted                                                          | Their rows CASCADE; other users' rows for the same assets survive                      | 0     |
