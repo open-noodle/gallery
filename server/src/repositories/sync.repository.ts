@@ -62,6 +62,7 @@ export class SyncRepository {
   assetFace: AssetFaceSync;
   assetMetadata: AssetMetadataSync;
   assetOcr: AssetOcrSync;
+  assetFavorite: AssetFavoriteSync;
   authUser: AuthUserSync;
   memory: MemorySync;
   memoryToAsset: MemoryToAssetSync;
@@ -102,6 +103,7 @@ export class SyncRepository {
     this.assetFace = new AssetFaceSync(this.db);
     this.assetMetadata = new AssetMetadataSync(this.db);
     this.assetOcr = new AssetOcrSync(this.db);
+    this.assetFavorite = new AssetFavoriteSync(this.db);
     this.authUser = new AuthUserSync(this.db);
     this.memory = new MemorySync(this.db);
     this.memoryToAsset = new MemoryToAssetSync(this.db);
@@ -857,6 +859,16 @@ class AssetOcrSync extends BaseSync {
       .innerJoin('asset', 'asset.id', 'asset_ocr.assetId')
       .where('asset.ownerId', '=', userId)
       .stream();
+  }
+}
+
+// Delete-audit cleanup only for the asset_favorite per-user overlay (#763). The
+// upsert/delete sync streams for favorites are slice 6 (design doc §4.3, not yet
+// written) — this class deliberately exposes nothing beyond what
+// onAuditTableCleanup needs to prune asset_favorite_audit.
+class AssetFavoriteSync extends BaseSync {
+  cleanupAuditTable(daysAgo: number) {
+    return this.auditCleanup('asset_favorite_audit', daysAgo);
   }
 }
 

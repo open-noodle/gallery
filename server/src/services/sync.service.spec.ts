@@ -56,6 +56,7 @@ const setupSyncMocks = (mocks: ServiceMocks) => {
     assetFace: makeSub(),
     assetMetadata: makeSub(),
     assetOcr: makeSub(),
+    assetFavorite: makeSub(),
     authUser: makeSub(),
     memory: makeSub(),
     memoryToAsset: makeSub(),
@@ -1186,6 +1187,7 @@ describe(SyncService.name, () => {
       expect(syncSubs.assetFace.cleanupAuditTable).toHaveBeenCalledWith(31);
       expect(syncSubs.assetMetadata.cleanupAuditTable).toHaveBeenCalledWith(31);
       expect(syncSubs.assetEdit.cleanupAuditTable).toHaveBeenCalledWith(31);
+      expect(syncSubs.assetFavorite.cleanupAuditTable).toHaveBeenCalledWith(31);
       expect(syncSubs.memory.cleanupAuditTable).toHaveBeenCalledWith(31);
       expect(syncSubs.memoryToAsset.cleanupAuditTable).toHaveBeenCalledWith(31);
       expect(syncSubs.partner.cleanupAuditTable).toHaveBeenCalledWith(31);

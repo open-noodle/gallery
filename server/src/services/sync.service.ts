@@ -320,6 +320,7 @@ export class SyncService extends BaseService {
     await this.syncRepository.assetFace.cleanupAuditTable(pruneThreshold);
     await this.syncRepository.assetMetadata.cleanupAuditTable(pruneThreshold);
     await this.syncRepository.assetEdit.cleanupAuditTable(pruneThreshold);
+    await this.syncRepository.assetFavorite.cleanupAuditTable(pruneThreshold);
     await this.syncRepository.memory.cleanupAuditTable(pruneThreshold);
     await this.syncRepository.memoryToAsset.cleanupAuditTable(pruneThreshold);
     await this.syncRepository.partner.cleanupAuditTable(pruneThreshold);
