@@ -585,7 +585,15 @@ select
   "id",
   "stackId",
   "originalPath",
-  "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavorite",
   (
     select
       coalesce(json_agg(agg), '[]')
@@ -605,9 +613,9 @@ select
 from
   "asset"
 where
-  "id" = $1::uuid
+  "id" = $2::uuid
 limit
-  $2
+  $3
 
 -- AssetRepository.getById
 select
