@@ -126,6 +126,8 @@ import { UserMetadataAuditTable } from 'src/schema/tables/user-metadata-audit.ta
 import { UserMetadataTable } from 'src/schema/tables/user-metadata.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
 import { VersionHistoryTable } from 'src/schema/tables/version-history.table.js';
+import { AssetFavoriteAuditTable } from 'src/schema/tables/asset-favorite-audit.table.js';
+import { AssetFavoriteTable } from 'src/schema/tables/asset-favorite.table.js';
 import {
   VideoStreamSegmentTable,
   VideoStreamSessionTable,
@@ -155,6 +157,8 @@ export class ImmichDatabase {
     AssetEditAuditTable,
     AssetFaceTable,
     AssetFaceAuditTable,
+    AssetFavoriteTable,
+    AssetFavoriteAuditTable,
     AssetMetadataTable,
     AssetMetadataAuditTable,
     AssetJobStatusTable,
@@ -300,6 +304,8 @@ export interface DB {
   asset_exif: AssetExifTable;
   asset_face: AssetFaceTable;
   asset_face_audit: AssetFaceAuditTable;
+  asset_favorite: AssetFavoriteTable;
+  asset_favorite_audit: AssetFavoriteAuditTable;
   asset_file: AssetFileTable;
   asset_metadata: AssetMetadataTable;
   asset_metadata_audit: AssetMetadataAuditTable;
