@@ -152,6 +152,14 @@ export class AssetFavoriteTable {
 
   @CreateDateColumn()
   createdAt!: Generated<Timestamp>;
+
+  // Sync watermarks — see §4.3. Favorites are their own synced entity, not a field
+  // on the asset row, so they need their own createId/updateId cursors.
+  @CreateIdColumn({ index: true })
+  createId!: Generated<string>;
+
+  @UpdateIdColumn({ index: true })
+  updateId!: Generated<string>;
 }
 ```
 
@@ -168,16 +176,48 @@ meaningless.
 ("recently favorited") is a plausible near-term ask and adding a timestamp column later to a
 large table is more expensive than carrying it from the start. Slices must not build behavior on it.
 
-**No audit table — but the decision is made in slice 0, not deferred.** Audit tables in this fork
-exist to feed sync _delete_ streams for cross-owner state (`album_space_asset_audit`,
-`shared_space_asset_audit`). Favorites are single-user state, so mobile should be able to
-reconcile deletes from the user's own full row set without a tombstone stream.
+### 4.3 Sync watermarks and the audit table — RESOLVED: both are required
 
-**Slice 0 must prove that before proceeding**, by writing the mobile delete-reconciliation
-scenario as a medium test against the sync stream contract. Deferring this to slice 6 would put a
-possible schema addition **after** slice 3 drops the column — i.e. after the irreversible step —
-forcing a late second migration and a retrofitted trigger. If slice 0's test shows a tombstone
-stream is required, `asset_favorite_audit` is created in slice 0 alongside the main table.
+An earlier draft of this section assumed favorites were single-user state that mobile could
+reconcile without a tombstone stream, and deferred the question to a slice-0 proof. **That proof
+was run during slice-0 planning and the assumption is refuted.** The resolution is recorded here
+because it changes the table definition above.
+
+**The mechanism.** Sync streams page on `updateId`, a UUIDv7 watermark column — see
+`server/src/repositories/sync.repository.ts:136-143`:
+
+```ts
+const updateIdRef = ref(`${t}.updateId`);
+  .where(updateIdRef, '<', nowId)
+  .where(updateIdRef, '<=', beforeUpdateId)
+  .$if(!!afterUpdateId, (qb) => qb.where(updateIdRef, '>', afterUpdateId!))
+```
+
+An asset is re-emitted to a device only when `asset.updateId` advances. If a favorite write
+touches only `asset_favorite`, the asset's watermark never moves, the incremental stream never
+re-emits that asset, and **the favorite never reaches the device**. A full resync masks this
+entirely, so it would not surface in a naive slice-6 test.
+
+**The two candidate fixes, and why one loses.**
+
+1. _Favorite writes bump `asset.updateId`._ Rejected. A viewer favoriting would mutate the
+   **owner's** asset row, re-syncing that asset to every member of the space — cross-user write
+   amplification triggered by a personal action, and in tension with §3's invariant that no write
+   by user A changes what user B sees.
+2. _`asset_favorite` becomes its own synced entity._ **Chosen.** It carries `createId` / `updateId`
+   watermarks and an `asset_favorite_audit` tombstone table for the delete stream, exactly
+   mirroring `album_space_asset` + `album_space_asset_audit`.
+
+**Consequences.** `asset_favorite_audit` is created in **slice 0**, alongside the main table and
+its delete trigger — never later, because slice 3 is irreversible. Slice 6 consumes these streams
+rather than introducing them. Both tables need DROP lines, step-8 migration entries and step-9
+guard entries in `revert-to-immich.sql` (§4.2), and `asset_favorite_audit` ends with `_audit`, so
+it _is_ caught by the existing `revert-to-immich.spec.ts` filter — but `asset_favorite` still is
+not, so the filter widening in §4.2 remains required.
+
+**Note on the API-shape claim (§1.1).** `AssetResponseDto.isFavorite` still does not change shape.
+Favorites being a separately-synced entity is a **sync-transport** decision, not a REST-payload
+one; the REST asset response continues to carry a resolved per-user boolean.
 
 ### 4.1 Migration
 
