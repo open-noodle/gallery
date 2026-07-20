@@ -62,6 +62,7 @@ import {
   withSmartSearch,
   withTags,
 } from 'src/utils/database';
+import { favoriteExistsFor } from 'src/utils/favorite';
 import { globToSqlPattern } from 'src/utils/misc';
 import {
   hiddenFromOwnTimeline,
@@ -177,6 +178,12 @@ export interface TimeBucketOptions extends AssetBuilderOptions {
    * never widens the result set, so it is resolved even when `withSharedSpaces` is off.
    */
   visibleSpaceIds?: string[];
+  /**
+   * #763: the caller making the request — NOT `userIds` (the timeline *target*, which differs
+   * from the caller on space/album browse paths). Required whenever `isFavorite` is set, so
+   * `withTimeBucketAssetFilters` can resolve the `asset_favorite` overlay for the right user.
+   */
+  authUserId?: string;
 }
 
 export interface TimeBucketItem {
@@ -586,7 +593,13 @@ export function withTimeBucketAssetFilters<O>(
           ]),
         ),
       )
-      .$if(options.isFavorite !== undefined, (qb) => qb.where('asset.isFavorite', '=', options.isFavorite!))
+      .$if(options.isFavorite !== undefined, (qb) =>
+        qb.where((eb) =>
+          options.isFavorite
+            ? favoriteExistsFor(eb, options.authUserId!)
+            : eb.not(favoriteExistsFor(eb, options.authUserId!)),
+        ),
+      )
       .$if(!!options.assetType, (qb) => qb.where('asset.type', '=', options.assetType!))
       .$if(options.isDuplicate !== undefined, (qb) =>
         qb.where('asset.duplicateId', options.isDuplicate ? 'is not' : 'is', null),
@@ -1367,13 +1380,17 @@ export class AssetRepository {
 
   @GenerateSql({ params: [DummyValue.UUID] })
   getForCopy(id: string) {
-    return this.db
-      .selectFrom('asset')
-      .select(['id', 'stackId', 'originalPath', 'isFavorite'])
-      .select(withFiles)
-      .where('id', '=', asUuid(id))
-      .limit(1)
-      .executeTakeFirst();
+    return (
+      this.db
+        .selectFrom('asset')
+        // TODO(#763 slice 7): this still reads the legacy asset.isFavorite column — copy semantics
+        // (whose overlay row(s), if any, should carry over to the copy) belong to slice 7.
+        .select(['id', 'stackId', 'originalPath', 'isFavorite'])
+        .select(withFiles)
+        .where('id', '=', asUuid(id))
+        .limit(1)
+        .executeTakeFirst()
+    );
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
@@ -1573,7 +1590,13 @@ export class AssetRepository {
       .where('ownerId', '=', asUuid(ownerId))
       .$if(visibility === undefined, withDefaultVisibility)
       .$if(!!visibility, (qb) => qb.where('asset.visibility', '=', visibility!))
-      .$if(isFavorite !== undefined, (qb) => qb.where('isFavorite', '=', isFavorite!))
+      .$if(isFavorite !== undefined, (qb) =>
+        // #763: `ownerId` doubles as the favoriting user here — the query is already scoped to
+        // `WHERE asset.ownerId = ownerId` below, so this only ever asks "of ownerId's own assets,
+        // how many has ownerId favorited", regardless of which caller (self or an admin viewing
+        // another user's stats, see user-admin.service.ts) triggered the request.
+        qb.where((eb) => (isFavorite ? favoriteExistsFor(eb, ownerId) : eb.not(favoriteExistsFor(eb, ownerId)))),
+      )
       .$if(!!isTrashed, (qb) => qb.where('asset.status', '!=', AssetStatus.Deleted))
       .where('deletedAt', isTrashed ? 'is not' : 'is', null)
       .executeTakeFirstOrThrow();
@@ -1758,7 +1781,11 @@ export class AssetRepository {
             'asset.duration',
             'asset.id',
             'asset.visibility',
-            sql`asset."isFavorite" and asset."ownerId" = ${auth.user.id}`.as('isFavorite'),
+            // The `eb` here is scoped to this `.with('cte', ...)` builder (DB & { filtered: ... }),
+            // which Kysely's ExpressionBuilder generics don't consider assignable to the plain
+            // `ExpressionBuilder<DB, keyof DB>` favoriteExistsFor expects, even though the
+            // 'asset_favorite' table it queries is unaffected by the extra CTE in scope. Safe cast.
+            favoriteExistsFor(eb as unknown as ExpressionBuilder<DB, keyof DB>, auth.user.id).as('isFavorite'),
             sql`asset.type = 'IMAGE'`.as('isImage'),
             sql`asset."deletedAt" is not null`.as('isTrashed'),
             'asset.livePhotoVideoId',

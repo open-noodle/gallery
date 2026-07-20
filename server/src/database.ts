@@ -484,7 +484,6 @@ export const columns = {
     'asset.isFavorite',
     'asset.isExternal',
     'asset.isEdited',
-    'asset.isFavorite',
   ],
   assetFiles: ['asset_file.id', 'asset_file.path', 'asset_file.type', 'asset_file.isEdited'],
   assetFilesForThumbnail: [
