@@ -463,18 +463,33 @@ Removal is out of scope; it needs a deprecation window announced to API consumer
 
 ## 9. Slice overview
 
-| #   | Slice                                                          | Layers                 | Depends on | Self-contained?      |
-| --- | -------------------------------------------------------------- | ---------------------- | ---------- | -------------------- |
-| 0   | `asset_favorite` schema, migration, backfill, revert-to-immich | server medium          | —          | foundation           |
-| 1   | Read path: masking → EXISTS join, + favorites access filter    | server medium + unit   | 0          | foundation           |
-| 2   | Write path: canonical endpoint, deprecated alias, authz        | server e2e + unit      | 1          | ✅ (API)             |
-| 3   | Drop `asset.isFavorite`; regenerate SQL snapshots              | server medium          | 1, 2       | irreversible gate    |
-| 4   | Cross-scope favorites: guard **and** owner-scoping removal     | server e2e + web       | 3          | ✅                   |
-| 5   | Web: un-gate the heart in viewer + multi-select                | web unit + Playwright  | 2          | ✅ — **closes #763** |
-| 6   | Mobile: sync stream, Drift, un-gate the action                 | server medium + mobile | 3          | ✅                   |
-| 7   | Secondary writes: upload, copy, duplicate-merge, trash         | server e2e + unit      | 2          | ✅                   |
+| #   | Slice                                                          | Layers                 | Depends on  | Self-contained?      |
+| --- | -------------------------------------------------------------- | ---------------------- | ----------- | -------------------- |
+| 0   | `asset_favorite` schema, migration, backfill, revert-to-immich | server medium          | —           | foundation           |
+| 1   | Read path: masking → EXISTS join, + favorites access filter    | server medium + unit   | 0           | foundation           |
+| 2   | Write path: canonical endpoint, deprecated alias, authz        | server e2e + unit      | 1           | ✅ (API)             |
+| 3   | Drop `asset.isFavorite`; regenerate SQL snapshots              | server medium          | 1, 2, **7** | irreversible gate    |
+| 4   | Cross-scope favorites: guard **and** owner-scoping removal     | server e2e + web       | 3           | ✅                   |
+| 5   | Web: un-gate the heart in viewer + multi-select                | web unit + Playwright  | 2           | ✅ — **closes #763** |
+| 6   | Mobile: sync stream, Drift, un-gate the action                 | server medium + mobile | 3           | ✅                   |
+| 7   | Secondary writes: upload, copy, duplicate-merge, trash         | server e2e + unit      | 2           | ✅                   |
 
-Ordering: **0 → 1 → 2 → 3 → {4, 5, 6, 7}**. Each `/impl-loop` run does one slice, TDD.
+Ordering: **0 → 1 → 1b → 2 → 7 → 3 → {4, 5, 6}**. Each `/impl-loop` run does one slice, TDD.
+
+**Correction (2026-07-20): slice 7 must precede slice 3.** The original ordering put the
+secondary writes after the column drop. That is wrong and would have broken the build at the one
+irreversible step. Three sites still write or read the raw column and would fail the moment it is
+dropped:
+
+- `asset-media.service.ts:352` — upload writes `isFavorite: dto.isFavorite` into the asset create
+- `asset.service.ts:557` — copy writes `{ id: targetId, isFavorite: sourceAsset.isFavorite }`
+- `duplicate.service.ts:308` — merge reads `assets.some((asset) => asset.isFavorite)`
+
+The symptom was already visible before the reorder: after slice 1b made statistics read the
+overlay while upload still wrote the column, `GET /assets/statistics?isFavorite` returned zero for
+freshly-uploaded favorited assets — three failing e2e assertions in `asset.e2e-spec.ts`. Those
+failures are the read/write asymmetry, and slice 7 closes it. **Do not run slice 3 until slice 7
+is green.**
 
 **All eight slices land as a single PR.** §8 records the decision that server, web and mobile ship
 atomically, so there is no window where the sync stream and the server disagree about what
