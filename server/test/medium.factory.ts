@@ -99,6 +99,7 @@ import { newTelemetryRepositoryMock } from 'test/repositories/telemetry.reposito
 import { factory, newDate, newEmbedding, newUuid } from 'test/small.factory.js';
 import { automock, wait } from 'test/utils.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
+import { WebsocketRepository } from 'src/repositories/websocket.repository.js';
 
 export const testAssetsDir = resolve(import.meta.dirname, '../../e2e/test-assets');
 
@@ -801,6 +802,13 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
 
     case StorageRepository: {
       return automock(StorageRepository, { args: [{ setContext: () => {} }] });
+    }
+
+    // #763: job.service.spec's websocket-payload staleness test (job.service-favorite-payload.spec.ts)
+    // needs to assert on WebsocketRepository.clientSend calls from a real JobService constructed via
+    // newMediumService — not previously wired here since no medium test had exercised that path.
+    case WebsocketRepository: {
+      return automock(WebsocketRepository, { args: [undefined, { setContext: () => {} }], strict: false });
     }
 
     default: {
