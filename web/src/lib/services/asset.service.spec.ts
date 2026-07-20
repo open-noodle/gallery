@@ -426,12 +426,12 @@ describe('favorite actions — per-user, un-gated from ownership (#763 slice 5)'
     authManager.setUser(user);
     setSharedLink(sharedLinkFactory.build());
 
-    const notFavorited = assetFactory.build({ isFavorite: false });
+    const notFavorited = assetFactory.build({ ownerId: user.id, isFavorite: false });
     const notFavoritedActions = getAssetActions(() => '', notFavorited);
     expect(notFavoritedActions.Favorite.$if?.()).toBe(false);
     expect(notFavoritedActions.Unfavorite.$if?.()).toBe(false);
 
-    const favorited = assetFactory.build({ isFavorite: true });
+    const favorited = assetFactory.build({ ownerId: user.id, isFavorite: true });
     const favoritedActions = getAssetActions(() => '', favorited);
     expect(favoritedActions.Favorite.$if?.()).toBe(false);
     expect(favoritedActions.Unfavorite.$if?.()).toBe(false);
