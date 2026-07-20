@@ -1687,6 +1687,9 @@ export class SharedSpaceService extends BaseService {
       // albumSharedSpaceScope's shared-space re-gate (database.ts:713): album membership is already the
       // boundary here, matching the grid and the old map endpoint — see the comment above.
       userIds: dto.spaceId || dto.albumId ? undefined : [auth.user.id],
+      // #763: the favourite overlay resolves against the CALLER, which userIds no longer names on
+      // the space/album arms above.
+      authUserId: auth.user.id,
       spaceId: dto.spaceId,
       albumAccessIsBoundary: !!dto.albumId,
       // Consumer 1 only (see above): a favorites query resolved timelineSpaceIds purely to make its

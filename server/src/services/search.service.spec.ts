@@ -912,6 +912,7 @@ describe(SearchService.name, () => {
           userIds: [authStub.user1.user.id],
           viewingUserId: authStub.user1.user.id,
           callerId: authStub.user1.user.id,
+          authUserId: authStub.user1.user.id,
           maxDistance: 0,
           visibility: 'not-locked',
         },
