@@ -11,6 +11,7 @@ This guide walks through switching a Gallery instance back to upstream [Immich](
 - Pet detection results, and every individual pet you named through pet recognition
 - Asset duplicate checksums
 - Library sync state
+- Favorites belonging to anyone other than the asset's owner (see note below)
 
 Assets you uploaded through Gallery are preserved, as long as they exist in Immich-native tables (which is the normal case for every file uploaded via the web or mobile app).
 
@@ -115,8 +116,9 @@ Watch the server log. A successful boot ends with the usual Immich startup banne
 
 For transparency, here is what the cleanup script changes:
 
-- **Drops Gallery-only tables**: `shared_space*`, `album_space_asset*`, `library_user`, `library_audit`, `library_asset_audit`, `shared_space_library*`, `face_identity*`, `face_repair*`, `pet_search`, `user_group`, `user_group_member`, `classification_category`, `classification_prompt_embedding`, `storage_migration_log`, `asset_duplicate_checksum`.
+- **Drops Gallery-only tables**: `shared_space*`, `album_space_asset*`, `library_user`, `library_audit`, `library_asset_audit`, `shared_space_library*`, `face_identity*`, `face_repair*`, `pet_search`, `user_group`, `user_group_member`, `classification_category`, `classification_prompt_embedding`, `storage_migration_log`, `asset_duplicate_checksum`, `asset_favorite`, `asset_favorite_audit`.
 - **Drops Gallery-added columns**: `person.type`, `person.species`, `asset_job_status.petsDetectedAt`, `asset_job_status.classifiedAt`, `library.createId`.
+- **Restores `asset.isFavorite`** (an upstream Immich column Gallery moved into the `asset_favorite` overlay so each space member can favorite independently) before dropping `asset_favorite`, and backfills it from the overlay — but **only for the asset's owner**. Favorites belonging to anyone else (for example, a shared-space viewer who favorited another member's photo) have no equivalent in plain Immich's single-favorite-flag model and are discarded. Your own favorites on your own assets are preserved.
 - **Drops Gallery-only functions and triggers** that reference the dropped tables.
 - **Strips the `classification` key** out of the `system-config` row in `system_metadata`.
 - **Deletes fork migration rows** from `kysely_migrations` and `migration_overrides`, so upstream Immich's migrator does not see them as unknown migrations.
