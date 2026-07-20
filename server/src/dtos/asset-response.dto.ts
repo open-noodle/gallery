@@ -1,4 +1,4 @@
-import { Selectable, ShallowDehydrateObject } from 'kysely';
+import { Selectable, ShallowDehydrateObject, SqlBool } from 'kysely';
 import { createZodDto } from 'nestjs-zod';
 import { AssetFace, AssetFile, Exif, Stack, Tag, User } from 'src/database';
 import { HistoryBuilder } from 'src/decorators';
@@ -141,7 +141,10 @@ export type MapAsset = {
   // #763: resolved per-user by the query via favoriteExistsFor(...).as('isFavoriteForUser').
   // Distinct from `isFavorite` (the global column, dropped in slice 3) so an un-migrated query
   // fails safe to `false` instead of silently leaking the owner's flag. See mapAsset.
-  isFavoriteForUser?: boolean;
+  // Typed `SqlBool` (kysely's `boolean | 0 | 1`), not plain `boolean` — that's what `.select()`
+  // infers for a projected `favoriteExistsFor(...)` expression (used in EXISTS/WHERE position
+  // elsewhere in the codebase, where SqlBool is the natural fit). mapAsset coerces with `!!`.
+  isFavoriteForUser?: SqlBool;
   isOffline: boolean;
   visibility: AssetVisibility;
   libraryId: string | null;
@@ -233,7 +236,8 @@ export function mapAsset(entity: MaybeDehydrated<MapAsset>, options: AssetMapOpt
     // Deliberately NOT `entity.isFavorite` — that is the global column (dropped in slice 3), and
     // reading it here would leak the owner's flag to non-owners and to auth-less callers such as
     // mapSharedLink. A query that does not project the field yields undefined -> false (fail-safe).
-    isFavorite: entity.isFavoriteForUser ?? false,
+    // `!!` (not `?? false`) also normalizes SqlBool's `0`/`1` to a real boolean.
+    isFavorite: !!entity.isFavoriteForUser,
     isArchived: entity.visibility === AssetVisibility.Archive,
     isTrashed: !!entity.deletedAt,
     visibility: entity.visibility,

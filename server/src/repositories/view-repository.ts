@@ -4,6 +4,7 @@ import { DummyValue, GenerateSql } from 'src/decorators';
 import { AssetVisibility } from 'src/enum';
 import { DB } from 'src/schema';
 import { asUuid, withExif } from 'src/utils/database';
+import { favoriteExistsFor } from 'src/utils/favorite';
 import {
   hiddenFromOwnTimeline,
   spaceAssetPathBranches,
@@ -53,6 +54,12 @@ export class ViewRepository {
       .selectFrom('asset')
       .selectAll('asset')
       .$call(withExif)
+      // #763: userId doubles as the caller here (this repository has only one user concept — no
+      // owner/caller split like the shared-space browse paths), so it's also the right id to
+      // project the per-user isFavorite overlay for. Gated on `.$if` (always true — userId is a
+      // required param) purely so Kysely infers `isFavoriteForUser` as optional, matching
+      // MapAsset and every other projection site instead of forcing it required here alone.
+      .$if(!!userId, (qb) => qb.select((eb) => favoriteExistsFor(eb, userId).as('isFavoriteForUser')))
       .where((eb) => this.ownedOrSpaceAccessible(eb, userId, hiddenScope, visibleSpaceIds))
       .where('visibility', '=', AssetVisibility.Timeline)
       .where('deletedAt', 'is', null)
