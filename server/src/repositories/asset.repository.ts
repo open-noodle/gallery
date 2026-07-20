@@ -1334,11 +1334,12 @@ export class AssetRepository {
       .select(withFacesAndPeople({ viewingUserId }))
       .select(withTags)
       .$call(withExif)
-      // #763: `isFavorite` is resolved from the OWNER's overlay row (favoriteExistsForOwner), NOT
-      // the raw asset."isFavorite" column selectAll('asset') would otherwise surface — see the
-      // matching comment on getById below for the full rationale (same owner-semantics decision;
-      // job.service.ts's AssetEditReadyV2/AssetUploadReadyV2 payloads are this method's only
-      // direct `.isFavorite` reader, and always send to the asset's OWNER).
+      // #763: `isFavorite` is resolved from the OWNER's overlay row (favoriteExistsForOwner) — the
+      // raw asset."isFavorite" column was dropped outright in slice 3, so selectAll('asset') no
+      // longer surfaces one at all; see the matching comment on getById below for the full
+      // rationale (same owner-semantics decision; job.service.ts's
+      // AssetEditReadyV2/AssetUploadReadyV2 payloads are this method's only direct `.isFavorite`
+      // reader, and always send to the asset's OWNER).
       .select((eb) => favoriteExistsForOwner(eb).as('isFavorite'))
       // #763: authUserId is optional and deliberately omitted by job.service.ts (background job)
       // and notification.service.ts (synthetic partial auth) — see the comments at their mapAsset
