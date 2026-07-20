@@ -54,7 +54,7 @@ class AlbumSharedSpaceLinkResponseDto {
     if (this.linkedById != null) {
       json[r'linkedById'] = this.linkedById;
     } else {
-    //  json[r'linkedById'] = null;
+      json[r'linkedById'] = null;
     }
       json[r'showInTimeline'] = this.showInTimeline;
       json[r'spaceId'] = this.spaceId;
