@@ -13,9 +13,9 @@
 // object. CAVEAT (slice-3 review finding): being un-matchable does NOT make such reads correct —
 // `job.service.ts`'s AssetEditReadyV2/AssetUploadReadyV2 payload mappings read `asset.isFavorite`
 // off `getById`/`getByIdsWithAllRelationsButStacks` results fetched WITHOUT `authUserId`, i.e.
-// `selectAll('asset')`'s RAW column, which the overlay write path no longer updates — a known
-// staleness bug that the column drop (slice 3 task 2) forces into the open via tsc and fixes with
-// an owner-overlay projection. Separately, `person.isFavorite` (a different table) and
+// `selectAll('asset')`'s RAW column, which the overlay write path no longer updated — a
+// staleness bug FIXED in slice 3 task 2 (owner-overlay projection in those repository methods,
+// see job-favorite-payload medium spec). Separately, `person.isFavorite` (a different table) and
 // a bare `isFavorite:` object key never match — the patterns all require the literal `asset.`
 // prefix.
 import { readdirSync, readFileSync } from 'node:fs';
