@@ -155,7 +155,8 @@ describe('getSelectionCapabilities — space timeline (direct space)', () => {
       canShare: true,
       shareScopedToSpace: true,
       canAddToAlbum: true,
-      canFavorite: false,
+      // Favorites are a per-user overlay row (#763), so they are never owner-gated.
+      canFavorite: true,
       canEditMetadata: false,
       canTag: false,
       canDelete: false,
@@ -179,7 +180,8 @@ describe('getSelectionCapabilities — space timeline (direct space)', () => {
     expect(caps.shareScopedToSpace).toBe(true);
     expect(caps.canAddToAlbum).toBe(true);
     expect(caps.addToAlbumRestrictedToSpace).toBe(true);
-    expect(caps.canFavorite).toBe(false);
+    // Favorites are a per-user overlay row (#763), so they are never owner-gated.
+    expect(caps.canFavorite).toBe(true);
     expect(caps.canEditMetadata).toBe(false);
     expect(caps.canTag).toBe(false);
     expect(caps.canDelete).toBe(false);
@@ -192,8 +194,9 @@ describe('getSelectionCapabilities — space timeline (direct space)', () => {
     expect(caps.canShare).toBe(true);
     expect(caps.canAddToAlbum).toBe(true);
     expect(caps.addToAlbumRestrictedToSpace).toBe(true);
+    // Allowed regardless of ownership: a favorite is the viewer's own `asset_favorite` row (#763).
+    expect(caps.canFavorite).toBe(true);
     // Still denied: these mutate every selected asset, and the server refuses the non-owned ones.
-    expect(caps.canFavorite).toBe(false);
     expect(caps.canEditMetadata).toBe(false);
     expect(caps.canDelete).toBe(false);
   });
@@ -280,7 +283,8 @@ describe('getSelectionCapabilities — cross-cutting edge cases', () => {
     // No space to contribute through, so the non-owned assets have nowhere to land.
     expect(caps.canAddToAlbum).toBe(false);
     expect(caps.addToAlbumRestrictedToSpace).toBe(false);
-    expect(caps.canFavorite).toBe(false);
+    // Favorites are a per-user overlay row (#763), so they are never owner-gated.
+    expect(caps.canFavorite).toBe(true);
     expect(caps.canEditMetadata).toBe(false);
     expect(caps.canTag).toBe(false);
     expect(caps.canDelete).toBe(false);
