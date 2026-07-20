@@ -78,7 +78,7 @@ class AlbumNameDto {
     if (this.albumThumbnailAssetId != null) {
       json[r'albumThumbnailAssetId'] = this.albumThumbnailAssetId;
     } else {
-    //  json[r'albumThumbnailAssetId'] = null;
+      json[r'albumThumbnailAssetId'] = null;
     }
       json[r'assetCount'] = this.assetCount;
     if (this.endDate.isPresent) {
