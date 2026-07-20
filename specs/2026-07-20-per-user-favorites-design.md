@@ -348,46 +348,67 @@ revocation event itself, which would reintroduce the leave/rejoin data loss.
 
 ---
 
+### 5.4 Stacked assets — favorites are per-photo
+
+**Decision (approved 2026-07-20): a favorite applies to the exact asset favorited, never to its
+stack.** Favoriting a stack **child** favorites that child only; favoriting the **primary**
+favorites the primary only. A favorited child appears in `/favorites` as a standalone asset even
+though it is normally hidden behind its stack primary elsewhere in the timeline.
+
+Rationale: it is the only option that needs no special-casing, and it follows directly from §3 —
+a favorite is a fact about `(user, asset)`. The alternatives (redirect the favorite to the stack
+primary; or render the stack in Favorites with the favorited child inside it) both introduce a
+second notion of what a favorite attaches to, which is the ambiguity this whole design exists to
+remove.
+
+Accepted cost: a user can see a photo in Favorites that appears nowhere else in their timeline,
+which can read as a bug. It is rare, and it is literally what the user asked for by favoriting
+that photo. Do **not** add stack-collapsing logic to the favorites view to hide it.
+
+Why it becomes reachable now: today only owners favorite, and owners can restack and manage their
+own assets. Once space viewers can favorite, users who can neither see nor manage the stack can
+reach this state.
+
 ## 6. Lifecycle & edge cases — assertion source for the slices
 
 Every row here must have an explicit assertion in the slice named. This table is the contract;
 a slice is not done while a row in it is unasserted.
 
-| #    | Scenario                                                              | Expected                                                                               | Slice |
-| ---- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----- |
-| E1   | Two users favorite the same asset                                     | Two independent rows; each sees only their own `isFavorite: true`                      | 1, 2  |
-| E2   | Owner unfavorites; member had favorited                               | Member's row untouched; member still sees `true`                                       | 2     |
-| E3   | Space **viewer** favorites a space asset                              | 200; row created; owner's view unchanged                                               | 2     |
-| E4   | Space **editor** attempts to set another member's favorite            | Impossible — no endpoint accepts a target user                                         | 2     |
-| E5   | Non-member attempts to favorite a space asset                         | 403; no row created                                                                    | 2     |
-| E6   | Shared-link session attempts to favorite                              | Rejected by an **explicit** `auth.sharedLink` guard; no row created for the link owner | 2     |
-| E7   | System admin (`hasElevatedPermission`) favorites another user's asset | Creates the **admin's own** row only; target user unaffected                           | 2     |
-| E8   | Favorite twice (idempotency)                                          | Second call is a no-op, not a 500 (`onConflict do nothing`)                            | 2     |
-| E9   | Unfavorite something never favorited                                  | No-op, 200, not 404                                                                    | 2     |
-| E10  | Member favorites, then leaves the space                               | Row persists; asset absent from their `/favorites` and from `isFavorite: true` filters | 4     |
-| E11  | …then rejoins the space                                               | Asset reappears in their favorites                                                     | 4     |
-| E12  | Asset deleted                                                         | Rows CASCADE for all users                                                             | 0     |
-| E13  | User deleted                                                          | Their rows CASCADE; other users' rows for the same assets survive                      | 0     |
-| E14  | Asset trashed then restored                                           | Favorite survives (trash never touched favorite before and must not now)               | 7     |
-| E15  | `isFavorite: true` + `withSharedSpaces`                               | Works, returns cross-space favorites — no longer a 400                                 | 4     |
-| E16  | `isFavorite: true` + `withPartners`                                   | Works — no longer a 400                                                                | 4     |
-| E16b | `isFavorite: **false**` + either cross-user scope                     | Also works — the guard trips on `false` too today, so both arms must be asserted       | 4     |
-| E17  | Deprecated `UpdateAssetDto.isFavorite` from an owner                  | Writes the caller's own row; identical result to the canonical endpoint                | 2     |
-| E18  | Deprecated alias from a space **viewer**                              | Still 403 — the alias is strictly narrower and must never widen access                 | 2     |
-| E19  | Upload with `isFavorite: true`                                        | Creates the uploader's row (uploader is always the owner)                              | 7     |
-| E20  | Asset copy with `favorite: true`                                      | Copies the **acting user's** row only, not every user's                                | 7     |
-| E21  | Duplicate merge                                                       | Union of all source assets' rows onto the keeper, **per user**, before sources CASCADE | 7     |
-| E22  | Statistics `isFavorite: true`                                         | Counts only the caller's rows                                                          | 1     |
-| E23  | Map markers `isFavorite: true`                                        | Only caller's favorites; cross-space markers now included                              | 4     |
-| E24  | Timeline bucket parallel array                                        | `isFavorite[]` aligns 1:1 with the bucket's asset order for the caller                 | 1     |
-| E25  | Mobile sync, non-owned space asset                                    | Stream carries the **recipient's** favorite, not a masked `false`                      | 6     |
-| E26  | Mobile unfavorite while offline, then sync                            | Converges to the user's intent; no cross-user write                                    | 6     |
-| E27  | Concurrent favorite + unfavorite of the same `(user, asset)`          | Converges deterministically; no PK violation, no 500, no orphaned row                  | 2     |
-| E28  | Bulk request with an oversized `ids` array                            | Bounded — documented limit enforced with a 400, not an unbounded statement             | 2     |
-| E29  | Album **unshared** after the user favorited an asset in it            | Same as E10: row persists, asset drops out of their favorites                          | 4     |
-| E30  | Partner sharing **revoked** after favoriting                          | Same as E10                                                                            | 4     |
-| E31  | Stacked assets (`/favorites` sends `withStacked: true`)               | Favoriting a stack child vs. primary has one defined behavior, asserted either way     | 4     |
-| E32  | Mobile toggle direction on a mixed-ownership selection                | Direction derives from the **same** set that is mutated (see slice 6)                  | 6     |
+| #    | Scenario                                                              | Expected                                                                                                         | Slice |
+| ---- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ----- |
+| E1   | Two users favorite the same asset                                     | Two independent rows; each sees only their own `isFavorite: true`                                                | 1, 2  |
+| E2   | Owner unfavorites; member had favorited                               | Member's row untouched; member still sees `true`                                                                 | 2     |
+| E3   | Space **viewer** favorites a space asset                              | 200; row created; owner's view unchanged                                                                         | 2     |
+| E4   | Space **editor** attempts to set another member's favorite            | Impossible — no endpoint accepts a target user                                                                   | 2     |
+| E5   | Non-member attempts to favorite a space asset                         | 403; no row created                                                                                              | 2     |
+| E6   | Shared-link session attempts to favorite                              | Rejected by an **explicit** `auth.sharedLink` guard; no row created for the link owner                           | 2     |
+| E7   | System admin (`hasElevatedPermission`) favorites another user's asset | Creates the **admin's own** row only; target user unaffected                                                     | 2     |
+| E8   | Favorite twice (idempotency)                                          | Second call is a no-op, not a 500 (`onConflict do nothing`)                                                      | 2     |
+| E9   | Unfavorite something never favorited                                  | No-op, 200, not 404                                                                                              | 2     |
+| E10  | Member favorites, then leaves the space                               | Row persists; asset absent from their `/favorites` and from `isFavorite: true` filters                           | 4     |
+| E11  | …then rejoins the space                                               | Asset reappears in their favorites                                                                               | 4     |
+| E12  | Asset deleted                                                         | Rows CASCADE for all users                                                                                       | 0     |
+| E13  | User deleted                                                          | Their rows CASCADE; other users' rows for the same assets survive                                                | 0     |
+| E14  | Asset trashed then restored                                           | Favorite survives (trash never touched favorite before and must not now)                                         | 7     |
+| E15  | `isFavorite: true` + `withSharedSpaces`                               | Works, returns cross-space favorites — no longer a 400                                                           | 4     |
+| E16  | `isFavorite: true` + `withPartners`                                   | Works — no longer a 400                                                                                          | 4     |
+| E16b | `isFavorite: **false**` + either cross-user scope                     | Also works — the guard trips on `false` too today, so both arms must be asserted                                 | 4     |
+| E17  | Deprecated `UpdateAssetDto.isFavorite` from an owner                  | Writes the caller's own row; identical result to the canonical endpoint                                          | 2     |
+| E18  | Deprecated alias from a space **viewer**                              | Still 403 — the alias is strictly narrower and must never widen access                                           | 2     |
+| E19  | Upload with `isFavorite: true`                                        | Creates the uploader's row (uploader is always the owner)                                                        | 7     |
+| E20  | Asset copy with `favorite: true`                                      | Copies the **acting user's** row only, not every user's                                                          | 7     |
+| E21  | Duplicate merge                                                       | Union of all source assets' rows onto the keeper, **per user**, before sources CASCADE                           | 7     |
+| E22  | Statistics `isFavorite: true`                                         | Counts only the caller's rows                                                                                    | 1     |
+| E23  | Map markers `isFavorite: true`                                        | Only caller's favorites; cross-space markers now included                                                        | 4     |
+| E24  | Timeline bucket parallel array                                        | `isFavorite[]` aligns 1:1 with the bucket's asset order for the caller                                           | 1     |
+| E25  | Mobile sync, non-owned space asset                                    | Stream carries the **recipient's** favorite, not a masked `false`                                                | 6     |
+| E26  | Mobile unfavorite while offline, then sync                            | Converges to the user's intent; no cross-user write                                                              | 6     |
+| E27  | Concurrent favorite + unfavorite of the same `(user, asset)`          | Converges deterministically; no PK violation, no 500, no orphaned row                                            | 2     |
+| E28  | Bulk request with an oversized `ids` array                            | Bounded — documented limit enforced with a 400, not an unbounded statement                                       | 2     |
+| E29  | Album **unshared** after the user favorited an asset in it            | Same as E10: row persists, asset drops out of their favorites                                                    | 4     |
+| E30  | Partner sharing **revoked** after favoriting                          | Same as E10                                                                                                      | 4     |
+| E31  | Stacked assets (`/favorites` sends `withStacked: true`)               | **Per-photo** (§5.4): favoriting a stack child favorites only that asset, and it appears standalone in Favorites | 4     |
+| E32  | Mobile toggle direction on a mixed-ownership selection                | Direction derives from the **same** set that is mutated (see slice 6)                                            | 6     |
 
 ---
 
