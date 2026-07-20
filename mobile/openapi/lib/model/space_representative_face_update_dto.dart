@@ -36,7 +36,7 @@ class SpaceRepresentativeFaceUpdateDto {
     if (this.assetFaceId != null) {
       json[r'assetFaceId'] = this.assetFaceId;
     } else {
-    //  json[r'assetFaceId'] = null;
+      json[r'assetFaceId'] = null;
     }
     return json;
   }

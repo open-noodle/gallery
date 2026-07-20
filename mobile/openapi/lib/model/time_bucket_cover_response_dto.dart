@@ -53,17 +53,17 @@ class TimeBucketCoverResponseDto {
     if (this.representativeAssetId != null) {
       json[r'representativeAssetId'] = this.representativeAssetId;
     } else {
-    //  json[r'representativeAssetId'] = null;
+      json[r'representativeAssetId'] = null;
     }
     if (this.representativeRatio != null) {
       json[r'representativeRatio'] = this.representativeRatio;
     } else {
-    //  json[r'representativeRatio'] = null;
+      json[r'representativeRatio'] = null;
     }
     if (this.representativeThumbhash != null) {
       json[r'representativeThumbhash'] = this.representativeThumbhash;
     } else {
-    //  json[r'representativeThumbhash'] = null;
+      json[r'representativeThumbhash'] = null;
     }
       json[r'timeBucket'] = this.timeBucket;
     return json;
