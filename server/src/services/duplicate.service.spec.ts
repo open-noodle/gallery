@@ -453,7 +453,7 @@ describe(DuplicateService.name, () => {
     });
 
     it('should not merge metadata when multiple assets are kept', async () => {
-      const asset1 = AssetFactory.create({ isFavorite: true });
+      const asset1 = AssetFactory.create();
       const asset2 = AssetFactory.create();
       mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
       mocks.duplicateRepository.get.mockResolvedValue({

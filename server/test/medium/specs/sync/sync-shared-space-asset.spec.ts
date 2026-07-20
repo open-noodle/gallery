@@ -173,9 +173,14 @@ describe(SyncRequestType.SharedSpaceAssetsV1, () => {
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.SharedSpaceAssetsV1]);
 
     // #763: favoriting alone does not bump asset.updateId (asset_favorite is a separate overlay
-    // table — see design doc §4.3), so the raw column update below stands in for "some metadata
-    // changed" to trigger the re-emit; the actual isFavorite value comes from the overlay insert.
-    await defaultDatabase.updateTable('asset').set({ isFavorite: true }).where('id', '=', asset.id).execute();
+    // table — see design doc §4.3), so the unrelated column update below stands in for "some
+    // metadata changed" to trigger the re-emit; the actual isFavorite value comes from the
+    // overlay insert. asset."isFavorite" no longer exists (dropped in slice 3), hence originalFileName.
+    await defaultDatabase
+      .updateTable('asset')
+      .set({ originalFileName: 'renamed-for-resync.jpg' })
+      .where('id', '=', asset.id)
+      .execute();
     await ctx.get(AssetFavoriteRepository).addAll(auth.user.id, [asset.id]);
 
     const next = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetsV1]);
@@ -298,7 +303,11 @@ describe(SyncRequestType.SharedSpaceAssetsV1, () => {
     // asset.updateId so the row re-flows through the update path — even so, auth's stream must
     // never see the peer's favorite.
     await ctx.get(AssetFavoriteRepository).addAll(peer.id, [asset.id]);
-    await defaultDatabase.updateTable('asset').set({ isFavorite: true }).where('id', '=', asset.id).execute();
+    await defaultDatabase
+      .updateTable('asset')
+      .set({ originalFileName: 'renamed-for-resync.jpg' })
+      .where('id', '=', asset.id)
+      .execute();
 
     const next = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetsV1]);
     const updateEvents = next.filter((r: { type: string }) => r.type === SyncEntityType.SharedSpaceAssetUpdateV1);
