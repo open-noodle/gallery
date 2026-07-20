@@ -98,6 +98,7 @@ import { newMetadataRepositoryMock } from 'test/repositories/metadata.repository
 import { newStorageRepositoryMock } from 'test/repositories/storage.repository.mock.js';
 import { newSystemMetadataRepositoryMock } from 'test/repositories/system-metadata.repository.mock.js';
 import { ITelemetryRepositoryMock, newTelemetryRepositoryMock } from 'test/repositories/telemetry.repository.mock.js';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 
 export type ControllerContext = {
   authenticate: Mock;
@@ -249,6 +250,7 @@ export type ServiceOverrides = {
   app: AppRepository;
   asset: AssetRepository;
   assetEdit: AssetEditRepository;
+  assetFavorite: AssetFavoriteRepository;
   assetFile: AssetFileRepository;
   assetJob: AssetJobRepository;
   clusterGroup: ClusterGroupRepository;
@@ -349,6 +351,7 @@ export const getMocks = () => {
     albumUser: automock(AlbumUserRepository),
     asset: newAssetRepositoryMock(),
     assetEdit: automock(AssetEditRepository),
+    assetFavorite: automock(AssetFavoriteRepository),
     assetFile: automock(AssetFileRepository),
     assetJob: automock(AssetJobRepository),
     clusterGroup: automock(ClusterGroupRepository),
@@ -434,6 +437,7 @@ export const newTestService = <T extends BaseService>(
     overrides.app || (mocks.app as As<AppRepository>),
     overrides.asset || (mocks.asset as As<AssetRepository>),
     overrides.assetEdit || (mocks.assetEdit as As<AssetEditRepository>),
+    overrides.assetFavorite || (mocks.assetFavorite as As<AssetFavoriteRepository>),
     overrides.assetFile || (mocks.assetFile as As<AssetFileRepository>),
     overrides.assetJob || (mocks.assetJob as As<AssetJobRepository>),
     overrides.clusterGroup || (mocks.clusterGroup as As<ClusterGroupRepository>),
