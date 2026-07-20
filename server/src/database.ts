@@ -481,7 +481,10 @@ export const columns = {
     'asset.originalPath',
     'asset.originalFileName',
     'asset.isOffline',
-    'asset.isFavorite',
+    // #763: isFavorite is intentionally NOT listed here — the sole consumer, workflow.repository.ts's
+    // getForAssetV1, projects it separately via favoriteExistsForOwner(eb), the per-user asset_favorite
+    // overlay resolved for the asset's OWNER (background workflow jobs have no auth user — see
+    // favorite.ts's doc comment for the owner-semantics rationale).
     'asset.isExternal',
     'asset.isEdited',
   ],

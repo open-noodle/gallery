@@ -8,6 +8,7 @@ import { WorkflowSearchDto } from 'src/dtos/workflow.dto';
 import { DB } from 'src/schema';
 import { WorkflowStepTable } from 'src/schema/tables/workflow-step.table';
 import { WorkflowTable } from 'src/schema/tables/workflow.table';
+import { favoriteExistsForOwner } from 'src/utils/favorite';
 
 export type WorkflowStepUpsert = Omit<Insertable<WorkflowStepTable>, 'workflowId' | 'order'>;
 
@@ -143,6 +144,11 @@ export class WorkflowRepository {
       .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
       .select((eb) => [
         ...columns.workflowAssetV1,
+        // #763: the plugin-facing `isFavorite` field is the asset OWNER's favorite — the workflow
+        // engine always acts AS the owner (see workflow-execution.service.ts's handleAssetTrigger)
+        // and there is no other viewer in scope for a background job. See favorite.ts's doc
+        // comment on favoriteExistsForOwner for the full owner-semantics rationale.
+        favoriteExistsForOwner(eb).as('isFavorite'),
         jsonObjectFrom(
           eb
             .selectFrom('asset_exif')
