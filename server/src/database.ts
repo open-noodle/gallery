@@ -526,6 +526,9 @@ export const columns = {
     'plugin_method.allowedHosts',
     'plugin_method.uiHints',
   ],
+  // #763: isFavorite is intentionally NOT listed here — AssetSync.getUpserts (sync.repository.ts)
+  // projects it separately via favoriteExistsFor(eb, userId), the per-user asset_favorite overlay,
+  // instead of this raw asset column (same pattern as syncLibraryAsset below).
   syncAsset: [
     'asset.id',
     'asset.ownerId',
@@ -538,7 +541,6 @@ export const columns = {
     'asset.localDateTime',
     'asset.type',
     'asset.deletedAt',
-    'asset.isFavorite',
     'asset.visibility',
     'asset.duration',
     'asset.livePhotoVideoId',
@@ -611,9 +613,10 @@ export const columns = {
     'asset.height',
     'asset.isEdited',
   ],
-  // syncAsset minus isFavorite — LibraryAssetSync masks the favorite flag per row
-  // (owner keeps it, other library members see false), like the other shared-scope
-  // sync column sets above (issue #743 item 1).
+  // syncAsset minus isFavorite — LibraryAssetSync projects the favorite flag separately via
+  // favoriteExistsFor(eb, userId) (#763), the per-user asset_favorite overlay: each syncing user
+  // sees their OWN favorite state for the row, never another library member's, like the other
+  // shared-scope sync column sets above (issue #743 item 1).
   syncLibraryAsset: [
     'asset.id',
     'asset.ownerId',

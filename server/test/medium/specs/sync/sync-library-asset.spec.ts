@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { AssetVisibility, SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository';
 import { DB } from 'src/schema';
 import { SyncTestContext } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
@@ -79,13 +80,17 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     // LibraryAssetCreateV1 and the client applies them idempotently.
     const { auth, ctx } = await setup();
     const { library } = await ctx.newLibrary({ ownerId: auth.user.id });
-    const { asset } = await ctx.newAsset({ ownerId: auth.user.id, libraryId: library.id, isFavorite: false });
+    const { asset } = await ctx.newAsset({ ownerId: auth.user.id, libraryId: library.id });
 
     const initial = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetsV1]);
     await ctx.syncAckAll(auth, initial);
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.LibraryAssetsV1]);
 
+    // #763: favoriting alone does not bump asset.updateId (asset_favorite is a separate overlay
+    // table — see design doc §4.3), so the raw column update below stands in for "some metadata
+    // changed" to trigger the re-emit; the actual isFavorite value comes from the overlay insert.
     await defaultDatabase.updateTable('asset').set({ isFavorite: true }).where('id', '=', asset.id).execute();
+    await ctx.get(AssetFavoriteRepository).addAll(auth.user.id, [asset.id]);
 
     const next = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetsV1]);
     const assetEvents = next.filter((r) => isAssetEvent(r));
@@ -96,13 +101,14 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     });
   });
 
-  it('masks isFavorite for a foreign-owned asset in a shared library', async () => {
-    // The owner's favorite flag must not leak to other library members — same
-    // masking rule as SharedSpaceAssetSync / AlbumAssetSync (issue #743 item 1).
+  it("does not leak the owner's favorite for a foreign-owned asset in a shared library (#763)", async () => {
+    // The owner's favorite must not leak to other library members — same
+    // per-user overlay rule as SharedSpaceAssetSync / AlbumAssetSync (issue #743 item 1).
     const { auth, ctx } = await setup();
     const { user: owner } = await ctx.newUser();
     const { library } = await ctx.newLibrary({ ownerId: owner.id });
-    const { asset } = await ctx.newAsset({ ownerId: owner.id, libraryId: library.id, isFavorite: true });
+    const { asset } = await ctx.newAsset({ ownerId: owner.id, libraryId: library.id });
+    await ctx.get(AssetFavoriteRepository).addAll(owner.id, [asset.id]);
 
     const { space } = await ctx.newSharedSpace({ createdById: owner.id });
     await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
@@ -118,7 +124,29 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     });
   });
 
-  it('masks isFavorite on the backfill path for a foreign-owned asset in a late-linked library', async () => {
+  it("syncs the recipient's own favorite for a foreign-owned asset in a shared library (#763, E25)", async () => {
+    const { auth, ctx } = await setup();
+    const { user: owner } = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: owner.id });
+    const { asset } = await ctx.newAsset({ ownerId: owner.id, libraryId: library.id });
+    // The member favorites an asset they don't own — their own stream must reflect it as true.
+    await ctx.get(AssetFavoriteRepository).addAll(auth.user.id, [asset.id]);
+
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Editor });
+    await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: owner.id });
+
+    const response = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetsV1]);
+    const assetEvents = response.filter((r) => isAssetEvent(r));
+    expect(assetEvents).toHaveLength(1);
+    expect((assetEvents[0] as { data: { id: string; isFavorite: boolean } }).data).toMatchObject({
+      id: asset.id,
+      isFavorite: true,
+    });
+  });
+
+  it("does not leak the owner's favorite on the backfill path for a foreign-owned asset in a late-linked library (#763)", async () => {
     const { auth, ctx } = await setup();
     const { user: owner } = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: owner.id });
@@ -131,7 +159,8 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
 
     // Link a new library with a foreign favorite asset — it flows via getBackfill.
     const { library } = await ctx.newLibrary({ ownerId: owner.id });
-    const { asset } = await ctx.newAsset({ ownerId: owner.id, libraryId: library.id, isFavorite: true });
+    const { asset } = await ctx.newAsset({ ownerId: owner.id, libraryId: library.id });
+    await ctx.get(AssetFavoriteRepository).addAll(owner.id, [asset.id]);
     await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: owner.id });
 
     const response = await ctx.syncStream(auth, syncTypes);
@@ -140,6 +169,32 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     expect((assetEvents[0] as { data: { id: string; isFavorite: boolean } }).data).toMatchObject({
       id: asset.id,
       isFavorite: false,
+    });
+  });
+
+  it("syncs the recipient's own favorite on the backfill path for a foreign-owned asset in a late-linked library (#763, E25)", async () => {
+    const { auth, ctx } = await setup();
+    const { user: owner } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Editor });
+
+    const syncTypes = [SyncRequestType.LibrariesV1, SyncRequestType.LibraryAssetsV1];
+    const initial = await ctx.syncStream(auth, syncTypes);
+    await ctx.syncAckAll(auth, initial);
+
+    // Link a new library with an asset the RECIPIENT favorites before it backfills.
+    const { library } = await ctx.newLibrary({ ownerId: owner.id });
+    const { asset } = await ctx.newAsset({ ownerId: owner.id, libraryId: library.id });
+    await ctx.get(AssetFavoriteRepository).addAll(auth.user.id, [asset.id]);
+    await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: owner.id });
+
+    const response = await ctx.syncStream(auth, syncTypes);
+    const assetEvents = response.filter((r) => isAssetEvent(r));
+    expect(assetEvents).toHaveLength(1);
+    expect((assetEvents[0] as { data: { id: string; isFavorite: boolean } }).data).toMatchObject({
+      id: asset.id,
+      isFavorite: true,
     });
   });
 
@@ -289,6 +344,9 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.LibraryAssetsV1]);
 
     await defaultDatabase.updateTable('library').set({ deletedAt: new Date() }).where('id', '=', library.id).execute();
+    // Owner favorites the asset (via the overlay) AND a genuine metadata change bumps
+    // asset.updateId so the row re-flows — even so, the owner's favorite must not leak to auth.
+    await ctx.get(AssetFavoriteRepository).addAll(owner.id, [asset.id]);
     await defaultDatabase.updateTable('asset').set({ isFavorite: true }).where('id', '=', asset.id).execute();
 
     const after = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetsV1]);
@@ -296,8 +354,8 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     expect(events).toHaveLength(1);
     const data = (events[0] as { data: { id: string; isFavorite: boolean } }).data;
     expect(data.id).toBe(asset.id);
-    // L5: `auth` is a space member, not the asset owner — the owner's true isFavorite flag must not
-    // leak to a non-owning library sync arm reader (mirrors the direct/album arms' masking).
+    // L5/#763: `auth` is a space member, not the asset owner — isFavorite resolves auth's OWN
+    // overlay row, so the owner's favorite must not leak (mirrors the direct/album arms).
     expect(data.isFavorite).toBe(false);
   });
 

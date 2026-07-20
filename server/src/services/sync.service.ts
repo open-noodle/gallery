@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { Insertable } from 'kysely';
+import { Insertable, SqlBool } from 'kysely';
 import { DateTime, Duration } from 'luxon';
 import { Writable } from 'node:stream';
 import { OnJob } from 'src/decorators';
@@ -23,19 +23,26 @@ import { formatSecondsToDuration } from 'src/utils/duration';
 import { fromAck, serialize, SerializeOptions, toAck } from 'src/utils/sync';
 
 type CheckpointMap = Partial<Record<SyncEntityType, SyncAck>>;
-type AssetLike = Omit<SyncAssetV2, 'checksum' | 'thumbhash'> & {
+// #763: isFavorite is SqlBool (boolean | 0 | 1), not boolean, because every asset-payload stream
+// now projects it via favoriteExistsFor's eb.exists(...) (sync.repository.ts), whose driver-level
+// boolean representation Kysely can't narrow further than SqlBool — same reason
+// asset-response.dto.ts's MapAsset.isFavoriteForUser is typed SqlBool. Coerced to a strict
+// boolean below, in mapSyncAssetV2, mirroring that DTO's `!!entity.isFavoriteForUser`.
+type AssetLike = Omit<SyncAssetV2, 'checksum' | 'thumbhash' | 'isFavorite'> & {
   checksum: Buffer<ArrayBufferLike>;
   thumbhash: Buffer<ArrayBufferLike> | null;
+  isFavorite: SqlBool;
 };
 
 const COMPLETE_ID = 'complete';
 const MAX_DAYS = 30;
 const MAX_DURATION = Duration.fromObject({ days: MAX_DAYS });
 
-const mapSyncAssetV2 = ({ checksum, thumbhash, ...data }: AssetLike): SyncAssetV2 => ({
+const mapSyncAssetV2 = ({ checksum, thumbhash, isFavorite, ...data }: AssetLike): SyncAssetV2 => ({
   ...data,
   checksum: hexOrBufferToBase64(checksum),
   thumbhash: thumbhash ? hexOrBufferToBase64(thumbhash) : null,
+  isFavorite: !!isFavorite,
 });
 
 const mapSyncAssetV1 = (data: AssetLike): SyncAssetV1 => {
@@ -446,6 +453,7 @@ export class SyncService extends BaseService {
         const backfill = this.syncRepository.partnerAsset.getBackfill(
           { ...options, afterUpdateId: startId, beforeUpdateId: endId },
           partner.sharedById,
+          options.userId,
         );
 
         for await (const { updateId, ...data } of backfill) {

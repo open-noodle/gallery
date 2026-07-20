@@ -6,6 +6,7 @@ import { DummyValue, GenerateSql } from 'src/decorators';
 import { DB } from 'src/schema';
 import { SyncAck } from 'src/types';
 import { asUuid } from 'src/utils/database';
+import { favoriteExistsFor } from 'src/utils/favorite';
 import { accessibleSpaceAlbums, accessibleSpaces, spaceVisibilityGate } from 'src/utils/shared-space-album-scope';
 
 // Re-export the relocated scoping helpers so existing `sync.repository` importers
@@ -239,15 +240,7 @@ class AlbumAssetSync extends BaseSync {
     return this.backfillQuery('album_asset', options)
       .innerJoin('asset', 'asset.id', 'album_asset.assetId')
       .select(columns.syncAlbumAsset)
-      .select((eb) =>
-        eb
-          .case()
-          .when('asset.ownerId', '=', userId)
-          .then(eb.ref('asset.isFavorite'))
-          .else(eb.val(false))
-          .end()
-          .as('isFavorite'),
-      )
+      .select((eb) => favoriteExistsFor(eb, userId).as('isFavorite'))
       .select('album_asset.updateId')
       .where('album_asset.albumId', '=', albumId)
       .stream();
@@ -259,15 +252,7 @@ class AlbumAssetSync extends BaseSync {
     return this.upsertQuery('asset', options)
       .innerJoin('album_asset', 'album_asset.assetId', 'asset.id')
       .select(columns.syncAlbumAsset)
-      .select((eb) =>
-        eb
-          .case()
-          .when('asset.ownerId', '=', userId)
-          .then(eb.ref('asset.isFavorite'))
-          .else(eb.val(false))
-          .end()
-          .as('isFavorite'),
-      )
+      .select((eb) => favoriteExistsFor(eb, userId).as('isFavorite'))
       .select('asset.updateId')
       .where('album_asset.updateId', '<=', albumToAssetAck.updateId) // Ensure we only send updates for assets that the client already knows about
       .innerJoin('album_user', 'album_user.albumId', 'album_asset.albumId')
@@ -282,15 +267,7 @@ class AlbumAssetSync extends BaseSync {
       .select('album_asset.updateId')
       .innerJoin('asset', 'asset.id', 'album_asset.assetId')
       .select(columns.syncAlbumAsset)
-      .select((eb) =>
-        eb
-          .case()
-          .when('asset.ownerId', '=', userId)
-          .then(eb.ref('asset.isFavorite'))
-          .else(eb.val(false))
-          .end()
-          .as('isFavorite'),
-      )
+      .select((eb) => favoriteExistsFor(eb, userId).as('isFavorite'))
       .innerJoin('album_user', 'album_user.albumId', 'album_asset.albumId')
       .where('album_user.userId', '=', userId)
       .stream();
@@ -436,12 +413,18 @@ class AssetSync extends BaseSync {
     return this.auditCleanup('asset_audit', daysAgo);
   }
 
+  // #763: the syncing user IS the owner here (getDeletes/getUpserts both filter `ownerId =
+  // options.userId`), so favoriteExistsFor resolves the same rows the old `asset.isFavorite`
+  // column read — no behavior change post-backfill, just the source of truth moving to the
+  // per-user overlay like every other asset-payload stream in this file.
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
   getUpserts(options: SyncQueryOptions) {
+    const userId = options.userId;
     return this.upsertQuery('asset', options)
       .select(columns.syncAsset)
+      .select((eb) => favoriteExistsFor(eb, userId).as('isFavorite'))
       .select('asset.updateId')
-      .where('ownerId', '=', options.userId)
+      .where('ownerId', '=', userId)
       .stream();
   }
 }
@@ -660,11 +643,18 @@ class PartnerSync extends BaseSync {
 }
 
 class PartnerAssetsSync extends BaseSync {
-  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID], stream: true })
-  getBackfill(options: SyncBackfillOptions, partnerId: string) {
+  // #763 (E25): isFavorite now resolves the RECIPIENT's (`userId` — the syncing user, not
+  // `partnerId`) own overlay row instead of a hardcoded false. The hardcoded false this replaces
+  // was introduced by migration 1777897107000-PartnerAssetSyncReset to guard against the *owner's*
+  // (the partner's) favorite leaking to the recipient, back when favorite was a single boolean on
+  // the asset row. `favoriteExistsFor` is always scoped to the passed-in `userId`, so it can only
+  // ever report the recipient's own favorite of a partner asset — the owner's favorite is a
+  // different (userId, assetId) row in `asset_favorite` and is never read here.
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, partnerId: string, userId: string) {
     return this.backfillQuery('asset', options)
       .select(columns.syncPartnerAsset)
-      .select(sql.val(false).as('isFavorite'))
+      .select((eb) => favoriteExistsFor(eb, userId).as('isFavorite'))
       .select('asset.updateId')
       .where('ownerId', '=', partnerId)
       .stream();
@@ -680,14 +670,16 @@ class PartnerAssetsSync extends BaseSync {
       .stream();
   }
 
+  // #763 (E25): isFavorite resolves the recipient's own overlay row — see getBackfill above.
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
   getUpserts(options: SyncQueryOptions) {
+    const userId = options.userId;
     return this.upsertQuery('asset', options)
       .select(columns.syncPartnerAsset)
-      .select(sql.val(false).as('isFavorite'))
+      .select((eb) => favoriteExistsFor(eb, userId).as('isFavorite'))
       .select('asset.updateId')
       .where('ownerId', 'in', (eb) =>
-        eb.selectFrom('partner').select(['sharedById']).where('sharedWithId', '=', options.userId),
+        eb.selectFrom('partner').select(['sharedById']).where('sharedWithId', '=', userId),
       )
       .stream();
   }
@@ -998,24 +990,16 @@ export class SharedSpaceMemberSync extends BaseSync {
 export class SharedSpaceAssetSync extends BaseSync {
   // Per-space backfill of asset rows joined through shared_space_asset.
   //
-  // isFavorite is masked to the syncing user's own rows (mirrors AlbumAssetSync):
-  // a space member must not learn another owner's favorite flag for an asset
-  // shared into the space.
+  // #763: isFavorite resolves the syncing user's OWN asset_favorite overlay row
+  // (favoriteExistsFor), never the asset owner's — a space member sees whether THEY favorited an
+  // asset shared into the space, not whether the owner did (mirrors AlbumAssetSync).
   @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID, DummyValue.UUID], stream: true })
   getBackfill(options: SyncBackfillOptions, spaceId: string, userId: string) {
     return (
       this.backfillQuery('shared_space_asset', options)
         .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
         .select(columns.syncSharedSpaceAsset)
-        .select((eb) =>
-          eb
-            .case()
-            .when('asset.ownerId', '=', userId)
-            .then(eb.ref('asset.isFavorite'))
-            .else(eb.val(false))
-            .end()
-            .as('isFavorite'),
-        )
+        .select((eb) => favoriteExistsFor(eb, userId).as('isFavorite'))
         .select('shared_space_asset.updateId')
         .where('shared_space_asset.spaceId', '=', spaceId)
         .where((eb) => spaceVisibilityGate(eb))
@@ -1030,7 +1014,7 @@ export class SharedSpaceAssetSync extends BaseSync {
   // shared_space_asset row produces one event (write amplification accepted —
   // mobile dedups by asset id at insert time).
   //
-  // isFavorite is masked to the syncing user's own rows — see getBackfill above.
+  // #763: isFavorite resolves the syncing user's own overlay row — see getBackfill above.
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
   getCreates(options: SyncQueryOptions) {
     const userId = options.userId;
@@ -1038,15 +1022,7 @@ export class SharedSpaceAssetSync extends BaseSync {
       this.upsertQuery('shared_space_asset', options)
         .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
         .select(columns.syncSharedSpaceAsset)
-        .select((eb) =>
-          eb
-            .case()
-            .when('asset.ownerId', '=', userId)
-            .then(eb.ref('asset.isFavorite'))
-            .else(eb.val(false))
-            .end()
-            .as('isFavorite'),
-        )
+        .select((eb) => favoriteExistsFor(eb, userId).as('isFavorite'))
         .select('shared_space_asset.updateId')
         .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
         .where((eb) => spaceVisibilityGate(eb))
@@ -1061,22 +1037,14 @@ export class SharedSpaceAssetSync extends BaseSync {
   // received. Gated by `shared_space_asset.updateId <= sharedSpaceToAssetAck` to
   // ensure we only emit updates for join rows the client has acked.
   //
-  // isFavorite is masked to the syncing user's own rows — see getBackfill above.
+  // #763: isFavorite resolves the syncing user's own overlay row — see getBackfill above.
   @GenerateSql({ params: [dummyQueryOptions, { updateId: DummyValue.UUID }], stream: true })
   getUpdates(options: SyncQueryOptions, sharedSpaceToAssetAck: SyncAck) {
     const userId = options.userId;
     return this.upsertQuery('asset', options)
       .innerJoin('shared_space_asset', 'shared_space_asset.assetId', 'asset.id')
       .select(columns.syncSharedSpaceAsset)
-      .select((eb) =>
-        eb
-          .case()
-          .when('asset.ownerId', '=', userId)
-          .then(eb.ref('asset.isFavorite'))
-          .else(eb.val(false))
-          .end()
-          .as('isFavorite'),
-      )
+      .select((eb) => favoriteExistsFor(eb, userId).as('isFavorite'))
       .select('asset.updateId')
       .where('shared_space_asset.updateId', '<=', sharedSpaceToAssetAck.updateId)
       .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
@@ -1311,23 +1279,15 @@ export class LibraryAssetSync extends BaseSync {
   // assets. For OTHER members' assets (reached via the space-link branch of
   // accessibleLibraries), only Archive and Timeline are streamed.
   //
-  // L5: isFavorite is masked to the syncing user's own rows (mirrors SharedSpaceAssetSync/
-  // SharedSpaceAlbumAssetSync) — a member syncing another owner's space-linked library must not learn
-  // the owner's true favorite flag for an asset they don't own.
+  // L5/#763: isFavorite resolves the syncing user's OWN asset_favorite overlay row (mirrors
+  // SharedSpaceAssetSync/SharedSpaceAlbumAssetSync) — a member syncing another owner's
+  // space-linked library sees whether THEY favorited the asset, never the owner's favorite.
   @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID, DummyValue.UUID], stream: true })
   getBackfill(options: SyncBackfillOptions, libraryId: string, userId: string) {
     return (
       this.backfillQuery('asset', options)
         .select(columns.syncLibraryAsset)
-        .select((eb) =>
-          eb
-            .case()
-            .when('asset.ownerId', '=', userId)
-            .then(eb.ref('asset.isFavorite'))
-            .else(eb.val(false))
-            .end()
-            .as('isFavorite'),
-        )
+        .select((eb) => favoriteExistsFor(eb, userId).as('isFavorite'))
         .select('asset.updateId')
         .where('asset.libraryId', '=', libraryId)
         // M-2: the non-owner (space-link) branch also excludes trashed assets; the owner keeps their own
@@ -1350,21 +1310,13 @@ export class LibraryAssetSync extends BaseSync {
   // as `LibraryAssetCreateV1` events; the client upserts idempotently.
   //
   // M3 visibility gate: see getBackfill above.
-  // L5: isFavorite masking — see getBackfill above.
+  // L5/#763: isFavorite resolves the syncing user's own overlay row — see getBackfill above.
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
   getUpserts(options: SyncQueryOptions) {
     const userId = options.userId;
     return this.upsertQuery('asset', options)
       .select(columns.syncLibraryAsset)
-      .select((eb) =>
-        eb
-          .case()
-          .when('asset.ownerId', '=', userId)
-          .then(eb.ref('asset.isFavorite'))
-          .else(eb.val(false))
-          .end()
-          .as('isFavorite'),
-      )
+      .select((eb) => favoriteExistsFor(eb, userId).as('isFavorite'))
       .select('asset.updateId')
       .where('asset.libraryId', 'is not', null)
       .where('asset.libraryId', 'in', (eb) => accessibleLibraries(eb, userId))
@@ -1920,9 +1872,10 @@ class SharedSpaceAlbumToAssetSync extends BaseSync {
 // contributionVisibleToMember). Clone of AlbumAssetSync with the album_user
 // scoping swapped for the grant.
 //
-// Preserves the split getCreates/getUpdates/getBackfill pattern, the
-// isFavorite masking (false for non-owners), and the albumToAssetAck coupling
-// that ensures updates only fire for assets the client already knows about.
+// Preserves the split getCreates/getUpdates/getBackfill pattern, the per-user isFavorite overlay
+// resolution (#763: favoriteExistsFor(eb, userId) — the syncing user's own favorite, never the
+// asset owner's), and the albumToAssetAck coupling that ensures updates only fire for assets the
+// client already knows about.
 class SharedSpaceAlbumAssetSync extends BaseSync {
   @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID, DummyValue.UUID], stream: true })
   getBackfill(options: SyncBackfillOptions, albumId: string, userId: string) {
@@ -1934,15 +1887,7 @@ class SharedSpaceAlbumAssetSync extends BaseSync {
       .innerJoin('asset', 'asset.id', 'album_asset.assetId')
       .innerJoin('album', 'album.id', 'album_asset.albumId')
       .select(columns.syncAlbumAsset)
-      .select((eb) =>
-        eb
-          .case()
-          .when('asset.ownerId', '=', userId)
-          .then(eb.ref('asset.isFavorite'))
-          .else(eb.val(false))
-          .end()
-          .as('isFavorite'),
-      )
+      .select((eb) => favoriteExistsFor(eb, userId).as('isFavorite'))
       .select('album_asset.updateId')
       .where('album_asset.albumId', '=', albumId)
       .where('album.deletedAt', 'is', null)
@@ -1959,15 +1904,7 @@ class SharedSpaceAlbumAssetSync extends BaseSync {
       .innerJoin('asset', 'asset.id', 'album_space_asset.assetId')
       .innerJoin('album', 'album.id', 'album_space_asset.albumId')
       .select(columns.syncAlbumAsset)
-      .select((eb) =>
-        eb
-          .case()
-          .when('asset.ownerId', '=', userId)
-          .then(eb.ref('asset.isFavorite'))
-          .else(eb.val(false))
-          .end()
-          .as('isFavorite'),
-      )
+      .select((eb) => favoriteExistsFor(eb, userId).as('isFavorite'))
       .select('album_space_asset.updateId')
       .where('album_space_asset.albumId', '=', albumId)
       .where('album.deletedAt', 'is', null)
@@ -1993,15 +1930,7 @@ class SharedSpaceAlbumAssetSync extends BaseSync {
       .innerJoin('album_asset', 'album_asset.assetId', 'asset.id')
       .innerJoin('shared_space_album_user', 'shared_space_album_user.albumId', 'album_asset.albumId')
       .select(columns.syncAlbumAsset)
-      .select((eb) =>
-        eb
-          .case()
-          .when('asset.ownerId', '=', userId)
-          .then(eb.ref('asset.isFavorite'))
-          .else(eb.val(false))
-          .end()
-          .as('isFavorite'),
-      )
+      .select((eb) => favoriteExistsFor(eb, userId).as('isFavorite'))
       .select('asset.updateId')
       .where('asset.updateId', '<', nowId)
       .$if(!!ack, (qb) => qb.where('asset.updateId', '>', ack!.updateId))
@@ -2016,15 +1945,7 @@ class SharedSpaceAlbumAssetSync extends BaseSync {
       .innerJoin('album_space_asset', 'album_space_asset.assetId', 'asset.id')
       .innerJoin('shared_space_album_user', 'shared_space_album_user.albumId', 'album_space_asset.albumId')
       .select(columns.syncAlbumAsset)
-      .select((eb) =>
-        eb
-          .case()
-          .when('asset.ownerId', '=', userId)
-          .then(eb.ref('asset.isFavorite'))
-          .else(eb.val(false))
-          .end()
-          .as('isFavorite'),
-      )
+      .select((eb) => favoriteExistsFor(eb, userId).as('isFavorite'))
       .select('asset.updateId')
       .where('asset.updateId', '<', nowId)
       .$if(!!ack, (qb) => qb.where('asset.updateId', '>', ack!.updateId))
@@ -2048,15 +1969,7 @@ class SharedSpaceAlbumAssetSync extends BaseSync {
       .innerJoin('asset', 'asset.id', 'album_asset.assetId')
       .innerJoin('shared_space_album_user', 'shared_space_album_user.albumId', 'album_asset.albumId')
       .select(columns.syncAlbumAsset)
-      .select((eb) =>
-        eb
-          .case()
-          .when('asset.ownerId', '=', userId)
-          .then(eb.ref('asset.isFavorite'))
-          .else(eb.val(false))
-          .end()
-          .as('isFavorite'),
-      )
+      .select((eb) => favoriteExistsFor(eb, userId).as('isFavorite'))
       .select('album_asset.updateId')
       .where('shared_space_album_user.userId', '=', userId)
       .where('album_asset.albumId', 'in', (eb) => accessibleSpaceAlbums(eb, userId))
@@ -2072,15 +1985,7 @@ class SharedSpaceAlbumAssetSync extends BaseSync {
       .innerJoin('asset', 'asset.id', 'album_space_asset.assetId')
       .innerJoin('shared_space_album_user', 'shared_space_album_user.albumId', 'album_space_asset.albumId')
       .select(columns.syncAlbumAsset)
-      .select((eb) =>
-        eb
-          .case()
-          .when('asset.ownerId', '=', userId)
-          .then(eb.ref('asset.isFavorite'))
-          .else(eb.val(false))
-          .end()
-          .as('isFavorite'),
-      )
+      .select((eb) => favoriteExistsFor(eb, userId).as('isFavorite'))
       .select('album_space_asset.updateId')
       .where('shared_space_album_user.userId', '=', userId)
       .where('album_space_asset.albumId', 'in', (eb) => accessibleSpaceAlbums(eb, userId))
