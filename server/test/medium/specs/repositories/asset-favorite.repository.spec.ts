@@ -2,6 +2,7 @@ import { Kysely, sql } from 'kysely';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
+import { favoriteExistsFor } from 'src/utils/favorite';
 import { newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 
@@ -228,5 +229,65 @@ describe('asset_favorite schema', () => {
     const rows = await ctx.database.selectFrom('asset_favorite').selectAll().execute();
 
     expect(rows).toHaveLength(0);
+  });
+});
+
+describe('favoriteExistsFor', () => {
+  it('is true only for the user who favorited the asset', async () => {
+    const { ctx } = setup();
+    const { user: userA } = await ctx.newUser();
+    const { user: userB } = await ctx.newUser();
+    const { user: owner } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: owner.id });
+
+    await ctx.database.insertInto('asset_favorite').values({ userId: userA.id, assetId: asset.id }).execute();
+
+    const rowForUserA = await ctx.database
+      .selectFrom('asset')
+      .select((eb) => ['asset.id', favoriteExistsFor(eb, userA.id).as('fav')])
+      .where('asset.id', '=', asset.id)
+      .executeTakeFirstOrThrow();
+
+    const rowForUserB = await ctx.database
+      .selectFrom('asset')
+      .select((eb) => ['asset.id', favoriteExistsFor(eb, userB.id).as('fav')])
+      .where('asset.id', '=', asset.id)
+      .executeTakeFirstOrThrow();
+
+    expect(rowForUserA.fav).toBe(true);
+    expect(rowForUserB.fav).toBe(false);
+  });
+
+  it('is false for an asset with no favorite rows at all', async () => {
+    const { ctx } = setup();
+    const { user } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+
+    const row = await ctx.database
+      .selectFrom('asset')
+      .select((eb) => ['asset.id', favoriteExistsFor(eb, user.id).as('fav')])
+      .where('asset.id', '=', asset.id)
+      .executeTakeFirstOrThrow();
+
+    expect(row.fav).toBe(false);
+  });
+
+  it('usable as a WHERE predicate to filter to a user favorites', async () => {
+    const { ctx } = setup();
+    const { user: userA } = await ctx.newUser();
+    const { user: owner } = await ctx.newUser();
+    const { asset: assetX } = await ctx.newAsset({ ownerId: owner.id });
+    const { asset: assetY } = await ctx.newAsset({ ownerId: owner.id });
+
+    await ctx.database.insertInto('asset_favorite').values({ userId: userA.id, assetId: assetX.id }).execute();
+
+    const rows = await ctx.database
+      .selectFrom('asset')
+      .select('asset.id')
+      .where('asset.id', 'in', [assetX.id, assetY.id])
+      .where((eb) => favoriteExistsFor(eb, userA.id))
+      .execute();
+
+    expect(rows).toEqual([{ id: assetX.id }]);
   });
 });
