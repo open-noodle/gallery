@@ -488,7 +488,7 @@ describe('Photos page search URL state', () => {
     });
   });
 
-  it('narrows non-search dependent suggestions to favorites without shared spaces when selected', async () => {
+  it('narrows non-search dependent suggestions to favorites while keeping shared spaces in scope (#763 slice 4)', async () => {
     mockPage.url = new URL('https://gallery.test/photos');
 
     renderPage();
@@ -506,7 +506,7 @@ describe('Photos page search URL state', () => {
     });
 
     for (const [request] of sdkMock.getSearchSuggestions.mock.calls) {
-      expect(request).not.toHaveProperty('withSharedSpaces');
+      expect(request).toHaveProperty('withSharedSpaces', true);
     }
   });
 
@@ -579,7 +579,7 @@ describe('Photos page search URL state', () => {
     expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-language', 'de');
   });
 
-  it('narrows search results and smart facets to favorites without shared spaces when selected', async () => {
+  it('narrows search results and smart facets to favorites while keeping shared spaces in scope (#763 slice 4)', async () => {
     renderPage();
     await vi.waitFor(() => expect(sdkMock.searchSmartFacets).toHaveBeenCalledTimes(1));
 
@@ -587,12 +587,12 @@ describe('Photos page search URL state', () => {
 
     await vi.waitFor(() => expect(sdkMock.searchSmartFacets).toHaveBeenCalledTimes(2));
     expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-is-favorite', 'true');
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-with-shared-spaces', 'false');
+    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-with-shared-spaces', 'true');
     expect(sdkMock.searchSmartFacets.mock.calls[1][0].smartSearchFacetsDto).toMatchObject({
       query: 'nature',
       isFavorite: true,
+      withSharedSpaces: true,
     });
-    expect(sdkMock.searchSmartFacets.mock.calls[1][0].smartSearchFacetsDto).not.toHaveProperty('withSharedSpaces');
   });
 
   it('uses smart facet timeBuckets in search mode', async () => {
