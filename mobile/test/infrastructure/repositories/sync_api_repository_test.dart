@@ -347,6 +347,57 @@ void main() {
     });
   });
 
+  group('#763: AssetFavoritesV1 request-type version gate', () {
+    test('v5.2.0 (at the boundary): EXCLUDES AssetFavoritesV1', () async {
+      final types = await capturedRequestTypes(const SemVer(major: 5, minor: 2, patch: 0));
+      expect(types, isNot(contains('AssetFavoritesV1')));
+    });
+
+    test('below the boundary (v5.1.9): EXCLUDES AssetFavoritesV1', () async {
+      final types = await capturedRequestTypes(const SemVer(major: 5, minor: 1, patch: 9));
+      expect(types, isNot(contains('AssetFavoritesV1')));
+    });
+
+    test('old upstream-numbered fork server (3.0.1): EXCLUDES AssetFavoritesV1 (fail-safe to old)', () async {
+      final types = await capturedRequestTypes(const SemVer(major: 3, minor: 0, patch: 1));
+      expect(types, isNot(contains('AssetFavoritesV1')));
+    });
+
+    test('v5.2.1 (first possible post-release): INCLUDES AssetFavoritesV1', () async {
+      final types = await capturedRequestTypes(const SemVer(major: 5, minor: 2, patch: 1));
+      expect(types, contains('AssetFavoritesV1'));
+    });
+
+    test('feature release-candidate v5.2.1-rc.0: INCLUDES AssetFavoritesV1 (RC validation)', () async {
+      final types = await capturedRequestTypes(const SemVer(major: 5, minor: 2, patch: 1, prerelease: 0));
+      expect(types, contains('AssetFavoritesV1'));
+    });
+
+    test('far-future v6.0.0: INCLUDES AssetFavoritesV1', () async {
+      final types = await capturedRequestTypes(const SemVer(major: 6, minor: 0, patch: 0));
+      expect(types, contains('AssetFavoritesV1'));
+    });
+  });
+
+  group('#763: server-declared sync capabilities override the AssetFavoritesV1 version gate', () {
+    test('a declaring server INCLUDES AssetFavoritesV1 even when its version reads at/below the gate', () async {
+      // Same RC/unbranded-dev-server lie as the album types: the declaration must win.
+      for (final version in [const SemVer(major: 5, minor: 2, patch: 0), const SemVer(major: 3, minor: 0, patch: 3)]) {
+        final types = await capturedRequestTypes(version, supportedSyncTypes: {'AssetFavoritesV1', 'AssetsV1'});
+        expect(types, contains('AssetFavoritesV1'), reason: 'declared capability must open the gate at $version');
+        clearInteractions(mockHttpClient);
+      }
+    });
+
+    test('a declaring server WITHOUT AssetFavoritesV1 EXCLUDES it even far above the version gate', () async {
+      final types = await capturedRequestTypes(
+        const SemVer(major: 6, minor: 0, patch: 0),
+        supportedSyncTypes: {'AssetsV1'},
+      );
+      expect(types, isNot(contains('AssetFavoritesV1')), reason: 'the declaration is authoritative in both directions');
+    });
+  });
+
   test('streamChanges stops processing stream when abort is called', () async {
     int onDataCallCount = 0;
     bool abortWasCalledInCallback = false;
