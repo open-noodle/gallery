@@ -46,3 +46,39 @@ export function favoriteExistsFor(
       .where('asset_favorite.userId', '=', asUuid(userId)),
   );
 }
+
+/**
+ * Per-user favorites (#763), OWNER-scoped variant: correlated EXISTS against the `asset_favorite`
+ * overlay, true iff the asset's OWNER — not any particular viewer — has favorited the asset
+ * referenced by `assetIdRef`. Unlike `favoriteExistsFor`, which binds a caller-supplied `userId`
+ * parameter, this helper takes no user at all: `ownerIdRef` is correlated via `sql.ref` against a
+ * column on the query's own row (defaulting to `asset.ownerId`), exactly like `assetIdRef`.
+ *
+ * Owner-semantics decision: this exists for contexts with no authenticated viewer to resolve a
+ * per-user value for — currently the plugin-facing `workflowAssetV1` projection
+ * (`workflow.repository.ts` `getForAssetV1`), consumed by background workflow jobs, which have no
+ * auth user. The workflow engine always acts AS the asset owner (see
+ * `workflow-execution.service.ts`'s `handleAssetTrigger`), so projecting the OWNER's favorite onto
+ * the plugin-facing `isFavorite` field reproduces the exact pre-#763 semantic of the raw
+ * `asset."isFavorite"` column it replaces — that column could only ever be true for the owner,
+ * since favoriting was owner-only before this feature. Resolving any OTHER viewer's favorite here
+ * would be meaningless (no viewer is in scope) and resolving nobody's would silently regress
+ * plugin steps like `assetFavorite` (`inverse: true`) back to always reading a stale `false`.
+ *
+ * Same shape as `favoriteExistsFor` — see its doc comment for the `AliasableExpression<SqlBool>`
+ * return type rationale and the `assetIdRef: string` (rather than a typed `ReferenceExpression`)
+ * rationale; both apply identically to `ownerIdRef` here.
+ */
+export function favoriteExistsForOwner(
+  eb: ExpressionBuilder<DB, keyof DB>,
+  assetIdRef: string = 'asset.id',
+  ownerIdRef: string = 'asset.ownerId',
+): AliasableExpression<SqlBool> {
+  return eb.exists(
+    eb
+      .selectFrom('asset_favorite')
+      .select(eb.lit(1).as('exists'))
+      .whereRef('asset_favorite.assetId', '=', sql.ref(assetIdRef))
+      .whereRef('asset_favorite.userId', '=', sql.ref(ownerIdRef)),
+  );
+}

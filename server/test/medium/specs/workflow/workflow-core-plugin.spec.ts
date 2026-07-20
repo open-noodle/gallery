@@ -256,6 +256,31 @@ describe('core plugin', () => {
         isFavoriteForUser: false,
       });
     });
+
+    // #763 slice 3 pre-drop: workflow.repository.ts's getForAssetV1 (the workflowAssetV1
+    // projection consumed by handleAssetTrigger's read()) must resolve the plugin-facing
+    // `isFavorite` field via favoriteExistsForOwner directly, not the legacy raw column — this
+    // asserts the PROJECTION itself, independent of the assetFavorite plugin action's write path
+    // covered above.
+    it('projects the ASSET OWNER favorite onto workflowAssetV1, not another user favorite', async () => {
+      const { user: owner } = await ctx.newUser();
+      const { user: other } = await ctx.newUser();
+      const { asset: ownerFavorited } = await ctx.newAsset({ ownerId: owner.id });
+      const { asset: notOwnerFavorited } = await ctx.newAsset({ ownerId: owner.id });
+
+      // Owner favorites via the per-user overlay only — the legacy asset.isFavorite column is
+      // never touched.
+      await ctx.get(AssetFavoriteRepository).addAll(owner.id, [ownerFavorited.id]);
+      // A DIFFERENT user favorites the other asset — its owner never favorited it.
+      await ctx.get(AssetFavoriteRepository).addAll(other.id, [notOwnerFavorited.id]);
+
+      await expect(ctx.get(WorkflowRepository).getForAssetV1(ownerFavorited.id)).resolves.toMatchObject({
+        isFavorite: true,
+      });
+      await expect(ctx.get(WorkflowRepository).getForAssetV1(notOwnerFavorited.id)).resolves.toMatchObject({
+        isFavorite: false,
+      });
+    });
   });
 
   describe('assetAddToAlbums', () => {
