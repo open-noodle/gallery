@@ -12998,13 +12998,21 @@ describe(SharedSpaceService.name, () => {
       );
     });
 
-    it('should not resolve timelineSpaceIds when isFavorite=true', async () => {
+    it('resolves timelineSpaceIds even when isFavorite=true (#763 slice 4)', async () => {
       const auth = factory.auth();
+      const spaceId = newUuid();
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
       mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
 
       await sut.getFilteredMapMarkers(auth, { withSharedSpaces: true, isFavorite: true });
 
-      expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(auth.user.id);
+      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timelineSpaceIds: [spaceId],
+          isFavorite: true,
+        }),
+      );
     });
 
     // Regression (Task 11 / D-silent-empty): the SAME bug 00a7fd6bac fixed on the albumId arm of

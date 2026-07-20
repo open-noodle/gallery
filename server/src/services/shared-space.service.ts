@@ -1647,7 +1647,12 @@ export class SharedSpaceService extends BaseService {
     // out of their timeline (#656). (It matches the grid on VISIBILITY too — see the `visibility`
     // option below.) On the album path timelineSpaceIds is therefore inert for the gate (albumAccessIsBoundary
     // skips albumSharedSpaceScope, and with userIds unset the widening arm cannot fire either).
-    const spaceScopeWidensToTimelineSpaces = !dto.spaceId && dto.withSharedSpaces === true && dto.isFavorite !== true;
+    // #763: `isFavorite` used to be carved out here, because favourites lived on `asset.isFavorite`
+    // (the OWNER's flag) and widening to timeline spaces would have surfaced other members' assets
+    // under the caller's own favourite filter. The overlay makes the filter per-user — searchAssetBuilder
+    // resolves it from `asset_favorite` for `authUserId` — so a member's favourite inside a space is
+    // theirs, and the widening is correct rather than a leak.
+    const spaceScopeWidensToTimelineSpaces = !dto.spaceId && dto.withSharedSpaces === true;
 
     // CONSUMER 2 — scoped person-token resolution. resolveScopedMapPersonFilters forwards
     // timelineSpaceIds to faceIdentityRepository.resolveScopedPersonTokens to resolve

@@ -1122,6 +1122,66 @@ describe('/gallery/map/markers', () => {
 
       expect(status).toBe(200);
       expect(markerIds(body)).toEqual([favAssetId]);
+  });
+
+  describe('cross-scope favorite markers (#763 slice 4, E23)', () => {
+    let spaceOwner: LoginResponseDto;
+    let spaceGpsAsset: AssetMediaResponseDto;
+
+    beforeAll(async () => {
+      spaceOwner = await utils.userSetup(admin.accessToken, createUserDto.create('t18-space-owner'));
+      const filepath = join(testAssetDir, 'metadata/gps-position/thompson-springs.jpg');
+      spaceGpsAsset = await utils.createAsset(spaceOwner.accessToken, {
+        assetData: { bytes: await readFile(filepath), filename: basename(filepath) },
+      });
+      // Wait for metadata (GPS) extraction. The file's websocket is connected as `user`, so
+      // waitForWebsocketEvent will NOT see spaceOwner's upload — poll the post-condition instead
+      // (memory feedback_e2e_waitforqueuefinish_false_done).
+      let exifReady = false;
+      for (let i = 0; i < 30; i++) {
+        const info = await utils.getAssetInfo(spaceOwner.accessToken, spaceGpsAsset.id);
+        if (info.exifInfo?.latitude != null) {
+          exifReady = true;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+      if (!exifReady) {
+        throw new Error('Timed out waiting for GPS metadata extraction on spaceGpsAsset');
+      }
+
+      const space = await utils.createSpace(spaceOwner.accessToken, { name: 'map-fav-space' });
+      await utils.addSpaceMember(spaceOwner.accessToken, space.id, {
+        userId: user.userId,
+        role: SharedSpaceRole.Viewer,
+      });
+      await utils.addSpaceAssets(spaceOwner.accessToken, space.id, [spaceGpsAsset.id]);
+      // The VIEWER favorites the non-owned space asset.
+      await request(app)
+        .put('/assets/favorites')
+        .set(asBearerAuth(user.accessToken))
+        .send({ ids: [spaceGpsAsset.id], isFavorite: true });
+    });
+
+    it('/map/markers?isFavorite=true&withSharedSpaces=true includes the cross-space favorite', async () => {
+      const { status, body } = await request(app)
+        .get('/map/markers?isFavorite=true&withSharedSpaces=true')
+        .set(asBearerAuth(user.accessToken));
+      expect(status).toBe(200);
+      expect((body as Array<{ id: string }>).map((m) => m.id)).toContain(spaceGpsAsset.id);
+    });
+
+    it('/gallery/map/markers?isFavorite=true&withSharedSpaces=true includes the cross-space favorite', async () => {
+      const { status, body } = await request(app)
+        .get('/gallery/map/markers?isFavorite=true&withSharedSpaces=true')
+        .set(asBearerAuth(user.accessToken));
+      expect(status).toBe(200);
+      expect((body as Array<{ id: string }>).map((m) => m.id)).toContain(spaceGpsAsset.id);
+    });
+
+    it("the owner's map does not show the viewer's favorite as their own (no cross-user read)", async () => {
+      const { body } = await request(app).get('/map/markers?isFavorite=true').set(asBearerAuth(spaceOwner.accessToken));
+      expect((body as Array<{ id: string }>).map((m) => m.id)).not.toContain(spaceGpsAsset.id);
     });
   });
 });
