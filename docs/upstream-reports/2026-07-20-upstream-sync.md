@@ -182,9 +182,9 @@ job logs rather than re-run blindly; **none was caused by the upstream batches t
 | Gallery Revert-to-Immich Validation | GREEN                 | Confirms the step-7i coverage gate on branch code |
 | Storage Migration E2E (standalone)  | GREEN                 |                                                   |
 | Static Code Analysis                | RED → fixed           | Stale drift codegen (`shared_space_album_link`)   |
-| Gallery Mobile Smoke                | RED → fixed           | Same stale drift file                             |
-| Test                                | RED → fixed           | `demoLogin` header assertion                      |
-| Storage Migration Tests             | RED → suspected flake | Docker web build; see below                       |
+| Gallery Mobile Smoke                | RED → fixed (codegen) | Same stale drift file (codegen gate)              |
+| Test                                | RED → fixed           | `demoLogin` header assertion (Unit Test Mobile)   |
+| Storage Migration Tests             | RED → confirmed flake | See second-dispatch analysis below                |
 
 ### Stale drift codegen (Static Code Analysis + Gallery Mobile Smoke)
 
@@ -212,17 +212,53 @@ with and without the header. The assertion was relaxed to `isEmpty` rather than 
 it still catches an accidental authorization-header leak on this unauthenticated route.
 Fixed in `0739274227`.
 
-### Storage Migration Tests — suspected infrastructure flake
+### Second dispatch on `2a1587679f` — the three codegen/build fixes verified, three flakes isolated
 
-Its `Storage Migration E2E` job failed building the `immich-web` Docker layer, with a
-sibling build step reported `CANCELED`. The **identical** web build succeeded twice on the
-same SHA in this dispatch — in the `Docker` workflow and in the standalone
-`Storage Migration E2E` workflow — and the truncated log shows no source-level error.
-Being re-run to confirm flake versus real failure rather than assumed away.
+After committing the three fixes above, the four previously-red workflows were re-dispatched.
+
+- **Static Code Analysis → GREEN.** The drift regen fixed it.
+- **Test → Unit Test Mobile GREEN** (the `demoLogin` fix landed), but a **different** job,
+  `End-to-End Tests (Web)`, flaked on the maintenance-mode spec:
+  `getByText('Temporarily Unavailable')` not visible + `Error: 404`. This job **passed** in
+  the first dispatch, nothing in the diff touches maintenance mode, and the signature is a
+  timing/404 flake in an inherently timing-sensitive spec (it toggles the whole server into
+  maintenance).
+- **Gallery Mobile Smoke → the codegen gate now passes**, but the `Android smoke`
+  `assembleDebug` step failed on `checkDebugDuplicateClasses` / `JetifyTransform` of the
+  **Flutter engine** jars. Root cause: `mobile/android/gradle.properties` sets
+  `android.enableJetifier=true`, so Jetifier tries to transform Flutter's own engine jars
+  (already AndroidX) and races intermittently — the failing jar even **varied between runs**
+  (`arm64_v8a_debug` + `armeabi_v7a_debug` first, `x86_64_debug` on rerun), the signature of
+  a transform/cache race rather than a deterministic break. This is a **pre-existing flake in
+  this smoke workflow**, not a rebase regression: its own run history alternates pass/fail on
+  the _same_ rolling-branch state (e.g. 2026-07-17 went fail → success → fail → success within
+  hours; 2026-07-18 green), the rebase touched **zero** Android build config (the diff over
+  all `mobile/android/**` + `build.gradle*` + `gradle.properties` is empty), and the full
+  `Gallery Build Mobile` workflow built **release** Android on the identical tree and passed.
+  Not a rebase blocker. A proper root-cause fix — evaluating whether `enableJetifier` can be
+  dropped now that the dependency graph is AndroidX-native — is a separate infra task, logged
+  under Follow-up.
+- **Storage Migration Tests → flaked at a _different_ point** than the first dispatch: this
+  time it got past the Docker build and failed at the `delete-source-false` phase with
+  `TypeError: fetch failed / SocketError: other side closed`. Different failure point across
+  two runs is the non-determinism signature. Decisive evidence: on `main`'s own cron this
+  workflow failed **2 of its last 8 runs** (2026-07-20, 2026-07-16) with no fork change
+  involved — a confirmed pre-existing flake. (The standalone `storage-migration-e2e`
+  workflow, by contrast, is 8/8 green on main and green here.)
+
+**Causation.** None of the three can stem from this rebase: the entire diff is
+mobile codegen + one mobile test + docs + `ownership.yml`, none of which touches web
+maintenance mode, the Android Gradle graph, or the storage-migration server E2E. Each was
+re-run (`gh run rerun --failed`) to confirm the flake rather than assert it; see the run
+history for the confirming green.
 
 ## Follow-up
 
 - The null-serialization realignment (46 DTOs, omit-key → explicit-null) is a deliberate
   convergence with upstream, recorded above. Worth a targeted look on the next mobile RC.
+- **Android smoke Jetifier flake** — `mobile/android/gradle.properties` still sets
+  `android.enableJetifier=true`, which intermittently fails to transform Flutter engine jars.
+  Not introduced by this rebase (see above), but a standing infra flake worth fixing at root
+  cause by trialling `enableJetifier=false` now that the AndroidX migration is long complete.
 - This report covers the **rolling branch only**. Promotion to `main` remains a separate
   cutover decision.
