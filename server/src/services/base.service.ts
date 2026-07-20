@@ -83,6 +83,7 @@ import { FaceVerdictService } from 'src/services/face-verdict.service.js';
 import { IdentityMergePropagationService } from 'src/services/identity-merge-propagation.service.js';
 import { AccessRequest, checkAccess, requireAccess } from 'src/utils/access.js';
 import { getConfig, updateConfig } from 'src/utils/config.js';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import {
   ContentDisposition,
   ImmichFileResponse,
@@ -109,6 +110,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   AppRepository,
   AssetRepository,
   AssetEditRepository,
+  AssetFavoriteRepository,
   AssetFileRepository,
   AssetJobRepository,
   ClusterGroupRepository,
@@ -182,6 +184,7 @@ export class BaseService {
     protected appRepository: AppRepository,
     protected assetRepository: AssetRepository,
     protected assetEditRepository: AssetEditRepository,
+    protected assetFavoriteRepository: AssetFavoriteRepository,
     protected assetFileRepository: AssetFileRepository,
     protected assetJobRepository: AssetJobRepository,
     protected clusterGroupRepository: ClusterGroupRepository,
@@ -276,6 +279,7 @@ export class BaseService {
       ctx.appRepository,
       ctx.assetRepository,
       ctx.assetEditRepository,
+      ctx.assetFavoriteRepository,
       ctx.assetFileRepository,
       ctx.assetJobRepository,
       ctx.clusterGroupRepository,
