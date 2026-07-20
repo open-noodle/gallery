@@ -2250,4 +2250,47 @@ void main() {
       });
     });
   });
+
+  // --- gallery-fork: per-user favorites sync (#763) ---
+  //
+  // remote_asset.isFavorite is the per-account store for this stream — no new
+  // Drift table, because every asset payload is now recipient-resolved
+  // server-side. Handlers flip the column by assetId: upsert -> true,
+  // tombstone -> false. Ordering note: a favorite event for a not-yet-synced
+  // asset updates zero rows and self-heals when the recipient-resolved asset
+  // payload arrives; a stale-ordered asset payload overwriting a newer
+  // favorite self-heals on the next favorite event or full resync — same
+  // eventual-consistency class as other cross-entity fields.
+  group('SyncStreamRepository - AssetFavorites (#763)', () {
+    test('updateAssetFavoritesV1 flips isFavorite to true for a known asset', () async {
+      await sut.updateUsersV1([_createUser()]);
+      await sut.updateAssetsV1([_createAsset(id: 'fav-asset-1', checksum: 'cFav1', fileName: 'fav1.jpg')]);
+
+      await sut.updateAssetFavoritesV1([SyncAssetFavoriteV1(assetId: 'fav-asset-1')]);
+
+      final row = await (db.remoteAssetEntity.select()..where((t) => t.id.equals('fav-asset-1'))).getSingle();
+      expect(row.isFavorite, isTrue);
+    });
+
+    test('deleteAssetFavoritesV1 flips isFavorite back to false for a known asset', () async {
+      await sut.updateUsersV1([_createUser()]);
+      await sut.updateAssetsV1([_createAsset(id: 'fav-asset-2', checksum: 'cFav2', fileName: 'fav2.jpg')]);
+      await sut.updateAssetFavoritesV1([SyncAssetFavoriteV1(assetId: 'fav-asset-2')]);
+
+      await sut.deleteAssetFavoritesV1([SyncAssetFavoriteDeleteV1(assetId: 'fav-asset-2')]);
+
+      final row = await (db.remoteAssetEntity.select()..where((t) => t.id.equals('fav-asset-2'))).getSingle();
+      expect(row.isFavorite, isFalse);
+    });
+
+    test('updateAssetFavoritesV1 for an unknown assetId is a silent no-op (self-heals)', () async {
+      await expectLater(sut.updateAssetFavoritesV1([SyncAssetFavoriteV1(assetId: 'not-synced-yet')]), completes);
+      expect(await db.remoteAssetEntity.select().get(), isEmpty);
+    });
+
+    test('deleteAssetFavoritesV1 for an unknown assetId is a silent no-op (self-heals)', () async {
+      await expectLater(sut.deleteAssetFavoritesV1([SyncAssetFavoriteDeleteV1(assetId: 'not-synced-yet')]), completes);
+      expect(await db.remoteAssetEntity.select().get(), isEmpty);
+    });
+  });
 }
