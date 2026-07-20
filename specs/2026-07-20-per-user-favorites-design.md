@@ -474,7 +474,20 @@ Removal is out of scope; it needs a deprecation window announced to API consumer
 | 6   | Mobile: sync stream, Drift, un-gate the action                 | server medium + mobile | 3           | ✅                   |
 | 7   | Secondary writes: upload, copy, duplicate-merge, trash         | server e2e + unit      | 2           | ✅                   |
 
-Ordering: **0 → 1 → 1b → 2 → 7 → 3 → {4, 5, 6}**. Each `/impl-loop` run does one slice, TDD.
+Ordering: **0 → 1 → 1b → 2 → 7 → 4 → 5 → 6 → 3**. Each `/impl-loop` run does one slice, TDD.
+
+**Slice 3 is LAST.** It was originally placed mid-sequence on the reasoning that dropping the
+column as soon as nothing depends on it converts silent-staleness risk into a loud error. That
+reasoning is sound, but the premise was wrong: things still depend on it much later than assumed.
+The readiness grep after slice 7 found the column still referenced by
+
+- `sync.repository.ts` — 15 `eb.ref('asset.isFavorite')` sites (slice 6 converts these)
+- `database.ts:451,508` — the `columns.asset` / `columns.syncAsset` constants
+- `job.service.ts:162,232` and `workflow-execution.service.ts:331` — the plugin-facing
+  `workflowAssetV1` projection
+
+so slice 3 must follow slice 6. Its gate is not "the tests pass" but the readiness grep returning
+**nothing outside DTOs, schema definitions, person favorites and migration history**.
 
 **Correction (2026-07-20): slice 7 must precede slice 3.** The original ordering put the
 secondary writes after the column drop. That is wrong and would have broken the build at the one
