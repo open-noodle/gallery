@@ -544,7 +544,13 @@ export function withTimeBucketAssetFilters<O>(
           .leftJoin('stack', (join) =>
             join.onRef('stack.id', '=', 'asset.stackId').onRef('stack.primaryAssetId', '=', 'asset.id'),
           )
-          .where((eb) => eb.or([eb('asset.stackId', 'is', null), eb(eb.table('stack'), 'is not', null)])),
+          // #763 §5.4 (E31): favorites are per (user, asset). Under an isFavorite:true filter every
+          // row is already one of the caller's favorites, and a favorited stack CHILD must surface
+          // standalone instead of staying collapsed behind a primary the caller may not have
+          // favorited — so the primary-only collapse is skipped for favorite-filtered timelines.
+          .$if(options.isFavorite !== true, (qb) =>
+            qb.where((eb) => eb.or([eb('asset.stackId', 'is', null), eb(eb.table('stack'), 'is not', null)])),
+          ),
       )
       // #1041 §4: the `!timelineSpaceIds` branch — userIds set, shared spaces off. E12 requires the
       // subtraction still applies here even with `withSharedSpaces: false`; easy to miss because this
