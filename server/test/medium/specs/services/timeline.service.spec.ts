@@ -291,31 +291,31 @@ describe(TimelineService.name, () => {
         });
         await expect(response1).rejects.toBeInstanceOf(BadRequestException);
         await expect(response1).rejects.toThrow(
-          'withPartners is only supported for non-archived, non-trashed, non-favorited, non-locked assets',
+          'withPartners is only supported for non-archived, non-trashed, non-locked assets',
         );
 
         const response2 = sut.getTimeBuckets(auth, { bucketSize, withPartners: true });
         await expect(response2).rejects.toBeInstanceOf(BadRequestException);
         await expect(response2).rejects.toThrow(
-          'withPartners is only supported for non-archived, non-trashed, non-favorited, non-locked assets',
+          'withPartners is only supported for non-archived, non-trashed, non-locked assets',
         );
       },
     );
 
-    it('should return error if time bucket is requested with partners asset and favorite', async () => {
+    // #763 slice 4: isFavorite no longer trips this guard — it composes with withPartners (the
+    // caller-scoped asset_favorite overlay resolves independently of the cross-user union). An
+    // explicit non-archived visibility is required so the request doesn't fall into the separate
+    // undefined-visibility-defaults-to-archived rejection exercised above.
+    it('resolves time buckets when partners is combined with isFavorite (true or false) (#763 slice 4)', async () => {
       const { sut } = setup();
       const auth = factory.auth();
-      const response1 = sut.getTimeBuckets(auth, { withPartners: true, isFavorite: false });
-      await expect(response1).rejects.toBeInstanceOf(BadRequestException);
-      await expect(response1).rejects.toThrow(
-        'withPartners is only supported for non-archived, non-trashed, non-favorited, non-locked assets',
-      );
 
-      const response2 = sut.getTimeBuckets(auth, { withPartners: true, isFavorite: true });
-      await expect(response2).rejects.toBeInstanceOf(BadRequestException);
-      await expect(response2).rejects.toThrow(
-        'withPartners is only supported for non-archived, non-trashed, non-favorited, non-locked assets',
-      );
+      await expect(
+        sut.getTimeBuckets(auth, { withPartners: true, isFavorite: false, visibility: AssetVisibility.Timeline }),
+      ).resolves.toEqual([]);
+      await expect(
+        sut.getTimeBuckets(auth, { withPartners: true, isFavorite: true, visibility: AssetVisibility.Timeline }),
+      ).resolves.toEqual([]);
     });
 
     it.each([TimeBucketSize.Year, TimeBucketSize.Month, TimeBucketSize.Day])(
@@ -326,7 +326,7 @@ describe(TimelineService.name, () => {
         const response = sut.getTimeBuckets(auth, { bucketSize, withPartners: true, isTrashed: true });
         await expect(response).rejects.toBeInstanceOf(BadRequestException);
         await expect(response).rejects.toThrow(
-          'withPartners is only supported for non-archived, non-trashed, non-favorited, non-locked assets',
+          'withPartners is only supported for non-archived, non-trashed, non-locked assets',
         );
       },
     );
