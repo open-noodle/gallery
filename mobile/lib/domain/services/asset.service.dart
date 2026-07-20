@@ -115,6 +115,20 @@ class AssetService {
     await _apiRepository.unStack(stackIds);
   }
 
+  // #763: favorites are a per-user overlay (`asset_favorite`) that a read-only space Viewer may set
+  // on another member's asset, so they must NOT go through the consolidated `update` below — that
+  // forwards to the OWNER-ONLY `PUT /assets`. This routes to `PUT /assets/favorites` instead and
+  // mirrors the change into the local Drift mirror. See
+  // test/policy/favorite_overlay_policy_test.dart, which fails if a favorite is routed the other way.
+  Future<void> updateFavorite(List<String> remoteIds, bool isFavorite) async {
+    if (remoteIds.isEmpty) {
+      return;
+    }
+
+    await _apiRepository.updateFavorite(remoteIds, isFavorite);
+    await _remoteRepository.updateAssets(remoteIds, isFavorite: .some(isFavorite));
+  }
+
   Future<void> update(
     List<String> remoteIds, {
     Option<bool> isFavorite = const .none(),
