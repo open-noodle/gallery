@@ -9,10 +9,13 @@
 // TypeScript source — always as a STRING (Kysely column selectors are plain strings; a raw
 // Postgres-quoted identifier only ever shows up embedded in a string/template literal). It does
 // NOT match a bare, unquoted `asset.isFavorite` (no adjacent quote/backtick at all), because that
-// form is indistinguishable by text alone from ordinary JS property access on an
-// already-projected object — e.g. `isFavorite: asset.isFavorite` in job.service.ts and
-// workflow-execution.service.ts, which read the *mapped* field the query already resolved
-// correctly and are not raw column reads. Similarly, `person.isFavorite` (a different table) and
+// form is indistinguishable by text alone from ordinary JS property access on a query-result
+// object. CAVEAT (slice-3 review finding): being un-matchable does NOT make such reads correct —
+// `job.service.ts`'s AssetEditReadyV2/AssetUploadReadyV2 payload mappings read `asset.isFavorite`
+// off `getById`/`getByIdsWithAllRelationsButStacks` results fetched WITHOUT `authUserId`, i.e.
+// `selectAll('asset')`'s RAW column, which the overlay write path no longer updates — a known
+// staleness bug that the column drop (slice 3 task 2) forces into the open via tsc and fixes with
+// an owner-overlay projection. Separately, `person.isFavorite` (a different table) and
 // a bare `isFavorite:` object key never match — the patterns all require the literal `asset.`
 // prefix.
 import { readdirSync, readFileSync } from 'node:fs';
