@@ -24,6 +24,7 @@ import { ActivityRepository } from 'src/repositories/activity.repository';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository';
 import { AlbumRepository } from 'src/repositories/album.repository';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { ClassificationRepository } from 'src/repositories/classification.repository';
@@ -587,6 +588,7 @@ const newRealRepository = <T>(key: ClassConstructor<T>, db: Kysely<DB>): T => {
     case ActivityRepository:
     case AssetRepository:
     case AssetEditRepository:
+    case AssetFavoriteRepository:
     case AssetJobRepository:
     case DownloadRepository:
     case FaceIdentityRepository:

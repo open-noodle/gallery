@@ -20,6 +20,7 @@ import { AlbumRepository } from 'src/repositories/album.repository';
 import { ApiKeyRepository } from 'src/repositories/api-key.repository';
 import { AppRepository } from 'src/repositories/app.repository';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { ClassificationRepository } from 'src/repositories/classification.repository';
@@ -107,6 +108,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   AppRepository,
   AssetRepository,
   AssetEditRepository,
+  AssetFavoriteRepository,
   AssetJobRepository,
   ConfigRepository,
   ClassificationRepository,
@@ -178,6 +180,7 @@ export class BaseService {
     protected appRepository: AppRepository,
     protected assetRepository: AssetRepository,
     protected assetEditRepository: AssetEditRepository,
+    protected assetFavoriteRepository: AssetFavoriteRepository,
     protected assetJobRepository: AssetJobRepository,
     protected configRepository: ConfigRepository,
     protected classificationRepository: ClassificationRepository,
@@ -270,6 +273,7 @@ export class BaseService {
       ctx.appRepository,
       ctx.assetRepository,
       ctx.assetEditRepository,
+      ctx.assetFavoriteRepository,
       ctx.assetJobRepository,
       ctx.configRepository,
       ctx.classificationRepository,

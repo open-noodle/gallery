@@ -24,6 +24,7 @@ import { AlbumRepository } from 'src/repositories/album.repository';
 import { ApiKeyRepository } from 'src/repositories/api-key.repository';
 import { AppRepository } from 'src/repositories/app.repository';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { ClassificationRepository } from 'src/repositories/classification.repository';
@@ -237,6 +238,7 @@ export type ServiceOverrides = {
   app: AppRepository;
   asset: AssetRepository;
   assetEdit: AssetEditRepository;
+  assetFavorite: AssetFavoriteRepository;
   assetJob: AssetJobRepository;
   classification: ClassificationRepository;
   config: ConfigRepository;
@@ -334,6 +336,7 @@ export const getMocks = () => {
     albumUser: automock(AlbumUserRepository),
     asset: newAssetRepositoryMock(),
     assetEdit: automock(AssetEditRepository),
+    assetFavorite: automock(AssetFavoriteRepository),
     assetJob: automock(AssetJobRepository),
     app: automock(AppRepository, { strict: false }),
     // eslint-disable-next-line no-sparse-arrays
@@ -414,6 +417,7 @@ export const newTestService = <T extends BaseService>(
     overrides.app || (mocks.app as As<AppRepository>),
     overrides.asset || (mocks.asset as As<AssetRepository>),
     overrides.assetEdit || (mocks.assetEdit as As<AssetEditRepository>),
+    overrides.assetFavorite || (mocks.assetFavorite as As<AssetFavoriteRepository>),
     overrides.assetJob || (mocks.assetJob as As<AssetJobRepository>),
     overrides.config || (mocks.config as As<ConfigRepository> as ConfigRepository),
     overrides.classification || (mocks.classification as As<ClassificationRepository>),
