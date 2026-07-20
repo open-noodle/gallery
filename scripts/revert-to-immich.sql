@@ -105,11 +105,10 @@ DROP TRIGGER IF EXISTS "album_soft_delete_shared_space_album" ON "album";
 -- LOSSY: favorites belonging to non-owners (space members who favorited someone
 -- else's photo) have nowhere to live in plain Immich and are discarded.
 --
--- IF NOT EXISTS: at the time this revert path was added, asset."isFavorite" has
--- NOT yet been dropped from the live schema (that happens in a future slice 3),
--- so a bare ADD COLUMN would fail with "column already exists" against every
--- Gallery DB until that slice ships. IF NOT EXISTS keeps the script correct in
--- both states (column still present, or column already dropped by slice 3).
+-- IF NOT EXISTS: slice 3 (1784100000000-DropAssetIsFavoriteColumn) has now dropped
+-- asset."isFavorite" from the live schema, but a Gallery DB that has not yet applied that
+-- migration still has the column, and a bare ADD COLUMN would fail with "column already exists"
+-- against it. IF NOT EXISTS keeps the script correct in both states.
 -- -----------------------------------------------------------------------------
 ALTER TABLE "asset" ADD COLUMN IF NOT EXISTS "isFavorite" boolean NOT NULL DEFAULT false;
 
@@ -489,6 +488,7 @@ DELETE FROM "kysely_migrations"
    '1783700000000-FixSharedSpaceMemberJoinGrantCreateId',
    '1784000000000-AddAssetFavoriteTables',
    '1784000000000-FixFaceRepairScanInFlightIndexOverride',
+   '1784100000000-DropAssetIsFavoriteColumn',
    '1784800000000-RepairSharedSpaceAlbumGrantDrift',
    '1785000000000-AddFaceRepairLock',
    '1785000000000-CreatePetSearchTable',

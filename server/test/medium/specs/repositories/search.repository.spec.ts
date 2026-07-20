@@ -63,7 +63,6 @@ describe(SearchRepository.name, () => {
       const { asset: february } = await ctx.newAsset({
         ownerId: user.id,
         type: AssetType.Video,
-        isFavorite: true,
         fileCreatedAt: new Date('2024-02-20T10:00:00.000Z'),
         localDateTime: new Date('2024-02-20T10:00:00.000Z'),
       });
@@ -642,9 +641,9 @@ describe(SearchRepository.name, () => {
     });
   });
 
-  // #763 slice 1 Task 3 — isFavorite must resolve against the per-user asset_favorite overlay,
-  // not the ownership-masked asset.isFavorite column. Every asset here has asset.isFavorite left
-  // at its default (false); only a direct asset_favorite insert marks the caller's favorite.
+  // #763 slice 1 Task 3 — isFavorite must resolve against the per-user asset_favorite overlay, not
+  // the (now-dropped, slice 3) ownership-masked asset.isFavorite column. Only a direct
+  // asset_favorite insert marks the caller's favorite.
   describe('isFavorite overlay (#763)', () => {
     it('searchMetadata filters isFavorite from the callers overlay, not asset.isFavorite', async () => {
       const { ctx, sut } = setup();

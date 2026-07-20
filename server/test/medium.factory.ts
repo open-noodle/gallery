@@ -767,7 +767,6 @@ const assetInsert = (asset: Partial<Insertable<AssetTable>> = {}) => {
     type: AssetType.Image,
     originalPath: '/path/to/something.jpg',
     ownerId: 'not-a-valid-uuid',
-    isFavorite: false,
     fileCreatedAt: now,
     fileModifiedAt: now,
     localDateTime: now,

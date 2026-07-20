@@ -1,4 +1,4 @@
-import { Kysely, sql } from 'kysely';
+import { Kysely } from 'kysely';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { DB } from 'src/schema';
@@ -31,13 +31,6 @@ const setupRepo = (db?: Kysely<DB>) => {
   });
   return { ctx, sut: ctx.get(AssetFavoriteRepository) };
 };
-
-const backfillFavorites = (db: Kysely<DB>) =>
-  sql`
-    INSERT INTO "asset_favorite" ("userId", "assetId")
-    SELECT "ownerId", "id" FROM "asset" WHERE "isFavorite" = true
-    ON CONFLICT DO NOTHING;
-  `.execute(db);
 
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
@@ -208,39 +201,12 @@ describe('asset_favorite schema', () => {
     expect(auditRows.map((row) => row.userId).toSorted()).toEqual([userA.id, userB.id].toSorted());
   });
 
-  it('backfills one row per owner-favorited asset', async () => {
-    const { ctx } = setup(await getKyselyDB());
-    const { user: u1 } = await ctx.newUser();
-    const { user: u2 } = await ctx.newUser();
-    const { asset: assetA } = await ctx.newAsset({ ownerId: u1.id, isFavorite: true });
-    const { asset: assetB } = await ctx.newAsset({ ownerId: u1.id, isFavorite: false });
-    const { asset: assetC } = await ctx.newAsset({ ownerId: u2.id, isFavorite: true });
-
-    await backfillFavorites(ctx.database);
-
-    const rows = await ctx.database.selectFrom('asset_favorite').select(['userId', 'assetId']).execute();
-
-    expect(rows).toHaveLength(2);
-    expect(rows).toEqual(
-      expect.arrayContaining([
-        { userId: u1.id, assetId: assetA.id },
-        { userId: u2.id, assetId: assetC.id },
-      ]),
-    );
-    expect(rows.some((row) => row.assetId === assetB.id)).toBe(false);
-  });
-
-  it('backfills cleanly on a database with zero favorites', async () => {
-    const { ctx } = setup(await getKyselyDB());
-    const { user } = await ctx.newUser();
-    await ctx.newAsset({ ownerId: user.id, isFavorite: false });
-
-    await backfillFavorites(ctx.database);
-
-    const rows = await ctx.database.selectFrom('asset_favorite').selectAll().execute();
-
-    expect(rows).toHaveLength(0);
-  });
+  // #763 slice 3: the two "backfills from asset.isFavorite" tests that lived here exercised
+  // 1784000000000-AddAssetFavoriteTables's up() backfill SQL against a live DB — that only made
+  // sense while asset."isFavorite" still existed (slices 0-2). Slice 3
+  // (1784100000000-DropAssetIsFavoriteColumn) has now dropped the column outright, so there is no
+  // live schema left to run that historical backfill query against; the migration file itself
+  // (and its own historical correctness) is unaffected and untouched.
 });
 
 describe('favoriteExistsFor', () => {

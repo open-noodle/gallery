@@ -95,6 +95,11 @@ export const getForActivity = (activity: Selectable<ActivityTable> & { user: Ret
 export const getForAsset = (asset: ReturnType<AssetFactory['build']>) => {
   return {
     ...asset,
+    // #763: assetRepository.getById/getByIdsWithAllRelationsButStacks now always project
+    // `isFavorite` from favoriteExistsForOwner (the raw column this used to come from was
+    // dropped in slice 3) — mock this shape's baseline the same way: no favorite by default.
+    // Override per-test (`{ ...getForAsset(asset), isFavorite: true }`) when a case needs it.
+    isFavorite: false,
     faces: asset.faces.map((face) => ({
       ...getDehydrated(face),
       person: face.person ? getDehydrated(face.person) : null,
