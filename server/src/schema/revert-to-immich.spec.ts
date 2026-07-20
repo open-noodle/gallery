@@ -31,10 +31,10 @@ for (const file of migrationFiles) {
   }
 }
 
-// Targeted regression guard (not exhaustive, matching the original scope): the
-// shared_space_* / *_audit fork tables the album + library sync slices added — where the
-// drift this spec guards against actually happened.
-const forkTables = [...createdTables].filter((name) => name.startsWith('shared_space') || name.endsWith('_audit'));
+// Every table migrations-gallery CREATEs is a fork table and needs a revert entry.
+// (Was previously narrowed to shared_space* / *_audit, which silently excluded
+// fork tables outside those naming conventions — e.g. asset_favorite. #763)
+const forkTables = [...createdTables];
 
 // The step-9 guard IN-list is the parenthesised block after `tablename IN (`.
 const guardBlock = sql.slice(sql.indexOf('AND tablename IN ('));
@@ -59,5 +59,23 @@ describe('revert-to-immich.sql', () => {
   it('lists every migrations-gallery migration in the step-8 kysely_migrations DELETE block', () => {
     const missing = migrationNames.filter((name) => !deleteBlock.includes(`'${name}'`));
     expect(missing).toEqual([]);
+  });
+
+  it('restores asset.isFavorite before dropping asset_favorite', () => {
+    // "IF NOT EXISTS" is intentionally tolerated: at the time this revert path was added
+    // (slice 0, #763), asset."isFavorite" has NOT yet been dropped from the live schema —
+    // that happens in a future slice 3 — so a bare ADD COLUMN would fail with "column
+    // already exists" against every Gallery DB until that slice ships.
+    const addColumn = sql.search(/ADD COLUMN(?: IF NOT EXISTS)? "isFavorite"/);
+    const backfill = sql.indexOf('FROM asset_favorite');
+    const dropTable = sql.indexOf('DROP TABLE IF EXISTS "asset_favorite"');
+
+    expect(addColumn).toBeGreaterThan(-1);
+    expect(backfill).toBeGreaterThan(-1);
+    expect(dropTable).toBeGreaterThan(-1);
+    // ordering is load-bearing: the backfill reads asset_favorite, so it must
+    // run before the table is dropped
+    expect(addColumn).toBeLessThan(backfill);
+    expect(backfill).toBeLessThan(dropTable);
   });
 });

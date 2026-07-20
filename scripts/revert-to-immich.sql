@@ -96,6 +96,30 @@ DROP TRIGGER IF EXISTS "asset_library_delete_audit" ON "asset";
 DROP TRIGGER IF EXISTS "album_soft_delete_shared_space_album" ON "album";
 
 -- -----------------------------------------------------------------------------
+-- 1b. Restore upstream columns Gallery removed.
+--
+-- #763: per-user favorites. Gallery replaced asset."isFavorite" with the
+-- asset_favorite overlay, so reverting must RESTORE the upstream column before
+-- the overlay is dropped. This is the first fork change that removes upstream
+-- schema, so it is the first restore step in this script.
+-- LOSSY: favorites belonging to non-owners (space members who favorited someone
+-- else's photo) have nowhere to live in plain Immich and are discarded.
+--
+-- IF NOT EXISTS: at the time this revert path was added, asset."isFavorite" has
+-- NOT yet been dropped from the live schema (that happens in a future slice 3),
+-- so a bare ADD COLUMN would fail with "column already exists" against every
+-- Gallery DB until that slice ships. IF NOT EXISTS keeps the script correct in
+-- both states (column still present, or column already dropped by slice 3).
+-- -----------------------------------------------------------------------------
+ALTER TABLE "asset" ADD COLUMN IF NOT EXISTS "isFavorite" boolean NOT NULL DEFAULT false;
+
+UPDATE "asset"
+   SET "isFavorite" = true
+  FROM asset_favorite f
+ WHERE f."assetId" = "asset"."id"
+   AND f."userId"  = "asset"."ownerId";
+
+-- -----------------------------------------------------------------------------
 -- 2. Drop Gallery-only tables (CASCADE).
 --
 -- CASCADE handles: inter-table FKs, indexes, triggers on these tables, and
@@ -160,6 +184,11 @@ DROP TABLE IF EXISTS "classification_category" CASCADE;
 DROP TABLE IF EXISTS "storage_migration_log" CASCADE;
 DROP TABLE IF EXISTS "asset_duplicate_checksum" CASCADE;
 
+-- Per-user favorites overlay (#763). asset."isFavorite" is restored and
+-- backfilled from this table in step 1b above before it is dropped here.
+DROP TABLE IF EXISTS "asset_favorite_audit" CASCADE;
+DROP TABLE IF EXISTS "asset_favorite" CASCADE;
+
 -- -----------------------------------------------------------------------------
 -- 3. Drop Gallery-only functions.
 --
@@ -191,6 +220,7 @@ DROP FUNCTION IF EXISTS shared_space_album_hidden_delete_audit() CASCADE;
 DROP FUNCTION IF EXISTS shared_space_album_folder_delete_audit() CASCADE;
 DROP FUNCTION IF EXISTS album_soft_delete_shared_space_album() CASCADE;
 DROP FUNCTION IF EXISTS album_space_asset_delete_audit() CASCADE;
+DROP FUNCTION IF EXISTS asset_favorite_delete_audit() CASCADE;
 
 -- -----------------------------------------------------------------------------
 -- 4. Drop Gallery-added columns from Immich-native tables.
@@ -254,6 +284,7 @@ DELETE FROM "migration_overrides"
    'trigger_shared_space_album_hidden_updatedAt',
    'function_album_soft_delete_shared_space_album',
    'function_album_space_asset_delete_audit',
+   'function_asset_favorite_delete_audit',
    'index_asset_face_personId_idx',
    'index_face_identity_representativeFaceId_idx',
    'index_person_identityId_idx',
@@ -305,7 +336,8 @@ DELETE FROM "migration_overrides"
    'trigger_shared_space_person_updatedAt',
    'trigger_shared_space_updatedAt',
    'trigger_user_group_updatedAt',
-   'trigger_shared_space_album_folder_updatedAt'
+   'trigger_shared_space_album_folder_updatedAt',
+   'trigger_asset_favorite_delete_audit'
  );
 
 -- -----------------------------------------------------------------------------
@@ -455,6 +487,7 @@ DELETE FROM "kysely_migrations"
    '1783100000000-AddAlbumSpaceAssetSyncAndAudit',
    '1783628194057-DisablePostgresJit',
    '1783700000000-FixSharedSpaceMemberJoinGrantCreateId',
+   '1784000000000-AddAssetFavoriteTables',
    '1784000000000-FixFaceRepairScanInFlightIndexOverride',
    '1784800000000-RepairSharedSpaceAlbumGrantDrift',
    '1785000000000-AddFaceRepairLock',
@@ -538,7 +571,8 @@ BEGIN
       OR "name" LIKE '%AddFaceRepairDecline%'
       OR "name" LIKE '%AddFaceRepairLock%'
       OR "name" LIKE '%AddFaceRepairScanFlaggedFace%'
-      OR "name" LIKE '%AddFaceRepairScanInFlightIndex%';
+      OR "name" LIKE '%AddFaceRepairScanInFlightIndex%'
+      OR "name" LIKE '%AssetFavoriteTables%';
   IF fork_rows_left > 0 THEN
     RAISE EXCEPTION 'revert-to-immich: % Gallery row(s) still present in kysely_migrations after cleanup — aborting.', fork_rows_left;
   END IF;
@@ -560,14 +594,15 @@ BEGIN
        'shared_space_album_hidden', 'shared_space_album_hidden_audit',
        'shared_space_album_asset_audit', 'shared_space_album_folder',
        'shared_space_album_folder_audit',
-       'album_space_asset_audit',
+       'album_space_asset_audit', 'album_space_asset',
        'face_identity_face', 'face_identity',
        'shared_space', 'user_group_member', 'user_group',
        'classification_prompt_embedding', 'classification_category',
        'storage_migration_log', 'asset_duplicate_checksum',
        'face_person_verdict', 'face_repair_scan', 'face_repair_decline',
        'face_repair_scan_flagged_face', 'face_repair_lock',
-       'pet_search'
+       'pet_search',
+       'asset_favorite_audit', 'asset_favorite'
      );
   IF fork_tables_left > 0 THEN
     RAISE EXCEPTION 'revert-to-immich: % Gallery table(s) still present after cleanup — aborting.', fork_tables_left;
