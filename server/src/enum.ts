@@ -1132,6 +1132,10 @@ export enum SyncRequestType {
   AssetEditsV1 = 'AssetEditsV1',
   AssetMetadataV1 = 'AssetMetadataV1',
   AssetOcrV1 = 'AssetOcrV1',
+  // #763: asset_favorite is its own synced entity (design doc §4.3) — a favorite write must
+  // never bump asset.updateId (that would amplify a personal write into a cross-user re-sync),
+  // so favorites need their own request/entity types rather than riding the asset payload.
+  AssetFavoritesV1 = 'AssetFavoritesV1',
   AuthUsersV1 = 'AuthUsersV1',
   MemoriesV1 = 'MemoriesV1',
   MemoryToAssetsV1 = 'MemoryToAssetsV1',
@@ -1196,6 +1200,10 @@ export enum SyncEntityType {
   AssetMetadataDeleteV1 = 'AssetMetadataDeleteV1',
   AssetOcrV1 = 'AssetOcrV1',
   AssetOcrDeleteV1 = 'AssetOcrDeleteV1',
+
+  // #763: per-user favorites overlay — see AssetFavoritesV1 above.
+  AssetFavoriteV1 = 'AssetFavoriteV1',
+  AssetFavoriteDeleteV1 = 'AssetFavoriteDeleteV1',
 
   PartnerV1 = 'PartnerV1',
   PartnerDeleteV1 = 'PartnerDeleteV1',

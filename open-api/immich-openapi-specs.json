@@ -36145,6 +36145,34 @@
         ],
         "type": "object"
       },
+      "SyncAssetFavoriteDeleteV1": {
+        "properties": {
+          "assetId": {
+            "description": "Asset ID",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId"
+        ],
+        "type": "object"
+      },
+      "SyncAssetFavoriteV1": {
+        "properties": {
+          "assetId": {
+            "description": "Asset ID",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId"
+        ],
+        "type": "object"
+      },
       "SyncAssetMetadataDeleteV1": {
         "properties": {
           "assetId": {
@@ -36698,6 +36726,8 @@
           "AssetMetadataDeleteV1",
           "AssetOcrV1",
           "AssetOcrDeleteV1",
+          "AssetFavoriteV1",
+          "AssetFavoriteDeleteV1",
           "PartnerV1",
           "PartnerDeleteV1",
           "PartnerAssetV1",
@@ -37156,6 +37186,7 @@
           "AssetEditsV1",
           "AssetMetadataV1",
           "AssetOcrV1",
+          "AssetFavoritesV1",
           "AuthUsersV1",
           "MemoriesV1",
           "MemoryToAssetsV1",

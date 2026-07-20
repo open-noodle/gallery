@@ -96,6 +96,9 @@ export const SYNC_TYPES_ORDER = [
   SyncRequestType.UserMetadataV1,
   SyncRequestType.AssetMetadataV1,
   SyncRequestType.AssetEditsV1,
+  // #763: asset_favorite is its own synced entity (design doc §4.3) — grouped with the other
+  // per-asset overlay streams above.
+  SyncRequestType.AssetFavoritesV1,
   // Shared spaces — wired in Task 10. Order: parent metadata before assets, exifs after assets.
   SyncRequestType.SharedSpacesV1,
   SyncRequestType.SharedSpaceMembersV1,
@@ -250,6 +253,7 @@ export class SyncService extends BaseService {
       [SyncRequestType.AssetsV2]: () => this.syncAssetsV2(options, response, checkpointMap),
       [SyncRequestType.AssetExifsV1]: () => this.syncAssetExifsV1(options, response, checkpointMap),
       [SyncRequestType.AssetEditsV1]: () => this.syncAssetEditsV1(options, response, checkpointMap),
+      [SyncRequestType.AssetFavoritesV1]: () => this.syncAssetFavoritesV1(options, response, checkpointMap),
       [SyncRequestType.PartnerAssetsV2]: () => this.syncPartnerAssetsV2(options, response, checkpointMap, session.id),
       [SyncRequestType.AssetMetadataV1]: () => this.syncAssetMetadataV1(options, response, checkpointMap, auth),
       [SyncRequestType.PartnerAssetExifsV1]: () =>
@@ -497,6 +501,24 @@ export class SyncService extends BaseService {
     }
     const upsertType = SyncEntityType.AssetEditV1;
     const upserts = this.syncRepository.assetEdit.getUpserts({ ...options, ack: checkpointMap[upsertType] });
+
+    for await (const { updateId, ...data } of upserts) {
+      send(response, { type: upsertType, ids: [updateId], data });
+    }
+  }
+
+  // #763: asset_favorite is its own synced entity (design doc §4.3) — mirrors syncAssetEditsV1
+  // (deletes before upserts) so a favorite/unfavorite converges the same way an edit does.
+  private async syncAssetFavoritesV1(options: SyncQueryOptions, response: Writable, checkpointMap: CheckpointMap) {
+    const deleteType = SyncEntityType.AssetFavoriteDeleteV1;
+    const deletes = this.syncRepository.assetFavorite.getDeletes({ ...options, ack: checkpointMap[deleteType] });
+
+    for await (const { id, ...data } of deletes) {
+      send(response, { type: deleteType, ids: [id], data });
+    }
+
+    const upsertType = SyncEntityType.AssetFavoriteV1;
+    const upserts = this.syncRepository.assetFavorite.getUpserts({ ...options, ack: checkpointMap[upsertType] });
 
     for await (const { updateId, ...data } of upserts) {
       send(response, { type: upsertType, ids: [updateId], data });

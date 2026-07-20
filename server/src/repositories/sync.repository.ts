@@ -854,13 +854,32 @@ class AssetOcrSync extends BaseSync {
   }
 }
 
-// Delete-audit cleanup only for the asset_favorite per-user overlay (#763). The
-// upsert/delete sync streams for favorites are slice 6 (design doc §4.3, not yet
-// written) — this class deliberately exposes nothing beyond what
-// onAuditTableCleanup needs to prune asset_favorite_audit.
+// Per-user favorites overlay sync (#763, design doc §4.3). Structurally identical to
+// AssetEditSync above: a flat, caller-scoped table (`asset_favorite.userId = options.userId`,
+// no join through `asset`), getUpserts + getDeletes, no backfill loop. `asset_favorite` is its
+// own synced entity — not a field riding the asset payload — specifically so that a favorite
+// write never bumps `asset.updateId`, which would otherwise amplify a personal write into a
+// cross-user re-sync of the underlying asset (see AssetSync.getUpserts / SharedSpaceAssetSync
+// above, both of which resolve isFavorite via a read-only correlated EXISTS and never write here).
 class AssetFavoriteSync extends BaseSync {
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getDeletes(options: SyncQueryOptions) {
+    return this.auditQuery('asset_favorite_audit', options)
+      .select(['asset_favorite_audit.id', 'asset_favorite_audit.assetId'])
+      .where('asset_favorite_audit.userId', '=', options.userId)
+      .stream();
+  }
+
   cleanupAuditTable(daysAgo: number) {
     return this.auditCleanup('asset_favorite_audit', daysAgo);
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getUpserts(options: SyncQueryOptions) {
+    return this.upsertQuery('asset_favorite', options)
+      .select(['asset_favorite.assetId', 'asset_favorite.updateId'])
+      .where('asset_favorite.userId', '=', options.userId)
+      .stream();
   }
 }
 

@@ -817,6 +817,8 @@ Class | Method | HTTP request | Description
  - [SyncAssetFaceDeleteV1](doc//SyncAssetFaceDeleteV1.md)
  - [SyncAssetFaceV1](doc//SyncAssetFaceV1.md)
  - [SyncAssetFaceV2](doc//SyncAssetFaceV2.md)
+ - [SyncAssetFavoriteDeleteV1](doc//SyncAssetFavoriteDeleteV1.md)
+ - [SyncAssetFavoriteV1](doc//SyncAssetFavoriteV1.md)
  - [SyncAssetMetadataDeleteV1](doc//SyncAssetMetadataDeleteV1.md)
  - [SyncAssetMetadataV1](doc//SyncAssetMetadataV1.md)
  - [SyncAssetOcrDeleteV1](doc//SyncAssetOcrDeleteV1.md)

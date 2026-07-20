@@ -439,6 +439,8 @@ part 'model/sync_asset_exif_v1.dart';
 part 'model/sync_asset_face_delete_v1.dart';
 part 'model/sync_asset_face_v1.dart';
 part 'model/sync_asset_face_v2.dart';
+part 'model/sync_asset_favorite_delete_v1.dart';
+part 'model/sync_asset_favorite_v1.dart';
 part 'model/sync_asset_metadata_delete_v1.dart';
 part 'model/sync_asset_metadata_v1.dart';
 part 'model/sync_asset_ocr_delete_v1.dart';

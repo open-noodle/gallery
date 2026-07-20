@@ -913,6 +913,10 @@ class ApiClient {
           return SyncAssetFaceV1.fromJson(value);
         case 'SyncAssetFaceV2':
           return SyncAssetFaceV2.fromJson(value);
+        case 'SyncAssetFavoriteDeleteV1':
+          return SyncAssetFavoriteDeleteV1.fromJson(value);
+        case 'SyncAssetFavoriteV1':
+          return SyncAssetFavoriteV1.fromJson(value);
         case 'SyncAssetMetadataDeleteV1':
           return SyncAssetMetadataDeleteV1.fromJson(value);
         case 'SyncAssetMetadataV1':
