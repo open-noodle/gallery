@@ -87,9 +87,14 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.LibraryAssetsV1]);
 
     // #763: favoriting alone does not bump asset.updateId (asset_favorite is a separate overlay
-    // table — see design doc §4.3), so the raw column update below stands in for "some metadata
-    // changed" to trigger the re-emit; the actual isFavorite value comes from the overlay insert.
-    await defaultDatabase.updateTable('asset').set({ isFavorite: true }).where('id', '=', asset.id).execute();
+    // table — see design doc §4.3), so the unrelated column update below stands in for "some
+    // metadata changed" to trigger the re-emit; the actual isFavorite value comes from the
+    // overlay insert. asset."isFavorite" no longer exists (dropped in slice 3), hence originalFileName.
+    await defaultDatabase
+      .updateTable('asset')
+      .set({ originalFileName: 'renamed-for-resync.jpg' })
+      .where('id', '=', asset.id)
+      .execute();
     await ctx.get(AssetFavoriteRepository).addAll(auth.user.id, [asset.id]);
 
     const next = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetsV1]);
@@ -309,7 +314,11 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     await defaultDatabase.updateTable('library').set({ deletedAt: new Date() }).where('id', '=', library.id).execute();
 
     // Mutate the asset so it would be streamed if the library gate was broken.
-    await defaultDatabase.updateTable('asset').set({ isFavorite: true }).where('id', '=', asset.id).execute();
+    await defaultDatabase
+      .updateTable('asset')
+      .set({ originalFileName: 'renamed-for-resync.jpg' })
+      .where('id', '=', asset.id)
+      .execute();
 
     const after = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetsV1]);
     const afterEvents = after.filter((r) => isAssetEvent(r));
@@ -347,7 +356,11 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     // Owner favorites the asset (via the overlay) AND a genuine metadata change bumps
     // asset.updateId so the row re-flows — even so, the owner's favorite must not leak to auth.
     await ctx.get(AssetFavoriteRepository).addAll(owner.id, [asset.id]);
-    await defaultDatabase.updateTable('asset').set({ isFavorite: true }).where('id', '=', asset.id).execute();
+    await defaultDatabase
+      .updateTable('asset')
+      .set({ originalFileName: 'renamed-for-resync.jpg' })
+      .where('id', '=', asset.id)
+      .execute();
 
     const after = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetsV1]);
     const events = after.filter((r) => isAssetEvent(r));

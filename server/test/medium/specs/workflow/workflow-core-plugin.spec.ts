@@ -286,7 +286,7 @@ describe('core plugin', () => {
   describe('assetAddToAlbums', () => {
     it('should create an album by name', async () => {
       const { user } = await ctx.newUser();
-      const { asset } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
 
       const workflow = await createWorkflow({
         ownerId: user.id,
@@ -310,7 +310,7 @@ describe('core plugin', () => {
 
     it('should not use the name when there is an albumId', async () => {
       const { user } = await ctx.newUser();
-      const { asset } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
       const { album } = await ctx.newAlbum({ ownerId: user.id });
 
       const workflow = await createWorkflow({
@@ -332,7 +332,7 @@ describe('core plugin', () => {
 
     it('should add an asset to an album', async () => {
       const { user } = await ctx.newUser();
-      const { asset } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
       const { album } = await ctx.newAlbum({ ownerId: user.id });
 
       const workflow = await createWorkflow({
@@ -349,7 +349,7 @@ describe('core plugin', () => {
     it('should add an asset to multiple albums', async () => {
       const { user } = await ctx.newUser();
       const [{ asset }, { album: album1 }, { album: album2 }] = await Promise.all([
-        ctx.newAsset({ ownerId: user.id, isFavorite: true }),
+        ctx.newAsset({ ownerId: user.id }),
         ctx.newAlbum({ ownerId: user.id }),
         ctx.newAlbum({ ownerId: user.id }),
       ]);
@@ -369,7 +369,7 @@ describe('core plugin', () => {
     it('should require album access', async () => {
       const { user: user1 } = await ctx.newUser();
       const { user: user2 } = await ctx.newUser();
-      const { asset } = await ctx.newAsset({ ownerId: user1.id, isFavorite: true });
+      const { asset } = await ctx.newAsset({ ownerId: user1.id });
       const { album } = await ctx.newAlbum({ ownerId: user2.id });
 
       const workflow = await createWorkflow({

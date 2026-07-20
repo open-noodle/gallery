@@ -76,7 +76,9 @@ describe(SyncRequestType.AlbumAssetsV2, () => {
           fileCreatedAt: asset.fileCreatedAt,
           fileModifiedAt: asset.fileModifiedAt,
           createdAt: asset.createdAt,
-          isFavorite: asset.isFavorite,
+          // #763: no asset_favorite overlay row seeded for this asset -> resolves to false. The
+          // raw asset."isFavorite" column this used to read from is gone (dropped in slice 3).
+          isFavorite: false,
           localDateTime: asset.localDateTime,
           type: asset.type,
           visibility: asset.visibility,

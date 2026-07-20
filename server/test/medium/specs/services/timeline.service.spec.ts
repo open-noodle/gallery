@@ -257,7 +257,9 @@ describe(TimelineService.name, () => {
       const { user } = await ctx.newUser();
       const auth = factory.auth({ user });
 
-      await createTimelineAsset(ctx, user.id, new Date('2024-05-01T12:00:00.000Z'), { isFavorite: false });
+      // Not favorited: no asset_favorite overlay row seeded (there is no raw column to default
+      // false anymore — dropped in slice 3).
+      await createTimelineAsset(ctx, user.id, new Date('2024-05-01T12:00:00.000Z'));
 
       await expect(sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Year, isFavorite: true })).resolves.toEqual(
         [],
