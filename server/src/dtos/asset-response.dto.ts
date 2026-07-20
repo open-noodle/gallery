@@ -138,6 +138,10 @@ export type MapAsset = {
   files?: ShallowDehydrateObject<AssetFile>[];
   isExternal: boolean;
   isFavorite: boolean;
+  // #763: resolved per-user by the query via favoriteExistsFor(...).as('isFavoriteForUser').
+  // Distinct from `isFavorite` (the global column, dropped in slice 3) so an un-migrated query
+  // fails safe to `false` instead of silently leaking the owner's flag. See mapAsset.
+  isFavoriteForUser?: boolean;
   isOffline: boolean;
   visibility: AssetVisibility;
   libraryId: string | null;
@@ -225,7 +229,11 @@ export function mapAsset(entity: MaybeDehydrated<MapAsset>, options: AssetMapOpt
     fileModifiedAt: asDateTimeString(entity.fileModifiedAt),
     localDateTime: asDateTimeString(entity.localDateTime),
     updatedAt: asDateTimeString(entity.updatedAt),
-    isFavorite: options.auth?.user.id === entity.ownerId && entity.isFavorite,
+    // #763: resolved per-user by the query via favoriteExistsFor(...).as('isFavoriteForUser').
+    // Deliberately NOT `entity.isFavorite` — that is the global column (dropped in slice 3), and
+    // reading it here would leak the owner's flag to non-owners and to auth-less callers such as
+    // mapSharedLink. A query that does not project the field yields undefined -> false (fail-safe).
+    isFavorite: entity.isFavoriteForUser ?? false,
     isArchived: entity.visibility === AssetVisibility.Archive,
     isTrashed: !!entity.deletedAt,
     visibility: entity.visibility,
