@@ -46,16 +46,7 @@ final class $$SharedSpaceAlbumLinkEntityTableReferences
       i5.ReadDatabaseContainer(db)
           .resultSet<i4.$SharedSpaceEntityTable>('shared_space_entity')
           .createAlias(
-            i0.$_aliasNameGenerator(
-              i5.ReadDatabaseContainer(db)
-                  .resultSet<i1.$SharedSpaceAlbumLinkEntityTable>(
-                    'shared_space_album_link_entity',
-                  )
-                  .spaceId,
-              i5.ReadDatabaseContainer(
-                db,
-              ).resultSet<i4.$SharedSpaceEntityTable>('shared_space_entity').id,
-            ),
+            'shared_space_album_link_entity__space_id__shared_space_entity__id',
           );
 
   i4.$$SharedSpaceEntityTableProcessedTableManager get spaceId {
