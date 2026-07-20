@@ -381,4 +381,136 @@ describe('AssetFavoriteRepository', () => {
 
     expect(rows).toHaveLength(0);
   });
+
+  // #763 slice 7 (E21): duplicate-merge calls mergeOnto BEFORE the source assets are deleted —
+  // their own asset_favorite rows would otherwise CASCADE away with them. Duplicate detection is
+  // owner-scoped (all sources share an owner), but other users can have favorited a source via
+  // space access, which the old boolean-OR on the raw column could not express.
+  describe('mergeOnto', () => {
+    it('unions favorites from multiple source assets onto the keeper, per user', async () => {
+      const { ctx, sut } = setupRepo();
+      const { user: owner } = await ctx.newUser();
+      const { user: userA } = await ctx.newUser();
+      const { user: userB } = await ctx.newUser();
+      const { asset: keeper } = await ctx.newAsset({ ownerId: owner.id });
+      const { asset: source1 } = await ctx.newAsset({ ownerId: owner.id });
+      const { asset: source2 } = await ctx.newAsset({ ownerId: owner.id });
+
+      // userA favorited source1, userB favorited source2 — two different users, two different
+      // sources. The old global-column OR could only ever carry the owner's single boolean.
+      await sut.addAll(userA.id, [source1.id]);
+      await sut.addAll(userB.id, [source2.id]);
+
+      await sut.mergeOnto(keeper.id, [source1.id, source2.id]);
+
+      const rows = await ctx.database
+        .selectFrom('asset_favorite')
+        .select('userId')
+        .where('assetId', '=', keeper.id)
+        .execute();
+
+      expect(rows.map((row) => row.userId).toSorted()).toEqual([userA.id, userB.id].toSorted());
+    });
+
+    it('dedups when the same user favorited multiple sources — exactly one keeper row (E8)', async () => {
+      const { ctx, sut } = setupRepo();
+      const { user: owner } = await ctx.newUser();
+      const { user: userA } = await ctx.newUser();
+      const { asset: keeper } = await ctx.newAsset({ ownerId: owner.id });
+      const { asset: source1 } = await ctx.newAsset({ ownerId: owner.id });
+      const { asset: source2 } = await ctx.newAsset({ ownerId: owner.id });
+
+      await sut.addAll(userA.id, [source1.id, source2.id]);
+
+      await expect(sut.mergeOnto(keeper.id, [source1.id, source2.id])).resolves.not.toThrow();
+
+      const rows = await ctx.database
+        .selectFrom('asset_favorite')
+        .select('userId')
+        .where('assetId', '=', keeper.id)
+        .execute();
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0].userId).toBe(userA.id);
+    });
+
+    it('does not conflict with a favorite the keeper already carries', async () => {
+      const { ctx, sut } = setupRepo();
+      const { user: owner } = await ctx.newUser();
+      const { user: userA } = await ctx.newUser();
+      const { asset: keeper } = await ctx.newAsset({ ownerId: owner.id });
+      const { asset: source } = await ctx.newAsset({ ownerId: owner.id });
+
+      // userA already favorited the keeper directly, AND favorited the source being merged in.
+      await sut.addAll(userA.id, [keeper.id, source.id]);
+
+      await expect(sut.mergeOnto(keeper.id, [source.id])).resolves.not.toThrow();
+
+      const rows = await ctx.database
+        .selectFrom('asset_favorite')
+        .select('userId')
+        .where('assetId', '=', keeper.id)
+        .execute();
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0].userId).toBe(userA.id);
+    });
+
+    it('creates no rows when no source was favorited', async () => {
+      const { ctx, sut } = setupRepo();
+      const { user: owner } = await ctx.newUser();
+      const { asset: keeper } = await ctx.newAsset({ ownerId: owner.id });
+      const { asset: source } = await ctx.newAsset({ ownerId: owner.id });
+
+      await sut.mergeOnto(keeper.id, [source.id]);
+
+      const rows = await ctx.database
+        .selectFrom('asset_favorite')
+        .selectAll()
+        .where('assetId', '=', keeper.id)
+        .execute();
+
+      expect(rows).toHaveLength(0);
+    });
+
+    it('with an empty source list does nothing and does not throw', async () => {
+      const { ctx, sut } = setupRepo();
+      const { user: owner } = await ctx.newUser();
+      const { asset: keeper } = await ctx.newAsset({ ownerId: owner.id });
+
+      await expect(sut.mergeOnto(keeper.id, [])).resolves.not.toThrow();
+
+      const rows = await ctx.database
+        .selectFrom('asset_favorite')
+        .selectAll()
+        .where('assetId', '=', keeper.id)
+        .execute();
+
+      expect(rows).toHaveLength(0);
+    });
+
+    // §5.2: visibility is re-derived on read, never enforced by deleting rows on access loss —
+    // mergeOnto has no notion of "current access" at all, it only reads existing asset_favorite
+    // rows. A favorite from a user who has since lost access to the source still transfers here;
+    // whether it's visible to that user afterwards is entirely a read-path/access-filter concern.
+    it('transfers a source favorite regardless of the favoriting users current access', async () => {
+      const { ctx, sut } = setupRepo();
+      const { user: owner } = await ctx.newUser();
+      const { user: formerMember } = await ctx.newUser();
+      const { asset: keeper } = await ctx.newAsset({ ownerId: owner.id });
+      const { asset: source } = await ctx.newAsset({ ownerId: owner.id });
+
+      await sut.addAll(formerMember.id, [source.id]);
+
+      await sut.mergeOnto(keeper.id, [source.id]);
+
+      const rows = await ctx.database
+        .selectFrom('asset_favorite')
+        .select('userId')
+        .where('assetId', '=', keeper.id)
+        .execute();
+
+      expect(rows.map((row) => row.userId)).toEqual([formerMember.id]);
+    });
+  });
 });
