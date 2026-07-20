@@ -97,6 +97,15 @@ class AssetApiRepository extends ApiRepository {
       ),
     );
   }
+
+  // #763: favorites are per-user (not owner-gated), so they route through the dedicated
+  // /assets/favorites endpoint rather than the owner-only bulk-update endpoint. Upstream's action
+  // migration deleted the `updateLocation`/`updateDateTime`/`updateFavorite` trio in favour of the
+  // consolidated `update` above; only this one is kept, because `update` posts an
+  // AssetBulkUpdateDto to the OWNER-ONLY `PUT /assets`.
+  Future<void> updateFavorite(List<String> ids, bool isFavorite) async {
+    await _api.updateAssetFavorites(AssetFavoriteUpdateDto(ids: ids, isFavorite: isFavorite));
+  }
 }
 
 extension on StackResponseDto {

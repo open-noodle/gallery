@@ -93,8 +93,9 @@ void main() {
     });
 
     // A viewer's selected facet only returns shared-space assets (and space-person tokens only
-    // resolve) when the search requests shared spaces — mirror web buildPhotosTimelineOptions,
-    // which gates shared content on `isFavorite === undefined` (favourites are owner-only).
+    // resolve) when the search requests shared spaces. #763: favorites are per-user, and the
+    // server composes shared-space visibility with the favorite filter (slice 4), so this is no
+    // longer gated on `isFavorite` — inverts the pre-#763 "favourites are owner-only" behavior.
     test('metadata search requests shared spaces when not filtering by favourite', () async {
       when(() => searchApi.searchAssets(any())).thenAnswer((_) async => null);
       await sut.search(SearchFilter.empty(), 1);
@@ -102,12 +103,12 @@ void main() {
       expect(dto.withSharedSpaces.value, true);
     });
 
-    test('metadata search omits shared spaces when filtering by favourite', () async {
+    test('metadata search still requests shared spaces when filtering by favourite', () async {
       when(() => searchApi.searchAssets(any())).thenAnswer((_) async => null);
       final filter = SearchFilter.empty().copyWith(display: SearchFilter.empty().display.copyWith(isFavorite: true));
       await sut.search(filter, 1);
       final dto = verify(() => searchApi.searchAssets(captureAny())).captured.single as MetadataSearchDto;
-      expect(dto.withSharedSpaces.isPresent, isFalse);
+      expect(dto.withSharedSpaces.value, true);
     });
 
     test('smart search requests shared spaces when not filtering by favourite', () async {
@@ -118,7 +119,7 @@ void main() {
       expect(dto.withSharedSpaces.value, true);
     });
 
-    test('smart search omits shared spaces when filtering by favourite', () async {
+    test('smart search still requests shared spaces when filtering by favourite', () async {
       when(() => searchApi.searchSmart(any())).thenAnswer((_) async => null);
       final filter = SearchFilter.empty().copyWith(
         context: 'beach',
@@ -126,7 +127,7 @@ void main() {
       );
       await sut.search(filter, 1);
       final dto = verify(() => searchApi.searchSmart(captureAny())).captured.single as SmartSearchDto;
-      expect(dto.withSharedSpaces.isPresent, isFalse);
+      expect(dto.withSharedSpaces.value, true);
     });
   });
 }
