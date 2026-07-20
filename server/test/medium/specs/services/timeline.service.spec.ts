@@ -210,12 +210,11 @@ describe(TimelineService.name, () => {
       const { user } = await ctx.newUser();
       const auth = factory.auth({ user });
 
-      await createTimelineAsset(ctx, user.id, new Date('2024-04-02T12:00:00.000Z'), {
-        isFavorite: true,
-      });
-      await createTimelineAsset(ctx, user.id, new Date('2024-04-03T12:00:00.000Z'), {
-        isFavorite: false,
-      });
+      const favorited = await createTimelineAsset(ctx, user.id, new Date('2024-04-02T12:00:00.000Z'));
+      await createTimelineAsset(ctx, user.id, new Date('2024-04-03T12:00:00.000Z'));
+      // #763: isFavorite now filters against the asset_favorite overlay for the caller, not the
+      // legacy asset.isFavorite column.
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: favorited.id }).execute();
 
       await expect(sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Month, isFavorite: true })).resolves.toEqual([
         expect.objectContaining({ count: 1 }),
@@ -449,7 +448,6 @@ describe(TimelineService.name, () => {
             ownerId: user.id,
             fileCreatedAt: new Date('1970-02-12'),
             localDateTime: new Date('1970-02-12'),
-            isFavorite: true,
           });
           await ctx.newExif({ assetId: result.asset.id, make: 'Canon' });
           return result;
@@ -460,12 +458,22 @@ describe(TimelineService.name, () => {
             ownerId: user.id,
             fileCreatedAt: new Date('1970-02-13'),
             localDateTime: new Date('1970-02-13'),
-            isFavorite: true,
           });
           await ctx.newExif({ assetId: result.asset.id, make: 'Canon' });
           return result;
         }),
       ]);
+
+      // #763: each owner has favorited only their own asset in the asset_favorite overlay — the
+      // legacy asset.isFavorite column is never set here, so this is exercised purely against the
+      // overlay, same as production once the (currently untouched) write path records a favorite.
+      await ctx.database
+        .insertInto('asset_favorite')
+        .values([
+          { userId: asset1.ownerId, assetId: asset1.id },
+          { userId: asset2.ownerId, assetId: asset2.id },
+        ])
+        .execute();
 
       await Promise.all([
         ctx.newPartner({ sharedById: asset1.ownerId, sharedWithId: asset2.ownerId }),

@@ -144,6 +144,12 @@ export class TimelineService extends BaseService {
       callerId,
       hiddenScope,
       visibleSpaceIds,
+      // #763: the caller, threaded separately from `userIds` (the timeline *target*, which is not
+      // necessarily the caller on space/album browse paths) so the isFavorite overlay predicate in
+      // withTimeBucketAssetFilters resolves against the right user. Distinct from `callerId` above:
+      // that one is set only on the own-timeline path and drives #1041's hidden-scope subtraction,
+      // while this is always the authenticated user because the overlay is always per-caller.
+      authUserId: auth.user.id,
     };
   }
 
