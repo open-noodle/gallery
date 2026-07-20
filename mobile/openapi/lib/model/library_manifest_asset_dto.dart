@@ -96,19 +96,19 @@ class LibraryManifestAssetDto {
     if (this.fileCreatedAt != null) {
       json[r'fileCreatedAt'] = this.fileCreatedAt!.toUtc().toIso8601String();
     } else {
-    //  json[r'fileCreatedAt'] = null;
+      json[r'fileCreatedAt'] = null;
     }
     if (this.fileModifiedAt != null) {
       json[r'fileModifiedAt'] = this.fileModifiedAt!.toUtc().toIso8601String();
     } else {
-    //  json[r'fileModifiedAt'] = null;
+      json[r'fileModifiedAt'] = null;
     }
       json[r'objectKey'] = this.objectKey;
       json[r'originalFileName'] = this.originalFileName;
     if (this.size != null) {
       json[r'size'] = this.size;
     } else {
-    //  json[r'size'] = null;
+      json[r'size'] = null;
     }
       json[r'type'] = this.type;
     return json;
