@@ -642,6 +642,65 @@ describe(SearchRepository.name, () => {
     });
   });
 
+  // #763 slice 1 Task 3 — isFavorite must resolve against the per-user asset_favorite overlay,
+  // not the ownership-masked asset.isFavorite column. Every asset here has asset.isFavorite left
+  // at its default (false); only a direct asset_favorite insert marks the caller's favorite.
+  describe('isFavorite overlay (#763)', () => {
+    it('searchMetadata filters isFavorite from the callers overlay, not asset.isFavorite', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: favorited } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: notFavorited } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: favorited.id }).execute();
+
+      const { items: favoriteItems } = await sut.searchMetadata(
+        { page: 1, size: 100 },
+        { userIds: [user.id], authUserId: user.id, isFavorite: true },
+      );
+      expect(favoriteItems.map((item) => item.id)).toEqual([favorited.id]);
+
+      const { items: nonFavoriteItems } = await sut.searchMetadata(
+        { page: 1, size: 100 },
+        { userIds: [user.id], authUserId: user.id, isFavorite: false },
+      );
+      expect(nonFavoriteItems.map((item) => item.id)).toEqual([notFavorited.id]);
+    });
+
+    it('getSmartSearchFacets scopes isFavorite totals to the callers overlay', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: favorited } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: notFavorited } = await ctx.newAsset({ ownerId: user.id });
+      await addEmbedding(ctx.database, favorited.id);
+      await addEmbedding(ctx.database, notFavorited.id);
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: favorited.id }).execute();
+
+      const result = await sut.getSmartSearchFacets({
+        embedding: matchingEmbedding,
+        userIds: [user.id],
+        authUserId: user.id,
+        maxDistance: 0.01,
+        isFavorite: true,
+      });
+
+      expect(result.total).toBe(1);
+    });
+
+    it('getFilterSuggestions (buildFilteredAssetIds) scopes isFavorite to the callers overlay', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: favorited } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: notFavorited } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: favorited.id, country: 'Germany' });
+      await ctx.newExif({ assetId: notFavorited.id, country: 'France' });
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: favorited.id }).execute();
+
+      const result = await sut.getFilterSuggestions([user.id], { isFavorite: true });
+
+      expect(result.countries).toEqual(['Germany']);
+    });
+  });
+
   describe('getFilterSuggestions', () => {
     it('returns album facets for a viewer who owns none of the shared album assets', async () => {
       const { ctx, sut } = setup();

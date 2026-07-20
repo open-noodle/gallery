@@ -46,6 +46,7 @@ type ResolvedSmartSearch = {
     // boundary and `albumSharedSpaceScope` re-gates — see resolveSmartSearch.
     userIds?: string[];
     callerId?: string;
+    authUserId: string;
     timelineSpaceIds?: string[];
     maxDistance?: number;
     orderDirection?: SmartSearchDto['order'];
@@ -197,6 +198,7 @@ export class SearchService extends BaseService {
         checksum,
         visibility: dto.visibility ?? (auth.session?.hasElevatedPermission ? undefined : 'not-locked'),
         userIds,
+        authUserId: auth.user.id,
         orderDirection: dto.order ?? AssetOrder.Desc,
       },
     );
@@ -230,6 +232,7 @@ export class SearchService extends BaseService {
       ...resolvedDto,
       visibility: dto.visibility ?? (auth.session?.hasElevatedPermission ? undefined : 'not-locked'),
       userIds,
+      authUserId: auth.user.id,
     });
   }
 
@@ -258,6 +261,7 @@ export class SearchService extends BaseService {
     const items = await this.searchRepository.searchRandom(dto.size || 250, {
       ...resolvedDto,
       userIds,
+      authUserId: auth.user.id,
       visibility: dto.visibility ?? (auth.session?.hasElevatedPermission ? undefined : 'not-locked'),
     });
     return items.map((item) => mapAsset(item, { auth }));
@@ -289,6 +293,7 @@ export class SearchService extends BaseService {
       ...resolvedDto,
       visibility: dto.visibility ?? (auth.session?.hasElevatedPermission ? undefined : 'not-locked'),
       userIds,
+      authUserId: auth.user.id,
     });
     return items.map((item) => mapAsset(item, { auth }));
   }
@@ -579,6 +584,8 @@ export class SearchService extends BaseService {
       // Always set, unlike userIds: the facets' people list needs the viewer even when nothing is
       // owner-scoped. See SearchEmbeddingOptions.callerId.
       callerId: auth.user.id,
+      // #763: the favorite overlay is always resolved for the caller, on every scope.
+      authUserId: auth.user.id,
       embedding,
       maxDistance: machineLearning.clip.maxDistance,
       visibility: resolvedVisibility,
