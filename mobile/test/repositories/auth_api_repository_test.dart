@@ -113,7 +113,11 @@ void main() {
     expect(request, isA<http.AbortableRequest>());
     expect(request.method, 'POST');
     expect(request.url, Uri.parse('https://demo.opennoodle.de/api/auth/demo-login'));
-    expect(request.headers, {'content-type': 'text/plain; charset=utf-8'});
+    // demoLogin sends no body and no explicit content type, so the generated client
+    // sets no headers at all. Asserting emptiness still catches an accidental
+    // authorization-header leak on this unauthenticated route, without pinning the
+    // incidental `text/plain` header older http versions auto-added for an empty body.
+    expect(request.headers, isEmpty);
     expect(request.body, '');
   });
 
