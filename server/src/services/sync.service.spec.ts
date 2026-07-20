@@ -1233,6 +1233,7 @@ describe(SyncService.name, () => {
       expect(syncSubs.partnerAsset.getBackfill).toHaveBeenCalledWith(
         expect.objectContaining({ afterUpdateId: partialExtraId }),
         partnerId,
+        authStub.user1.user.id,
       );
     });
   });
