@@ -1,4 +1,5 @@
 import { Kysely, sql } from 'kysely';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
@@ -6,9 +7,10 @@ import { favoriteExistsFor } from 'src/utils/favorite';
 import { newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 
-// #763 slice 0 — schema foundation only. No repository exists yet (deferred to slice 2, see
-// docs/superpowers/plans/2026-07-20-per-user-favorites-slice-0.md Self-Review), so these tests
-// exercise `asset_favorite` / `asset_favorite_audit` directly via the Kysely DB handle.
+// #763 slice 0 laid the schema foundation (`asset_favorite` / `asset_favorite_audit`), exercised
+// below directly via the Kysely DB handle. Slice 2 (this file's `AssetFavoriteRepository` describe
+// block, see docs/superpowers/plans/2026-07-20-per-user-favorites-slice-2.md Task 1) adds the
+// repository that Task 2's write path calls.
 
 let defaultDatabase: Kysely<DB>;
 
@@ -19,6 +21,15 @@ const setup = (db?: Kysely<DB>) => {
     mock: [LoggingRepository],
   });
   return { ctx };
+};
+
+const setupRepo = (db?: Kysely<DB>) => {
+  const { ctx } = newMediumService(BaseService, {
+    database: db || defaultDatabase,
+    real: [AssetFavoriteRepository],
+    mock: [LoggingRepository],
+  });
+  return { ctx, sut: ctx.get(AssetFavoriteRepository) };
 };
 
 const backfillFavorites = (db: Kysely<DB>) =>
@@ -289,5 +300,85 @@ describe('favoriteExistsFor', () => {
       .execute();
 
     expect(rows).toEqual([{ id: assetX.id }]);
+  });
+});
+
+describe('AssetFavoriteRepository', () => {
+  it('addAll creates one row per asset for the given user', async () => {
+    const { ctx, sut } = setupRepo();
+    const { user } = await ctx.newUser();
+    const { asset: assetA } = await ctx.newAsset({ ownerId: user.id });
+    const { asset: assetB } = await ctx.newAsset({ ownerId: user.id });
+
+    await sut.addAll(user.id, [assetA.id, assetB.id]);
+
+    const rows = await ctx.database
+      .selectFrom('asset_favorite')
+      .select(['userId', 'assetId'])
+      .where('userId', '=', user.id)
+      .execute();
+
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.assetId).toSorted()).toEqual([assetA.id, assetB.id].toSorted());
+  });
+
+  it('addAll is idempotent — re-adding an existing favorite is a no-op, not a 500', async () => {
+    const { ctx, sut } = setupRepo();
+    const { user } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+
+    await sut.addAll(user.id, [asset.id]);
+
+    await expect(sut.addAll(user.id, [asset.id])).resolves.not.toThrow();
+
+    const rows = await ctx.database
+      .selectFrom('asset_favorite')
+      .selectAll()
+      .where('userId', '=', user.id)
+      .where('assetId', '=', asset.id)
+      .execute();
+
+    expect(rows).toHaveLength(1);
+  });
+
+  it('removeAll deletes only the given users rows', async () => {
+    const { ctx, sut } = setupRepo();
+    const { user: userA } = await ctx.newUser();
+    const { user: userB } = await ctx.newUser();
+    const { user: owner } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: owner.id });
+
+    await sut.addAll(userA.id, [asset.id]);
+    await sut.addAll(userB.id, [asset.id]);
+
+    await sut.removeAll(userA.id, [asset.id]);
+
+    const rows = await ctx.database.selectFrom('asset_favorite').selectAll().where('assetId', '=', asset.id).execute();
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].userId).toBe(userB.id);
+  });
+
+  it('removeAll on a never-favorited asset is a no-op', async () => {
+    const { ctx, sut } = setupRepo();
+    const { user } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+
+    await expect(sut.removeAll(user.id, [asset.id])).resolves.not.toThrow();
+
+    const rows = await ctx.database.selectFrom('asset_favorite').selectAll().where('assetId', '=', asset.id).execute();
+
+    expect(rows).toHaveLength(0);
+  });
+
+  it('addAll with an empty id list does nothing and does not throw', async () => {
+    const { ctx, sut } = setupRepo();
+    const { user } = await ctx.newUser();
+
+    await expect(sut.addAll(user.id, [])).resolves.not.toThrow();
+
+    const rows = await ctx.database.selectFrom('asset_favorite').selectAll().where('userId', '=', user.id).execute();
+
+    expect(rows).toHaveLength(0);
   });
 });
