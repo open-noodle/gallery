@@ -71,7 +71,7 @@ class LibraryManifestResponseDto {
     if (this.nextCursor != null) {
       json[r'nextCursor'] = this.nextCursor;
     } else {
-    //  json[r'nextCursor'] = null;
+      json[r'nextCursor'] = null;
     }
       json[r'owner'] = this.owner;
     return json;
