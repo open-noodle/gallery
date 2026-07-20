@@ -174,13 +174,13 @@ class SharedSpaceLinkedAlbumDto {
     if (this.addedById != null) {
       json[r'addedById'] = this.addedById;
     } else {
-    //  json[r'addedById'] = null;
+      json[r'addedById'] = null;
     }
       json[r'albumName'] = this.albumName;
     if (this.albumThumbnailAssetId != null) {
       json[r'albumThumbnailAssetId'] = this.albumThumbnailAssetId;
     } else {
-    //  json[r'albumThumbnailAssetId'] = null;
+      json[r'albumThumbnailAssetId'] = null;
     }
       json[r'assetCount'] = this.assetCount;
     if (this.contributorCounts.isPresent) {
