@@ -821,8 +821,15 @@ with
       "asset"."duration",
       "asset"."id",
       "asset"."visibility",
-      asset."isFavorite"
-      and asset."ownerId" = $2 as "isFavorite",
+      exists (
+        select
+          1 as "exists"
+        from
+          "asset_favorite"
+        where
+          "asset_favorite"."assetId" = "asset"."id"
+          and "asset_favorite"."userId" = $2::uuid
+      ) as "isFavorite",
       asset.type = 'IMAGE' as "isImage",
       asset."deletedAt" is not null as "isTrashed",
       "asset"."livePhotoVideoId",
@@ -919,8 +926,15 @@ with
       "asset"."duration",
       "asset"."id",
       "asset"."visibility",
-      asset."isFavorite"
-      and asset."ownerId" = $2 as "isFavorite",
+      exists (
+        select
+          1 as "exists"
+        from
+          "asset_favorite"
+        where
+          "asset_favorite"."assetId" = "asset"."id"
+          and "asset_favorite"."userId" = $2::uuid
+      ) as "isFavorite",
       asset.type = 'IMAGE' as "isImage",
       asset."deletedAt" is not null as "isTrashed",
       "asset"."livePhotoVideoId",
@@ -1003,8 +1017,15 @@ with
       "asset"."duration",
       "asset"."id",
       "asset"."visibility",
-      asset."isFavorite"
-      and asset."ownerId" = $2 as "isFavorite",
+      exists (
+        select
+          1 as "exists"
+        from
+          "asset_favorite"
+        where
+          "asset_favorite"."assetId" = "asset"."id"
+          and "asset_favorite"."userId" = $2::uuid
+      ) as "isFavorite",
       asset.type = 'IMAGE' as "isImage",
       asset."deletedAt" is not null as "isTrashed",
       "asset"."livePhotoVideoId",
