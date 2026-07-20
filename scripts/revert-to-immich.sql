@@ -112,11 +112,20 @@ DROP TRIGGER IF EXISTS "album_soft_delete_shared_space_album" ON "album";
 -- -----------------------------------------------------------------------------
 ALTER TABLE "asset" ADD COLUMN IF NOT EXISTS "isFavorite" boolean NOT NULL DEFAULT false;
 
-UPDATE "asset"
-   SET "isFavorite" = true
-  FROM asset_favorite f
- WHERE f."assetId" = "asset"."id"
-   AND f."userId"  = "asset"."ownerId";
+-- Guarded: on a Gallery DB that predates the #763 migrations entirely (e.g. the CI validation
+-- image built from a pre-favorites main, or a deployment that never upgraded that far), the
+-- asset_favorite overlay does not exist and the raw column still carries the favorites — there
+-- is nothing to backfill and the bare UPDATE would abort the transaction.
+DO $$
+BEGIN
+  IF to_regclass('public.asset_favorite') IS NOT NULL THEN
+    UPDATE "asset"
+       SET "isFavorite" = true
+      FROM asset_favorite f
+     WHERE f."assetId" = "asset"."id"
+       AND f."userId"  = "asset"."ownerId";
+  END IF;
+END $$;
 
 -- -----------------------------------------------------------------------------
 -- 2. Drop Gallery-only tables (CASCADE).
