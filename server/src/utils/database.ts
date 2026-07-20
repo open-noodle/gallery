@@ -52,6 +52,7 @@ import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
 import { fromChecksum } from 'src/utils/request.js';
 import { spaceAssetPathBranches, spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
 import { dateTruncUnitForTimeBucketSize } from 'src/utils/timeline-bucket.js';
+import { favoriteExistsFor } from 'src/utils/favorite.js';
 
 export const getKyselyConfig = (connection: DatabaseConnectionParams): KyselyConfig => {
   return {
@@ -1028,7 +1029,13 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
           .where(() => sql`f_unaccent(ocr_search.text) %>> f_unaccent(${tokenizeForSearch(options.ocr!).join(' ')})`),
       )
       .$if(!!options.type, (qb) => qb.where('asset.type', '=', options.type!))
-      .$if(options.isFavorite !== undefined, (qb) => qb.where('asset.isFavorite', '=', options.isFavorite!))
+      .$if(options.isFavorite !== undefined, (qb) =>
+      qb.where((eb) =>
+        options.isFavorite
+          ? favoriteExistsFor(eb, options.authUserId!)
+          : eb.not(favoriteExistsFor(eb, options.authUserId!)),
+      ),
+    )
       .$if(options.isOffline !== undefined, (qb) => qb.where('asset.isOffline', '=', options.isOffline!))
       .$if(options.isEncoded !== undefined, (qb) =>
         qb.where((eb) => {
