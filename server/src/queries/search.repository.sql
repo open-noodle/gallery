@@ -37,14 +37,23 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavoriteForUser"
 from
   "asset"
   inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
 where
-  "asset"."fileCreatedAt" >= $1
-  and "asset_exif"."lensModel" = $2
-  and "asset"."ownerId" = any ($3::uuid[])
+  "asset"."fileCreatedAt" >= $2
+  and "asset_exif"."lensModel" = $3
+  and "asset"."ownerId" = any ($4::uuid[])
   and exists (
     select
       1 as "exists"
@@ -52,16 +61,16 @@ where
       "asset_favorite"
     where
       "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = $4::uuid
+      and "asset_favorite"."userId" = $5::uuid
   )
   and "asset"."deletedAt" is null
 order by
   "asset"."fileCreatedAt" desc,
   "asset"."id" desc
 limit
-  $5
-offset
   $6
+offset
+  $7
 
 -- SearchRepository.searchMetadata (identity-filter)
 select
@@ -226,14 +235,23 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavoriteForUser"
 from
   "asset"
   inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
 where
-  "asset"."fileCreatedAt" >= $1
-  and "asset_exif"."lensModel" = $2
-  and "asset"."ownerId" = any ($3::uuid[])
+  "asset"."fileCreatedAt" >= $2
+  and "asset_exif"."lensModel" = $3
+  and "asset"."ownerId" = any ($4::uuid[])
   and exists (
     select
       1 as "exists"
@@ -241,13 +259,13 @@ where
       "asset_favorite"
     where
       "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = $4::uuid
+      and "asset_favorite"."userId" = $5::uuid
   )
   and "asset"."deletedAt" is null
 order by
   random()
 limit
-  $5
+  $6
 
 -- SearchRepository.searchLargeAssets
 select
@@ -279,14 +297,23 @@ select
   "asset"."type",
   "asset"."width",
   "asset"."height",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavoriteForUser",
   to_json("asset_exif") as "exifInfo"
 from
   "asset"
   inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
 where
-  "asset"."fileCreatedAt" >= $1
-  and "asset_exif"."lensModel" = $2
-  and "asset"."ownerId" = any ($3::uuid[])
+  "asset"."fileCreatedAt" >= $2
+  and "asset_exif"."lensModel" = $3
+  and "asset"."ownerId" = any ($4::uuid[])
   and exists (
     select
       1 as "exists"
@@ -294,14 +321,14 @@ where
       "asset_favorite"
     where
       "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = $4::uuid
+      and "asset_favorite"."userId" = $5::uuid
   )
   and "asset"."deletedAt" is null
-  and "asset_exif"."fileSizeInByte" > $5
+  and "asset_exif"."fileSizeInByte" > $6
 order by
   "asset_exif"."fileSizeInByte" desc
 limit
-  $6
+  $7
 
 -- SearchRepository.searchSmart
 begin
@@ -312,16 +339,25 @@ select
 from
   (
     select
-      "asset".*
+      "asset".*,
+      exists (
+        select
+          1 as "exists"
+        from
+          "asset_favorite"
+        where
+          "asset_favorite"."assetId" = "asset"."id"
+          and "asset_favorite"."userId" = $1::uuid
+      ) as "isFavoriteForUser"
     from
       "asset"
       inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
       inner join "smart_search" on "asset"."id" = "smart_search"."assetId"
     where
       (
-        "asset"."ownerId" = any ($1::uuid[])
+        "asset"."ownerId" = any ($2::uuid[])
         or (
-          "asset"."visibility" in ($2, $3)
+          "asset"."visibility" in ($3, $4)
           and "asset"."deletedAt" is null
           and (
             exists (
@@ -331,7 +367,7 @@ from
                 "shared_space_asset"
               where
                 "shared_space_asset"."assetId" = "asset"."id"
-                and "shared_space_asset"."spaceId" = any ($4::uuid[])
+                and "shared_space_asset"."spaceId" = any ($5::uuid[])
             )
             or exists (
               select
@@ -340,7 +376,7 @@ from
                 "shared_space_library"
               where
                 "shared_space_library"."libraryId" = "asset"."libraryId"
-                and "shared_space_library"."spaceId" = any ($5::uuid[])
+                and "shared_space_library"."spaceId" = any ($6::uuid[])
             )
             or (
               exists (
@@ -353,8 +389,8 @@ from
                   and "album"."deletedAt" is null
                 where
                   "album_asset"."assetId" = "asset"."id"
-                  and "shared_space_album"."spaceId" = any ($6::uuid[])
-                  and "shared_space_album"."showInTimeline" = $7
+                  and "shared_space_album"."spaceId" = any ($7::uuid[])
+                  and "shared_space_album"."showInTimeline" = $8
               )
               or exists (
                 select
@@ -367,8 +403,8 @@ from
                   and "album"."deletedAt" is null
                 where
                   "album_space_asset"."assetId" = "asset"."id"
-                  and "shared_space_album"."spaceId" = any ($8::uuid[])
-                  and "shared_space_album"."showInTimeline" = $9
+                  and "shared_space_album"."spaceId" = any ($9::uuid[])
+                  and "shared_space_album"."showInTimeline" = $10
               )
             )
           )
@@ -383,10 +419,10 @@ from
           "asset_face"."assetId" = "asset"."id"
           and "asset_face"."deletedAt" is null
           and "asset_face"."isVisible" is true
-          and "shared_space_person_face"."personId" = $10::uuid
+          and "shared_space_person_face"."personId" = $11::uuid
       )
-      and "asset"."fileCreatedAt" >= $11
-      and "asset_exif"."lensModel" = $12
+      and "asset"."fileCreatedAt" >= $12
+      and "asset_exif"."lensModel" = $13
       and exists (
         select
           1 as "exists"
@@ -394,22 +430,22 @@ from
           "asset_favorite"
         where
           "asset_favorite"."assetId" = "asset"."id"
-          and "asset_favorite"."userId" = $13::uuid
+          and "asset_favorite"."userId" = $14::uuid
       )
       and "asset"."deletedAt" is null
-      and (smart_search.embedding <=> $14) <= $15
+      and (smart_search.embedding <=> $15) <= $16
     order by
-      smart_search.embedding <=> $16
+      smart_search.embedding <=> $17
     limit
-      $17
+      $18
   ) as "candidates"
 order by
   "candidates"."fileCreatedAt" desc nulls last,
   "candidates"."id"
 limit
-  $18
-offset
   $19
+offset
+  $20
 commit
 
 -- SearchRepository.getSmartSearchFacets
@@ -1538,6 +1574,72 @@ select
   "asset"."width",
   "asset"."height",
   to_jsonb("asset_exif") as "exifInfo"
+from
+  "asset"
+  inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
+  inner join "cte" on "asset"."id" = "cte"."assetId"
+order by
+  "asset_exif"."city"
+
+-- SearchRepository.getAssetsByCity (with authUserId)
+with recursive
+  "cte" as (
+    (
+      select
+        "city",
+        "assetId"
+      from
+        "asset_exif"
+        inner join "asset" on "asset"."id" = "asset_exif"."assetId"
+      where
+        "asset"."ownerId" = any ($1::uuid[])
+        and "asset"."visibility" = $2
+        and "asset"."type" = $3
+        and "asset"."deletedAt" is null
+      order by
+        "city"
+      limit
+        $4
+    )
+    union all
+    (
+      select
+        "l"."city",
+        "l"."assetId"
+      from
+        "cte"
+        inner join lateral (
+          select
+            "city",
+            "assetId"
+          from
+            "asset_exif"
+            inner join "asset" on "asset"."id" = "asset_exif"."assetId"
+          where
+            "asset"."ownerId" = any ($5::uuid[])
+            and "asset"."visibility" = $6
+            and "asset"."type" = $7
+            and "asset"."deletedAt" is null
+            and "asset_exif"."city" > "cte"."city"
+          order by
+            "city"
+          limit
+            $8
+        ) as "l" on true
+    )
+  )
+select
+  "asset".*,
+  to_jsonb("asset_exif") as "exifInfo",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $9::uuid
+  ) as "isFavoriteForUser"
 from
   "asset"
   inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"

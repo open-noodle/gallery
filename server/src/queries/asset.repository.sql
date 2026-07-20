@@ -487,6 +487,68 @@ from
 where
   "asset"."id" = any ($1::uuid[])
 
+-- AssetRepository.getByIdsWithAllRelationsButStacks (with authUserId)
+select
+  "asset".*,
+  (
+    select
+      coalesce(json_agg(agg), '[]')
+    from
+      (
+        select
+          "asset_face".*,
+          "person" as "person"
+        from
+          "asset_face"
+          left join lateral (
+            select
+              "person".*
+            from
+              "person"
+            where
+              "asset_face"."personId" = "person"."id"
+          ) as "person" on true
+        where
+          "asset_face"."assetId" = "asset"."id"
+          and "asset_face"."deletedAt" is null
+          and "asset_face"."isVisible" is true
+      ) as agg
+  ) as "faces",
+  (
+    select
+      coalesce(json_agg(agg), '[]')
+    from
+      (
+        select
+          "tag"."id",
+          "tag"."value",
+          "tag"."createdAt",
+          "tag"."updatedAt",
+          "tag"."color",
+          "tag"."parentId"
+        from
+          "tag"
+          inner join "tag_asset" on "tag"."id" = "tag_asset"."tagId"
+        where
+          "asset"."id" = "tag_asset"."assetId"
+      ) as agg
+  ) as "tags",
+  to_json("asset_exif") as "exifInfo",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavoriteForUser"
+from
+  "asset"
+  left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
+where
+  "asset"."id" = any ($2::uuid[])
+
 -- AssetRepository.deleteAll
 delete from "asset"
 where
@@ -619,6 +681,25 @@ where
   "asset"."id" = $1::uuid
 limit
   $2
+
+-- AssetRepository.getById (with authUserId)
+select
+  "asset".*,
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavoriteForUser"
+from
+  "asset"
+where
+  "asset"."id" = $2::uuid
+limit
+  $3
 
 -- AssetRepository.updateAll
 update "asset"
