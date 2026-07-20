@@ -732,9 +732,9 @@
     {/if}
     <ActionButton action={Actions.AddToAlbum} />
 
-    {#if assetMultiSelectManager.isAllUserOwned}
-      <FavoriteAction removeFavorite={assetMultiSelectManager.isAllFavorite} onFavorite={handleFavorite} />
+    <FavoriteAction removeFavorite={assetMultiSelectManager.isAllFavorite} onFavorite={handleFavorite} />
 
+    {#if assetMultiSelectManager.isAllUserOwned}
       <ButtonContextMenu icon={mdiDotsVertical} title={$t('menu')}>
         <DownloadAction menuItem />
         {#if !showSearchResults && (assetMultiSelectManager.assets.length > 1 || isAssetStackSelected)}
