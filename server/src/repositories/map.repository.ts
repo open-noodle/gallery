@@ -19,6 +19,7 @@ import {
   spaceAssetPathBranches,
   spaceVisibilityGate,
 } from 'src/utils/shared-space-album-scope.js';
+import { favoriteExistsFor } from 'src/utils/favorite.js';
 
 export interface MapMarkerSearchOptions {
   isArchived?: boolean;
@@ -110,7 +111,9 @@ export class MapRepository {
       .$if(isArchived === false || isArchived === undefined, (qb) =>
         qb.where('asset.visibility', '=', AssetVisibility.Timeline),
       )
-      .$if(isFavorite !== undefined, (q) => q.where('isFavorite', '=', isFavorite!))
+      .$if(isFavorite !== undefined, (q) =>
+        q.where((eb) => (isFavorite ? favoriteExistsFor(eb, authUserId) : eb.not(favoriteExistsFor(eb, authUserId)))),
+      )
       .$if(fileCreatedAfter !== undefined, (q) => q.where('fileCreatedAt', '>=', fileCreatedAfter!))
       .$if(fileCreatedBefore !== undefined, (q) => q.where('fileCreatedAt', '<=', fileCreatedBefore!))
       .where((eb) => {
