@@ -105,7 +105,7 @@ class SyncSharedSpaceV1 {
     if (this.color != null) {
       json[r'color'] = this.color;
     } else {
-    //  json[r'color'] = null;
+      json[r'color'] = null;
     }
       json[r'createdAt'] = _isEpochMarker(r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$/')
         ? this.createdAt.millisecondsSinceEpoch
@@ -114,7 +114,7 @@ class SyncSharedSpaceV1 {
     if (this.description != null) {
       json[r'description'] = this.description;
     } else {
-    //  json[r'description'] = null;
+      json[r'description'] = null;
     }
       json[r'faceRecognitionEnabled'] = this.faceRecognitionEnabled;
       json[r'id'] = this.id;
@@ -123,19 +123,19 @@ class SyncSharedSpaceV1 {
         ? this.lastActivityAt!.millisecondsSinceEpoch
         : this.lastActivityAt!.toUtc().toIso8601String();
     } else {
-    //  json[r'lastActivityAt'] = null;
+      json[r'lastActivityAt'] = null;
     }
       json[r'name'] = this.name;
       json[r'petsEnabled'] = this.petsEnabled;
     if (this.thumbnailAssetId != null) {
       json[r'thumbnailAssetId'] = this.thumbnailAssetId;
     } else {
-    //  json[r'thumbnailAssetId'] = null;
+      json[r'thumbnailAssetId'] = null;
     }
     if (this.thumbnailCropY != null) {
       json[r'thumbnailCropY'] = this.thumbnailCropY;
     } else {
-    //  json[r'thumbnailCropY'] = null;
+      json[r'thumbnailCropY'] = null;
     }
       json[r'updatedAt'] = _isEpochMarker(r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$/')
         ? this.updatedAt.millisecondsSinceEpoch
