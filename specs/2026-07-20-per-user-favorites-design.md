@@ -76,8 +76,11 @@ favorite state to space members are **false** — `Thumbnail.svelte:337` renders
 
 ### 1.2 The guard that encodes the bug
 
-`server/src/services/timeline.service.ts:180,192` throws `BadRequestException` when `isFavorite`
-is combined with `withPartners` or `withSharedSpaces`. Web mirrors it in ~12 places as
+`server/src/services/timeline.service.ts` throws `BadRequestException` when `isFavorite` is
+combined with `withPartners` or `withSharedSpaces` — the `isFavorite` checks are at `:180,192`,
+the `throw`s at `:183-185,195-197`. Note the predicate is
+`dto.isFavorite === true || dto.isFavorite === false`, so it trips on **`false` as well as
+`true`**; both arms change in slice 4. Web mirrors it in ~12 places as
 `withSharedSpaces: filters.isFavorite === undefined` (heaviest:
 `routes/(user)/photos/[[assetId=id]]/+page.svelte`). `shared-space.service.ts:1040` skips
 space-ID resolution when `isFavorite === true`; `map.service.ts:21,26` does the same.
@@ -165,11 +168,16 @@ meaningless.
 ("recently favorited") is a plausible near-term ask and adding a timestamp column later to a
 large table is more expensive than carrying it from the start. Slices must not build behavior on it.
 
-**No audit table.** Audit tables in this fork exist to feed sync _delete_ streams for
-cross-owner state (`album_space_asset_audit`, `shared_space_asset_audit`). Favorites are
-single-user state, so mobile can reconcile deletes from the user's own full row set without a
-tombstone stream. Slice 6 verifies this holds; if it does not, the audit table is added there,
-not retrofitted.
+**No audit table — but the decision is made in slice 0, not deferred.** Audit tables in this fork
+exist to feed sync _delete_ streams for cross-owner state (`album_space_asset_audit`,
+`shared_space_asset_audit`). Favorites are single-user state, so mobile should be able to
+reconcile deletes from the user's own full row set without a tombstone stream.
+
+**Slice 0 must prove that before proceeding**, by writing the mobile delete-reconciliation
+scenario as a medium test against the sync stream contract. Deferring this to slice 6 would put a
+possible schema addition **after** slice 3 drops the column — i.e. after the irreversible step —
+forcing a late second migration and a retrofitted trigger. If slice 0's test shows a tombstone
+stream is required, `asset_favorite_audit` is created in slice 0 alongside the main table.
 
 ### 4.1 Migration
 
@@ -177,7 +185,10 @@ Fork migration in `server/src/schema/migrations-gallery/`, round timestamp per t
 convention:
 
 1. `CREATE TABLE asset_favorite …`
-2. Backfill: `INSERT INTO asset_favorite (userId, assetId) SELECT "ownerId", id FROM asset WHERE "isFavorite" = true`
+2. Backfill:
+   `INSERT INTO asset_favorite ("userId", "assetId") SELECT "ownerId", id FROM asset WHERE "isFavorite" = true`
+   — camelCase identifiers **must** be double-quoted or Postgres folds them to lowercase and the
+   insert fails against the generated schema.
 3. Drop `asset."isFavorite"` — **in slice 3, not slice 0** (see §9 ordering rationale).
 
 The backfill assigns each existing favorite to the **owner**, which is exactly what the current
@@ -204,11 +215,26 @@ under `docs/docs/guides/`.
 Ordering matters: the `ADD COLUMN` + backfill must run **before** the `DROP TABLE`, which sits in
 a block (`revert-to-immich.sql:107-145`) that currently assumes drop-only semantics.
 
-`server/src/schema/revert-to-immich.spec.ts` derives its expected fork-table set from what
-`migrations-gallery/` actually `CREATE`s, so `asset_favorite` will be picked up automatically and
-the spec will **fail until a matching DROP line is added** — a useful red. The spec must be
-extended to also assert the column-restore steps exist and are correctly ordered, since its
-current guards only understand DROP lines. CI gate:
+**`revert-to-immich.spec.ts` will _not_ catch a missing DROP line for this table — read this
+before assuming it does.** The spec derives `createdTables` from what `migrations-gallery/`
+actually `CREATE`s, but then narrows it (`server/src/schema/revert-to-immich.spec.ts:38`):
+
+```ts
+const forkTables = [...createdTables].filter((name) => name.startsWith('shared_space') || name.endsWith('_audit'));
+```
+
+`asset_favorite` matches **neither** predicate, so it is silently excluded from both the
+drop-every-fork-table test and the step-9 guard-list test. Left as-is, this table would ship with
+**zero** revert coverage — exactly the drift the file's own header comment (`:20-23`) says it was
+rewritten to prevent.
+
+Slice 0 must therefore **widen that filter** so non-`shared_space` fork tables are covered, not
+merely add a DROP line under the existing one.
+
+The genuine red available at slice 0 is the **third** test — every `migrations-gallery` migration
+must appear in the step-8 `kysely_migrations` DELETE block — which our new migration files do trip.
+The spec must additionally be extended to assert the column-restore steps exist and are correctly
+ordered, since its current guards understand only DROP lines. CI gate:
 `.github/workflows/gallery-revert-to-immich-validation.yml`.
 
 ---
@@ -229,8 +255,14 @@ Space roles are `owner` / `editor` / `viewer` (`server/src/enum.ts:73-77`); ther
 space-level "admin". The issue's "Space Admin" is the space **owner**, and its "regular member"
 is a viewer or editor. Slices must use the real role names.
 
-**Shared-link (anonymous) sessions may never favorite.** They have no user identity, so there is
-no `userId` to key a row on. This must be an asserted negative, not an assumption.
+**Shared-link sessions may never favorite — and this requires an explicit guard.** It does _not_
+fall out for free. `server/src/dtos/auth.dto.ts:16,18` declares `user: AuthUser` as
+**non-optional** and `sharedLink?: AuthSharedLink` as the optional field, so a shared-link request
+carries the **link owner's** identity. Without an explicit `auth.sharedLink` rejection on the
+canonical endpoint, an anonymous visitor holding a share link would create `asset_favorite` rows
+**attributed to the link's owner** — an unauthenticated write in a real user's name.
+
+The endpoint must reject any request where `auth.sharedLink` is set, and E6 must assert it.
 
 ### 5.2 Losing access
 
@@ -257,6 +289,15 @@ Rationale, and why the alternative was rejected:
 adds one, and slice 1's edge cases must assert it — an unfiltered favorites query would surface
 assets the user can no longer read, which is precisely the leak this design claims to prevent.
 
+**Mechanically, the safety today comes from owner-scoping, and that is also the second blocker.**
+`server/src/services/timeline.service.ts:164` sets `dto.userId = dto.userId || auth.user.id`, and
+`server/src/utils/database.ts:880` applies a bare `qb.where('asset.isFavorite', '=', …)` with no
+owner or space awareness of its own. So the query is restricted to assets the caller **owns**.
+That is why removing the `BadRequestException` guard alone (§1.2) is **not sufficient** — the
+owner-scoping would still filter every non-owned favorite out, and the slice would pass its own
+tests while delivering nothing. Slice 4 must replace owner-scoping with readable-asset scoping,
+not merely delete the guard.
+
 ### 5.3 Storage growth
 
 Rows for permanently-lost access accumulate. This is accepted: the row is three columns, the
@@ -272,34 +313,41 @@ revocation event itself, which would reintroduce the leave/rejoin data loss.
 Every row here must have an explicit assertion in the slice named. This table is the contract;
 a slice is not done while a row in it is unasserted.
 
-| #   | Scenario                                                              | Expected                                                                               | Slice |
-| --- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----- |
-| E1  | Two users favorite the same asset                                     | Two independent rows; each sees only their own `isFavorite: true`                      | 1, 2  |
-| E2  | Owner unfavorites; member had favorited                               | Member's row untouched; member still sees `true`                                       | 2     |
-| E3  | Space **viewer** favorites a space asset                              | 200; row created; owner's view unchanged                                               | 2     |
-| E4  | Space **editor** attempts to set another member's favorite            | Impossible — no endpoint accepts a target user                                         | 2     |
-| E5  | Non-member attempts to favorite a space asset                         | 403; no row created                                                                    | 2     |
-| E6  | Shared-link session attempts to favorite                              | 401/403; no row created                                                                | 2     |
-| E7  | System admin (`hasElevatedPermission`) favorites another user's asset | Creates the **admin's own** row only; target user unaffected                           | 2     |
-| E8  | Favorite twice (idempotency)                                          | Second call is a no-op, not a 500 (`onConflict do nothing`)                            | 2     |
-| E9  | Unfavorite something never favorited                                  | No-op, 200, not 404                                                                    | 2     |
-| E10 | Member favorites, then leaves the space                               | Row persists; asset absent from their `/favorites` and from `isFavorite: true` filters | 1, 4  |
-| E11 | …then rejoins the space                                               | Asset reappears in their favorites                                                     | 4     |
-| E12 | Asset deleted                                                         | Rows CASCADE for all users                                                             | 0     |
-| E13 | User deleted                                                          | Their rows CASCADE; other users' rows for the same assets survive                      | 0     |
-| E14 | Asset trashed then restored                                           | Favorite survives (trash never touched favorite before and must not now)               | 7     |
-| E15 | `isFavorite: true` + `withSharedSpaces`                               | Works, returns cross-space favorites — no longer a 400                                 | 4     |
-| E16 | `isFavorite: true` + `withPartners`                                   | Works — no longer a 400                                                                | 4     |
-| E17 | Deprecated `UpdateAssetDto.isFavorite` from an owner                  | Writes the caller's own row; identical result to the canonical endpoint                | 2     |
-| E18 | Deprecated alias from a space **viewer**                              | Still 403 — the alias is strictly narrower and must never widen access                 | 2     |
-| E19 | Upload with `isFavorite: true`                                        | Creates the uploader's row (uploader is always the owner)                              | 7     |
-| E20 | Asset copy with `favorite: true`                                      | Copies the **acting user's** row only, not every user's                                | 7     |
-| E21 | Duplicate merge                                                       | Union of all source assets' rows onto the keeper, **per user**, before sources CASCADE | 7     |
-| E22 | Statistics `isFavorite: true`                                         | Counts only the caller's rows                                                          | 1     |
-| E23 | Map markers `isFavorite: true`                                        | Only caller's favorites; cross-space markers now included                              | 4     |
-| E24 | Timeline bucket parallel array                                        | `isFavorite[]` aligns 1:1 with the bucket's asset order for the caller                 | 1     |
-| E25 | Mobile sync, non-owned space asset                                    | Stream carries the **recipient's** favorite, not a masked `false`                      | 6     |
-| E26 | Mobile unfavorite while offline, then sync                            | Converges to the user's intent; no cross-user write                                    | 6     |
+| #    | Scenario                                                              | Expected                                                                               | Slice |
+| ---- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----- |
+| E1   | Two users favorite the same asset                                     | Two independent rows; each sees only their own `isFavorite: true`                      | 1, 2  |
+| E2   | Owner unfavorites; member had favorited                               | Member's row untouched; member still sees `true`                                       | 2     |
+| E3   | Space **viewer** favorites a space asset                              | 200; row created; owner's view unchanged                                               | 2     |
+| E4   | Space **editor** attempts to set another member's favorite            | Impossible — no endpoint accepts a target user                                         | 2     |
+| E5   | Non-member attempts to favorite a space asset                         | 403; no row created                                                                    | 2     |
+| E6   | Shared-link session attempts to favorite                              | Rejected by an **explicit** `auth.sharedLink` guard; no row created for the link owner | 2     |
+| E7   | System admin (`hasElevatedPermission`) favorites another user's asset | Creates the **admin's own** row only; target user unaffected                           | 2     |
+| E8   | Favorite twice (idempotency)                                          | Second call is a no-op, not a 500 (`onConflict do nothing`)                            | 2     |
+| E9   | Unfavorite something never favorited                                  | No-op, 200, not 404                                                                    | 2     |
+| E10  | Member favorites, then leaves the space                               | Row persists; asset absent from their `/favorites` and from `isFavorite: true` filters | 1, 4  |
+| E11  | …then rejoins the space                                               | Asset reappears in their favorites                                                     | 4     |
+| E12  | Asset deleted                                                         | Rows CASCADE for all users                                                             | 0     |
+| E13  | User deleted                                                          | Their rows CASCADE; other users' rows for the same assets survive                      | 0     |
+| E14  | Asset trashed then restored                                           | Favorite survives (trash never touched favorite before and must not now)               | 7     |
+| E15  | `isFavorite: true` + `withSharedSpaces`                               | Works, returns cross-space favorites — no longer a 400                                 | 4     |
+| E16  | `isFavorite: true` + `withPartners`                                   | Works — no longer a 400                                                                | 4     |
+| E16b | `isFavorite: **false**` + either cross-user scope                     | Also works — the guard trips on `false` too today, so both arms must be asserted       | 4     |
+| E17  | Deprecated `UpdateAssetDto.isFavorite` from an owner                  | Writes the caller's own row; identical result to the canonical endpoint                | 2     |
+| E18  | Deprecated alias from a space **viewer**                              | Still 403 — the alias is strictly narrower and must never widen access                 | 2     |
+| E19  | Upload with `isFavorite: true`                                        | Creates the uploader's row (uploader is always the owner)                              | 7     |
+| E20  | Asset copy with `favorite: true`                                      | Copies the **acting user's** row only, not every user's                                | 7     |
+| E21  | Duplicate merge                                                       | Union of all source assets' rows onto the keeper, **per user**, before sources CASCADE | 7     |
+| E22  | Statistics `isFavorite: true`                                         | Counts only the caller's rows                                                          | 1     |
+| E23  | Map markers `isFavorite: true`                                        | Only caller's favorites; cross-space markers now included                              | 4     |
+| E24  | Timeline bucket parallel array                                        | `isFavorite[]` aligns 1:1 with the bucket's asset order for the caller                 | 1     |
+| E25  | Mobile sync, non-owned space asset                                    | Stream carries the **recipient's** favorite, not a masked `false`                      | 6     |
+| E26  | Mobile unfavorite while offline, then sync                            | Converges to the user's intent; no cross-user write                                    | 6     |
+| E27  | Concurrent favorite + unfavorite of the same `(user, asset)`          | Converges deterministically; no PK violation, no 500, no orphaned row                  | 2     |
+| E28  | Bulk request with an oversized `ids` array                            | Bounded — documented limit enforced with a 400, not an unbounded statement             | 2     |
+| E29  | Album **unshared** after the user favorited an asset in it            | Same as E10: row persists, asset drops out of their favorites                          | 4     |
+| E30  | Partner sharing **revoked** after favoriting                          | Same as E10                                                                            | 4     |
+| E31  | Stacked assets (`/favorites` sends `withStacked: true`)               | Favoriting a stack child vs. primary has one defined behavior, asserted either way     | 4     |
+| E32  | Mobile toggle direction on a mixed-ownership selection                | Direction derives from the **same** set that is mutated (see slice 6)                  | 6     |
 
 ---
 
@@ -354,18 +402,26 @@ Removal is out of scope; it needs a deprecation window announced to API consumer
 
 ## 9. Slice overview
 
-| #   | Slice                                                             | Layers                 | Depends on | Independent ship?             |
-| --- | ----------------------------------------------------------------- | ---------------------- | ---------- | ----------------------------- |
-| 0   | `asset_favorite` schema, migration, backfill, revert-to-immich    | server medium          | —          | foundation                    |
-| 1   | Read path: masking → EXISTS join, + favorites access filter       | server medium + unit   | 0          | foundation                    |
-| 2   | Write path: canonical endpoint, deprecated alias, authz           | server e2e + unit      | 1          | ✅ vertical (API)             |
-| 3   | Drop `asset.isFavorite`; regenerate SQL snapshots                 | server medium          | 1, 2       | irreversible gate             |
-| 4   | Cross-scope favorites: remove the `isFavorite` × cross-user guard | server e2e + web       | 3          | ✅ vertical                   |
-| 5   | Web: un-gate the heart in viewer + multi-select                   | web unit + Playwright  | 2          | ✅ vertical — **closes #763** |
-| 6   | Mobile: sync stream, Drift, un-gate the action                    | server medium + mobile | 3          | ✅ vertical                   |
-| 7   | Secondary writes: upload, copy, duplicate-merge, trash            | server e2e + unit      | 2          | ✅ vertical                   |
+| #   | Slice                                                          | Layers                 | Depends on | Self-contained?      |
+| --- | -------------------------------------------------------------- | ---------------------- | ---------- | -------------------- |
+| 0   | `asset_favorite` schema, migration, backfill, revert-to-immich | server medium          | —          | foundation           |
+| 1   | Read path: masking → EXISTS join, + favorites access filter    | server medium + unit   | 0          | foundation           |
+| 2   | Write path: canonical endpoint, deprecated alias, authz        | server e2e + unit      | 1          | ✅ (API)             |
+| 3   | Drop `asset.isFavorite`; regenerate SQL snapshots              | server medium          | 1, 2       | irreversible gate    |
+| 4   | Cross-scope favorites: guard **and** owner-scoping removal     | server e2e + web       | 3          | ✅                   |
+| 5   | Web: un-gate the heart in viewer + multi-select                | web unit + Playwright  | 2          | ✅ — **closes #763** |
+| 6   | Mobile: sync stream, Drift, un-gate the action                 | server medium + mobile | 3          | ✅                   |
+| 7   | Secondary writes: upload, copy, duplicate-merge, trash         | server e2e + unit      | 2          | ✅                   |
 
 Ordering: **0 → 1 → 2 → 3 → {4, 5, 6, 7}**. Each `/impl-loop` run does one slice, TDD.
+
+**All eight slices land as a single PR.** §8 records the decision that server, web and mobile ship
+atomically, so there is no window where the sync stream and the server disagree about what
+`isFavorite` means. "Self-contained" in the table above means the slice is a coherent, separately
+reviewable unit whose tests pass on their own — **not** that it may be merged alone. In
+particular, shipping slice 5 by itself would un-gate the web heart against a server that still
+owner-scopes favorites (§5.2), and shipping 0–5 without 6 would leave mobile reading a column that
+slice 3 deleted.
 
 **Why slice 3 (the drop) sits mid-sequence, not last.** Slices 0–2 leave the column present but
 unread and unwritten — a dead column. Deferring the drop past 4–7 would mean every later slice
@@ -402,9 +458,16 @@ tests against the live schema.
   does not exist.
 - **Migration test**: seed `asset` rows with `isFavorite` true/false across two owners, run the
   migration, assert the backfilled row set exactly.
-- **Unit** (`server/src/schema/revert-to-immich.spec.ts`): extend to assert the `ADD COLUMN` +
-  backfill + `DROP TABLE` steps exist **and are correctly ordered**. Red because the spec today
-  only understands DROP lines, and `asset_favorite` has no DROP line yet.
+- **Unit** (`server/src/schema/revert-to-immich.spec.ts`): the available red is the **step-8
+  `kysely_migrations` DELETE block** test, which the new `migrations-gallery` migration trips
+  immediately. The drop-every-fork-table test will **not** go red — `asset_favorite` is filtered
+  out at `:38` (§4.2) — so this slice must first **widen that filter** to cover non-`shared_space`
+  fork tables, which makes the DROP-line test go red, and only then add the DROP line. Extend the
+  spec to assert the `ADD COLUMN` + backfill + `DROP TABLE` steps exist **and are correctly
+  ordered**; its current guards understand only DROP lines.
+- **Medium (audit-table decision, §4)**: assert a client can reconcile favorite **deletes** from
+  the user's own full row set with no tombstone stream. If this cannot be satisfied,
+  `asset_favorite_audit` is created **in this slice** — never later, since slice 3 is irreversible.
 
 **Fix (green).**
 
@@ -412,7 +475,10 @@ tests against the live schema.
 - Migration in `migrations-gallery/` with a round timestamp: create + backfill. **Does not drop
   the column** — that is slice 3.
 - `scripts/revert-to-immich.sql`: the three ordered steps from §4.2, with a comment stating the
-  non-owner-row loss.
+  non-owner-row loss, **plus** `asset_favorite` in the step-9 `fork_tables_left` guard list and
+  the new migration name in the step-8 DELETE block.
+- `revert-to-immich.spec.ts:38` — widen the `forkTables` filter so fork tables outside the
+  `shared_space*` / `*_audit` naming conventions are covered.
 - Register the repository in `test/medium.factory.ts`'s `newRealRepository` switch, and in
   `BaseService` at **all three sites** — import, constructor, and the `static create()` positional
   list. Missing the third shifts every later repository and fails only in medium tests.
@@ -435,9 +501,14 @@ workflow green; `make sql` diff limited to the new table; server `check` clean.
 ## Slice 1 — Read path: masking → overlay join
 
 **Delivers.** Every read of "is this favorited" resolves against `asset_favorite` for the
-requesting user, and the favorites read path gains the access filter §5.2 requires. Behavior is
-observably **unchanged** for owners (the backfill guarantees parity), which is what makes this
-slice safely testable as a pure refactor.
+requesting user, and the favorites read path gains the access filter §5.2 requires.
+
+**This slice is _not_ a pure refactor, despite mostly looking like one.** The substitution of
+masking expressions for overlay joins is behaviour-preserving — the backfill guarantees owner
+parity, and that parity is the regression suite. But adding the readable-asset filter is a real
+behaviour change (E10), and it is the one part of this slice that can leak if it is wrong. Treat
+the substitution as refactor-with-parity-tests and the access filter as new behaviour with its own
+red-first test.
 
 **Behavior (BDD)**
 
@@ -535,9 +606,14 @@ it for themselves, and no user can alter anyone else's favorite.
 - Bulk request mixing readable and unreadable ids → per-id outcome, no partial-success lie
   (mirrors the #764 toast lesson).
 - Empty `ids` → 400 or clean no-op, explicitly asserted either way.
+- Oversized `ids` array → bounded by a documented limit, rejected with 400 rather than issuing an
+  unbounded statement. (E28)
+- Concurrent favorite + unfavorite of the same `(user, asset)` → converges deterministically; the
+  `onConflict do nothing` insert and the delete-by-key must not race into a 500 or an orphan. (E27)
 - Nonexistent asset id → 400/404, never a 500.
 - No request shape permits naming another user as the favorite subject. (E4)
 - Elevated permission does not widen the subject. (E7)
+- A request carrying `auth.sharedLink` is rejected before any row is written. (E6, §5.1)
 
 **Green.** New + inverted e2e green; `asset.service.spec.ts` green; SDKs regenerated and
 committed; server `check` + `prettier --check` clean.
@@ -550,8 +626,13 @@ committed; server `check` + `prettier --check` clean.
 
 **Behavior (BDD)**
 
-- _Given_ slices 1–2 are complete, _When_ the column is dropped, _Then_ no query references it and
-  every favorite surface behaves identically.
+- _Given_ a user who had favorited assets before the column was dropped, _When_ they fetch those
+  assets, list `/favorites`, request a timeline bucket, and read their favorite statistic, _Then_
+  every result is byte-identical to the pre-drop response.
+- _Given_ a second user who favorited a subset of the same assets, _When_ both users read, _Then_
+  each still sees only their own favorites — the drop changes storage, never semantics.
+- _Given_ the column is gone, _When_ the server boots and runs its migrations, _Then_ startup
+  succeeds and no query references the removed column.
 
 **TDD — red first**
 
@@ -589,22 +670,37 @@ whole design.
 **Behavior (BDD)**
 
 - _Given_ a user with favorites across their own library and two spaces, _When_ they request
-  `isFavorite: true` with `withSharedSpaces: true`, _Then_ 200 with the union — not a 400. (E15)
-- _Given_ the same with `withPartners: true`, _Then_ 200. (E16)
+  `isFavorite: true` with `withSharedSpaces: true`, _Then_ 200 with the union — not a 400, **and
+  the non-owned favorites are actually present in the result**. (E15)
+- _Given_ the same with `withPartners: true`, _Then_ 200 with partner-owned favorites present. (E16)
+- _Given_ `isFavorite: false` with either cross-user scope, _Then_ 200 — the current guard trips on
+  `false` as well as `true`, so both arms change. (E16b)
 - _Given_ a user who favorited a space asset then left, _When_ they list favorites, _Then_ absent;
   _When_ they rejoin, _Then_ present again. (E10, E11)
+- _Given_ an album is unshared, or partner sharing revoked, after favoriting, _Then_ the same
+  drop-out behaviour as leaving a space. (E29, E30)
 - _Given_ map markers filtered by favorite, _When_ requested, _Then_ cross-space markers included. (E23)
 
 **TDD — red first**
 
-- **E2E**: the combinations above. Red because `timeline.service.ts:180,192` throws today.
+- **E2E**: the combinations above. Two distinct reds, and the second is the one that matters —
+  first the 400 from the guard, then, once the guard is gone, an **empty/short result** because
+  the query is still owner-scoped. A test that only asserts "not a 400" would pass against a
+  feature that returns nothing; every scenario must assert the non-owned favorite is **in** the
+  payload.
 - **Unit** (`timeline.service.spec.ts`): the 5 existing tests asserting the rejection must be
   **inverted** — they currently encode the limitation.
 - **Web unit**: filter-options specs asserting favorites no longer suppress `withSharedSpaces`.
 
-**Fix (green).**
+**Fix (green).** Two independent blockers — removing only the first yields a green-but-inert slice:
 
-- Delete the `BadRequestException` guards at `timeline.service.ts:180,192`.
+1. Delete the `BadRequestException` guards in `timeline.service.ts` (the `isFavorite` checks are
+   at `:180,192`; the `throw`s at `:183-185,195-197`). Both trip on `isFavorite: false` too.
+2. **Replace owner-scoping with readable-asset scoping** (§5.2). `timeline.service.ts:164` sets
+   `dto.userId = dto.userId || auth.user.id`, and `utils/database.ts:880` applies a bare
+   `qb.where('asset.isFavorite', '=', …)`. Together these restrict results to assets the caller
+   **owns**, which would filter out every cross-space favorite even with the guard gone.
+
 - Remove the ~12 web mirrors (`withSharedSpaces: filters.isFavorite === undefined`), heaviest in
   `routes/(user)/photos/[[assetId=id]]/+page.svelte`.
 - Remove the space-resolution skip at `shared-space.service.ts:1040` and the `map.service.ts:21,26`
@@ -617,6 +713,13 @@ whole design.
 - Favorited asset in a space the user owns _and_ one they're a viewer of → appears once, not twice.
 - Trashed favorited asset stays out of the favorites timeline.
 - `/favorites` route unchanged for a user with no spaces (regression).
+- Album unshare (E29) and partner revoke (E30) drop favorites out, exactly as leaving a space does.
+- **Stacks**: `/favorites` sends `withStacked: true`. Favoriting a stack **child** vs. the
+  **primary** must have one defined behaviour — pick it, state it, assert it. Today the question
+  cannot arise because only owners favorite; it becomes reachable here. (E31)
+- **Performance**: `utils/database.ts:880` goes from a bare indexed column predicate to a join, at
+  the same time as the result set widens across spaces. Assert the §10 budget on a seeded
+  many-spaces dataset — this is the shape of regression that produced the People-page incident.
 
 **Green.** E2E green; inverted `timeline.service.spec.ts` green; web unit green; web
 `check:typescript` + `check:svelte` + `pnpm lint` clean.
@@ -693,6 +796,11 @@ mobile heart works on non-owned space assets.
   the `CASE WHEN ownerId = $1` masking and the partner hardcoded `false`.
 - **Flutter** (`flutter test`): `favorite.action.dart` no longer filters on
   `asset.ownerId == scope.authUser.id` (`:22`); the repository writes via the canonical endpoint.
+- **Flutter (toggle-direction bug, E32)**: with a mixed-ownership selection, assert the toggle
+  direction matches the set actually mutated. Red today — `favorite.action.dart:11` computes
+  `shouldFavorite = assets.any((asset) => !asset.isFavorite)` over the **unfiltered** selection
+  while `:22` filters to owned assets, so a non-owned asset can already flip the direction while
+  being excluded from the mutation. Latent today; load-bearing once `:22` is un-gated.
 
 **Fix (green).**
 
@@ -702,9 +810,11 @@ mobile heart works on non-owned space assets.
   (`:478`). Update the explanatory comments at `:985,1017,1048,1298,1337,1810`, which currently
   document the masking rationale.
 - Regenerate the 12 `sync.repository.sql` snapshot blocks.
-- Verify the §4 no-audit-table assumption: if mobile cannot reconcile favorite **deletes** from
-  the user's own row set, add `asset_favorite_audit` **here**.
-- Dart: `favorite.action.dart:22` un-gate; `remote_asset.repository.dart:119-124` and
+- Re-confirm the §4 no-audit-table decision against the real stream (the decision itself, and any
+  `asset_favorite_audit` table, belongs to **slice 0** — it must not be introduced here, after the
+  irreversible slice 3).
+- Dart: `favorite.action.dart:11` — derive `shouldFavorite` from the same filtered set that gets
+  mutated, not the raw selection (E32); `:22` un-gate; `remote_asset.repository.dart:119-124` and
   `asset_api.repository.dart:45-46` to the canonical endpoint; verify
   `timeline.repository.dart` favorite queries and `merged_asset.drift`.
 - Leave `local_asset` / `trashed_local_asset` favorite mirrors alone — device-local backup state.
@@ -775,13 +885,22 @@ misses test lints); `flutter test` green on Flutter 3.41.7.
 3. No code path lets any actor write another user's favorite. Asserted, not assumed. (E4, E7)
 4. No response, bucket, sync stream, statistic or map marker exposes another user's favorite.
 5. `asset."isFavorite"` does not exist post-slice-3; the grep gate enforces it.
-6. `revert-to-immich.sql` restores the column with owner rows and passes its CI workflow.
+6. `revert-to-immich.sql` restores the column with owner rows and passes its CI workflow, **and**
+   `asset_favorite` is actually covered by `revert-to-immich.spec.ts` (its filter widened — §4.2).
 7. `AssetResponseDto` shape is unchanged; both SDKs regenerated via `make open-api`.
-8. Full local gate green: `make lint-all`, `make check-all`, server + web unit, server medium,
-   e2e API + web, `dart analyze --fatal-infos lib test`, `dart format --set-exit-if-changed`,
-   `flutter test`.
-9. `docs/plans/shared-spaces-permission-matrix.md` updated at both `:70` and `:178`.
-10. #763 verified manually on a real space with a **viewer**-role member.
+8. **A shared-link request can never write a favorite row.** Explicitly guarded, explicitly
+   asserted. (§5.1, E6)
+9. **Cross-scope favorites actually return non-owned assets** — not merely "no longer a 400".
+   Owner-scoping replaced by readable-asset scoping. (§5.2, slice 4)
+10. **Performance budget**: on a seeded dataset with a user in ≥10 spaces and ≥10k favorites,
+    `/favorites` first-page latency stays within the pre-change budget. Record the measurement in
+    the PR. The People-page incident came from exactly this shape of change.
+11. Full local gate green: `make lint-all`, `make check-all`, server + web unit, server medium,
+    e2e API + web, `dart analyze --fatal-infos lib test`, `dart format --set-exit-if-changed`,
+    `flutter test`.
+12. `docs/plans/shared-spaces-permission-matrix.md` updated at both `:70` and `:178`.
+13. #763 verified manually on a real space with a **viewer**-role member.
+14. All eight slices land as **one PR** (§8, §9).
 
 **Verification discipline:** run the full gate yourself at the end. Subagent "green" reports have
 repeatedly missed what integrated CI catches. `pnpm test -- --run <path>` silently drops the path
