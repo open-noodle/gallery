@@ -63,7 +63,7 @@ import {
   withSmartSearch,
   withTags,
 } from 'src/utils/database';
-import { favoriteExistsFor } from 'src/utils/favorite';
+import { favoriteExistsFor, favoriteExistsForOwner } from 'src/utils/favorite';
 import { globToPostgresRegex } from 'src/utils/misc';
 import {
   hiddenFromOwnTimeline,
@@ -1334,6 +1334,12 @@ export class AssetRepository {
       .select(withFacesAndPeople({ viewingUserId }))
       .select(withTags)
       .$call(withExif)
+      // #763: `isFavorite` is resolved from the OWNER's overlay row (favoriteExistsForOwner), NOT
+      // the raw asset."isFavorite" column selectAll('asset') would otherwise surface — see the
+      // matching comment on getById below for the full rationale (same owner-semantics decision;
+      // job.service.ts's AssetEditReadyV2/AssetUploadReadyV2 payloads are this method's only
+      // direct `.isFavorite` reader, and always send to the asset's OWNER).
+      .select((eb) => favoriteExistsForOwner(eb).as('isFavorite'))
       // #763: authUserId is optional and deliberately omitted by job.service.ts (background job)
       // and notification.service.ts (synthetic partial auth) — see the comments at their mapAsset
       // call sites. Only search.service.ts's getExploreData passes it (real caller identity).
@@ -1458,6 +1464,16 @@ export class AssetRepository {
     return this.db
       .selectFrom('asset')
       .selectAll('asset')
+      // #763: `isFavorite` is resolved from the OWNER's overlay row (favoriteExistsForOwner), NOT
+      // the raw asset."isFavorite" column selectAll('asset') would otherwise surface — that column
+      // is a frozen legacy value the overlay write path no longer updates (dropped outright in
+      // slice 3). Projected unconditionally (not gated on authUserId, unlike isFavoriteForUser
+      // below) because every consumer that reads `.isFavorite` directly off this method's result
+      // (job.service.ts's AssetEditReadyV2/AssetUploadReadyV2 payloads) sends its event to the
+      // asset's OWNER, so owner semantics is always correct here — see favoriteExistsForOwner's doc
+      // comment. mapAsset-facing callers (asset.service.ts `get`/`update`) never read this field;
+      // they use isFavoriteForUser instead.
+      .select((eb) => favoriteExistsForOwner(eb).as('isFavorite'))
       .where('asset.id', '=', asUuid(id))
       .$if(!!exifInfo, withExif)
       .$if(!!faces, (qb) =>
