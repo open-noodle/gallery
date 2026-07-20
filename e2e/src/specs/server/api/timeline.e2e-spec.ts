@@ -491,6 +491,48 @@ describe('/timeline', () => {
     });
   });
 
+  describe('GET /timeline — favorited stack children surface standalone (#763 slice 4, E31)', () => {
+    let stackUser: { accessToken: string };
+    let primaryId: string;
+    let childId: string;
+
+    beforeAll(async () => {
+      const login = await utils.userSetup(ctx.admin.token!, createUserDto.create('stack-fav'));
+      stackUser = login;
+      const [a, b] = await Promise.all([utils.createAsset(login.accessToken), utils.createAsset(login.accessToken)]);
+      const stack = await utils.createStack(login.accessToken, [a.id, b.id]);
+      primaryId = stack.primaryAssetId;
+      childId = stack.primaryAssetId === a.id ? b.id : a.id;
+      // Favorite ONLY the child.
+      await request(app)
+        .put('/assets/favorites')
+        .set(asBearerAuth(login.accessToken))
+        .send({ ids: [childId], isFavorite: true });
+    });
+
+    it('unfiltered withStacked timeline still collapses to the primary (regression)', async () => {
+      const { body } = await request(app)
+        .get('/timeline/buckets?withStacked=true')
+        .set(asBearerAuth(stackUser.accessToken));
+      expect(total(body)).toBe(1);
+    });
+
+    it('isFavorite=true + withStacked returns the favorited CHILD standalone (E31, §5.4)', async () => {
+      const buckets = await request(app)
+        .get('/timeline/buckets?withStacked=true&isFavorite=true')
+        .set(asBearerAuth(stackUser.accessToken));
+      expect(buckets.status).toBe(200);
+      expect(total(buckets.body)).toBe(1);
+
+      const timeBucket = (buckets.body as Array<{ timeBucket: string }>)[0].timeBucket;
+      const bucket = await request(app)
+        .get(`/timeline/bucket?withStacked=true&isFavorite=true&timeBucket=${encodeURIComponent(timeBucket)}`)
+        .set(asBearerAuth(stackUser.accessToken));
+      expect(bucket.body.id).toContain(childId);
+      expect(bucket.body.id).not.toContain(primaryId);
+    });
+  });
+
   describe('GET /timeline/buckets — visibility filters', () => {
     // Dedicated user with 4 assets in different visibility states. Using a fresh user
     // (not spaceOwner) keeps the asset counts deterministic and avoids polluting other
