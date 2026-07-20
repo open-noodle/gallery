@@ -137,10 +137,10 @@ export type MapAsset = {
   fileModifiedAt: Date;
   files?: ShallowDehydrateObject<AssetFile>[];
   isExternal: boolean;
-  isFavorite: boolean;
-  // #763: resolved per-user by the query via favoriteExistsFor(...).as('isFavoriteForUser').
-  // Distinct from `isFavorite` (the global column, dropped in slice 3) so an un-migrated query
-  // fails safe to `false` instead of silently leaking the owner's flag. See mapAsset.
+  // #763: resolved per-user by the query via favoriteExistsFor(...).as('isFavoriteForUser'). There
+  // is deliberately no plain `isFavorite` field here — the global column it used to come from was
+  // dropped in slice 3, and reading it would leak the owner's flag to non-owners and to auth-less
+  // callers such as mapSharedLink. See mapAsset.
   // Typed `SqlBool` (kysely's `boolean | 0 | 1`), not plain `boolean` — that's what `.select()`
   // infers for a projected `favoriteExistsFor(...)` expression (used in EXISTS/WHERE position
   // elsewhere in the codebase, where SqlBool is the natural fit). mapAsset coerces with `!!`.
@@ -232,9 +232,9 @@ export function mapAsset(entity: MaybeDehydrated<MapAsset>, options: AssetMapOpt
     fileModifiedAt: asDateTimeString(entity.fileModifiedAt),
     localDateTime: asDateTimeString(entity.localDateTime),
     updatedAt: asDateTimeString(entity.updatedAt),
-    // #763: resolved per-user by the query via favoriteExistsFor(...).as('isFavoriteForUser').
-    // Deliberately NOT `entity.isFavorite` — that is the global column (dropped in slice 3), and
-    // reading it here would leak the owner's flag to non-owners and to auth-less callers such as
+    // #763: resolved per-user by the query via favoriteExistsFor(...).as('isFavoriteForUser'). The
+    // global asset."isFavorite" column this used to read is gone (dropped in slice 3) — reading it
+    // would have leaked the owner's flag to non-owners and to auth-less callers such as
     // mapSharedLink. A query that does not project the field yields undefined -> false (fail-safe).
     // `!!` (not `?? false`) also normalizes SqlBool's `0`/`1` to a real boolean.
     isFavorite: !!entity.isFavoriteForUser,
