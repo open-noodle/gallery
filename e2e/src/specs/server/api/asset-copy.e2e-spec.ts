@@ -1,4 +1,4 @@
-import { type LoginResponseDto } from '@immich/sdk';
+import { type LoginResponseDto, SharedSpaceRole } from '@immich/sdk';
 import { type Actor, authHeaders } from 'src/actors';
 import { createUserDto } from 'src/fixtures';
 import { errorDto } from 'src/responses';
@@ -197,6 +197,69 @@ describe('PUT /assets/copy', () => {
       .put('/assets/copy')
       .set(asBearerAuth(owner.accessToken))
       .send({ sourceId, targetId, favorite: false });
+    expect(copy.status).toBe(204);
+
+    const after = await request(app).get(`/assets/${targetId}`).set(asBearerAuth(owner.accessToken));
+    expect((after.body as { isFavorite: boolean }).isFavorite).toBe(false);
+  });
+
+  // #763 slice 7 (E20): favorite carries the ACTING user's overlay row, never every user who
+  // favorited the source. `other` gains read access to both assets via a shared space (viewer
+  // role is enough under Permission.AssetRead, per #763 slice 2) purely so they can favorite the
+  // source and later read the target back — `other` still can't call PUT /assets/copy itself,
+  // since Permission.AssetCopy stays owner-only (asset.service.spec.ts already pins that).
+  it("copies only the ACTING user's favorite of the source, not another user's (E20)", async () => {
+    const [sourceId, targetId] = await createOwnerPair();
+
+    const space = await utils.createSpace(owner.accessToken, { name: 't26-copy-favorite-space' });
+    await utils.addSpaceMember(owner.accessToken, space.id, { userId: other.userId, role: SharedSpaceRole.Viewer });
+    await utils.addSpaceAssets(owner.accessToken, space.id, [sourceId, targetId]);
+
+    // Both the owner (acting user) and `other` favorite the SOURCE — independent per-user facts.
+    const ownerFav = await request(app)
+      .put('/assets/favorites')
+      .set(asBearerAuth(owner.accessToken))
+      .send({ ids: [sourceId], isFavorite: true });
+    expect(ownerFav.status).toBe(204);
+
+    const otherFav = await request(app)
+      .put('/assets/favorites')
+      .set(asBearerAuth(other.accessToken))
+      .send({ ids: [sourceId], isFavorite: true });
+    expect(otherFav.status).toBe(204);
+
+    const copy = await request(app)
+      .put('/assets/copy')
+      .set(asBearerAuth(owner.accessToken))
+      .send({ sourceId, targetId, favorite: true });
+    expect(copy.status).toBe(204);
+
+    // The acting user (owner) gets the target favorited (E20 happy path).
+    const ownerView = await request(app).get(`/assets/${targetId}`).set(asBearerAuth(owner.accessToken));
+    expect((ownerView.body as { isFavorite: boolean }).isFavorite).toBe(true);
+
+    // `other` favorited the SOURCE but never acted on this copy — their view of the target must
+    // stay unfavorited. This is the negative the old global-column copy could not express.
+    const otherView = await request(app).get(`/assets/${targetId}`).set(asBearerAuth(other.accessToken));
+    expect((otherView.body as { isFavorite: boolean }).isFavorite).toBe(false);
+  });
+
+  it('clears the target favorite when the acting user did not favorite the source, even though favorite defaults to true', async () => {
+    const [sourceId, targetId] = await createOwnerPair();
+
+    // Owner favorites the TARGET directly (unrelated to the upcoming copy) but never favorites
+    // the source. A working copy still "copies the status" — including a false one — for the
+    // acting user, mirroring the old column-overwrite semantics scoped to the actor.
+    const preFav = await request(app)
+      .put('/assets/favorites')
+      .set(asBearerAuth(owner.accessToken))
+      .send({ ids: [targetId], isFavorite: true });
+    expect(preFav.status).toBe(204);
+
+    const copy = await request(app)
+      .put('/assets/copy')
+      .set(asBearerAuth(owner.accessToken))
+      .send({ sourceId, targetId });
     expect(copy.status).toBe(204);
 
     const after = await request(app).get(`/assets/${targetId}`).set(asBearerAuth(owner.accessToken));

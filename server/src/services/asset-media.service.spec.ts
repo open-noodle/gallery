@@ -378,6 +378,32 @@ describe(AssetMediaService.name, () => {
         expect.any(Date),
         new Date(createDto.fileModifiedAt),
       );
+      // #763 (E19): createDto.isFavorite is false — no overlay row for an unfavorited upload, and
+      // the create payload no longer carries a raw isFavorite column at all.
+      expect(mocks.assetFavorite.addAll).not.toHaveBeenCalled();
+      expect(mocks.asset.create).not.toHaveBeenCalledWith(expect.objectContaining({ isFavorite: expect.anything() }));
+    });
+
+    it('should favorite the upload for the uploader when isFavorite is true (E19)', async () => {
+      const file = {
+        uuid: 'random-uuid',
+        originalPath: 'fake_path/asset_1.jpeg',
+        mimeType: 'image/jpeg',
+        checksum: Buffer.from('file hash', 'utf8'),
+        originalName: 'asset_1.jpeg',
+        size: 42,
+      };
+
+      mocks.asset.create.mockResolvedValue(assetEntity);
+      mocks.assetFavorite.addAll.mockResolvedValue(void 0);
+
+      await expect(sut.uploadAsset(authStub.user1, { ...createDto, isFavorite: true }, file)).resolves.toEqual({
+        id: 'id_1',
+        status: AssetMediaStatus.CREATED,
+      });
+
+      // The uploader is always the owner (E19) — the overlay row is created for auth.user.id.
+      expect(mocks.assetFavorite.addAll).toHaveBeenCalledWith(authStub.user1.user.id, [assetEntity.id]);
     });
 
     it('should remove the asset row when post-create processing fails', async () => {

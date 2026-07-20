@@ -2197,7 +2197,44 @@ describe(AssetService.name, () => {
         sourceAssetId: sourceId,
         targetAssetId: targetId,
       });
-      expect(mocks.asset.update).toHaveBeenCalledWith({ id: targetId, isFavorite: true });
+      // #763 (E20): getForCopy's isFavorite is the ACTING user's own overlay row (see
+      // asset.repository.ts), so the copy writes only auth.user.id's row for the target.
+      expect(mocks.asset.getForCopy).toHaveBeenCalledWith(sourceId, authStub.admin.user.id);
+      expect(mocks.asset.getForCopy).toHaveBeenCalledWith(targetId, authStub.admin.user.id);
+      expect(mocks.assetFavorite.addAll).toHaveBeenCalledWith(authStub.admin.user.id, [targetId]);
+      expect(mocks.assetFavorite.removeAll).not.toHaveBeenCalled();
+      expect(mocks.asset.update).not.toHaveBeenCalled();
+    });
+
+    it('should clear the target favorite when the acting user did not favorite the source', async () => {
+      // #763 (E20): favorite:true (the default) still means "copy the status", including a
+      // false status — mirrors the old column-overwrite semantics, just scoped to the actor.
+      const sourceId = newUuid();
+      const targetId = newUuid();
+      const sourceAsset = {
+        id: sourceId,
+        stackId: null,
+        isFavorite: false,
+        files: [],
+        originalPath: '/data/source.jpg',
+      };
+      const targetAsset = {
+        id: targetId,
+        stackId: null,
+        isFavorite: true,
+        files: [],
+        originalPath: '/data/target.jpg',
+      };
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([sourceId, targetId]));
+      mocks.asset.getForCopy.mockResolvedValueOnce(sourceAsset);
+      mocks.asset.getForCopy.mockResolvedValueOnce(targetAsset);
+      mocks.sharedLinkAsset.copySharedLinks.mockResolvedValue(void 0 as any);
+
+      await sut.copy(authStub.admin, { sourceId, targetId });
+
+      expect(mocks.assetFavorite.removeAll).toHaveBeenCalledWith(authStub.admin.user.id, [targetId]);
+      expect(mocks.assetFavorite.addAll).not.toHaveBeenCalled();
     });
 
     it('should skip albums copy when albums flag is false', async () => {
@@ -2280,7 +2317,8 @@ describe(AssetService.name, () => {
 
       await sut.copy(authStub.admin, { sourceId, targetId, favorite: false });
 
-      expect(mocks.asset.update).not.toHaveBeenCalledWith(expect.objectContaining({ isFavorite: true }));
+      expect(mocks.assetFavorite.addAll).not.toHaveBeenCalled();
+      expect(mocks.assetFavorite.removeAll).not.toHaveBeenCalled();
     });
   });
 

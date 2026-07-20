@@ -363,7 +363,6 @@ export class AssetMediaService extends BaseService {
       localDateTime: dto.fileCreatedAt,
 
       type: mimeTypes.assetType(file.originalPath),
-      isFavorite: dto.isFavorite,
       duration: dto.duration || null,
       visibility: dto.visibility ?? AssetVisibility.Timeline,
       livePhotoVideoId: dto.livePhotoVideoId,
@@ -374,6 +373,18 @@ export class AssetMediaService extends BaseService {
     let writeBackend: StorageBackend | undefined;
 
     try {
+      // #763 (E19): the uploader is always the owner, so this is the uploader's own overlay
+      // row. Placed as the first statement in this try block — not before it — so a failure
+      // here (or in anything after it) hits the same catch below, which removes the just-created
+      // asset row. That DELETE cascades onto asset_favorite via its FK, so no partial state
+      // (an orphaned favorite row for a rolled-back asset) can survive an upload failure. This
+      // whole method is a compensating-action pattern rather than a real DB transaction already
+      // (S3 upload + job queueing happen alongside the writes), so joining that existing
+      // contract is more consistent than opening a separate transaction just for this insert.
+      if (dto.isFavorite) {
+        await this.assetFavoriteRepository.addAll(ownerId, [asset.id]);
+      }
+
       if (dto.metadata?.length) {
         await this.assetRepository.upsertMetadata(asset.id, dto.metadata);
       }
