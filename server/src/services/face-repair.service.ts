@@ -141,7 +141,7 @@ export class FaceRepairService extends BaseService {
     }
 
     await this.faceIdentityRepository.unlinkFaces(unassignedIds);
-    await this.faceRepairRepository.reconcileRepresentativeFaces([...byPerson.keys()]);
+    await this.faceRepairRepository.reconcileRepresentativeFaces(byPerson.keys().toArray());
     await this.jobRepository.queueAll(
       unassignedIds.map((id) => ({ name: JobName.FacialRecognition, data: { id, deferred: false } })),
     );

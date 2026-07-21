@@ -431,7 +431,7 @@ export class GlobalSearchManager {
           this.tagsCache = null;
         }
       };
-      globalThis.addEventListener('storage', this.storageListener);
+      addEventListener('storage', this.storageListener);
 
       // Invalidate the navigation search cache when the locale changes.
       // The unsubscribe handle is stored on `this.localeUnsubscribe` for test isolation.
@@ -445,7 +445,7 @@ export class GlobalSearchManager {
 
   destroy() {
     if (this.storageListener) {
-      globalThis.removeEventListener('storage', this.storageListener);
+      removeEventListener('storage', this.storageListener);
     }
     if (this.localeUnsubscribe) {
       this.localeUnsubscribe();
@@ -532,7 +532,8 @@ export class GlobalSearchManager {
       if (item.adminOnly && !isAdmin) {
         continue;
       }
-      if (item.featureFlag && !flags?.[item.featureFlag]) {
+      const itemFlagEnabled = item.featureFlag ? flags?.[item.featureFlag] : true;
+      if (!itemFlagEnabled) {
         continue;
       }
       eligibleNav.push(item);
@@ -544,7 +545,8 @@ export class GlobalSearchManager {
       if (item.adminOnly && !isAdmin) {
         continue;
       }
-      if (item.featureFlag && !flags?.[item.featureFlag]) {
+      const itemFlagEnabled = item.featureFlag ? flags?.[item.featureFlag] : true;
+      if (!itemFlagEnabled) {
         continue;
       }
       if (item.isAvailable) {
@@ -901,7 +903,7 @@ export class GlobalSearchManager {
         return;
       }
       const status = (error as { status?: number } | null)?.status;
-      if (status === 400 || status === 404 || status === 403) {
+      if (status !== undefined && [400, 403, 404].includes(status)) {
         removeEntry(key);
         toastManager.warning(get(t)('cmdk_toast_album_unavailable'));
         return;
@@ -970,7 +972,7 @@ export class GlobalSearchManager {
         return;
       }
       const status = (error as { status?: number } | null)?.status;
-      if (status === 400 || status === 404 || status === 403) {
+      if (status !== undefined && [400, 403, 404].includes(status)) {
         removeEntry(key);
         toastManager.warning(get(t)('cmdk_toast_space_unavailable'));
         return;
@@ -1308,9 +1310,9 @@ export class GlobalSearchManager {
       // Plain URL parsing, not reactive state — the instance is discarded after the
       // pathname comparison. SvelteURL would be overkill here.
       // eslint-disable-next-line svelte/prefer-svelte-reactivity
-      const target = new URL(route, globalThis.location.href);
-      if (target.pathname === globalThis.location.pathname) {
-        globalThis.location.href = route;
+      const target = new URL(route, location.href);
+      if (target.pathname === location.pathname) {
+        location.assign(route);
         return;
       }
     } catch {
@@ -1338,7 +1340,7 @@ export class GlobalSearchManager {
     this.typedSearchIssues = [];
     this.typedSearchChoices = [];
     for (const key of this.selectedTypedSearchChoices.keys()) {
-      if (!parsed.resolutionTokens.some((token) => token.raw === key || token.identity === key)) {
+      if (parsed.resolutionTokens.every((token) => !(token.raw === key || token.identity === key))) {
         this.selectedTypedSearchChoices.delete(key);
       }
     }
@@ -1395,7 +1397,7 @@ export class GlobalSearchManager {
       return;
     }
     const key = this.activeTypedSearchToken.key;
-    const supportsLiveSuggestions = key === 'person' || key === 'tag' || key === 'country' || key === 'city';
+    const supportsLiveSuggestions = ['person', 'tag', 'country', 'city'].includes(key);
     if (!supportsLiveSuggestions) {
       this.resetLiveTypedSearchSuggestions();
       return;
@@ -1641,7 +1643,7 @@ export class GlobalSearchManager {
 
     // Field-search modes (filename / description / OCR) bypass typed-search parsing and route to
     // the filtered timeline so the selected mode is honoured instead of becoming a smart search.
-    if (this.mode === 'metadata' || this.mode === 'description' || this.mode === 'ocr') {
+    if (['metadata', 'description', 'ocr'].includes(this.mode)) {
       addEntry({
         kind: 'query',
         id: `query:${trimmed.toLowerCase()}`,
@@ -1833,7 +1835,8 @@ export class GlobalSearchManager {
         this.close();
         return;
       }
-      if (liveNavItem.featureFlag && !flags?.[liveNavItem.featureFlag]) {
+      const liveNavFlagEnabled = liveNavItem.featureFlag ? flags?.[liveNavItem.featureFlag] : true;
+      if (!liveNavFlagEnabled) {
         console.warn('[cmdk] purging stale recent — feature flag disabled', entry.id);
         removeEntry(entry.id);
         this.close();
@@ -1850,17 +1853,23 @@ export class GlobalSearchManager {
     // result activation path (global-search.svelte): rely on the route change to
     // tear down the modal, and on the 404/403 toast branch to leave the palette
     // open so the stale row gets removed in place.
-    if (entry.kind === 'album') {
-      void this.activateAlbum(entry.albumId);
-      return;
-    }
-    if (entry.kind === 'space') {
-      void this.activateSpace(entry.spaceId);
-      return;
-    }
-    if (entry.kind === 'query') {
-      void this.activateSearch(entry.text);
-      return;
+    switch (entry.kind) {
+      case 'album': {
+        void this.activateAlbum(entry.albumId);
+        return;
+      }
+      case 'space': {
+        void this.activateSpace(entry.spaceId);
+        return;
+      }
+      case 'query': {
+        void this.activateSearch(entry.text);
+        return;
+      }
+      default: {
+        // every other kind falls through to the shared recent-entry handling below
+        break;
+      }
     }
     const now = Date.now();
     addEntry({ ...entry, lastUsed: now });
@@ -1901,7 +1910,7 @@ export class GlobalSearchManager {
    */
   removeRecent(id: string) {
     const before = getEntries();
-    if (!before.some((e) => e.id === id)) {
+    if (before.every((e) => e.id !== id)) {
       return;
     }
     removeEntry(id);
@@ -2085,7 +2094,8 @@ export class GlobalSearchManager {
       if (item.adminOnly && !isAdmin) {
         continue;
       }
-      if (item.featureFlag && !flags?.[item.featureFlag]) {
+      const itemFlagEnabled = item.featureFlag ? flags?.[item.featureFlag] : true;
+      if (!itemFlagEnabled) {
         continue;
       }
       const label = translate(item.labelKey as Translations);
@@ -2141,7 +2151,8 @@ export class GlobalSearchManager {
       if (item.adminOnly && !isAdmin) {
         continue;
       }
-      if (item.featureFlag && !flags?.[item.featureFlag]) {
+      const itemFlagEnabled = item.featureFlag ? flags?.[item.featureFlag] : true;
+      if (!itemFlagEnabled) {
         continue;
       }
       if (item.isAvailable) {
@@ -2311,7 +2322,7 @@ export class GlobalSearchManager {
     // `now - batchInFlightStartedAt > 200` to be FALSE so the stripe stays hidden.
     // Setting startedAt to +Infinity makes `now - Infinity = -Infinity`, which is not
     // greater than 200. runBatch overwrites this with `performance.now()` at fire-time.
-    this._batchInFlightStartedAt = Number.POSITIVE_INFINITY;
+    this._batchInFlightStartedAt = Infinity;
     this.debounceTimer = setTimeout(() => this.runBatch(text, this.mode), 150);
   }
 
@@ -2430,10 +2441,12 @@ export class GlobalSearchManager {
   }
 
   private clearDebounce() {
-    if (this.debounceTimer !== null) {
-      clearTimeout(this.debounceTimer);
-      this.debounceTimer = null;
+    if (this.debounceTimer === null) {
+      return;
     }
+
+    clearTimeout(this.debounceTimer);
+    this.debounceTimer = null;
   }
 
   /**
@@ -2623,9 +2636,9 @@ export class GlobalSearchManager {
           // have in the palette. Only smart search includes shared-space content in v1.
           const metadataSearchDto: MetadataSearchDto = {
             size: 5,
-            ...(mode === 'metadata' ? { originalFileName: query } : {}),
-            ...(mode === 'description' ? { description: query } : {}),
-            ...(mode === 'ocr' ? { ocr: query } : {}),
+            ...(mode === 'metadata' && { originalFileName: query }),
+            ...(mode === 'description' && { description: query }),
+            ...(mode === 'ocr' && { ocr: query }),
           };
           const response = await searchAssets({ metadataSearchDto }, { signal });
           const items = response.assets.items;

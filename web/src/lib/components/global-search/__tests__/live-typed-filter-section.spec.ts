@@ -126,7 +126,7 @@ describe('LiveTypedFilterSection', () => {
 
     const option = screen.getByRole('option', { name: /Anna Maria/i });
     const row = option.firstElementChild as HTMLElement;
-    expect(`${option.className} ${row.className}`).toContain('group-data-[selected]:bg-primary/10');
+    expect(`${option.className} ${row.className}`).toContain('group-data-selected:bg-primary/10');
   });
 
   it('renders loading empty and error states', async () => {

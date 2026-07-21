@@ -12,7 +12,7 @@
 {#if selectedCount > MAX_SPACE_ASSETS_PER_REQUEST}
   <div
     data-testid="asset-limit-warning"
-    class="fixed top-16 left-1/2 z-[1000] w-fit max-w-xl -translate-x-1/2 rounded-lg bg-red-100 p-3 text-sm text-red-800 shadow-lg dark:bg-red-900 dark:text-red-200"
+    class="fixed top-16 left-1/2 z-1000 w-fit max-w-xl -translate-x-1/2 rounded-lg bg-red-100 p-3 text-sm text-red-800 shadow-lg dark:bg-red-900 dark:text-red-200"
   >
     <FormatMessage key="space_asset_limit_warning">
       {#snippet children({ tag, message })}

@@ -309,7 +309,7 @@ describe('DetailPanel', () => {
   });
 
   it('renders Google, Apple, and OpenStreetMap links in the image info panel map popup', async () => {
-    const lat = 48.853_41;
+    const lat = 48.85341;
     const lon = 2.3488;
     const asset = assetFactory.build({
       id: 'asset-with-location',

@@ -106,31 +106,33 @@
 
   // Sync when navigating between spaces (component persists, data updates)
   $effect(() => {
-    if (data.space.id !== space.id) {
-      const nextSearchState = getSearchablePageState(page.url);
-      const nextFilterState = getSearchablePageFilterState(page.url);
-      space = data.space;
-      members = data.members;
-      filters = {
-        ...createFilterState(),
-        ...nextFilterState,
-        sortOrder: nextSearchState.sortOrder,
-      };
-      personNames.clear();
-      tagNames.clear();
-      consumeTypedSearchNamesInto(page.url.pathname + page.url.search, personNames, tagNames);
-      isLoading = false;
-      smartFacetInFlight?.controller.abort();
-      smartFacets = undefined;
-      smartFacetKey = '';
-      smartFacetInFlight = undefined;
-      committedSearchQuery = nextSearchState.query;
-      lastHandledSearchState = `${nextSearchState.query}:${nextSearchState.sortOrder}:${page.url.search}`;
-      timelineGrouping = 'day';
-      temporalAnchor = undefined;
-      viewMode = 'view';
-      assetMultiSelectManager.clear();
+    if (data.space.id === space.id) {
+      return;
     }
+
+    const nextSearchState = getSearchablePageState(page.url);
+    const nextFilterState = getSearchablePageFilterState(page.url);
+    space = data.space;
+    members = data.members;
+    filters = {
+      ...createFilterState(),
+      ...nextFilterState,
+      sortOrder: nextSearchState.sortOrder,
+    };
+    personNames.clear();
+    tagNames.clear();
+    consumeTypedSearchNamesInto(page.url.pathname + page.url.search, personNames, tagNames);
+    isLoading = false;
+    smartFacetInFlight?.controller.abort();
+    smartFacets = undefined;
+    smartFacetKey = '';
+    smartFacetInFlight = undefined;
+    committedSearchQuery = nextSearchState.query;
+    lastHandledSearchState = `${nextSearchState.query}:${nextSearchState.sortOrder}:${page.url.search}`;
+    timelineGrouping = 'day';
+    temporalAnchor = undefined;
+    viewMode = 'view';
+    assetMultiSelectManager.clear();
   });
 
   let viewMode = $state<ViewMode>('view');
@@ -723,10 +725,12 @@
   const spaceGradient = $derived(gradientClasses[space.color ?? 'primary'] ?? gradientClasses[UserAvatarColor.Primary]);
 
   $effect(() => {
-    if (space?.id && space.id !== initializedSpaceId) {
-      initializedSpaceId = space.id;
-      void markSpaceViewed({ id: space.id });
+    if (!space?.id || space.id === initializedSpaceId) {
+      return;
     }
+
+    initializedSpaceId = space.id;
+    void markSpaceViewed({ id: space.id });
   });
 
   // Consume add-photos / change-cover intents triggered from the shell app bar.
@@ -818,8 +822,8 @@
     {#if !showSearchResults}
       {#if isFilteredTimelineEmpty}
         <div class="flex flex-1 flex-col items-center justify-center gap-2" data-testid="empty-state-message">
-          <p class="text-sm text-[var(--fg-muted)]">{$t('spaces_no_filtered_assets')}</p>
-          <button type="button" class="text-sm text-[var(--primary)]" onclick={handleClearAllFilters}>
+          <p class="text-sm text-(--fg-muted)">{$t('spaces_no_filtered_assets')}</p>
+          <button type="button" class="text-sm text-(--primary)" onclick={handleClearAllFilters}>
             {$t('spaces_clear_all_filters')}
           </button>
         </div>
