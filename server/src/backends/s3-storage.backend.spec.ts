@@ -200,13 +200,9 @@ describe('S3StorageBackend', () => {
         proxyReadConcurrency: 1,
       });
       const proxyClient = (S3Client as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
-      let firstResolve!: (value: unknown) => void;
+      const { promise: firstPending, resolve: firstResolve } = Promise.withResolvers<unknown>();
       proxyClient.send
-        .mockReturnValueOnce(
-          new Promise((resolve) => {
-            firstResolve = resolve;
-          }),
-        )
+        .mockReturnValueOnce(firstPending)
         .mockResolvedValueOnce({ Body: Readable.from([Buffer.from('second')]), ContentLength: 6 });
 
       const first = proxyBackend.getServeStrategy('first.jpg', {
@@ -303,9 +299,10 @@ describe('S3StorageBackend', () => {
         proxyReadConcurrency: 1,
       });
       const proxyClient = (S3Client as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
-      const erroringStream = new Readable({
+      // self-reference instead of `this` (unicorn/no-this-outside-of-class)
+      const erroringStream: Readable = new Readable({
         read() {
-          this.destroy(new Error('stream failed'));
+          erroringStream.destroy(new Error('stream failed'));
         },
       });
       proxyClient.send

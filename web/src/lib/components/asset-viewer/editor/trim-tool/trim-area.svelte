@@ -21,9 +21,9 @@
   let videoSrc = $derived(getAssetPlaybackUrl({ id: asset.id, cacheKey: asset.thumbhash }));
 </script>
 
-<div class="flex h-full w-full flex-col items-center justify-center gap-4 p-4">
+<div class="flex size-full flex-col items-center justify-center gap-4 p-4">
   <!-- Video player (no native controls — TrimTimeline handles playback) -->
-  <div class="relative flex-1 flex items-center justify-center w-full min-h-0">
+  <div class="relative flex min-h-0 w-full flex-1 items-center justify-center">
     <video
       bind:this={videoElement}
       src={videoSrc}

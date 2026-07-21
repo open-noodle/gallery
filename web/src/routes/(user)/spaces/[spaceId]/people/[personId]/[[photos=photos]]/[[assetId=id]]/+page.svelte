@@ -541,17 +541,17 @@
 </script>
 
 <main
-  class="relative z-0 flex flex-col h-dvh overflow-hidden px-2 pt-(--navbar-height) md:px-6 md:pt-(--navbar-height-md)"
+  class="relative z-0 flex h-dvh flex-col overflow-hidden px-2 pt-(--navbar-height) md:px-6 md:pt-(--navbar-height-md)"
 >
   <!-- Sticky grouping switcher: lives outside the scrolling timeline so it stays visible (see Tags).
        mt-12 clears the taller ControlAppBar, which exceeds the --navbar-height padding reserve. -->
   <TimelineRouteGroupingBar
     grouping={timelineGrouping}
     hidden={assetMultiSelectManager.selectionActive || action === 'merge'}
-    class="shrink-0 mt-12"
+    class="mt-12 shrink-0"
     onGroupingChange={handleTimelineGroupingChange}
   />
-  <div class="relative flex-1 min-h-0">
+  <div class="relative min-h-0 flex-1">
     {#key person.id}
       <Timeline
         enableRouting={true}
@@ -609,15 +609,14 @@
                   <input
                     bind:this={nameInput}
                     bind:value={editedName}
-                    class="w-40 rounded-lg bg-gray-100 px-2 py-1 font-medium text-primary outline-hidden focus:ring-2 focus:ring-immich-primary dark:bg-immich-dark-gray dark:focus:ring-immich-dark-primary sm:w-72"
+                    class="w-40 rounded-lg bg-gray-100 px-2 py-1 font-medium text-primary outline-hidden focus:ring-2 focus:ring-immich-primary sm:w-72 dark:bg-immich-dark-gray dark:focus:ring-immich-dark-primary"
                     placeholder={$t('add_a_name')}
                     aria-label={$t('edit_name')}
                     oninput={() => void searchSpacePeople()}
                     onkeydown={(event) => {
                       if (event.key === 'Enter') {
                         void saveName();
-                      }
-                      if (event.key === 'Escape') {
+                      } else if (event.key === 'Escape') {
                         cancelEditingName();
                       }
                     }}

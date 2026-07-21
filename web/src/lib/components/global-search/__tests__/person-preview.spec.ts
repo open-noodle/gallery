@@ -44,7 +44,7 @@ describe('person-preview', () => {
     const { container } = render(PersonPreview, {
       props: { person: { id: 'p1', name: 'Alice' } as never },
     });
-    const img = container.querySelector('[data-cmdk-preview-person] > img');
+    const img = container.querySelector(':scope [data-cmdk-preview-person] > img');
     expect(img).not.toBeNull();
     expect(img?.getAttribute('src')).toMatch(/\/api\/people\/p1\/thumbnail/);
   });
@@ -60,7 +60,7 @@ describe('person-preview', () => {
         } as never,
       },
     });
-    const img = container.querySelector('[data-cmdk-preview-person] > img');
+    const img = container.querySelector(':scope [data-cmdk-preview-person] > img');
     expect(img?.getAttribute('src')).toMatch(/\/api\/shared-spaces\/space-1\/people\/space-person-1\/thumbnail/);
 
     await vi.advanceTimersByTimeAsync(350);
@@ -80,10 +80,10 @@ describe('person-preview', () => {
     const { container } = render(PersonPreview, {
       props: { person: { id: 'p1', name: 'Alice' } as never },
     });
-    const img = container.querySelector('[data-cmdk-preview-person] > img');
+    const img = container.querySelector(':scope [data-cmdk-preview-person] > img');
     expect(img).not.toBeNull();
     await fireEvent.error(img!);
-    expect(container.querySelector('[data-cmdk-preview-person] > img')).toBeNull();
-    expect(container.querySelector('[data-cmdk-preview-person] > div[aria-hidden="true"]')).not.toBeNull();
+    expect(container.querySelector(':scope [data-cmdk-preview-person] > img')).toBeNull();
+    expect(container.querySelector(':scope [data-cmdk-preview-person] > div[aria-hidden="true"]')).not.toBeNull();
   });
 });

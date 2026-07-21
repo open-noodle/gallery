@@ -48,7 +48,7 @@ describe('sortPeopleForManagement', () => {
 
   it('treats whitespace-only names as unnamed and uses assetCount for space people', () => {
     const people = [
-      p({ id: 'space-unnamed-low', name: '   ', assetCount: 2 }),
+      p({ id: 'space-unnamed-low', name: ' '.repeat(3), assetCount: 2 }),
       p({ id: 'space-named', name: 'anna', assetCount: 1 }),
       p({ id: 'space-unnamed-high', name: '', assetCount: 9 }),
     ];
@@ -137,7 +137,7 @@ describe('sortPeople', () => {
       const people = [
         p({ id: 'unnamed-low', name: '', numberOfAssets: 1 }),
         p({ id: 'named-b', name: 'bob', numberOfAssets: 999 }),
-        p({ id: 'unnamed-high', name: '   ', numberOfAssets: 50 }),
+        p({ id: 'unnamed-high', name: ' '.repeat(3), numberOfAssets: 50 }),
         p({ id: 'named-a', name: 'Alice', numberOfAssets: 1 }),
       ];
 

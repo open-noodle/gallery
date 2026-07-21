@@ -666,7 +666,7 @@
        externalToggle mode it collapses to w-0 (space reclaimed, content clipped + inert); otherwise it
        collapses to the w-12 built-in filter button. -->
   <div
-    class="flex h-full flex-shrink-0 overflow-hidden transition-[width] duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none {collapsed
+    class="flex h-full shrink-0 overflow-hidden transition-[width] duration-420 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none {collapsed
       ? externalToggle
         ? 'w-0'
         : 'w-12'
@@ -676,10 +676,10 @@
     {#if collapsed && !externalToggle}
       <!-- Collapsed (built-in): a single filter button. Clicking it re-opens the panel; a dot marks any
            active filter. Keeps the collapsed-icon-strip / expand-panel-btn testids. -->
-      <div class="flex flex-shrink-0 items-start p-1.5" data-testid="collapsed-icon-strip">
+      <div class="flex shrink-0 items-start p-1.5" data-testid="collapsed-icon-strip">
         <button
           type="button"
-          class="relative flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-subtle dark:text-gray-400"
+          class="relative flex size-9 items-center justify-center rounded-lg text-gray-500 hover:bg-subtle dark:text-gray-400"
           onclick={() => (collapsed = false)}
           data-testid="expand-panel-btn"
           aria-label={$t('filters')}
@@ -688,7 +688,7 @@
           <Icon icon={mdiTune} size="20" />
           {#if anyActiveFilter}
             <span
-              class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border-[1.5px] border-light bg-immich-primary dark:bg-immich-dark-primary"
+              class="absolute -top-0.5 -right-0.5 size-2 rounded-full border-[1.5px] border-light bg-immich-primary dark:bg-immich-dark-primary"
             ></span>
           {/if}
         </button>
@@ -697,7 +697,7 @@
       <!-- inert while collapsed: in externalToggle mode this panel stays mounted at w-0 (clipped) so the
            open/close animates, but its inputs must not be focusable/announced while hidden. -->
       <div
-        class="immich-scrollbar flex h-full w-64 flex-col overflow-y-auto bg-light"
+        class="flex h-full w-64 immich-scrollbar flex-col overflow-y-auto bg-light"
         data-testid="discovery-panel"
         inert={collapsed}
       >
@@ -707,7 +707,7 @@
           <span class="text-sm font-medium">{$t('filters')}</span>
           <button
             type="button"
-            class="flex h-6 w-6 items-center justify-center rounded-full text-gray-500 hover:bg-subtle dark:text-gray-400"
+            class="flex size-6 items-center justify-center rounded-full text-gray-500 hover:bg-subtle dark:text-gray-400"
             onclick={() => (collapsed = true)}
             data-testid="collapse-panel-btn"
             aria-label={$t('collapse')}
@@ -724,7 +724,7 @@
             {#each config.sections as section (section)}
               <button
                 type="button"
-                class="relative flex h-[30px] w-[30px] items-center justify-center rounded-[10px] transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-90 motion-reduce:transition-none motion-reduce:active:scale-100
+                class="relative flex size-[30px] items-center justify-center rounded-[10px] transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-90 motion-reduce:transition-none motion-reduce:active:scale-100
               {visibleSections.has(section)
                   ? 'bg-primary/10 text-primary'
                   : 'text-gray-400 hover:bg-subtle hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400'}"
@@ -737,7 +737,7 @@
                 <Icon icon={sectionIcons[section]} size="16" />
                 {#if !visibleSections.has(section) && hasActiveFilter(section)}
                   <span
-                    class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border-[1.5px] border-light bg-immich-primary dark:bg-immich-dark-primary"
+                    class="absolute -top-0.5 -right-0.5 size-2 rounded-full border-[1.5px] border-light bg-immich-primary dark:bg-immich-dark-primary"
                     data-testid="section-toggle-dot-{section}"
                   ></span>
                 {/if}

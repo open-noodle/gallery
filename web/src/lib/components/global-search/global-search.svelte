@@ -255,10 +255,8 @@
         if (live.adminOnly && !isAdmin) {
           return false;
         }
-        if (live.featureFlag && !flags?.[live.featureFlag]) {
-          return false;
-        }
-        return true;
+        const liveFlagEnabled = live.featureFlag ? flags?.[live.featureFlag] : true;
+        return Boolean(liveFlagEnabled);
       });
     })(),
   );
@@ -281,10 +279,8 @@
         if (item.category !== 'userPages') {
           return false;
         }
-        if (item.featureFlag && !flags?.[item.featureFlag]) {
-          return false;
-        }
-        return true;
+        const itemFlagEnabled = item.featureFlag ? flags?.[item.featureFlag] : true;
+        return Boolean(itemFlagEnabled);
       });
     })(),
   );
@@ -310,18 +306,20 @@
   let stripeTimer: ReturnType<typeof setTimeout> | null = null;
 
   $effect(() => {
-    if (manager.batchInFlight) {
-      stripeTimer = setTimeout(() => {
-        stripeArmed = true;
-      }, 200);
-      return () => {
-        if (stripeTimer !== null) {
-          clearTimeout(stripeTimer);
-          stripeTimer = null;
-        }
-        stripeArmed = false;
-      };
+    if (!manager.batchInFlight) {
+      return;
     }
+
+    stripeTimer = setTimeout(() => {
+      stripeArmed = true;
+    }, 200);
+    return () => {
+      if (stripeTimer !== null) {
+        clearTimeout(stripeTimer);
+        stripeTimer = null;
+      }
+      stripeArmed = false;
+    };
   });
 
   const showProgressStripe = $derived(stripeArmed && manager.batchInFlight);
@@ -613,10 +611,10 @@
     >
       <div
         data-testid="cmdk-input-trigger"
-        class="flex h-10 min-w-0 flex-1 items-center gap-3 rounded-2xl border border-gray-300/80 bg-gray-100/90 px-3 text-left text-sm shadow-sm transition-all duration-150 focus-within:border-primary/50 focus-within:bg-white focus-within:shadow hover:border-primary/50 hover:bg-white hover:shadow md:h-11 dark:border-immich-dark-gray dark:bg-immich-dark-gray/70 dark:focus-within:border-primary/40 dark:focus-within:bg-immich-dark-gray dark:hover:border-primary/40 dark:hover:bg-immich-dark-gray"
+        class="flex h-10 min-w-0 flex-1 items-center gap-3 rounded-2xl border border-gray-300/80 bg-gray-100/90 px-3 text-left text-sm shadow-sm transition-all duration-150 focus-within:border-primary/50 focus-within:bg-white focus-within:shadow-sm hover:border-primary/50 hover:bg-white hover:shadow-sm md:h-11 dark:border-immich-dark-gray dark:bg-immich-dark-gray/70 dark:focus-within:border-primary/40 dark:focus-within:bg-immich-dark-gray dark:hover:border-primary/40 dark:hover:bg-immich-dark-gray"
       >
         <span
-          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/80 text-gray-500 shadow-sm dark:bg-immich-dark-bg dark:text-gray-300"
+          class="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/80 text-gray-500 shadow-sm dark:bg-immich-dark-bg dark:text-gray-300"
         >
           <Icon icon={mdiMagnify} size="1.05em" aria-hidden />
         </span>
@@ -651,13 +649,13 @@
       {#if showDropdownPanel}
         <div
           data-cmdk-dropdown-panel
-          class="absolute start-0 top-full z-50 mt-2 w-full overflow-hidden rounded-xl border border-gray-200/90 bg-white/95 shadow-[0_18px_48px_rgba(15,23,42,0.18)] backdrop-blur-md dark:border-gray-700/90 dark:bg-immich-dark-bg/95"
+          class="absolute inset-s-0 top-full z-50 mt-2 w-full overflow-hidden rounded-xl border border-gray-200/90 bg-white/95 shadow-[0_18px_48px_rgba(15,23,42,0.18)] backdrop-blur-md dark:border-gray-700/90 dark:bg-immich-dark-bg/95"
         >
           {#if showProgressStripe}
             <div
               aria-hidden="true"
               data-cmdk-progress
-              class="h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent bg-[length:200%_100%] animate-cmdk-shimmer motion-reduce:animate-none"
+              class="animate-cmdk-shimmer h-0.5 bg-linear-to-r from-transparent via-primary to-transparent bg-size-[200%_100%] motion-reduce:animate-none"
             ></div>
           {/if}
           {#if manager.mode === 'smart' && !manager.mlHealthy && inputValue.trim() !== '' && manager.scope === 'all'}
@@ -666,7 +664,7 @@
               <button
                 type="button"
                 onclick={() => manager.setMode('metadata')}
-                class="ml-2 text-primary transition-colors duration-[80ms] ease-out"
+                class="ml-2 text-primary transition-colors duration-80 ease-out"
               >
                 {$t('cmdk_try_filename')}
               </button>
@@ -681,7 +679,7 @@
             {#if manager.typedSearchIssues.length > 0}
               <Command.Group class="mb-4" data-typed-search-issues>
                 <Command.GroupHeading
-                  class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                  class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
                 >
                   {$t('cmdk_typed_search_issues_heading')}
                 </Command.GroupHeading>
@@ -699,7 +697,7 @@
             {#if manager.typedSearchChoices.length > 0}
               <Command.Group class="mb-4" data-typed-search-choices>
                 <Command.GroupHeading
-                  class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                  class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
                 >
                   {$t('cmdk_typed_search_choices_heading')}
                 </Command.GroupHeading>
@@ -724,7 +722,7 @@
               {#if recentEntries.length > 0}
                 <Command.Group>
                   <Command.GroupHeading
-                    class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                    class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
                   >
                     {$t('cmdk_recent_heading')}
                   </Command.GroupHeading>
@@ -739,7 +737,7 @@
               {:else if quickLinks.length > 0}
                 <Command.Group class="mb-2">
                   <Command.GroupHeading
-                    class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                    class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
                   >
                     {$t('cmdk_quick_links')}
                   </Command.GroupHeading>
@@ -760,7 +758,7 @@
               {#if manager.topSearchMatch}
                 <Command.Group class="mb-2" data-cmdk-top-result-search data-testid="cmdk-top-result">
                   <Command.GroupHeading
-                    class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                    class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
                   >
                     {$t('cmdk_top_result')}
                   </Command.GroupHeading>
@@ -783,7 +781,7 @@
               {#if manager.topCommandMatch}
                 <Command.Group class="mb-2" data-cmdk-top-result-commands data-testid="cmdk-top-result">
                   <Command.GroupHeading
-                    class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                    class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
                   >
                     {$t('cmdk_top_result')}
                   </Command.GroupHeading>
@@ -803,7 +801,7 @@
               {:else if manager.topNavigationMatch}
                 <Command.Group class="mb-2" data-cmdk-top-result-navigation data-testid="cmdk-top-result">
                   <Command.GroupHeading
-                    class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                    class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
                   >
                     {$t('cmdk_top_result')}
                   </Command.GroupHeading>
@@ -974,9 +972,9 @@
     closeOnEsc={false}
     closeOnBackdropClick={true}
     onClose={() => manager.close()}
-    class="motion-reduce:transition-none motion-reduce:transform-none !p-0"
+    class="p-0! motion-reduce:transform-none motion-reduce:transition-none"
   >
-    <ModalBody class="!p-0">
+    <ModalBody class="p-0!">
       <span class="sr-only" id="global-search-label">{$t('global_search')}</span>
       <Command.Root
         shouldFilter={false}
@@ -1026,7 +1024,7 @@
           <div
             aria-hidden="true"
             data-cmdk-progress
-            class="h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent bg-[length:200%_100%] animate-cmdk-shimmer motion-reduce:animate-none"
+            class="animate-cmdk-shimmer h-0.5 bg-linear-to-r from-transparent via-primary to-transparent bg-size-[200%_100%] motion-reduce:animate-none"
           ></div>
         {/if}
 
@@ -1044,7 +1042,7 @@
                grows wider than the modal/viewport — pushing the fixed-width preview
                pane off-screen. With min-w-0, flex-1 can shrink below content width
                and the rows' `truncate` class ellipsizes long text. -->
-        <div class="flex flex-1 min-h-0 sm:h-[520px] sm:max-h-[80vh] sm:flex-none">
+        <div class="flex min-h-0 flex-1 sm:h-[520px] sm:max-h-[80vh] sm:flex-none">
           <div
             class="flex min-h-0 min-w-0 flex-1 flex-col {showPreview
               ? 'border-e border-gray-200 dark:border-gray-700'
@@ -1056,7 +1054,7 @@
                 <button
                   type="button"
                   onclick={() => manager.setMode('metadata')}
-                  class="ml-2 text-primary transition-colors duration-[80ms] ease-out"
+                  class="ml-2 text-primary transition-colors duration-80 ease-out"
                 >
                   {$t('cmdk_try_filename')}
                 </button>
@@ -1068,7 +1066,7 @@
               {#if manager.typedSearchIssues.length > 0}
                 <Command.Group class="mb-4" data-typed-search-issues>
                   <Command.GroupHeading
-                    class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                    class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
                   >
                     {$t('cmdk_typed_search_issues_heading')}
                   </Command.GroupHeading>
@@ -1086,7 +1084,7 @@
               {#if manager.typedSearchChoices.length > 0}
                 <Command.Group class="mb-4" data-typed-search-choices>
                   <Command.GroupHeading
-                    class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                    class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
                   >
                     {$t('cmdk_typed_search_choices_heading')}
                   </Command.GroupHeading>
@@ -1111,7 +1109,7 @@
                 {#if recentEntries.length > 0}
                   <Command.Group>
                     <Command.GroupHeading
-                      class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                      class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
                     >
                       {$t('cmdk_recent_heading')}
                     </Command.GroupHeading>
@@ -1133,7 +1131,7 @@
                           <button
                             type="button"
                             aria-label={$t('cmdk_remove_from_recents')}
-                            class="absolute end-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-gray-500 opacity-0 transition-opacity duration-[80ms] ease-out hover:bg-black/10 hover:text-gray-900 group-hover:opacity-100 group-data-[selected]:opacity-100 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-100"
+                            class="absolute inset-e-3 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full text-gray-500 opacity-0 transition-opacity duration-80 ease-out group-hover:opacity-100 group-data-selected:opacity-100 hover:bg-black/10 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-100"
                             onclick={(e) => {
                               e.stopPropagation();
                               manager.removeRecent(entry.id);
@@ -1148,7 +1146,7 @@
                 {:else if quickLinks.length > 0}
                   <Command.Group class="mb-4">
                     <Command.GroupHeading
-                      class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                      class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
                     >
                       {$t('cmdk_quick_links')}
                     </Command.GroupHeading>
@@ -1169,7 +1167,7 @@
                 {#if manager.topSearchMatch}
                   <Command.Group class="mb-4" data-cmdk-top-result-search data-testid="cmdk-top-result">
                     <Command.GroupHeading
-                      class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                      class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
                     >
                       {$t('cmdk_top_result')}
                     </Command.GroupHeading>
@@ -1192,7 +1190,7 @@
                 {#if manager.topCommandMatch}
                   <Command.Group class="mb-4" data-cmdk-top-result-commands data-testid="cmdk-top-result">
                     <Command.GroupHeading
-                      class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                      class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
                     >
                       {$t('cmdk_top_result')}
                     </Command.GroupHeading>
@@ -1212,7 +1210,7 @@
                 {:else if manager.topNavigationMatch}
                   <Command.Group class="mb-4" data-cmdk-top-result-navigation data-testid="cmdk-top-result">
                     <Command.GroupHeading
-                      class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                      class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
                     >
                       {$t('cmdk_top_result')}
                     </Command.GroupHeading>
@@ -1390,7 +1388,7 @@
             </Command.List>
           </div>
           {#if showPreview}
-            <div data-cmdk-preview class="w-[280px] shrink-0 overflow-y-auto min-h-0">
+            <div data-cmdk-preview class="min-h-0 w-[280px] shrink-0 overflow-y-auto">
               <GlobalSearchPreview activeItem={manager.getActiveItem()} />
             </div>
           {/if}
