@@ -320,7 +320,7 @@ describe(SmartInfoService.name, () => {
       it('should extract 1 frame at t=0 when duration is NaN', async () => {
         const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
         mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
-        mocks.media.probe.mockResolvedValue(probeStub(Number.NaN));
+        mocks.media.probe.mockResolvedValue(probeStub(NaN));
         mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/f.jpg']);
         mocks.machineLearning.encodeImage.mockResolvedValue('[1,0,0]');
 
