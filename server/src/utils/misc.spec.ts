@@ -137,7 +137,7 @@ describe('ImmichStartupError / isStartUpError', () => {
   it('should return false for non-error values', () => {
     expect(isStartUpError('string')).toBe(false);
     expect(isStartUpError(null)).toBe(false);
-    // eslint-disable-next-line unicorn/no-useless-undefined
+     
     expect(isStartUpError(undefined)).toBe(false);
     expect(isStartUpError(42)).toBe(false);
     expect(isStartUpError({})).toBe(false);

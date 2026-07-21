@@ -71,9 +71,9 @@ const createPersonProfile = async (
   const { person } = await ctx.newPerson({
     ownerId: input.ownerId,
     name: input.name ?? 'Person',
-    ...(input.birthDate === undefined ? {} : { birthDate: input.birthDate }),
-    ...(input.isHidden === undefined ? {} : { isHidden: input.isHidden }),
-    ...(input.isFavorite === undefined ? {} : { isFavorite: input.isFavorite }),
+    ...(input.birthDate !== undefined && { birthDate: input.birthDate }),
+    ...(input.isHidden !== undefined && { isHidden: input.isHidden }),
+    ...(input.isFavorite !== undefined && { isFavorite: input.isFavorite }),
   });
   if (input.identityId !== undefined) {
     await setPersonIdentity(ctx.database, { personId: person.id, identityId: input.identityId });

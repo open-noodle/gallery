@@ -229,10 +229,7 @@ describe('library_user triggers', () => {
         userId: newMember.id,
         ack: { type: SyncEntityType.LibraryV1, updateId: preBump.updateId },
       });
-      const rows: { id: string }[] = [];
-      for await (const row of upsertStream) {
-        rows.push(row);
-      }
+      const rows: { id: string }[] = await Array.fromAsync(upsertStream);
       expect(rows.map((r) => r.id)).toContain(library.id);
     });
   });
