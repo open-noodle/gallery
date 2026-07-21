@@ -25,7 +25,7 @@ const createRawDatabase = async (name: string): Promise<Kysely<DB>> => {
   return new Kysely<DB>(
     getKyselyConfig({
       connectionType: 'url',
-      url: testUrl.replace(`/${templateDb}`, `/${name}`),
+      url: testUrl.replace(`/${templateDb}`, () => `/${name}`),
     }),
   );
 };
@@ -222,7 +222,7 @@ describe('Database Migration Scenarios', () => {
     const testUrl = process.env.IMMICH_TEST_POSTGRES_URL!;
     const templateDb = testUrl.split('/').pop()!;
     const db = new Kysely<DB>(
-      getKyselyConfig({ connectionType: 'url', url: testUrl.replace(`/${templateDb}`, `/${dbName}`) }),
+      getKyselyConfig({ connectionType: 'url', url: testUrl.replace(`/${templateDb}`, () => `/${dbName}`) }),
     );
     try {
       const { rows } = await sql<{ jit: string; configured: boolean }>`

@@ -108,9 +108,9 @@ describe('parseTypedSearch', () => {
   });
 
   it('keeps non-filter colon text in the query', () => {
-    const result = parseTypedSearch('IMG_1234.jpg ratio:3:2 http://example.test');
+    const result = parseTypedSearch('IMG_1234.jpg ratio:3:2 https://example.test');
 
-    expect(result.queryText).toBe('IMG_1234.jpg http://example.test');
+    expect(result.queryText).toBe('IMG_1234.jpg https://example.test');
     expect(result.issues).toEqual([
       {
         code: 'unknown-key',
