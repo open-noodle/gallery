@@ -456,10 +456,12 @@ export class AlbumService extends BaseService {
       if (contributed.size > 0) {
         await this.albumRepository.removeContributedAssetIds(id, [...contributed]);
         for (const result of results) {
-          if (contributed.has(result.id)) {
-            result.success = true;
-            delete result.error;
+          if (!contributed.has(result.id)) {
+          	continue;
           }
+
+          result.success = true;
+          delete result.error;
         }
       }
     }
