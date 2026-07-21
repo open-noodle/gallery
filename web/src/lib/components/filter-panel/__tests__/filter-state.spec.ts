@@ -181,7 +181,7 @@ describe('FilterState utilities', () => {
 
   it('should not count whitespace-only or empty text filters as active', () => {
     const state = createFilterState();
-    state.description = '   ';
+    state.description = ' '.repeat(3);
     state.originalFileName = '';
     state.ocr = undefined;
     expect(getActiveFilterCount(state)).toBe(0);

@@ -120,7 +120,7 @@ describe('TimelineBucketCard component', () => {
       onActivate: vi.fn(),
     });
 
-    expect(screen.getByTestId('timeline-bucket-card')).toHaveClass('relative', 'h-full', 'min-h-56');
+    expect(screen.getByTestId('timeline-bucket-card')).toHaveClass('relative', 'size-full', 'min-h-56');
     expect(screen.getByTestId('timeline-bucket-card-media')).toHaveClass('absolute', 'inset-0');
     expect(screen.getByTestId('timeline-bucket-card-media')).not.toHaveAttribute(
       'style',
@@ -385,7 +385,7 @@ describe('TimelineBucketCard component', () => {
       onActivate: vi.fn(),
     });
 
-    expect(screen.getByTestId('timeline-bucket-card')).toHaveClass('h-full', 'min-h-56');
+    expect(screen.getByTestId('timeline-bucket-card')).toHaveClass('size-full', 'min-h-56');
     expect(screen.getByTestId('timeline-bucket-card-media')).toHaveClass('absolute', 'inset-0');
     expect(screen.getByTestId('timeline-bucket-card-media')).not.toHaveAttribute(
       'style',

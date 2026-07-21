@@ -40,13 +40,14 @@
   const inFlightSpaceAlbumFetches = new SvelteSet<string>();
 
   const loadAlbums = async (spaceId: string) => {
-    if (userInteraction.spaceAlbums?.[spaceId] || inFlightSpaceAlbumFetches.has(spaceId)) {
+    const cachedAlbums = userInteraction.spaceAlbums?.[spaceId];
+    if (cachedAlbums || inFlightSpaceAlbumFetches.has(spaceId)) {
       return; // already fetched (possibly an empty list), or a fetch is already in flight — never refetch
     }
     inFlightSpaceAlbumFetches.add(spaceId);
     try {
       const albums = await getSharedSpaceAlbums({ id: spaceId });
-      const sorted = [...albums].sort((a, b) => (a.linkedAt > b.linkedAt ? -1 : a.linkedAt < b.linkedAt ? 1 : 0));
+      const sorted = [...albums].sort((a, b) => b.linkedAt.localeCompare(a.linkedAt));
       userInteraction.spaceAlbums = { ...userInteraction.spaceAlbums, [spaceId]: sorted };
     } catch (error) {
       handleError(error, $t('failed_to_load_albums'));
@@ -118,7 +119,7 @@
           aria-label={expanded ? $t('collapse') : $t('expand')}
           aria-expanded={expanded}
           data-testid="sidebar-space-chevron-{space.id}"
-          class="absolute start-2 top-1/2 z-10 hidden -translate-y-1/2 rounded-lg p-0.5 hover:bg-subtle md:block"
+          class="absolute inset-s-2 top-1/2 z-10 hidden -translate-y-1/2 rounded-lg p-0.5 hover:bg-subtle md:block"
           onclick={() => toggleAlbums(space.id)}
         >
           <!-- 1em matches the chevron @immich/ui's NavbarItem renders for the Spaces row above. -->
@@ -130,22 +131,22 @@
         title={space.name}
         aria-current={active ? 'page' : undefined}
         data-testid="sidebar-space-{space.id}"
-        class="flex w-full place-items-center gap-4 rounded-e-full py-3 transition-[padding] delay-100 duration-100 hover:cursor-pointer hover:bg-subtle hover:text-immich-primary dark:text-immich-dark-fg dark:hover:bg-immich-dark-gray dark:hover:text-immich-dark-primary ps-10 group-hover:sm:pe-4 md:pe-4 {active
+        class="flex w-full place-items-center gap-4 rounded-e-full py-3 ps-10 transition-[padding] delay-100 duration-100 hover:cursor-pointer hover:bg-subtle hover:text-immich-primary group-hover:sm:pe-4 md:pe-4 dark:text-immich-dark-fg dark:hover:bg-immich-dark-gray dark:hover:text-immich-dark-primary {active
           ? 'bg-primary/10 text-immich-primary dark:text-immich-dark-primary'
           : ''}"
       >
-        <div class="flex h-6 w-6 items-center justify-center">
+        <div class="flex size-6 items-center justify-center">
           <!-- Always the thumbnail: the sidebar identifies a space, it doesn't report on it. New
                activity is surfaced on the Spaces page and by the in-timeline new-assets divider. -->
           <div
-            class="h-6 w-6 bg-cover rounded bg-gray-200 dark:bg-gray-600"
+            class="size-6 rounded-sm bg-gray-200 bg-cover dark:bg-gray-600"
             style={space.thumbnailAssetId
               ? `background-image:url('${getAssetMediaUrl({ id: space.thumbnailAssetId })}')`
               : ''}
             data-testid="sidebar-space-thumbnail-{space.id}"
           ></div>
         </div>
-        <div class="grow text-sm font-medium truncate">
+        <div class="grow truncate text-sm font-medium">
           {space.name}
         </div>
       </a>

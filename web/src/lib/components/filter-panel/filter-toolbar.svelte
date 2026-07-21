@@ -49,7 +49,7 @@
       // pointer-fine:pe-15 (60px) reserves the timeline Scrubber's DESKTOP_WIDTH on the right so the
       // bar's right-aligned actions (Clear all, Add-all-to-collection) don't sit under the scrubber and
       // stay fully clickable. Matches Scrubber's own `pointer: coarse` gate (no scrubber margin on touch).
-      'shrink-0 items-center gap-3 bg-transparent py-2 pe-4 pointer-fine:pe-15 dark:bg-transparent',
+      'shrink-0 items-center gap-3 bg-transparent py-2 pe-4 dark:bg-transparent pointer-fine:pe-15',
       // The compact filter button leads the row when shown — tighten the leading inset so it sits
       // closer to the edge; grouping-only usages keep the standard ps-4.
       showFilterButton ? 'ps-2' : 'ps-4',

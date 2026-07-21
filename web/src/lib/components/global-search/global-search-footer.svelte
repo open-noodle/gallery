@@ -60,7 +60,7 @@
     {#if pillReady}
       <div
         aria-hidden="true"
-        class="absolute top-0.5 bottom-0.5 rounded-sm bg-primary/10 transition-all duration-[180ms] ease-out"
+        class="absolute inset-y-0.5 rounded-sm bg-primary/10 transition-all duration-180 ease-out"
         style:left="{pillLeft}px"
         style:width="{pillWidth}px"
       ></div>
@@ -76,7 +76,7 @@
           class="sr-only"
         />
         <span
-          class="block cursor-pointer rounded-sm px-2.5 py-1 tabular-nums transition-colors duration-[180ms] ease-out {manager.mode ===
+          class="block cursor-pointer rounded-sm px-2.5 py-1 tabular-nums transition-colors duration-180 ease-out {manager.mode ===
           opt.value
             ? 'text-primary'
             : 'text-gray-500 dark:text-gray-400'}"
@@ -102,7 +102,7 @@
       aria-label={$t('cmdk_show_shortcuts')}
       title={$t('cmdk_show_shortcuts')}
       onclick={() => void modalManager.show(ShortcutsModal, {})}
-      class="hidden h-5 w-5 items-center justify-center rounded-full text-gray-500 hover:bg-white/5 hover:text-gray-300 sm:flex"
+      class="hidden size-5 items-center justify-center rounded-full text-gray-500 hover:bg-white/5 hover:text-gray-300 sm:flex"
     >
       <Icon icon={mdiHelpCircleOutline} size="1em" aria-hidden />
     </button>
