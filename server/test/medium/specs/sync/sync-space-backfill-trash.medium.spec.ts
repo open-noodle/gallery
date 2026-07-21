@@ -20,10 +20,7 @@ const BEFORE_UPDATE_ID = 'ffffffff-ffff-7fff-bfff-ffffffffffff';
 const setup = () => new SyncTestContext(defaultDatabase);
 
 const collect = async (stream: AsyncIterable<unknown>): Promise<any[]> => {
-  const rows: any[] = [];
-  for await (const row of stream) {
-    rows.push(row);
-  }
+  const rows: any[] = await Array.fromAsync(stream);
   return rows;
 };
 
