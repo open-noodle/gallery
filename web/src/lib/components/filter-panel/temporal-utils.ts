@@ -19,7 +19,7 @@ export function aggregateYears(buckets: Array<{ timeBucket: string; count: numbe
     yearMap.set(year, (yearMap.get(year) ?? 0) + b.count);
   }
   const maxCount = Math.max(...yearMap.values(), 1);
-  return [...yearMap.entries()]
+  return [...yearMap]
     .sort(([a], [b]) => a - b)
     .map(([year, count]) => ({
       year,

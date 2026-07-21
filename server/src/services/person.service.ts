@@ -92,8 +92,8 @@ export class PersonService extends BaseService {
 
   @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Microservices] })
   async onBootstrap(): Promise<void> {
-    if (!await this.faceIdentityRepository.hasBackfillWork()) {
-    	return;
+    if (!(await this.faceIdentityRepository.hasBackfillWork())) {
+      return;
     }
 
     const activeBackfills = await this.jobRepository.searchJobs(QueueName.PeopleBackfill, {
@@ -697,13 +697,13 @@ export class PersonService extends BaseService {
   private async queueSharedSpaceFaceMatchTargets(
     targets: SharedSpaceFaceMatchBackfillTarget[],
   ): Promise<SharedSpaceFaceMatchBackfillTarget[]> {
-    const uniqueTargets = [
-      ...new Map(
-        targets
-          .toSorted((a, b) => a.spaceId.localeCompare(b.spaceId) || a.assetId.localeCompare(b.assetId))
-          .map((target) => [`${target.spaceId}:${target.assetId}`, target]),
-      ).values(),
-    ];
+    const uniqueTargets = new Map(
+      targets
+        .toSorted((a, b) => a.spaceId.localeCompare(b.spaceId) || a.assetId.localeCompare(b.assetId))
+        .map((target) => [`${target.spaceId}:${target.assetId}`, target]),
+    )
+      .values()
+      .toArray();
 
     if (uniqueTargets.length === 0) {
       return [];

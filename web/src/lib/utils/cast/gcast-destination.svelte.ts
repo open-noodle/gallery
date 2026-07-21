@@ -11,7 +11,7 @@ enum SESSION_DISCOVERY_CAUSE {
 }
 
 export const getMediaContentType = async (mediaUrl: string): Promise<string> => {
-  const mediaResponse = await fetch(mediaUrl, { method: 'GET', headers: { Range: 'bytes=0-0' } });
+  const mediaResponse = await fetch(mediaUrl, { headers: { Range: 'bytes=0-0' } });
   const contentType = mediaResponse.headers.get('content-type');
 
   if (!contentType) {

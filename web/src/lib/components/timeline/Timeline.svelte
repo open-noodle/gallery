@@ -137,10 +137,12 @@
   // updateOptions() clears the flag again once the reload settles.
   let lastActiveGrouping = activeGrouping;
   $effect.pre(() => {
-    if (activeGrouping !== lastActiveGrouping) {
-      lastActiveGrouping = activeGrouping;
-      timelineManager.suspendTransitions = true;
+    if (activeGrouping === lastActiveGrouping) {
+      return;
     }
+
+    lastActiveGrouping = activeGrouping;
+    timelineManager.suspendTransitions = true;
   });
   const showMobileGroupingControl = $derived(
     Boolean(onGroupingChange) &&

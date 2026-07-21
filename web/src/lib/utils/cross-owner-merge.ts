@@ -108,7 +108,7 @@ export const runMergeWithCrossOwnerConfirmation = async (
       // localized toast instead of the raw truncated server sentence (#733 review L7). Anything we don't
       // recognise is re-thrown to the caller's generic error handling.
       const messageKey =
-        code && code in TERMINAL_MERGE_ERROR_MESSAGE
+        code && Object.hasOwn(TERMINAL_MERGE_ERROR_MESSAGE, code)
           ? TERMINAL_MERGE_ERROR_MESSAGE[code as keyof typeof TERMINAL_MERGE_ERROR_MESSAGE]
           : undefined;
       if (messageKey) {

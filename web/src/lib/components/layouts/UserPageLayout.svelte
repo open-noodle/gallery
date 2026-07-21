@@ -79,13 +79,13 @@
         <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden" data-testid="page-header-title-row">
           {@render leading?.()}
           {#if title}
-            <div class="min-w-0 pe-8 truncate outline-none" tabindex="-1" id={headerId} data-testid="page-header">
+            <div class="min-w-0 truncate pe-8 outline-none" tabindex="-1" id={headerId} data-testid="page-header">
               {title}
             </div>
           {/if}
           {#if description}
             <p
-              class="shrink-0 whitespace-nowrap text-sm text-gray-400 dark:text-gray-600"
+              class="shrink-0 text-sm whitespace-nowrap text-gray-400 dark:text-gray-600"
               data-testid="page-header-description"
             >
               {description}
