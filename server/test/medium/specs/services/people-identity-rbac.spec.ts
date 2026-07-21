@@ -3675,7 +3675,7 @@ describe('People identity RBAC projection', () => {
       fx.sut.mergeScopedPeople(factory.auth({ user: fx.actor }), {
         target: { type: 'person', id: fx.actorPerson.id },
         sources: [{ type: 'space-person', id: fx.sourceSpacePerson.id, spaceId: fx.accessibleSpace.id }],
-        ...(confirmCrossOwner ? { confirmCrossOwner: true } : {}),
+        ...(confirmCrossOwner && { confirmCrossOwner: true }),
       });
 
     const spaceProfileCount = (ctx: Awaited<ReturnType<typeof setupFanOutSpaceCollapse>>['ctx'], spaceId: string) =>

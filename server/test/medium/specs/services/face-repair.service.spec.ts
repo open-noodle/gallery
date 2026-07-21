@@ -77,10 +77,7 @@ describe('FaceRepairService.findReattributionCandidates', () => {
       leakedFaceIds.push(assetFace.id);
     }
 
-    const candidates: ReattributionCandidate[] = [];
-    for await (const c of sut.findReattributionCandidates({ ownerId: user.id, maxDistance: 0.6, voteWindow: 50 })) {
-      candidates.push(c);
-    }
+    const candidates: ReattributionCandidate[] = await Array.fromAsync(sut.findReattributionCandidates({ ownerId: user.id, maxDistance: 0.6, voteWindow: 50 }));
 
     // Each leaked face (on Alexia) should report Karina as topOtherPersonId
     for (const leakedId of leakedFaceIds) {
@@ -111,10 +108,7 @@ describe('FaceRepairService.findReattributionCandidates', () => {
       .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
       .execute();
 
-    const candidates: ReattributionCandidate[] = [];
-    for await (const c of sut.findReattributionCandidates({ ownerId: user.id, maxDistance: 0.6, voteWindow: 50 })) {
-      candidates.push(c);
-    }
+    const candidates: ReattributionCandidate[] = await Array.fromAsync(sut.findReattributionCandidates({ ownerId: user.id, maxDistance: 0.6, voteWindow: 50 }));
 
     const candidate = candidates.find((c) => c.assetFaceId === assetFace.id);
     expect(candidate).toBeDefined();
@@ -140,10 +134,7 @@ describe('FaceRepairService.findReattributionCandidates', () => {
     // Owner B has many faces on 'first' axis (identical embedding — maximally close)
     await buildCluster(ctx, ownerB.id, axisEmbedding('first'), 10);
 
-    const candidates: ReattributionCandidate[] = [];
-    for await (const c of sut.findReattributionCandidates({ ownerId: ownerA.id, maxDistance: 0.6, voteWindow: 50 })) {
-      candidates.push(c);
-    }
+    const candidates: ReattributionCandidate[] = await Array.fromAsync(sut.findReattributionCandidates({ ownerId: ownerA.id, maxDistance: 0.6, voteWindow: 50 }));
 
     // Owner A's face should not see owner B's person as topOther (cross-owner)
     const candidateA = candidates.find((c) => c.assetFaceId === faceA.id);

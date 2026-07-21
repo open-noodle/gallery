@@ -88,8 +88,8 @@ const actionParameterKeys = {
 } as const;
 
 function getExpectedKeysByActionMessage(): string {
-  const expectedByAction = Object.entries(actionParameterMap)
-    .map(([action]) => `${action}: [${actionParameterKeys[action as AssetEditAction].join(', ')}]`)
+  const expectedByAction = Object.keys(actionParameterMap)
+    .map((action) => `${action}: [${actionParameterKeys[action as AssetEditAction].join(', ')}]`)
     .join('; ');
 
   return `Invalid parameters for action, expected keys by action: ${expectedByAction}`;

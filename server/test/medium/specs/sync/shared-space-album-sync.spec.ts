@@ -114,10 +114,7 @@ describe('SharedSpaceAlbumSync.getUpserts', () => {
     const nowId = NOW_ID;
     // Direct stream() call — collect via for-await
     const stream = sut.getUpserts({ nowId, userId: member.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.id)).toContain(album.id);
   });
 
@@ -134,10 +131,7 @@ describe('SharedSpaceAlbumSync.getUpserts', () => {
     await db.updateTable('album').set({ deletedAt: new Date() }).where('id', '=', album.id).execute();
 
     const stream = sut.getUpserts({ nowId: NOW_ID, userId: member.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.id)).not.toContain(album.id);
   });
 
@@ -150,10 +144,7 @@ describe('SharedSpaceAlbumSync.getUpserts', () => {
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
 
     const stream = sut.getUpserts({ nowId: NOW_ID, userId: stranger.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.id)).not.toContain(album.id);
   });
 });
@@ -168,10 +159,7 @@ describe('SharedSpaceAlbumSync.getDeletes (hybrid-clone: reads shared_space_albu
     await db.insertInto('shared_space_album_user_audit').values({ albumId: album.id, userId: user.id }).execute();
 
     const stream = sut.getDeletes({ nowId: NOW_ID, userId: user.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.albumId)).toContain(album.id);
   });
 
@@ -185,10 +173,7 @@ describe('SharedSpaceAlbumSync.getDeletes (hybrid-clone: reads shared_space_albu
     await db.insertInto('shared_space_album_user_audit').values({ albumId: album.id, userId: u1.id }).execute();
 
     const stream = sut.getDeletes({ nowId: NOW_ID, userId: u2.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result).toHaveLength(0);
   });
 });
@@ -211,10 +196,7 @@ describe('accessibleSpaceAlbums set-equality guard', () => {
     await db.updateTable('album').set({ deletedAt: new Date() }).where('id', '=', softDeleted.id).execute();
 
     const stream = sut.getUpserts({ nowId: NOW_ID, userId: member.id });
-    const upsertRows: any[] = [];
-    for await (const row of stream) {
-      upsertRows.push(row);
-    }
+    const upsertRows: any[] = await Array.fromAsync(stream);
     const upsertIds = new Set(upsertRows.map((r: any) => r.id));
 
     // accessibleSpaceAlbums should match: a1 and a2 but NOT softDeleted

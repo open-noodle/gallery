@@ -975,13 +975,13 @@ export class MediaService extends BaseService {
   }): boolean {
     if (colorspace || profileDescription) {
       return [colorspace, profileDescription].some((s) => s?.toLowerCase().includes('srgb'));
-    } else if (bitsPerSample) {
+    }
+    if (bitsPerSample) {
       // assume sRGB for 8-bit images with no color profile or colorspace metadata
       return bitsPerSample === 8;
-    } else {
-      // assume sRGB for images with no relevant metadata
-      return true;
     }
+    // assume sRGB for images with no relevant metadata
+    return true;
   }
 
   private parseBitrateToBps(bitrateString: string) {
@@ -994,11 +994,11 @@ export class MediaService extends BaseService {
 
     if (bitrateString.toLowerCase().endsWith('k')) {
       return bitrateValue * 1000; // Kilobits per second to bits per second
-    } else if (bitrateString.toLowerCase().endsWith('m')) {
-      return bitrateValue * 1_000_000; // Megabits per second to bits per second
-    } else {
-      return bitrateValue;
     }
+    if (bitrateString.toLowerCase().endsWith('m')) {
+      return bitrateValue * 1_000_000; // Megabits per second to bits per second
+    }
+    return bitrateValue;
   }
 
   private async shouldUseExtractedImage(extractedPathOrBuffer: string | Buffer, targetSize: number) {

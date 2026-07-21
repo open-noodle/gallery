@@ -3044,7 +3044,7 @@ describe(FaceIdentityRepository.name, () => {
         });
         await newIdentityFace(ctx, sut, { ownerId: user.id, name: 'Hidden', isHidden: true });
         await newIdentityFace(ctx, sut, { ownerId: user.id, name: '' });
-        await newIdentityFace(ctx, sut, { ownerId: user.id, name: '   ' });
+        await newIdentityFace(ctx, sut, { ownerId: user.id, name: ' '.repeat(3) });
 
         await expect(sut.getAccessiblePeopleFaceStatistics(user.id, { minimumFaceCount: 1 })).resolves.toMatchObject({
           namedVisiblePersonCount: 1,

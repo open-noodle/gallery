@@ -5368,7 +5368,7 @@ describe(PersonService.name, () => {
 
   describe('handlePersonMigration (additional)', () => {
     it('should return Failed when person is not found', async () => {
-      // eslint-disable-next-line unicorn/no-useless-undefined
+       
       mocks.person.getById.mockResolvedValue(undefined);
 
       await expect(sut.handlePersonMigration({ id: newUuid() })).resolves.toBe(JobStatus.Failed);
@@ -5469,7 +5469,7 @@ describe(PersonService.name, () => {
   describe('createNewFeaturePhoto', () => {
     it('should not queue job when no random face is found', async () => {
       const person = PersonFactory.create();
-      // eslint-disable-next-line unicorn/no-useless-undefined
+       
       mocks.person.getRandomFace.mockResolvedValue(undefined);
 
       await sut.createNewFeaturePhoto([person.id]);
@@ -5655,7 +5655,7 @@ describe(PersonService.name, () => {
       const face = AssetFaceFactory.create();
       const lastRun = new Date();
       mocks.systemMetadata.get.mockResolvedValue({ lastRun: lastRun.toISOString() });
-      // eslint-disable-next-line unicorn/no-useless-undefined
+       
       mocks.person.getLatestFaceDate.mockResolvedValue(undefined);
       mocks.person.getAllFaces.mockReturnValue(makeStream([face]));
       mocks.job.getJobCounts.mockResolvedValue({
@@ -5741,7 +5741,7 @@ describe(PersonService.name, () => {
 
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
-      // eslint-disable-next-line unicorn/no-useless-undefined
+       
       mocks.asset.getById.mockResolvedValue(undefined);
       mocks.person.getById.mockResolvedValue(person);
 
@@ -5782,7 +5782,7 @@ describe(PersonService.name, () => {
     it('should throw NotFoundException when closestPersonId is not found', async () => {
       const auth = AuthFactory.create();
 
-      // eslint-disable-next-line unicorn/no-useless-undefined
+       
       mocks.person.getById.mockResolvedValue(undefined);
 
       await expect(sut.getAll(auth, { closestPersonId: 'invalid', page: 1, size: 10 })).rejects.toBeInstanceOf(
