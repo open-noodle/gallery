@@ -24,7 +24,7 @@ describe('tokenizeForSearch', () => {
     });
 
     it('should return an empty array for whitespace only', () => {
-      expect(tokenizeForSearch('   ')).toEqual([]);
+      expect(tokenizeForSearch(' '.repeat(3))).toEqual([]);
     });
 
     it('should handle multiple spaces between words', () => {
@@ -46,69 +46,69 @@ describe('tokenizeForSearch', () => {
 
   describe('CJK text', () => {
     it('should tokenize a single CJK character as-is', () => {
-      expect(tokenizeForSearch('\u4E16')).toEqual(['\u4E16']);
+      expect(tokenizeForSearch('\u{4E16}')).toEqual(['\u{4E16}']);
     });
 
     it('should tokenize two CJK characters into a single bigram', () => {
-      expect(tokenizeForSearch('\u4E16\u754C')).toEqual(['\u4E16\u754C']);
+      expect(tokenizeForSearch('\u{4E16}\u{754C}')).toEqual(['\u{4E16}\u{754C}']);
     });
 
     it('should tokenize three CJK characters into overlapping bigrams', () => {
       // 世界杯 -> 世界, 界杯
-      expect(tokenizeForSearch('\u4E16\u754C\u676F')).toEqual(['\u4E16\u754C', '\u754C\u676F']);
+      expect(tokenizeForSearch('\u{4E16}\u{754C}\u{676F}')).toEqual(['\u{4E16}\u{754C}', '\u{754C}\u{676F}']);
     });
 
     it('should tokenize four CJK characters into overlapping bigrams', () => {
       // 人工智能 -> 人工, 工智, 智能
-      expect(tokenizeForSearch('\u4EBA\u5DE5\u667A\u80FD')).toEqual(['\u4EBA\u5DE5', '\u5DE5\u667A', '\u667A\u80FD']);
+      expect(tokenizeForSearch('\u{4EBA}\u{5DE5}\u{667A}\u{80FD}')).toEqual(['\u{4EBA}\u{5DE5}', '\u{5DE5}\u{667A}', '\u{667A}\u{80FD}']);
     });
 
     it('should handle Japanese Hiragana', () => {
       // こんにちは (5 chars) -> こん, んに, にち, ちは
-      expect(tokenizeForSearch('\u3053\u3093\u306B\u3061\u306F')).toEqual([
-        '\u3053\u3093',
-        '\u3093\u306B',
-        '\u306B\u3061',
-        '\u3061\u306F',
+      expect(tokenizeForSearch('\u{3053}\u{3093}\u{306B}\u{3061}\u{306F}')).toEqual([
+        '\u{3053}\u{3093}',
+        '\u{3093}\u{306B}',
+        '\u{306B}\u{3061}',
+        '\u{3061}\u{306F}',
       ]);
     });
 
     it('should handle Japanese Katakana', () => {
       // カタカナ (4 chars) -> カタ, タカ, カナ
-      expect(tokenizeForSearch('\u30AB\u30BF\u30AB\u30CA')).toEqual(['\u30AB\u30BF', '\u30BF\u30AB', '\u30AB\u30CA']);
+      expect(tokenizeForSearch('\u{30AB}\u{30BF}\u{30AB}\u{30CA}')).toEqual(['\u{30AB}\u{30BF}', '\u{30BF}\u{30AB}', '\u{30AB}\u{30CA}']);
     });
 
     it('should handle Korean characters', () => {
       // 한국 (2 chars) -> 한국
-      expect(tokenizeForSearch('\uD55C\uAD6D')).toEqual(['\uD55C\uAD6D']);
+      expect(tokenizeForSearch('\u{D55C}\u{AD6D}')).toEqual(['\u{D55C}\u{AD6D}']);
     });
   });
 
   describe('mixed text', () => {
     it('should handle CJK followed by Latin', () => {
-      expect(tokenizeForSearch('\u4E16\u754C hello')).toEqual(['\u4E16\u754C', 'hello']);
+      expect(tokenizeForSearch('\u{4E16}\u{754C} hello')).toEqual(['\u{4E16}\u{754C}', 'hello']);
     });
 
     it('should handle Latin followed by CJK', () => {
-      expect(tokenizeForSearch('hello \u4E16\u754C')).toEqual(['hello', '\u4E16\u754C']);
+      expect(tokenizeForSearch('hello \u{4E16}\u{754C}')).toEqual(['hello', '\u{4E16}\u{754C}']);
     });
 
     it('should handle alternating Latin and CJK', () => {
-      expect(tokenizeForSearch('test \u4E16\u754C\u676F more')).toEqual([
+      expect(tokenizeForSearch('test \u{4E16}\u{754C}\u{676F} more')).toEqual([
         'test',
-        '\u4E16\u754C',
-        '\u754C\u676F',
+        '\u{4E16}\u{754C}',
+        '\u{754C}\u{676F}',
         'more',
       ]);
     });
 
     it('should handle CJK and Latin without spaces between them', () => {
       // CJK chars are split from Latin even without whitespace
-      expect(tokenizeForSearch('\u4E16\u754Chello')).toEqual(['\u4E16\u754C', 'hello']);
+      expect(tokenizeForSearch('\u{4E16}\u{754C}hello')).toEqual(['\u{4E16}\u{754C}', 'hello']);
     });
 
     it('should handle Latin followed by CJK without spaces', () => {
-      expect(tokenizeForSearch('hello\u4E16\u754C')).toEqual(['hello', '\u4E16\u754C']);
+      expect(tokenizeForSearch('hello\u{4E16}\u{754C}')).toEqual(['hello', '\u{4E16}\u{754C}']);
     });
 
     it('should truncate input longer than 1000 characters', () => {
@@ -260,7 +260,7 @@ describe('isAssetChecksumConstraint', () => {
   });
 
   it('should return false for undefined', () => {
-    // eslint-disable-next-line unicorn/no-useless-undefined
+     
     expect(isAssetChecksumConstraint(undefined)).toBe(false);
   });
 

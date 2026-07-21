@@ -86,7 +86,7 @@ export class TimelineService extends BaseService {
       }
     }
 
-    let albumSpaceIds: string[] | undefined = undefined;
+    let albumSpaceIds: string[] | undefined;
     // #752 P0-2: album browse — resolve the viewer's live member-spaces linking this album so the
     // repository unions member-gated contributions. NEVER for shared-link auth: auth.user is the
     // link OWNER there, and their membership must not leak contributions to anonymous viewers.

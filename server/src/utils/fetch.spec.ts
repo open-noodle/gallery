@@ -18,7 +18,7 @@ describe('fetch', () => {
     const spy = vi.fn().mockResolvedValue(new Response());
     vi.stubGlobal('fetch', spy);
     configureUserAgent();
-    await fetch('http://test.local');
+    await fetch('https://test.local');
     const headers: Headers = spy.mock.calls[0][1].headers;
     return headers.get('User-Agent');
   };

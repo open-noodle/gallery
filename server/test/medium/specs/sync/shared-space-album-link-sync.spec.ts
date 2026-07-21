@@ -33,10 +33,7 @@ describe('SharedSpaceAlbumLinkSync.getBackfill', () => {
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id, showInTimeline: true });
 
     const stream = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, space.id);
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.albumId)).toContain(album.id);
     const row = result.find((r: any) => r.albumId === album.id);
     expect(row).toBeDefined();
@@ -53,10 +50,7 @@ describe('SharedSpaceAlbumLinkSync.getBackfill', () => {
     await ctx.newSharedSpaceAlbum({ spaceId: s1.id, albumId: album.id });
 
     const stream = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, s2.id);
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result).toHaveLength(0);
   });
 });
@@ -73,10 +67,7 @@ describe('SharedSpaceAlbumLinkSync.getUpserts', () => {
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
 
     const stream = sut.getUpserts({ nowId: NOW_ID, userId: member.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.albumId)).toContain(album.id);
   });
 
@@ -88,10 +79,7 @@ describe('SharedSpaceAlbumLinkSync.getUpserts', () => {
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
 
     const stream = sut.getUpserts({ nowId: NOW_ID, userId: owner.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.albumId)).toContain(album.id);
   });
 
@@ -104,10 +92,7 @@ describe('SharedSpaceAlbumLinkSync.getUpserts', () => {
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
 
     const stream = sut.getUpserts({ nowId: NOW_ID, userId: stranger.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.albumId)).not.toContain(album.id);
   });
 
@@ -119,10 +104,7 @@ describe('SharedSpaceAlbumLinkSync.getUpserts', () => {
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, showInTimeline: false });
 
     const stream = sut.getUpserts({ nowId: NOW_ID, userId: owner.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     const row = result.find((r: any) => r.albumId === album.id);
     expect(row).toBeDefined();
     expect(row.showInTimeline).toBe(false);
@@ -140,10 +122,7 @@ describe('SharedSpaceAlbumLinkSync.getDeletes', () => {
     await db.insertInto('shared_space_album_audit').values({ spaceId: space.id, albumId: album.id }).execute();
 
     const stream = sut.getDeletes({ nowId: NOW_ID, userId: owner.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.some((r: any) => r.albumId === album.id && r.spaceId === space.id)).toBe(true);
   });
 
@@ -157,10 +136,7 @@ describe('SharedSpaceAlbumLinkSync.getDeletes', () => {
     await db.insertInto('shared_space_album_audit').values({ spaceId: space.id, albumId: album.id }).execute();
 
     const stream = sut.getDeletes({ nowId: NOW_ID, userId: stranger.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result).toHaveLength(0);
   });
 });
@@ -179,10 +155,7 @@ describe('SharedSpaceAlbumLinkSync — soft-deleted album exclusion (Slice 8)', 
     await db.updateTable('album').set({ deletedAt: new Date() }).where('id', '=', trashed.id).execute();
 
     const stream = sut.getUpserts({ nowId: NOW_ID, userId: owner.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     const albumIds = result.map((r: any) => r.albumId);
     expect(albumIds).toContain(live.id);
     expect(albumIds).not.toContain(trashed.id);
@@ -200,10 +173,7 @@ describe('SharedSpaceAlbumLinkSync — soft-deleted album exclusion (Slice 8)', 
     await db.updateTable('album').set({ deletedAt: new Date() }).where('id', '=', trashed.id).execute();
 
     const stream = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, space.id);
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     const albumIds = result.map((r: any) => r.albumId);
     expect(albumIds).toContain(live.id);
     expect(albumIds).not.toContain(trashed.id);
@@ -220,10 +190,7 @@ describe('SharedSpaceAlbumLinkSync — soft-deleted album exclusion (Slice 8)', 
     await db.updateTable('album').set({ deletedAt: null }).where('id', '=', album.id).execute();
 
     const stream = sut.getUpserts({ nowId: NOW_ID, userId: owner.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.albumId)).toContain(album.id);
   });
 });
