@@ -176,24 +176,25 @@
   };
 
   const onkeydown = async (event: KeyboardEvent) => {
+    // Called synchronously for every handled key, before any `await` can suspend the
+    // handler — otherwise preventDefault() is a no-op (unicorn/no-late-event-control).
+    if (['ArrowUp', 'ArrowDown', 'Enter', 'Control'].includes(event.key)) {
+      event.preventDefault();
+    }
     switch (event.key) {
       case 'ArrowUp': {
-        event.preventDefault();
         selectedRowIndex = selectedRowIndex > 0 ? selectedRowIndex - 1 : selectableRowCount - 1;
         break;
       }
       case 'ArrowDown': {
-        event.preventDefault();
         selectedRowIndex = selectedRowIndex < selectableRowCount - 1 ? selectedRowIndex + 1 : 0;
         break;
       }
       case 'Enter': {
-        event.preventDefault();
         await onEnter();
         break;
       }
       case 'Control': {
-        event.preventDefault();
         toggleMultiSelect();
         break;
       }
@@ -206,12 +207,12 @@
 
 <Modal title={$t('add_to_album_or_space')} {onClose} size="medium">
   <ModalBody>
-    <div class="mb-2 flex max-h-[36rem] flex-col">
+    <div class="mb-2 flex max-h-144 flex-col">
       {#if loading}
         <!-- eslint-disable-next-line svelte/require-each-key -->
         {#each { length: 3 } as _}
           <div class="flex animate-pulse gap-4 px-6 py-2">
-            <div class="h-12 w-12 rounded-xl bg-slate-200"></div>
+            <div class="size-12 rounded-xl bg-slate-200"></div>
             <div class="flex flex-col items-start justify-center gap-2">
               <span class="h-4 w-36 animate-pulse bg-slate-200"></span>
               <span class="h-3 w-20 animate-pulse bg-slate-200"></span>
@@ -282,16 +283,16 @@
     {/if}
   </ModalBody>
   <ModalFooter>
-    <div class="flex justify-around w-full">
+    <div class="flex w-full justify-around">
       <div class="flex gap-4">
-        <div class="flex gap-1 place-items-center">
-          <span class="bg-gray-300 dark:bg-gray-500 rounded p-1">
+        <div class="flex place-items-center gap-1">
+          <span class="rounded-sm bg-gray-300 p-1 dark:bg-gray-500">
             <Icon icon={mdiKeyboardReturn} size="1rem" />
           </span>
           <Text size="tiny">{$t('to_select')}</Text>
         </div>
-        <div class="flex gap-1 place-items-center">
-          <span class="bg-gray-300 dark:bg-gray-500 rounded p-1">
+        <div class="flex place-items-center gap-1">
+          <span class="rounded-sm bg-gray-300 p-1 dark:bg-gray-500">
             <Text size="tiny">CTRL</Text>
           </span>
           <Text size="tiny">{$t('to_multi_select')}</Text>

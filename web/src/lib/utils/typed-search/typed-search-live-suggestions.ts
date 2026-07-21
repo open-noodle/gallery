@@ -19,8 +19,7 @@ export type LiveTypedSearchPersonPreview = {
 export type LiveTypedSearchTagPreview = { id: string; name?: string | null; value?: string | null };
 
 export type LiveTypedSearchPreview =
-  | { kind: 'person'; data: LiveTypedSearchPersonPreview }
-  | { kind: 'tag'; data: LiveTypedSearchTagPreview };
+  { kind: 'person'; data: LiveTypedSearchPersonPreview } | { kind: 'tag'; data: LiveTypedSearchTagPreview };
 
 export type LiveTypedSearchChoice = {
   id: string;
@@ -58,7 +57,7 @@ export function isLiveTypedSearchToken(token: TypedSearchTokenSpan | undefined):
 }
 
 function isLiveKey(key: string | undefined): key is LiveTypedSearchKey {
-  return key === 'person' || key === 'tag' || key === 'country' || key === 'city';
+  return key !== undefined && ['person', 'tag', 'country', 'city'].includes(key);
 }
 
 function makeChoiceId(token: TypedSearchTokenSpan, entityId: string, key: LiveTypedSearchKey) {
@@ -308,7 +307,7 @@ async function resolveCityLiveSuggestions(
     const cities = await getSearchSuggestions(
       {
         $type: SearchSuggestionType.City,
-        ...(country ? { country } : {}),
+        ...(country && { country }),
         ...liveSuggestionScope(context),
       },
       { signal: context.signal },
