@@ -63,7 +63,7 @@ function resolveRoute(pathname: string, dir = ROUTES_ROOT, segments = pathToSegm
 }
 
 function pathToSegments(pathname: string): string[] {
-  return pathname.split(/[?#]/)[0].split('/').filter(Boolean);
+  return pathname.split(/[?#]/, 1)[0].split('/').filter(Boolean);
 }
 
 function childDirs(dir: string): string[] {

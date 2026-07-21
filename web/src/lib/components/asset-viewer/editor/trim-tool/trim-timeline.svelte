@@ -61,12 +61,12 @@
         trimManager.seekTo(trimManager.endTime);
       }
       dragging = null;
-      globalThis.removeEventListener('pointermove', onMove);
-      globalThis.removeEventListener('pointerup', onUp);
+      removeEventListener('pointermove', onMove);
+      removeEventListener('pointerup', onUp);
     };
 
-    globalThis.addEventListener('pointermove', onMove);
-    globalThis.addEventListener('pointerup', onUp);
+    addEventListener('pointermove', onMove);
+    addEventListener('pointerup', onUp);
   }
 
   function onTrackClick(event: MouseEvent) {
@@ -87,9 +87,7 @@
     if (event.key === 'i' || event.key === 'I') {
       event.preventDefault();
       trimManager.setStart(trimManager.currentTime);
-    }
-
-    if (event.key === 'o' || event.key === 'O') {
+    } else if (event.key === 'o' || event.key === 'O') {
       event.preventDefault();
       trimManager.setEnd(trimManager.currentTime);
     }
@@ -152,7 +150,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div
-  class="relative h-12 rounded-md bg-gray-800 cursor-pointer select-none"
+  class="relative h-12 cursor-pointer rounded-md bg-gray-800 select-none"
   role="slider"
   tabindex="-1"
   aria-label={$t('editor_trim_timeline_label')}
@@ -164,23 +162,23 @@
   onkeydown={handleKeydown}
 >
   <!-- Dimmed left region -->
-  <div class="absolute top-0 left-0 h-full rounded-l-md bg-black/70 z-[2]" style:width={startPctStyle}></div>
+  <div class="absolute top-0 left-0 z-2 h-full rounded-l-md bg-black/70" style:width={startPctStyle}></div>
 
   <!-- Dimmed right region -->
-  <div class="absolute top-0 right-0 h-full rounded-r-md bg-black/70 z-[2]" style:width={endPctStyle}></div>
+  <div class="absolute top-0 right-0 z-2 h-full rounded-r-md bg-black/70" style:width={endPctStyle}></div>
 
   <!-- Trim region (kept) -->
   <div
-    class="absolute top-0 h-full z-[1] border-t-2 border-b-2 border-immich-primary/60"
+    class="absolute top-0 z-1 h-full border-y-2 border-immich-primary/60"
     style:left={startPctStyle}
     style:right={endPctStyle}
   >
     <!-- Time labels above trim region -->
-    <div class="absolute -top-5.5 z-[6] flex w-full justify-between pointer-events-none">
-      <span class="text-[0.65rem] font-medium text-immich-primary tabular-nums bg-gray-900/80 px-1 rounded-sm">
+    <div class="pointer-events-none absolute -top-5.5 z-6 flex w-full justify-between">
+      <span class="rounded-sm bg-gray-900/80 px-1 text-[0.65rem] font-medium text-immich-primary tabular-nums">
         {formatTime(trimManager.startTime)}
       </span>
-      <span class="text-[0.65rem] font-medium text-immich-primary tabular-nums bg-gray-900/80 px-1 rounded-sm">
+      <span class="rounded-sm bg-gray-900/80 px-1 text-[0.65rem] font-medium text-immich-primary tabular-nums">
         {formatTime(trimManager.endTime)}
       </span>
     </div>
@@ -188,7 +186,7 @@
 
   <!-- In handle -->
   <div
-    class="absolute -top-0.5 w-3.5 z-[4] flex items-center justify-center rounded-l bg-immich-primary/85 hover:bg-immich-primary cursor-col-resize transition-colors"
+    class="absolute -top-0.5 z-4 flex w-3.5 cursor-col-resize items-center justify-center rounded-l bg-immich-primary/85 transition-colors hover:bg-immich-primary"
     style:left={handleInStyle}
     style:height="calc(100% + 4px)"
     role="slider"
@@ -201,15 +199,15 @@
     onkeydown={(e) => onHandleKeydown('start', e)}
   >
     <div class="flex flex-col gap-[3px]">
-      <span class="block w-1.5 h-[1.5px] bg-black/70 rounded-sm"></span>
-      <span class="block w-1.5 h-[1.5px] bg-black/70 rounded-sm"></span>
-      <span class="block w-1.5 h-[1.5px] bg-black/70 rounded-sm"></span>
+      <span class="block h-[1.5px] w-1.5 rounded-sm bg-black/70"></span>
+      <span class="block h-[1.5px] w-1.5 rounded-sm bg-black/70"></span>
+      <span class="block h-[1.5px] w-1.5 rounded-sm bg-black/70"></span>
     </div>
   </div>
 
   <!-- Out handle -->
   <div
-    class="absolute -top-0.5 w-3.5 z-[4] flex items-center justify-center rounded-r bg-immich-primary/85 hover:bg-immich-primary cursor-col-resize transition-colors"
+    class="absolute -top-0.5 z-4 flex w-3.5 cursor-col-resize items-center justify-center rounded-r bg-immich-primary/85 transition-colors hover:bg-immich-primary"
     style:left={handleOutStyle}
     style:height="calc(100% + 4px)"
     role="slider"
@@ -222,26 +220,26 @@
     onkeydown={(e) => onHandleKeydown('end', e)}
   >
     <div class="flex flex-col gap-[3px]">
-      <span class="block w-1.5 h-[1.5px] bg-black/70 rounded-sm"></span>
-      <span class="block w-1.5 h-[1.5px] bg-black/70 rounded-sm"></span>
-      <span class="block w-1.5 h-[1.5px] bg-black/70 rounded-sm"></span>
+      <span class="block h-[1.5px] w-1.5 rounded-sm bg-black/70"></span>
+      <span class="block h-[1.5px] w-1.5 rounded-sm bg-black/70"></span>
+      <span class="block h-[1.5px] w-1.5 rounded-sm bg-black/70"></span>
     </div>
   </div>
 
   <!-- Playhead -->
   <div
-    class="absolute -top-1 w-0.5 z-[5] bg-white rounded-sm pointer-events-none shadow-[0_0_6px_rgba(255,255,255,0.3)]"
+    class="pointer-events-none absolute -top-1 z-5 w-0.5 rounded-sm bg-white shadow-[0_0_6px_rgba(255,255,255,0.3)]"
     style:left={playheadPctStyle}
     style:height="calc(100% + 8px)"
   >
     <div
-      class="absolute -top-[3px] left-1/2 -translate-x-1/2 w-2 h-2 bg-white rounded-full shadow-[0_0_4px_rgba(255,255,255,0.4)]"
+      class="absolute top-[-3px] left-1/2 size-2 -translate-x-1/2 rounded-full bg-white shadow-[0_0_4px_rgba(255,255,255,0.4)]"
     ></div>
   </div>
 </div>
 
 <!-- Full duration tick labels -->
-<div class="flex justify-between mt-2 px-0.5 text-[0.7rem] text-gray-500 tabular-nums">
+<div class="mt-2 flex justify-between px-0.5 text-[0.7rem] text-gray-500 tabular-nums">
   {#each timeLabels as label, i (i)}
     <span>{label}</span>
   {/each}

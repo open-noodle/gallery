@@ -148,6 +148,8 @@ export default typescriptEslint.config(
       // not yet compatible with all our supported browsers
       'unicorn/prefer-promise-with-resolvers': 'off',
       // not yet compatible with all our supported browsers
+      'unicorn/prefer-promise-try': 'off',
+      // not yet compatible with all our supported browsers
       'unicorn/prefer-iterator-to-array': 'off',
       // not yet compatible with all our supported browsers
       'unicorn/prefer-array-from-async': 'off',

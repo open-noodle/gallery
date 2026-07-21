@@ -49,10 +49,12 @@
   let hasInteracted = $state(false);
 
   $effect(() => {
-    if (repositioning) {
-      dragCropY = space.thumbnailCropY ?? 50;
-      hasInteracted = false;
+    if (!repositioning) {
+      return;
     }
+
+    dragCropY = space.thumbnailCropY ?? 50;
+    hasInteracted = false;
   });
 
   let displayCropY = $derived(repositioning ? dragCropY : (space.thumbnailCropY ?? 50));

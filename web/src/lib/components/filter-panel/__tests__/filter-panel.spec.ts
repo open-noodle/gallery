@@ -476,7 +476,7 @@ describe('Section Selector', () => {
               { timeBucket: '2023-08-01', count: 200 },
             ]
           : [],
-        ...(filters ? { filters } : {}),
+        ...(filters && { filters }),
       },
     });
   }

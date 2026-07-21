@@ -3300,7 +3300,7 @@ describe('People identity RBAC projection', () => {
       personIds: [`space-person:${fx.space1Alice.spacePerson.id}`],
     });
 
-    expect(result.toSorted()).toEqual(['Berlin', 'Paris']);
+    expect(result.toSorted((a, b) => (a ?? '').localeCompare(b ?? ''))).toEqual(['Berlin', 'Paris']);
   });
 
   it('does not broaden filters when a scoped space person token is inaccessible', async () => {

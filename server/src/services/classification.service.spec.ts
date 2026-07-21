@@ -733,12 +733,8 @@ describe(ClassificationService.name, () => {
     });
 
     it('should deduplicate concurrent encode calls for the same prompt', async () => {
-      let resolveEncode: (value: string) => void;
-      mocks.machineLearning.encodeText.mockReturnValue(
-        new Promise((resolve) => {
-          resolveEncode = resolve;
-        }),
-      );
+      const { promise: encodePending, resolve: resolveEncode } = Promise.withResolvers<string>();
+      mocks.machineLearning.encodeText.mockReturnValue(encodePending);
       mocks.asset.getById.mockResolvedValue({
         id: 'asset-1',
         ownerId: 'user-1',

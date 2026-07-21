@@ -168,7 +168,7 @@ export class RecentTripMemoryRule implements MemoryRule {
       byDay.set(dayKey!, dayAssets);
     }
 
-    return [...byDay.values()];
+    return byDay.values().toArray();
   }
 
   private getTripTargetSize(dayCount: number, representativeCount: number) {

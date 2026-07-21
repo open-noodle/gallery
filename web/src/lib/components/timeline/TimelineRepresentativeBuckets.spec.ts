@@ -86,7 +86,7 @@ describe('TimelineRepresentativeBuckets', () => {
     const shell = screen.getByTestId('timeline-bucket-shell-2016-01-01');
     const frame = within(shell).getByTestId('timeline-bucket-frame');
     expect(frame).toHaveClass('h-full');
-    expect(within(frame).getByTestId('timeline-bucket-card')).toHaveClass('h-full');
+    expect(within(frame).getByTestId('timeline-bucket-card')).toHaveClass('size-full');
   });
 
   it('does not render a bucket outside the overscan window', () => {
@@ -119,7 +119,9 @@ describe('TimelineRepresentativeBuckets', () => {
       grouping: 'year',
       buckets: [bucket(2016, 120)],
       visibleWindow: { top: 0, bottom: 1000 },
-      onTimelineBucketActivate: (activation: ActivatableTimelineBucket) => activations.push(activation),
+      onTimelineBucketActivate: (activation: ActivatableTimelineBucket) => {
+        activations.push(activation);
+      },
     });
 
     expect(screen.getByRole('button', { name: 'timeline_overview_card_semantics' })).toBeInTheDocument();

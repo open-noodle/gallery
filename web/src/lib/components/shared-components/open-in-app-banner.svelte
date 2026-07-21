@@ -81,7 +81,7 @@
     role="region"
     aria-label={$t('open_in_app_banner_aria_label')}
     data-testid="open-in-app-banner"
-    class="fixed inset-x-0 top-0 z-40 motion-safe:animate-slide-down"
+    class="motion-safe:animate-slide-down fixed inset-x-0 top-0 z-40"
   >
     <div
       class="flex items-center gap-3 border-b px-3 py-2 shadow-sm backdrop-blur-xl {darkContext
@@ -92,7 +92,7 @@
       <img
         src="/apple-icon-180.png"
         alt=""
-        class="h-10 w-10 flex-shrink-0 rounded-[9px] shadow-sm ring-1 {darkContext
+        class="size-10 shrink-0 rounded-[9px] shadow-sm ring-1 {darkContext
           ? 'ring-white/15'
           : 'ring-black/5 dark:ring-white/10'}"
       />
@@ -109,7 +109,7 @@
           {$t('open_in_app_banner_get_app')}
         </a>
       </div>
-      <Button href={eligibility.deepLink} size="small" shape="round" class="flex-shrink-0">
+      <Button href={eligibility.deepLink} size="small" shape="round" class="shrink-0">
         {$t('open_in_app_banner_open')}
       </Button>
       <IconButton
@@ -120,7 +120,7 @@
         size="small"
         color="secondary"
         onclick={dismiss}
-        class="-mr-1 flex-shrink-0 {darkContext ? 'text-white/70 hover:text-white' : ''}"
+        class="-mr-1 shrink-0 {darkContext ? 'text-white/70 hover:text-white' : ''}"
       />
     </div>
   </div>

@@ -125,7 +125,7 @@ describe('RecentSpaces component', () => {
       await renderAndFlush();
 
       const thumbnail = screen.getByTestId('sidebar-space-thumbnail-thumb-1');
-      expect(thumbnail).toHaveClass('h-6', 'w-6', 'bg-cover');
+      expect(thumbnail).toHaveClass('size-6', 'bg-cover');
       expect(thumbnail.getAttribute('style')).toContain(
         'background-image: url("/api/assets/asset-thumb-1/thumbnail?edited=true")',
       );

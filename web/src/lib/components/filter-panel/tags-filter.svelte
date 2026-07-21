@@ -41,7 +41,7 @@
   // Orphaned tags: selected but not in current results
   let orphanedTags = $derived(
     selectedIds
-      .filter((id) => !tags.some((t) => t.id === id))
+      .filter((id) => tags.every((t) => t.id !== id))
       .map((id) => ({ id, name: selectedNames?.get(id) ?? tagNameCache.get(id) ?? id })),
   );
 
@@ -70,12 +70,12 @@
   {:else}
     <!-- Search input -->
     <div class="relative mb-2">
-      <div class="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500">
+      <div class="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-gray-400 dark:text-gray-500">
         <Icon icon={mdiMagnify} size="14" />
       </div>
       <input
         type="text"
-        class="immich-form-input h-8 w-full rounded-lg pl-7 pr-2 text-sm"
+        class="immich-form-input h-8 w-full rounded-lg pr-2 pl-7 text-sm"
         placeholder={$t('search_tags')}
         bind:value={searchQuery}
         oninput={() => {
@@ -96,15 +96,15 @@
       >
         <!-- Checkbox (always checked for orphaned) -->
         <div
-          class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded bg-immich-primary dark:bg-immich-dark-primary"
+          class="flex size-4 shrink-0 items-center justify-center rounded-sm bg-immich-primary dark:bg-immich-dark-primary"
         >
-          <svg viewBox="0 0 24 24" class="h-3 w-3 text-white dark:text-black">
+          <svg viewBox="0 0 24 24" class="size-3 text-white dark:text-black">
             <path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" />
           </svg>
         </div>
 
         <!-- Label -->
-        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left font-medium">{tag.name}</span>
+        <span class="flex-1 truncate text-left font-medium">{tag.name}</span>
       </button>
     {/each}
 
@@ -129,19 +129,19 @@
       >
         <!-- Checkbox -->
         <div
-          class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded {isActive
+          class="flex size-4 shrink-0 items-center justify-center rounded-sm {isActive
             ? 'bg-immich-primary dark:bg-immich-dark-primary'
             : 'border border-gray-300 dark:border-gray-600'}"
         >
           {#if isActive}
-            <svg viewBox="0 0 24 24" class="h-3 w-3 text-white dark:text-black">
+            <svg viewBox="0 0 24 24" class="size-3 text-white dark:text-black">
               <path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" />
             </svg>
           {/if}
         </div>
 
         <!-- Label -->
-        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">{tag.name}</span>
+        <span class="flex-1 truncate text-left">{tag.name}</span>
       </button>
     {/each}
 

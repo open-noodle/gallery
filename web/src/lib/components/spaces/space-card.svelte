@@ -60,7 +60,7 @@
 
 <a
   href={Route.viewSpace({ id: space.id })}
-  class="group relative rounded-2xl border border-transparent p-5 hover:bg-gray-100 hover:border-gray-200 dark:hover:border-gray-800 dark:hover:bg-gray-900"
+  class="group relative rounded-2xl border border-transparent p-5 hover:border-gray-200 hover:bg-gray-100 dark:hover:border-gray-800 dark:hover:bg-gray-900"
   data-testid="space-card"
   onmouseenter={() => (showMenu = true)}
   onmouseleave={() => {
@@ -73,7 +73,7 @@
 
     {#if isPinned}
       <div
-        class="absolute top-2 start-2 z-10 rounded-full bg-white/70 p-1 dark:bg-gray-800/70"
+        class="absolute inset-s-2 top-2 z-10 rounded-full bg-white/70 p-1 dark:bg-gray-800/70"
         data-testid="pin-overlay"
       >
         <Icon icon={mdiPin} size="14" class="text-gray-600 dark:text-gray-400" />
@@ -83,7 +83,7 @@
     {#if showMenu}
       <button
         type="button"
-        class="absolute top-2 end-2 z-20 rounded-full bg-white/80 p-1 shadow-sm hover:bg-white dark:bg-gray-800/80 dark:hover:bg-gray-800"
+        class="absolute inset-e-2 top-2 z-20 rounded-full bg-white/80 p-1 shadow-sm hover:bg-white dark:bg-gray-800/80 dark:hover:bg-gray-800"
         onclick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -97,7 +97,7 @@
 
     {#if showDropdown}
       <div
-        class="absolute top-10 end-2 z-30 min-w-[140px] rounded-lg border bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
+        class="absolute inset-e-2 top-10 z-30 min-w-[140px] rounded-lg border bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
       >
         <button
           type="button"
@@ -116,13 +116,13 @@
     {/if}
 
     {#if hasActivity}
-      <div data-testid="activity-dot" class="absolute -right-1 -top-1 z-10 h-2 w-2 rounded-full bg-immich-primary">
+      <div data-testid="activity-dot" class="absolute -top-1 -right-1 z-10 size-2 rounded-full bg-immich-primary">
         <div class="absolute inset-0 animate-ping rounded-full bg-immich-primary opacity-40"></div>
       </div>
     {/if}
 
     {#if visibleMembers.length > 0}
-      <div class="absolute bottom-2 end-2 flex items-center">
+      <div class="absolute inset-e-2 bottom-2 flex items-center">
         {#each visibleMembers as member (member.userId)}
           <div class="-ms-1.5 first:ms-0">
             <UserAvatar
@@ -141,7 +141,7 @@
         {/each}
         {#if overflowCount > 0}
           <div
-            class="-ms-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-gray-500 text-xs font-medium text-white shadow-md"
+            class="-ms-1.5 flex size-7 items-center justify-center rounded-full bg-gray-500 text-xs font-medium text-white shadow-md"
           >
             +{overflowCount}
           </div>
@@ -152,7 +152,7 @@
 
   <div class="mt-4">
     <p
-      class="w-full leading-6 text-lg line-clamp-2 font-semibold text-black dark:text-white group-hover:text-primary"
+      class="line-clamp-2 w-full text-lg/6 font-semibold text-black group-hover:text-primary dark:text-white"
       data-testid="space-name"
       title={space.name}
     >

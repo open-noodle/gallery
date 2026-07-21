@@ -124,7 +124,7 @@ describe('buildSpaceTimelineOptions', () => {
   });
 
   it('omits empty / whitespace-only text filters', () => {
-    const filters = { ...createFilterState(), description: '   ', originalFileName: '', ocr: undefined };
+    const filters = { ...createFilterState(), description: ' '.repeat(3), originalFileName: '', ocr: undefined };
     const options = buildSpaceTimelineOptions('space-1', filters);
 
     expect(options).not.toHaveProperty('description');

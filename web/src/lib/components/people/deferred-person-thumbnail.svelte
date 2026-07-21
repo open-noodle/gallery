@@ -82,10 +82,12 @@
     }
 
     const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        requestStart();
-        observer.disconnect();
+      if (entries.every((entry) => !entry.isIntersecting)) {
+        return;
       }
+
+      requestStart();
+      observer.disconnect();
     });
 
     observer.observe(element);
@@ -142,7 +144,7 @@
     />
   {:else}
     <img
-      class={['object-cover bg-gray-300 dark:bg-gray-700', sharedClasses, imageClass]}
+      class={['bg-gray-300 object-cover dark:bg-gray-700', sharedClasses, imageClass]}
       {style}
       alt={altText ?? ''}
       draggable={false}

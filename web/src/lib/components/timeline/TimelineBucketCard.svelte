@@ -104,7 +104,7 @@
 
 <button
   type="button"
-  class="group relative block h-full min-h-56 w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-200 text-left text-white shadow-sm transition hover:border-gray-300 hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-immich-primary disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
+  class="group relative block size-full min-h-56 overflow-hidden rounded-lg border border-gray-200 bg-gray-200 text-left text-white shadow-sm transition hover:border-gray-300 hover:brightness-105 focus-visible:ring-2 focus-visible:ring-immich-primary focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
   aria-label={accessibleLabel}
   {disabled}
   data-state={renderState}
@@ -116,7 +116,7 @@
       {#if bucket.representativeThumbhash && !imageLoaded}
         <Thumbhash
           base64ThumbHash={bucket.representativeThumbhash}
-          class="absolute inset-0 h-full w-full object-cover"
+          class="absolute inset-0 size-full object-cover"
           fadeOut
         />
       {/if}
@@ -126,7 +126,7 @@
           src={imageUrl}
           alt=""
           draggable="false"
-          class="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+          class="absolute inset-0 size-full object-cover transition duration-300 group-hover:scale-[1.02]"
           data-testid="timeline-bucket-card-image"
           data-image-key={imageKey}
           onload={handleImageLoad}
@@ -135,7 +135,7 @@
       {/key}
     {:else if imageFailed}
       <div
-        class="flex h-full w-full items-center justify-center bg-gray-200 px-3 text-center text-4xl font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+        class="flex size-full items-center justify-center bg-gray-200 px-3 text-center text-4xl font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300"
         data-testid="timeline-bucket-card-fallback"
       >
         {title}
@@ -148,11 +148,11 @@
   </div>
 
   <div
-    class="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/80 via-black/45 to-transparent p-4 text-white"
+    class="absolute inset-x-0 bottom-0 z-10 bg-linear-to-t from-black/80 via-black/45 to-transparent p-4 text-white"
     data-testid="timeline-bucket-card-overlay"
   >
     <div
-      class="truncate text-2xl font-semibold leading-none tracking-normal sm:text-3xl"
+      class="truncate text-2xl leading-none font-semibold tracking-normal sm:text-3xl"
       data-testid="timeline-bucket-card-title"
     >
       {title}

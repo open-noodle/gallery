@@ -10,14 +10,14 @@ export const getGoogleMapsUrl = (lat: number, lon: number) => {
   const url = new URL('https://www.google.com/maps/search/');
   url.searchParams.set('api', '1');
   url.searchParams.set('query', coordinates(lat, lon));
-  return url.toString();
+  return url.href;
 };
 
 export const getAppleMapsUrl = (lat: number, lon: number) => {
   const url = new URL('https://maps.apple.com/');
   url.searchParams.set('ll', coordinates(lat, lon));
   url.searchParams.set('q', coordinates(lat, lon));
-  return url.toString();
+  return url.href;
 };
 
 export const getOpenStreetMapUrl = (lat: number, lon: number) => {
@@ -26,7 +26,7 @@ export const getOpenStreetMapUrl = (lat: number, lon: number) => {
   url.searchParams.set('mlon', String(lon));
   url.searchParams.set('zoom', '13');
   url.hash = `map=15/${lat}/${lon}`;
-  return url.toString();
+  return url.href;
 };
 
 export const getMapProviderLinks = (lat: number, lon: number): MapProviderLink[] => [
