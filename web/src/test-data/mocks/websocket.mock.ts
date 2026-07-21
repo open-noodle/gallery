@@ -18,6 +18,9 @@ import {
  * // vi.mock is called automatically when this module is imported
  * ```
  */
+// this module exists precisely to register the websocket mock on import
+// (documented usage above)
+// eslint-disable-next-line unicorn/no-top-level-side-effects
 vi.mock('$lib/stores/websocket', () => ({
   websocketStore: {
     connected: writable(false),
