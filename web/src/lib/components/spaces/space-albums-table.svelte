@@ -9,6 +9,7 @@
     type SpaceAlbumGroup,
   } from '$lib/utils/space-album-grouping';
   import { dateFormats } from '$lib/constants';
+  import { Route } from '$lib/route';
   import { type SharedSpaceLinkedAlbumDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiChevronRight, mdiDotsVertical } from '@mdi/js';
@@ -38,7 +39,7 @@
   >
     <td class="text-md w-8/12 items-center text-start text-ellipsis sm:w-4/12 md:w-4/12 xl:w-[30%] 2xl:w-[40%]">
       <a
-        href="/spaces/{spaceId}/albums/{album.id}"
+        href={Route.viewSpaceAlbum({ spaceId, albumId: album.id })}
         data-testid="space-album-row-{album.id}"
         class="hover:text-immich-primary"
       >

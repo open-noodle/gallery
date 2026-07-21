@@ -103,4 +103,14 @@ describe('Route', () => {
       expect(Route.continue(String.raw`\/malicious.com`, '/fallback')).toBe('/fallback');
     });
   });
+
+  describe('viewSpaceAlbum', () => {
+    it('links to an album inside a space', () => {
+      expect(Route.viewSpaceAlbum({ spaceId: 'space-1', albumId: 'album-2' })).toBe('/spaces/space-1/albums/album-2');
+    });
+
+    it('links to a space albums tab', () => {
+      expect(Route.viewSpaceAlbums({ id: 'space-1' })).toBe('/spaces/space-1/albums');
+    });
+  });
 });

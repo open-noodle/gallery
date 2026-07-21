@@ -127,8 +127,12 @@ test.describe('Spaces Sidebar Dropdown', () => {
     });
   });
 
-  test.describe('Colored Dot', () => {
-    test('should show colored dot for spaces with new assets', async ({ context, page }) => {
+  // The sidebar always identifies a space by its thumbnail. A space with unseen assets used to swap
+  // that thumbnail for a coloured activity dot, so the one row with activity was also the one row
+  // you couldn't identify. New-asset activity is surfaced on the Spaces page (card + table) and by
+  // the in-timeline new-assets divider instead.
+  test.describe('Space thumbnail', () => {
+    test('should show the thumbnail and no dot for spaces with new assets', async ({ context, page }) => {
       await utils.resetDatabase();
       admin = await utils.adminSetup();
 
@@ -140,10 +144,11 @@ test.describe('Spaces Sidebar Dropdown', () => {
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto('/photos');
 
-      await expect(page.locator(`[data-testid="sidebar-space-dot-${space.id}"]`)).toBeVisible();
+      await expect(page.locator(`[data-testid="sidebar-space-thumbnail-${space.id}"]`)).toBeVisible();
+      await expect(page.locator(`[data-testid="sidebar-space-dot-${space.id}"]`)).toHaveCount(0);
     });
 
-    test('should not show colored dot when no new assets', async ({ context, page }) => {
+    test('should show the thumbnail when there are no new assets', async ({ context, page }) => {
       await utils.resetDatabase();
       admin = await utils.adminSetup();
 
@@ -155,7 +160,8 @@ test.describe('Spaces Sidebar Dropdown', () => {
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto('/photos');
 
-      await expect(page.locator(`[data-testid="sidebar-space-dot-${space.id}"]`)).not.toBeVisible();
+      await expect(page.locator(`[data-testid="sidebar-space-thumbnail-${space.id}"]`)).toBeVisible();
+      await expect(page.locator(`[data-testid="sidebar-space-dot-${space.id}"]`)).toHaveCount(0);
     });
   });
 

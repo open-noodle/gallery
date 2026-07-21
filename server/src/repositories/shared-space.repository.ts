@@ -954,6 +954,18 @@ export class SharedSpaceRepository {
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
+  async getLinkedAlbumCount(spaceId: string): Promise<number> {
+    const result = await this.db
+      .selectFrom('shared_space_album')
+      .innerJoin('album', 'album.id', 'shared_space_album.albumId')
+      .where('shared_space_album.spaceId', '=', spaceId)
+      .where('album.deletedAt', 'is', null)
+      .select((eb) => eb.fn.countAll().$castTo<number>().as('count'))
+      .executeTakeFirst();
+    return result?.count ?? 0;
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
   getLinkedAlbums(spaceId: string) {
     return (
       this.db
