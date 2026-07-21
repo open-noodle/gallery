@@ -500,10 +500,7 @@ describe('contribution visibility parity (album_space_asset)', () => {
       .execute();
     expect(audit).toHaveLength(1);
 
-    const deletes: any[] = [];
-    for await (const row of toAsset.getDeletes({ nowId: NOW_ID, userId: member.id })) {
-      deletes.push(row);
-    }
+    const deletes: any[] = await Array.fromAsync(toAsset.getDeletes({ nowId: NOW_ID, userId: member.id }));
     expect(deletes.some((r) => r.albumId === album.id && r.assetId === asset.id)).toBe(true);
   });
 
@@ -541,14 +538,11 @@ describe('contribution visibility parity (album_space_asset)', () => {
 
     // Stronger: the restore's updateId bump must actually drive getUpserts to re-emit the contribution
     // to a member who acked BEFORE the restore (ack = pre-restore updateId).
-    const upserts: any[] = [];
-    for await (const row of toAsset.getUpserts({
+    const upserts: any[] = await Array.fromAsync(toAsset.getUpserts({
       nowId: NOW_ID,
       userId: member.id,
       ack: { type: SyncEntityType.SharedSpaceAlbumToAssetV1, updateId: before.updateId },
-    })) {
-      upserts.push(row);
-    }
+    }));
     expect(upserts.some((r) => r.albumId === album.id && r.assetId === asset.id)).toBe(true);
   });
 
@@ -581,17 +575,11 @@ describe('contribution visibility parity (album_space_asset)', () => {
     expect(remaining).toHaveLength(0);
 
     // getDeletes delivers (L, X) to the member (via the album_space_asset_audit delete trigger).
-    const deletes: any[] = [];
-    for await (const row of toAsset.getDeletes({ nowId: NOW_ID, userId: member.id })) {
-      deletes.push(row);
-    }
+    const deletes: any[] = await Array.fromAsync(toAsset.getDeletes({ nowId: NOW_ID, userId: member.id }));
     expect(deletes.some((r) => r.albumId === album.id && r.assetId === asset.id)).toBe(true);
 
     // No resurrection — the row is deleted, so getUpserts must not re-emit it (matches owned-Locked A8).
-    const upserts: any[] = [];
-    for await (const row of toAsset.getUpserts({ nowId: NOW_ID, userId: member.id })) {
-      upserts.push(row);
-    }
+    const upserts: any[] = await Array.fromAsync(toAsset.getUpserts({ nowId: NOW_ID, userId: member.id }));
     expect(upserts.some((r) => r.albumId === album.id && r.assetId === asset.id)).toBe(false);
   });
 });
