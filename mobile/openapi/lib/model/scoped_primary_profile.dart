@@ -122,29 +122,29 @@ class ScopedPrimaryProfile {
 }
 
 
-class ScopedPrimaryProfileTypeEnum {
-  /// Instantiate a new enum with the provided [value].
-  const ScopedPrimaryProfileTypeEnum._(this.value);
+enum ScopedPrimaryProfileTypeEnum {
+  userPerson._(r'user-person'),
+  spacePerson._(r'space-person'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const ScopedPrimaryProfileTypeEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const userPerson = ScopedPrimaryProfileTypeEnum._(r'user-person');
-  static const spacePerson = ScopedPrimaryProfileTypeEnum._(r'space-person');
-
-  /// List of all possible values in this [enum][ScopedPrimaryProfileTypeEnum].
-  static const values = <ScopedPrimaryProfileTypeEnum>[
-    userPerson,
-    spacePerson,
-  ];
-
+  /// Returns the instance of [ScopedPrimaryProfileTypeEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static ScopedPrimaryProfileTypeEnum? fromJson(dynamic value) => ScopedPrimaryProfileTypeEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [ScopedPrimaryProfileTypeEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<ScopedPrimaryProfileTypeEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <ScopedPrimaryProfileTypeEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -166,9 +166,10 @@ class ScopedPrimaryProfileTypeEnumTypeTransformer {
 
   const ScopedPrimaryProfileTypeEnumTypeTransformer._();
 
-  String encode(ScopedPrimaryProfileTypeEnum data) => data.value;
+  String encode(ScopedPrimaryProfileTypeEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a ScopedPrimaryProfileTypeEnum.
+  /// Returns the instance of [ScopedPrimaryProfileTypeEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -177,6 +178,9 @@ class ScopedPrimaryProfileTypeEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   ScopedPrimaryProfileTypeEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is ScopedPrimaryProfileTypeEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'user-person': return ScopedPrimaryProfileTypeEnum.userPerson;
@@ -190,7 +194,7 @@ class ScopedPrimaryProfileTypeEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [ScopedPrimaryProfileTypeEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static ScopedPrimaryProfileTypeEnumTypeTransformer? _instance;
 }
 
