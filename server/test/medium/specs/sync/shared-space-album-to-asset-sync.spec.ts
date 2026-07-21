@@ -35,10 +35,7 @@ describe('SharedSpaceAlbumToAssetSync.getBackfill', () => {
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
 
     const stream = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id, owner.id);
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.assetId)).toContain(asset.id);
     expect(result.find((r: any) => r.assetId === asset.id)?.albumId).toBe(album.id);
   });
@@ -52,10 +49,7 @@ describe('SharedSpaceAlbumToAssetSync.getBackfill', () => {
     await ctx.newAlbumAsset({ albumId: a1.id, assetId: asset.id });
 
     const stream = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, a2.id, owner.id);
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result).toHaveLength(0);
   });
 });
@@ -74,10 +68,7 @@ describe('SharedSpaceAlbumToAssetSync.getUpserts', () => {
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
 
     const stream = sut.getUpserts({ nowId: NOW_ID, userId: member.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.some((r: any) => r.albumId === album.id && r.assetId === asset.id)).toBe(true);
   });
 
@@ -92,10 +83,7 @@ describe('SharedSpaceAlbumToAssetSync.getUpserts', () => {
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
 
     const stream = sut.getUpserts({ nowId: NOW_ID, userId: stranger.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.some((r: any) => r.albumId === album.id)).toBe(false);
   });
 
@@ -113,20 +101,14 @@ describe('SharedSpaceAlbumToAssetSync.getUpserts', () => {
 
     // Confirm membership row is visible before soft-delete
     const streamBefore = sut.getUpserts({ nowId: NOW_ID, userId: member.id });
-    const resultBefore: any[] = [];
-    for await (const row of streamBefore) {
-      resultBefore.push(row);
-    }
+    const resultBefore: any[] = await Array.fromAsync(streamBefore);
     expect(resultBefore.some((r: any) => r.albumId === album.id && r.assetId === asset.id)).toBe(true);
 
     // Soft-delete the album
     await db.updateTable('album').set({ deletedAt: new Date() }).where('id', '=', album.id).execute();
 
     const stream = sut.getUpserts({ nowId: NOW_ID, userId: member.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.some((r: any) => r.albumId === album.id)).toBe(false);
   });
 
@@ -145,10 +127,7 @@ describe('SharedSpaceAlbumToAssetSync.getUpserts', () => {
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
 
     const stream = sut.getUpserts({ nowId: NOW_ID, userId: member.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     const assetIds = result.map((r: any) => r.assetId);
     expect(assetIds).toContain(timeline.id); // shareable membership delivered
     expect(assetIds).not.toContain(hidden.id); // Hidden membership withheld
@@ -164,10 +143,7 @@ describe('SharedSpaceAlbumToAssetSync.getUpserts', () => {
     await ctx.newAlbumAsset({ albumId: album.id, assetId: timeline.id });
 
     const stream = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id, owner.id);
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     const assetIds = result.map((r: any) => r.assetId);
     expect(assetIds).toContain(timeline.id);
     expect(assetIds).not.toContain(hidden.id);
@@ -194,10 +170,7 @@ describe('SharedSpaceAlbumToAssetSync.getUpserts', () => {
 
     for (const userId of [memberA.id, memberB.id]) {
       const stream = sut.getUpserts({ nowId: NOW_ID, userId });
-      const result: any[] = [];
-      for await (const row of stream) {
-        result.push(row);
-      }
+      const result: any[] = await Array.fromAsync(stream);
       expect(result.map((r: any) => r.assetId)).not.toContain(hidden.id);
     }
   });
@@ -215,10 +188,7 @@ describe('SharedSpaceAlbumToAssetSync.getUpserts', () => {
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
 
     const stream = sut.getUpserts({ nowId: NOW_ID, userId: member.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.assetId)).toContain(asset.id);
   });
 });
@@ -238,10 +208,7 @@ describe('SharedSpaceAlbumToAssetSync.getDeletes', () => {
     await db.insertInto('album_asset_audit').values({ assetId: asset.id, albumId: album.id }).execute();
 
     const stream = sut.getDeletes({ nowId: NOW_ID, userId: member.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.some((r: any) => r.albumId === album.id && r.assetId === asset.id)).toBe(true);
   });
 
@@ -257,19 +224,13 @@ describe('SharedSpaceAlbumToAssetSync.getDeletes', () => {
     await db.insertInto('album_asset_audit').values({ assetId: asset.id, albumId: album.id }).execute();
 
     const stream = sut.getDeletes({ nowId: NOW_ID, userId: stranger.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result).toHaveLength(0);
   });
 });
 
 const drain = async (stream: AsyncIterable<any>) => {
-  const out: any[] = [];
-  for await (const row of stream) {
-    out.push(row);
-  }
+  const out: any[] = await Array.fromAsync(stream);
   return out;
 };
 
