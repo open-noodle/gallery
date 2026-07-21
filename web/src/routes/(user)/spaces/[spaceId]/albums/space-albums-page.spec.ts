@@ -13,6 +13,7 @@ import { goto, invalidateAll } from '$app/navigation';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
+import { eventManager } from '$lib/managers/event-manager.svelte';
 import SpaceLinkAlbumModal from '$lib/modals/SpaceLinkAlbumModal.svelte';
 import { spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
@@ -341,6 +342,40 @@ describe('Space albums page', () => {
       renderPage([makeAlbum({ id: 'a' })], SharedSpaceRole.Viewer);
       expect(screen.queryByTestId('create-album-button')).not.toBeInTheDocument();
       expect(screen.queryByTestId('link-album-button')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('album link/unlink events', () => {
+    it('emits SpaceUnlinkAlbum after a confirmed unlink', async () => {
+      const emitSpy = vi.spyOn(eventManager, 'emit');
+      modalManagerMock.showDialog.mockResolvedValue(true);
+      sdkMock.unlinkAlbum.mockResolvedValue(undefined as never);
+      sdkMock.getSharedSpaceAlbums.mockResolvedValue([]);
+      const album = makeAlbum({ id: 'album-1', albumName: 'Vacation' });
+      renderPage([album], SharedSpaceRole.Editor);
+
+      const menuContainer = screen.getByTestId('space-album-card-menu');
+      const menuButton = menuContainer.querySelector('button');
+      expect(menuButton).not.toBeNull();
+      await fireEvent.click(menuButton!);
+
+      const unlinkOption = await screen.findByText('Unlink album');
+      await fireEvent.click(unlinkOption);
+
+      await waitFor(() => expect(emitSpy).toHaveBeenCalledWith('SpaceUnlinkAlbum', { spaceId: 'space-1' }));
+      emitSpy.mockRestore();
+    });
+
+    it('emits SpaceLinkAlbum after creating and linking a new album', async () => {
+      const emitSpy = vi.spyOn(eventManager, 'emit');
+      sdkMock.createAlbum.mockResolvedValue({ id: 'new-1', albumName: '' } as AlbumResponseDto);
+      sdkMock.linkAlbum.mockResolvedValue(undefined as never);
+      renderPage([makeAlbum({ id: 'a' })], SharedSpaceRole.Owner);
+
+      await fireEvent.click(screen.getByTestId('create-album-button'));
+
+      await waitFor(() => expect(emitSpy).toHaveBeenCalledWith('SpaceLinkAlbum', { spaceId: BASE_SPACE.id }));
+      emitSpy.mockRestore();
     });
   });
 
