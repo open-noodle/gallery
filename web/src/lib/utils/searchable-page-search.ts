@@ -67,6 +67,10 @@ export function getSearchablePageBasePath(pathname: string): string | null {
     return '/photos';
   }
 
+  if (pathname.startsWith('/recently-added')) {
+    return '/recently-added';
+  }
+
   const parts = pathname.split('/').filter(Boolean);
   if (parts[0] !== 'spaces' || parts[1] === undefined) {
     return null;
@@ -118,6 +122,7 @@ export function buildSearchablePageUrl(
   }
 
   const trimmedQuery = query.trim();
+
   const params = new URLSearchParams(url.searchParams);
 
   // `at` is a one-shot grid scroll target left over from closing the asset viewer. It must not

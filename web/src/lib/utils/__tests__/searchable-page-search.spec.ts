@@ -3,6 +3,7 @@ import { createFilterState } from '$lib/components/filter-panel/filter-panel';
 import {
   buildSearchablePageUrl,
   clearSearchablePageFilterParams,
+  getSearchablePageBasePath,
   getSearchablePageFilterState,
   getSearchablePageState,
   preserveTransientTemporalFilters,
@@ -234,5 +235,48 @@ describe('text filter URL params', () => {
     expect(state.personIds).toEqual(['p1']);
     expect(state.isInAlbum).toBe(true);
     expect(state.description).toBe('beach');
+  });
+});
+
+describe('recently added page', () => {
+  it('resolves the base path so filter changes can be written to the URL', () => {
+    expect(getSearchablePageBasePath('/recently-added')).toBe('/recently-added');
+    expect(getSearchablePageBasePath('/recently-added/photos')).toBe('/recently-added');
+  });
+
+  it('builds a filter URL for the recently added page', () => {
+    const url = buildSearchablePageUrl(new URL('https://gallery.test/recently-added'), '', 'desc', {
+      ...createFilterState(),
+      rating: 5,
+    });
+
+    expect(url).not.toBeNull();
+    expect(url).toContain('rating=5');
+  });
+
+  it('is query-capable now that the text section and search path exist', () => {
+    const state = getSearchablePageState(new URL('https://gallery.test/recently-added'));
+
+    expect(state.basePath).toBe('/recently-added');
+    expect(state.isSearchable).toBe(true);
+  });
+
+  it('builds a query URL for the recently added page', () => {
+    expect(buildSearchablePageUrl(new URL('https://gallery.test/recently-added'), 'beach')).toContain('q=beach');
+  });
+
+  it('still builds a filter-only URL for the same page', () => {
+    const url = buildSearchablePageUrl(new URL('https://gallery.test/recently-added'), '', 'desc', {
+      ...createFilterState(),
+      rating: 5,
+    });
+
+    expect(url).toContain('rating=5');
+  });
+
+  it('leaves photos and spaces query-capable', () => {
+    expect(getSearchablePageState(new URL('https://gallery.test/photos')).isSearchable).toBe(true);
+    expect(getSearchablePageState(new URL('https://gallery.test/spaces/space-1')).isSearchable).toBe(true);
+    expect(buildSearchablePageUrl(new URL('https://gallery.test/photos'), 'beach')).toContain('q=beach');
   });
 });
