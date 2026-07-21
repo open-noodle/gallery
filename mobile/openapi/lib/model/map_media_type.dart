@@ -11,29 +11,29 @@
 part of openapi.api;
 
 
-class MapMediaType {
-  /// Instantiate a new enum with the provided [value].
-  const MapMediaType._(this.value);
+enum MapMediaType {
+  IMAGE._(r'IMAGE'),
+  VIDEO._(r'VIDEO'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const MapMediaType._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const IMAGE = MapMediaType._(r'IMAGE');
-  static const VIDEO = MapMediaType._(r'VIDEO');
-
-  /// List of all possible values in this [enum][MapMediaType].
-  static const values = <MapMediaType>[
-    IMAGE,
-    VIDEO,
-  ];
-
+  /// Returns the instance of [MapMediaType] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static MapMediaType? fromJson(dynamic value) => MapMediaTypeTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [MapMediaType]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<MapMediaType> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <MapMediaType>[];
     if (json is List && json.isNotEmpty) {
@@ -55,9 +55,11 @@ class MapMediaTypeTypeTransformer {
 
   const MapMediaTypeTypeTransformer._();
 
-  String encode(MapMediaType data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(MapMediaType data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a MapMediaType.
+  /// Returns the instance of [MapMediaType] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -66,6 +68,9 @@ class MapMediaTypeTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   MapMediaType? decode(dynamic data, {bool allowNull = true}) {
+    if (data is MapMediaType) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'IMAGE': return MapMediaType.IMAGE;
@@ -79,7 +84,7 @@ class MapMediaTypeTypeTransformer {
     return null;
   }
 
-  /// Singleton [MapMediaTypeTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static MapMediaTypeTypeTransformer? _instance;
 }
 

@@ -8,6 +8,7 @@ import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/store.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/utils/migration.dart';
 
@@ -31,6 +32,11 @@ void main() {
   setUpAll(() async {
     db = Drift(DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
     storeService = await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    // Upstream #30072 ("do not show the whats new page on fresh login") made the
+    // fresh-install branch of migrateDatabaseIfNeeded call
+    // FeatureMessageService(SettingsRepository.instance), so the singleton must
+    // be bound to this test's in-memory Drift before any migration runs.
+    await SettingsRepository.ensureInitialized(db);
   });
 
   tearDownAll(() async {
