@@ -55,7 +55,7 @@
   const peopleToNotShow = $derived([...selectedPeople, person]);
   const visiblePeople = $derived.by(() => {
     const source = searchName ? searchedPeople : people;
-    return source.filter((person) => !peopleToNotShow.some((hiddenPerson) => hiddenPerson.id === person.id));
+    return source.filter((person) => peopleToNotShow.every((hiddenPerson) => hiddenPerson.id !== person.id));
   });
 
   const loadMergePeople = async (sortFaces = false) => {
@@ -89,7 +89,9 @@
   };
 
   const handleSwapPeople = async (notify = true) => {
-    [person, selectedPeople[0]] = [selectedPeople[0], person];
+    const swapped = selectedPeople[0];
+    selectedPeople[0] = person;
+    person = swapped;
     if (notify) {
       await onSwapPerson(person);
     }
@@ -141,7 +143,7 @@
 
 <section
   transition:fly={{ y: 500, duration: 100, easing: quintOut }}
-  class="fixed start-0 top-0 z-50 h-full w-full bg-light dark:bg-immich-dark-bg"
+  class="fixed inset-s-0 top-0 z-50 size-full bg-light dark:bg-immich-dark-bg"
 >
   <ControlAppBar onClose={onBack}>
     {#snippet leading()}
@@ -174,7 +176,7 @@
                 onclick={() => onSelect(selectedPerson)}
               >
                 <div
-                  class="h-full w-full rounded-full border-2 border-immich-primary brightness-90 filter dark:border-immich-dark-primary"
+                  class="size-full rounded-full border-2 border-immich-primary brightness-90 filter dark:border-immich-dark-primary"
                 >
                   <ImageThumbnail
                     circle
@@ -186,7 +188,7 @@
                 </div>
                 {#if getDisplayName(selectedPerson)}
                   <span
-                    class="text-white-shadow absolute bottom-2 start-0 w-full text-ellipsis px-1 text-center font-medium text-white"
+                    class="text-white-shadow absolute inset-s-0 bottom-2 w-full px-1 text-center font-medium text-ellipsis text-white"
                   >
                     {getDisplayName(selectedPerson)}
                   </span>
@@ -225,7 +227,7 @@
             aria-label={getDisplayName(person)}
           >
             <div
-              class="h-full w-full rounded-full border-2 border-immich-primary brightness-90 filter dark:border-immich-dark-primary"
+              class="size-full rounded-full border-2 border-immich-primary brightness-90 filter dark:border-immich-dark-primary"
             >
               <ImageThumbnail
                 circle
@@ -237,7 +239,7 @@
             </div>
             {#if getDisplayName(person)}
               <span
-                class="text-white-shadow absolute bottom-2 start-0 w-full text-ellipsis px-1 text-center font-medium text-white"
+                class="text-white-shadow absolute inset-s-0 bottom-2 w-full px-1 text-center font-medium text-ellipsis text-white"
               >
                 {getDisplayName(person)}
               </span>
@@ -273,7 +275,7 @@
       </div>
 
       <div
-        class="immich-scrollbar mt-6 overflow-y-auto rounded-3xl bg-gray-200 p-10 dark:bg-immich-dark-gray"
+        class="mt-6 immich-scrollbar overflow-y-auto rounded-3xl bg-gray-200 p-10 dark:bg-immich-dark-gray"
         style:max-height={Math.max(screenHeight - 400, 200) + 'px'}
       >
         <div class="grid-col-2 grid gap-8 md:grid-cols-3 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10">
@@ -285,7 +287,7 @@
               onclick={() => onSelect(mergePerson)}
             >
               <div
-                class="h-full w-full rounded-full border-2 border-immich-primary brightness-90 filter dark:border-immich-dark-primary"
+                class="size-full rounded-full border-2 border-immich-primary brightness-90 filter dark:border-immich-dark-primary"
               >
                 <ImageThumbnail
                   circle
@@ -296,11 +298,11 @@
                 />
               </div>
               <div
-                class="absolute start-0 top-0 h-full w-full rounded-full bg-immich-primary/30 opacity-0 hover:opacity-100"
+                class="absolute inset-s-0 top-0 size-full rounded-full bg-immich-primary/30 opacity-0 hover:opacity-100"
               ></div>
               {#if getDisplayName(mergePerson)}
                 <span
-                  class="text-white-shadow absolute bottom-2 start-0 w-full text-ellipsis px-1 text-center font-medium text-white"
+                  class="text-white-shadow absolute inset-s-0 bottom-2 w-full px-1 text-center font-medium text-ellipsis text-white"
                 >
                   {getDisplayName(mergePerson)}
                 </span>

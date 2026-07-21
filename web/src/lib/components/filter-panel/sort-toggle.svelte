@@ -20,7 +20,7 @@
 
 <button
   type="button"
-  class="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-subtle dark:text-gray-400"
+  class="flex size-8 items-center justify-center rounded-full text-gray-500 hover:bg-subtle dark:text-gray-400"
   onclick={handleClick}
   {title}
   data-testid="sort-toggle"

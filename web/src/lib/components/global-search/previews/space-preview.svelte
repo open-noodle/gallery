@@ -56,7 +56,7 @@
     {:else}
       <div
         data-testid="space-preview-gradient"
-        class="flex aspect-square w-full items-center justify-center rounded-xl bg-gradient-to-br {gradientClass}"
+        class="flex aspect-square w-full items-center justify-center rounded-xl bg-linear-to-br {gradientClass}"
         aria-hidden="true"
       >
         <Icon icon={mdiAccountMultipleOutline} size="4em" class="text-white/40" />
@@ -90,7 +90,7 @@
       {#if overflowCount > 0}
         <div
           data-testid="member-overflow"
-          class="-ms-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-gray-500 text-xs font-medium text-white shadow-md"
+          class="-ms-1.5 flex size-7 items-center justify-center rounded-full bg-gray-500 text-xs font-medium text-white shadow-md"
         >
           +{overflowCount}
         </div>

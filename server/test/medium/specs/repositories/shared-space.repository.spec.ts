@@ -1864,7 +1864,7 @@ describe(SharedSpaceRepository.name, () => {
       const { user } = await ctx.newUser();
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       const assets = await Promise.all(
-        Array.from({ length: 6 }).map(() => ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline })),
+        Array.from({ length: 6 }, () => ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline })),
       );
       for (const { asset } of assets) {
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
@@ -2370,7 +2370,7 @@ describe(SharedSpaceRepository.name, () => {
       const { user } = await ctx.newUser();
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       const assets = await Promise.all(
-        Array.from({ length: 6 }).map(() => ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline })),
+        Array.from({ length: 6 }, () => ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline })),
       );
       for (const { asset } of assets) {
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
@@ -3269,7 +3269,11 @@ describe(SharedSpaceRepository.name, () => {
         representativeFaceId: null,
       });
       const unnamedPerson = await sut.createPerson({ spaceId: space.id, name: '', representativeFaceId: null });
-      const whitespacePerson = await sut.createPerson({ spaceId: space.id, name: ' '.repeat(3), representativeFaceId: null });
+      const whitespacePerson = await sut.createPerson({
+        spaceId: space.id,
+        name: ' '.repeat(3),
+        representativeFaceId: null,
+      });
       const outOfScopePerson = await sut.createPerson({
         spaceId: otherSpace.id,
         name: 'Other Space',
@@ -3409,7 +3413,7 @@ describe(SharedSpaceRepository.name, () => {
       const { user } = await ctx.newUser();
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       const assets = await Promise.all(
-        Array.from({ length: 6 }).map(() => ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline })),
+        Array.from({ length: 6 }, () => ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline })),
       );
       for (const { asset } of assets) {
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });

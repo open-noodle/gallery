@@ -19,7 +19,7 @@ export function buildPhotosTimelineOptions(filters: FilterState): Record<string,
   const base: Record<string, unknown> = {
     visibility: AssetVisibility.Timeline,
     withStacked: true,
-    ...(includeSharedTimelineAssets ? { withPartners: true, withSharedSpaces: true } : {}),
+    ...(includeSharedTimelineAssets && { withPartners: true, withSharedSpaces: true }),
   };
 
   if (filters.personIds.length > 0) {

@@ -477,7 +477,7 @@
 
   {#if showRepresentativeBuckets}
     <div
-      class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4 px-4 py-4"
+      class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4 p-4"
       data-testid="gallery-viewer-representative-buckets"
       data-grouping={galleryGrouping}
     >

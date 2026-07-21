@@ -2,6 +2,15 @@ import { serverVersion } from 'src/constants';
 import { ImmichEnvironment } from 'src/enum';
 import { configureUserAgent } from 'src/utils/fetch';
 
+const getUserAgent = async () => {
+  const spy = vi.fn().mockResolvedValue(new Response());
+  vi.stubGlobal('fetch', spy);
+  configureUserAgent();
+  await fetch('https://test.local');
+  const headers: Headers = spy.mock.calls[0][1].headers;
+  return headers.get('User-Agent');
+};
+
 describe('fetch', () => {
   let originalEnv: string | undefined;
 
@@ -13,15 +22,6 @@ describe('fetch', () => {
     vi.unstubAllGlobals();
     process.env.IMMICH_ENV = originalEnv;
   });
-
-  const getUserAgent = async () => {
-    const spy = vi.fn().mockResolvedValue(new Response());
-    vi.stubGlobal('fetch', spy);
-    configureUserAgent();
-    await fetch('https://test.local');
-    const headers: Headers = spy.mock.calls[0][1].headers;
-    return headers.get('User-Agent');
-  };
 
   it('should label production with (prod)', async () => {
     process.env.IMMICH_ENV = ImmichEnvironment.Production;

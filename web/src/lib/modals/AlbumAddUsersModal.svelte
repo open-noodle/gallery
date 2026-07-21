@@ -64,23 +64,27 @@
     if (activeGroupIds.has(group.id)) {
       activeGroupIds.delete(group.id);
       for (const member of group.members) {
-        if (!excludedUserIds.includes(member.userId)) {
-          const coveredByOtherGroup = groups.some(
-            (g) => g.id !== group.id && activeGroupIds.has(g.id) && g.members.some((m) => m.userId === member.userId),
-          );
-          if (!coveredByOtherGroup) {
-            selectedUsers.delete(member.userId);
-          }
+        if (excludedUserIds.includes(member.userId)) {
+          continue;
+        }
+
+        const coveredByOtherGroup = groups.some(
+          (g) => g.id !== group.id && activeGroupIds.has(g.id) && g.members.some((m) => m.userId === member.userId),
+        );
+        if (!coveredByOtherGroup) {
+          selectedUsers.delete(member.userId);
         }
       }
     } else {
       activeGroupIds.add(group.id);
       for (const member of group.members) {
-        if (!excludedUserIds.includes(member.userId)) {
-          const user = users.find((u) => u.id === member.userId);
-          if (user) {
-            selectedUsers.set(user.id, user);
-          }
+        if (excludedUserIds.includes(member.userId)) {
+          continue;
+        }
+
+        const user = users.find((u) => u.id === member.userId);
+        if (user) {
+          selectedUsers.set(user.id, user);
         }
       }
     }
@@ -123,16 +127,16 @@
     </div>
   {:else}
     {#if filteredGroups.length > 0}
-      <div class="flex flex-wrap gap-2 mb-3">
+      <div class="mb-3 flex flex-wrap gap-2">
         {#each filteredGroups as group (group.id)}
           {@const eligibleCount = group.members.filter((m) => !excludedUserIds.includes(m.userId)).length}
           <button
             type="button"
-            class="rounded-full px-3 py-1 text-xs font-medium transition-all border {activeGroupIds.has(group.id)
+            class="rounded-full border px-3 py-1 text-xs font-medium transition-all {activeGroupIds.has(group.id)
               ? group.color
                 ? (colorClasses[group.color] ?? 'bg-gray-700 text-white')
                 : 'bg-gray-700 text-white dark:bg-gray-200 dark:text-gray-800'
-              : 'bg-transparent text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800'}"
+              : 'border-gray-300 bg-transparent text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800'}"
             onclick={() => handleGroupToggle(group)}
           >
             {group.name}

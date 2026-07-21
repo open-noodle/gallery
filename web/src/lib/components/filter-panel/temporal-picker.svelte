@@ -127,7 +127,7 @@
 <div data-testid="temporal-picker">
   <div class="mb-4 space-y-2" data-testid="custom-date-range">
     <div class="grid grid-cols-2 gap-2.5">
-      <label class="flex flex-col gap-1.5 text-[11px] font-medium leading-none text-gray-600 dark:text-gray-300">
+      <label class="flex flex-col gap-1.5 text-[11px] leading-none font-medium text-gray-600 dark:text-gray-300">
         <span class="px-0.5">{$t('filter_from')}</span>
         <input
           bind:value={fromValue}
@@ -141,11 +141,11 @@
           aria-describedby={customRangeErrorTarget === 'from' || customRangeErrorTarget === 'range'
             ? CUSTOM_RANGE_ERROR_ID
             : undefined}
-          class="h-8 w-full rounded-lg border border-gray-200 bg-white px-2.5 text-xs text-gray-700 outline-none transition-colors placeholder:text-gray-400 focus:border-immich-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:border-immich-dark-primary"
+          class="h-8 w-full rounded-lg border border-gray-200 bg-white px-2.5 text-xs text-gray-700 transition-colors outline-none placeholder:text-gray-400 focus:border-immich-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:border-immich-dark-primary"
           data-testid="custom-date-from-input"
         />
       </label>
-      <label class="flex flex-col gap-1.5 text-[11px] font-medium leading-none text-gray-600 dark:text-gray-300">
+      <label class="flex flex-col gap-1.5 text-[11px] leading-none font-medium text-gray-600 dark:text-gray-300">
         <span class="px-0.5">{$t('filter_to')}</span>
         <input
           bind:value={toValue}
@@ -159,7 +159,7 @@
           aria-describedby={customRangeErrorTarget === 'to' || customRangeErrorTarget === 'range'
             ? CUSTOM_RANGE_ERROR_ID
             : undefined}
-          class="h-8 w-full rounded-lg border border-gray-200 bg-white px-2.5 text-xs text-gray-700 outline-none transition-colors placeholder:text-gray-400 focus:border-immich-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:border-immich-dark-primary"
+          class="h-8 w-full rounded-lg border border-gray-200 bg-white px-2.5 text-xs text-gray-700 transition-colors outline-none placeholder:text-gray-400 focus:border-immich-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:border-immich-dark-primary"
           data-testid="custom-date-to-input"
         />
       </label>
@@ -196,7 +196,7 @@
         {@const isSelected = selectedMonth === m.month}
         <button
           type="button"
-          class="flex flex-col items-center rounded-xl border px-2 py-2 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none
+          class="flex flex-col items-center rounded-xl border p-2 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none
             {isSelected
             ? 'border-immich-primary bg-immich-primary text-white dark:border-immich-dark-primary dark:bg-immich-dark-primary'
             : m.count === 0
@@ -235,8 +235,8 @@
           onclick={() => handleYearClick(y.year, y.count)}
           data-testid="year-btn-{y.year}"
         >
-          <span class="text-xs font-semibold leading-tight tabular-nums">{y.year}</span>
-          <span class="text-xs leading-tight tabular-nums text-gray-400 opacity-60 dark:text-gray-500">{y.count}</span>
+          <span class="text-xs/tight font-semibold tabular-nums">{y.year}</span>
+          <span class="text-xs/tight text-gray-400 tabular-nums opacity-60 dark:text-gray-500">{y.count}</span>
           <div class="mt-1 h-[3px] w-full overflow-hidden rounded-sm bg-gray-200 dark:bg-gray-700">
             <div
               class="year-bar h-full origin-left rounded-sm bg-immich-primary transition-[width] duration-300 dark:bg-immich-dark-primary"
