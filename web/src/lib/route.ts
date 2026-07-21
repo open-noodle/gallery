@@ -119,6 +119,9 @@ export const Route = {
   // spaces
   spaces: () => '/spaces',
   viewSpace: ({ id }: { id: string }) => `/spaces/${id}`,
+  viewSpaceAlbums: ({ id }: { id: string }) => `/spaces/${id}/albums`,
+  viewSpaceAlbum: ({ spaceId, albumId }: { spaceId: string; albumId: string }) =>
+    `/spaces/${spaceId}/albums/${albumId}`,
 
   // shared links
   sharedLinks: (params?: { filter?: SharedLinkTab }) => '/shared-links' + asQueryString(params),
