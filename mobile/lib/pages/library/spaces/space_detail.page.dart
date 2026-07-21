@@ -117,7 +117,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   SharedSpaceRole get _currentRole {
     final member = _currentMember;
     if (member == null) return SharedSpaceRole.viewer;
-    return SharedSpaceRole.fromJson(member.role.value) ?? SharedSpaceRole.viewer;
+    return SharedSpaceRole.fromJson(member.role.toString()) ?? SharedSpaceRole.viewer;
   }
 
   Future<void> _addPhotos() async {

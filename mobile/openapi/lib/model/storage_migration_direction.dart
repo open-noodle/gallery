@@ -11,29 +11,29 @@
 part of openapi.api;
 
 
-class StorageMigrationDirection {
-  /// Instantiate a new enum with the provided [value].
-  const StorageMigrationDirection._(this.value);
+enum StorageMigrationDirection {
+  toS3._(r'toS3'),
+  toDisk._(r'toDisk'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const StorageMigrationDirection._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const toS3 = StorageMigrationDirection._(r'toS3');
-  static const toDisk = StorageMigrationDirection._(r'toDisk');
-
-  /// List of all possible values in this [enum][StorageMigrationDirection].
-  static const values = <StorageMigrationDirection>[
-    toS3,
-    toDisk,
-  ];
-
+  /// Returns the instance of [StorageMigrationDirection] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static StorageMigrationDirection? fromJson(dynamic value) => StorageMigrationDirectionTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [StorageMigrationDirection]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<StorageMigrationDirection> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <StorageMigrationDirection>[];
     if (json is List && json.isNotEmpty) {
@@ -55,9 +55,11 @@ class StorageMigrationDirectionTypeTransformer {
 
   const StorageMigrationDirectionTypeTransformer._();
 
-  String encode(StorageMigrationDirection data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(StorageMigrationDirection data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a StorageMigrationDirection.
+  /// Returns the instance of [StorageMigrationDirection] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -66,6 +68,9 @@ class StorageMigrationDirectionTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   StorageMigrationDirection? decode(dynamic data, {bool allowNull = true}) {
+    if (data is StorageMigrationDirection) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'toS3': return StorageMigrationDirection.toS3;
@@ -79,7 +84,7 @@ class StorageMigrationDirectionTypeTransformer {
     return null;
   }
 
-  /// Singleton [StorageMigrationDirectionTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static StorageMigrationDirectionTypeTransformer? _instance;
 }
 
