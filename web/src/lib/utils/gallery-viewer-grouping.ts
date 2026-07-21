@@ -54,7 +54,7 @@ export function buildGalleryViewerBuckets(
       continue;
     }
 
-    const key = grouping === 'year' ? `${date.year}` : `${date.year}-${String(date.month).padStart(2, '0')}`;
+    const key = grouping === 'year' ? String(date.year) : `${date.year}-${String(date.month).padStart(2, '0')}`;
     const existing = buckets.get(key);
     if (existing) {
       existing.count += 1;

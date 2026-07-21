@@ -1,14 +1,5 @@
 export type TypedSearchFilterKey =
-  | 'person'
-  | 'tag'
-  | 'from'
-  | 'to'
-  | 'city'
-  | 'country'
-  | 'camera'
-  | 'type'
-  | 'favorite'
-  | 'rating';
+  'person' | 'tag' | 'from' | 'to' | 'city' | 'country' | 'camera' | 'type' | 'favorite' | 'rating';
 
 export type TypedSearchResolutionKey = 'person' | 'tag' | 'camera';
 
@@ -463,7 +454,7 @@ function normalizeScalarToken(key: TypedSearchFilterKey, raw: string, value: str
     }
     case 'rating': {
       const normalizedValue = Number(value);
-      if (!Number.isInteger(normalizedValue) || normalizedValue < 1 || normalizedValue > 5) {
+      if (!Number.isSafeInteger(normalizedValue) || normalizedValue < 1 || normalizedValue > 5) {
         return { issue: makeIssue('invalid-rating', raw, 'Rating must be between 1 and 5', key, value) };
       }
       return { token: { kind: 'scalar', key, raw, value, normalizedValue } };
@@ -515,7 +506,7 @@ function lastDayOfMonth(year: number, month: number): number {
 
 function normalizeMediaType(value: string): 'image' | 'video' | undefined {
   const normalized = value.toLowerCase();
-  if (normalized === 'photo' || normalized === 'photos' || normalized === 'image' || normalized === 'images') {
+  if (['photo', 'photos', 'image', 'images'].includes(normalized)) {
     return 'image';
   }
   if (normalized === 'video' || normalized === 'videos') {

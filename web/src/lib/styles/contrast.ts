@@ -1,4 +1,3 @@
-/* eslint-disable unicorn/numeric-separators-style -- sRGB/WCAG physical constants; grouping digits would obscure them */
 const channelToLinear = (c: number): number => {
   const s = c / 255;
   return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;

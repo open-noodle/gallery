@@ -176,7 +176,7 @@ export class SharedSpaceService extends BaseService {
       const recentAssetThumbhashes: string[] = [];
       for (const asset of recentAssets) {
         if (!asset.thumbhash) {
-        	continue;
+          continue;
         }
 
         recentAssetIds.push(asset.id);
@@ -220,10 +220,9 @@ export class SharedSpaceService extends BaseService {
       }
     }
 
-    let newAssetCount = 0;
-    if (membership.lastViewedAt) {
-      newAssetCount = await this.sharedSpaceRepository.getNewAssetCount(id, membership.lastViewedAt);
-    }
+    const newAssetCount = membership.lastViewedAt
+      ? await this.sharedSpaceRepository.getNewAssetCount(id, membership.lastViewedAt)
+      : 0;
 
     let hasPets: boolean | undefined;
     if (space.faceRecognitionEnabled) {
@@ -251,7 +250,7 @@ export class SharedSpaceService extends BaseService {
     const recentAssetThumbhashes: string[] = [];
     for (const asset of recentAssets) {
       if (!asset.thumbhash) {
-      	continue;
+        continue;
       }
 
       recentAssetIds.push(asset.id);
@@ -1570,7 +1569,7 @@ export class SharedSpaceService extends BaseService {
       processed: people.length,
       inherited,
       skipped,
-      ...((people.length === limit) && { nextCursor: people.at(-1)?.id }),
+      ...(people.length === limit && { nextCursor: people.at(-1)?.id }),
     };
   }
 
@@ -2875,13 +2874,18 @@ export class SharedSpaceService extends BaseService {
       );
     }
 
+    // Hoisted so the ternary's branches don't share a trailing `.identityId`
+    // (unicorn/prefer-minimal-ternary). Safe to evaluate eagerly: when `evidence`
+    // is empty, `evidence.some(...)` is false, so the old code took this same
+    // branch and threw identically.
+    const strongestEvidenceIdentityId = evidence.toSorted((a, b) => {
+      const supportDelta = Number(b.supportingFaceCount) - Number(a.supportingFaceCount);
+      return supportDelta === 0 ? a.identityId.localeCompare(b.identityId) : supportDelta;
+    })[0].identityId;
     const targetIdentityId =
       targetSpacePerson.identityId && evidence.some((item) => item.identityId === targetSpacePerson.identityId)
         ? targetSpacePerson.identityId
-        : evidence.toSorted((a, b) => {
-            const supportDelta = Number(b.supportingFaceCount) - Number(a.supportingFaceCount);
-            return supportDelta === 0 ? a.identityId.localeCompare(b.identityId) : supportDelta;
-          })[0].identityId;
+        : strongestEvidenceIdentityId;
 
     const sourceIdentityIds = evidence
       .map((item) => item.identityId)
@@ -3202,7 +3206,7 @@ export class SharedSpaceService extends BaseService {
       }
     } catch (error) {
       this.logger.error(`Failed to sync space people after deleting asset ${assetId}: ${error}`);
-      await this.enqueueSpaceFaceProjectionReconcile([...spacePersonMap.keys()]);
+      await this.enqueueSpaceFaceProjectionReconcile(spacePersonMap.keys().toArray());
     }
   }
 

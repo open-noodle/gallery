@@ -74,7 +74,7 @@
   disabled={!name.trim()}
   {onClose}
 >
-  <div class="flex flex-col gap-4 m-4">
+  <div class="m-4 flex flex-col gap-4">
     <Field label={$t('name')} required>
       <Input bind:value={name} autofocus maxlength={100} />
     </Field>
@@ -89,7 +89,7 @@
           {#each [...selectedUsers.values()] as user (user.id)}
             <button
               type="button"
-              class="flex items-center gap-1 rounded-full bg-gray-100 dark:bg-gray-700 px-2.5 py-1 text-xs transition-colors hover:bg-gray-200 dark:hover:bg-gray-600"
+              class="flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
               onclick={() => selectedUsers.delete(user.id)}
             >
               {user.name}
@@ -103,16 +103,16 @@
     </Field>
 
     {#if loading}
-      <div class="w-full flex place-items-center place-content-center p-4">
+      <div class="flex w-full place-content-center place-items-center p-4">
         <LoadingSpinner />
       </div>
     {:else}
-      <div class="max-h-64 overflow-y-auto -mx-1 px-1">
+      <div class="-mx-1 max-h-64 overflow-y-auto px-1">
         <Stack>
           {#each filteredUsers as user (user.id)}
             <ListButton selected={selectedUsers.has(user.id)} onclick={() => handleToggle(user)}>
               <UserAvatar {user} size="md" />
-              <div class="text-start grow">
+              <div class="grow text-start">
                 <Text fontWeight="medium">{user.name}</Text>
                 <Text size="tiny" color="muted">{user.email}</Text>
               </div>

@@ -25,7 +25,8 @@ describe('memory-type.metadata', () => {
     });
 
     it('every rule-kind entry has a non-empty key', () => {
-      for (const meta of MEMORY_TYPE_METADATA.filter((m) => m.kind === 'rule')) {
+      const ruleEntries = MEMORY_TYPE_METADATA.filter((m) => m.kind === 'rule');
+      for (const meta of ruleEntries) {
         expect(typeof meta.key).toBe('string');
         expect(meta.key.length).toBeGreaterThan(0);
       }

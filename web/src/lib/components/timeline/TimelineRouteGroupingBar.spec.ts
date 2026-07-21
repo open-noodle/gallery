@@ -40,7 +40,9 @@ describe('TimelineRouteGroupingBar', () => {
       props: {
         grouping: 'day',
         filters,
-        onGroupingChange: (grouping: TimelineGrouping) => changes.push(grouping),
+        onGroupingChange: (grouping: TimelineGrouping) => {
+          changes.push(grouping);
+        },
       },
     });
 
@@ -60,7 +62,9 @@ describe('TimelineRouteGroupingBar', () => {
         filters,
         resultCount: 12,
         onGroupingChange: () => {},
-        onClearTemporalFilter: () => cleared.push('timeline'),
+        onClearTemporalFilter: () => {
+          cleared.push('timeline');
+        },
       },
     });
 

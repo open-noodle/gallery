@@ -60,13 +60,13 @@
   }
 </script>
 
-<div class="mt-3 px-4 flex flex-col gap-5">
+<div class="mt-3 flex flex-col gap-5 px-4">
   <!-- Trimmed Duration -->
   <div class="flex flex-col gap-1">
-    <span class="text-[0.65rem] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold">
+    <span class="text-[0.65rem] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400">
       {$t('editor_trim_trimmed_duration')}
     </span>
-    <span class="text-2xl font-bold text-immich-fg dark:text-immich-dark-fg tabular-nums tracking-tight">
+    <span class="text-2xl font-bold tracking-tight text-immich-fg tabular-nums dark:text-immich-dark-fg">
       {formatTime(trimManager.trimmedDuration)}
     </span>
   </div>
@@ -74,31 +74,31 @@
   <!-- In / Out Time Inputs -->
   <div class="flex flex-col gap-2">
     <div class="flex gap-2">
-      <div class="flex-1 flex flex-col gap-1">
-        <label for="trim-in" class="text-[0.6rem] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-medium">
+      <div class="flex flex-1 flex-col gap-1">
+        <label for="trim-in" class="text-[0.6rem] font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400">
           {$t('editor_trim_in')}
         </label>
         <input
           id="trim-in"
           type="text"
-          class="bg-gray-800 dark:bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-immich-fg dark:text-immich-dark-fg tabular-nums outline-none focus:border-immich-primary/50 transition-colors"
+          class="rounded-sm border border-gray-700 bg-gray-800 px-2 py-1.5 text-sm text-immich-fg tabular-nums transition-colors outline-none focus:border-immich-primary/50 dark:bg-gray-800 dark:text-immich-dark-fg"
           value={displayIn}
           onfocus={onInFocus}
           onblur={onInBlur}
           oninput={(e) => (inValue = e.currentTarget.value)}
         />
       </div>
-      <div class="flex-1 flex flex-col gap-1">
+      <div class="flex flex-1 flex-col gap-1">
         <label
           for="trim-out"
-          class="text-[0.6rem] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-medium"
+          class="text-[0.6rem] font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400"
         >
           {$t('editor_trim_out')}
         </label>
         <input
           id="trim-out"
           type="text"
-          class="bg-gray-800 dark:bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-immich-fg dark:text-immich-dark-fg tabular-nums outline-none focus:border-immich-primary/50 transition-colors"
+          class="rounded-sm border border-gray-700 bg-gray-800 px-2 py-1.5 text-sm text-immich-fg tabular-nums transition-colors outline-none focus:border-immich-primary/50 dark:bg-gray-800 dark:text-immich-dark-fg"
           value={displayOut}
           onfocus={onOutFocus}
           onblur={onOutBlur}
@@ -111,19 +111,19 @@
     <div class="flex gap-1.5">
       <button
         type="button"
-        class="flex-1 flex items-center justify-center gap-1 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs font-medium text-gray-400 hover:bg-gray-700 hover:text-gray-300 hover:border-gray-600 transition-all cursor-pointer"
+        class="flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-sm border border-gray-700 bg-gray-800 px-2 py-1.5 text-xs font-medium text-gray-400 transition-all hover:border-gray-600 hover:bg-gray-700 hover:text-gray-300"
         onclick={setIn}
       >
         {$t('editor_trim_set_in')}
-        <kbd class="text-[0.6rem] bg-gray-700 rounded px-1 text-gray-500">I</kbd>
+        <kbd class="rounded-sm bg-gray-700 px-1 text-[0.6rem] text-gray-500">I</kbd>
       </button>
       <button
         type="button"
-        class="flex-1 flex items-center justify-center gap-1 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs font-medium text-gray-400 hover:bg-gray-700 hover:text-gray-300 hover:border-gray-600 transition-all cursor-pointer"
+        class="flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-sm border border-gray-700 bg-gray-800 px-2 py-1.5 text-xs font-medium text-gray-400 transition-all hover:border-gray-600 hover:bg-gray-700 hover:text-gray-300"
         onclick={setOut}
       >
         {$t('editor_trim_set_out')}
-        <kbd class="text-[0.6rem] bg-gray-700 rounded px-1 text-gray-500">O</kbd>
+        <kbd class="rounded-sm bg-gray-700 px-1 text-[0.6rem] text-gray-500">O</kbd>
       </button>
     </div>
   </div>
@@ -132,7 +132,7 @@
 
   <!-- Original Duration -->
   <div class="flex flex-col gap-1">
-    <span class="text-[0.65rem] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold">
+    <span class="text-[0.65rem] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400">
       {$t('crop_aspect_ratio_original')}
     </span>
     <span class="text-sm text-gray-500 tabular-nums">
@@ -144,7 +144,7 @@
   {#if trimManager.hasChanges}
     <button
       type="button"
-      class="text-xs text-gray-500 hover:text-gray-300 transition-colors cursor-pointer self-start"
+      class="cursor-pointer self-start text-xs text-gray-500 transition-colors hover:text-gray-300"
       onclick={() => trimManager.resetAllChanges()}
     >
       {$t('editor_trim_reset_to_full_duration')}

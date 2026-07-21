@@ -31,23 +31,25 @@
   let observer: IntersectionObserver | undefined;
 
   $effect(() => {
-    if (sentinelElement && scrollContainer) {
-      observer?.disconnect();
-      observer = new IntersectionObserver(
-        (entries) => {
-          if (entries[0]?.isIntersecting && hasMore && !isLoading) {
-            onLoadMore();
-          }
-        },
-        { root: scrollContainer },
-      );
-      observer.observe(sentinelElement);
-      return () => observer?.disconnect();
+    if (!(sentinelElement && scrollContainer)) {
+      return;
     }
+
+    observer?.disconnect();
+    observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasMore && !isLoading) {
+          onLoadMore();
+        }
+      },
+      { root: scrollContainer },
+    );
+    observer.observe(sentinelElement);
+    return () => observer?.disconnect();
   });
 
   const getFullAsset = (id: string): Promise<AssetResponseDto> => {
-    return getAssetInfo({ ...authManager.params, id, ...(spaceId ? { spaceId } : {}) });
+    return getAssetInfo({ ...authManager.params, id, ...(spaceId && { spaceId }) });
   };
 
   let cursor = $state<AssetCursor | undefined>();
@@ -114,7 +116,7 @@
   const LazyAssetViewer = lazyComponent(() => import('$lib/components/asset-viewer/AssetViewer.svelte'));
 </script>
 
-<section bind:this={scrollContainer} class="immich-scrollbar flex-1 overflow-y-auto px-4 py-4">
+<section bind:this={scrollContainer} class="flex-1 immich-scrollbar overflow-y-auto p-4">
   {#if isLoading && results.length === 0}
     <div class="flex justify-center py-8" data-testid="search-loading">
       <LoadingSpinner />
@@ -150,21 +152,17 @@
         {#each results as asset (asset.id)}
           <button
             type="button"
-            class="aspect-square cursor-pointer overflow-hidden rounded"
+            class="aspect-square cursor-pointer overflow-hidden rounded-sm"
             onclick={() => openAsset(asset)}
           >
-            <img
-              src="/api/assets/{asset.id}/thumbnail"
-              alt={asset.originalFileName}
-              class="h-full w-full object-cover"
-            />
+            <img src="/api/assets/{asset.id}/thumbnail" alt={asset.originalFileName} class="size-full object-cover" />
           </button>
         {/each}
       </div>
     {:else}
       {#each dateGroups as group, i (group.key)}
         <h3
-          class="mb-2 mt-4 text-sm font-medium text-gray-500 first:mt-0 dark:text-gray-400"
+          class="mt-4 mb-2 text-sm font-medium text-gray-500 first:mt-0 dark:text-gray-400"
           data-testid="date-group-header-{i}"
         >
           {group.label}
@@ -173,14 +171,10 @@
           {#each group.assets as asset (asset.id)}
             <button
               type="button"
-              class="aspect-square cursor-pointer overflow-hidden rounded"
+              class="aspect-square cursor-pointer overflow-hidden rounded-sm"
               onclick={() => openAsset(asset)}
             >
-              <img
-                src="/api/assets/{asset.id}/thumbnail"
-                alt={asset.originalFileName}
-                class="h-full w-full object-cover"
-              />
+              <img src="/api/assets/{asset.id}/thumbnail" alt={asset.originalFileName} class="size-full object-cover" />
             </button>
           {/each}
         </div>

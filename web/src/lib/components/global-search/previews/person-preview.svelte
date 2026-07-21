@@ -65,11 +65,11 @@
     <img
       src={thumbUrl}
       alt={person.name ?? ''}
-      class="h-[120px] w-[120px] rounded-full object-cover"
+      class="size-[120px] rounded-full object-cover"
       onerror={() => (failed = true)}
     />
   {:else}
-    <div class="h-[120px] w-[120px] rounded-full bg-subtle/40" aria-hidden="true"></div>
+    <div class="size-[120px] rounded-full bg-subtle/40" aria-hidden="true"></div>
   {/if}
   <div class="text-center">
     <div class="text-lg font-semibold">{person.name || $t('cmdk_unnamed_person')}</div>
@@ -85,7 +85,7 @@
         <img
           src={getAssetMediaUrl({ id: photo.id, size: AssetMediaSize.Thumbnail })}
           alt=""
-          class="h-12 w-12 rounded-md object-cover"
+          class="size-12 rounded-md object-cover"
         />
       {/each}
     </div>

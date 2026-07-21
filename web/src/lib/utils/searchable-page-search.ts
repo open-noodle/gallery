@@ -207,8 +207,7 @@ export function getSearchablePageFilterState(url: URL): SearchablePageFilterStat
   }
   if (albumFilter === 'none') {
     result.isNotInAlbum = true;
-  }
-  if (albumFilter === 'has') {
+  } else if (albumFilter === 'has') {
     result.isInAlbum = true;
   }
   if (rating !== undefined) {
@@ -305,7 +304,7 @@ function parseRating(value: string | null): number | undefined {
   }
 
   const rating = Number(value);
-  return Number.isInteger(rating) && rating >= 1 && rating <= 5 ? rating : undefined;
+  return Number.isSafeInteger(rating) && rating >= 1 && rating <= 5 ? rating : undefined;
 }
 
 function parseMediaType(value: string | null): 'image' | 'video' | undefined {

@@ -14,13 +14,19 @@ describe('loadImage', () => {
     const img = originalCreateElement('img');
     const operations: string[] = [];
 
-    Object.defineProperty(img, 'crossOrigin', {
-      configurable: true,
-      set: (value: string) => operations.push(`crossOrigin:${value}`),
-    });
-    Object.defineProperty(img, 'src', {
-      configurable: true,
-      set: (value: string) => operations.push(`src:${value}`),
+    Object.defineProperties(img, {
+      crossOrigin: {
+        configurable: true,
+        set: (value: string) => {
+          operations.push(`crossOrigin:${value}`);
+        },
+      },
+      src: {
+        configurable: true,
+        set: (value: string) => {
+          operations.push(`src:${value}`);
+        },
+      },
     });
 
     vi.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {

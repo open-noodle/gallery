@@ -24,11 +24,11 @@
   ];
 </script>
 
-<div class="flex gap-2 flex-wrap">
+<div class="flex flex-wrap gap-2">
   {#each colors as color (color.value)}
     <button
       type="button"
-      class="flex h-7 w-7 items-center justify-center rounded-full transition-transform {color.class}"
+      class="flex size-7 items-center justify-center rounded-full transition-transform {color.class}"
       class:ring-2={value === color.value}
       class:ring-offset-2={value === color.value}
       class:ring-gray-800={value === color.value}

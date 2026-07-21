@@ -153,7 +153,9 @@ describe('scanTakeoutFiles', () => {
     const progressUpdates: ScanProgress[] = [];
     await scanTakeoutFiles({
       files: [blobToFile(zipBlob, 'takeout-001.zip')],
-      onProgress: (p) => progressUpdates.push({ ...p, albumNames: new Set(p.albumNames) }),
+      onProgress: (p) => {
+        progressUpdates.push({ ...p, albumNames: new Set(p.albumNames) });
+      },
     });
 
     expect(progressUpdates.length).toBeGreaterThan(0);
@@ -552,7 +554,9 @@ describe('sidecar matching edge cases end-to-end', () => {
     const progressSnapshots: ScanProgress[] = [];
     await scanTakeoutFiles({
       files: [blobToFile(zipBlob, 'takeout.zip')],
-      onProgress: (p) => progressSnapshots.push({ ...p, albumNames: new Set(p.albumNames) }),
+      onProgress: (p) => {
+        progressSnapshots.push({ ...p, albumNames: new Set(p.albumNames) });
+      },
     });
 
     // At least one mid-extraction snapshot saw the transient over-count.

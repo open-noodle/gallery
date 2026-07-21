@@ -106,11 +106,11 @@
 <section class="my-4">
   {#if groups.length > 0}
     {#each groups as group (group.id)}
-      <div class="rounded-2xl border border-gray-200 dark:border-gray-800 mt-4 bg-slate-50 dark:bg-gray-900 p-4">
+      <div class="mt-4 rounded-2xl border border-gray-200 bg-slate-50 p-4 dark:border-gray-800 dark:bg-gray-900">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
             {#if group.color}
-              <div class="h-3 w-3 rounded-full {colorClasses[group.color] ?? 'bg-gray-400'}"></div>
+              <div class="size-3 rounded-full {colorClasses[group.color] ?? 'bg-gray-400'}"></div>
             {/if}
             <div>
               <Text fontWeight="medium">{group.name}</Text>
@@ -137,7 +137,7 @@
               {/each}
               {#if group.members.length > 5}
                 <div
-                  class="flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-xs font-medium"
+                  class="flex size-7 items-center justify-center rounded-full bg-gray-200 text-xs font-medium dark:bg-gray-700"
                 >
                   +{group.members.length - 5}
                 </div>
@@ -170,7 +170,7 @@
     <Text class="py-4" color="muted">{$t('groups_empty_state')}</Text>
   {/if}
 
-  <div class="flex justify-end mt-5">
+  <div class="mt-5 flex justify-end">
     <Button shape="round" size="small" onclick={() => handleCreate()}>{$t('create_group')}</Button>
   </div>
 </section>

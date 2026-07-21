@@ -41,7 +41,7 @@
     }
 
     return countries.some(
-      (country) => loadingCitiesByCountry[country] || (!(country in cityCache) && !cityFetchErrors[country]),
+      (country) => loadingCitiesByCountry[country] || (!Object.hasOwn(cityCache, country) && !cityFetchErrors[country]),
     );
   });
 
@@ -97,14 +97,16 @@
   let orphanedCountry = $derived(selectedCountry && !countries.includes(selectedCountry) ? selectedCountry : undefined);
 
   $effect(() => {
-    if (selectedCountry && selectedCity && expandedCountry !== selectedCountry) {
-      expandedCountry = selectedCountry;
-      expandedCityLists = { ...expandedCityLists, [selectedCountry]: false };
+    if (!(selectedCountry && selectedCity) || expandedCountry === selectedCountry) {
+      return;
     }
+
+    expandedCountry = selectedCountry;
+    expandedCityLists = { ...expandedCityLists, [selectedCountry]: false };
   });
 
   function ensureCities(country: string) {
-    if (country in cityCache || loadingCitiesByCountry[country]) {
+    if (Object.hasOwn(cityCache, country) || loadingCitiesByCountry[country]) {
       return;
     }
 
@@ -287,12 +289,12 @@
   {:else}
     <!-- Search input -->
     <div class="relative mb-2">
-      <div class="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500">
+      <div class="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-gray-400 dark:text-gray-500">
         <Icon icon={mdiMagnify} size="14" />
       </div>
       <input
         type="text"
-        class="immich-form-input h-8 w-full rounded-lg pl-7 pr-2 text-sm"
+        class="immich-form-input h-8 w-full rounded-lg pr-2 pl-7 text-sm"
         placeholder={$t('filter_search_locations')}
         bind:value={searchQuery}
         oninput={() => {
@@ -313,16 +315,16 @@
         data-testid="location-country-{orphanedCountry}"
       >
         <div
-          class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border-2 {isCountrySelected &&
+          class="flex size-4 shrink-0 items-center justify-center rounded-full border-2 {isCountrySelected &&
           !selectedCity
             ? 'border-immich-primary bg-immich-primary dark:border-immich-dark-primary dark:bg-immich-dark-primary'
             : 'border-gray-300 dark:border-gray-600'}"
         >
           {#if isCountrySelected && !selectedCity}
-            <div class="h-1.5 w-1.5 rounded-full bg-white dark:bg-black"></div>
+            <div class="size-1.5 rounded-full bg-white dark:bg-black"></div>
           {/if}
         </div>
-        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">{orphanedCountry}</span>
+        <span class="flex-1 truncate text-left">{orphanedCountry}</span>
       </button>
     {/if}
 
@@ -335,11 +337,11 @@
         data-testid="location-city-{selectedCity}"
       >
         <div
-          class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border-2 border-immich-primary bg-immich-primary dark:border-immich-dark-primary dark:bg-immich-dark-primary"
+          class="flex size-4 shrink-0 items-center justify-center rounded-full border-2 border-immich-primary bg-immich-primary dark:border-immich-dark-primary dark:bg-immich-dark-primary"
         >
-          <div class="h-1.5 w-1.5 rounded-full bg-white dark:bg-black"></div>
+          <div class="size-1.5 rounded-full bg-white dark:bg-black"></div>
         </div>
-        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">{selectedCity}</span>
+        <span class="flex-1 truncate text-left">{selectedCity}</span>
       </button>
     {/if}
 
@@ -364,18 +366,18 @@
       >
         <!-- Radio indicator -->
         <div
-          class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border-2 {isCountrySelected &&
+          class="flex size-4 shrink-0 items-center justify-center rounded-full border-2 {isCountrySelected &&
           !selectedCity
             ? 'border-immich-primary bg-immich-primary dark:border-immich-dark-primary dark:bg-immich-dark-primary'
             : 'border-gray-300 dark:border-gray-600'}"
         >
           {#if isCountrySelected && !selectedCity}
-            <div class="h-1.5 w-1.5 rounded-full bg-white dark:bg-black"></div>
+            <div class="size-1.5 rounded-full bg-white dark:bg-black"></div>
           {/if}
         </div>
 
         <!-- Label -->
-        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">{country}</span>
+        <span class="flex-1 truncate text-left">{country}</span>
       </button>
 
       <!-- Cities (indented when country is expanded) -->
@@ -392,17 +394,17 @@
           >
             <!-- Radio indicator -->
             <div
-              class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border-2 {isCitySelected
+              class="flex size-4 shrink-0 items-center justify-center rounded-full border-2 {isCitySelected
                 ? 'border-immich-primary bg-immich-primary dark:border-immich-dark-primary dark:bg-immich-dark-primary'
                 : 'border-gray-300 dark:border-gray-600'}"
             >
               {#if isCitySelected}
-                <div class="h-1.5 w-1.5 rounded-full bg-white dark:bg-black"></div>
+                <div class="size-1.5 rounded-full bg-white dark:bg-black"></div>
               {/if}
             </div>
 
             <!-- Label -->
-            <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">{city}</span>
+            <span class="flex-1 truncate text-left">{city}</span>
           </button>
         {/each}
         {#if !expandedCityLists[country] && getRemainingCityCount(country) > 0}

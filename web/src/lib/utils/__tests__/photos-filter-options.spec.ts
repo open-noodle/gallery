@@ -62,7 +62,7 @@ describe('buildPhotosTimelineOptions', () => {
   });
 
   it('should omit empty / whitespace-only text filters', () => {
-    const filters = { ...createFilterState(), description: '   ', originalFileName: '', ocr: undefined };
+    const filters = { ...createFilterState(), description: ' '.repeat(3), originalFileName: '', ocr: undefined };
     const options = buildPhotosTimelineOptions(filters);
     expect(options).not.toHaveProperty('description');
     expect(options).not.toHaveProperty('originalFileName');

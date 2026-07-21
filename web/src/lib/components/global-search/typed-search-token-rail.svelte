@@ -50,11 +50,11 @@
         data-status={token.status}
         aria-label={token.issue?.message}
         class="inline-flex min-h-7 max-w-full items-stretch overflow-hidden rounded-full border text-xs leading-none shadow-sm
-          shadow-black/5 ring-1 ring-white/10 {tokenClass(token.status)}"
+          ring-1 shadow-black/5 ring-white/10 {tokenClass(token.status)}"
       >
         <span
           data-testid={`typed-search-token-${token.key}-key`}
-          class="flex items-center px-2 py-1.5 font-semibold uppercase tracking-[0.08em] {keyClass(token.status)}"
+          class="flex items-center px-2 py-1.5 font-semibold tracking-[0.08em] uppercase {keyClass(token.status)}"
         >
           {token.key}
         </span>

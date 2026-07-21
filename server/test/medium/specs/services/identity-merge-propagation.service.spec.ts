@@ -570,14 +570,8 @@ describe('IdentityMergePropagationService medium tests', () => {
       const personB = await createPersonProfile(ctx, { ownerId: user.id, identityId: identityB.id, name: 'B' });
       const personC = await createPersonProfile(ctx, { ownerId: user.id, identityId: identityC.id, name: 'C' });
       const originalLock = personRepository.lockPeopleForMerge.bind(personRepository);
-      let releaseFirst!: () => void;
-      const firstCanFinish = new Promise<void>((resolve) => {
-        releaseFirst = resolve;
-      });
-      let firstLocked!: () => void;
-      const firstLockReached = new Promise<void>((resolve) => {
-        firstLocked = resolve;
-      });
+      const { promise: firstCanFinish, resolve: releaseFirst } = Promise.withResolvers<void>();
+      const { promise: firstLockReached, resolve: firstLocked } = Promise.withResolvers<void>();
       let heldFirst = false;
       vi.spyOn(personRepository, 'lockPeopleForMerge').mockImplementation(async (personIds, transaction) => {
         await originalLock(personIds, transaction);
@@ -618,14 +612,8 @@ describe('IdentityMergePropagationService medium tests', () => {
       const personA = await createPersonProfile(ctx, { ownerId: user.id, identityId: null, name: 'A' });
       const personB = await createPersonProfile(ctx, { ownerId: user.id, identityId: null, name: 'B' });
       const originalLock = personRepository.lockPeopleForMerge.bind(personRepository);
-      let releaseFirst!: () => void;
-      const firstCanFinish = new Promise<void>((resolve) => {
-        releaseFirst = resolve;
-      });
-      let firstLocked!: () => void;
-      const firstLockReached = new Promise<void>((resolve) => {
-        firstLocked = resolve;
-      });
+      const { promise: firstCanFinish, resolve: releaseFirst } = Promise.withResolvers<void>();
+      const { promise: firstLockReached, resolve: firstLocked } = Promise.withResolvers<void>();
       let heldFirst = false;
       vi.spyOn(personRepository, 'lockPeopleForMerge').mockImplementation(async (personIds, transaction) => {
         await originalLock(personIds, transaction);
@@ -707,14 +695,8 @@ describe('IdentityMergePropagationService medium tests', () => {
       const personB = await createSpacePerson(ctx.database, { spaceId: space.id, identityId: identityB.id, name: 'B' });
       const personC = await createSpacePerson(ctx.database, { spaceId: space.id, identityId: identityC.id, name: 'C' });
       const originalLock = sharedSpaceRepository.lockSpacePeopleForMerge.bind(sharedSpaceRepository);
-      let releaseFirst!: () => void;
-      const firstCanFinish = new Promise<void>((resolve) => {
-        releaseFirst = resolve;
-      });
-      let firstLocked!: () => void;
-      const firstLockReached = new Promise<void>((resolve) => {
-        firstLocked = resolve;
-      });
+      const { promise: firstCanFinish, resolve: releaseFirst } = Promise.withResolvers<void>();
+      const { promise: firstLockReached, resolve: firstLocked } = Promise.withResolvers<void>();
       let heldFirst = false;
       vi.spyOn(sharedSpaceRepository, 'lockSpacePeopleForMerge').mockImplementation(async (personIds, transaction) => {
         await originalLock(personIds, transaction);
@@ -756,14 +738,8 @@ describe('IdentityMergePropagationService medium tests', () => {
       const personA = await createSpacePerson(ctx.database, { spaceId: space.id, identityId: null, name: 'A' });
       const personB = await createSpacePerson(ctx.database, { spaceId: space.id, identityId: null, name: 'B' });
       const originalLock = sharedSpaceRepository.lockSpacePeopleForMerge.bind(sharedSpaceRepository);
-      let releaseFirst!: () => void;
-      const firstCanFinish = new Promise<void>((resolve) => {
-        releaseFirst = resolve;
-      });
-      let firstLocked!: () => void;
-      const firstLockReached = new Promise<void>((resolve) => {
-        firstLocked = resolve;
-      });
+      const { promise: firstCanFinish, resolve: releaseFirst } = Promise.withResolvers<void>();
+      const { promise: firstLockReached, resolve: firstLocked } = Promise.withResolvers<void>();
       let heldFirst = false;
       vi.spyOn(sharedSpaceRepository, 'lockSpacePeopleForMerge').mockImplementation(async (personIds, transaction) => {
         await originalLock(personIds, transaction);

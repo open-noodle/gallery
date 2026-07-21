@@ -54,7 +54,7 @@
       <div class="truncate text-sm font-medium">{item.albumName}</div>
       {#if item.shared}
         <span
-          class="shrink-0 rounded-full bg-subtle/60 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-600 dark:text-gray-300"
+          class="shrink-0 rounded-full bg-subtle/60 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-gray-600 uppercase dark:text-gray-300"
         >
           {$t('shared')}
         </span>
