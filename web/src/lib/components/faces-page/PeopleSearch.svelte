@@ -86,7 +86,7 @@
     timeout = setTimeout(() => (showLoadingSpinner = true), timeBeforeShowLoadingSpinner);
     try {
       const data = await searchPerson(
-        { name: searchName, ...(withSharedSpaces ? { withSharedSpaces } : {}) },
+        { name: searchName, ...(withSharedSpaces && { withSharedSpaces }) },
         { signal: abortController?.signal },
       );
       searchedPeople = data;

@@ -456,7 +456,7 @@ describe('setQuery', () => {
       run: async (query, mode, signal) => {
         calls.push({ key, query, mode });
         return new Promise<ProviderStatus>((resolve, reject) => {
-          signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+          signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
           setTimeout(() => resolve({ status: 'ok', items: [], total: 0 }), 0);
         });
       },
@@ -509,7 +509,7 @@ describe('setQuery', () => {
     const providers = (manager as unknown as { providers: Record<keyof Sections, Provider> }).providers;
     providers.photos.run = (_q: string, _m: SearchMode, signal: AbortSignal) =>
       new Promise<ProviderStatus>((_resolve, reject) => {
-        signal.addEventListener('abort', () => reject(Object.assign(new Error('x'), { name: 'AbortError' })));
+        signal.addEventListener('abort', () => reject(new DOMException('x', 'AbortError')));
       });
     manager.setQuery('first');
     await vi.advanceTimersByTimeAsync(200);
@@ -522,7 +522,7 @@ describe('setQuery', () => {
     const providers = (manager as unknown as { providers: Record<keyof Sections, Provider> }).providers;
     providers.photos.run = (_q: string, _m: SearchMode, signal: AbortSignal) =>
       new Promise<ProviderStatus>((_resolve, reject) => {
-        signal.addEventListener('abort', () => reject(Object.assign(new Error('x'), { name: 'AbortError' })));
+        signal.addEventListener('abort', () => reject(new DOMException('x', 'AbortError')));
       });
     manager.setQuery('hang');
     await vi.advanceTimersByTimeAsync(200);
@@ -534,7 +534,7 @@ describe('setQuery', () => {
     const providers = (manager as unknown as { providers: Record<keyof Sections, Provider> }).providers;
     providers.photos.run = (_q: string, _m: SearchMode, signal: AbortSignal) =>
       new Promise<ProviderStatus>((_resolve, reject) => {
-        signal.addEventListener('abort', () => reject(Object.assign(new Error('x'), { name: 'AbortError' })));
+        signal.addEventListener('abort', () => reject(new DOMException('x', 'AbortError')));
       });
     manager.setQuery('inflight');
     await vi.advanceTimersByTimeAsync(200);
@@ -771,7 +771,7 @@ describe('tag provider', () => {
     const m = new GlobalSearchManager();
     m.setQuery('be');
     await vi.advanceTimersByTimeAsync(200);
-    globalThis.dispatchEvent(new StorageEvent('storage', { key: 'cmdk.tags.version', newValue: '2' }));
+    dispatchEvent(new StorageEvent('storage', { key: 'cmdk.tags.version', newValue: '2' }));
     m.setQuery('mou');
     await vi.advanceTimersByTimeAsync(200);
     expect(getAllTags).toHaveBeenCalledTimes(2);
@@ -986,7 +986,7 @@ describe('ML health retroactive promotion', () => {
     const providers = (m as unknown as { providers: Record<keyof Sections, Provider> }).providers;
     providers.photos.run = (_q: string, _mode: SearchMode, signal: AbortSignal) =>
       new Promise<ProviderStatus>((_resolve, reject) => {
-        signal.addEventListener('abort', () => reject(Object.assign(new Error('x'), { name: 'AbortError' })));
+        signal.addEventListener('abort', () => reject(new DOMException('x', 'AbortError')));
       });
     m.setQuery('beach');
     await vi.advanceTimersByTimeAsync(200);
@@ -1000,7 +1000,7 @@ describe('ML health retroactive promotion', () => {
     const providers = (m as unknown as { providers: Record<keyof Sections, Provider> }).providers;
     providers.photos.run = (_q: string, _mode: SearchMode, signal: AbortSignal) =>
       new Promise<ProviderStatus>((_resolve, reject) => {
-        signal.addEventListener('abort', () => reject(Object.assign(new Error('x'), { name: 'AbortError' })));
+        signal.addEventListener('abort', () => reject(new DOMException('x', 'AbortError')));
       });
     m.setQuery('beach');
     await vi.advanceTimersByTimeAsync(200);
@@ -3073,7 +3073,7 @@ describe('edge-case guards', () => {
     m.activateRecent({
       kind: 'place',
       id: 'place:bad',
-      latitude: Number.NaN,
+      latitude: NaN,
       longitude: 0,
       label: 'Broken',
       lastUsed: 1,
@@ -3090,7 +3090,7 @@ describe('edge-case guards', () => {
     m.activateRecent({
       kind: 'query',
       id: 'query:bad',
-      text: '   ',
+      text: ' '.repeat(3),
       lastUsed: 1,
     });
     expect(warnSpy).toHaveBeenCalled();
@@ -3421,7 +3421,7 @@ describe('runNavigationProvider', () => {
       const ids = result.items.map((i) => (i as { id: string }).id);
       expect(ids).toContain('nav:userPages:trash');
       expect(ids).not.toContain('nav:systemSettings:trash');
-      expect(result.items.every((i) => (i as { adminOnly: boolean }).adminOnly === false)).toBe(true);
+      expect(result.items.every((i) => !(i as { adminOnly: boolean }).adminOnly)).toBe(true);
     }
   });
 
@@ -4341,7 +4341,7 @@ describe('batch lifecycle: close, empty-query, grace window (review fixes)', () 
     m.open();
     m.setQuery('beach');
     // Sync check — no timer advancement yet, runBatch has not fired.
-    expect(m.batchInFlightStartedAt).toBe(Number.POSITIVE_INFINITY);
+    expect(m.batchInFlightStartedAt).toBe(Infinity);
     // Grace-window contract: `now - startedAt > 200` must be false, so the stripe stays hidden.
     expect(performance.now() - m.batchInFlightStartedAt > 200).toBe(false);
   });
@@ -4587,7 +4587,7 @@ describe('Batch 4 post-review: route consistency, SWR cursor, debounce-window cl
     m.open();
     m.setQuery('beach');
     expect(m.batchInFlight).toBe(true);
-    expect(m.batchInFlightStartedAt).toBe(Number.POSITIVE_INFINITY);
+    expect(m.batchInFlightStartedAt).toBe(Infinity);
     m.close();
     expect(m.batchInFlight).toBe(false);
     expect(m.batchInFlightStartedAt).toBe(0);
@@ -4765,15 +4765,15 @@ describe('getActiveItem recent-entry preview lookup (cold open)', () => {
     // params without re-running the page component — URL-backed state (e.g.,
     // SettingAccordionState) stays on its stale initial value. The manager must
     // detect this case and do a full browser navigation so every component remounts.
-    const originalLocation = globalThis.location;
-    const hrefSetter = vi.fn();
+    const originalLocation = location;
+    const assignSpy = vi.fn();
     const fakeLocation: Record<string, unknown> = {
       pathname: '/admin/system-settings',
+      assign: assignSpy,
     };
     Object.defineProperty(fakeLocation, 'href', {
       configurable: true,
       get: () => 'http://localhost/admin/system-settings?isOpen=classification',
-      set: (v: string) => hrefSetter(v),
     });
     Object.defineProperty(globalThis, 'location', {
       configurable: true,
@@ -4791,8 +4791,8 @@ describe('getActiveItem recent-entry preview lookup (cold open)', () => {
         route: '/admin/system-settings?isOpen=video-transcoding',
         adminOnly: true,
       });
-      // Full browser navigation via location.href = route
-      expect(hrefSetter).toHaveBeenCalledWith('/admin/system-settings?isOpen=video-transcoding');
+      // Full browser navigation via location.assign(route)
+      expect(assignSpy).toHaveBeenCalledWith('/admin/system-settings?isOpen=video-transcoding');
       // Client-side goto must NOT have fired — that would leave the accordion stale.
       expect(goto).not.toHaveBeenCalled();
     } finally {
@@ -4804,7 +4804,7 @@ describe('getActiveItem recent-entry preview lookup (cold open)', () => {
   });
 
   it('activate nav: different-pathname navigation uses client-side goto (unchanged)', () => {
-    const originalLocation = globalThis.location;
+    const originalLocation = location;
     const fakeLocation: Record<string, unknown> = {
       pathname: '/photos',
       href: 'http://localhost/photos',
@@ -4935,7 +4935,7 @@ describe('album catalog fetch', () => {
     vi.mocked(getAlbumNames).mockImplementation((opts) => {
       const signal = (opts as { signal?: AbortSignal } | undefined)?.signal;
       return new Promise((_, reject) => {
-        signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+        signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
       }) as unknown as ReturnType<typeof getAlbumNames>;
     });
 
@@ -4998,7 +4998,7 @@ describe('spaces catalog fetch', () => {
     vi.mocked(getAllSpaces).mockImplementation((opts) => {
       const signal = (opts as { signal?: AbortSignal } | undefined)?.signal;
       return new Promise((_, reject) => {
-        signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+        signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
       }) as unknown as ReturnType<typeof getAllSpaces>;
     });
 
@@ -5263,7 +5263,7 @@ describe('activateAlbum', () => {
     vi.mocked(getAlbumInfo).mockImplementation((_args, opts) => {
       const signal = (opts as { signal?: AbortSignal } | undefined)?.signal;
       return new Promise((_, reject) => {
-        signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+        signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
       }) as unknown as ReturnType<typeof getAlbumInfo>;
     });
 
@@ -5510,7 +5510,7 @@ describe('activateSpace', () => {
     vi.mocked(getSpace).mockImplementation((_args, opts) => {
       const signal = (opts as { signal?: AbortSignal } | undefined)?.signal;
       return new Promise((_, reject) => {
-        signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+        signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
       }) as unknown as ReturnType<typeof getSpace>;
     });
 
@@ -6502,7 +6502,7 @@ describe('field-search mode navigation (filename / description / ocr)', () => {
     const m = new GlobalSearchManager();
     m.mode = 'description';
 
-    await m.activateSearch('   ');
+    await m.activateSearch(' '.repeat(3));
 
     const fieldNav = vi.mocked(goto).mock.calls.find((c) => String(c[0]).includes('description='));
     expect(fieldNav).toBeUndefined();

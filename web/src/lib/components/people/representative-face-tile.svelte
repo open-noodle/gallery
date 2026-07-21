@@ -23,7 +23,7 @@
   onclick={() => onSelect(faceId)}
   class={[
     'relative aspect-square w-full overflow-hidden rounded-lg bg-gray-100 text-left transition dark:bg-gray-800',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-immich-primary dark:focus-visible:ring-immich-dark-primary',
+    'focus-visible:ring-2 focus-visible:ring-immich-primary focus-visible:outline-none dark:focus-visible:ring-immich-dark-primary',
     selected
       ? 'ring-2 ring-immich-primary dark:ring-immich-dark-primary'
       : 'hover:ring-2 hover:ring-gray-300 dark:hover:ring-gray-600',
@@ -41,7 +41,7 @@
   />
 
   {#if selected}
-    <span data-testid="representative-face-selected" class="absolute right-1.5 top-1.5 rounded-full bg-white shadow-sm">
+    <span data-testid="representative-face-selected" class="absolute top-1.5 right-1.5 rounded-full bg-white shadow-sm">
       <Icon icon={mdiCheckCircle} size="22" class="text-immich-primary dark:text-immich-dark-primary" />
     </span>
   {/if}

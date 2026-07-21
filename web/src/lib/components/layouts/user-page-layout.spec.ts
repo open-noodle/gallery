@@ -18,11 +18,11 @@ describe('UserPageLayout header', () => {
     render(UserPageLayout, {
       props: {
         title: 'People',
-        description: '(60) \u00B7 2,901 faces',
+        description: '(60) \u{B7} 2,901 faces',
       },
     });
 
-    expect(screen.getByTestId('page-header-description')).toHaveTextContent('(60) \u00B7 2,901 faces');
+    expect(screen.getByTestId('page-header-description')).toHaveTextContent('(60) \u{B7} 2,901 faces');
     expect(screen.getByTestId('page-header-title-row')).toHaveClass('min-w-0', 'overflow-hidden');
     expect(screen.getByTestId('page-header')).toHaveClass('min-w-0', 'truncate');
     expect(screen.getByTestId('page-header-description')).toHaveClass('shrink-0', 'whitespace-nowrap');

@@ -51,7 +51,7 @@ export function buildAlbumAssetPickerOptions(albumId: string, filters: FilterSta
   return applyCommonFilterFields(
     {
       visibility: AssetVisibility.Timeline,
-      ...(filters.isFavorite === undefined ? { withPartners: true } : {}),
+      ...(filters.isFavorite === undefined && { withPartners: true }),
       timelineAlbumId: albumId,
     },
     filters,

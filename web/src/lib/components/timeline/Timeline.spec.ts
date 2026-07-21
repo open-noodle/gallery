@@ -351,15 +351,16 @@ describe('Timeline representative grouping integration', () => {
   });
 
   it('retries a day-mode temporal anchor until the scroll position reaches the target', async () => {
-    const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
-    const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
-    globalThis.requestAnimationFrame = (callback: FrameRequestCallback) =>
-      setTimeout(() => {
-        testState.viewportHeight = 600;
-        testState.viewportWidth = 390;
-        callback(performance.now());
-      }, 0) as unknown as number;
-    globalThis.cancelAnimationFrame = (id: number) => clearTimeout(id);
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      (callback: FrameRequestCallback) =>
+        setTimeout(() => {
+          testState.viewportHeight = 600;
+          testState.viewportWidth = 390;
+          callback(performance.now());
+        }, 0) as unknown as number,
+    );
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => clearTimeout(id));
 
     try {
       const onTemporalAnchorResolved = vi.fn();
@@ -378,8 +379,7 @@ describe('Timeline representative grouping integration', () => {
       await waitFor(() => expect(onTemporalAnchorResolved).toHaveBeenCalledOnce());
       expect(testState.scrollCalls).toEqual([1200, 1200]);
     } finally {
-      globalThis.requestAnimationFrame = originalRequestAnimationFrame;
-      globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+      vi.unstubAllGlobals();
     }
   });
 
@@ -406,7 +406,9 @@ describe('Timeline representative grouping integration', () => {
     testState.pointerCoarse = true;
 
     renderTimeline({
-      onGroupingChange: (grouping: TimelineGrouping) => changes.push(grouping),
+      onGroupingChange: (grouping: TimelineGrouping) => {
+        changes.push(grouping);
+      },
     });
 
     const shell = await screen.findByTestId('timeline-mobile-grouping-control-shell');

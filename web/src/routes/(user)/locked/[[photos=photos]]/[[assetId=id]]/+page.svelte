@@ -41,8 +41,7 @@
     grouping: timelineGrouping,
   });
   const hideGroupingControls = $derived(
-    assetMultiSelectManager.selectionActive ||
-      Boolean(timelineManager?.isInitialized && timelineManager.assetCount === 0),
+    assetMultiSelectManager.selectionActive || (timelineManager?.isInitialized && timelineManager.assetCount === 0),
   );
 
   const handleEscape = () => {

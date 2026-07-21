@@ -82,7 +82,7 @@ describe('cmdk-recent', () => {
   it('QuotaExceededError does not throw; the failing write is silently dropped', () => {
     addEntry({ kind: 'query', id: 'query:initial', text: 'initial', lastUsed: 1 });
     const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw Object.assign(new Error('quota'), { name: 'QuotaExceededError' });
+      throw new DOMException('quota', 'QuotaExceededError');
     });
     expect(() => addEntry({ kind: 'query', id: 'query:new', text: 'new', lastUsed: 2 })).not.toThrow();
     spy.mockRestore();
@@ -315,9 +315,9 @@ describe('space entry', () => {
 
 describe('makePlaceId precision', () => {
   it('rounds to 4 decimals so near-identical coords collapse', () => {
-    expect(makePlaceId(48.856_645_67, 2.352_210_01)).toBe('place:48.8566:2.3522');
-    expect(makePlaceId(48.856_611_11, 2.352_199_99)).toBe('place:48.8566:2.3522');
-    expect(makePlaceId(48.856_645_67, 2.352_210_01)).toBe(makePlaceId(48.856_611_11, 2.352_199_99));
+    expect(makePlaceId(48.85664567, 2.35221001)).toBe('place:48.8566:2.3522');
+    expect(makePlaceId(48.85661111, 2.35219999)).toBe('place:48.8566:2.3522');
+    expect(makePlaceId(48.85664567, 2.35221001)).toBe(makePlaceId(48.85661111, 2.35219999));
   });
 
   it('coords far apart produce different keys', () => {

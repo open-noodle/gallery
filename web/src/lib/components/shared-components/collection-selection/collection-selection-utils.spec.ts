@@ -75,7 +75,7 @@ describe('collection helpers', () => {
 
   it('validates new space names (1..100 chars, trimmed)', () => {
     expect(isValidNewSpaceName('')).toBe(false);
-    expect(isValidNewSpaceName('   ')).toBe(false);
+    expect(isValidNewSpaceName(' '.repeat(3))).toBe(false);
     expect(isValidNewSpaceName('Family')).toBe(true);
     expect(isValidNewSpaceName('x'.repeat(101))).toBe(false);
     expect(isValidNewSpaceName('x'.repeat(100))).toBe(true);
