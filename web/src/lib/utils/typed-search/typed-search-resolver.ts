@@ -114,7 +114,7 @@ async function resolveTypedSearchFiltersInternal(
     ? await getSearchSuggestions(
         {
           $type: SearchSuggestionType.City,
-          ...(country ? { country } : {}),
+          ...(country && { country }),
           ...suggestionScope(context),
         },
         { signal: context.signal },

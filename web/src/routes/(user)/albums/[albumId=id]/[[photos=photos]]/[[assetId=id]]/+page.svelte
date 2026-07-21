@@ -266,21 +266,23 @@
   });
 
   $effect(() => {
-    if (data.album.id !== album.id) {
-      album = data.album;
-      albumFilters = createFilterState();
-      pickerFilters = createFilterState();
-      albumPersonNames.clear();
-      albumTagNames.clear();
-      pickerPersonNames.clear();
-      pickerTagNames.clear();
-      timelineMultiSelectManager.clear();
-      assetMultiSelectManager.clear();
-      viewMode = AlbumPageViewMode.VIEW;
-      timelineGrouping = 'day';
-      temporalAnchor = undefined;
-      oldAt = null;
+    if (data.album.id === album.id) {
+      return;
     }
+
+    album = data.album;
+    albumFilters = createFilterState();
+    pickerFilters = createFilterState();
+    albumPersonNames.clear();
+    albumTagNames.clear();
+    pickerPersonNames.clear();
+    pickerTagNames.clear();
+    timelineMultiSelectManager.clear();
+    assetMultiSelectManager.clear();
+    viewMode = AlbumPageViewMode.VIEW;
+    timelineGrouping = 'day';
+    temporalAnchor = undefined;
+    oldAt = null;
   });
 
   const containsEditors = $derived(album?.shared && album.albumUsers.some(({ role }) => role === AlbumUserRole.Editor));
@@ -595,14 +597,14 @@
 
           {#if showFilteredEmptyState}
             <div class="flex flex-1 flex-col items-center justify-center gap-2" data-testid="empty-state-message">
-              <p class="text-sm text-[var(--fg-muted)]">
+              <p class="text-sm text-(--fg-muted)">
                 {viewMode === AlbumPageViewMode.SELECT_ASSETS
                   ? 'No photos available to add match your filters'
                   : 'No photos match your filters'}
               </p>
               <button
                 type="button"
-                class="text-sm text-[var(--primary)]"
+                class="text-sm text-(--primary)"
                 onclick={() => {
                   if (viewMode === AlbumPageViewMode.SELECT_ASSETS) {
                     pickerFilters = clearFilters(pickerFilters);

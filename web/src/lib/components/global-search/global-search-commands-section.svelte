@@ -17,7 +17,7 @@
   <div in:fade={{ duration: 120 }} out:fade={{ duration: 80 }}>
     <Command.Group class="mb-4" data-cmdk-commands-section>
       <Command.GroupHeading
-        class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+        class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
       >
         {$t('cmdk_section_commands')}
       </Command.GroupHeading>

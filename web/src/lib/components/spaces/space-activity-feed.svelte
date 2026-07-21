@@ -177,7 +177,7 @@
     {#each groupedByDay as group, groupIndex (group.label)}
       <!-- Day header -->
       <div
-        class="sticky top-0 z-10 bg-white/90 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 backdrop-blur-sm dark:bg-immich-dark-bg/90 dark:text-gray-400"
+        class="sticky top-0 z-10 bg-white/90 px-4 py-2 text-xs font-semibold tracking-wider text-gray-500 uppercase backdrop-blur-sm dark:bg-immich-dark-bg/90 dark:text-gray-400"
         data-testid="day-header-{groupIndex}"
       >
         {group.label}
@@ -207,14 +207,14 @@
                     <img
                       alt=""
                       src={getAssetMediaUrl({ id: assetId })}
-                      class="h-8 w-8 rounded-md object-cover"
+                      class="size-8 rounded-md object-cover"
                       loading="lazy"
                       draggable="false"
                     />
                   {/each}
                   {#if assetIds.length > 4}
                     <div
-                      class="flex h-8 w-8 items-center justify-center rounded-md bg-gray-200 text-xs text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+                      class="flex size-8 items-center justify-center rounded-md bg-gray-200 text-xs text-gray-500 dark:bg-gray-700 dark:text-gray-400"
                     >
                       +{assetIds.length - 4}
                     </div>
@@ -226,7 +226,7 @@
         {:else if MEDIUM_TYPES.has(activity.type)}
           <!-- Medium: row with avatar + left border accent -->
           <div
-            class="mx-3 mb-2 flex items-center gap-3 border-l-2 {borderClass} py-2 pl-3 pr-2"
+            class="mx-3 mb-2 flex items-center gap-3 border-l-2 {borderClass} py-2 pr-2 pl-3"
             data-testid="activity-item-{activity.id}"
           >
             <div class="shrink-0">
@@ -240,7 +240,7 @@
         {:else}
           <!-- Low: compact single line with small colored dot -->
           <div class="mx-3 mb-1 flex items-center gap-2 px-2 py-1.5" data-testid="activity-item-{activity.id}">
-            <div class="h-2 w-2 shrink-0 rounded-full {dotColorClass}"></div>
+            <div class="size-2 shrink-0 rounded-full {dotColorClass}"></div>
             <p class="flex-1 truncate text-xs text-gray-500 dark:text-gray-400">
               {getDescription(activity, $t)}
             </p>

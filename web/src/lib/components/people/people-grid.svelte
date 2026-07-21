@@ -98,7 +98,7 @@
       }
 
       const rect = observedSentinel.getBoundingClientRect();
-      if (rect.top < globalThis.innerHeight) {
+      if (rect.top < innerHeight) {
         requestNextPage();
       }
     };
@@ -107,8 +107,8 @@
       const frame = requestAnimationFrame(checkSentinelVisibility);
       cancelVisibilityCheck = () => cancelAnimationFrame(frame);
     } else {
-      const timeout = globalThis.setTimeout(checkSentinelVisibility, 0);
-      cancelVisibilityCheck = () => globalThis.clearTimeout(timeout);
+      const timeout = setTimeout(checkSentinelVisibility, 0);
+      cancelVisibilityCheck = () => clearTimeout(timeout);
     }
   });
 </script>

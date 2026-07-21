@@ -147,7 +147,8 @@ describe('COMMAND_ITEMS', () => {
 
   it('all selection command label/description keys exist in en.json', () => {
     const keys = new Set(Object.keys(en));
-    for (const cmd of COMMAND_ITEMS.filter((item) => item.id.startsWith('cmd:selection_'))) {
+    const selectionCommands = COMMAND_ITEMS.filter((item) => item.id.startsWith('cmd:selection_'));
+    for (const cmd of selectionCommands) {
       expect(keys.has(cmd.labelKey), `${cmd.id} labelKey ${cmd.labelKey}`).toBe(true);
       expect(keys.has(cmd.descriptionKey), `${cmd.id} descriptionKey ${cmd.descriptionKey}`).toBe(true);
     }

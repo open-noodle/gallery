@@ -160,7 +160,7 @@
               <span class="justify-self-end tabular-nums">
                 {formatSampledJobTypeCount(row.active, (count) => count.toLocaleString($locale))}
               </span>
-              <span class="justify-self-end tabular-nums text-gray-500 dark:text-gray-400">
+              <span class="justify-self-end text-gray-500 tabular-nums dark:text-gray-400">
                 {formatSampledJobTypeCount(row.pending, (count) => count.toLocaleString($locale))}
               </span>
             </div>

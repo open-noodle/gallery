@@ -68,8 +68,8 @@
       </div>
     {/if}
     <!-- BRANDING:UPSTREAM_START -->
-    <p class="mt-5 text-sm text-secondary">{$t('upstream_project')}</p>
-    <div class="flex flex-col gap-2 mt-2">
+    <p class="text-secondary mt-5 text-sm">{$t('upstream_project')}</p>
+    <div class="mt-2 flex flex-col gap-2">
       {@render link('https://github.com/immich-app/immich', mdiGithub, 'Immich')}
       {@render link('https://docs.immich.app', mdiInformationOutline, $t('documentation'))}
       {@render link('https://discord.immich.app', siDiscord, $t('discord'))}

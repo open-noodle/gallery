@@ -72,6 +72,9 @@
 
   onMount(() => {
     checkMobile();
+    // ResizeObserver observes elements, not the viewport; this tracks window width
+    // to switch the map between mobile and desktop layouts.
+    // eslint-disable-next-line unicorn/prefer-observer-apis
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   });
@@ -369,7 +372,7 @@
         <div
           class={[
             'relative min-h-0',
-            isTimelinePanelVisible ? 'h-1/2 w-full pb-2 sm:h-full sm:w-2/3 sm:pe-2 sm:pb-0' : 'h-full w-full',
+            isTimelinePanelVisible ? 'h-1/2 w-full pb-2 sm:h-full sm:w-2/3 sm:pe-2 sm:pb-0' : 'size-full',
           ]}
         >
           {#if LazyMap.current}
@@ -395,7 +398,7 @@
           {#if noResults}
             <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
               <div
-                class="pointer-events-auto rounded-lg bg-white/90 px-4 py-3 text-sm text-gray-600 shadow dark:bg-gray-800/90 dark:text-gray-300"
+                class="pointer-events-auto rounded-lg bg-white/90 px-4 py-3 text-sm text-gray-600 shadow-sm dark:bg-gray-800/90 dark:text-gray-300"
               >
                 No matching photos
               </div>

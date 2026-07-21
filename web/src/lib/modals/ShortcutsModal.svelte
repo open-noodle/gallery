@@ -123,28 +123,28 @@
                 @
               </p>
             </div>
-            <p class="mb-1 mt-1 flex">{$t('cmdk_shortcut_scope_people')}</p>
+            <p class="my-1 flex">{$t('cmdk_shortcut_scope_people')}</p>
 
             <div class="flex justify-self-end">
               <p class="me-1 flex items-center justify-center justify-self-end rounded-lg bg-immich-primary/25 p-2">
                 #
               </p>
             </div>
-            <p class="mb-1 mt-1 flex">{$t('cmdk_shortcut_scope_tags')}</p>
+            <p class="my-1 flex">{$t('cmdk_shortcut_scope_tags')}</p>
 
             <div class="flex justify-self-end">
               <p class="me-1 flex items-center justify-center justify-self-end rounded-lg bg-immich-primary/25 p-2">
                 /
               </p>
             </div>
-            <p class="mb-1 mt-1 flex">{$t('cmdk_shortcut_scope_collections')}</p>
+            <p class="my-1 flex">{$t('cmdk_shortcut_scope_collections')}</p>
 
             <div class="flex justify-self-end">
               <p class="me-1 flex items-center justify-center justify-self-end rounded-lg bg-immich-primary/25 p-2">
                 &gt;
               </p>
             </div>
-            <p class="mb-1 mt-1 flex">{$t('cmdk_shortcut_scope_nav')}</p>
+            <p class="my-1 flex">{$t('cmdk_shortcut_scope_nav')}</p>
           </div>
         </div>
       </div>

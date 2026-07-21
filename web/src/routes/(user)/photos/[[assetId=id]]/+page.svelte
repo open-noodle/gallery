@@ -190,7 +190,7 @@
       isInAlbum: nextFilters.isInAlbum === true ? true : undefined,
       takenAfter: context?.takenAfter,
       takenBefore: context?.takenBefore,
-      ...(nextFilters.isFavorite === undefined ? { withSharedSpaces: true } : {}),
+      ...(nextFilters.isFavorite === undefined && { withSharedSpaces: true }),
     });
     const mappedPeople = response.people.map((p) => ({
       id: getPhotosPersonFilterId(p),
@@ -272,14 +272,14 @@
         $type: SearchSuggestionType.City,
         country,
         ...context,
-        ...(context?.isFavorite === undefined ? { withSharedSpaces: true } : {}),
+        ...(context?.isFavorite === undefined && { withSharedSpaces: true }),
       }),
     cameraModels: (make, context) =>
       getSearchSuggestions({
         $type: SearchSuggestionType.CameraModel,
         make,
         ...context,
-        ...(context?.isFavorite === undefined ? { withSharedSpaces: true } : {}),
+        ...(context?.isFavorite === undefined && { withSharedSpaces: true }),
       }),
   };
 

@@ -37,7 +37,7 @@ export const addAssetsToCollections = async (collections: PickerCollection[], as
   const settled = await Promise.allSettled(tasks.map((task) => task.run()));
   let success = 0;
   for (const [i, result] of settled.entries()) {
-    if (result.status === 'fulfilled' && result.value === true) {
+    if (result.status === 'fulfilled' && result.value) {
       success += tasks[i].count;
     }
   }

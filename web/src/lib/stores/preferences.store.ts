@@ -156,8 +156,7 @@ export const recentSpacesDropdown = persisted<boolean>('recent-spaces-open', tru
 
 export const recentSpaceAlbumsExpanded = persisted<Record<string, boolean>>('recent-space-albums-open', {}, {});
 
-export const isSpaceAlbumsExpanded = (state: Record<string, boolean>, spaceId: string): boolean =>
-  state[spaceId] === true;
+export const isSpaceAlbumsExpanded = (state: Record<string, boolean>, spaceId: string): boolean => state[spaceId];
 
 export const setSpaceAlbumsExpanded = (spaceId: string, expanded: boolean, validSpaceIds: string[]): void => {
   recentSpaceAlbumsExpanded.update((state) => {
