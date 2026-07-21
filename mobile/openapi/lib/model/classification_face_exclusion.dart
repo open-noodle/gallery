@@ -11,33 +11,31 @@
 part of openapi.api;
 
 /// Face exclusion rule for this classification category
-class ClassificationFaceExclusion {
-  /// Instantiate a new enum with the provided [value].
-  const ClassificationFaceExclusion._(this.value);
+enum ClassificationFaceExclusion {
+  off._(r'off'),
+  anyAssignedFace._(r'any_assigned_face'),
+  namedPeople._(r'named_people'),
+  namedVisiblePeople._(r'named_visible_people'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const ClassificationFaceExclusion._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const off = ClassificationFaceExclusion._(r'off');
-  static const anyAssignedFace = ClassificationFaceExclusion._(r'any_assigned_face');
-  static const namedPeople = ClassificationFaceExclusion._(r'named_people');
-  static const namedVisiblePeople = ClassificationFaceExclusion._(r'named_visible_people');
-
-  /// List of all possible values in this [enum][ClassificationFaceExclusion].
-  static const values = <ClassificationFaceExclusion>[
-    off,
-    anyAssignedFace,
-    namedPeople,
-    namedVisiblePeople,
-  ];
-
+  /// Returns the instance of [ClassificationFaceExclusion] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static ClassificationFaceExclusion? fromJson(dynamic value) => ClassificationFaceExclusionTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [ClassificationFaceExclusion]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<ClassificationFaceExclusion> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <ClassificationFaceExclusion>[];
     if (json is List && json.isNotEmpty) {
@@ -59,9 +57,11 @@ class ClassificationFaceExclusionTypeTransformer {
 
   const ClassificationFaceExclusionTypeTransformer._();
 
-  String encode(ClassificationFaceExclusion data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(ClassificationFaceExclusion data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a ClassificationFaceExclusion.
+  /// Returns the instance of [ClassificationFaceExclusion] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -70,6 +70,9 @@ class ClassificationFaceExclusionTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   ClassificationFaceExclusion? decode(dynamic data, {bool allowNull = true}) {
+    if (data is ClassificationFaceExclusion) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'off': return ClassificationFaceExclusion.off;
@@ -85,7 +88,7 @@ class ClassificationFaceExclusionTypeTransformer {
     return null;
   }
 
-  /// Singleton [ClassificationFaceExclusionTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static ClassificationFaceExclusionTypeTransformer? _instance;
 }
 

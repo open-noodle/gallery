@@ -230,29 +230,29 @@ class SharedSpacePersonResponseDto {
 }
 
 /// Representative face source
-class SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum {
-  /// Instantiate a new enum with the provided [value].
-  const SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum._(this.value);
+enum SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum {
+  auto._(r'auto'),
+  manual._(r'manual'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const auto = SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum._(r'auto');
-  static const manual = SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum._(r'manual');
-
-  /// List of all possible values in this [enum][SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum].
-  static const values = <SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum>[
-    auto,
-    manual,
-  ];
-
+  /// Returns the instance of [SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum? fromJson(dynamic value) => SharedSpacePersonResponseDtoRepresentativeFaceSourceEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -274,9 +274,10 @@ class SharedSpacePersonResponseDtoRepresentativeFaceSourceEnumTypeTransformer {
 
   const SharedSpacePersonResponseDtoRepresentativeFaceSourceEnumTypeTransformer._();
 
-  String encode(SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum data) => data.value;
+  String encode(SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum.
+  /// Returns the instance of [SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -285,6 +286,9 @@ class SharedSpacePersonResponseDtoRepresentativeFaceSourceEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'auto': return SharedSpacePersonResponseDtoRepresentativeFaceSourceEnum.auto;
@@ -298,7 +302,7 @@ class SharedSpacePersonResponseDtoRepresentativeFaceSourceEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [SharedSpacePersonResponseDtoRepresentativeFaceSourceEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static SharedSpacePersonResponseDtoRepresentativeFaceSourceEnumTypeTransformer? _instance;
 }
 
