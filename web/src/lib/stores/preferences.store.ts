@@ -153,3 +153,22 @@ export const alwaysLoadOriginalVideo = persisted<boolean>('always-load-original-
 
 export const recentAlbumsDropdown = persisted<boolean>('recent-albums-open', true, {});
 export const recentSpacesDropdown = persisted<boolean>('recent-spaces-open', true, {});
+
+export const recentSpaceAlbumsExpanded = persisted<Record<string, boolean>>('recent-space-albums-open', {}, {});
+
+export const isSpaceAlbumsExpanded = (state: Record<string, boolean>, spaceId: string): boolean =>
+  state[spaceId] === true;
+
+export const setSpaceAlbumsExpanded = (spaceId: string, expanded: boolean, validSpaceIds: string[]): void => {
+  recentSpaceAlbumsExpanded.update((state) => {
+    const valid = new Set(validSpaceIds);
+    const next: Record<string, boolean> = {};
+    for (const [id, value] of Object.entries(state)) {
+      if (valid.has(id)) {
+        next[id] = value;
+      }
+    }
+    next[spaceId] = expanded;
+    return next;
+  });
+};
