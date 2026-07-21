@@ -1473,5 +1473,9 @@ extension on api.AssetEditAction {
     api.AssetEditAction.crop => AssetEditAction.crop,
     api.AssetEditAction.rotate => AssetEditAction.rotate,
     api.AssetEditAction.mirror => AssetEditAction.mirror,
+    // gallery-fork: `trim` (video trimming, #191) has no local counterpart and
+    // previously fell through the `_ => AssetEditAction.other` arm that upstream
+    // dropped when openapi-generator v7.24 made these enums exhaustive.
+    api.AssetEditAction.trim => AssetEditAction.other,
   };
 }
