@@ -125,14 +125,16 @@
   let mergingPerson = $state<SharedSpacePersonResponseDto>();
 
   $effect(() => {
-    if (data.space.id !== loadedSpaceId) {
-      people = data.people;
-      peopleStatistics = data.peopleStatistics;
-      statisticsSearchName = null;
-      hasMore = data.people.length >= PAGE_SIZE;
-      mergingPerson = undefined;
-      loadedSpaceId = data.space.id;
+    if (data.space.id === loadedSpaceId) {
+      return;
     }
+
+    people = data.people;
+    peopleStatistics = data.peopleStatistics;
+    statisticsSearchName = null;
+    hasMore = data.people.length >= PAGE_SIZE;
+    mergingPerson = undefined;
+    loadedSpaceId = data.space.id;
   });
 
   const currentMember = $derived(members.find((m) => m.userId === authManager.user.id));
@@ -170,12 +172,12 @@
     spaceId = space.id,
   ) => {
     const name = searchFilter.trim();
-    return { id: spaceId, ...(name ? { name } : {}), ...query };
+    return { id: spaceId, ...(name && { name }), ...query };
   };
 
   const getStatisticsQuery = (searchFilter = searchName, spaceId = space.id) => {
     const name = searchFilter.trim();
-    return { id: spaceId, ...(name ? { name } : {}) };
+    return { id: spaceId, ...(name && { name }) };
   };
 
   const statisticsScopeMatches = (spaceId: string, searchFilter: string) =>

@@ -336,11 +336,7 @@ describe(StorageMigrationService.name, () => {
     };
 
     it('should copy file from source to target, update DB path, write migration log, and return Success', async () => {
-      const mockStream = new Readable({
-        read() {
-          this.push(null);
-        },
-      });
+      const mockStream = Readable.from([]);
       mockDiskBackend.exists.mockResolvedValue(true);
       mockS3Backend.exists.mockResolvedValue(false);
       mockDiskBackend.get.mockResolvedValue({ stream: mockStream });
@@ -403,11 +399,7 @@ describe(StorageMigrationService.name, () => {
       mockDiskBackend.exists.mockResolvedValue(true);
       mockS3Backend.exists.mockResolvedValue(false);
       mockDiskBackend.get.mockResolvedValue({
-        stream: new Readable({
-          read() {
-            this.push(null);
-          },
-        }),
+        stream: Readable.from([]),
       });
       mockS3Backend.put.mockResolvedValue(void 0);
       mocks.storageMigration.updateAssetOriginalPath.mockResolvedValue(false); // 0 rows
@@ -419,11 +411,7 @@ describe(StorageMigrationService.name, () => {
     });
 
     it('should delete source when deleteSource is true', async () => {
-      const mockStream = new Readable({
-        read() {
-          this.push(null);
-        },
-      });
+      const mockStream = Readable.from([]);
       mockDiskBackend.exists.mockResolvedValue(true);
       mockS3Backend.exists.mockResolvedValue(false);
       mockDiskBackend.get.mockResolvedValue({ stream: mockStream });
@@ -439,11 +427,7 @@ describe(StorageMigrationService.name, () => {
     });
 
     it('should not delete source when deleteSource is false', async () => {
-      const mockStream = new Readable({
-        read() {
-          this.push(null);
-        },
-      });
+      const mockStream = Readable.from([]);
       mockDiskBackend.exists.mockResolvedValue(true);
       mockS3Backend.exists.mockResolvedValue(false);
       mockDiskBackend.get.mockResolvedValue({ stream: mockStream });
@@ -478,11 +462,7 @@ describe(StorageMigrationService.name, () => {
         deleteSource: false,
       };
 
-      const mockStream = new Readable({
-        read() {
-          this.push(null);
-        },
-      });
+      const mockStream = Readable.from([]);
       mockS3Backend.exists.mockResolvedValue(true);
       mockDiskBackend.exists.mockResolvedValue(false);
       mockS3Backend.get.mockResolvedValue({ stream: mockStream });
@@ -507,11 +487,7 @@ describe(StorageMigrationService.name, () => {
         sourcePath: '/usr/src/app/upload/encoded-video/user/ab/cd/video.mp4',
       };
 
-      const mockStream = new Readable({
-        read() {
-          this.push(null);
-        },
-      });
+      const mockStream = Readable.from([]);
       mockDiskBackend.exists.mockResolvedValue(true);
       mockS3Backend.exists.mockResolvedValue(false);
       mockDiskBackend.get.mockResolvedValue({ stream: mockStream });
@@ -538,11 +514,7 @@ describe(StorageMigrationService.name, () => {
         sourcePath: '/usr/src/app/upload/thumbs/user/ab/cd/thumb.webp',
       };
 
-      const mockStream = new Readable({
-        read() {
-          this.push(null);
-        },
-      });
+      const mockStream = Readable.from([]);
       mockDiskBackend.exists.mockResolvedValue(true);
       mockS3Backend.exists.mockResolvedValue(false);
       mockDiskBackend.get.mockResolvedValue({ stream: mockStream });
@@ -569,11 +541,7 @@ describe(StorageMigrationService.name, () => {
         sourcePath: '/usr/src/app/upload/thumbs/user/ab/cd/person.jpeg',
       };
 
-      const mockStream = new Readable({
-        read() {
-          this.push(null);
-        },
-      });
+      const mockStream = Readable.from([]);
       mockDiskBackend.exists.mockResolvedValue(true);
       mockS3Backend.exists.mockResolvedValue(false);
       mockDiskBackend.get.mockResolvedValue({ stream: mockStream });
@@ -600,11 +568,7 @@ describe(StorageMigrationService.name, () => {
         sourcePath: '/usr/src/app/upload/profile/user/ab/cd/profile.jpg',
       };
 
-      const mockStream = new Readable({
-        read() {
-          this.push(null);
-        },
-      });
+      const mockStream = Readable.from([]);
       mockDiskBackend.exists.mockResolvedValue(true);
       mockS3Backend.exists.mockResolvedValue(false);
       mockDiskBackend.get.mockResolvedValue({ stream: mockStream });

@@ -32,7 +32,9 @@ export class BirthdayMemoryRule implements MemoryRule {
         }
       }
 
-      const assetIds = [...byYear.keys()]
+      const assetIds = byYear
+        .keys()
+        .toArray()
         .toSorted((a, b) => b - a)
         .flatMap((year) => byYear.get(year) ?? [])
         .slice(0, 12);

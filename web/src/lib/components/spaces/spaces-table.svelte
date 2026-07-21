@@ -87,7 +87,7 @@
   <table class="w-full text-sm">
     <thead>
       <tr
-        class="border-b border-gray-200 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:text-gray-400"
+        class="border-b border-gray-200 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:border-gray-700 dark:text-gray-400"
       >
         <th class="w-1 py-2 pr-3"></th>
         <th class="py-2 pr-4">{$t('name')}</th>
@@ -106,7 +106,7 @@
         <!-- Separator before unpinned -->
         {#if spaces.length > 0}
           <tr>
-            <td colspan="7" class="border-b-2 border-gray-200 dark:border-gray-700 py-0"></td>
+            <td colspan="7" class="border-b-2 border-gray-200 py-0 dark:border-gray-700"></td>
           </tr>
         {/if}
       {/if}
@@ -146,7 +146,7 @@
         href={Route.viewSpace({ id: space.id })}
         class="flex items-center gap-3 font-medium text-black hover:text-immich-primary dark:text-white dark:hover:text-immich-primary"
       >
-        <div class="h-8 w-8 shrink-0">
+        <div class="size-8 shrink-0">
           <SpaceCollage assets={collageAssets} {gradientClass} />
         </div>
         <span class="flex items-center gap-1">
@@ -196,7 +196,7 @@
       {#if hoveredId === space.id}
         <button
           type="button"
-          class="absolute end-0 top-1/2 -translate-y-1/2 rounded p-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+          class="absolute inset-e-0 top-1/2 -translate-y-1/2 rounded-sm p-1 hover:bg-gray-100 dark:hover:bg-gray-700"
           onclick={(e) => {
             e.stopPropagation();
             openMenuId = openMenuId === space.id ? null : space.id;
@@ -211,7 +211,7 @@
 
       {#if openMenuId === space.id}
         <div
-          class="absolute end-0 top-full z-20 min-w-[140px] rounded-lg border bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
+          class="absolute inset-e-0 top-full z-20 min-w-[140px] rounded-lg border bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
         >
           <button
             type="button"

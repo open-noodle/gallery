@@ -2451,7 +2451,9 @@ export class SharedSpaceRepository {
       .execute();
 
     return [
-      ...new Set([...directRows, ...libraryRows, ...albumRows].flatMap((row) => (row.userId ? [row.userId] : []))),
+      ...new Set(
+        [...directRows, ...libraryRows, ...albumRows].filter((row) => row.userId).map((row) => row.userId as string),
+      ),
     ];
   }
 

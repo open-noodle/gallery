@@ -20,7 +20,7 @@ function makeConfig(suggestions: FilterSuggestionsResponse, hasProvider = true):
   return {
     sections: ['timeline', 'people'],
     providers: { cities: () => Promise.resolve([]) },
-    ...(hasProvider ? { suggestionsProvider: () => Promise.resolve(suggestions) } : {}),
+    ...(hasProvider && { suggestionsProvider: () => Promise.resolve(suggestions) }),
   } as FilterPanelConfig;
 }
 

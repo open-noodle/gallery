@@ -37,10 +37,12 @@ const resetRecentSpaces = () => {
 };
 
 const dropSpaceAlbumCache = (spaceId: string) => {
-  if (userInteraction.spaceAlbums) {
-    const { [spaceId]: _, ...rest } = userInteraction.spaceAlbums;
-    userInteraction.spaceAlbums = rest;
+  if (!userInteraction.spaceAlbums) {
+    return;
   }
+
+  const { [spaceId]: _, ...rest } = userInteraction.spaceAlbums;
+  userInteraction.spaceAlbums = rest;
 };
 
 const reset = () => {

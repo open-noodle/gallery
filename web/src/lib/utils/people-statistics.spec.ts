@@ -10,7 +10,7 @@ describe(formatPeopleHeaderDescription.name, () => {
         faceSingular: 'face',
         facePlural: 'faces',
       }),
-    ).toBe('(60) \u00B7 2,901 faces');
+    ).toBe('(60) \u{B7} 2,901 faces');
   });
 
   it('formats singular detected face labels', () => {
@@ -22,7 +22,7 @@ describe(formatPeopleHeaderDescription.name, () => {
         faceSingular: 'face',
         facePlural: 'faces',
       }),
-    ).toBe('(1) \u00B7 1 face');
+    ).toBe('(1) \u{B7} 1 face');
   });
 
   it('uses locale formatting for people and face counts', () => {
@@ -34,7 +34,7 @@ describe(formatPeopleHeaderDescription.name, () => {
         faceSingular: 'face',
         facePlural: 'faces',
       }),
-    ).toBe('(1.234) \u00B7 5.678 faces');
+    ).toBe('(1.234) \u{B7} 5.678 faces');
   });
 
   it('can return only the people count when the face count is unsupported for the current filter', () => {
@@ -84,7 +84,7 @@ describe(formatPeopleHeaderDescription.name, () => {
         facePlural: 'faces',
         showZeroPeople: true,
       }),
-    ).toBe('(0) \u00B7 42 faces');
+    ).toBe('(0) \u{B7} 42 faces');
   });
 
   it('does not render invalid face text for missing detected-face counts', () => {

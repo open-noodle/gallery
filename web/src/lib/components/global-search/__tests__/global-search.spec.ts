@@ -571,8 +571,10 @@ describe('global-search root', () => {
     render(GlobalSearch, { props: { manager } });
 
     const input = screen.getByRole('combobox') as HTMLInputElement;
-    Object.defineProperty(input, 'selectionStart', { configurable: true, get: () => 'person:ann'.length });
-    Object.defineProperty(input, 'selectionEnd', { configurable: true, get: () => 'person:ann'.length });
+    Object.defineProperties(input, {
+      selectionStart: { configurable: true, get: () => 'person:ann'.length },
+      selectionEnd: { configurable: true, get: () => 'person:ann'.length },
+    });
     input.focus();
     await user.keyboard('{ArrowDown}');
     await vi.waitFor(() => expect(manager.activeItemId).toBe('filter:person:0:10:p1:Ann Live'));
@@ -926,8 +928,10 @@ describe('global-search root', () => {
     expect(m.activeTypedSearchToken).toMatchObject({ key: 'person', raw: 'person:ann' });
 
     const input = screen.getByRole('combobox') as HTMLInputElement;
-    Object.defineProperty(input, 'selectionStart', { configurable: true, get: () => query.length });
-    Object.defineProperty(input, 'selectionEnd', { configurable: true, get: () => query.length });
+    Object.defineProperties(input, {
+      selectionStart: { configurable: true, get: () => query.length },
+      selectionEnd: { configurable: true, get: () => query.length },
+    });
     expect(m.activeTypedSearchToken).toMatchObject({ key: 'person', raw: 'person:ann' });
 
     await fireEvent.pointerUp(input);
@@ -1716,16 +1720,19 @@ describe('global-search root', () => {
   });
 
   it('respects prefers-reduced-motion class on palette shell', () => {
-    globalThis.matchMedia = vi.fn().mockImplementation((query: string) => ({
-      matches: query === '(prefers-reduced-motion: reduce)',
-      media: query,
-      addListener: () => {},
-      removeListener: () => {},
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => false,
-      onchange: null,
-    }));
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockImplementation((query: string) => ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+        onchange: null,
+      })),
+    );
     const m = new GlobalSearchManager();
     m.open();
     render(GlobalSearch, { props: { manager: m } });

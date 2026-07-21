@@ -38,7 +38,7 @@
   use:focusOutside={{ onFocusOut: () => (showActions = false) }}
 >
   <a href={person.href} draggable="false" aria-label={person.displayName} onfocus={() => (showActions = true)}>
-    <div class="w-full h-full rounded-xl brightness-95 filter">
+    <div class="size-full rounded-xl brightness-95 filter">
       {#if deferThumbnail && thumbnailQueue}
         <DeferredPersonThumbnail
           queue={thumbnailQueue}
@@ -61,13 +61,13 @@
         />
       {/if}
       {#if person.isFavorite}
-        <div class="absolute top-4 start-4" aria-label={$t('favorite')} title={$t('favorite')}>
+        <div class="absolute inset-s-4 top-4" aria-label={$t('favorite')} title={$t('favorite')}>
           <Icon icon={mdiHeart} size="24" class="text-white" />
         </div>
       {/if}
       {#if person.type === 'pet'}
         <div
-          class="absolute bottom-1 right-1 rounded-full bg-immich-primary p-1 text-white"
+          class="absolute right-1 bottom-1 rounded-full bg-immich-primary p-1 text-white"
           title={person.species ?? undefined}
         >
           <Icon icon={mdiPaw} size="16" class="text-white" />
@@ -77,7 +77,7 @@
   </a>
 
   {#if showActionMenu && actionMenu && showActions}
-    <div class="absolute top-2 end-2 z-1">
+    <div class="absolute inset-e-2 top-2 z-1">
       {@render actionMenu()}
     </div>
   {/if}

@@ -7,47 +7,53 @@ import TestWrapper from '$lib/components/TestWrapper.svelte';
 import type { AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
 import GalleryViewer from './GalleryViewer.svelte';
 
-const { assetViewerPropsCalls, mockAssetInteraction, mockAssetViewerManager } = vi.hoisted(() => ({
-  assetViewerPropsCalls: [] as Array<Record<string, unknown>>,
-  mockAssetInteraction: {
-    selectionActive: false,
-    assets: [],
-    candidates: [],
-    startAsset: null,
-    clear: vi.fn(),
-    clearCandidates: vi.fn(),
-    hasSelectedAsset: vi.fn(() => false),
-    hasSelectionCandidate: vi.fn(() => false),
-    removeAssetFromMultiselectGroup: vi.fn(),
-    selectAsset: vi.fn(),
-    selectAssets: vi.fn(),
-    setAssetSelectionCandidates: vi.fn(),
-    setAssetSelectionStart: vi.fn(),
-  },
-  mockAssetViewerManager: {
+const { assetViewerPropsCalls, mockAssetInteraction, mockAssetViewerManager } = vi.hoisted(() => {
+  // Bound to a local name (not an inline literal) so the accessors reference the
+  // state directly instead of `this` (unicorn/no-this-outside-of-class).
+  const assetViewerManager = {
     _asset: undefined as AssetResponseDto | undefined,
     _isViewing: false,
     _notify: () => {},
     _track: () => {},
     get asset() {
-      this._track();
-      return this._asset;
+      assetViewerManager._track();
+      return assetViewerManager._asset;
     },
     set asset(asset: AssetResponseDto | undefined) {
-      this._asset = asset;
-      this._notify();
+      assetViewerManager._asset = asset;
+      assetViewerManager._notify();
     },
     get isViewing() {
-      this._track();
-      return this._isViewing;
+      assetViewerManager._track();
+      return assetViewerManager._isViewing;
     },
     set isViewing(isViewing: boolean) {
-      this._isViewing = isViewing;
-      this._notify();
+      assetViewerManager._isViewing = isViewing;
+      assetViewerManager._notify();
     },
     showAssetViewer: vi.fn(),
-  },
-}));
+  };
+
+  return {
+    assetViewerPropsCalls: [] as Array<Record<string, unknown>>,
+    mockAssetInteraction: {
+      selectionActive: false,
+      assets: [],
+      candidates: [],
+      startAsset: null,
+      clear: vi.fn(),
+      clearCandidates: vi.fn(),
+      hasSelectedAsset: vi.fn(() => false),
+      hasSelectionCandidate: vi.fn(() => false),
+      removeAssetFromMultiselectGroup: vi.fn(),
+      selectAsset: vi.fn(),
+      selectAssets: vi.fn(),
+      setAssetSelectionCandidates: vi.fn(),
+      setAssetSelectionStart: vi.fn(),
+    },
+    mockAssetViewerManager: assetViewerManager,
+  };
+});
 
 const asAssetInteraction = (assetInteraction: typeof mockAssetInteraction) =>
   assetInteraction as unknown as AssetMultiSelectManager;
@@ -67,7 +73,9 @@ vi.mock('$lib/components/asset-viewer/AssetViewer.svelte', () => {
     default: function MockAssetViewer(_node: unknown, props: Record<string, unknown>) {
       assetViewerPropsCalls.push(props);
       return {
-        $set: (nextProps: Record<string, unknown>) => assetViewerPropsCalls.push(nextProps),
+        $set: (nextProps: Record<string, unknown>) => {
+          assetViewerPropsCalls.push(nextProps);
+        },
         destroy: () => {},
       };
     },
@@ -161,7 +169,7 @@ function createAnimationFrameQueue() {
     callbacks.push(callback);
     return callbacks.length;
   });
-  globalThis.requestAnimationFrame = requestAnimationFrame;
+  vi.stubGlobal('requestAnimationFrame', requestAnimationFrame);
 
   return {
     requestAnimationFrame,
@@ -172,7 +180,7 @@ function createAnimationFrameQueue() {
       }
     },
     restore() {
-      globalThis.requestAnimationFrame = originalRequestAnimationFrame;
+      vi.stubGlobal('requestAnimationFrame', originalRequestAnimationFrame);
     },
   };
 }
@@ -204,9 +212,12 @@ function getScrolledElementSelector(element: Element) {
 function trackScrolledElement() {
   let scrolledElement: Element | undefined;
   const originalScrollIntoView = Element.prototype.scrollIntoView;
+  // A prototype-method mock genuinely needs the receiver: scrollIntoView() is called
+  // with options, not the element, so `this` is the only handle on the scrolled node.
   Element.prototype.scrollIntoView = vi.fn(function (this: Element) {
+    // eslint-disable-next-line unicorn/no-this-outside-of-class
     const selector = getScrolledElementSelector(this);
-    scrolledElement = selector ? (globalThis.document.querySelector(selector) ?? undefined) : undefined;
+    scrolledElement = selector ? (document.querySelector(selector) ?? undefined) : undefined;
   });
 
   return {

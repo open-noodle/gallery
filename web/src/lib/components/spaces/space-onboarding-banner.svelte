@@ -70,14 +70,14 @@
 
 {#if !allComplete && !dismissed}
   <div
-    class="mx-4 mt-4 mb-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-immich-dark-gray"
+    class="m-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-immich-dark-gray"
     data-testid="onboarding-banner"
     data-collapsed={collapsed}
   >
     <!-- Progress bar -->
     <div class="h-1 w-full bg-gray-100 dark:bg-gray-800">
       <div
-        class="h-full bg-gradient-to-r transition-all duration-500 ease-out {gradientClass}"
+        class="h-full bg-linear-to-r transition-all duration-500 ease-out {gradientClass}"
         style="width: {progressPercent}%"
         data-testid="progress-bar-fill"
       ></div>
@@ -120,9 +120,7 @@
                 ? 'border-b border-gray-100 dark:border-gray-800'
                 : ''}"
             >
-              <div
-                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br {gradientClass}"
-              >
+              <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-linear-to-br {gradientClass}">
                 <span data-testid="step-{step.id}-check">
                   <Icon icon={mdiCheck} size="20" class="text-white" />
                 </span>
@@ -141,7 +139,7 @@
               onclick={step.action}
               data-testid="step-{step.id}-action"
             >
-              <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                 <Icon icon={step.icon} size="20" class="text-primary" />
               </div>
               <span class="flex-1 text-left text-sm font-medium dark:text-white">{step.label}</span>

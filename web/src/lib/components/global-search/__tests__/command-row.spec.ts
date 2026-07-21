@@ -37,7 +37,7 @@ describe('command-row', () => {
     const { container } = render(CommandRow, { props: { item: baseItem } });
     const root = container.firstElementChild as HTMLElement;
     expect(root.className).toContain('transition-colors');
-    expect(root.className).toContain('duration-[80ms]');
+    expect(root.className).toContain('duration-80');
   });
 
   it('pending=true renders the confirm-hint text (not the description)', () => {
@@ -71,10 +71,10 @@ describe('command-row', () => {
   it('uses group-data-[selected] to inherit the selected highlight from Command.Item', () => {
     // bits-ui Command.Item sets `data-selected=""` (empty string) when selected —
     // `data-[selected=true]:` would NOT match because it looks for the literal "true".
-    // Using `group-data-[selected]:` on the row with `group` on the Command.Item
+    // Using `group-data-selected:` on the row with `group` on the Command.Item
     // matches any (including empty) value of data-selected on the parent.
     const { container } = render(CommandRow, { props: { item: baseItem } });
     const root = container.firstElementChild as HTMLElement;
-    expect(root.className).toContain('group-data-[selected]:bg-primary/10');
+    expect(root.className).toContain('group-data-selected:bg-primary/10');
   });
 });

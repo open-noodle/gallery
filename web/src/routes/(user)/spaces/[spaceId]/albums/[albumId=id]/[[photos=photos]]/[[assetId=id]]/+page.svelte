@@ -113,13 +113,13 @@
   const browseHasMonths = $derived((timelineManager?.months?.length ?? 0) > 0);
   const browseActive = $derived(getActiveFilterCount(browseFilters));
   const isBrowseEmpty = $derived(
-    Boolean(timelineManager?.isInitialized) && !browseHasMonths && browseTotal === 0 && browseActive === 0,
+    timelineManager?.isInitialized && !browseHasMonths && browseTotal === 0 && browseActive === 0,
   );
 
   // Filter-panel collapse is driven here so the header filter button can reclaim the panel's space.
   let filterCollapsed = $state(loadFilterCollapsed());
   const showBrowseFilteredEmpty = $derived(
-    Boolean(timelineManager?.isInitialized) && !browseHasMonths && browseTotal === 0 && browseActive > 0,
+    timelineManager?.isInitialized && !browseHasMonths && browseTotal === 0 && browseActive > 0,
   );
   const browseTimeBuckets = $derived(getTimelineManagerTimeBuckets(timelineManager));
 
@@ -153,10 +153,10 @@
   const pickerHasMonths = $derived((pickerTimelineManager?.months?.length ?? 0) > 0);
   const pickerActive = $derived(getActiveFilterCount(pickerFilters));
   const isPickerEmpty = $derived(
-    Boolean(pickerTimelineManager?.isInitialized) && !pickerHasMonths && pickerTotal === 0 && pickerActive === 0,
+    pickerTimelineManager?.isInitialized && !pickerHasMonths && pickerTotal === 0 && pickerActive === 0,
   );
   const showPickerFilteredEmpty = $derived(
-    Boolean(pickerTimelineManager?.isInitialized) && !pickerHasMonths && pickerTotal === 0 && pickerActive > 0,
+    pickerTimelineManager?.isInitialized && !pickerHasMonths && pickerTotal === 0 && pickerActive > 0,
   );
   const pickerTimeBuckets = $derived(getTimelineManagerTimeBuckets(pickerTimelineManager));
 
@@ -205,15 +205,17 @@
   // re-seeded by hand, or the URL changes while the page keeps rendering the album we came from.
   // Mirrors the identical effect on the global album route.
   $effect(() => {
-    if (data.album.id !== album.id) {
-      album = data.album;
-      mode = 'browse';
-      browseFilters = createFilterState();
-      browsePersonNames.clear();
-      browseTagNames.clear();
-      assetMultiSelectManager.clear();
-      resetPicker();
+    if (data.album.id === album.id) {
+      return;
     }
+
+    album = data.album;
+    mode = 'browse';
+    browseFilters = createFilterState();
+    browsePersonNames.clear();
+    browseTagNames.clear();
+    assetMultiSelectManager.clear();
+    resetPicker();
   });
 
   function handleTimelineGroupingChange(grouping: TimelineGrouping) {

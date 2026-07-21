@@ -70,7 +70,7 @@ const countOrderByExpressions = (compiledSql: string, anchor: string): number =>
   // Find the ORDER BY that immediately precedes the given anchor (or LIMIT/OFFSET).
   // Kysely's PostgresQueryCompiler emits a single-line compact SQL string.
   const orderByRegex = /order by\s+([\s\S]+?)\s+(?:limit\b|offset\b|\)\s+as\b)/gi;
-  const matches = [...compiledSql.matchAll(orderByRegex)];
+  const matches = compiledSql.matchAll(orderByRegex).toArray();
   const match = matches.find((m) => compiledSql.indexOf(anchor) > compiledSql.indexOf(m[0]));
   if (!match) {
     throw new Error(`no ORDER BY before anchor "${anchor}" in: ${compiledSql}`);
@@ -83,7 +83,7 @@ const countOrderByExpressions = (compiledSql: string, anchor: string): number =>
 // its own ORDER BY.
 const countOuterOrderByExpressions = (compiledSql: string): number => {
   const orderByRegex = /order by\s+([\s\S]+?)\s+(?:limit\b|offset\b)/gi;
-  const matches = [...compiledSql.matchAll(orderByRegex)];
+  const matches = compiledSql.matchAll(orderByRegex).toArray();
   if (matches.length === 0) {
     throw new Error(`no ORDER BY in: ${compiledSql}`);
   }
@@ -92,7 +92,7 @@ const countOuterOrderByExpressions = (compiledSql: string): number => {
 };
 
 const countMatches = (compiledSql: string, pattern: RegExp): number => {
-  return [...compiledSql.matchAll(pattern)].length;
+  return compiledSql.matchAll(pattern).toArray().length;
 };
 
 describe(SearchRepository.name, () => {
