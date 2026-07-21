@@ -13,6 +13,7 @@ part of openapi.api;
 class SharedSpaceResponseDto {
   /// Returns a new [SharedSpaceResponseDto] instance.
   SharedSpaceResponseDto({
+    this.albumCount = const Optional.absent(),
     this.assetCount = const Optional.absent(),
     this.color = const Optional.absent(),
     required this.createdAt,
@@ -36,6 +37,15 @@ class SharedSpaceResponseDto {
     this.thumbnailCropY = const Optional.absent(),
     required this.updatedAt,
   });
+
+  /// Number of linked albums
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  Optional<num?> albumCount;
 
   /// Number of assets
   ///
@@ -139,6 +149,7 @@ class SharedSpaceResponseDto {
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is SharedSpaceResponseDto &&
+    other.albumCount == albumCount &&
     other.assetCount == assetCount &&
     other.color == color &&
     other.createdAt == createdAt &&
@@ -165,6 +176,7 @@ class SharedSpaceResponseDto {
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
+    (albumCount == null ? 0 : albumCount!.hashCode) +
     (assetCount == null ? 0 : assetCount!.hashCode) +
     (color == null ? 0 : color!.hashCode) +
     (createdAt.hashCode) +
@@ -189,10 +201,14 @@ class SharedSpaceResponseDto {
     (updatedAt.hashCode);
 
   @override
-  String toString() => 'SharedSpaceResponseDto[assetCount=$assetCount, color=$color, createdAt=$createdAt, createdById=$createdById, description=$description, faceRecognitionEnabled=$faceRecognitionEnabled, hasPets=$hasPets, id=$id, lastActivityAt=$lastActivityAt, lastContributor=$lastContributor, lastViewedAt=$lastViewedAt, linkedLibraries=$linkedLibraries, memberCount=$memberCount, members=$members, name=$name, newAssetCount=$newAssetCount, petsEnabled=$petsEnabled, recentAssetIds=$recentAssetIds, recentAssetThumbhashes=$recentAssetThumbhashes, thumbnailAssetId=$thumbnailAssetId, thumbnailCropY=$thumbnailCropY, updatedAt=$updatedAt]';
+  String toString() => 'SharedSpaceResponseDto[albumCount=$albumCount, assetCount=$assetCount, color=$color, createdAt=$createdAt, createdById=$createdById, description=$description, faceRecognitionEnabled=$faceRecognitionEnabled, hasPets=$hasPets, id=$id, lastActivityAt=$lastActivityAt, lastContributor=$lastContributor, lastViewedAt=$lastViewedAt, linkedLibraries=$linkedLibraries, memberCount=$memberCount, members=$members, name=$name, newAssetCount=$newAssetCount, petsEnabled=$petsEnabled, recentAssetIds=$recentAssetIds, recentAssetThumbhashes=$recentAssetThumbhashes, thumbnailAssetId=$thumbnailAssetId, thumbnailCropY=$thumbnailCropY, updatedAt=$updatedAt]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
+    if (this.albumCount.isPresent) {
+      final value = this.albumCount.value;
+      json[r'albumCount'] = value;
+    }
     if (this.assetCount.isPresent) {
       final value = this.assetCount.value;
       json[r'assetCount'] = value;
@@ -278,6 +294,7 @@ class SharedSpaceResponseDto {
       final json = value.cast<String, dynamic>();
 
       return SharedSpaceResponseDto(
+        albumCount: json.containsKey(r'albumCount') ? Optional.present(json[r'albumCount'] == null ? null : num.parse('${json[r'albumCount']}')) : const Optional.absent(),
         assetCount: json.containsKey(r'assetCount') ? Optional.present(json[r'assetCount'] == null ? null : num.parse('${json[r'assetCount']}')) : const Optional.absent(),
         color: json.containsKey(r'color') ? Optional.present(UserAvatarColor.fromJson(json[r'color'])) : const Optional.absent(),
         createdAt: mapValueOfType<String>(json, r'createdAt')!,

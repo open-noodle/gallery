@@ -2,6 +2,7 @@
   import AlbumCover from '$lib/components/album-page/AlbumCover.svelte';
   import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
+  import { Route } from '$lib/route';
   import { type AlbumResponseDto, type SharedSpaceLinkedAlbumDto } from '@immich/sdk';
   import { mdiDotsVertical } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -46,7 +47,7 @@
     </div>
   {/if}
 
-  <a href="/spaces/{spaceId}/albums/{album.id}" data-testid="space-album-card-link">
+  <a href={Route.viewSpaceAlbum({ spaceId, albumId: album.id })} data-testid="space-album-card-link">
     <!-- Cover image -->
     <div class="relative aspect-square w-full overflow-hidden rounded-xl {album.showInTimeline ? '' : 'opacity-60'}">
       <AlbumCover album={album as unknown as AlbumResponseDto} class="size-full object-cover" />
