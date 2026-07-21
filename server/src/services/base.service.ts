@@ -503,7 +503,7 @@ export class BaseService {
     if (
       !this.hasPositiveDimensions(dims.old) ||
       !this.hasPositiveDimensions(dims.new) ||
-      ![x1, y1, x2, y2].every((value) => Number.isFinite(value)) ||
+      [x1, y1, x2, y2].some((value) => !Number.isFinite(value)) ||
       x2 <= x1 ||
       y2 <= y1
     ) {

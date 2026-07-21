@@ -693,13 +693,13 @@ describe(AuthService.name, () => {
     });
 
     it('should preserve every query param, including an error response', () => {
-      expect(sut.getMobileRedirect('http://immich.app?error=access_denied&error_description=nope&state=456')).toEqual(
+      expect(sut.getMobileRedirect('https://immich.app?error=access_denied&error_description=nope&state=456')).toEqual(
         'app.immich:///oauth-callback?error=access_denied&error_description=nope&state=456',
       );
     });
 
     it('should preserve percent-encoded values', () => {
-      expect(sut.getMobileRedirect('http://immich.app?code=a%2Fb%3Dc&state=456')).toEqual(
+      expect(sut.getMobileRedirect('https://immich.app?code=a%2Fb%3Dc&state=456')).toEqual(
         'app.immich:///oauth-callback?code=a%2Fb%3Dc&state=456',
       );
     });

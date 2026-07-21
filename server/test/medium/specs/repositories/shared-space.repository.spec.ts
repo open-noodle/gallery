@@ -126,7 +126,7 @@ const seedAlbumPerson = async (
   const { asset } = await ctx.newAsset({
     ownerId: user.id,
     visibility: AssetVisibility.Timeline,
-    ...(opts.fileCreatedAt ? { fileCreatedAt: opts.fileCreatedAt } : {}),
+    ...(opts.fileCreatedAt && { fileCreatedAt: opts.fileCreatedAt }),
   });
   await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
   await sut.addAlbum({ spaceId: space.id, albumId: album.id, addedById: user.id });
@@ -2078,7 +2078,7 @@ describe(SharedSpaceRepository.name, () => {
 
       const whitespaceName = await sut.createPerson({
         spaceId: space.id,
-        name: '   ',
+        name: ' '.repeat(3),
         representativeFaceId: null,
         type: 'person',
         assetCount: 20,
@@ -3269,7 +3269,7 @@ describe(SharedSpaceRepository.name, () => {
         representativeFaceId: null,
       });
       const unnamedPerson = await sut.createPerson({ spaceId: space.id, name: '', representativeFaceId: null });
-      const whitespacePerson = await sut.createPerson({ spaceId: space.id, name: '   ', representativeFaceId: null });
+      const whitespacePerson = await sut.createPerson({ spaceId: space.id, name: ' '.repeat(3), representativeFaceId: null });
       const outOfScopePerson = await sut.createPerson({
         spaceId: otherSpace.id,
         name: 'Other Space',
