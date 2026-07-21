@@ -149,7 +149,7 @@ void main() {
       // here even if `albumTypes` above is never updated to match — the exact regression class
       // the mobile-1 gate exists to prevent (a whole-stream 400 outage on an older server).
       final forkAlbumTypes = SyncRequestType.values
-          .map((t) => t.value)
+          .map((t) => t.toString())
           .where((v) => v.startsWith('SharedSpaceAlbum'))
           .toSet();
 
