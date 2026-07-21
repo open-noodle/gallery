@@ -2,6 +2,7 @@ import { getQueueToken } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import { ModuleRef, Reflector } from '@nestjs/core';
 import { JobsOptions, Queue, Worker, WorkerOptions } from 'bullmq';
+import type { Redis } from 'ioredis';
 import { setTimeout } from 'node:timers/promises';
 import { JobConfig } from 'src/decorators';
 import { QueueJobResponseDto, QueueJobSearchDto } from 'src/dtos/queue.dto';
@@ -250,7 +251,10 @@ export class JobRepository {
     for (const jobId of activeIds) {
       const job = await queue.getJob(jobId);
       if (!job) {
-        await client.lrem(activeKey, 0, jobId);
+        // bullmq >=5.80 narrowed `IRedisClient` to just the commands bullmq itself
+        // issues, and LREM is not among them. The concrete client is ioredis, so
+        // cast to reach it rather than reimplementing LREM via a Lua script.
+        await (client as unknown as Pick<Redis, 'lrem'>).lrem(activeKey, 0, jobId);
         removed.push(jobId);
       }
     }
@@ -323,7 +327,7 @@ export class JobRepository {
       }
     }
 
-    return [...counts.values()];
+    return counts.values().toArray();
   }
 
   async getTelemetryMetrics(now = Date.now()): Promise<QueueTelemetryMetrics> {
@@ -591,12 +595,12 @@ export class JobRepository {
   }
 
   private isSharedSpaceFacePipelineJob(name: JobName): boolean {
-    return (
-      name === JobName.SharedSpaceFaceMatch ||
-      name === JobName.SharedSpaceFaceMatchAll ||
-      name === JobName.SharedSpaceFaceMatchPage ||
-      name === JobName.SharedSpaceFaceMatchFromBackfill
-    );
+    return [
+      JobName.SharedSpaceFaceMatch,
+      JobName.SharedSpaceFaceMatchAll,
+      JobName.SharedSpaceFaceMatchPage,
+      JobName.SharedSpaceFaceMatchFromBackfill,
+    ].includes(name);
   }
 
   private async prepareFacialRecognitionQueueAll(
@@ -633,7 +637,7 @@ export class JobRepository {
       return { add: true, options };
     }
 
-    if (state === 'waiting' || state === 'delayed' || state === 'paused') {
+    if (['waiting', 'delayed', 'paused'].includes(state)) {
       await existingJob.remove();
       await queue.drain(true);
       return { add: true, options };

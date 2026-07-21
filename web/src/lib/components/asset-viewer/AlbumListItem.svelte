@@ -150,7 +150,7 @@
       {/if}
       {#if badgeIcon}
         <span
-          class="absolute -bottom-1.5 -end-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-immich-bg ring-2 ring-immich-bg dark:bg-immich-dark-gray dark:ring-immich-dark-gray"
+          class="absolute -inset-e-1.5 -bottom-1.5 flex size-6 items-center justify-center rounded-full bg-immich-bg ring-2 ring-immich-bg dark:bg-immich-dark-gray dark:ring-immich-dark-gray"
           data-testid="collection-row-badge"
         >
           <Icon

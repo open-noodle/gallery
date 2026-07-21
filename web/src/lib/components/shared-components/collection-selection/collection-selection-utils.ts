@@ -70,9 +70,9 @@ export type CollectionModalRow = {
 };
 
 export const isSelectableRowType = (type: CollectionModalRowType): boolean =>
-  type === CollectionModalRowType.NEW_ALBUM ||
-  type === CollectionModalRowType.NEW_SPACE ||
-  type === CollectionModalRowType.COLLECTION_ITEM;
+  [CollectionModalRowType.NEW_ALBUM, CollectionModalRowType.NEW_SPACE, CollectionModalRowType.COLLECTION_ITEM].includes(
+    type,
+  );
 
 export class CollectionModalRowConverter {
   toModalRows(

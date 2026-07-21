@@ -33,7 +33,7 @@
 {#if isComplete}
   <!-- Complete state -->
   <div class="flex flex-col items-center gap-6">
-    <div class="flex h-20 w-20 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+    <div class="flex size-20 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
       <Icon icon={mdiCheckDecagram} size="48" class="text-green-500" />
     </div>
 

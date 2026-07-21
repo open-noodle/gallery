@@ -90,8 +90,7 @@ export type MergePropagationProfile = {
 };
 
 export type MergePropagationProfileInput =
-  | { mode: 'profiles'; personIds: string[] }
-  | { mode: 'identities'; identityIds: string[] };
+  { mode: 'profiles'; personIds: string[] } | { mode: 'identities'; identityIds: string[] };
 
 // Automatic shared-space identity merges must never irreversibly fuse two clusters whose averaged
 // embeddings are farther apart than this cosine distance. A single representative-face match (the basis
@@ -645,13 +644,13 @@ export class FaceIdentityRepository {
   private dedupeSharedSpaceFaceMatchBackfillTargets(
     targets: SharedSpaceFaceMatchBackfillTarget[],
   ): SharedSpaceFaceMatchBackfillTarget[] {
-    return [
-      ...new Map(
-        targets
-          .toSorted((a, b) => a.spaceId.localeCompare(b.spaceId) || a.assetId.localeCompare(b.assetId))
-          .map((target) => [`${target.spaceId}:${target.assetId}`, target]),
-      ).values(),
-    ];
+    return new Map(
+      targets
+        .toSorted((a, b) => a.spaceId.localeCompare(b.spaceId) || a.assetId.localeCompare(b.assetId))
+        .map((target) => [`${target.spaceId}:${target.assetId}`, target]),
+    )
+      .values()
+      .toArray();
   }
 
   private async getSharedSpaceFaceMatchTargetsForAssetFaces(
@@ -2623,7 +2622,7 @@ export class FaceIdentityRepository {
     return {
       processed: page.length,
       conflictCount: 0,
-      ...((people.length > input.limit) && { nextCursor: page.at(-1)?.id }),
+      ...(people.length > input.limit && { nextCursor: page.at(-1)?.id }),
       affectedSpaceAssets: this.dedupeSharedSpaceFaceMatchBackfillTargets(affectedSpaceAssets),
     };
   }
