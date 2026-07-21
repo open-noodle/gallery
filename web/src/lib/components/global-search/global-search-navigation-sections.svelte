@@ -51,7 +51,7 @@
     {#each buckets as bucket (bucket.category)}
       <Command.Group class="mb-4" data-cmdk-nav-section>
         <Command.GroupHeading
-          class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+          class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
         >
           {$t(bucket.headingKey)}
         </Command.GroupHeading>

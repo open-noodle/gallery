@@ -30,7 +30,7 @@
       data-completed={step.index < currentStep ? 'true' : 'false'}
     >
       <div
-        class="flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium {step.index === currentStep
+        class="flex size-8 items-center justify-center rounded-full text-sm font-medium {step.index === currentStep
           ? 'bg-primary text-white'
           : step.index < currentStep
             ? 'bg-primary/20 text-primary'
