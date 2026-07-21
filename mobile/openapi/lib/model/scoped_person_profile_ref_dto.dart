@@ -125,29 +125,29 @@ class ScopedPersonProfileRefDto {
 }
 
 /// Scoped profile type
-class ScopedPersonProfileRefDtoTypeEnum {
-  /// Instantiate a new enum with the provided [value].
-  const ScopedPersonProfileRefDtoTypeEnum._(this.value);
+enum ScopedPersonProfileRefDtoTypeEnum {
+  person._(r'person'),
+  spacePerson._(r'space-person'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const ScopedPersonProfileRefDtoTypeEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const person = ScopedPersonProfileRefDtoTypeEnum._(r'person');
-  static const spacePerson = ScopedPersonProfileRefDtoTypeEnum._(r'space-person');
-
-  /// List of all possible values in this [enum][ScopedPersonProfileRefDtoTypeEnum].
-  static const values = <ScopedPersonProfileRefDtoTypeEnum>[
-    person,
-    spacePerson,
-  ];
-
+  /// Returns the instance of [ScopedPersonProfileRefDtoTypeEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static ScopedPersonProfileRefDtoTypeEnum? fromJson(dynamic value) => ScopedPersonProfileRefDtoTypeEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [ScopedPersonProfileRefDtoTypeEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<ScopedPersonProfileRefDtoTypeEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <ScopedPersonProfileRefDtoTypeEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -169,9 +169,10 @@ class ScopedPersonProfileRefDtoTypeEnumTypeTransformer {
 
   const ScopedPersonProfileRefDtoTypeEnumTypeTransformer._();
 
-  String encode(ScopedPersonProfileRefDtoTypeEnum data) => data.value;
+  String encode(ScopedPersonProfileRefDtoTypeEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a ScopedPersonProfileRefDtoTypeEnum.
+  /// Returns the instance of [ScopedPersonProfileRefDtoTypeEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -180,6 +181,9 @@ class ScopedPersonProfileRefDtoTypeEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   ScopedPersonProfileRefDtoTypeEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is ScopedPersonProfileRefDtoTypeEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'person': return ScopedPersonProfileRefDtoTypeEnum.person;
@@ -193,7 +197,7 @@ class ScopedPersonProfileRefDtoTypeEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [ScopedPersonProfileRefDtoTypeEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static ScopedPersonProfileRefDtoTypeEnumTypeTransformer? _instance;
 }
 
