@@ -6,10 +6,7 @@ import { SyncTestContext } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 
 const drain = async (stream: AsyncIterable<any>) => {
-  const out: any[] = [];
-  for await (const row of stream) {
-    out.push(row);
-  }
+  const out: any[] = await Array.fromAsync(stream);
   return out;
 };
 
@@ -46,10 +43,7 @@ describe('SharedSpaceAlbumAssetSync.getBackfill', () => {
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
 
     const stream = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id, owner.id);
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.id)).toContain(asset.id);
   });
 
@@ -62,20 +56,14 @@ describe('SharedSpaceAlbumAssetSync.getBackfill', () => {
 
     // Confirm asset appears before soft-delete
     const streamBefore = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id, owner.id);
-    const resultBefore: any[] = [];
-    for await (const row of streamBefore) {
-      resultBefore.push(row);
-    }
+    const resultBefore: any[] = await Array.fromAsync(streamBefore);
     expect(resultBefore.map((r: any) => r.id)).toContain(asset.id);
 
     // Soft-delete the album
     await db.updateTable('album').set({ deletedAt: new Date() }).where('id', '=', album.id).execute();
 
     const stream = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id, owner.id);
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result).toHaveLength(0);
   });
 
@@ -92,20 +80,14 @@ describe('SharedSpaceAlbumAssetSync.getBackfill', () => {
 
     // Backfill as member (non-owner) — should see isFavorite=false
     const stream = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id, member.id);
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     const row = result.find((r: any) => r.id === asset.id);
     expect(row).toBeDefined();
     expect(row.isFavorite).toBe(false);
 
     // Backfill as owner — should see true isFavorite
     const ownerStream = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id, owner.id);
-    const ownerResult: any[] = [];
-    for await (const row of ownerStream) {
-      ownerResult.push(row);
-    }
+    const ownerResult: any[] = await Array.fromAsync(ownerStream);
     expect(ownerResult.find((r: any) => r.id === asset.id)?.isFavorite).toBe(true);
   });
 });
@@ -124,10 +106,7 @@ describe('SharedSpaceAlbumAssetSync.getCreates', () => {
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
 
     const stream = sut.getCreates({ nowId: NOW_ID, userId: member.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.id)).toContain(asset.id);
   });
 
@@ -142,10 +121,7 @@ describe('SharedSpaceAlbumAssetSync.getCreates', () => {
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
 
     const stream = sut.getCreates({ nowId: NOW_ID, userId: stranger.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.id)).not.toContain(asset.id);
   });
 
@@ -163,20 +139,14 @@ describe('SharedSpaceAlbumAssetSync.getCreates', () => {
 
     // Confirm asset is visible before soft-delete
     const streamBefore = sut.getCreates({ nowId: NOW_ID, userId: member.id });
-    const resultBefore: any[] = [];
-    for await (const row of streamBefore) {
-      resultBefore.push(row);
-    }
+    const resultBefore: any[] = await Array.fromAsync(streamBefore);
     expect(resultBefore.map((r: any) => r.id)).toContain(asset.id);
 
     // Soft-delete the album
     await db.updateTable('album').set({ deletedAt: new Date() }).where('id', '=', album.id).execute();
 
     const stream = sut.getCreates({ nowId: NOW_ID, userId: member.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.id)).not.toContain(asset.id);
   });
 
@@ -193,10 +163,7 @@ describe('SharedSpaceAlbumAssetSync.getCreates', () => {
     await db.updateTable('asset').set({ isFavorite: true }).where('id', '=', asset.id).execute();
 
     const stream = sut.getCreates({ nowId: NOW_ID, userId: member.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     const row = result.find((r: any) => r.id === asset.id);
     expect(row?.isFavorite).toBe(false);
   });
@@ -219,10 +186,7 @@ describe('SharedSpaceAlbumAssetSync.getUpdates', () => {
       { nowId: NOW_ID, userId: member.id },
       { type: SyncEntityType.AlbumToAssetV1, updateId: BEFORE_UPDATE_ID },
     );
-    const resultBefore: any[] = [];
-    for await (const row of streamBefore) {
-      resultBefore.push(row);
-    }
+    const resultBefore: any[] = await Array.fromAsync(streamBefore);
     expect(resultBefore.map((r: any) => r.id)).toContain(asset.id);
 
     // Soft-delete the album
@@ -232,10 +196,7 @@ describe('SharedSpaceAlbumAssetSync.getUpdates', () => {
       { nowId: NOW_ID, userId: member.id },
       { type: SyncEntityType.AlbumToAssetV1, updateId: BEFORE_UPDATE_ID },
     );
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.id)).not.toContain(asset.id);
   });
 
@@ -255,19 +216,13 @@ describe('SharedSpaceAlbumAssetSync.getUpdates', () => {
       { nowId: NOW_ID, userId: member.id },
       { type: SyncEntityType.AlbumToAssetV1, updateId: ZERO_UPDATE_ID },
     );
-    const resultZero: any[] = [];
-    for await (const row of streamZero) {
-      resultZero.push(row);
-    }
+    const resultZero: any[] = await Array.fromAsync(streamZero);
     // With ack at max — all assets known, so updates should come through
     const streamMax = sut.getUpdates(
       { nowId: NOW_ID, userId: member.id },
       { type: SyncEntityType.AlbumToAssetV1, updateId: BEFORE_UPDATE_ID },
     );
-    const resultMax: any[] = [];
-    for await (const row of streamMax) {
-      resultMax.push(row);
-    }
+    const resultMax: any[] = await Array.fromAsync(streamMax);
     // With ack BELOW the asset's album_asset.updateId → result must be EMPTY.
     // (Dropping the `album_asset.updateId <= albumToAssetAck.updateId` coupling
     // would cause this assertion to fail because the asset would appear here.)
