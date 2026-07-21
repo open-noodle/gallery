@@ -508,29 +508,38 @@
   <div class="relative w-full shrink">
     <main class="relative h-dvh overflow-hidden px-2 pt-(--navbar-height) max-md:pt-(--navbar-height-md) md:px-6">
       <div class="flex h-full" data-testid="discovery-timeline">
-        {#if viewMode === AlbumPageViewMode.SELECT_ASSETS}
-          {#key `picker-${album.id}`}
-            <FilterPanel
-              config={pickerFilterConfig}
-              bind:filters={pickerFilters}
-              {timeBuckets}
-              storageKey="gallery-filter-visible-sections-album-detail"
-              hidden={isTimelineEmpty}
-            />
-          {/key}
-        {:else}
-          {#key `album-${album.id}`}
-            <FilterPanel
-              config={albumFilterConfig}
-              bind:filters={albumFilters}
-              bind:collapsed={filterCollapsed}
-              externalToggle
-              {timeBuckets}
-              storageKey="gallery-filter-visible-sections-album-detail"
-              hidden={isTimelineEmpty}
-            />
-          {/key}
-        {/if}
+        <!-- This route doesn't use UserPageLayout, so there's no page-level card for the panel to
+             blend into — its bg-light surface would otherwise read as a flush black slab running to
+             the foot of the window. Give it the app's own surface radius (rounded-lg is 16px in this
+             theme, matching UserPageLayout's <main>) and inset it equally from the app bar above and
+             the window edge below, so it reads as a deliberate floating panel. -->
+        <div class="h-full shrink-0 py-4">
+          <div class="h-full overflow-hidden rounded-lg" data-testid="album-filter-panel-surface">
+            {#if viewMode === AlbumPageViewMode.SELECT_ASSETS}
+              {#key `picker-${album.id}`}
+                <FilterPanel
+                  config={pickerFilterConfig}
+                  bind:filters={pickerFilters}
+                  {timeBuckets}
+                  storageKey="gallery-filter-visible-sections-album-detail"
+                  hidden={isTimelineEmpty}
+                />
+              {/key}
+            {:else}
+              {#key `album-${album.id}`}
+                <FilterPanel
+                  config={albumFilterConfig}
+                  bind:filters={albumFilters}
+                  bind:collapsed={filterCollapsed}
+                  externalToggle
+                  {timeBuckets}
+                  storageKey="gallery-filter-visible-sections-album-detail"
+                  hidden={isTimelineEmpty}
+                />
+              {/key}
+            {/if}
+          </div>
+        </div>
 
         <div class="flex flex-1 flex-col overflow-hidden pl-4">
           {#if viewMode === AlbumPageViewMode.SELECT_ASSETS && getActiveFilterCount(pickerFilters) > 0}
