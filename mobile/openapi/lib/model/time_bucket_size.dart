@@ -11,31 +11,30 @@
 part of openapi.api;
 
 /// Timeline bucket granularity
-class TimeBucketSize {
-  /// Instantiate a new enum with the provided [value].
-  const TimeBucketSize._(this.value);
+enum TimeBucketSize {
+  year._(r'year'),
+  month._(r'month'),
+  day._(r'day'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const TimeBucketSize._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const year = TimeBucketSize._(r'year');
-  static const month = TimeBucketSize._(r'month');
-  static const day = TimeBucketSize._(r'day');
-
-  /// List of all possible values in this [enum][TimeBucketSize].
-  static const values = <TimeBucketSize>[
-    year,
-    month,
-    day,
-  ];
-
+  /// Returns the instance of [TimeBucketSize] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static TimeBucketSize? fromJson(dynamic value) => TimeBucketSizeTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [TimeBucketSize]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<TimeBucketSize> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <TimeBucketSize>[];
     if (json is List && json.isNotEmpty) {
@@ -57,9 +56,11 @@ class TimeBucketSizeTypeTransformer {
 
   const TimeBucketSizeTypeTransformer._();
 
-  String encode(TimeBucketSize data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(TimeBucketSize data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a TimeBucketSize.
+  /// Returns the instance of [TimeBucketSize] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -68,6 +69,9 @@ class TimeBucketSizeTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   TimeBucketSize? decode(dynamic data, {bool allowNull = true}) {
+    if (data is TimeBucketSize) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'year': return TimeBucketSize.year;
@@ -82,7 +86,7 @@ class TimeBucketSizeTypeTransformer {
     return null;
   }
 
-  /// Singleton [TimeBucketSizeTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static TimeBucketSizeTypeTransformer? _instance;
 }
 
