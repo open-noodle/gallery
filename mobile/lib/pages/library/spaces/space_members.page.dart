@@ -78,7 +78,7 @@ class SpaceMembersPage extends HookConsumerWidget {
         if (context.mounted) {
           ImmichToast.show(
             context: context,
-            msg: '${member.name} is now ${newRole.value}',
+            msg: '${member.name} is now ${newRole.toString()}',
             toastType: ToastType.success,
           );
         }
@@ -186,7 +186,7 @@ class SpaceMembersPage extends HookConsumerWidget {
                 title: Text(member.name),
                 subtitle: Text(member.email),
                 trailing: Chip(
-                  label: Text(member.role.value, style: context.textTheme.labelSmall),
+                  label: Text(member.role.toString(), style: context.textTheme.labelSmall),
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
