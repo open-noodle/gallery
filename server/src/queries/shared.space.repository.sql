@@ -433,6 +433,16 @@ where
 returning
   "shared_space_album"."albumId"
 
+-- SharedSpaceRepository.getLinkedAlbumCount
+select
+  count(*) as "count"
+from
+  "shared_space_album"
+  inner join "album" on "album"."id" = "shared_space_album"."albumId"
+where
+  "shared_space_album"."spaceId" = $1
+  and "album"."deletedAt" is null
+
 -- SharedSpaceRepository.getLinkedAlbums
 select
   "album".*,
