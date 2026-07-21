@@ -34,7 +34,7 @@
   <Command.Group class="mb-4">
     <Command.GroupHeading
       data-testid="section-heading"
-      class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+      class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
     >
       {heading}
     </Command.GroupHeading>

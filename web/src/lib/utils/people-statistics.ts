@@ -1,3 +1,4 @@
+const MIDDLE_DOT = '\u{B7}';
 type FormatPeopleHeaderDescriptionOptions = {
   visiblePeopleCount: number;
   detectedFaceCount?: number | null;
@@ -27,5 +28,5 @@ export const formatPeopleHeaderDescription = ({
   }
 
   const faceLabel = detectedFaceCount === 1 ? faceSingular : facePlural;
-  return `${peopleText} \u00B7 ${detectedFaceCount.toLocaleString(locale)} ${faceLabel}`;
+  return `${peopleText} ${MIDDLE_DOT} ${detectedFaceCount.toLocaleString(locale)} ${faceLabel}`;
 };

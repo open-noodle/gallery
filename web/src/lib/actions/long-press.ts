@@ -38,7 +38,7 @@ export const longPress: Action<HTMLElement, { onLongPress: () => void }> = (elem
   };
 
   element.addEventListener('click', click);
-  element.addEventListener('pointerdown', start, true);
+  element.addEventListener('pointerdown', start, { capture: true });
   element.addEventListener('pointerup', clear, { capture: true, passive: true });
 
   return {
