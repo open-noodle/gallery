@@ -329,7 +329,7 @@ export class FaceIdentityRepository {
           !!row &&
           (!input.scope.spaceId || row.spaceId === input.scope.spaceId) &&
           (!input.scope.withSharedSpaces ||
-            (row.showInTimeline === true && timelineSpaceIds.size > 0 && timelineSpaceIds.has(row.spaceId)));
+            (row.showInTimeline && timelineSpaceIds.size > 0 && timelineSpaceIds.has(row.spaceId)));
 
         if (!row || !spaceMatchesScope) {
           hasInaccessibleToken = true;
@@ -2623,7 +2623,7 @@ export class FaceIdentityRepository {
     return {
       processed: page.length,
       conflictCount: 0,
-      ...(people.length > input.limit ? { nextCursor: page.at(-1)?.id } : {}),
+      ...((people.length > input.limit) && { nextCursor: page.at(-1)?.id }),
       affectedSpaceAssets: this.dedupeSharedSpaceFaceMatchBackfillTargets(affectedSpaceAssets),
     };
   }
@@ -2652,7 +2652,6 @@ export class FaceIdentityRepository {
         const existingPerson = await this.getSpacePersonByIdentity(person.spaceId, group.identityId, person.id);
         if (existingPerson) {
           targetPersonId = existingPerson.id;
-          didMutateSpacePerson = true;
         } else if (currentIdentityId) {
           const createdPerson = await this.db
             .insertInto('shared_space_person')
@@ -2665,7 +2664,6 @@ export class FaceIdentityRepository {
             .returning(['id'])
             .executeTakeFirstOrThrow();
           targetPersonId = createdPerson.id;
-          didMutateSpacePerson = true;
         } else {
           const update: { identityId: string; type: string; representativeFaceId?: string } = {
             identityId: group.identityId,
@@ -2677,8 +2675,8 @@ export class FaceIdentityRepository {
           await this.db.updateTable('shared_space_person').set(update).where('id', '=', person.id).execute();
           currentIdentityId = group.identityId;
           targetPersonId = person.id;
-          didMutateSpacePerson = true;
         }
+        didMutateSpacePerson = true;
       }
 
       affectedPersonIds.add(targetPersonId);
