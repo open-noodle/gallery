@@ -138,6 +138,7 @@ export class SharedSpaceService extends BaseService {
       const members = await this.sharedSpaceRepository.getMembers(space.id);
       const assetCount = await this.sharedSpaceRepository.getAssetCount(space.id);
       const recentAssets = await this.sharedSpaceRepository.getRecentAssets(space.id);
+      const albumCount = await this.sharedSpaceRepository.getLinkedAlbumCount(space.id);
 
       // Recency badge data
       const membership = await this.sharedSpaceRepository.getMember(space.id, auth.user.id);
@@ -184,6 +185,7 @@ export class SharedSpaceService extends BaseService {
         ...this.mapSpace(space),
         memberCount: members.length,
         assetCount,
+        albumCount,
         recentAssetIds,
         recentAssetThumbhashes,
         members: members.map((m) => this.mapMember(m)),
@@ -745,6 +747,7 @@ export class SharedSpaceService extends BaseService {
 
     // Only queue face sync for newly created links (not idempotent re-links).
     if (result) {
+      await this.sharedSpaceRepository.update(spaceId, { lastActivityAt: new Date() });
       const space = await this.sharedSpaceRepository.getById(spaceId);
       if (space?.faceRecognitionEnabled) {
         await this.jobRepository.queue({

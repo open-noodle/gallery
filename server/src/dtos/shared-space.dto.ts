@@ -86,6 +86,7 @@ const SharedSpaceResponseSchema = z
     updatedAt: z.string().describe('Last update date'),
     memberCount: z.number().optional().describe('Number of members'),
     assetCount: z.number().optional().describe('Number of assets'),
+    albumCount: z.number().optional().describe('Number of linked albums'),
     thumbnailAssetId: z.string().nullable().optional().describe('Thumbnail asset ID'),
     thumbnailCropY: z.number().nullable().optional().describe('Vertical crop position for cover photo (0-100)'),
     color: UserAvatarColorSchema.nullable().optional().describe('Space color'),
