@@ -202,14 +202,14 @@
 
 <section class="my-4">
   {#if isCreating || editingIndex !== null}
-    <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-slate-50 dark:bg-gray-900 p-5">
+    <div class="rounded-2xl border border-gray-200 bg-slate-50 p-5 dark:border-gray-800 dark:bg-gray-900">
       <Text fontWeight="semi-bold" class="mb-4"
         >{isCreating ? $t('admin.classification_new_category') : $t('admin.classification_edit_category')}</Text
       >
 
       <div class="flex flex-col gap-4">
         <div>
-          <label for="category-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          <label for="category-name" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
             >{$t('name')}</label
           >
           <input
@@ -218,12 +218,12 @@
             bind:value={formName}
             {disabled}
             placeholder={$t('admin.classification_name_placeholder')}
-            class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-immich-primary focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-immich-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
           />
         </div>
 
         <div>
-          <label for="category-prompts" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label for="category-prompts" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
             {$t('admin.classification_prompts_label')}
           </label>
           <textarea
@@ -232,12 +232,12 @@
             {disabled}
             rows="4"
             placeholder={$t('admin.classification_prompts_placeholder')}
-            class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-immich-primary focus:outline-none resize-y disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full resize-y rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-immich-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
           ></textarea>
         </div>
 
         <div>
-          <label for="category-similarity" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label for="category-similarity" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
             {$t('admin.classification_similarity_label', {
               values: { value: formSimilarity.toFixed(2), label: getSimilarityLabel(formSimilarity) },
             })}
@@ -252,7 +252,7 @@
               step="0.01"
               bind:value={formSimilarity}
               {disabled}
-              class="flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="flex-1 disabled:cursor-not-allowed disabled:opacity-50"
             />
             <span class="text-xs text-gray-500 dark:text-gray-400">{$t('admin.classification_similarity_strict')}</span>
           </div>
@@ -262,14 +262,14 @@
         </div>
 
         <div>
-          <label for="category-action" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label for="category-action" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
             {$t('action')}
           </label>
           <select
             id="category-action"
             bind:value={formAction}
             {disabled}
-            class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-immich-primary focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-immich-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
           >
             <option value={Action.Tag}>{actionLabels.tag}</option>
             <option value={Action.TagAndArchive}>{actionLabels.tag_and_archive}</option>
@@ -277,14 +277,14 @@
         </div>
 
         <div>
-          <label for="category-face-exclusion" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label for="category-face-exclusion" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
             {$t('admin.classification_face_exclusion')}
           </label>
           <select
             id="category-face-exclusion"
             bind:value={formFaceExclusion}
             {disabled}
-            class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-immich-primary focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-immich-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
           >
             <option value={ClassificationFaceExclusion.Off}>
               {faceExclusionLabels[ClassificationFaceExclusion.Off]}
@@ -329,18 +329,18 @@
   {#if categories.length > 0}
     {#each categories as category, index (category.name)}
       <div
-        class="rounded-2xl border border-gray-200 dark:border-gray-800 mt-4 bg-slate-50 dark:bg-gray-900 p-4"
+        class="mt-4 rounded-2xl border border-gray-200 bg-slate-50 p-4 dark:border-gray-800 dark:bg-gray-900"
         class:opacity-50={!category.enabled}
       >
         <div class="flex items-center justify-between gap-3">
-          <div class="flex items-center gap-3 flex-1 min-w-0">
-            <div class="flex-1 min-w-0">
+          <div class="flex min-w-0 flex-1 items-center gap-3">
+            <div class="min-w-0 flex-1">
               <div class="min-w-0">
-                <Text fontWeight="medium" class="block truncate break-words">{category.name}</Text>
+                <Text fontWeight="medium" class="block truncate wrap-break-word">{category.name}</Text>
               </div>
               <div class="mt-1 flex flex-wrap gap-2">
                 <span
-                  class="inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-xs font-medium break-words whitespace-normal
+                  class="inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-xs font-medium wrap-break-word whitespace-normal
                     {category.action === 'tag_and_archive'
                     ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
                     : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'}"
@@ -349,7 +349,7 @@
                 </span>
                 {#if getFaceExclusion(category) !== ClassificationFaceExclusion.Off}
                   <span
-                    class="inline-flex max-w-full items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 break-words whitespace-normal dark:bg-emerald-900 dark:text-emerald-200"
+                    class="inline-flex max-w-full items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium wrap-break-word whitespace-normal text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
                   >
                     {faceExclusionLabels[getFaceExclusion(category)]}
                   </span>
@@ -394,7 +394,7 @@
     <Text class="py-4" color="muted">{$t('admin.classification_empty')}</Text>
   {/if}
 
-  <div class="flex justify-end gap-2 mt-5">
+  <div class="mt-5 flex justify-end gap-2">
     <Button shape="round" size="small" color="secondary" onclick={handleScan} disabled={disabled || isScanning}>
       {isScanning ? $t('admin.classification_scanning') : $t('admin.classification_scan_button')}
     </Button>

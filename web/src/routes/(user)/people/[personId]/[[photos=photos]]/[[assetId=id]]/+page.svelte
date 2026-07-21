@@ -537,7 +537,7 @@
 />
 
 <main
-  class="relative z-0 flex flex-col h-dvh overflow-hidden px-2 md:px-6 md:pt-(--navbar-height-md) pt-(--navbar-height)"
+  class="relative z-0 flex h-dvh flex-col overflow-hidden px-2 pt-(--navbar-height) md:px-6 md:pt-(--navbar-height-md)"
   use:scrollMemoryClearer={{
     routeStartsWith: Route.people(),
     beforeClear: () => {
@@ -550,12 +550,12 @@
   <TimelineRouteGroupingBar
     grouping={timelineGrouping}
     hidden={assetMultiSelectManager.selectionActive || viewMode !== PersonPageViewMode.VIEW_ASSETS}
-    class="shrink-0 mt-12"
+    class="mt-12 shrink-0"
     resultCount={numberOfAssets}
     onGroupingChange={handleTimelineGroupingChange}
     onAddAllToCollection={handleAddAllToCollection}
   />
-  <div class="relative flex-1 min-h-0">
+  <div class="relative min-h-0 flex-1">
     {#key person.id}
       <Timeline
         enableRouting={true}
@@ -573,7 +573,7 @@
         {#if viewMode === PersonPageViewMode.VIEW_ASSETS}
           <!-- Person information block -->
           <div
-            class="relative p-4 sm:px-6 pt-12"
+            class="relative p-4 pt-12 sm:px-6"
             use:clickOutside={{
               onOutclick: handleCancelEditName,
               onEscape: handleCancelEditName,
@@ -607,8 +607,8 @@
                         widthStyle="3.375rem"
                         heightStyle="3.375rem"
                       />
-                      <div class="flex flex-col justify-center text-start px-4 text-primary">
-                        <p class="w-40 font-medium truncate">{person.name || $t('add_a_name')}</p>
+                      <div class="flex flex-col justify-center px-4 text-start text-primary">
+                        <p class="w-40 truncate font-medium">{person.name || $t('add_a_name')}</p>
                         <p class="text-sm text-gray-500 dark:text-gray-400">
                           {$t('assets_count', { values: { count: numberOfAssets } })}
                         </p>
@@ -640,10 +640,10 @@
               </section>
             </div>
             {#if isEditingName}
-              <div class="absolute w-64 sm:w-96 z-1">
+              <div class="absolute z-1 w-64 sm:w-96">
                 {#if isSearchingPeople}
                   <div
-                    class="flex border h-14 rounded-b-lg border-gray-400 dark:border-immich-dark-gray place-items-center bg-gray-200 p-2 dark:bg-gray-700"
+                    class="flex h-14 place-items-center rounded-b-lg border border-gray-400 bg-gray-200 p-2 dark:border-immich-dark-gray dark:bg-gray-700"
                   >
                     <div class="flex w-full place-items-center">
                       <LoadingSpinner />
@@ -654,7 +654,7 @@
                     {#each suggestedPeople as person, index (person.id)}
                       <button
                         type="button"
-                        class="flex w-full border border-gray-200 dark:border-immich-dark-gray h-14 place-items-center bg-gray-100 p-2 dark:bg-gray-700 hover:bg-gray-300 hover:dark:bg-[#232932] focus:bg-gray-300 focus:dark:bg-[#232932] {index ===
+                        class="flex h-14 w-full place-items-center border border-gray-200 bg-gray-100 p-2 hover:bg-gray-300 focus:bg-gray-300 dark:border-immich-dark-gray dark:bg-gray-700 hover:dark:bg-[#232932] focus:dark:bg-[#232932] {index ===
                         suggestedPeople.length - 1
                           ? 'rounded-b-lg border-b'
                           : ''}"

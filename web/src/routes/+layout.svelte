@@ -270,7 +270,7 @@
 <svelte:document
   use:shortcut={{
     shortcut: { ctrl: true, shift: true, key: 'm' },
-    onShortcut: () => void copyToClipboard(getMyImmichLink().toString()),
+    onShortcut: () => void copyToClipboard(getMyImmichLink().href),
   }}
   use:shortcut={{
     shortcut: { shift: true, key: 't' },

@@ -64,7 +64,6 @@ describe('getMediaContentType', () => {
     await expect(getMediaContentType()('/media/original.jpg')).resolves.toBe('image/jpeg');
 
     expect(fetchMock).toHaveBeenCalledWith('/media/original.jpg', {
-      method: 'GET',
       headers: { Range: 'bytes=0-0' },
     });
   });
@@ -94,7 +93,6 @@ describe('GCastDestination', () => {
     await destination.loadMedia('/api/assets/asset-1/original?c=cache-1', 'session-1');
 
     expect(fetchMock).toHaveBeenCalledWith('/api/assets/asset-1/original?c=cache-1', {
-      method: 'GET',
       headers: { Range: 'bytes=0-0' },
     });
     expect(queueLoad).toHaveBeenCalledOnce();
