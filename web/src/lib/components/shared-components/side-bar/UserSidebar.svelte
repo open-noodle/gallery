@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import BottomInfo from '$lib/components/shared-components/side-bar/BottomInfo.svelte';
   import RecentAlbums from '$lib/components/shared-components/side-bar/RecentAlbums.svelte';
   import RecentSpaces from '$lib/components/shared-components/side-bar/recent-spaces.svelte';
@@ -46,9 +47,12 @@
 <Sidebar ariaLabel={$t('primary')}>
   <NavbarItem title={$t('photos')} href={Route.photos()} icon={mdiImageMultipleOutline} activeIcon={mdiImageMultiple} />
 
+  <!-- Exact match, not NavbarItem's default `startsWith`: the rows this expands into (spaces, and
+       their albums) highlight themselves, so a prefix match would light up two rows at once. -->
   <NavbarItem
     title={$t('spaces')}
     href={Route.spaces()}
+    isActive={() => page.url.pathname === Route.spaces()}
     icon={mdiAccountGroupOutline}
     activeIcon={mdiAccountGroup}
     bind:expanded={$recentSpacesDropdown}
