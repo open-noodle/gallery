@@ -36,12 +36,12 @@
     }
   }}
   use:scrollIntoViewIfSelected
-  class="flex w-full items-center gap-4 px-6 py-2 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:bg-gray-200 dark:enabled:hover:bg-gray-700"
+  class="flex w-full items-center gap-4 rounded-xl px-6 py-2 transition-colors enabled:hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40 dark:enabled:hover:bg-gray-700"
   class:bg-gray-200={selected && !disabled}
   class:dark:bg-gray-700={selected && !disabled}
   data-testid="new-space-row"
 >
-  <div class="flex h-12 w-12 items-center justify-center">
+  <div class="flex size-12 items-center justify-center">
     <Icon icon={mdiPlus} size="30" />
   </div>
   <p>
