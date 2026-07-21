@@ -377,7 +377,7 @@ describe(MachineLearningRepository.name, () => {
       mockFetch.mockImplementation(
         (_url: URL, init: RequestInit) =>
           new Promise((_resolve, reject) => {
-            init.signal?.addEventListener('abort', () => reject(Object.assign(new Error('t'), { name: 'AbortError' })));
+            init.signal?.addEventListener('abort', () => reject(new DOMException('t', 'AbortError')));
           }),
       );
       await expect(sut.ping()).resolves.toEqual({ ok: false });
@@ -407,9 +407,7 @@ describe(MachineLearningRepository.name, () => {
         mockFetch.mockImplementation(
           (_url: URL, init: RequestInit) =>
             new Promise((_resolve, reject) => {
-              init.signal?.addEventListener('abort', () =>
-                reject(Object.assign(new Error('t'), { name: 'AbortError' })),
-              );
+              init.signal?.addEventListener('abort', () => reject(new DOMException('t', 'AbortError')));
             }),
         );
         // Attach the .rejects assertion synchronously before advancing timers so
@@ -477,9 +475,7 @@ describe(MachineLearningRepository.name, () => {
       mockFetch.mockImplementation(
         (_url: URL, init: RequestInit) =>
           new Promise((_resolve, reject) => {
-            init.signal?.addEventListener('abort', () =>
-              reject(Object.assign(new Error('timeout'), { name: 'AbortError' })),
-            );
+            init.signal?.addEventListener('abort', () => reject(new DOMException('timeout', 'AbortError')));
           }),
       );
       const predictFn = (sut as unknown as { predict: (...args: unknown[]) => Promise<unknown> }).predict.bind(sut);

@@ -95,7 +95,7 @@
     {/if}
 
     {#each members as member (member.userId)}
-      <div class="flex items-center gap-4 py-3 border-b border-gray-200 dark:border-gray-800">
+      <div class="flex items-center gap-4 border-b border-gray-200 py-3 dark:border-gray-800">
         <UserAvatar user={toAvatarUser(member)} size="md" />
         <div class="flex-1">
           <Text fontWeight="medium">{member.name}</Text>

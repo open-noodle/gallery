@@ -21,9 +21,7 @@ export interface UploadResult {
 async function computeSha1(file: File): Promise<string> {
   const bytes = await file.arrayBuffer();
   const hash = await crypto.subtle.digest('SHA-1', bytes);
-  return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  return Array.from(new Uint8Array(hash), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 export async function uploadTakeoutItem(item: TakeoutMediaItem, options: ImportOptions): Promise<UploadResult> {

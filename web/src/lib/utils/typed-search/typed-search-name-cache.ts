@@ -27,8 +27,8 @@ export function storeTypedSearchNames(
   }
 
   const payload: StoredTypedSearchNames = {
-    personNames: [...names.personNames.entries()],
-    tagNames: [...names.tagNames.entries()],
+    personNames: [...names.personNames],
+    tagNames: [...names.tagNames],
   };
 
   sessionStorage.setItem(`${prefix}${destination}`, JSON.stringify(payload));

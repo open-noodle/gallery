@@ -78,11 +78,11 @@
         data-testid="camera-make-{orphanedMake}"
       >
         <div
-          class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border-2 border-immich-primary bg-immich-primary dark:border-immich-dark-primary dark:bg-immich-dark-primary"
+          class="flex size-4 shrink-0 items-center justify-center rounded-full border-2 border-immich-primary bg-immich-primary dark:border-immich-dark-primary dark:bg-immich-dark-primary"
         >
-          <div class="h-1.5 w-1.5 rounded-full bg-white dark:bg-black"></div>
+          <div class="size-1.5 rounded-full bg-white dark:bg-black"></div>
         </div>
-        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">{orphanedMake}</span>
+        <span class="flex-1 truncate text-left">{orphanedMake}</span>
       </button>
     {/if}
 
@@ -99,18 +99,18 @@
       >
         <!-- Radio indicator -->
         <div
-          class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border-2 {isMakeSelected &&
+          class="flex size-4 shrink-0 items-center justify-center rounded-full border-2 {isMakeSelected &&
           !selectedModel
             ? 'border-immich-primary bg-immich-primary dark:border-immich-dark-primary dark:bg-immich-dark-primary'
             : 'border-gray-300 dark:border-gray-600'}"
         >
           {#if isMakeSelected && !selectedModel}
-            <div class="h-1.5 w-1.5 rounded-full bg-white dark:bg-black"></div>
+            <div class="size-1.5 rounded-full bg-white dark:bg-black"></div>
           {/if}
         </div>
 
         <!-- Label -->
-        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">{make}</span>
+        <span class="flex-1 truncate text-left">{make}</span>
       </button>
 
       <!-- Models (indented when make is expanded) -->
@@ -127,17 +127,17 @@
           >
             <!-- Radio indicator -->
             <div
-              class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border-2 {isModelSelected
+              class="flex size-4 shrink-0 items-center justify-center rounded-full border-2 {isModelSelected
                 ? 'border-immich-primary bg-immich-primary dark:border-immich-dark-primary dark:bg-immich-dark-primary'
                 : 'border-gray-300 dark:border-gray-600'}"
             >
               {#if isModelSelected}
-                <div class="h-1.5 w-1.5 rounded-full bg-white dark:bg-black"></div>
+                <div class="size-1.5 rounded-full bg-white dark:bg-black"></div>
               {/if}
             </div>
 
             <!-- Label -->
-            <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">{model}</span>
+            <span class="flex-1 truncate text-left">{model}</span>
           </button>
         {/each}
       {/if}

@@ -23,7 +23,7 @@
 
 {#if layout === 'empty'}
   <div
-    class="flex size-full items-center justify-center rounded-xl bg-gradient-to-br {gradientClass} aspect-square"
+    class="flex size-full items-center justify-center rounded-xl bg-linear-to-br {gradientClass} aspect-square"
     data-testid="collage-empty"
   >
     <Icon icon={mdiImageMultipleOutline} size="4em" class="text-white/40" />
@@ -70,7 +70,7 @@
     {/if}
   </div>
 {:else}
-  <div class="grid grid-cols-2 grid-rows-2 aspect-square gap-0.5 overflow-hidden rounded-xl" data-testid="collage-grid">
+  <div class="grid aspect-square grid-cols-2 grid-rows-2 gap-0.5 overflow-hidden rounded-xl" data-testid="collage-grid">
     {#each assets.slice(0, 4) as asset (asset.id)}
       <img
         alt=""
