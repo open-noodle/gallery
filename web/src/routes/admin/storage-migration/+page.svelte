@@ -374,7 +374,7 @@
               type="text"
               bind:value={rollbackBatchId}
               placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-              class="w-80 rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
+              class="w-80 rounded-sm border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
             />
           </div>
           <Button onclick={handleRollback} disabled={rollingBack || !rollbackBatchId.trim()}>

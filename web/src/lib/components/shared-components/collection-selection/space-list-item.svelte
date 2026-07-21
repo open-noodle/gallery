@@ -67,7 +67,7 @@
 <div
   role="group"
   class={[
-    'relative flex w-full text-start justify-between transition-colors hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl my-2 hover:cursor-pointer',
+    'relative my-2 flex w-full justify-between rounded-xl text-start transition-colors hover:cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700',
     { 'bg-primary/10 hover:bg-primary/10': multiSelected },
   ]}
   onmouseenter={() => {
@@ -81,25 +81,23 @@
     type="button"
     onclick={onSpaceClick}
     use:scrollIntoViewIfSelected
-    class="flex w-full gap-4 px-2 py-2 text-start"
+    class="flex w-full gap-4 p-2 text-start"
     class:bg-gray-200={selected}
     class:dark:bg-gray-700={selected}
     use:longPress={{ onLongPress: () => handleMultiSelectClicked() }}
     data-testid="space-row"
   >
-    <span class="relative h-16 w-16 shrink-0">
+    <span class="relative size-16 shrink-0">
       <SpaceCollage assets={collageAssets} />
       <span
-        class="absolute -bottom-1.5 -end-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-immich-bg ring-2 ring-immich-bg dark:bg-immich-dark-gray dark:ring-immich-dark-gray"
+        class="absolute -inset-e-1.5 -bottom-1.5 flex size-6 items-center justify-center rounded-full bg-immich-bg ring-2 ring-immich-bg dark:bg-immich-dark-gray dark:ring-immich-dark-gray"
         data-testid="space-row-badge"
       >
         <Icon icon={mdiAccountMultipleOutline} size="0.9rem" class="text-pink-500" />
       </span>
     </span>
     <span class="flex h-full flex-col items-start justify-center overflow-hidden">
-      <span class="w-full shrink overflow-hidden text-ellipsis whitespace-nowrap"
-        >{nameParts[0]}<b>{nameParts[1]}</b>{nameParts[2]}</span
-      >
+      <span class="w-full shrink truncate">{nameParts[0]}<b>{nameParts[1]}</b>{nameParts[2]}</span>
       <span class="flex gap-2 text-sm" data-testid="space-row-details">
         {#if space.assetCount != null}
           <span>{$t('items_count', { values: { count: space.assetCount } })}</span>
@@ -118,7 +116,7 @@
     <button
       type="button"
       onclick={handleMultiSelectClicked}
-      class="absolute end-0 top-4 p-3 focus:outline-none hover:cursor-pointer"
+      class="absolute inset-e-0 top-4 p-3 hover:cursor-pointer focus:outline-none"
       role="checkbox"
       tabindex={-1}
       aria-checked={multiSelected}

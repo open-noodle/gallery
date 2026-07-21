@@ -163,11 +163,8 @@ export const buildSpaceAlbumGroups = (
         // Unknown-year always last
         if (a === ctx.unknownYear) {
           return 1;
-        } else if (b === ctx.unknownYear) {
-          return -1;
-        } else {
-          return (Number.parseInt(a) - Number.parseInt(b)) * sortSign;
         }
+        return b === ctx.unknownYear ? -1 : (Number.parseInt(a) - Number.parseInt(b)) * sortSign;
       });
 
       groups = sortedByYear.map(([year, yearAlbums]) => ({
@@ -194,9 +191,11 @@ export const buildSpaceAlbumGroups = (
         // Unassigned always last
         if (keyA === UNASSIGNED_KEY) {
           return 1;
-        } else if (keyB === UNASSIGNED_KEY) {
+        }
+        if (keyB === UNASSIGNED_KEY) {
           return -1;
-        } else {
+        }
+        {
           const nameA = ctx.members.find((m) => m.userId === keyA)?.name ?? '';
           const nameB = ctx.members.find((m) => m.userId === keyB)?.name ?? '';
           return nameA.localeCompare(nameB) * sortSign;
@@ -228,15 +227,18 @@ export const buildSpaceAlbumGroups = (
         // Unassigned always last
         if (ownerIdA === UNASSIGNED_KEY) {
           return 1;
-        } else if (ownerIdB === UNASSIGNED_KEY) {
+        }
+        if (ownerIdB === UNASSIGNED_KEY) {
           return -1;
         }
         // Current user pinned first (before sort direction applies)
         if (ownerIdA === ctx.currentUserId) {
           return -sortSign;
-        } else if (ownerIdB === ctx.currentUserId) {
+        }
+        if (ownerIdB === ctx.currentUserId) {
           return sortSign;
-        } else {
+        }
+        {
           const ownerAName = ctx.members.find((m) => m.userId === ownerIdA)?.name ?? '';
           const ownerBName = ctx.members.find((m) => m.userId === ownerIdB)?.name ?? '';
           return ownerAName.localeCompare(ownerBName) * sortSign;

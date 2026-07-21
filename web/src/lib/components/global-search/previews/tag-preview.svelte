@@ -52,7 +52,7 @@
         <img
           src={getAssetMediaUrl({ id: photo.id, size: AssetMediaSize.Thumbnail })}
           alt=""
-          class="h-[72px] w-[72px] rounded-md object-cover"
+          class="size-[72px] rounded-md object-cover"
         />
       {/each}
     </div>

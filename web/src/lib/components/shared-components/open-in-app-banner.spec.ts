@@ -49,11 +49,13 @@ describe('OpenInAppBanner', () => {
     setUser('user-1');
     pageState.url.pathname = '/photos/550e8400-e29b-41d4-a716-446655440000';
     localStorage.clear();
-    Object.defineProperty(navigator, 'userAgent', {
-      value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
-      configurable: true,
+    Object.defineProperties(navigator, {
+      userAgent: {
+        value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+        configurable: true,
+      },
+      maxTouchPoints: { value: 5, configurable: true },
     });
-    Object.defineProperty(navigator, 'maxTouchPoints', { value: 5, configurable: true });
   });
 
   it('renders the banner when all gates pass', async () => {
