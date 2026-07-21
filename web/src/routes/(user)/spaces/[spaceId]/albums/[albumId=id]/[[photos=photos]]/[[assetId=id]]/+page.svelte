@@ -200,6 +200,22 @@
     await refreshAlbum();
   };
 
+  // Navigating straight from one album to a sibling (the sidebar drill-down) keeps this component
+  // instance alive — SvelteKit only swaps `data`. Local album-scoped state therefore has to be
+  // re-seeded by hand, or the URL changes while the page keeps rendering the album we came from.
+  // Mirrors the identical effect on the global album route.
+  $effect(() => {
+    if (data.album.id !== album.id) {
+      album = data.album;
+      mode = 'browse';
+      browseFilters = createFilterState();
+      browsePersonNames.clear();
+      browseTagNames.clear();
+      assetMultiSelectManager.clear();
+      resetPicker();
+    }
+  });
+
   function handleTimelineGroupingChange(grouping: TimelineGrouping) {
     const anchor = getTimelineTopVisibleAnchor(timelineManager);
     timelineGrouping = grouping;

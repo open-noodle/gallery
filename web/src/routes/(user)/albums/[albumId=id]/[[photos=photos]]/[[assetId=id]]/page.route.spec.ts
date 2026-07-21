@@ -133,6 +133,25 @@ describe('album detail filter panel route', () => {
     await waitFor(() => expect(screen.queryByTestId('discovery-panel')).not.toBeInTheDocument());
   });
 
+  // Unlike the pages built on UserPageLayout, this route's <main> is transparent, so the panel's
+  // bg-light surface sits directly on the darker app background instead of blending into a card.
+  // It therefore has to shape itself: rounded to the app's 16px surface radius and held off the
+  // bottom edge, rather than running as a flush slab to the foot of the window.
+  it('shapes the filter panel as a rounded card lifted off the bottom edge', async () => {
+    renderPage();
+
+    await waitFor(() => expect(screen.getByTestId('filter-panel-shell')).toBeInTheDocument());
+
+    const clip = screen.getByTestId('album-filter-panel-surface');
+    expect(clip).toContainElement(screen.getByTestId('filter-panel-shell'));
+    // rounded-lg is 16px in this theme — the same radius UserPageLayout gives every other page.
+    expect(clip.className).toContain('rounded-lg');
+    expect(clip.className).toContain('overflow-hidden');
+    // py-4: inset equally from the app bar above and the window edge below, so the card doesn't
+    // sit flush against either.
+    expect(clip.parentElement?.className).toContain('py-4');
+  });
+
   it('registers cmdk selection context for album view mode only', async () => {
     renderPage();
 

@@ -339,3 +339,36 @@ describe('SharedSpaceService.getAssetLinkedAlbums — which linked albums projec
     ).rejects.toThrow();
   });
 });
+
+describe('SharedSpaceService.getAll — albumCount', () => {
+  it('counts linked albums per space and excludes soft-deleted albums', async () => {
+    const { ctx, sut } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: false });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+
+    const { result: a1 } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'One' });
+    const { result: a2 } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Two' });
+    const { result: trashed } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Trashed' });
+    await ctx.get(SharedSpaceRepository).addAlbum({ spaceId: space.id, albumId: a1.id, addedById: owner.id });
+    await ctx.get(SharedSpaceRepository).addAlbum({ spaceId: space.id, albumId: a2.id, addedById: owner.id });
+    await ctx.get(SharedSpaceRepository).addAlbum({ spaceId: space.id, albumId: trashed.id, addedById: owner.id });
+    await ctx.softDeleteAlbum(trashed.id);
+
+    const result = await sut.getAll(authFromUser(owner));
+
+    const target = result.find((s) => s.id === space.id);
+    expect(target?.albumCount).toBe(2);
+  });
+
+  it('returns albumCount 0 for a space with no linked albums', async () => {
+    const { ctx, sut } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: false });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+
+    const result = await sut.getAll(authFromUser(owner));
+
+    expect(result.find((s) => s.id === space.id)?.albumCount).toBe(0);
+  });
+});
