@@ -164,6 +164,24 @@ function makeMember(role: SharedSpaceRole = SharedSpaceRole.Editor): SharedSpace
   } as SharedSpaceMemberResponseDto;
 }
 
+// The page only reads space/members/album, but the route's PageData also carries the layout's
+// linkedAlbums plus the asset-viewer fields — spell them out so `render`/`rerender` type-check.
+function makePageData(
+  album: AlbumResponseDto,
+  members: SharedSpaceMemberResponseDto[] = [makeMember()],
+  space: SharedSpaceResponseDto = BASE_SPACE,
+) {
+  return {
+    error: undefined,
+    asset: undefined,
+    linkedAlbums: [],
+    space,
+    members,
+    album,
+    meta: { title: album.albumName },
+  };
+}
+
 function renderPage({
   album = makeAlbum(),
   members = [makeMember()],
@@ -177,14 +195,7 @@ function renderPage({
   authManager.setPreferences(preferencesFactory.build());
 
   return render(SpaceAlbumDetailPage, {
-    props: {
-      data: {
-        space,
-        members,
-        album,
-        meta: { title: album.albumName },
-      },
-    },
+    props: { data: makePageData(album, members, space) },
   });
 }
 
@@ -812,6 +823,80 @@ describe('Space album detail page', () => {
       expect(screen.queryByTestId('change-location-action')).not.toBeInTheDocument();
       expect(screen.queryByTestId('archive-action')).not.toBeInTheDocument();
       expect(screen.queryByTestId('tag-action')).not.toBeInTheDocument();
+    });
+  });
+
+  // The sidebar album drill-down made album → sibling-album navigation reachable for the first
+  // time. SvelteKit reuses this component instance across that navigation, so nothing remounts —
+  // only `data` changes. The page has to re-seed its local album state from it, or the URL moves
+  // while the timeline keeps showing the album you came from.
+  describe('navigating between sibling albums (same route, new params)', () => {
+    const rerenderWith = (album: AlbumResponseDto, members = [makeMember()]) => ({
+      data: makePageData(album, members),
+    });
+
+    const albumWithRole = (id: string, role: AlbumUserRole) =>
+      makeAlbum({
+        id,
+        albumUsers: [
+          {
+            user: { id: 'current-user-id', email: 'user@example.com', name: 'Current User' } as never,
+            role,
+          },
+        ],
+      });
+
+    it('rebuilds the timeline for the newly navigated album', async () => {
+      const { rerender } = renderPage({ album: makeAlbum({ id: 'album-1', albumName: 'Vacation 2025' }) });
+
+      expect(JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}').albumId).toBe('album-1');
+
+      await rerender(rerenderWith(makeAlbum({ id: 'album-2', albumName: 'Birthday Party' })));
+
+      expect(JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}').albumId).toBe('album-2');
+    });
+
+    it('re-evaluates album-derived permissions for the newly navigated album', async () => {
+      // Space viewer, so the manage gate falls through to the per-album role: owned album-1 keeps
+      // "Add photos", viewer-only album-2 must not. A stale album leaves the button wrongly shown.
+      const viewerOnly = [makeMember(SharedSpaceRole.Viewer)];
+      const { rerender } = renderPage({
+        album: albumWithRole('album-1', AlbumUserRole.Owner),
+        members: viewerOnly,
+      });
+
+      expect(screen.getByTestId('add-photos-button')).toBeInTheDocument();
+
+      await rerender(rerenderWith(albumWithRole('album-2', AlbumUserRole.Viewer), viewerOnly));
+
+      expect(screen.queryByTestId('add-photos-button')).not.toBeInTheDocument();
+    });
+
+    it('drops the previous album filters instead of carrying them onto the new album', async () => {
+      const { rerender } = renderPage({ album: makeAlbum({ id: 'album-1' }) });
+
+      await fireEvent.click(screen.getByTestId('filter-panel-add-person'));
+      await waitFor(() => {
+        const options = JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}');
+        expect(options.personIds).toEqual(['person-1']);
+      });
+
+      await rerender(rerenderWith(makeAlbum({ id: 'album-2' })));
+
+      const options = JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}');
+      expect(options.albumId).toBe('album-2');
+      expect(options.personIds).toBeUndefined();
+    });
+
+    it('returns to browse mode when navigating away from the add-photos picker', async () => {
+      const { rerender } = renderPage({ album: makeAlbum({ id: 'album-1' }) });
+
+      await fireEvent.click(screen.getByTestId('add-photos-button'));
+      await waitFor(() => expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'add'));
+
+      await rerender(rerenderWith(makeAlbum({ id: 'album-2' })));
+
+      expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'browse');
     });
   });
 });

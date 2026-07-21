@@ -56,6 +56,8 @@ export type Events = {
 
   SpaceAddAssets: [{ assetIds: string[]; spaceId: string }];
   SpaceRemoveAssets: [{ assetIds: string[]; spaceId: string }];
+  SpaceLinkAlbum: [{ spaceId: string }];
+  SpaceUnlinkAlbum: [{ spaceId: string }];
 
   PersonUpdate: [PersonResponseDto];
   PersonShare: [{ personId: string }];
