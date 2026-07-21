@@ -43,10 +43,7 @@ describe(ClassificationRepository.name, () => {
         .execute();
 
       const stream = sut.streamUnclassifiedAssets();
-      const results: Array<{ id: string; ownerId: string }> = [];
-      for await (const row of stream) {
-        results.push(row);
-      }
+      const results: Array<{ id: string; ownerId: string }> = await Array.fromAsync(stream);
 
       const found = results.find((r) => r.id === asset.id);
       expect(found).toBeDefined();
@@ -166,7 +163,7 @@ describe(ClassificationRepository.name, () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { person } = await ctx.newPerson({ ownerId: user.id, name: '   ', isHidden: false, type: 'person' });
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: ' '.repeat(3), isHidden: false, type: 'person' });
 
       await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
 

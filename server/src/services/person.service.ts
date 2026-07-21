@@ -92,16 +92,18 @@ export class PersonService extends BaseService {
 
   @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Microservices] })
   async onBootstrap(): Promise<void> {
-    if (await this.faceIdentityRepository.hasBackfillWork()) {
-      const activeBackfills = await this.jobRepository.searchJobs(QueueName.PeopleBackfill, {
-        status: [QueueJobStatus.Active, QueueJobStatus.Delayed, QueueJobStatus.Paused, QueueJobStatus.Waiting],
-      });
-      if (activeBackfills.some((job) => job.name === JobName.FaceIdentityBackfill)) {
-        return;
-      }
-
-      await this.jobRepository.queue({ name: JobName.FaceIdentityBackfill, data: {} });
+    if (!await this.faceIdentityRepository.hasBackfillWork()) {
+    	return;
     }
+
+    const activeBackfills = await this.jobRepository.searchJobs(QueueName.PeopleBackfill, {
+      status: [QueueJobStatus.Active, QueueJobStatus.Delayed, QueueJobStatus.Paused, QueueJobStatus.Waiting],
+    });
+    if (activeBackfills.some((job) => job.name === JobName.FaceIdentityBackfill)) {
+      return;
+    }
+
+    await this.jobRepository.queue({ name: JobName.FaceIdentityBackfill, data: {} });
   }
 
   /**
@@ -745,7 +747,7 @@ export class PersonService extends BaseService {
       await this.jobRepository.queueAll(
         assets.map((asset) => ({
           name: JobName.AssetDetectFaces as const,
-          data: { id: asset.id, ...(force === true ? { force: true as const } : {}) },
+          data: { id: asset.id, ...(force === true && { force: true as const }) },
         })),
       );
     }
@@ -942,7 +944,7 @@ export class PersonService extends BaseService {
           data: {
             id: face.id,
             deferred: false as const,
-            ...(force ? { skipSharedSpaceMatch: true as const } : {}),
+            ...(force && { skipSharedSpaceMatch: true as const }),
           },
         })),
       );
@@ -1084,7 +1086,7 @@ export class PersonService extends BaseService {
         data: {
           id,
           deferred: true,
-          ...(skipSharedSpaceMatch ? { skipSharedSpaceMatch: true } : {}),
+          ...(skipSharedSpaceMatch && { skipSharedSpaceMatch: true }),
         },
       });
       return JobStatus.Skipped;
