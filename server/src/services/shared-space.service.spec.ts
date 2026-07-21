@@ -5383,7 +5383,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
       mocks.sharedSpace.getAssetIdsInSpacePage.mockResolvedValueOnce([]);
 
-      const result = await sut.handleSharedSpaceFaceMatchPage({ spaceId, batchSize: Number.NaN });
+      const result = await sut.handleSharedSpaceFaceMatchPage({ spaceId, batchSize: NaN });
 
       expect(result).toBe(JobStatus.Success);
       expect(mocks.sharedSpace.getAssetIdsInSpacePage).toHaveBeenCalledWith(spaceId, { limit: 3 });
@@ -5431,7 +5431,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
       mocks.sharedSpace.getAssetIdsInSpacePage.mockResolvedValueOnce([]);
 
-      const result = await sut.handleSharedSpaceFaceMatchPage({ spaceId, batchSize: Number.POSITIVE_INFINITY });
+      const result = await sut.handleSharedSpaceFaceMatchPage({ spaceId, batchSize: Infinity });
 
       expect(result).toBe(JobStatus.Success);
       expect(mocks.sharedSpace.getAssetIdsInSpacePage).toHaveBeenCalledWith(spaceId, { limit: 3 });
