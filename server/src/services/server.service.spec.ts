@@ -693,7 +693,7 @@ describe(ServerService.name, () => {
       expect(mocks.machineLearning.ping).toHaveBeenCalledTimes(1);
       resolveProbe({ ok: true });
       const results = await Promise.all([a, b, c]);
-      expect(results.every((r: { smartSearchHealthy: boolean }) => r.smartSearchHealthy === true)).toBe(true);
+      expect(results.every((r: { smartSearchHealthy: boolean }) => r.smartSearchHealthy)).toBe(true);
     });
 
     it('second call within TTL returns the cached value without re-probing', async () => {

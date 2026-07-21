@@ -175,10 +175,12 @@ export class SharedSpaceService extends BaseService {
       const recentAssetIds: string[] = [];
       const recentAssetThumbhashes: string[] = [];
       for (const asset of recentAssets) {
-        if (asset.thumbhash) {
-          recentAssetIds.push(asset.id);
-          recentAssetThumbhashes.push(Buffer.from(asset.thumbhash).toString('base64'));
+        if (!asset.thumbhash) {
+        	continue;
         }
+
+        recentAssetIds.push(asset.id);
+        recentAssetThumbhashes.push(Buffer.from(asset.thumbhash).toString('base64'));
       }
 
       results.push({
@@ -248,10 +250,12 @@ export class SharedSpaceService extends BaseService {
     const recentAssetIds: string[] = [];
     const recentAssetThumbhashes: string[] = [];
     for (const asset of recentAssets) {
-      if (asset.thumbhash) {
-        recentAssetIds.push(asset.id);
-        recentAssetThumbhashes.push(Buffer.from(asset.thumbhash).toString('base64'));
+      if (!asset.thumbhash) {
+      	continue;
       }
+
+      recentAssetIds.push(asset.id);
+      recentAssetThumbhashes.push(Buffer.from(asset.thumbhash).toString('base64'));
     }
 
     return {
@@ -544,7 +548,7 @@ export class SharedSpaceService extends BaseService {
     userId: string,
     dto: SharedSpaceMemberMetadataContributionDto,
   ): Promise<SharedSpaceMemberResponseDto> {
-    if (dto.sharePersonMetadata !== false) {
+    if (dto.sharePersonMetadata) {
       throw new BadRequestException('Cannot enable person metadata contribution for another member');
     }
 
@@ -1566,7 +1570,7 @@ export class SharedSpaceService extends BaseService {
       processed: people.length,
       inherited,
       skipped,
-      ...(people.length === limit ? { nextCursor: people.at(-1)?.id } : {}),
+      ...((people.length === limit) && { nextCursor: people.at(-1)?.id }),
     };
   }
 
@@ -2180,7 +2184,7 @@ export class SharedSpaceService extends BaseService {
     const { pageSize, propagatedBatchSize } = this.getSharedSpaceFaceMatchPageSize(batchSize);
     const assets = await this.sharedSpaceRepository.getAssetIdsInSpacePage(spaceId, {
       limit: pageSize + 1,
-      ...(afterAssetId ? { afterAssetId } : {}),
+      ...(afterAssetId && { afterAssetId }),
     });
 
     if (assets.length === 0) {
@@ -2209,7 +2213,7 @@ export class SharedSpaceService extends BaseService {
         data: {
           spaceId,
           afterAssetId: lastProcessedAssetId,
-          ...(propagatedBatchSize ? { batchSize: propagatedBatchSize } : {}),
+          ...(propagatedBatchSize && { batchSize: propagatedBatchSize }),
         },
       });
       return JobStatus.Success;
