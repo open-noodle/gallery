@@ -91,9 +91,9 @@
     <div class="mb-2 flex max-h-100 flex-col">
       {#if loading}
         <div class="flex animate-pulse flex-col gap-3 px-6 py-4">
-          <span class="h-5 w-40 rounded bg-slate-200 dark:bg-slate-700"></span>
-          <span class="h-5 w-56 rounded bg-slate-200 dark:bg-slate-700"></span>
-          <span class="h-5 w-48 rounded bg-slate-200 dark:bg-slate-700"></span>
+          <span class="h-5 w-40 rounded-sm bg-slate-200 dark:bg-slate-700"></span>
+          <span class="h-5 w-56 rounded-sm bg-slate-200 dark:bg-slate-700"></span>
+          <span class="h-5 w-48 rounded-sm bg-slate-200 dark:bg-slate-700"></span>
         </div>
       {:else}
         <input
@@ -106,7 +106,7 @@
         />
         <div class="immich-scrollbar overflow-y-auto">
           {#if filteredSpaces.length === 0}
-            <p class="px-6 py-6 text-sm text-gray-500 dark:text-gray-400">{$t('spaces_no_writable_spaces')}</p>
+            <p class="p-6 text-sm text-gray-500 dark:text-gray-400">{$t('spaces_no_writable_spaces')}</p>
           {:else}
             {#each filteredSpaces as space, index (space.id)}
               <button

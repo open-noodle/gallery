@@ -9,11 +9,11 @@ class KeyboardManager {
       return;
     }
     // eslint-disable-next-line unicorn/no-unnecessary-global-this
-    globalThis.addEventListener('keydown', this.#update);
+    addEventListener('keydown', this.#update);
     // eslint-disable-next-line unicorn/no-unnecessary-global-this
-    globalThis.addEventListener('keyup', this.#update);
+    addEventListener('keyup', this.#update);
     // eslint-disable-next-line unicorn/no-unnecessary-global-this
-    globalThis.addEventListener('blur', this.#clear);
+    addEventListener('blur', this.#clear);
   }
 
   get shift() {
