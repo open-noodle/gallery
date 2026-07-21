@@ -18,7 +18,7 @@
       data-testid="source-google"
       class="flex cursor-pointer items-center gap-4 rounded-xl border-2 border-primary bg-primary/5 p-6 text-left transition-colors"
     >
-      <div class="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+      <div class="flex size-12 items-center justify-center rounded-full bg-primary/10">
         <Icon icon={mdiGoogle} size="24" color="primary" />
       </div>
       <div>
@@ -33,7 +33,7 @@
       aria-disabled="true"
       class="flex cursor-not-allowed items-center gap-4 rounded-xl border-2 border-gray-200 p-6 opacity-50 dark:border-gray-700"
     >
-      <div class="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+      <div class="flex size-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
         <Icon icon={mdiApple} size="24" />
       </div>
       <div>

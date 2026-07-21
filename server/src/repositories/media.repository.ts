@@ -442,8 +442,8 @@ export class MediaRepository {
   trim(input: string, output: string, startTime: number, duration: number): Promise<void> {
     return new Promise((resolve, reject) => {
       ffmpeg(input, { niceness: 10 })
-        .inputOptions([`-ss`, `${startTime}`])
-        .outputOptions(['-t', `${duration}`, '-c', 'copy', '-avoid_negative_ts', 'make_zero'])
+        .inputOptions(['-ss', String(startTime)])
+        .outputOptions(['-t', String(duration), '-c', 'copy', '-avoid_negative_ts', 'make_zero'])
         .output(output)
         .on('start', (command: string) => this.logger.debug(command))
         .on('error', (error, _, stderr) => {
@@ -459,7 +459,7 @@ export class MediaRepository {
     return new Promise((resolve, reject) => {
       const outputOptions = streamIndex === undefined ? [] : ['-map', `0:${streamIndex}`];
       ffmpeg(input, { niceness: 10 })
-        .inputOptions([`-ss`, `${timeSeconds}`])
+        .inputOptions(['-ss', String(timeSeconds)])
         .outputOptions([...outputOptions, '-frames:v', '1', '-q:v', '2'])
         .output(output)
         .on('start', (command: string) => this.logger.debug(command))

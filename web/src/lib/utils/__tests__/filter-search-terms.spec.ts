@@ -57,7 +57,7 @@ describe('filterStateToSearchTerms', () => {
   it('omits blank / whitespace-only text filters', () => {
     const terms = filterStateToSearchTerms({
       ...createFilterState(),
-      description: '   ',
+      description: ' '.repeat(3),
       originalFileName: '',
       ocr: '  ',
     });
