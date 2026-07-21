@@ -192,7 +192,7 @@ class TransformManager implements EditToolManager {
     });
 
     // eslint-disable-next-line unicorn/no-unnecessary-global-this
-    globalThis.addEventListener('mousemove', (e: MouseEvent) => transformManager.handleMouseMove(e), { passive: true });
+    addEventListener('mousemove', (e: MouseEvent) => transformManager.handleMouseMove(e), { passive: true });
 
     const transformEdits = edits.filter((e) => e.action === 'rotate' || e.action === 'mirror');
 
@@ -210,7 +210,7 @@ class TransformManager implements EditToolManager {
 
   onDeactivate() {
     // eslint-disable-next-line unicorn/no-unnecessary-global-this
-    globalThis.removeEventListener('mousemove', transformManager.handleMouseMove);
+    removeEventListener('mousemove', transformManager.handleMouseMove);
 
     this.reset();
   }
@@ -554,7 +554,7 @@ class TransformManager implements EditToolManager {
 
     document.body.style.userSelect = 'none';
     // eslint-disable-next-line unicorn/no-unnecessary-global-this
-    globalThis.addEventListener('mouseup', () => this.handleMouseUp(), { passive: true });
+    addEventListener('mouseup', () => this.handleMouseUp(), { passive: true });
   }
 
   handleMouseMove(e: MouseEvent) {
@@ -573,7 +573,7 @@ class TransformManager implements EditToolManager {
 
   handleMouseUp() {
     // eslint-disable-next-line unicorn/no-unnecessary-global-this
-    globalThis.removeEventListener('mouseup', this.handleMouseUp);
+    removeEventListener('mouseup', this.handleMouseUp);
     document.body.style.userSelect = '';
 
     this.isInteracting = false;

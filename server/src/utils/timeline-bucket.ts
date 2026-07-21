@@ -23,7 +23,7 @@ export function normalizeTimeBucketForBucketSize(timeBucket: string, bucketSize:
   const day = Number(match[3]);
   const daysInMonth = getDaysInMonth(year, month);
 
-  if (!Number.isInteger(year) || month < 1 || month > 12 || day < 1 || day > daysInMonth) {
+  if (!Number.isSafeInteger(year) || month < 1 || month > 12 || day < 1 || day > daysInMonth) {
     throw new BadRequestException('Invalid time bucket format');
   }
 

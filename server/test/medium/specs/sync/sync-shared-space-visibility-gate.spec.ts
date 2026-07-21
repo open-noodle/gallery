@@ -37,24 +37,32 @@ beforeAll(async () => {
 // ── Helper predicates ────────────────────────────────────────────────────────
 
 const isSharedSpaceAssetEvent = (r: { type: string }) =>
-  r.type === SyncEntityType.SharedSpaceAssetCreateV1 ||
-  r.type === SyncEntityType.SharedSpaceAssetUpdateV1 ||
-  r.type === SyncEntityType.SharedSpaceAssetBackfillV1;
+  [
+    SyncEntityType.SharedSpaceAssetCreateV1,
+    SyncEntityType.SharedSpaceAssetUpdateV1,
+    SyncEntityType.SharedSpaceAssetBackfillV1,
+  ].includes(r.type as SyncEntityType);
 
 const isSharedSpaceAssetExifEvent = (r: { type: string }) =>
-  r.type === SyncEntityType.SharedSpaceAssetExifCreateV1 ||
-  r.type === SyncEntityType.SharedSpaceAssetExifUpdateV1 ||
-  r.type === SyncEntityType.SharedSpaceAssetExifBackfillV1;
+  [
+    SyncEntityType.SharedSpaceAssetExifCreateV1,
+    SyncEntityType.SharedSpaceAssetExifUpdateV1,
+    SyncEntityType.SharedSpaceAssetExifBackfillV1,
+  ].includes(r.type as SyncEntityType);
 
 const isAlbumAssetEvent = (r: { type: string }) =>
-  r.type === SyncEntityType.SharedSpaceAlbumAssetCreateV1 ||
-  r.type === SyncEntityType.SharedSpaceAlbumAssetUpdateV1 ||
-  r.type === SyncEntityType.SharedSpaceAlbumAssetBackfillV1;
+  [
+    SyncEntityType.SharedSpaceAlbumAssetCreateV1,
+    SyncEntityType.SharedSpaceAlbumAssetUpdateV1,
+    SyncEntityType.SharedSpaceAlbumAssetBackfillV1,
+  ].includes(r.type as SyncEntityType);
 
 const isAlbumAssetExifEvent = (r: { type: string }) =>
-  r.type === SyncEntityType.SharedSpaceAlbumAssetExifCreateV1 ||
-  r.type === SyncEntityType.SharedSpaceAlbumAssetExifUpdateV1 ||
-  r.type === SyncEntityType.SharedSpaceAlbumAssetExifBackfillV1;
+  [
+    SyncEntityType.SharedSpaceAlbumAssetExifCreateV1,
+    SyncEntityType.SharedSpaceAlbumAssetExifUpdateV1,
+    SyncEntityType.SharedSpaceAlbumAssetExifBackfillV1,
+  ].includes(r.type as SyncEntityType);
 
 // ── SharedSpaceAssetSync visibility gate ─────────────────────────────────────
 

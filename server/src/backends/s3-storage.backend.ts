@@ -27,7 +27,9 @@ class AsyncLimiter {
 
   async acquire(): Promise<() => void> {
     if (this.active >= this.max) {
-      await new Promise<void>((resolve) => this.queue.push(resolve));
+      await new Promise<void>((resolve) => {
+        this.queue.push(resolve);
+      });
     }
 
     this.active++;

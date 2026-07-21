@@ -44,7 +44,7 @@
     type="button"
     aria-label={currentOption.label}
     class={`flex items-center rounded-full py-1.5 text-sm text-gray-500 hover:bg-subtle dark:text-gray-400 ${
-      compact ? 'h-10 w-10 justify-center px-0' : 'gap-1 px-3'
+      compact ? 'size-10 justify-center px-0' : 'gap-1 px-3'
     }`}
     data-testid="search-sort-btn"
     onclick={() => (open = !open)}
@@ -58,7 +58,7 @@
 
   {#if open}
     <div
-      class="absolute right-0 top-full z-10 mt-1 min-w-[160px] rounded-lg border border-gray-200 bg-light py-1 shadow-lg dark:border-gray-700"
+      class="absolute top-full right-0 z-10 mt-1 min-w-[160px] rounded-lg border border-gray-200 bg-light py-1 shadow-lg dark:border-gray-700"
     >
       {#each options as option (option.value)}
         <button
