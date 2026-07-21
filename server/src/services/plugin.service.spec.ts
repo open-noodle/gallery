@@ -60,7 +60,7 @@ describe(PluginService.name, () => {
   });
 
   it('throws when a plugin cannot be found', async () => {
-    // eslint-disable-next-line unicorn/no-useless-undefined
+     
     mocks.plugin.get.mockResolvedValue(undefined);
 
     await expect(sut.get(newUuid())).rejects.toBeInstanceOf(BadRequestException);

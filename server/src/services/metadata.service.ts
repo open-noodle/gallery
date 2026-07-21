@@ -147,9 +147,7 @@ const validateRange = (value: number | undefined, min: number, max: number): Non
 };
 
 const getLensModel = (exifTags: ImmichTags): string | null => {
-  const lensModel = String(
-    exifTags.LensID ?? exifTags.LensType ?? exifTags.LensSpec ?? exifTags.LensModel ?? '',
-  ).trim();
+  const lensModel = (exifTags.LensID ?? exifTags.LensType ?? exifTags.LensSpec ?? exifTags.LensModel ?? '').trim();
   if (lensModel === '----') {
     return null;
   }
@@ -321,7 +319,7 @@ export class MetadataService extends BaseService {
           exifImageHeight: validate(height),
           exifImageWidth: validate(width),
           orientation: validate(exifTags.Orientation)?.toString() ?? null,
-          projectionType: exifTags.ProjectionType ? String(exifTags.ProjectionType).toUpperCase() : null,
+          projectionType: exifTags.ProjectionType ? exifTags.ProjectionType.toUpperCase() : null,
           bitsPerSample: this.getBitsPerSample(exifTags),
           colorspace: exifTags.ColorSpace === undefined ? null : String(exifTags.ColorSpace),
 

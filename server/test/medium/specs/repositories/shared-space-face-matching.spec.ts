@@ -31,7 +31,7 @@ async function createFaceWithEmbedding(
   const { result: faceId } = await ctx.newAssetFace({
     assetId: opts.assetId,
     personId: opts.personId ?? null,
-    ...(opts.isVisible === undefined ? {} : { isVisible: opts.isVisible }),
+    ...(opts.isVisible !== undefined && { isVisible: opts.isVisible }),
   });
   await ctx.database.insertInto('face_search').values({ faceId, embedding: newEmbedding() }).execute();
   return faceId;

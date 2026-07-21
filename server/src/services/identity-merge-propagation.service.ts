@@ -627,7 +627,7 @@ export class IdentityMergePropagationService {
     const repointedOwnerIds = new Set<string>();
     const collapsedOwnerIds = new Set<string>();
 
-    for (const [ownerId, profiles] of [...personalGroups.entries()].toSorted(([a], [b]) => a.localeCompare(b))) {
+    for (const [ownerId, profiles] of [...personalGroups].toSorted(([a], [b]) => a.localeCompare(b))) {
       const survivor = this.chooseSurvivor(profiles, {
         targetIdentityId,
         initiatingTargetProfileId: ownerId === initiatingOwnerId ? ensuredTarget.id : undefined,
@@ -653,7 +653,7 @@ export class IdentityMergePropagationService {
       }
     }
 
-    for (const [spaceId, profiles] of [...spaceGroups.entries()].toSorted(([a], [b]) => a.localeCompare(b))) {
+    for (const [spaceId, profiles] of [...spaceGroups].toSorted(([a], [b]) => a.localeCompare(b))) {
       const survivor = this.chooseSurvivor(profiles, {
         targetIdentityId,
         initiatingTargetProfileId: spaceId === initiatingSpaceId ? ensuredTarget.id : undefined,

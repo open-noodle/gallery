@@ -29,10 +29,7 @@ beforeAll(async () => {
 });
 
 const drain = async (stream: AsyncIterable<any>) => {
-  const out: any[] = [];
-  for await (const row of stream) {
-    out.push(row);
-  }
+  const out: any[] = await Array.fromAsync(stream);
   return out;
 };
 
@@ -46,10 +43,7 @@ describe('SharedSpaceAlbumAssetExifSync.getBackfill', () => {
     await ctx.newExif({ assetId: asset.id, make: 'TestCamera' });
 
     const stream = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id, owner.id);
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.assetId)).toContain(asset.id);
   });
 
@@ -63,10 +57,7 @@ describe('SharedSpaceAlbumAssetExifSync.getBackfill', () => {
     await ctx.newExif({ assetId: asset.id, make: 'TestCamera' });
 
     const stream = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, a2.id, owner.id);
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result).toHaveLength(0);
   });
 
@@ -80,20 +71,14 @@ describe('SharedSpaceAlbumAssetExifSync.getBackfill', () => {
 
     // Confirm exif appears before soft-delete
     const streamBefore = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id, owner.id);
-    const resultBefore: any[] = [];
-    for await (const row of streamBefore) {
-      resultBefore.push(row);
-    }
+    const resultBefore: any[] = await Array.fromAsync(streamBefore);
     expect(resultBefore.map((r: any) => r.assetId)).toContain(asset.id);
 
     // Soft-delete the album
     await db.updateTable('album').set({ deletedAt: new Date() }).where('id', '=', album.id).execute();
 
     const stream = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id, owner.id);
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result).toHaveLength(0);
   });
 });
@@ -113,10 +98,7 @@ describe('SharedSpaceAlbumAssetExifSync.getCreates', () => {
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
 
     const stream = sut.getCreates({ nowId: NOW_ID, userId: member.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.assetId)).toContain(asset.id);
   });
 
@@ -132,10 +114,7 @@ describe('SharedSpaceAlbumAssetExifSync.getCreates', () => {
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
 
     const stream = sut.getCreates({ nowId: NOW_ID, userId: stranger.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.assetId)).not.toContain(asset.id);
   });
 
@@ -154,20 +133,14 @@ describe('SharedSpaceAlbumAssetExifSync.getCreates', () => {
 
     // Confirm exif is visible before soft-delete
     const streamBefore = sut.getCreates({ nowId: NOW_ID, userId: member.id });
-    const resultBefore: any[] = [];
-    for await (const row of streamBefore) {
-      resultBefore.push(row);
-    }
+    const resultBefore: any[] = await Array.fromAsync(streamBefore);
     expect(resultBefore.map((r: any) => r.assetId)).toContain(asset.id);
 
     // Soft-delete the album
     await db.updateTable('album').set({ deletedAt: new Date() }).where('id', '=', album.id).execute();
 
     const stream = sut.getCreates({ nowId: NOW_ID, userId: member.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.assetId)).not.toContain(asset.id);
   });
 });
@@ -190,10 +163,7 @@ describe('SharedSpaceAlbumAssetExifSync.getUpdates', () => {
       { nowId: NOW_ID, userId: member.id },
       { type: SyncEntityType.AlbumToAssetV1, updateId: BEFORE_UPDATE_ID },
     );
-    const resultBefore: any[] = [];
-    for await (const row of streamBefore) {
-      resultBefore.push(row);
-    }
+    const resultBefore: any[] = await Array.fromAsync(streamBefore);
     expect(resultBefore.map((r: any) => r.assetId)).toContain(asset.id);
 
     // Soft-delete the album
@@ -203,10 +173,7 @@ describe('SharedSpaceAlbumAssetExifSync.getUpdates', () => {
       { nowId: NOW_ID, userId: member.id },
       { type: SyncEntityType.AlbumToAssetV1, updateId: BEFORE_UPDATE_ID },
     );
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.map((r: any) => r.assetId)).not.toContain(asset.id);
   });
 
@@ -229,10 +196,7 @@ describe('SharedSpaceAlbumAssetExifSync.getUpdates', () => {
       { nowId: NOW_ID, userId: member.id },
       { type: SyncEntityType.AlbumToAssetV1, updateId: ZERO_UPDATE_ID },
     );
-    const resultZero: any[] = [];
-    for await (const row of streamZero) {
-      resultZero.push(row);
-    }
+    const resultZero: any[] = await Array.fromAsync(streamZero);
     expect(resultZero).toHaveLength(0);
 
     // With ack ABOVE the asset's album_asset.updateId → exif must be returned.
@@ -240,10 +204,7 @@ describe('SharedSpaceAlbumAssetExifSync.getUpdates', () => {
       { nowId: NOW_ID, userId: member.id },
       { type: SyncEntityType.AlbumToAssetV1, updateId: BEFORE_UPDATE_ID },
     );
-    const resultMax: any[] = [];
-    for await (const row of streamMax) {
-      resultMax.push(row);
-    }
+    const resultMax: any[] = await Array.fromAsync(streamMax);
     expect(resultMax.map((r: any) => r.assetId)).toContain(asset.id);
   });
 });
@@ -262,10 +223,7 @@ describe('SharedSpaceAlbumAssetExifSync — contributions (album_space_asset)', 
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
     await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: asset.id, spaceId: space.id });
 
-    const out: any[] = [];
-    for await (const row of sut.getCreates({ nowId: NOW_ID, userId: member.id })) {
-      out.push(row);
-    }
+    const out: any[] = await Array.fromAsync(sut.getCreates({ nowId: NOW_ID, userId: member.id }));
     expect(out.some((r: any) => r.assetId === asset.id)).toBe(true);
   });
 
