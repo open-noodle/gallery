@@ -218,6 +218,10 @@ describe(AssetService.name, () => {
       expect(assets).toHaveLength(1);
       expect(assets[0]).toEqual(response.id);
 
+      // Upstream #29008 reshaped AlbumUpdate from one event per recipient
+      // ({ id, recipientId }) into a single event carrying the full audience. The
+      // uploader is a shared-link visitor rather than an album member, so every
+      // album user is a recipient.
       expect(ctx.getMock(EventRepository).emit).toHaveBeenCalledWith('AlbumUpdate', {
         id: album.id,
         userIds: [user.id],
