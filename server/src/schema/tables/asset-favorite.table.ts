@@ -1,5 +1,6 @@
-import { CreateDateColumn, ForeignKeyColumn, Generated, Table, Timestamp } from '@immich/sql-tools';
+import { AfterDeleteTrigger, CreateDateColumn, ForeignKeyColumn, Generated, Table, Timestamp } from '@immich/sql-tools';
 import { CreateIdColumn, UpdateIdColumn } from 'src/decorators';
+import { asset_favorite_delete_audit } from 'src/schema/functions';
 import { AssetTable } from 'src/schema/tables/asset.table';
 import { UserTable } from 'src/schema/tables/user.table';
 
@@ -11,6 +12,13 @@ import { UserTable } from 'src/schema/tables/user.table';
 //
 // PK is (userId, assetId), deliberately userId-leading — the dominant query is "my favorites".
 @Table('asset_favorite')
+// No `when` guard: FK cascades from asset/user deletes arrive at trigger depth > 1 and MUST still be
+// tombstoned, or those favorites linger on clients. Matches migration 1784000000000's DDL exactly.
+@AfterDeleteTrigger({
+  scope: 'statement',
+  function: asset_favorite_delete_audit,
+  referencingOldTableAs: 'old',
+})
 export class AssetFavoriteTable {
   @ForeignKeyColumn(() => UserTable, { onDelete: 'CASCADE', onUpdate: 'CASCADE', primary: true })
   userId!: string;
