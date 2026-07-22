@@ -29,7 +29,7 @@ the existing `PersonRead` reachability check.
   role filter** (`:721-729`).
 - `SpaceScope` union (`shared-space-album-scope.ts:57-60`) has `{ memberUserId: string }`; the member
   join with `shared_space_member.userId = memberUserId` appears in 3 Kysely arms:
-  `spaceDirectAssetExists` (~`:137`), `spaceAlbumAssetExists` (~`:180`), `spaceLibraryAssetExists`
+  `spaceDirectAssetExists` (~~`:137`), `spaceAlbumAssetExists` (~~`:180`), `spaceLibraryAssetExists`
   (~`:212`). (The raw-SQL `spaceAlbumAssetExistsSql` uses a `spaceScopeJoin` fragment, **not**
   `memberUserId` — no change there.)
 - `SharedSpaceRole` enum (`enum.ts:73`): values `owner` / `editor` / `viewer`. Access repo already
