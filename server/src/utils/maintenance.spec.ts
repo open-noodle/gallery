@@ -128,7 +128,7 @@ describe('detectPriorInstall', () => {
     const storageRepository = {
       readdir: vi.fn().mockResolvedValue(['file1.jpg', 'file2.jpg', '.immich']),
       readFile: vi.fn().mockResolvedValue(Buffer.from('test')),
-       
+
       overwriteFile: vi.fn().mockResolvedValue(undefined),
     } as unknown as StorageRepository;
 
@@ -192,7 +192,7 @@ describe('detectPriorInstall', () => {
     const storageRepository = {
       readdir: vi.fn().mockResolvedValue(['.immich', 'a.jpg', 'b.png', 'c.mp4']),
       readFile: vi.fn().mockResolvedValue(Buffer.from('data')),
-       
+
       overwriteFile: vi.fn().mockResolvedValue(undefined),
     } as unknown as StorageRepository;
 

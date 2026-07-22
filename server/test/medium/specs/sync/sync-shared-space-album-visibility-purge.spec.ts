@@ -538,11 +538,13 @@ describe('contribution visibility parity (album_space_asset)', () => {
 
     // Stronger: the restore's updateId bump must actually drive getUpserts to re-emit the contribution
     // to a member who acked BEFORE the restore (ack = pre-restore updateId).
-    const upserts: any[] = await Array.fromAsync(toAsset.getUpserts({
-      nowId: NOW_ID,
-      userId: member.id,
-      ack: { type: SyncEntityType.SharedSpaceAlbumToAssetV1, updateId: before.updateId },
-    }));
+    const upserts: any[] = await Array.fromAsync(
+      toAsset.getUpserts({
+        nowId: NOW_ID,
+        userId: member.id,
+        ack: { type: SyncEntityType.SharedSpaceAlbumToAssetV1, updateId: before.updateId },
+      }),
+    );
     expect(upserts.some((r) => r.albumId === album.id && r.assetId === asset.id)).toBe(true);
   });
 
