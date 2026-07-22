@@ -36,6 +36,7 @@ import {
 import { StorageService } from 'src/services/storage.service';
 import { ImmichFileResponse, ImmichStreamResponse } from 'src/utils/file';
 import { CROSS_OWNER_MERGE_ERROR_CODE } from 'src/utils/merge-policy';
+import { mockEnvData } from 'test/repositories/config.repository.mock';
 import { factory, newDate, newUuid } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
 
@@ -11038,6 +11039,64 @@ describe(SharedSpaceService.name, () => {
       const result = await sut.get(auth, space.id);
 
       expect(result.linkedLibraries).toEqual([]);
+    });
+
+    // Demo overlay: the demo user is not a real admin, but the web app grants it the read-only
+    // admin preview (authManager.canPreviewAdmin) and shows the space Libraries tab. Without this
+    // the tab renders, but always empty — the server withholds linkedLibraries from non-admins.
+    it('should include linked libraries for a non-admin when demo mode is enabled', async () => {
+      const auth = factory.auth({ user: { isAdmin: false } });
+      const space = factory.sharedSpace();
+      const member = makeMemberResult({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Viewer,
+      });
+      const linkedLibrary = factory.sharedSpaceLibrary({ spaceId: space.id, libraryId: newUuid() });
+
+      mocks.config.getEnv.mockReturnValue(
+        mockEnvData({ demo: { enabled: true, autoLogin: false, email: '', password: '' } }),
+      );
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getMembers.mockResolvedValue([member]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+      mocks.sharedSpace.getNewAssetCount.mockResolvedValue(0);
+      mocks.sharedSpace.getLinkedLibraries.mockResolvedValue([linkedLibrary]);
+      mocks.library.get.mockResolvedValue(factory.library({ id: linkedLibrary.libraryId, name: 'NAS Archive' }));
+
+      const result = await sut.get(auth, space.id);
+
+      expect(result.linkedLibraries).toHaveLength(1);
+      expect(result.linkedLibraries![0].libraryName).toBe('NAS Archive');
+    });
+
+    // Guards the demo relaxation from leaking into normal deployments: with demo mode explicitly
+    // off, a non-admin must still never see linked libraries.
+    it('should still hide linked libraries from a non-admin when demo mode is off', async () => {
+      const auth = factory.auth({ user: { isAdmin: false } });
+      const space = factory.sharedSpace();
+      const member = makeMemberResult({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Viewer,
+      });
+
+      mocks.config.getEnv.mockReturnValue(
+        mockEnvData({ demo: { enabled: false, autoLogin: false, email: '', password: '' } }),
+      );
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getMembers.mockResolvedValue([member]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+      mocks.sharedSpace.getNewAssetCount.mockResolvedValue(0);
+
+      const result = await sut.get(auth, space.id);
+
+      expect(result.linkedLibraries).toBeUndefined();
+      expect(mocks.sharedSpace.getLinkedLibraries).not.toHaveBeenCalled();
     });
   });
 
