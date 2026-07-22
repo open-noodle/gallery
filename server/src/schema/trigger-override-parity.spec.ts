@@ -86,3 +86,17 @@ describe('shared_space_album_folder_delete_audit trigger parity (space album fol
     expect(overrideSql('trigger_shared_space_album_folder_updatedAt')).toBe(expected);
   });
 });
+
+describe('asset_favorite_delete_audit trigger parity (#763, migration 1784000000000)', () => {
+  it('generates trigger DDL byte-identical to the statement the migration executed', () => {
+    // Verbatim from 1784000000000-AddAssetFavoriteTables.ts.
+    const expected = `CREATE OR REPLACE TRIGGER "asset_favorite_delete_audit"
+  AFTER DELETE ON "asset_favorite"
+  REFERENCING OLD TABLE AS "old"
+  FOR EACH STATEMENT
+  EXECUTE FUNCTION asset_favorite_delete_audit();`;
+
+    expect(overrideSql('trigger_asset_favorite_delete_audit')).toBe(expected);
+    expect(migrationSource('1784000000000-AddAssetFavoriteTables.ts')).toContain(expected);
+  });
+});
