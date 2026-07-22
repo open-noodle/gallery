@@ -122,6 +122,47 @@ Toolchain note: mobile must be driven through `mise exec` from `mobile/`
 against a pubspec requiring 3.44.6 and failed; `mise exec -- dart run build_runner`
 is the working path.
 
+### Remote CI
+
+All ten workflows were dispatched. First round: `docker`,
+`storage-migration-tests`, `storage-migration-e2e`, `gallery-ml-smoke`,
+`gallery-revert-to-immich-validation` and `gallery-build-mobile` passed; three
+failed, from two causes — both fixed and re-dispatched.
+
+**1. Lockfiles clobbered by a local `mise` run (the big one).** Every job that
+runs `Setup Mise` died at `mise install --locked` with
+`<tool>@<ver> is not in the lockfile`, naming `jellyfin/jellyfin-ffmpeg` (root
+`mise.toml`) and `java` / `CQLabs/homebrew-dcm` (`mobile/mise.toml`). That is
+all 12 `test.yml` jobs plus `static_analysis` and `gallery-mobile-smoke` — one
+root cause presenting as fourteen failures.
+
+The cause was **not** the batch-26 `mise.lock` conflict resolution, which was
+correct. Driving the mobile gates through `mise exec` / `mise run` from
+`mobile/` — required, per the Flutter-version note above — **rewrites the
+lockfiles in place, keeping only the host machine's platforms**. A `git add -A`
+in an unrelated e2e-lint commit then committed both: `mise.lock` −55 lines (the
+fork's per-platform `jellyfin-ffmpeg` blocks) and `mobile/mise.lock` −124 lines
+(every non-macOS `homebrew-dcm` and `java` block).
+
+Repaired by restoring `mobile/mise.lock` from the batch-23 checkpoint (upstream
+never touched it in 24–32; it is byte-identical to upstream's copy at the batch-32
+tip) and restoring the fork's root lock with only upstream's pnpm 11.13.1 blocks
+spliced back. Verified: `mobile/mise.lock` md5 matches the checkpoint exactly,
+and root `mise.lock` differs from the checkpoint in pnpm fields and nothing else.
+
+**Rules this earns: never `git add -A` during a rebase, and run
+`git status -- '*mise.lock'` after any local `mise` invocation.**
+
+**2. `gallery-rebase-smoke.yml` built the SDK after installing.** The specs failed
+to import `@immich/sdk/build/index.js`. `pnpm-workspace.yaml` sets
+`injectWorkspacePackages`, so `pnpm install` _copies_ the SDK into
+`e2e/node_modules`; running that before `pnpm --filter @immich/sdk build` left the
+injected copy with no `build/` output. The ordering was always wrong and only
+began failing this run. Reordered to build-before-inject, matching `test.yml`'s
+"Run setup @immich/sdk" step and `server/Dockerfile`. `test.yml` already had the
+correct order — worth re-grepping fork-only workflows for this shape after any
+pnpm bump.
+
 ### Rebase audits — all green
 
 Post-rebase audit (7 checks) ran per batch; `ci-invariants-check`,
