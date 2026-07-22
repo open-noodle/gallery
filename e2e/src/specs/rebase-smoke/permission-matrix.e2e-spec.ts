@@ -49,7 +49,7 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
       assetData: { bytes: readFileSync(imagePath), filename: 'rebase-smoke.jpg' },
     });
     await updateAsset(
-      { id: asset.id, updateAssetDto: { latitude: 48.853_41, longitude: 2.3488, rating: 5 } },
+      { id: asset.id, updateAssetDto: { latitude: 48.85341, longitude: 2.3488, rating: 5 } },
       { headers: asBearerAuth(owner.accessToken) },
     );
     const tags = await utils.upsertTags(owner.accessToken, ['rebase-smoke']);

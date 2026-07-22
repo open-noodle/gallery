@@ -57,7 +57,7 @@ test.describe('asset viewer reopen', () => {
     await utils.createFace({ assetId: assetWithPerson.id, personId: person.id });
 
     await updateAsset(
-      { id: assetWithLocation.id, updateAssetDto: { latitude: 48.853_41, longitude: 2.3488 } },
+      { id: assetWithLocation.id, updateAssetDto: { latitude: 48.85341, longitude: 2.3488 } },
       { headers: asBearerAuth(admin.accessToken) },
     );
     const tags = await utils.upsertTags(admin.accessToken, ['reopen-tag']);
