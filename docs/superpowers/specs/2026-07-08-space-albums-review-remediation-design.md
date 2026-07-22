@@ -294,8 +294,8 @@ Locked assets in albums.
   hidden" design.
 - **Additional bypass writer (confirmed by review of `metadata.service.ts`)** — the motion-photo
   path writes visibility directly via `assetRepository.update`/`create` and skips the space purge:
-  hiding an unlinked motion video (Timeline→Hidden, ~`:891-894`) and motion assets _created_ Hidden
-  (~`:849-861`). A motion video in a space-linked library going Hidden would therefore never be
+  hiding an unlinked motion video (Timeline→Hidden, ~~`:891-894`) and motion assets _created_ Hidden
+  (~~`:849-861`). A motion video in a space-linked library going Hidden would therefore never be
   tombstoned. Route these through the same helper (or emit the purge via the existing `AssetHide`
   event). `classification.service` (Archive↔Timeline) and `trash.repository.restoreAll` do **not**
   cross the shareable boundary and need no change.
