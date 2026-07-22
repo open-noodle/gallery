@@ -660,6 +660,9 @@ describe(AuthService.name, () => {
       '/api/system-config/storage-template-options',
       '/api/system-metadata/version-check-state',
       '/api/server/statistics',
+      '/api/admin/integrity/summary',
+      '/api/admin/integrity/report',
+      '/api/admin/database-backups',
     ])('allows the configured demo user to read allowlisted admin route %s in demo mode', async (uri) => {
       setDemoMode(true);
       mockSessionFor(demoUser);
@@ -673,7 +676,21 @@ describe(AuthService.name, () => {
       setDemoMode(true);
       mockSessionFor(demoUser);
 
-      await expect(authenticateAdmin('GET', '/api/admin/database-backups')).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(authenticateAdmin('GET', '/api/admin/notifications')).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    // The maintenance allowlist entries are anchored so that only the summary/list endpoints open up.
+    // Their sub-routes serve actual file content (a database dump, a flagged file, a CSV export) and
+    // must stay closed even though they are GETs under an allowlisted prefix.
+    it.each([
+      '/api/admin/database-backups/immich-db-backup-20260722T000000-v5.2.0-pg14.sql.gz',
+      '/api/admin/integrity/report/report-id/file',
+      '/api/admin/integrity/report/untracked-file/csv',
+    ])('blocks the configured demo user from file-serving maintenance sub-route %s', async (uri) => {
+      setDemoMode(true);
+      mockSessionFor(demoUser);
+
+      await expect(authenticateAdmin('GET', uri)).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('blocks demo user mutating admin requests before route handlers can run', async () => {

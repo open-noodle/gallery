@@ -66,6 +66,12 @@ const DEMO_ADMIN_PREVIEW_READ_ROUTES = [
   /^\/api\/system-config\/storage-template-options$/,
   /^\/api\/system-metadata\/version-check-state$/,
   /^\/api\/server\/statistics$/,
+  // Maintenance console. Anchored on purpose: the sub-routes of these two prefixes serve real file
+  // content (`/database-backups/:filename`, `/integrity/report/:id/file`, `/integrity/report/:type/csv`)
+  // and must stay closed to the demo user.
+  /^\/api\/admin\/integrity\/summary$/,
+  /^\/api\/admin\/integrity\/report$/,
+  /^\/api\/admin\/database-backups$/,
 ];
 
 const normalizeDemoAdminPreviewUri = (uri: string) => (uri.startsWith('/api/') ? uri : `/api${uri}`);
