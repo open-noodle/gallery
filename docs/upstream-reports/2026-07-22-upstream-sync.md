@@ -1,12 +1,13 @@
-# Upstream Sync Report — 2026-07-22 (batches 24–32)
+# Upstream Sync Report — 2026-07-22 (batches 24–35)
 
 ## Summary
 
 - **Branch**: `rebase/upstream-rolling-v3.0.3` (held off `main`)
-- **Upstream commits pulled**: 22 (batches 24–32, up to `7a7303ace`)
+- **Upstream commits pulled**: 27 (batches 24–35, up to `73329a8ce`)
 - **Fork commits synced from `origin/main`**: 2 (#824, #813)
-- **Conflicts resolved**: 11 across 9 files
-- **Batches complete**: 32 / 35 — batch 33 remains quarantined, 34–35 blocked behind it
+- **Conflicts resolved**: 16 across 11 files
+- **Batches complete**: 35 / 35 — **0 commits behind `upstream/main`**; the batch-33
+  quarantine was reviewed and released (see below)
 - **Risk level**: MEDIUM (TypeScript 7, eslint-unicorn v72, GitHub Actions major)
 - **Recommendation**: PROCEED
 
@@ -16,17 +17,20 @@ upstream's own sweeps did not cover.
 
 ## Incoming Upstream Changes
 
-| Batch | Tip         | Commits | Area                | Risk to Fork | Notes                                                       |
-| ----- | ----------- | ------: | ------------------- | ------------ | ----------------------------------------------------------- |
-| 24    | `2e587fc7e` |       1 | docs                | LOW          | Bulgarian readme; fork README kept its own NOTE block       |
-| 25    | `e918658cc` |       1 | docker              | LOW          | mise image tag 2026.7.7 → 2026.7.11                         |
-| 26    | `1b4d41324` |       4 | deps, server, web   | **HIGH**     | **TypeScript v7**, pnpm 11.13.1, upload-filename fix        |
-| 27    | `ce022233a` |       1 | docker              | LOW          | base-image → v202607211135                                  |
-| 28    | `aa08dad1f` |       1 | lint                | **HIGH**     | **eslint-plugin-unicorn v72**                               |
-| 29    | `ae8398ffe` |       1 | docker              | LOW          | valkey digest bump                                          |
-| 30    | `e6fff3b15` |       6 | mobile, web, server | MEDIUM       | Android startup refactor, web palette entry, lens-model fix |
-| 31    | `59bc81423` |       1 | ci                  | **HIGH**     | **github-actions major** across 15 workflows                |
-| 32    | `7a7303ace` |       5 | mobile              | MEDIUM       | album picker, photo_manager pin, maplibre SwiftPM lock      |
+| Batch | Tip         | Commits | Area                | Risk to Fork | Notes                                                         |
+| ----- | ----------- | ------: | ------------------- | ------------ | ------------------------------------------------------------- |
+| 24    | `2e587fc7e` |       1 | docs                | LOW          | Bulgarian readme; fork README kept its own NOTE block         |
+| 25    | `e918658cc` |       1 | docker              | LOW          | mise image tag 2026.7.7 → 2026.7.11                           |
+| 26    | `1b4d41324` |       4 | deps, server, web   | **HIGH**     | **TypeScript v7**, pnpm 11.13.1, upload-filename fix          |
+| 27    | `ce022233a` |       1 | docker              | LOW          | base-image → v202607211135                                    |
+| 28    | `aa08dad1f` |       1 | lint                | **HIGH**     | **eslint-plugin-unicorn v72**                                 |
+| 29    | `ae8398ffe` |       1 | docker              | LOW          | valkey digest bump                                            |
+| 30    | `e6fff3b15` |       6 | mobile, web, server | MEDIUM       | Android startup refactor, web palette entry, lens-model fix   |
+| 31    | `59bc81423` |       1 | ci                  | **HIGH**     | **github-actions major** across 15 workflows                  |
+| 32    | `7a7303ace` |       5 | mobile              | MEDIUM       | album picker, photo_manager pin, maplibre SwiftPM lock        |
+| 33    | `ee4bd3f83` |       1 | server, mobile      | **HIGH**     | album asset events (#29008) — quarantined, reviewed, released |
+| 34    | `d5adfb97d` |       3 | mobile, web         | MEDIUM       | album add-error surfacing, slideshow controls, iOS ethernet   |
+| 35    | `73329a8ce` |       1 | server              | **HIGH**     | OIDC logout id_token_hint (#29720) + session migration        |
 
 ### High-risk changes — detailed analysis
 
@@ -260,14 +264,62 @@ flow (#416). The fork's filter panel builds typed filter state rather than a
 free-text form, and `lensModel` appears only in display/deep-link paths with real
 values, so the bug does not apply.
 
-## Quarantine
+## Quarantine review — batch 33 released
 
-Batch 33 (`ee4bd3f83`, "add album asset event handling", #29008) remains held by the
-2026-07-21 product-direction decision: it reshapes `AlbumUpdate` and adds
-`on_album_update`, overlapping the fork's space-album event model. `lastAllowedTip`
-is `7a7303ace` — verified an ancestor of HEAD, and `ee4bd3f83` verified **not** in
-HEAD. Batches 34–35 sit behind it and cannot be pulled until the converge-vs-parallel
-call is made.
+Batch 33 (`ee4bd3f83`, "add album asset event handling", #29008) was held by the
+2026-07-21 product-direction gate on the concern that upstream was building the
+thing the fork already built, leaving two parallel album-event models.
+
+**Reviewed 2026-07-22 and released.** The two models are complementary, not
+competing:
+
+|                                     | payload                   | purpose                                       |
+| ----------------------------------- | ------------------------- | --------------------------------------------- |
+| upstream `AlbumUpdate`              | `userIds`, `recipientIds` | who to notify — notification/websocket fanout |
+| fork `AlbumAssetsAdd/Remove/Delete` | `assetIds`                | what changed — space-album sync               |
+
+Upstream's reshaped event carries no asset-level granularity, so it cannot replace
+the fork's three events even if convergence were wanted. The only genuine overlap is
+that both touch `album.service.ts`, which makes it a conflict-resolution job rather
+than a product fork. Pierre approved pulling 33–35 on that basis; the decision and
+its reasoning are recorded in `rolling-state.json` under `quarantineHistory`.
+
+### Batches 33–35 — what it took
+
+Five conflicts, all in the album surface and all resolved as unions:
+
+- `album.service.ts` ×3 — the fork's #749, its revert, and the #752 re-land each
+  collide with upstream's collapse of the per-recipient `AlbumUpdate` loop. Each was
+  resolved as upstream's single reshaped emit **plus** the fork's `AlbumAssetsAdd`
+  (and the revert correctly drops only the fork half).
+- `workflow-core-plugin.spec.ts` — upstream added the same `emit` stub the fork had;
+  kept the fork's comment explaining why it exists.
+- `drift_album_api_repository_test.dart` — add/add: upstream and the fork each created
+  this file. Merged both suites; upstream's cases were adapted to the fork's
+  constructor, which takes an `ApiService` rather than an `AlbumsApi`.
+
+Three follow-on fixes were needed that no conflict surfaced:
+
+1. **An inherited upstream bug.** #29008 reshaped the `AlbumUpdate` payload but did
+   not update `asset-media.service.ts`'s `addToSharedLink`, which still emits the
+   pre-#29008 `recipientId` shape. `upstream/main` carries the same stale call site
+   and does not type-check there — no commit between `ee4bd3f83` and `73329a8ce`
+   fixes it. **Worth reporting upstream.**
+2. `server/test/small.factory.ts`'s `sessionFactory` is fork-added, so it never got
+   the `oauthBearerToken` column from batch 35 — 16 tsc errors.
+3. The fork-only `drift_remote_album_page_test` still stubbed `getDateRange`, which
+   #29008 renamed to `watchDateRange` and changed from a Future to a Stream.
+
+`revert-to-immich.sql` gained both halves for batch 35's
+`1784647658615-AddOAuthBearerTokenToSession`: an idempotent
+`DROP COLUMN IF EXISTS` in step 7 (the script also runs against a tagged `:main`
+image whose DB never had the column, where the migration's own `down()` would throw)
+and the load-bearing `kysely_migrations` row deletion in step 8. Detector back to
+0 missing.
+
+The batch-35 audit flagged `server/src/queries/session.repository.sql` for review;
+it is byte-identical to upstream's own regenerated file, so there was nothing to
+reconcile.
 
 ## Follow-up work
 
@@ -278,13 +330,13 @@ call is made.
    setup-node v7 / cache v6. Pre-existing drift; the v4.2.2 pins are old enough to be
    worth attention. Deliberately deferred: these workflows push images, sign mobile
    builds and deploy docs, and bumping 24 pins mid-rebase adds risk without benefit.
-3. **Batch 33 product decision** — required before 34–35 can land.
-4. **Batch 35 `revert-to-immich.sql`** — will need an entry for
-   `AddOAuthBearerTokenToSession`.
+3. **Report the `addToSharedLink` bug upstream** — `upstream/main` emits the
+   pre-#29008 `AlbumUpdate` payload in `asset-media.service.ts` and does not
+   type-check there; the fork carries a local fix.
 
 ## Post-Rebase Verification
 
-- Upstream base in HEAD: `7a7303ace` (batch 32 tip)
+- Upstream base in HEAD: `73329a8ce` (batch 35 tip = `upstream/main`)
 - Fork commits ahead of that base: 951
-- Commits behind `upstream/main`: 5 (the quarantined batch 33 plus 34–35)
+- Commits behind `upstream/main`: **0**
 - Working tree clean; no conflict markers anywhere in the tree
