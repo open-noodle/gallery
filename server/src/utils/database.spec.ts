@@ -60,7 +60,11 @@ describe('tokenizeForSearch', () => {
 
     it('should tokenize four CJK characters into overlapping bigrams', () => {
       // 人工智能 -> 人工, 工智, 智能
-      expect(tokenizeForSearch('\u{4EBA}\u{5DE5}\u{667A}\u{80FD}')).toEqual(['\u{4EBA}\u{5DE5}', '\u{5DE5}\u{667A}', '\u{667A}\u{80FD}']);
+      expect(tokenizeForSearch('\u{4EBA}\u{5DE5}\u{667A}\u{80FD}')).toEqual([
+        '\u{4EBA}\u{5DE5}',
+        '\u{5DE5}\u{667A}',
+        '\u{667A}\u{80FD}',
+      ]);
     });
 
     it('should handle Japanese Hiragana', () => {
@@ -75,7 +79,11 @@ describe('tokenizeForSearch', () => {
 
     it('should handle Japanese Katakana', () => {
       // カタカナ (4 chars) -> カタ, タカ, カナ
-      expect(tokenizeForSearch('\u{30AB}\u{30BF}\u{30AB}\u{30CA}')).toEqual(['\u{30AB}\u{30BF}', '\u{30BF}\u{30AB}', '\u{30AB}\u{30CA}']);
+      expect(tokenizeForSearch('\u{30AB}\u{30BF}\u{30AB}\u{30CA}')).toEqual([
+        '\u{30AB}\u{30BF}',
+        '\u{30BF}\u{30AB}',
+        '\u{30AB}\u{30CA}',
+      ]);
     });
 
     it('should handle Korean characters', () => {
@@ -260,7 +268,6 @@ describe('isAssetChecksumConstraint', () => {
   });
 
   it('should return false for undefined', () => {
-     
     expect(isAssetChecksumConstraint(undefined)).toBe(false);
   });
 
