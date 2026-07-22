@@ -1,4 +1,5 @@
 import {
+  AfterDeleteTrigger,
   CreateDateColumn,
   ForeignKeyColumn,
   Generated,
@@ -8,6 +9,7 @@ import {
   UpdateDateColumn,
 } from '@immich/sql-tools';
 import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
+import { album_space_asset_delete_audit } from 'src/schema/functions';
 import { AlbumTable } from 'src/schema/tables/album.table';
 import { AssetTable } from 'src/schema/tables/asset.table';
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
@@ -26,6 +28,14 @@ import { UserTable } from 'src/schema/tables/user.table';
 // so a contribution re-appears on devices that purged it when its asset was un-hidden.
 @Table({ name: 'album_space_asset' })
 @UpdatedAtTrigger('album_space_asset_updatedAt')
+// No `when` guard (unlike album_asset's audit trigger): FK cascades from asset/album/space deletes
+// arrive at trigger depth > 1 and MUST still be tombstoned, or those contributions linger on
+// members' devices. Matches migration 1783100000000's DDL exactly.
+@AfterDeleteTrigger({
+  scope: 'statement',
+  function: album_space_asset_delete_audit,
+  referencingOldTableAs: 'old',
+})
 @Index({ name: 'album_space_asset_spaceId_idx', columns: ['spaceId'] })
 export class AlbumSpaceAssetTable {
   // index: false — albumId is the leading column of the composite PK, so a separate FK index is redundant.
