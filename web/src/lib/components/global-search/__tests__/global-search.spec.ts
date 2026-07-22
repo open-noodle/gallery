@@ -327,7 +327,11 @@ describe('global-search root', () => {
     const m = new GlobalSearchManager();
     m.open();
     render(GlobalSearch, { props: { manager: m } });
-    await user.type(screen.getByRole('combobox'), 'delete selected');
+    // Single word on purpose: svelte-i18n is uninitialised here so labels render
+    // as their raw keys (`cmdk_cmd_selection_delete_label`), which contain
+    // "delete" but not "selected". Selection is the only context set, so
+    // "delete" resolves unambiguously to the selection-delete command.
+    await user.type(screen.getByRole('combobox'), 'delete');
 
     await vi.waitFor(() => expect(m.topCommandMatch?.id).toBe('cmd:selection_delete'));
     await user.keyboard('{Enter}');
@@ -1082,7 +1086,13 @@ describe('global-search root', () => {
     const m = new GlobalSearchManager();
     m.open();
     render(GlobalSearch, { props: { manager: m } });
-    await user.type(screen.getByRole('combobox'), 'people');
+    // Pasted rather than typed: the nav section wrapper has an `out:fade`, and
+    // Svelte outros never complete under happy-dom. Typing character by
+    // character renders People in the section before the promotion gate opens,
+    // leaving a permanently fading ghost row that no amount of waiting clears.
+    // A single input event goes straight to the promoted state.
+    await user.click(screen.getByRole('combobox'));
+    await user.paste('people');
     await vi.waitFor(() => expect(document.querySelector('[data-cmdk-top-result-navigation]')).not.toBeNull());
     // There should be exactly one row carrying the People nav id.
     const rows = document.querySelectorAll('[data-command-item][data-value="nav:userPages:people"]');
