@@ -13,7 +13,15 @@ import SpaceLayout from './+layout.svelte';
 
 const { mockPage, mockAuthManager, gotoMock, invalidateAllMock } = vi.hoisted(() => ({
   mockPage: { url: new URL('https://gallery.test/spaces/s1'), route: { id: '/(user)/spaces/[spaceId]' } },
-  mockAuthManager: { user: { id: 'u1', isAdmin: false } },
+  // Mirrors the real auth-manager: the demo user is not a real admin but still gets the
+  // read-only admin preview, which is what gates the space Libraries tab.
+  mockAuthManager: {
+    user: { id: 'u1', isAdmin: false } as { id: string; isAdmin: boolean } | undefined,
+    isDemo: false,
+    get canPreviewAdmin() {
+      return !!this.user && (this.user.isAdmin || this.isDemo);
+    },
+  },
   gotoMock: vi.fn().mockResolvedValue(undefined),
   invalidateAllMock: vi.fn().mockResolvedValue(undefined),
 }));
@@ -76,13 +84,15 @@ function renderLayout(
   role: SharedSpaceRole,
   options: {
     isAdmin?: boolean;
+    isDemo?: boolean;
     space?: SharedSpaceResponseDto;
     member?: SharedSpaceMemberResponseDto;
     linkedAlbums?: unknown[];
   } = {},
 ) {
-  const { isAdmin = false } = options;
+  const { isAdmin = false, isDemo = false } = options;
   mockAuthManager.user = { id: 'u1', isAdmin };
+  mockAuthManager.isDemo = isDemo;
   // `children` is optional; the layout renders `{@render children?.()}`, so omitting it is fine.
   return render(SpaceLayout, {
     data: {
@@ -406,6 +416,26 @@ describe('space [spaceId] +layout.svelte', () => {
     await renderLayout(SharedSpaceRole.Owner);
     await expect.element(page.getByTestId('space-tabs')).toBeInTheDocument();
     await expect.element(page.getByTestId('space-tab-photos')).toMatchTextContent('35');
+  });
+
+  // The Libraries tab is gated on the admin *preview* (canPreviewAdmin), not the raw isAdmin flag,
+  // so the demo user — which is never a real admin — still gets it. Passing `user.isAdmin` here
+  // silently hides the tab on the demo instance.
+  describe('Libraries tab visibility', () => {
+    it('shows the Libraries tab to a real admin', async () => {
+      await renderLayout(SharedSpaceRole.Owner, { isAdmin: true });
+      await expect.element(page.getByTestId('space-tab-libraries')).toBeInTheDocument();
+    });
+
+    it('shows the Libraries tab to the demo user even though it is not an admin', async () => {
+      await renderLayout(SharedSpaceRole.Viewer, { isAdmin: false, isDemo: true });
+      await expect.element(page.getByTestId('space-tab-libraries')).toBeInTheDocument();
+    });
+
+    it('hides the Libraries tab from a plain non-admin, non-demo user', async () => {
+      await renderLayout(SharedSpaceRole.Viewer, { isAdmin: false, isDemo: false });
+      await expect.element(page.getByTestId('space-tab-libraries')).not.toBeInTheDocument();
+    });
   });
 
   it('renders the cover (SpaceHero) when chrome is shown', async () => {

@@ -288,7 +288,11 @@ export class SharedSpaceService extends BaseService {
         this.sharedSpaceRepository.getLinkedAlbumCount(space.id),
         // Recency badge data
         this.sharedSpaceRepository.getMember(space.id, auth.user.id),
-        auth.user.isAdmin ? this.sharedSpaceRepository.getLinkedLibraries(space.id) : undefined,
+        // Demo: the demo user isn't a real admin but gets the read-only admin preview
+        // (authManager.canPreviewAdmin), so surface linked libraries to them too.
+        auth.user.isAdmin || this.configRepository.getEnv().demo.enabled
+          ? this.sharedSpaceRepository.getLinkedLibraries(space.id)
+          : undefined,
       ]);
       let newAssetCount: number;
       let lastContributor: { id: string; name: string } | null = null;
@@ -382,7 +386,9 @@ export class SharedSpaceService extends BaseService {
     }
 
     let linkedLibraries: SharedSpaceLinkedLibraryDto[] | undefined;
-    if (auth.user.isAdmin) {
+    // Demo: the demo user isn't a real admin but gets the read-only admin preview
+    // (authManager.canPreviewAdmin), so surface linked libraries to them too.
+    if (auth.user.isAdmin || this.configRepository.getEnv().demo.enabled) {
       const links = await this.sharedSpaceRepository.getLinkedLibraries(space.id);
       linkedLibraries = [];
       for (const link of links) {
