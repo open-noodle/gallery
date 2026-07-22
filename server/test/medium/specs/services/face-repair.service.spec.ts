@@ -77,7 +77,9 @@ describe('FaceRepairService.findReattributionCandidates', () => {
       leakedFaceIds.push(assetFace.id);
     }
 
-    const candidates: ReattributionCandidate[] = await Array.fromAsync(sut.findReattributionCandidates({ ownerId: user.id, maxDistance: 0.6, voteWindow: 50 }));
+    const candidates: ReattributionCandidate[] = await Array.fromAsync(
+      sut.findReattributionCandidates({ ownerId: user.id, maxDistance: 0.6, voteWindow: 50 }),
+    );
 
     // Each leaked face (on Alexia) should report Karina as topOtherPersonId
     for (const leakedId of leakedFaceIds) {
@@ -108,7 +110,9 @@ describe('FaceRepairService.findReattributionCandidates', () => {
       .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
       .execute();
 
-    const candidates: ReattributionCandidate[] = await Array.fromAsync(sut.findReattributionCandidates({ ownerId: user.id, maxDistance: 0.6, voteWindow: 50 }));
+    const candidates: ReattributionCandidate[] = await Array.fromAsync(
+      sut.findReattributionCandidates({ ownerId: user.id, maxDistance: 0.6, voteWindow: 50 }),
+    );
 
     const candidate = candidates.find((c) => c.assetFaceId === assetFace.id);
     expect(candidate).toBeDefined();
@@ -134,7 +138,9 @@ describe('FaceRepairService.findReattributionCandidates', () => {
     // Owner B has many faces on 'first' axis (identical embedding — maximally close)
     await buildCluster(ctx, ownerB.id, axisEmbedding('first'), 10);
 
-    const candidates: ReattributionCandidate[] = await Array.fromAsync(sut.findReattributionCandidates({ ownerId: ownerA.id, maxDistance: 0.6, voteWindow: 50 }));
+    const candidates: ReattributionCandidate[] = await Array.fromAsync(
+      sut.findReattributionCandidates({ ownerId: ownerA.id, maxDistance: 0.6, voteWindow: 50 }),
+    );
 
     // Owner A's face should not see owner B's person as topOther (cross-owner)
     const candidateA = candidates.find((c) => c.assetFaceId === faceA.id);
@@ -781,8 +787,7 @@ describe('FaceRepairService.executeRepair', () => {
 
     // queueAll was not called with the moved face id
     const queueAllArg = jobMock.queueAll.mock.calls[0]?.[0] as
-      | Array<{ name: JobName; data: { id: string } }>
-      | undefined;
+      Array<{ name: JobName; data: { id: string } }> | undefined;
     const queuedIds = queueAllArg?.map((j) => j.data.id) ?? [];
     expect(queuedIds).not.toContain(movedFaceId);
   });
