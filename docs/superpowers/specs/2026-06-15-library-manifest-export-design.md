@@ -66,9 +66,7 @@ GET /api/admin/users/:id/library-manifest?cursor=<assetId>
   "generatedAt": "2026-06-15T12:00:00.000Z", // ISO-8601, when this page was generated
   "owner": { "id": "<uuid>", "email": "<string>" }, // the target user
   "albums": [{ "id": "<uuid>", "name": "<string>" }], // the user's OWN albums; maps albumIds -> names
-  "assets": [
-    /* ManifestAssetItem, this page */
-  ],
+  "assets": [/* ManifestAssetItem, this page */],
   "nextCursor": "<assetId>", // pass back as ?cursor to get the next page; null when exhausted
 }
 ```

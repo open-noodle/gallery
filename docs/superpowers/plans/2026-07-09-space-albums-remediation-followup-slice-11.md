@@ -101,12 +101,12 @@ point, not new backend. **Test:** the option renders on an owned album; picking 
 
 **Files:** `web/src/lib/components/spaces/space-activity-feed.svelte` (~`:75`, raw template literals for
 album*link/unlink/person*_ entries) + the mobile `mobile/lib/.../spaces/_`pages/widgets ('Link Albums',
-'Add photos', 'Unlink from space', 'Albums (N)', '$count photos', …). **Fix:** add keys to`i18n/en.json`and route web strings through`$t`; use `.tr()` consistently on the mobile space-album
+'Add photos', 'Unlink from space', 'Albums (N)', '$count photos', …). **Fix:** add keys to`i18n/en.json`and route web strings through`$t`; use `.tr()`consistently on the mobile space-album
 pages. Include the L16 leave-confirmation warning key ("albums you linked will be removed"), conditioned
-on the leaver having such links, extending `spaces_leave_confirmation`. **English keys only** — other
+on the leaver having such links, extending`spaces_leave_confirmation`. **English keys only** — other
 locales fall back. Regenerate mobile localization (`dart run easy_localization:generate -S ../i18n`)
-after adding keys. **Test:** `dart analyze` clean; web `check:svelte` clean; a couple of the routed
-strings resolve via `$t`/`.tr()`.
+after adding keys. **Test:** `dart analyze`clean; web`check:svelte`clean; a couple of the routed
+strings resolve via`$t`/`.tr()`.
 
 **Half-B gates:** web `pnpm check:typescript` + `check:svelte` + `pnpm lint` + `pnpm test`; mobile
 `dart analyze --fatal-infos lib test` + `flutter test` for touched files. Commit per finding (L9, L10,
