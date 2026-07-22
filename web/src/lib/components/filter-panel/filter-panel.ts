@@ -32,16 +32,7 @@ export function saveFilterCollapsed(collapsed: boolean): void {
 }
 
 export type FilterSection =
-  | 'timeline'
-  | 'people'
-  | 'location'
-  | 'camera'
-  | 'tags'
-  | 'rating'
-  | 'media'
-  | 'favorites'
-  | 'albums'
-  | 'text';
+  'timeline' | 'people' | 'location' | 'camera' | 'tags' | 'rating' | 'media' | 'favorites' | 'albums' | 'text';
 
 export interface PersonOption {
   id: string;

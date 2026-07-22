@@ -122,7 +122,8 @@ describe('FaceRepairRepository.streamEligibleFaces', () => {
       .execute();
     await ctx.softDeleteAsset(deletedAsset.id);
 
-    const results: { assetFaceId: string; personId: string; ownerId: string; embedding: string }[] = await Array.fromAsync(sut.streamEligibleFaces({ ownerId: user.id }));
+    const results: { assetFaceId: string; personId: string; ownerId: string; embedding: string }[] =
+      await Array.fromAsync(sut.streamEligibleFaces({ ownerId: user.id }));
 
     const resultIds = results.map((r) => r.assetFaceId).toSorted();
     expect(resultIds).toEqual([face1.id, face2.id].toSorted());
