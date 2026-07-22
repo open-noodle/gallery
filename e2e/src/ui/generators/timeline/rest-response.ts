@@ -288,7 +288,7 @@ export function getTimeBuckets(
     }
   }
 
-  const summary = [...summaryByBucket.values()];
+  const summary = summaryByBucket.values().toArray();
 
   // Sort summary by date (newest first) using luxon
   summary.sort((a, b) => {
@@ -350,7 +350,7 @@ export function getTimeBucketCovers(
     });
   }
 
-  return [...coversByBucket.values()];
+  return coversByBucket.values().toArray();
 }
 
 const createDefaultOwner = (ownerId: string) => {
