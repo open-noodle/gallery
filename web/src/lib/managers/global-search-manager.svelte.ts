@@ -196,6 +196,8 @@ function getCurrentSpaceTimelineId(pathname: string): string | undefined {
   return parts[1];
 }
 
+const canUseAdminSurface = () => authManager.canPreviewAdmin;
+
 // Entity-section keys dispatched by runBatch per scope. Navigation is intentionally
 // absent — it flows through the synchronous `runNavigationProvider` off the debounce
 // path. Under a prefix scope, only the matching keys dispatch; all other entity
@@ -563,13 +565,12 @@ export class GlobalSearchManager {
       return { commands: [], navigation: [] };
     }
 
-    const u = authManager.authenticated ? authManager.user : undefined;
-    const isAdmin = u?.isAdmin ?? false;
+    const canPreviewAdmin = canUseAdminSurface();
     const flags = featureFlagsManager.valueOrUndefined;
 
     const eligibleNav: NavigationItem[] = [];
     for (const item of NAVIGATION_ITEMS) {
-      if (item.adminOnly && !isAdmin) {
+      if (item.adminOnly && !canPreviewAdmin) {
         continue;
       }
       const itemFlagEnabled = item.featureFlag ? flags?.[item.featureFlag] : true;
@@ -582,7 +583,7 @@ export class GlobalSearchManager {
     const ctx = commandContextManager.getContext();
     const eligibleCmd: CommandItem[] = [];
     for (const item of COMMAND_ITEMS) {
-      if (item.adminOnly && !isAdmin) {
+      if (item.adminOnly && !canPreviewAdmin) {
         continue;
       }
       const itemFlagEnabled = item.featureFlag ? flags?.[item.featureFlag] : true;
@@ -2033,7 +2034,7 @@ export class GlobalSearchManager {
     let liveNavItem: NavigationItem | undefined;
     if (entry.kind === 'navigate') {
       liveNavItem = NAVIGATION_ITEMS.find((n) => n.id === entry.id);
-      const isAdmin = (authManager.authenticated ? authManager.user : undefined)?.isAdmin ?? false;
+      const canPreviewAdmin = canUseAdminSurface();
       const flags = featureFlagsManager.valueOrUndefined;
       if (!liveNavItem) {
         console.warn('[cmdk] purging stale recent — unknown nav item', entry.id);
@@ -2041,7 +2042,7 @@ export class GlobalSearchManager {
         this.close();
         return;
       }
-      if (liveNavItem.adminOnly && !isAdmin) {
+      if (liveNavItem.adminOnly && !canPreviewAdmin) {
         console.warn('[cmdk] purging stale admin recent', entry.id);
         removeEntry(entry.id);
         this.close();
@@ -2307,11 +2308,11 @@ export class GlobalSearchManager {
     if (this.topCommandMatch !== null) {
       return null;
     }
-    const isAdmin = (authManager.authenticated ? authManager.user : undefined)?.isAdmin ?? false;
+    const canPreviewAdmin = canUseAdminSurface();
     const flags = featureFlagsManager.valueOrUndefined;
     const translate = get(t);
     for (const item of NAVIGATION_ITEMS) {
-      if (item.adminOnly && !isAdmin) {
+      if (item.adminOnly && !canPreviewAdmin) {
         continue;
       }
       const itemFlagEnabled = item.featureFlag ? flags?.[item.featureFlag] : true;
@@ -2377,14 +2378,14 @@ export class GlobalSearchManager {
     if (q.length === 0) {
       return null;
     }
-    const isAdmin = (authManager.authenticated ? authManager.user : undefined)?.isAdmin ?? false;
+    const canPreviewAdmin = canUseAdminSurface();
     const flags = featureFlagsManager.valueOrUndefined;
     const translate = get(t);
     const ctx = commandContextManager.getContext();
     const cmdSearch = this.getCommandSearchStrings();
     let best: { item: CommandItem; score: number } | null = null;
     for (const item of COMMAND_ITEMS) {
-      if (item.adminOnly && !isAdmin) {
+      if (item.adminOnly && !canPreviewAdmin) {
         continue;
       }
       const itemFlagEnabled = item.featureFlag ? flags?.[item.featureFlag] : true;

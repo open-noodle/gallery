@@ -31,31 +31,33 @@
   let { breadcrumbs, actions, children, footer }: Props = $props();
 </script>
 
-<AppShell>
-  <AppShellHeader>
-    <NavigationBar noBorder />
-  </AppShellHeader>
-  <AppShellSidebar
-    bind:open={sidebarStore.isOpen}
-    class="flex h-full flex-col justify-between gap-2 border-none shadow-none"
-  >
-    <div class="flex flex-col gap-1 pe-4 pt-8">
-      <NavbarItem title={$t('users')} href={Route.users()} icon={mdiAccountMultipleOutline} />
-      <NavbarItem title={$t('external_libraries')} href={Route.libraries()} icon={mdiBookshelf} />
-      <NavbarItem title={$t('admin.queues')} href={Route.queues()} icon={mdiTrayFull} />
-      <NavbarItem title={$t('admin.face_cleanup')} href={Route.faceCleanup()} icon={mdiFaceRecognition} />
-      <NavbarItem title={$t('settings')} href={Route.systemSettings()} icon={mdiCog} />
-      <NavbarItem title={$t('admin.maintenance_settings')} href={Route.systemMaintenance()} icon={mdiWrench} />
-      <NavbarItem title="Storage Migration" href={Route.storageMigration()} icon={mdiCloudSyncOutline} />
-      <NavbarItem title={$t('server_stats')} href={Route.systemStatistics()} icon={mdiServer} />
-    </div>
+<div class="demo-admin-shell">
+  <AppShell>
+    <AppShellHeader class="max-md:h-(--navbar-height-md) h-(--navbar-height)">
+      <NavigationBar noBorder />
+    </AppShellHeader>
+    <AppShellSidebar
+      bind:open={sidebarStore.isOpen}
+      class="flex h-full flex-col justify-between gap-2 border-none shadow-none"
+    >
+      <div class="flex flex-col gap-1 pe-4 pt-8">
+        <NavbarItem title={$t('users')} href={Route.users()} icon={mdiAccountMultipleOutline} />
+        <NavbarItem title={$t('external_libraries')} href={Route.libraries()} icon={mdiBookshelf} />
+        <NavbarItem title={$t('admin.queues')} href={Route.queues()} icon={mdiTrayFull} />
+        <NavbarItem title={$t('admin.face_cleanup')} href={Route.faceCleanup()} icon={mdiFaceRecognition} />
+        <NavbarItem title={$t('settings')} href={Route.systemSettings()} icon={mdiCog} />
+        <NavbarItem title={$t('admin.maintenance_settings')} href={Route.systemMaintenance()} icon={mdiWrench} />
+        <NavbarItem title="Storage Migration" href={Route.storageMigration()} icon={mdiCloudSyncOutline} />
+        <NavbarItem title={$t('server_stats')} href={Route.systemStatistics()} icon={mdiServer} />
+      </div>
 
-    <div class="me-4 mb-2">
-      <BottomInfo />
-    </div>
-  </AppShellSidebar>
+      <div class="me-4 mb-2">
+        <BottomInfo />
+      </div>
+    </AppShellSidebar>
 
-  <BreadcrumbActionPage {breadcrumbs} {actions} {footer}>
-    {@render children?.()}
-  </BreadcrumbActionPage>
-</AppShell>
+    <BreadcrumbActionPage {breadcrumbs} {actions} {footer}>
+      {@render children?.()}
+    </BreadcrumbActionPage>
+  </AppShell>
+</div>

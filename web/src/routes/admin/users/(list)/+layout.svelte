@@ -1,6 +1,8 @@
 <script lang="ts">
   import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
+  import ReadOnlyDemoNotice from '$lib/components/admin/ReadOnlyDemoNotice.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { Route } from '$lib/route';
   import { getUserAdminActions, getUserAdminsActions } from '$lib/services/user-admin.service';
   import { locale } from '$lib/stores/preferences.store';
@@ -48,10 +50,12 @@
   };
 
   const { Create } = $derived(getUserAdminsActions($t));
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
+  const pageActions = $derived(isReadOnlyDemo ? [] : [Create]);
 
   const getActionsForUser = (user: UserAdminResponseDto) => {
     const { Detail, Update, Delete, ResetPassword, ResetPinCode } = getUserAdminActions($t, user);
-    return [Detail, Update, ResetPassword, ResetPinCode, MenuItemType.Divider, Delete];
+    return isReadOnlyDemo ? [Detail] : [Detail, Update, ResetPassword, ResetPinCode, MenuItemType.Divider, Delete];
   };
 
   const classes = {
@@ -72,8 +76,9 @@
 
 <CommandPaletteDefaultProvider name={$t('users')} actions={[Create]} />
 
-<AdminPageLayout breadcrumbs={[{ title: data.meta.title }]} actions={[Create]}>
+<AdminPageLayout breadcrumbs={[{ title: data.meta.title }]} actions={pageActions}>
   <Container center size="large">
+    <ReadOnlyDemoNotice />
     <Table class="mt-4" striped spacing="small" size="small">
       <TableHeader>
         <TableHeading class={classes.column1}>{$t('name')}</TableHeading>

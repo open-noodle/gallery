@@ -225,10 +225,10 @@ export const galleryJobDefaults = {
 export const galleryMachineLearningDefaults = {
   clipMaxDistance: 0,
   faceSuggestions: { enabled: true, maxDistance: 0.7 },
-  petDetection: { enabled: false, modelName: 'rfdetr-nano', minScore: 0.3 },
-  petRecognition: { enabled: false, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
+  petDetection: { enabled: true, modelName: 'rfdetr-nano', minScore: 0.3 },
+  petRecognition: { enabled: true, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
   spatialScene: {
-    enabled: false,
+    enabled: true,
     modelName: 'depth-anything-v2-small',
     offer: 'suitable' as const,
     minBoundarySharpness: 0.03,

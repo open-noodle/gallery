@@ -1,8 +1,10 @@
 <script lang="ts">
   import { goto, invalidate } from '$app/navigation';
   import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
+  import ReadOnlyDemoNotice from '$lib/components/admin/ReadOnlyDemoNotice.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
   import EmptyPlaceholder from '$lib/components/shared-components/EmptyPlaceholder.svelte';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { Route } from '$lib/route';
   import { getLibrariesActions, getLibraryActions } from '$lib/services/library.service';
   import { locale } from '$lib/stores/preferences.store';
@@ -44,10 +46,12 @@
   const onLibraryDelete = () => invalidate('app:libraries');
 
   const { Create, ScanAll } = $derived(getLibrariesActions($t));
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
+  const pageActions = $derived(isReadOnlyDemo ? [] : [ScanAll, Create]);
 
   const getActionsForLibrary = (library: LibraryResponseDto) => {
     const { Detail, Scan, Edit, Delete } = getLibraryActions($t, library);
-    return [Detail, Scan, Edit, MenuItemType.Divider, Delete];
+    return isReadOnlyDemo ? [Detail] : [Detail, Scan, Edit, MenuItemType.Divider, Delete];
   };
 
   const classes = {
@@ -64,8 +68,9 @@
 
 <CommandPaletteDefaultProvider name={$t('library')} actions={[Create, ScanAll]} />
 
-<AdminPageLayout breadcrumbs={[{ title: data.meta.title }]} actions={[ScanAll, Create]}>
+<AdminPageLayout breadcrumbs={[{ title: data.meta.title }]} actions={pageActions}>
   <Container size="large" center class="my-4">
+    <ReadOnlyDemoNotice />
     <div class="flex flex-col items-center gap-2" in:fade={{ duration: 500 }}>
       {#if libraries.length > 0}
         <Table striped size="small" spacing="small">
@@ -132,7 +137,7 @@
         <EmptyPlaceholder
           fullWidth
           text={$t('no_libraries_message')}
-          onClick={() => goto(Route.newLibrary())}
+          onClick={isReadOnlyDemo ? undefined : () => goto(Route.newLibrary())}
           class="mx-auto mt-10"
         />
       {/if}

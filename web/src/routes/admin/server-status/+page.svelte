@@ -1,5 +1,6 @@
 <script lang="ts">
   import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
+  import ReadOnlyDemoNotice from '$lib/components/admin/ReadOnlyDemoNotice.svelte';
   import ServerStatisticsPanel from './ServerStatisticsPanel.svelte';
   import { getServerStatistics, type ServerStatsResponseDto } from '@immich/sdk';
   import { Container } from '@immich/ui';
@@ -34,6 +35,7 @@
 
 <AdminPageLayout breadcrumbs={[{ title: data.meta.title }]}>
   <Container size="large" center>
+    <ReadOnlyDemoNotice />
     <ServerStatisticsPanel {statsPromise} users={data.users} />
   </Container>
 </AdminPageLayout>

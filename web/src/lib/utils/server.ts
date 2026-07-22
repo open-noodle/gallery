@@ -16,6 +16,7 @@ async function _init(fetch: Fetch) {
   setHeaders(galleryAppHeader);
   await initLanguage();
   await serverConfigManager.init();
+  authManager.isDemo = serverConfigManager.value.demoMode;
   await authManager.load();
 
   if (!serverConfigManager.value.maintenanceMode) {

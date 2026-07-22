@@ -15,6 +15,7 @@ import { isSharedLinkRoute } from '$lib/utils/navigation';
 
 class AuthManager {
   isPurchased = $state(false);
+  isDemo = $state(false);
   isSharedLink = $derived(isSharedLinkRoute(page.route?.id));
   params = $derived(this.isSharedLink ? { key: page.params.key, slug: page.params.slug } : {});
 
@@ -23,6 +24,14 @@ class AuthManager {
 
   get authenticated() {
     return !!(this.#user && this.#preferences);
+  }
+
+  get canPreviewAdmin() {
+    return !!this.#user && (this.#user.isAdmin || this.isDemo);
+  }
+
+  get isReadOnlyDemo() {
+    return !!this.#user && this.isDemo && !this.#user.isAdmin;
   }
 
   get user() {
@@ -103,6 +112,7 @@ class AuthManager {
 
     if (redirectUri.startsWith('/')) {
       this.isPurchased = false;
+      this.isDemo = false;
 
       this.reset();
       eventManager.emit('AuthLogout');
