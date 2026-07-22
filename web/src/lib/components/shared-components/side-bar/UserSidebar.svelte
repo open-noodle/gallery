@@ -65,7 +65,7 @@
     <NavbarItem title={$t('people')} href={Route.people()} icon={mdiAccountOutline} activeIcon={mdiAccount} />
   {/if}
 
-  {#if authManager.preferences.sharedLinks.enabled && authManager.preferences.sharedLinks.sidebarWeb}
+  {#if authManager.preferences.sharedLinks.enabled && authManager.preferences.sharedLinks.sidebarWeb && !authManager.isDemo}
     <NavbarItem title={$t('shared_links')} href={Route.sharedLinks()} icon={mdiLink} />
   {/if}
 
@@ -111,7 +111,9 @@
 
   <NavbarItem title={$t('utilities')} href={Route.utilities()} icon={mdiToolboxOutline} activeIcon={mdiToolbox} />
 
-  <NavbarItem title={$t('import')} href={Route.import()} icon={mdiDatabaseImportOutline} />
+  {#if !authManager.isDemo}
+    <NavbarItem title={$t('import')} href={Route.import()} icon={mdiDatabaseImportOutline} />
+  {/if}
 
   <NavbarItem
     title={$t('archive')}
@@ -122,7 +124,7 @@
 
   <NavbarItem title={$t('locked_folder')} href={Route.locked()} icon={mdiLockOutline} activeIcon={mdiLock} />
 
-  {#if config.trash.enabled}
+  {#if config.trash.enabled && !authManager.isDemo}
     <NavbarItem title={$t('trash')} href={Route.trash()} icon={mdiTrashCanOutline} activeIcon={mdiTrashCan} />
   {/if}
 

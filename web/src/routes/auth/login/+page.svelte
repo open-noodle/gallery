@@ -8,7 +8,8 @@
   import { Route } from '#lib/route.ts';
   import { oauth } from '#lib/utils.ts';
   import { getServerErrorMessage, handleError } from '#lib/utils/handle-error.ts';
-  import { login, type LoginResponseDto } from '@immich/sdk';
+  import { demoLogin, login, type LoginResponseDto } from '@immich/sdk';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Alert, Button, Field, Input, PasswordInput, Stack } from '@immich/ui';
   import { mdiShieldKeyOutline } from '@mdi/js';
   import { browserSupportsWebAuthn } from '@simplewebauthn/browser';
@@ -40,6 +41,16 @@
 
   const passkeySupported = browserSupportsWebAuthn();
   const passkeyEnabled = $derived(publicConfig.passkey.enabled && passkeySupported);
+
+  let demoLoading = $state(false);
+  let demoAutoLoginFailed = $state(false);
+  const showStandardLogin = $derived(!serverConfig.demoMode);
+  const showPasswordLogin = $derived(showStandardLogin && !oauthLoading && publicConfig.passwordLogin.enabled);
+  const showOAuthLogin = $derived(showStandardLogin && publicConfig.oauth.enabled);
+  const showDemoLogin = $derived(serverConfig.demoMode && (!serverConfig.demoAutoLogin || demoAutoLoginFailed));
+  const showLoginDisabled = $derived(
+    showStandardLogin && !publicConfig.passwordLogin.enabled && !passkeyEnabled && !publicConfig.oauth.enabled,
+  );
 
   const passkeyLogin = createMutation(() => ({ ...loginWithPasskeyMutation(), onSuccess: (user) => onLogin(user) }));
   const passkeyLoading = $derived(passkeyLogin.isPending || passkeyLogin.isSuccess);
@@ -79,7 +90,32 @@
     await onSuccess(user);
   };
 
+  const handleDemoLogin = async () => {
+    try {
+      demoLoading = true;
+      demoAutoLoginFailed = false;
+      errorMessage = '';
+      const user = await demoLogin();
+      authManager.isDemo = true;
+      await onSuccess(user);
+    } catch (error) {
+      errorMessage = getServerErrorMessage(error) || 'Unable to start demo';
+      demoAutoLoginFailed = true;
+      demoLoading = false;
+    }
+  };
+
   onMount(async () => {
+    if (serverConfig.demoMode && serverConfig.demoAutoLogin) {
+      await handleDemoLogin();
+      return;
+    }
+
+    if (serverConfig.demoMode) {
+      oauthLoading = false;
+      return;
+    }
+
     if (!publicConfig.oauth.enabled) {
       oauthLoading = false;
       return;
@@ -168,12 +204,12 @@
       </Alert>
     {/if}
 
-    {#if !oauthLoading && publicConfig.passwordLogin.enabled}
-      <form {onsubmit} class="flex flex-col gap-4">
-        {#if errorMessage}
-          <Alert color="danger" title={errorMessage} closable />
-        {/if}
+    {#if errorMessage}
+      <Alert color="danger" title={errorMessage} closable />
+    {/if}
 
+    {#if showPasswordLogin}
+      <form {onsubmit} class="flex flex-col gap-4">
         <Field label={$t('email')} required="indicator">
           <Input id="email" name="email" type="email" autocomplete="email" bind:value={email} />
         </Field>
@@ -186,7 +222,7 @@
       </form>
     {/if}
 
-    {#if !oauthLoading && passkeyEnabled}
+    {#if showStandardLogin && !oauthLoading && passkeyEnabled}
       {#if publicConfig.passwordLogin.enabled}
         {@render divider()}
       {/if}
@@ -207,7 +243,7 @@
       </Button>
     {/if}
 
-    {#if publicConfig.oauth.enabled}
+    {#if showOAuthLogin}
       {#if publicConfig.passwordLogin.enabled || passkeyEnabled}
         {@render divider()}
       {/if}
@@ -227,7 +263,21 @@
       </Button>
     {/if}
 
-    {#if !publicConfig.passwordLogin.enabled && !passkeyEnabled && !publicConfig.oauth.enabled}
+    {#if showDemoLogin}
+      <Button
+        shape="round"
+        size="large"
+        fullWidth
+        color="secondary"
+        loading={demoLoading}
+        disabled={demoLoading}
+        onclick={handleDemoLogin}
+      >
+        Try Demo
+      </Button>
+    {/if}
+
+    {#if showLoginDisabled}
       <Alert color="warning" title={$t('login_has_been_disabled')} />
     {/if}
   </Stack>

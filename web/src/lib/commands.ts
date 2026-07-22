@@ -74,7 +74,7 @@ export const getPagesProvider = ($t: MessageFormatter) => {
       icon: mdiWrench,
       onAction: () => goto(Route.systemMaintenance()),
     },
-  ].map((route) => ({ ...route, $if: () => authManager.authenticated && authManager.user.isAdmin }));
+  ].map((route) => ({ ...route, $if: () => authManager.canPreviewAdmin }));
 
   const userPages: ActionItem[] = [
     {

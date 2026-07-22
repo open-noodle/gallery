@@ -7,6 +7,8 @@
   import { Route } from '#lib/route.ts';
   import { getLibrariesActions } from '#lib/services/library.service.ts';
   import { CommandPaletteDefaultProvider, Container, Table, TableBody, TableHeader, TableHeading } from '@immich/ui';
+  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import type { Snippet } from 'svelte';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
@@ -25,12 +27,15 @@
   const libraries = $derived(query.data);
 
   const { Create, ScanAll } = $derived(getLibrariesActions($t));
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
+  const pageActions = $derived(isReadOnlyDemo ? [] : [ScanAll, Create]);
 </script>
 
 <CommandPaletteDefaultProvider name={$t('library')} actions={[Create, ScanAll]} />
 
-<AdminPageLayout breadcrumbs={[{ title: data.meta.title }]} actions={[ScanAll, Create]}>
+<AdminPageLayout breadcrumbs={[{ title: data.meta.title }]} actions={pageActions}>
   <Container size="large" center class="my-4">
+    <ReadOnlyDemoNotice />
     <div class="flex flex-col items-center gap-2" in:fade={{ duration: 500 }}>
       {#if libraries.length > 0}
         <Table striped size="small" spacing="small">
@@ -52,7 +57,7 @@
         <EmptyPlaceholder
           fullWidth
           text={$t('no_libraries_message')}
-          onClick={() => goto(Route.newLibrary())}
+          onClick={isReadOnlyDemo ? undefined : () => goto(Route.newLibrary())}
           class="mx-auto mt-10"
         />
       {/if}

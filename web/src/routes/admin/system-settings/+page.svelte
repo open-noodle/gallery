@@ -8,6 +8,8 @@
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getAdminConfigQuery } from '#lib/queries/config-admin.query.ts';
   import { getSystemConfigActions } from '#lib/services/system-config.service.ts';
+  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Alert, CommandPaletteDefaultProvider, Container } from '@immich/ui';
   import {
     mdiAccountOutline,
@@ -236,12 +238,15 @@
   let filteredSettings = $derived(settings.filter((setting) => adminSettingsSearch.matches(setting, searchQuery, $t)));
 
   const { CopyToClipboard, Upload, Download } = $derived(getSystemConfigActions($t, featureFlagsManager.value, config));
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
+  const pageActions = $derived(isReadOnlyDemo ? [CopyToClipboard, Download] : [CopyToClipboard, Download, Upload]);
 </script>
 
 <CommandPaletteDefaultProvider name={$t('admin.system_settings')} actions={[CopyToClipboard, Upload, Download]} />
 
-<AdminPageLayout breadcrumbs={[{ title: data.meta.title }]} actions={[CopyToClipboard, Download, Upload]}>
+<AdminPageLayout breadcrumbs={[{ title: data.meta.title }]} actions={pageActions}>
   <Container size="large" center>
+    <ReadOnlyDemoNotice />
     {#if featureFlagsManager.value.configFile}
       <Alert color="warning" class="my-4 text-dark" title={$t('admin.config_set_by_file')} />
     {/if}

@@ -7,6 +7,8 @@
   import { locale } from '#lib/stores/preferences.store.ts';
   import { getByteUnitString } from '#lib/utils/byte-units.ts';
   import type { UserAdminResponseDto } from '@immich/sdk';
+  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import {
     CommandPaletteDefaultProvider,
     Container,
@@ -37,10 +39,14 @@
   const users = $derived(query.data);
 
   const { Create } = $derived(getUserAdminsActions($t));
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
+  const pageActions = $derived(isReadOnlyDemo ? [] : [Create]);
 
   const getActionsForUser = (user: UserAdminResponseDto) => {
     const { Detail, Update, Delete, Restore, ResetPassword, ResetPinCode } = getUserAdminActions($t, user);
-    return [Detail, Update, ResetPassword, ResetPinCode, MenuItemType.Divider, Restore, Delete];
+    return isReadOnlyDemo
+      ? [Detail]
+      : [Detail, Update, ResetPassword, ResetPinCode, MenuItemType.Divider, Restore, Delete];
   };
 
   const classes = {
@@ -53,8 +59,9 @@
 
 <CommandPaletteDefaultProvider name={$t('users')} actions={[Create]} />
 
-<AdminPageLayout breadcrumbs={[{ title: data.meta.title }]} actions={[Create]}>
+<AdminPageLayout breadcrumbs={[{ title: data.meta.title }]} actions={pageActions}>
   <Container center size="large">
+    <ReadOnlyDemoNotice />
     <Table class="mt-4" striped spacing="small" size="small">
       <TableHeader>
         <TableHeading class={classes.column1}>{$t('name')}</TableHeading>

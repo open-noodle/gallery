@@ -24,6 +24,7 @@ const { mockUser } = vi.hoisted(() => ({
   // actually readable; admin-scoped tests override isAdmin explicitly.
   mockUser: {
     current: { id: 'test-user', isAdmin: false } as { id: string; isAdmin: boolean } | null,
+    isDemo: false,
   },
 }));
 vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
@@ -33,6 +34,9 @@ vi.mock('#lib/managers/auth-manager.svelte.js', () => ({
     },
     get user() {
       return mockUser.current;
+    },
+    get canPreviewAdmin() {
+      return !!mockUser.current && (mockUser.current.isAdmin || mockUser.isDemo);
     },
   },
 }));
@@ -171,6 +175,7 @@ describe('global-search root', () => {
     // predictable localStorage key. Tests that need admin-scoped navigation results
     // override `isAdmin` explicitly; anonymous-user edge cases flip to `null`.
     mockUser.current = { id: 'test-user', isAdmin: false };
+    mockUser.isDemo = false;
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
   });
 
@@ -1564,6 +1569,24 @@ describe('global-search root', () => {
     await render(GlobalSearch, { props: { manager: m } });
     // Live catalog says adminOnly=true, user is non-admin → entry must not render.
     expect(page.getByText('admin.classification_settings').query()).toBeNull();
+  });
+
+  it('render-time filter keeps admin navigate recents visible for demo preview users', () => {
+    mockUser.current = { id: 'demo-user', isAdmin: false };
+    mockUser.isDemo = true;
+    addEntry({
+      kind: 'navigate',
+      id: 'nav:systemSettings:classification',
+      route: '/admin/system-settings?isOpen=classification',
+      labelKey: 'admin.classification_settings',
+      icon: 'x',
+      adminOnly: true,
+      lastUsed: 1,
+    });
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    expect(screen.getByText('admin.classification_settings')).toBeInTheDocument();
   });
 
   // CG6: feature-flag-disabled navigate recents must also be hidden pre-click.

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { libraryTableClasses } from '#lib/constants.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getLibraryStatisticsQuery } from '#lib/queries/library.query.ts';
   import { getUserAdminQuery } from '#lib/queries/user-admin.query.ts';
@@ -28,7 +29,7 @@
 
   const actions = $derived.by(() => {
     const { Detail, Scan, Edit, Delete } = getLibraryActions($t, library);
-    return [Detail, Scan, Edit, MenuItemType.Divider, Delete];
+    return authManager.isReadOnlyDemo ? [Detail] : [Detail, Scan, Edit, MenuItemType.Divider, Delete];
   });
 </script>
 

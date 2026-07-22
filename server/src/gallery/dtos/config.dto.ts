@@ -317,7 +317,7 @@ export const galleryMachineLearningDefaults = {
     minRecognitionScore: 0.75,
   },
   petDetection: {
-    enabled: false,
+    enabled: true,
     modelName: 'rfdetr-nano',
     minScore: 0.3,
     // Half the video face budget: the pet queue runs one job at a time, and a pet stays in frame for longer than a
@@ -333,9 +333,9 @@ export const galleryMachineLearningDefaults = {
       minSightings: 2,
     },
   },
-  petRecognition: { enabled: false, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
+  petRecognition: { enabled: true, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
   spatialScene: {
-    enabled: false,
+    enabled: true,
     modelName: 'depth-anything-v2-small',
     offer: 'suitable' as const,
     minBoundarySharpness: 0.03,

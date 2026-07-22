@@ -3,6 +3,8 @@
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
   import { queueManager } from '#lib/managers/queue-manager.svelte.ts';
   import { getQueuesActions } from '#lib/services/queue.service.ts';
+  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { type QueueResponseDto } from '@immich/sdk';
   import { CommandPaletteDefaultProvider, Container, type ActionItem } from '@immich/ui';
   import { onMount } from 'svelte';
@@ -21,7 +23,9 @@
   let queues = $derived<QueueResponseDto[]>(queueManager.queues);
 
   const { ResumePaused, CreateJob, ManageConcurrency } = $derived(getQueuesActions($t, queueManager.queues));
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
   const commands: ActionItem[] = $derived([CreateJob, ManageConcurrency]);
+  const pageActions = $derived(isReadOnlyDemo ? [ManageConcurrency] : [ResumePaused, CreateJob, ManageConcurrency]);
 
   const onQueueUpdate = (update: QueueResponseDto) => {
     queues = queues.map((queue) => {
@@ -37,8 +41,9 @@
 
 <OnEvents {onQueueUpdate} />
 
-<AdminPageLayout breadcrumbs={[{ title: data.meta.title }]} actions={[ResumePaused, CreateJob, ManageConcurrency]}>
+<AdminPageLayout breadcrumbs={[{ title: data.meta.title }]} actions={pageActions}>
   <Container size="medium" center>
+    <ReadOnlyDemoNotice />
     {#if queues}
       <JobsPanel {queues} />
     {/if}
