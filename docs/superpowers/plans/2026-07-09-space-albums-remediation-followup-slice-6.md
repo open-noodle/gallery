@@ -23,8 +23,8 @@ simpler ones are green).
 
 ### Fix L1 — `contributorCounts` PII + hidden-count leak
 
-**Files:** `server/src/services/album.service.ts` (`get`, ~`:154`), `server/src/repositories/album.repository.ts` (`getContributorCounts`, `:575`)
-**Verified:** `get` already computes `isShared` (~`:103`) and `hasDirectAccess` (~`:111`); today
+**Files:** `server/src/services/album.service.ts` (`get`, ~~`:154`), `server/src/repositories/album.repository.ts` (`getContributorCounts`, `:575`)
+**Verified:** `get` already computes `isShared` (~~`:103`) and `hasDirectAccess` (~`:111`); today
 `contributorCounts: isShared ? await getContributorCounts(id) : undefined` (with an in-code comment
 admitting the leak). `getContributorCounts` filters `deletedAt` only (no visibility).
 

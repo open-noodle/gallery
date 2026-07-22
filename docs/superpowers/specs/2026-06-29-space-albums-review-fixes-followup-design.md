@@ -61,9 +61,9 @@ times. The album feature added the album branch to the _asset_ surfaces (access 
 counts — all in #726) but never to the _people_ projection's read surfaces. The result is two sources
 of truth that disagree:
 
-- **Projection write/grid INCLUDE album faces.** `recountPersons` (~`:2104`) recomputes
+- **Projection write/grid INCLUDE album faces.** `recountPersons` (~~`:2104`) recomputes
   `shared_space_person.assetCount` / `faceCount` from `shared_space_person_face` with **no path
-  scoping**, and `getPersonAssetIds` → `getSpacePersonAssets` (~`:1599–1670`) reads the projection
+  scoping**, and `getPersonAssetIds` → `getSpacePersonAssets` (~~`:1599–1670`) reads the projection
   directly. So an album-only person shows in the list with a thumbnail and `assetCount > 0`, and the
   asset grid shows the album photos.
 - **Read / statistics / face-listing EXCLUDE album faces.** Each of the following re-derives
@@ -125,8 +125,8 @@ behavior to a direct/library-sourced person.
 
 #### F2 — Owner-account HARD delete bypasses space face cleanup → stranded faces + orphan persons — **MEDIUM**
 
-`handleUserDelete` (`server/src/services/user.service.ts` ~`:274`) hard-deletes the user's albums via
-`albumRepository.deleteAll(user.id)` (~`:326`, `album.repository.ts:373` = `deleteFrom('album')`),
+`handleUserDelete` (`server/src/services/user.service.ts` ~~`:274`) hard-deletes the user's albums via
+`albumRepository.deleteAll(user.id)` (~~`:326`, `album.repository.ts:373` = `deleteFrom('album')`),
 which **emits no event** — and `shared-space.service` has no `UserDelete` handler (its only `@OnEvent`
 handlers are `AlbumAssetsAdd`, `AlbumDelete`, `AlbumAssetsRemove`). So when a user who owns an album
 linked into someone else's face-enabled space is hard-deleted:
@@ -163,7 +163,7 @@ pipeline:
   hard delete), so existing `shared_space_person_face` rows persist → the album's faces keep appearing
   as space people, and `getSpacePersonThumbnail` keeps serving a crop of the now-hidden assets.
 - **The two face-pipeline gates omit the `album.deletedAt IS NULL` filter** that every A1-fixed query
-  has: `isAssetInSpace` (~`:2298`, album branch ~`:2321`) and `getSpaceIdsForAsset` (~`:2458`, album
+  has: `isAssetInSpace` (~`:2298`, album branch ~~`:2321`) and `getSpaceIdsForAsset` (~~`:2458`, album
   branch ~`:2476`). So during the soft-delete window a late-detected face on a trashed-album asset is
   still **queued** (`getSpaceIdsForAsset`) and still **added** (`isAssetInSpace`).
 
@@ -191,9 +191,9 @@ path in the same space (face retained), hard-delete-after-soft (F2 path), multi-
 
 #### F4 — Metadata inheritance omits the album-adder branch — **LOW**
 
-`getSpacePersonAssetAdderIds` (~`:1494`) collects asset-adder user ids from
+`getSpacePersonAssetAdderIds` (~~`:1494`) collects asset-adder user ids from
 `shared_space_asset.addedById` + `shared_space_library.addedById` but has **no
-`shared_space_album.addedById` branch** — unlike its sibling `getSpaceAssetAdder` (~`:1530`), which
+`shared_space_album.addedById` branch** — unlike its sibling `getSpaceAssetAdder` (~~`:1530`), which
 _does_ include album. So an album-sourced space person doesn't treat the album-linker as an asset
 adder, weakening name/birth-date inheritance for album-only people.
 
@@ -230,12 +230,12 @@ implemented** — see [Product decisions](#product-decisions-noted-not-implement
 
 In `server/src/repositories/sync.repository.ts`, the album-asset/exif sync streams gate on the
 `shared_space_album_user` **grant only** and never exclude soft-deleted albums:
-`SharedSpaceAlbumAssetSync.getBackfill/getUpdates/getCreates` (~`:1508/:1527/:1549`),
-`SharedSpaceAlbumAssetExifSync.getBackfill/getUpdates/getCreates` (~`:1574/:1585/:1598`),
-`SharedSpaceAlbumToAssetSync.getUpserts` (~`:1489`), and `SharedSpaceAlbumSync.getCreatedAfter`
-(~`:1367`). The grant is **not** revoked on soft-delete (soft-delete is an `UPDATE`, no trigger
-fires). Meanwhile `SharedSpaceAlbumSync.getUpserts` (~`:1396`) and
-`SharedSpaceAlbumToAssetSync.getDeletes` (~`:1480`) **do** exclude soft-deleted albums via
+`SharedSpaceAlbumAssetSync.getBackfill/getUpdates/getCreates` (~~`:1508/:1527/:1549`),
+`SharedSpaceAlbumAssetExifSync.getBackfill/getUpdates/getCreates` (~~`:1574/:1585/:1598`),
+`SharedSpaceAlbumToAssetSync.getUpserts` (~~`:1489`), and `SharedSpaceAlbumSync.getCreatedAfter`
+(~~`:1367`). The grant is **not** revoked on soft-delete (soft-delete is an `UPDATE`, no trigger
+fires). Meanwhile `SharedSpaceAlbumSync.getUpserts` (~~`:1396`) and
+`SharedSpaceAlbumToAssetSync.getDeletes` (~~`:1480`) **do** exclude soft-deleted albums via
 `accessibleSpaceAlbums` (~`:1112`, which joins `album` and filters `album.deletedAt IS NULL`).
 
 **Why it's not a security hole.** Only users who already had legitimate access (past/current members
