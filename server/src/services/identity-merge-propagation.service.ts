@@ -709,9 +709,10 @@ export class IdentityMergePropagationService {
       affectedSpaceIds: sortedAffectedSpaceIds,
       followUpJobs: [
         { name: JobName.SharedSpacePersonMetadataBackfill, data: { identityId: targetIdentityId } },
-        ...sortedAffectedSpaceIds.map(
-          (spaceId): MergePropagationFollowUpJob => ({ name: JobName.SharedSpacePersonDedup, data: { spaceId } }),
-        ),
+        ...sortedAffectedSpaceIds.map((spaceId): MergePropagationFollowUpJob => ({
+          name: JobName.SharedSpacePersonDedup,
+          data: { spaceId },
+        })),
       ],
       activityEvents: [],
     };
