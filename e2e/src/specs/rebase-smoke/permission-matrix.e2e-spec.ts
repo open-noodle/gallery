@@ -164,11 +164,15 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     // SvelteKit returns 200 for the shell and renders the error page client-side when the
     // page load throws. The fork's service returns 403 "Not a member of this space", which
     // surfaces in the error page body as "HTTP 403" plus the message text.
-    const blockedText = await page
-      .locator('text=/access denied|not found|no access|not a member|http 403/i')
-      .first()
-      .isVisible()
-      .catch(() => false);
+    let blockedText = false;
+    try {
+      blockedText = await page
+        .locator('text=/access denied|not found|no access|not a member|http 403/i')
+        .first()
+        .isVisible();
+    } catch {
+      // locator resolution can race with the client-side error render
+    }
     expect(is403 || redirectedAway || blockedText).toBeTruthy();
   });
 
