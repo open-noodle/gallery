@@ -511,9 +511,23 @@ jobs:
 
           upstream_version=$(jq -r '.upstream.version' branding/config.json)
 
-          # Find the most recent previous release for the APK link. We just
-          # pushed $VERSION, so skip it in the sorted list.
-          prev_tag=$(git tag --list 'v*.*.*' --sort=-version:refname | grep -Fvx "$VERSION" | head -n1)
+          # Find the most recent previous release to diff against. We just pushed
+          # $VERSION, so skip it in the sorted list.
+          #
+          # Prereleases MUST be excluded. Two reasons, and both bite:
+          #   1. `--sort=version:refname` has no idea `-rc.0` means "earlier"
+          #      unless `versionsort.suffix` is configured, so it sorts
+          #      `v5.2.0-rc.0` ABOVE `v5.2.0` and the RC wins `head -n1`.
+          #   2. Even sorted correctly, an RC is not a shipped release — the
+          #      `shipped` subtraction below would treat everything already in
+          #      the RC as "announced in the previous release" and silently drop
+          #      it from these notes.
+          # v5.2.0 shipped with 6 of its 18 commits listed because of this.
+          prev_tag=$(git tag --list 'v*.*.*' --sort=-version:refname \
+            | grep -Ev -- '-(rc|alpha|beta)' \
+            | grep -Fvx "$VERSION" \
+            | head -n1)
+          echo "Previous release: ${prev_tag:-<none>}"
 
           notes="Based on [Immich v${upstream_version}](https://github.com/immich-app/immich/releases/tag/v${upstream_version})"
 
@@ -561,6 +575,30 @@ jobs:
 
             highlights=$(echo "$gallery_all" | grep -E '^(feat|fix|perf)' | sed 's/^/- /' || true)
             other=$(echo "$gallery_all" | grep -vE '^(feat|fix|perf)' | sed 's/^/- /' || true)
+
+            # Guardrail. The counts legitimately differ from the raw range (an
+            # upstream rebase makes `shipped` drop commits that already shipped;
+            # reverts cancel out), so this can't assert equality — but listing
+            # NOTHING for a non-empty range is always a bug, and that is exactly
+            # how the v5.2.0 notes failed. Make the arithmetic visible in the run
+            # summary so a partial drop is noticeable, and hard-fail on a total
+            # drop rather than publishing empty notes.
+            raw_count=$(git rev-list --count --no-merges "${prev_tag}..${SHA}")
+            listed_count=$(echo "$gallery_all" | grep -c . || true)
+            {
+              echo "### Release notes"
+              echo ""
+              echo "| | |"
+              echo "|---|---|"
+              echo "| Previous release | \`${prev_tag}\` |"
+              echo "| Commits in \`${prev_tag}..${VERSION}\` | ${raw_count} |"
+              echo "| Gallery entries listed | ${listed_count} |"
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            if [[ "$raw_count" -gt 0 && "$listed_count" -eq 0 ]]; then
+              echo "::error::Release notes would list 0 Gallery changes for ${raw_count} commits in ${prev_tag}..${SHA}. Refusing to publish empty notes." >&2
+              exit 1
+            fi
 
             # Gallery's own changes lead; upstream's go in a collapsed section.
             if [[ -n "$highlights" ]]; then
