@@ -22,7 +22,7 @@ export const authenticate = async (url: URL, options?: AuthOptions) => {
     redirect(307, Route.login({ continue: url.pathname + url.search }));
   }
 
-  if (adminRoute && !authManager.user.isAdmin) {
+  if (adminRoute && !authManager.canPreviewAdmin) {
     redirect(307, Route.photos());
   }
 };

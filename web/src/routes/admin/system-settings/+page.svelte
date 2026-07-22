@@ -21,9 +21,11 @@
   import TrashSettings from './TrashSettings.svelte';
   import UserSettings from './UserSettings.svelte';
   import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
+  import ReadOnlyDemoNotice from '$lib/components/admin/ReadOnlyDemoNotice.svelte';
   import SettingAccordion from '$lib/components/shared-components/settings/SettingAccordion.svelte';
   import SearchBar from '$lib/elements/SearchBar.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { systemConfigManager } from '$lib/managers/system-config-manager.svelte';
   import { getSystemConfigActions } from '$lib/services/system-config.service';
   import { Alert, CommandPaletteDefaultProvider, Container } from '@immich/ui';
@@ -238,12 +240,15 @@
   const { CopyToClipboard, Upload, Download } = $derived(
     getSystemConfigActions($t, featureFlagsManager.value, systemConfigManager.value),
   );
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
+  const pageActions = $derived(isReadOnlyDemo ? [CopyToClipboard, Download] : [CopyToClipboard, Download, Upload]);
 </script>
 
 <CommandPaletteDefaultProvider name={$t('admin.system_settings')} actions={[CopyToClipboard, Upload, Download]} />
 
-<AdminPageLayout breadcrumbs={[{ title: data.meta.title }]} actions={[CopyToClipboard, Download, Upload]}>
+<AdminPageLayout breadcrumbs={[{ title: data.meta.title }]} actions={pageActions}>
   <Container size="large" center>
+    <ReadOnlyDemoNotice />
     {#if featureFlagsManager.value.configFile}
       <Alert color="warning" class="my-4 text-dark" title={$t('admin.config_set_by_file')} />
     {/if}

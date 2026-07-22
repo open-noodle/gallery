@@ -113,6 +113,8 @@ const ServerMediaTypesResponseSchema = z
 
 const ServerConfigSchema = z
   .object({
+    demoMode: z.boolean(),
+    demoAutoLogin: z.boolean().describe('Whether demo auto-login is enabled'),
     oauthButtonText: z.string().describe('OAuth button text'),
     oauthAccountManagementUrl: z.string().describe('OAuth account management URL').optional().default(''),
     loginPageMessage: z.string().describe('Login page message'),
