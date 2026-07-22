@@ -4,6 +4,7 @@
   import MaintenanceBackupEntry from '#lib/components/maintenance/MaintenanceBackupEntry.svelte';
   import { getDatabaseBackupDateTime, handleUploadDatabaseBackup } from '#lib/services/database-backups.service.ts';
   import { listDatabaseBackups, type DatabaseBackupDto } from '@immich/sdk';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { Card, CardBody, HStack, Icon, ProgressBar, Stack, Text } from '@immich/ui';
   import { mdiCalendar, mdiTrayArrowUp } from '@mdi/js';
   import { DateTime } from 'luxon';
@@ -18,6 +19,8 @@
   let props: Props = $props();
 
   let backups = $state(props.backups ?? []);
+
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
 
   async function reloadBackups() {
     const result = await listDatabaseBackups();
@@ -86,32 +89,34 @@
 <OnEvents {onBackupDeleted} {onBackupUpload} />
 
 <Stack gap={4} class="mt-4 text-left">
-  <Card color="info">
-    <CardBody>
-      {#if uploadProgress === -1}
-        <div class="flex items-center justify-between">
-          <div class="flex w-max items-end gap-2">
-            <Icon icon={mdiTrayArrowUp} size="20" class="text-muted"></Icon>
-            <Text class="grow">{$t('admin.maintenance_upload_backup')}</Text>
+  {#if !isReadOnlyDemo}
+    <Card color="info">
+      <CardBody>
+        {#if uploadProgress === -1}
+          <div class="flex items-center justify-between">
+            <div class="flex w-max items-end gap-2">
+              <Icon icon={mdiTrayArrowUp} size="20" class="text-muted"></Icon>
+              <Text class="grow">{$t('admin.maintenance_upload_backup')}</Text>
+            </div>
+            <HeaderActionButton
+              action={{
+                color: 'primary',
+                title: $t('select_from_computer'),
+                onAction: handleUploadDatabaseBackup,
+              }}
+            />
           </div>
-          <HeaderActionButton
-            action={{
-              color: 'primary',
-              title: $t('select_from_computer'),
-              onAction: handleUploadDatabaseBackup,
-            }}
-          />
-        </div>
-      {:else}
-        <HStack gap={8}>
-          <Text class="grow">{$t('asset_uploading')}</Text>
-          <ProgressBar progress={uploadProgress} size="tiny" />
-        </HStack>
-      {/if}
-    </CardBody>
-  </Card>
+        {:else}
+          <HStack gap={8}>
+            <Text class="grow">{$t('asset_uploading')}</Text>
+            <ProgressBar progress={uploadProgress} size="tiny" />
+          </HStack>
+        {/if}
+      </CardBody>
+    </Card>
 
-  <hr />
+    <hr />
+  {/if}
 
   {#each [...groupedBackups] as [dateGroup, groupBackups] (dateGroup)}
     <Stack gap={2}>

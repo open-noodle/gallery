@@ -1,6 +1,7 @@
 <script lang="ts">
   import OnEvents from '#lib/components/OnEvents.svelte';
   import { getIntegrityReportItemActions } from '#lib/services/integrity.service.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import type { IntegrityReport } from '@immich/sdk';
   import { ContextMenuButton, TableCell, TableRow } from '@immich/ui';
   import { t } from 'svelte-i18n';
@@ -13,6 +14,8 @@
 
   let { id, path, reportType }: Props = $props();
   let deleting = $state(false);
+
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
 
   const { Download, Delete } = $derived(getIntegrityReportItemActions($t, id, reportType));
 
@@ -36,6 +39,8 @@
 <TableRow>
   <TableCell class="w-7/8 px-4 text-left">{path}</TableCell>
   <TableCell class="flex w-1/8 justify-end">
-    <ContextMenuButton disabled={deleting} position="top-right" aria-label={$t('open')} items={[Download, Delete]} />
+    {#if !isReadOnlyDemo}
+      <ContextMenuButton disabled={deleting} position="top-right" aria-label={$t('open')} items={[Download, Delete]} />
+    {/if}
   </TableCell>
 </TableRow>
