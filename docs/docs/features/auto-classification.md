@@ -10,6 +10,46 @@ Gallery can automatically tag and optionally archive photos based on their visua
 - **Nature/Pets** — Auto-tag outdoor scenes or pet photos
 - **Sensitive content** — Auto-archive content you don't want visible on the timeline
 
+## Choosing a CLIP model
+
+**Model choice is the single biggest factor in classification quality.** Before spending time tuning prompts, make sure you are on a model that can actually resolve the concepts you are describing.
+
+Classification does not have its own model setting — it reuses the **Smart Search** CLIP model configured at `Administration > Settings > Machine Learning Settings > Smart Search`. Changing it affects search and classification together.
+
+The default, `ViT-B-32__openai`, is among the smallest and fastest options, but it also sits **near the bottom of the quality range** (69.9% recall on the English benchmark — roughly 16 points behind the best model available). It is fine for casual search, but it frequently cannot separate "a scanned document" from "a photo of a book", which is why classification with default settings often tags very little or nothing at all.
+
+### Recommended models
+
+| Hardware                                  | Model                              | Memory (MiB) | Time (ms) | Recall (%) |
+| ----------------------------------------- | ---------------------------------- | ------------ | --------- | ---------- |
+| **Beefy (GPU, or lots of RAM and time)**  | `ViT-SO400M-16-SigLIP2-384__webli` | 3854         | 56.57     | **85.99**  |
+| Nearly as good, roughly half the compute  | `ViT-SO400M-16-SigLIP2-256__webli` | 3611         | 27.84     | 85.62      |
+| Balanced — near-top quality, 10× faster   | `ViT-B-16-SigLIP2__webli`          | 3038         | 5.81      | 84.86      |
+| Low memory (~1 GiB)                       | `ViT-B-16-SigLIP-384__webli`       | 1128         | 13.53     | 83.19      |
+| _Gallery default — weak for this feature_ | `ViT-B-32__openai`                 | 1004         | 2.26      | 69.9       |
+
+:::tip Best results
+If your machine can afford it, use **`ViT-SO400M-16-SigLIP2-384__webli`**. It is the highest-scoring model in Gallery's English benchmark and is Pareto-optimal — no other model beats it on quality without costing more memory or time. The memory figure in the table above is peak RSS for the model alone; one user running it on a real library [reported around 4.6 GB](https://github.com/open-noodle/gallery/discussions/795) once image decoding and concurrency are included, so budget above the table value. A GPU is strongly recommended for large libraries — a CPU-only pass is roughly 10× slower than `ViT-B-16-SigLIP2__webli`.
+:::
+
+Note that the SigLIP2 models above all sit in the same ~3–4 GiB memory band — the real tradeoff between them is **inference time**, not memory. If RAM is your constraint rather than CPU, drop to a `ViT-B-16-SigLIP*` model instead of a smaller SO400M variant.
+
+The numbers above are for **English** search. If your prompts are in another language, check the per-language tables and the multilingual model guidance in [Searching > CLIP models](/features/searching#clip-models), which also documents how these figures were measured.
+
+### Switching models
+
+Because classification compares an asset's stored Smart Search embedding against your prompt embeddings, both must come from the **same** model. After changing the model you must re-encode your library, or every comparison is meaningless:
+
+1. Change the model in [Smart Search settings][smart-search-settings] and save
+2. Go to the [Job Status page][job-status-page] and click **All** next to **Smart Search**
+3. Wait for Smart Search to finish — assets without an embedding are skipped by classification entirely
+4. Go to **Administration** > **Settings** > **Classification** and click **Scan All Libraries**
+5. Re-tune your similarity thresholds (see below)
+
+:::warning Similarity thresholds are model-specific
+Cosine similarity values are **not comparable across models**. The 0.28 default was chosen for the default model; a SigLIP2 model will produce a different range entirely. After switching models, expect to re-tune every category — if a model change results in nothing being tagged, a too-high threshold is the most likely cause, not a broken setup.
+:::
+
 ## Configuration
 
 Classification categories are managed through Gallery's system configuration. There are three ways to configure them:
@@ -93,6 +133,83 @@ Prompts describe the visual content of photos you want to match. Write them as i
 
 More prompts covering different angles and variations of the same concept improve recall without hurting precision.
 
+Negative-sounding prompts ("no people, no faces, no landscapes") are a commonly used trick, but be aware of what they actually do: CLIP has no notion of negation, so such a prompt is simply another vector that an asset can match against. In practice they work as _contrastive_ prompts — they tend to pull the category's best-match score toward text-heavy, non-photographic images — but they do not exclude anything. For genuine exclusion, use [Face exclusion](#face-exclusion) instead.
+
+### A real-world example
+
+The configuration below comes from a Gallery user running auto-classification over a large personal library ([discussion #795](https://github.com/open-noodle/gallery/discussions/795)). It is a useful starting point because it shows realistic prompt density and per-category similarity values rather than one-line examples.
+
+Treat the thresholds as a starting point, not a target — they were tuned for that user's model and library. See [Choosing a CLIP model](#choosing-a-clip-model) and the [similarity threshold](#similarity-threshold) notes above.
+
+<details>
+<summary>Full example configuration (YAML)</summary>
+
+```yaml
+classification:
+  enabled: true
+  categories:
+    - action: tag_and_archive
+      enabled: true
+      name: Documents
+      prompts:
+        - A photo of a document, paper sheet with printed text, scanned page, flat layout, high text density
+        - An image primarily showing a document, such as a report, form, or printed page, minimal background, text-focused
+        - Scanned or photographed document inside an image, including receipts, letters, or pages with structured text
+        - 'no people, no faces, no landscapes, no animals, no buildings, no natural scenery'
+        - 'not a photo of objects, food, products, or everyday scenes, avoid cluttered backgrounds and non-text-focused images'
+        - 'no artwork, paintings, illustrations, memes, or graphics with minimal text'
+        - 'exclude screenshots of videos, games, or UI with dominant visual elements instead of text'
+        - 'no handwriting-only images without structured layout, no blank pages, no low-text or decorative content'
+      similarity: 0.28
+    - action: tag_and_archive
+      enabled: true
+      name: Screenshots
+      prompts:
+        - 'a screenshot of a phone, computer, or application interface'
+        - 'UI elements, menus, buttons, chat interface, or software screen'
+        - 'screen capture with sharp digital text and interface layout'
+        - 'no facetime calls'
+        - 'no long videos with absolutely no text'
+        - 'no real-world camera photos'
+        - 'no memes with large caption text unless clearly UI-based'
+        - 'no natural scenes or physical objects'
+      similarity: 0.29
+    - action: tag_and_archive
+      enabled: true
+      name: Receipts and barcodes
+      prompts:
+        - A photo of a receipt, often showing itemized purchases, prices, and store information.
+        - A photo of a barcode or QR code, typically found on products, tickets, or packaging.
+      similarity: 0.28
+    - action: tag_and_archive
+      enabled: true
+      name: Memes
+      prompts:
+        - 'a meme image with overlaid text, captions, or jokes'
+        - 'viral image, reaction meme, edited photo with text'
+        - 'image with large text at top or bottom in meme format'
+        - 'screenshot of a social media post, tweet, or online content'
+        - 'frame from a video with subtitles or captions'
+        - 'video screenshot with text overlay, subtitles, or closed captions'
+        - 'vertical video frame typical of tiktok, reels, or shorts'
+        - 'image with video player UI elements such as progress bar, play button, or timestamps'
+        - 'image with watermarks, logos, or platform branding'
+        - 'not a clean photograph, not a document, not a plain image'
+        - 'no natural unedited photos, no camera-only images without overlays'
+      similarity: 0.24
+    - action: tag_and_archive
+      enabled: true
+      name: NSFW
+      prompts:
+        - A photo containing nudity, sexual content, or adult themes that may be inappropriate for all audiences.
+        - An explicit image depicting sexual acts, nudity, or adult content that is not suitable for minors.
+      similarity: 0.28
+```
+
+</details>
+
+This example predates the **Face exclusion** setting, so every category runs with `faceExclusion: off`. Categories like `Documents`, `Screenshots` and `Receipts and barcodes` are good candidates for `faceExclusion: named_people`, which stops them from swallowing genuine photos of people who happen to be holding a menu or standing in front of a sign.
+
 ### Similarity Threshold
 
 The similarity slider controls how closely a photo must match your prompts:
@@ -143,6 +260,27 @@ curl -X POST -H "Authorization: Bearer $TOKEN" http://localhost:2283/api/classif
 ```
 
 This queues all assets across all users for classification. It's additive — existing tags are kept, and new matches get tagged.
+
+## Troubleshooting
+
+### Nothing is being tagged
+
+This is the most common complaint, and it is almost always tuning rather than a broken install. Work through these in order:
+
+1. **Check your similarity threshold first.** This is the usual culprit. Lower the value (e.g. 0.28 → 0.22) and rescan. Lower matches more; higher matches less. If a category matches nothing at all, its threshold is too high for your model.
+2. **Check your model.** The default `ViT-B-32__openai` is weak at this task. See [Choosing a CLIP model](#choosing-a-clip-model).
+3. **Confirm Smart Search has finished.** Classification only runs on assets that already have a Smart Search embedding — assets still queued for Smart Search are skipped silently. Check the [Job Status page][job-status-page].
+4. **If you recently changed the CLIP model**, re-run Smart Search on **All** before rescanning classification, then re-tune thresholds. See [Switching models](#switching-models).
+5. **Confirm the category and the global toggle are both enabled**, and that `classification.enabled` is `true`.
+6. **Check Face exclusion.** A category set to `named_people` skips any asset containing a named person, which can be far more of your library than you expect.
+
+There is no universally correct threshold. Prompts and thresholds that work well on one library can tag nothing on another, because resolution, image quality and subject matter all shift the similarity distribution. Expect to iterate: change one category's threshold, rescan, inspect the `Auto/{name}` tag, repeat.
+
+### Too many false positives
+
+Raise the similarity threshold in small steps (0.02–0.03), and prefer adding more specific prompts over broad ones. For categories that should never match photos of people, set **Face exclusion** to `named_people` or `named_visible_people`.
+
+Note that raising a threshold **removes** existing auto-tags for that category and unarchives the affected assets — see the warning under [Behavior on Config Changes](#behavior-on-config-changes).
 
 ## Job Concurrency
 
@@ -265,3 +403,6 @@ The snapshot is the bridge between the two paths. Both paths write it after runn
 - **Global kill switch** — `classification.enabled: false` short-circuits both the queue-all job and individual classify jobs without processing any assets
 - **Duplicate name validation** — Category names must be unique (enforced by DTO validation)
 - **Error resilience** — If the ML service is down, individual classify jobs fail and are retried by BullMQ. Failed encodes are not cached, so the next attempt re-tries the ML call.
+
+[smart-search-settings]: https://my.immich.app/admin/system-settings?isOpen=machine-learning+smart-search
+[job-status-page]: https://my.immich.app/admin/queues
