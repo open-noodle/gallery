@@ -183,8 +183,8 @@ Both album branches `innerJoin('album_asset', …)` directly without joining `al
 
 **Files:**
 
-- Modify: `server/src/services/user.service.ts` — `handleUserDelete` (~`:274`), **before**
-  `albumRepository.deleteAll(user.id)` (~`:326`).
+- Modify: `server/src/services/user.service.ts` — `handleUserDelete` (~~`:274`), **before**
+  `albumRepository.deleteAll(user.id)` (~~`:326`).
 - Possibly add: a `albumRepository` query to enumerate a user's album ids (if none exists, reuse the
   owner predicate `isAlbumOwned`).
 - Test: `server/test/medium/specs/services/shared-space-album.service.spec.ts` (extend);
@@ -232,7 +232,7 @@ albumId })` (awaited in-process), or directly `sharedSpaceRepository.getSpacesLi
 **Files:**
 
 - Modify: `server/src/services/user-admin.service.ts` — `delete()` soft-delete path (~`:98–117`,
-  `softDeleteAll(id)` ~`:105`) and `restore()` (~`:119–125`, `restoreAll(id)` ~`:121`).
+  `softDeleteAll(id)` ~~`:105`) and `restore()` (~~`:119–125`, `restoreAll(id)` ~`:121`).
 - Modify: `server/src/services/shared-space.service.ts` — add the cleanup + re-projection entry
   points (reuse `onAlbumDelete`'s sequence; for restore, re-queue face matching per linking
   face-enabled space).
@@ -364,9 +364,9 @@ needs the set of affected spaces (`getSpaceIdsForAsset`) and affected person ids
 **Files:**
 
 - Modify: `server/src/repositories/sync.repository.ts` — `SharedSpaceAlbumAssetSync.getBackfill`
-  (~`:1508`), `getUpdates` (~`:1527`), `getCreates` (~`:1549`); `SharedSpaceAlbumAssetExifSync`
-  backfill/updates/creates (~`:1574/:1585/:1598`); `SharedSpaceAlbumToAssetSync.getUpserts` (~`:1489`);
-  `SharedSpaceAlbumSync.getCreatedAfter` (~`:1367`).
+  (~~`:1508`), `getUpdates` (~~`:1527`), `getCreates` (~~`:1549`); `SharedSpaceAlbumAssetExifSync`
+  backfill/updates/creates (~~`:1574/:1585/:1598`); `SharedSpaceAlbumToAssetSync.getUpserts` (~~`:1489`);
+  `SharedSpaceAlbumSync.getCreatedAfter` (~~`:1367`).
 - Test: `server/test/medium/specs/sync/shared-space-album-asset-sync.spec.ts`,
   `…-album-asset-exif-sync.spec.ts`, `…-album-to-asset-sync.spec.ts`,
   `shared-space-album-sync.spec.ts` (extend — the metadata stream's soft-delete test at ~`:103/:176`
@@ -444,8 +444,8 @@ user_has_album_path(...)` with the corrected body.
 
 **Files:**
 
-- Modify: `server/src/controllers/shared-space.controller.ts` — `linkAlbum` (~`:609`),
-  `updateSharedSpaceAlbum` (~`:623`), `unlinkAlbum` (~`:637`).
+- Modify: `server/src/controllers/shared-space.controller.ts` — `linkAlbum` (~~`:609`),
+  `updateSharedSpaceAlbum` (~~`:623`), `unlinkAlbum` (~`:637`).
 - Add: a zod param DTO in `server/src/dtos/shared-space.dto.ts` (e.g.
   `SharedSpaceAlbumParamDto = z.object({ id: z.uuidv4(), albumId: z.uuidv4() })`) mirroring
   `UUIDParamDto` (`validation.ts:112`).
@@ -576,8 +576,8 @@ space name from the space-metadata source.
 
 **Files:**
 
-- Modify: `mobile/lib/presentation/widgets/spaces/space_albums_shelf.widget.dart` (~`:168-222`, icon
-  `:198`), `mobile/lib/pages/library/spaces/space_albums.page.dart` (~`:154-247`, icon `:176`),
+- Modify: `mobile/lib/presentation/widgets/spaces/space_albums_shelf.widget.dart` (~~`:168-222`, icon
+  `:198`), `mobile/lib/pages/library/spaces/space_albums.page.dart` (~~`:154-247`, icon `:176`),
   `mobile/lib/pages/library/spaces/space_link_album.page.dart` (`_AlbumCover` ~`:202-219`, icon
   `:217`).
 - Reuse: `mobile/lib/presentation/widgets/album/album_tile.dart:20,36-64`
