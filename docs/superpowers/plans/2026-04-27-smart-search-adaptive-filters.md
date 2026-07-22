@@ -864,15 +864,7 @@ Add types near `SmartSearchOptions` and `FilterSuggestionsResult`:
 
 ```ts
 type SmartFacetExclude =
-  | 'time'
-  | 'people'
-  | 'location'
-  | 'city'
-  | 'camera'
-  | 'cameraModel'
-  | 'tags'
-  | 'rating'
-  | 'media';
+  'time' | 'people' | 'location' | 'city' | 'camera' | 'cameraModel' | 'tags' | 'rating' | 'media';
 
 export type SmartSearchFacetsOptions = Omit<SmartSearchOptions, 'orderDirection'>;
 
