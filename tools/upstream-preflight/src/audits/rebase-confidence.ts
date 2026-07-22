@@ -10,12 +10,7 @@ import type {
 } from '../types';
 
 export type ConfidenceSurface =
-  | 'branding'
-  | 'docker'
-  | 'ml'
-  | 'mobile'
-  | 'ownership'
-  | 'release';
+  'branding' | 'docker' | 'ml' | 'mobile' | 'ownership' | 'release';
 
 export type ConfidenceSurfaceMatch = {
   surface: ConfidenceSurface;
