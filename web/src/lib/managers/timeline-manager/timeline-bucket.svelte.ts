@@ -23,7 +23,7 @@ export function getTimeBucketSizeForGrouping(grouping: TimelineGrouping): TimeBu
 }
 
 function getMonthBucket(timeBucket: string) {
-  const [year, month] = timeBucket.split('-');
+  const [year, month] = timeBucket.split('-', 2);
   return `${year}-${month}-01`;
 }
 

@@ -144,9 +144,9 @@ describe('buildRecentlyAddedTimelineOptions', () => {
 
     const blank = buildRecentlyAddedTimelineOptions({
       ...createFilterState(),
-      description: '   ',
-      originalFileName: '   ',
-      ocr: '   ',
+      description: ' '.repeat(3),
+      originalFileName: ' '.repeat(3),
+      ocr: ' '.repeat(3),
     });
     expect(blank).not.toHaveProperty('description');
     expect(blank).not.toHaveProperty('originalFileName');
