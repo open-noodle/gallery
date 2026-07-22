@@ -124,8 +124,11 @@ void main() {
     final albumService = _MockRemoteAlbumService();
     // watchAlbum: return a stream that emits the album then closes.
     when(() => albumService.watchAlbum(any())).thenAnswer((_) => Stream.value(album));
-    // getDateRange: return a future that never resolves — keeps the date row empty (no crash).
-    when(() => albumService.getDateRange(any())).thenAnswer((_) async => (DateTime(2026, 1, 1), DateTime(2026, 6, 1)));
+    // watchDateRange: emit one range then close. Upstream #29008 turned this from a
+    // Future (getDateRange) into a Stream, so the stub has to emit rather than resolve.
+    when(
+      () => albumService.watchDateRange(any()),
+    ).thenAnswer((_) => Stream.value((DateTime(2026, 1, 1), DateTime(2026, 6, 1))));
     // getSharedUsers: empty list (no shared users icons).
     when(() => albumService.getSharedUsers(any())).thenAnswer((_) async => <UserDto>[]);
     // getUserRole: viewer role.
