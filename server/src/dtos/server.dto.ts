@@ -113,6 +113,8 @@ const ServerMediaTypesResponseSchema = z
 
 const ServerConfigSchema = z
   .object({
+    demoMode: z.boolean(),
+    demoAutoLogin: z.boolean().describe('Whether demo auto-login is enabled'),
     oauthButtonText: z.string().describe('OAuth button text'),
     loginPageMessage: z.string().describe('Login page message'),
     trashDays: z.int().describe('Number of days before trashed assets are permanently deleted'),

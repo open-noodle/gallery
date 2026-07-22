@@ -376,12 +376,12 @@ export const defaults = Object.freeze<SystemConfig>({
       maxResolution: 736,
     },
     petDetection: {
-      enabled: false,
+      enabled: true,
       modelName: 'rfdetr-nano',
       minScore: 0.3,
     },
     petRecognition: {
-      enabled: false,
+      enabled: true,
       modelName: 'pet-recognition-base',
       maxDistance: 0.55,
       minFaces: 1,

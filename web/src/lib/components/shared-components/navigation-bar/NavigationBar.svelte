@@ -181,7 +181,7 @@
           aria-label={$t('go_to_search')}
         />
 
-        {#if !page.url.pathname.includes('/admin') && onUploadClick}
+        {#if !page.url.pathname.includes('/admin') && onUploadClick && !authManager.isDemo}
           <Button
             leadingIcon={mdiTrayArrowUp}
             onclick={onUploadClick}

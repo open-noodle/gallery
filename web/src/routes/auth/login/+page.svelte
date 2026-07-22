@@ -1,13 +1,14 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import AuthPageLayout from '$lib/components/layouts/AuthPageLayout.svelte';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { eventManager } from '$lib/managers/event-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { serverConfigManager } from '$lib/managers/server-config-manager.svelte';
   import { Route } from '$lib/route';
   import { oauth } from '$lib/utils';
   import { getServerErrorMessage, handleError } from '$lib/utils/handle-error';
-  import { login, type LoginResponseDto } from '@immich/sdk';
+  import { demoLogin, login, type LoginResponseDto } from '@immich/sdk';
   import { Alert, Button, Field, Input, PasswordInput, Stack } from '@immich/ui';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
@@ -25,7 +26,16 @@
   let oauthError = $state('');
   let loading = $state(false);
   let oauthLoading = $state(true);
+  let demoLoading = $state(false);
+  let demoAutoLoginFailed = $state(false);
   const serverConfig = $derived(serverConfigManager.value);
+  const showStandardLogin = $derived(!serverConfig.demoMode);
+  const showPasswordLogin = $derived(showStandardLogin && !oauthLoading && featureFlagsManager.value.passwordLogin);
+  const showOAuthLogin = $derived(showStandardLogin && featureFlagsManager.value.oauth);
+  const showDemoLogin = $derived(serverConfig.demoMode && (!serverConfig.demoAutoLogin || demoAutoLoginFailed));
+  const showLoginDisabled = $derived(
+    showStandardLogin && !featureFlagsManager.value.passwordLogin && !featureFlagsManager.value.oauth,
+  );
 
   const onSuccess = async (user: LoginResponseDto) => {
     await goto(data.continueUrl, { invalidateAll: true });
@@ -35,7 +45,32 @@
   const onFirstLogin = () => goto(Route.changePassword());
   const onOnboarding = () => goto(Route.onboarding());
 
+  const handleDemoLogin = async () => {
+    try {
+      demoLoading = true;
+      demoAutoLoginFailed = false;
+      errorMessage = '';
+      const user = await demoLogin();
+      authManager.isDemo = true;
+      await onSuccess(user);
+    } catch (error) {
+      errorMessage = getServerErrorMessage(error) || 'Unable to start demo';
+      demoAutoLoginFailed = true;
+      demoLoading = false;
+    }
+  };
+
   onMount(async () => {
+    if (serverConfig.demoMode && serverConfig.demoAutoLogin) {
+      await handleDemoLogin();
+      return;
+    }
+
+    if (serverConfig.demoMode) {
+      oauthLoading = false;
+      return;
+    }
+
     if (!featureFlagsManager.value.oauth) {
       oauthLoading = false;
       return;
@@ -134,12 +169,12 @@
       </Alert>
     {/if}
 
-    {#if !oauthLoading && featureFlagsManager.value.passwordLogin}
-      <form {onsubmit} class="flex flex-col gap-4">
-        {#if errorMessage}
-          <Alert color="danger" title={errorMessage} closable />
-        {/if}
+    {#if errorMessage}
+      <Alert color="danger" title={errorMessage} closable />
+    {/if}
 
+    {#if showPasswordLogin}
+      <form {onsubmit} class="flex flex-col gap-4">
         <Field label={$t('email')} required="indicator">
           <Input id="email" name="email" type="email" autocomplete="email" bind:value={email} />
         </Field>
@@ -152,7 +187,7 @@
       </form>
     {/if}
 
-    {#if featureFlagsManager.value.oauth}
+    {#if showOAuthLogin}
       {#if featureFlagsManager.value.passwordLogin}
         <div class="my-4 inline-flex w-full items-center justify-center">
           <hr class="my-4 h-px w-3/4 border-0 bg-gray-200 dark:bg-gray-600" />
@@ -179,7 +214,21 @@
       </Button>
     {/if}
 
-    {#if !featureFlagsManager.value.passwordLogin && !featureFlagsManager.value.oauth}
+    {#if showDemoLogin}
+      <Button
+        shape="round"
+        size="large"
+        fullWidth
+        color="secondary"
+        loading={demoLoading}
+        disabled={demoLoading}
+        onclick={handleDemoLogin}
+      >
+        Try Demo
+      </Button>
+    {/if}
+
+    {#if showLoginDisabled}
       <Alert color="warning" title={$t('login_has_been_disabled')} />
     {/if}
   </Stack>

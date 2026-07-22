@@ -48,6 +48,31 @@ interface ClaimOptions<T> {
   isValid: (value: unknown) => boolean;
 }
 
+const DEMO_ADMIN_PREVIEW_READ_ROUTES = [
+  /^\/api\/admin\/users$/,
+  /^\/api\/admin\/users\/[^/]+$/,
+  /^\/api\/admin\/users\/[^/]+\/preferences$/,
+  /^\/api\/admin\/users\/[^/]+\/statistics$/,
+  /^\/api\/admin\/users\/[^/]+\/sessions$/,
+  /^\/api\/libraries$/,
+  /^\/api\/libraries\/[^/]+$/,
+  /^\/api\/libraries\/[^/]+\/statistics$/,
+  /^\/api\/jobs$/,
+  /^\/api\/queues$/,
+  /^\/api\/queues\/[^/]+$/,
+  /^\/api\/queues\/[^/]+\/jobs$/,
+  /^\/api\/system-config$/,
+  /^\/api\/system-config\/defaults$/,
+  /^\/api\/system-config\/storage-template-options$/,
+  /^\/api\/system-metadata\/version-check-state$/,
+  /^\/api\/server\/statistics$/,
+];
+
+const normalizeDemoAdminPreviewUri = (uri: string) => (uri.startsWith('/api/') ? uri : `/api${uri}`);
+
+const isDemoAdminPreviewReadRoute = (uri: string) =>
+  DEMO_ADMIN_PREVIEW_READ_ROUTES.some((route) => route.test(normalizeDemoAdminPreviewUri(uri)));
+
 export type ValidateRequest = {
   headers: IncomingHttpHeaders;
   queryParams: Record<string, string>;
@@ -57,6 +82,7 @@ export type ValidateRequest = {
     /** `false` explicitly means no permission is required, which otherwise defaults to `all` */
     permission?: Permission | false;
     uri: string;
+    method?: string;
   };
 };
 
@@ -76,6 +102,20 @@ export class AuthService extends BaseService {
     if (!user || !user.password || !isAuthenticated) {
       this.logger.warn(`Failed login attempt for user ${dto.email} from ip address ${details.clientIp}`);
       throw new UnauthorizedException('Incorrect email or password');
+    }
+
+    return this.createLoginResponse(user, details);
+  }
+
+  async demoLogin(details: LoginDetails) {
+    const { demo } = this.configRepository.getEnv();
+    if (!demo.enabled) {
+      throw new UnauthorizedException('Demo mode is not enabled');
+    }
+
+    const user = await this.userRepository.getByEmail(demo.email);
+    if (!user) {
+      throw new UnauthorizedException('Demo user not found');
     }
 
     return this.createLoginResponse(user, details);
@@ -230,8 +270,19 @@ export class AuthService extends BaseService {
     const requestedPermission = metadata.permission ?? Permission.All;
 
     if (!authDto.user.isAdmin && adminRoute) {
-      this.logger.warn(`Denied access to admin only route: ${uri}`);
-      throw new ForbiddenException('Forbidden');
+      const { demo } = this.configRepository.getEnv();
+      const isDemoPreviewRead =
+        demo.enabled &&
+        authDto.user.email === demo.email &&
+        metadata.method === 'GET' &&
+        !authDto.apiKey &&
+        !authDto.sharedLink &&
+        isDemoAdminPreviewReadRoute(uri);
+
+      if (!isDemoPreviewRead) {
+        this.logger.warn(`Denied access to admin only route: ${uri}`);
+        throw new ForbiddenException('Forbidden');
+      }
     }
 
     if (authDto.sharedLink && !sharedLinkRoute) {

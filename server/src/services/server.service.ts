@@ -157,12 +157,14 @@ export class ServerService extends BaseService {
   }
 
   async getSystemConfig(): Promise<ServerConfigDto> {
-    const { setup } = this.configRepository.getEnv();
+    const { setup, demo } = this.configRepository.getEnv();
     const config = await this.getConfig({ withCache: true });
     const isInitialized = !setup.allow || (await this.userRepository.hasAdmin());
     const onboarding = await this.systemMetadataRepository.get(SystemMetadataKey.AdminOnboarding);
 
     return {
+      demoMode: demo.enabled,
+      demoAutoLogin: demo.autoLogin,
       loginPageMessage: config.server.loginPageMessage,
       trashDays: config.trash.days,
       userDeleteDelay: config.user.deleteDelay,

@@ -1,5 +1,6 @@
 <script lang="ts">
   import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { handleError } from '$lib/utils/handle-error';
   import {
     StorageMigrationDirection,
@@ -165,9 +166,13 @@
   }
 
   let mounted = $state(false);
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
 
   onMount(() => {
     mounted = true;
+    if (isReadOnlyDemo) {
+      return;
+    }
     void fetchStatus();
 
     const interval = setInterval(() => void fetchStatus(), 5000);
@@ -323,42 +328,44 @@
         </div>
       </section>
 
-      <!-- Status -->
-      <section class="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-        <h2 class="mb-4 text-lg font-semibold">{$t('status')}</h2>
-        {#if loadingStatus && !status}
-          <p class="text-sm text-gray-500 dark:text-gray-400">{$t('admin.storage_migration_loading_status')}</p>
-        {:else if status}
-          <div class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-            <div class="flex flex-col">
-              <span class="text-gray-500 dark:text-gray-400">{$t('active')}</span>
-              <span class="font-medium">{status.isActive ? $t('yes') : $t('no')}</span>
+      {#if !isReadOnlyDemo}
+        <!-- Status -->
+        <section class="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+          <h2 class="mb-4 text-lg font-semibold">{$t('status')}</h2>
+          {#if loadingStatus && !status}
+            <p class="text-sm text-gray-500 dark:text-gray-400">{$t('admin.storage_migration_loading_status')}</p>
+          {:else if status}
+            <div class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+              <div class="flex flex-col">
+                <span class="text-gray-500 dark:text-gray-400">{$t('active')}</span>
+                <span class="font-medium">{status.isActive ? $t('yes') : $t('no')}</span>
+              </div>
+              <div class="flex flex-col">
+                <span class="text-gray-500 dark:text-gray-400">{$t('admin.storage_migration_active_jobs')}</span>
+                <span class="font-medium">{status.active}</span>
+              </div>
+              <div class="flex flex-col">
+                <span class="text-gray-500 dark:text-gray-400">{$t('waiting')}</span>
+                <span class="font-medium">{status.waiting}</span>
+              </div>
+              <div class="flex flex-col">
+                <span class="text-gray-500 dark:text-gray-400">{$t('completed')}</span>
+                <span class="font-medium">{status.completed}</span>
+              </div>
+              <div class="flex flex-col">
+                <span class="text-gray-500 dark:text-gray-400">{$t('failed')}</span>
+                <span class="font-medium">{status.failed}</span>
+              </div>
+              <div class="flex flex-col">
+                <span class="text-gray-500 dark:text-gray-400">{$t('admin.storage_migration_delayed')}</span>
+                <span class="font-medium">{status.delayed}</span>
+              </div>
             </div>
-            <div class="flex flex-col">
-              <span class="text-gray-500 dark:text-gray-400">{$t('admin.storage_migration_active_jobs')}</span>
-              <span class="font-medium">{status.active}</span>
-            </div>
-            <div class="flex flex-col">
-              <span class="text-gray-500 dark:text-gray-400">{$t('waiting')}</span>
-              <span class="font-medium">{status.waiting}</span>
-            </div>
-            <div class="flex flex-col">
-              <span class="text-gray-500 dark:text-gray-400">{$t('completed')}</span>
-              <span class="font-medium">{status.completed}</span>
-            </div>
-            <div class="flex flex-col">
-              <span class="text-gray-500 dark:text-gray-400">{$t('failed')}</span>
-              <span class="font-medium">{status.failed}</span>
-            </div>
-            <div class="flex flex-col">
-              <span class="text-gray-500 dark:text-gray-400">{$t('admin.storage_migration_delayed')}</span>
-              <span class="font-medium">{status.delayed}</span>
-            </div>
-          </div>
-        {:else}
-          <p class="text-sm text-gray-500 dark:text-gray-400">{$t('admin.storage_migration_no_status')}</p>
-        {/if}
-      </section>
+          {:else}
+            <p class="text-sm text-gray-500 dark:text-gray-400">{$t('admin.storage_migration_no_status')}</p>
+          {/if}
+        </section>
+      {/if}
 
       <!-- Rollback -->
       <section class="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">

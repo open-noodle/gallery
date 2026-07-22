@@ -31,6 +31,7 @@ const {
     isAllUserOwned: true,
   },
   mockAuthManager: {
+    isDemo: false,
     preferences: { memories: { enabled: false } },
     user: { id: 'cccccccc-cccc-4ccc-cccc-cccccccccccc' },
   },
@@ -256,6 +257,7 @@ describe('Photos page search URL state', () => {
     lang.set('de');
     mockAssetMultiSelectManager.selectionActive = false;
     mockAssetMultiSelectManager.assets = [];
+    mockAuthManager.isDemo = false;
     mockMemoryManager.memories = [];
     // Shared object across the whole file, and nothing else puts it back - the memories test
     // below turns it on and every test after it would otherwise render the strip too.

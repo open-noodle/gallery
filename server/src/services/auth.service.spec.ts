@@ -361,7 +361,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: {},
           queryParams: {},
-          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', method: 'GET' },
         }),
       ).rejects.toBeInstanceOf(UnauthorizedException);
     });
@@ -383,7 +383,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: { authorization: 'Bearer auth_token' },
           queryParams: {},
-          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', method: 'GET' },
         }),
       ).resolves.toEqual({
         user: sessionWithToken.user,
@@ -403,7 +403,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: { 'x-immich-share-key': 'key' },
           queryParams: {},
-          metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test', method: 'GET' },
         }),
       ).rejects.toBeInstanceOf(UnauthorizedException);
     });
@@ -415,7 +415,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: { 'x-immich-share-key': 'key' },
           queryParams: {},
-          metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test', method: 'GET' },
         }),
       ).rejects.toBeInstanceOf(UnauthorizedException);
     });
@@ -427,7 +427,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: { 'x-immich-share-key': 'key' },
           queryParams: {},
-          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', method: 'GET' },
         }),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
@@ -440,7 +440,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: { 'x-immich-share-key': 'key' },
           queryParams: {},
-          metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test', method: 'GET' },
         }),
       ).rejects.toBeInstanceOf(UnauthorizedException);
     });
@@ -459,7 +459,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: { 'x-immich-share-key': key },
           queryParams: {},
-          metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test', method: 'GET' },
         }),
       ).resolves.toEqual({ user, sharedLink });
 
@@ -480,7 +480,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: { 'x-immich-share-key': key },
           queryParams: {},
-          metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test', method: 'GET' },
         }),
       ).resolves.toEqual({ user, sharedLink });
 
@@ -496,7 +496,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: { 'x-immich-share-slug': 'slug' },
           queryParams: {},
-          metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test', method: 'GET' },
         }),
       ).rejects.toBeInstanceOf(UnauthorizedException);
     });
@@ -512,7 +512,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: { 'x-immich-share-slug': 'slug-123' },
           queryParams: {},
-          metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test', method: 'GET' },
         }),
       ).resolves.toEqual({ user, sharedLink });
 
@@ -528,7 +528,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: { 'x-immich-user-token': 'auth_token' },
           queryParams: {},
-          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', method: 'GET' },
         }),
       ).rejects.toBeInstanceOf(UnauthorizedException);
     });
@@ -550,7 +550,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: { cookie: 'immich_access_token=auth_token' },
           queryParams: {},
-          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', method: 'GET' },
         }),
       ).resolves.toEqual({
         user: sessionWithToken.user,
@@ -579,7 +579,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: { cookie: 'immich_access_token=auth_token' },
           queryParams: {},
-          metadata: { adminRoute: true, sharedLinkRoute: false, uri: 'test' },
+          metadata: { adminRoute: true, sharedLinkRoute: false, uri: 'test', method: 'GET' },
         }),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
@@ -603,11 +603,98 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: { cookie: 'immich_access_token=auth_token' },
           queryParams: {},
-          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', method: 'GET' },
         }),
       ).resolves.toBeDefined();
 
       expect(mocks.session.update).toHaveBeenCalled();
+    });
+  });
+
+  const setDemoMode = (enabled: boolean) => {
+    const env = mocks.config.getEnv();
+    mocks.config.getEnv.mockReturnValue({
+      ...env,
+      demo: { enabled, autoLogin: false, email: 'demo@gallery.app', password: 'demo' },
+    });
+  };
+
+  const mockSessionFor = (user: UserAdmin) => {
+    const session = SessionFactory.create();
+    mocks.session.getByToken.mockResolvedValue({
+      id: session.id,
+      updatedAt: session.updatedAt,
+      user,
+      pinExpiresAt: null,
+      appVersion: null,
+    });
+  };
+
+  const authenticateAdmin = (method: string, uri: string) =>
+    sut.authenticate({
+      headers: { cookie: 'immich_access_token=auth_token' },
+      queryParams: {},
+      metadata: { adminRoute: true, sharedLinkRoute: false, uri, method },
+    });
+
+  describe('demo admin preview', () => {
+    const demoUser = UserFactory.create({ email: 'demo@gallery.app', isAdmin: false });
+    const nonDemoUser = UserFactory.create({ email: 'visitor@gallery.app', isAdmin: false });
+
+    it.each([
+      '/admin/users',
+      '/api/admin/users',
+      '/api/admin/users/user-id',
+      '/api/admin/users/user-id/preferences',
+      '/api/admin/users/user-id/statistics',
+      '/api/admin/users/user-id/sessions',
+      '/api/libraries',
+      '/api/libraries/library-id',
+      '/api/libraries/library-id/statistics',
+      '/api/jobs',
+      '/api/queues',
+      '/api/queues/library',
+      '/api/queues/library/jobs',
+      '/api/system-config',
+      '/api/system-config/defaults',
+      '/api/system-config/storage-template-options',
+      '/api/system-metadata/version-check-state',
+      '/api/server/statistics',
+    ])('allows the configured demo user to read allowlisted admin route %s in demo mode', async (uri) => {
+      setDemoMode(true);
+      mockSessionFor(demoUser);
+
+      await expect(authenticateAdmin('GET', uri)).resolves.toMatchObject({
+        user: expect.objectContaining({ email: 'demo@gallery.app', isAdmin: false }),
+      });
+    });
+
+    it('blocks the configured demo user from non-allowlisted admin reads', async () => {
+      setDemoMode(true);
+      mockSessionFor(demoUser);
+
+      await expect(authenticateAdmin('GET', '/api/admin/database-backups')).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('blocks demo user mutating admin requests before route handlers can run', async () => {
+      setDemoMode(true);
+      mockSessionFor(demoUser);
+
+      await expect(authenticateAdmin('PUT', '/api/system-config')).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('blocks non-demo non-admin users from demo preview admin routes', async () => {
+      setDemoMode(true);
+      mockSessionFor(nonDemoUser);
+
+      await expect(authenticateAdmin('GET', '/api/admin/users')).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('does not grant demo preview access when demo mode is off', async () => {
+      setDemoMode(false);
+      mockSessionFor(demoUser);
+
+      await expect(authenticateAdmin('GET', '/api/admin/users')).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
 
@@ -619,7 +706,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: { 'x-api-key': 'auth_token' },
           queryParams: {},
-          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', method: 'GET' },
         }),
       ).rejects.toBeInstanceOf(UnauthorizedException);
       expect(mocks.apiKey.getKey).toHaveBeenCalledWith(Buffer.from('auth_token (hashed)'));
@@ -634,7 +721,13 @@ describe(AuthService.name, () => {
       const result = sut.authenticate({
         headers: { 'x-api-key': 'auth_token' },
         queryParams: {},
-        metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', permission: Permission.AssetRead },
+        metadata: {
+          adminRoute: false,
+          sharedLinkRoute: false,
+          uri: 'test',
+          method: 'GET',
+          permission: Permission.AssetRead,
+        },
       });
 
       await expect(result).rejects.toBeInstanceOf(ForbiddenException);
@@ -650,7 +743,7 @@ describe(AuthService.name, () => {
       const result = sut.authenticate({
         headers: { 'x-api-key': 'auth_token' },
         queryParams: {},
-        metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+        metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', method: 'GET' },
       });
       await expect(result).rejects.toBeInstanceOf(ForbiddenException);
       await expect(result).rejects.toThrow('Missing required permission: all');
@@ -667,7 +760,7 @@ describe(AuthService.name, () => {
       const result = sut.authenticate({
         headers: { 'x-api-key': 'auth_token' },
         queryParams: {},
-        metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', permission: false },
+        metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', method: 'GET', permission: false },
       });
       await expect(result).resolves.toEqual({ user: authUser, apiKey: expect.objectContaining(authApiKey) });
     });
@@ -684,7 +777,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: { 'x-api-key': 'auth_token' },
           queryParams: {},
-          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', method: 'GET' },
         }),
       ).resolves.toEqual({ user: authUser, apiKey: expect.objectContaining(authApiKey) });
       expect(mocks.apiKey.getKey).toHaveBeenCalledWith(Buffer.from('auth_token (hashed)'));
@@ -1808,7 +1901,7 @@ describe(AuthService.name, () => {
       const result = await sut.authenticate({
         headers: { 'x-immich-user-token': 'auth_token' },
         queryParams: {},
-        metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+        metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', method: 'GET' },
       });
 
       expect(result.session?.hasElevatedPermission).toBe(true);
@@ -1830,7 +1923,7 @@ describe(AuthService.name, () => {
       const result = await sut.authenticate({
         headers: { 'x-immich-user-token': 'auth_token' },
         queryParams: {},
-        metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+        metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', method: 'GET' },
       });
 
       expect(result.session?.hasElevatedPermission).toBe(false);
@@ -1853,7 +1946,7 @@ describe(AuthService.name, () => {
       await sut.authenticate({
         headers: { 'x-immich-user-token': 'auth_token' },
         queryParams: {},
-        metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+        metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', method: 'GET' },
       });
 
       expect(mocks.session.update).toHaveBeenCalledWith(session.id, {
@@ -1879,7 +1972,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: {},
           queryParams: { sessionKey: 'session_token' },
-          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', method: 'GET' },
         }),
       ).resolves.toEqual({
         user: sessionWithToken.user,
@@ -1900,7 +1993,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: {},
           queryParams: { apiKey: 'my_api_key' },
-          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', method: 'GET' },
         }),
       ).resolves.toEqual({ user: authUser, apiKey: expect.objectContaining(authApiKey) });
     });
@@ -1915,7 +2008,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: {},
           queryParams: { key: sharedLink.key.toString('base64url') },
-          metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test', method: 'GET' },
         }),
       ).resolves.toEqual({ user, sharedLink });
     });
@@ -2169,7 +2262,7 @@ describe(AuthService.name, () => {
         sut.authenticate({
           headers: { 'x-immich-session-token': 'session_token' },
           queryParams: {},
-          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+          metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', method: 'GET' },
         }),
       ).resolves.toEqual({
         user: sessionWithToken.user,

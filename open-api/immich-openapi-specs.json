@@ -6258,6 +6258,44 @@
         "x-immich-state": "Stable"
       }
     },
+    "/auth/demo-login": {
+      "post": {
+        "description": "Login as the demo user. Only available when demo mode is enabled.",
+        "operationId": "demoLogin",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Demo login",
+        "tags": [
+          "Authentication"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          },
+          {
+            "version": "v2",
+            "state": "Stable"
+          }
+        ],
+        "x-immich-state": "Stable"
+      }
+    },
     "/auth/login": {
       "post": {
         "description": "Login with username and password and receive a session token.",
@@ -32702,6 +32740,13 @@
             },
             "type": "array"
           },
+          "demoAutoLogin": {
+            "description": "Whether demo auto-login is enabled",
+            "type": "boolean"
+          },
+          "demoMode": {
+            "type": "boolean"
+          },
           "externalDomain": {
             "description": "External domain URL",
             "type": "string"
@@ -32759,6 +32804,8 @@
         },
         "required": [
           "availableMemoryTypes",
+          "demoAutoLogin",
+          "demoMode",
           "externalDomain",
           "isInitialized",
           "isOnboarded",

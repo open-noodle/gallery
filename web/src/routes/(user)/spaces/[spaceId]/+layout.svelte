@@ -320,7 +320,7 @@
           assetCount={space.assetCount ?? 0}
           gradientClass={spaceGradient}
           currentRole={currentMember?.role}
-          canEdit={isEditor}
+          canEdit={isEditor || authManager.isDemo}
           onChangeCover={handleChangeCover}
           onEditSpace={handleEditSpace}
           onReposition={() => (repositioning = true)}

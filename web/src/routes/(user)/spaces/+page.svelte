@@ -40,13 +40,19 @@
 
 <UserPageLayout title={data.meta.title}>
   {#snippet buttons()}
-    <Button shape="round" size="small" leadingIcon={mdiPlus} onclick={handleCreate}>
-      {$t('spaces_create')}
-    </Button>
+    {#if !authManager.isDemo}
+      <Button shape="round" size="small" leadingIcon={mdiPlus} onclick={handleCreate}>
+        {$t('spaces_create')}
+      </Button>
+    {/if}
   {/snippet}
 
   {#if spaces.length === 0}
-    <EmptyPlaceholder text={$t('spaces_empty')} onClick={handleCreate} class="mx-auto mt-10" />
+    <EmptyPlaceholder
+      text={$t('spaces_empty')}
+      onClick={authManager.isDemo ? undefined : handleCreate}
+      class="mx-auto mt-10"
+    />
   {:else}
     <SpacesControls {spaces} onSorted={(sorted) => (sortedSpaces = sorted)} />
 

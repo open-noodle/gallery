@@ -105,7 +105,7 @@ export class SearchService extends BaseService {
    */
   async getExploreData(auth: AuthDto) {
     const timelineSpaceIds = await this.getTimelineSpaceIds(auth, true);
-    const options = { maxFields: 12, minAssetsPerField: 5, timelineSpaceIds };
+    const options = { maxFields: 12, minAssetsPerField: 1, timelineSpaceIds };
 
     const cities = await this.assetRepository.getAssetIdByCity(auth.user.id, options);
     const cityAssets = await this.assetRepository.getByIdsWithAllRelationsButStacks(

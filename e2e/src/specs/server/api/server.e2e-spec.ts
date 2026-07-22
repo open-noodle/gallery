@@ -146,6 +146,7 @@ describe('/server', () => {
       const { status, body } = await request(app).get('/server/config');
       expect(status).toBe(200);
       expect(body).toEqual({
+        demoMode: false,
         loginPageMessage: '',
         oauthButtonText: 'Login with OAuth',
         trashDays: 30,

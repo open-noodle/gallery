@@ -8,6 +8,7 @@
   import UserSidebar from '$lib/components/shared-components/side-bar/UserSidebar.svelte';
   import { sidebarModeStore } from '$lib/stores/sidebar-mode.svelte';
   import type { HeaderButtonActionItem } from '$lib/types';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { openFileUploadDialog } from '$lib/utils/file-uploader';
   import { Button, ContextMenuButton, HStack, isMenuItemType, type MenuItemType } from '@immich/ui';
   import type { Snippet } from 'svelte';
@@ -68,7 +69,7 @@
 
 <header>
   {#if !hideNavbar}
-    <NavigationBar onUploadClick={() => openFileUploadDialog()} railAware={!sidebar} />
+    <NavigationBar onUploadClick={authManager.isDemo ? undefined : () => openFileUploadDialog()} railAware={!sidebar} />
   {/if}
 </header>
 <!-- The two height sources are not interchangeable: with a navbar the grid sits *below* a real
