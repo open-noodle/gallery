@@ -2,6 +2,7 @@
   import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
   import IntegrityReportTableItem from '$lib/components/maintenance/integrity/IntegrityReportTableItem.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { Route } from '$lib/route';
   import { getIntegrityReportActions } from '$lib/services/integrity.service';
   import { asyncTimeout } from '$lib/utils';
@@ -53,6 +54,8 @@
   });
 
   const { Download, Delete } = $derived(getIntegrityReportActions($t, data.type));
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
+  const pageActions = $derived(isReadOnlyDemo ? [] : [Download, Delete]);
 
   const onIntegrityReportDeleted = ({ id, type }: { id?: string; type?: IntegrityReport }) => {
     if (type === data.type) {
@@ -72,7 +75,7 @@
     { title: $t('admin.maintenance_integrity_report') },
     { title: data.meta.title },
   ]}
-  actions={[Download, Delete]}
+  actions={pageActions}
 >
   <section id="setting-content" class="flex place-content-center sm:mx-4">
     <section class="w-full pb-28 sm:w-5/6 md:w-212.5">
