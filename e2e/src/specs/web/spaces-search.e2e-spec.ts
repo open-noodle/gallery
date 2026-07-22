@@ -82,7 +82,7 @@ test.describe('Spaces Search', () => {
 
     await page.getByTestId('search-chip-close').dispatchEvent('click');
 
-    await expect(page).toHaveURL(new RegExp(String.raw`/spaces/${space.id}/photos$`));
+    await expect(page).toHaveURL(new RegExp(`/spaces/${space.id}/photos$`));
     await expect(page.getByTestId('result-count')).not.toBeVisible({ timeout: 5000 });
     await expect(page.getByTestId('search-empty')).not.toBeVisible({ timeout: 5000 });
     await expect(page.getByTestId('search-chip')).not.toBeVisible({ timeout: 5000 });
