@@ -9,7 +9,7 @@
 - **Batches complete**: 35 / 35 — **0 commits behind `upstream/main`**; the batch-33
   quarantine was reviewed and released (see below)
 - **Risk level**: MEDIUM (TypeScript 7, eslint-unicorn v72, GitHub Actions major)
-- **Recommendation**: PROCEED
+- **Recommendation**: PROCEED — **all 10 CI workflows green**
 
 Three toolchain majors landed in this run — TypeScript 6→7, eslint-plugin-unicorn
 v70→v72 and the GitHub Actions major. All three needed fork-side propagation that
@@ -340,3 +340,35 @@ reconcile.
 - Fork commits ahead of that base: 951
 - Commits behind `upstream/main`: **0**
 - Working tree clean; no conflict markers anywhere in the tree
+
+## Remote CI — final result
+
+All ten workflows green: `test`, `docker`, `static_analysis`, `gallery-rebase-smoke`,
+`storage-migration-tests`, `storage-migration-e2e`, `gallery-revert-to-immich-validation`,
+`gallery-ml-smoke`, `gallery-mobile-smoke`, `gallery-build-mobile`.
+
+Nine passed on `6e952c8855`; `Test` passed on `cd39912b71`, whose only delta is the
+six-line medium-spec fix below, so the other nine carry forward.
+
+Failures seen along the way, each with a proven cause rather than an assumed one:
+
+| Workflow                      | Cause                                 | Evidence                                                                                                       |
+| ----------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Storage Migration Tests / E2E | registry rate limit                   | `toomanyrequests ... allowed: 44000/minute` in both logs; passed on re-run                                     |
+| Gallery Rebase Smoke          | environmental                         | no rate-limit line in its log, so left unproven at the time; passed on re-run with no change                   |
+| Gallery Mobile Smoke          | D8 `OutOfMemoryError` (heap pressure) | passed on re-run with no config change; `gallery-build-mobile` — the heavier build — passed on the same commit |
+| **Test**                      | **real, and self-inflicted**          | the medium spec still asserted the pre-#29008 two-property `AlbumUpdate` payload                               |
+
+Dispatching all ten workflows simultaneously is what tripped the registry limit;
+staggered re-dispatches cleared it.
+
+The one real failure is worth recording: fixing the inherited upstream
+`addToSharedLink` bug meant the medium spec asserting the old payload had to move
+with it. Upstream left both on the pre-#29008 shape. Verified locally against a real
+database before pushing — the spec passes (12 tests) and the run applies
+`1784647658615-AddOAuthBearerTokenToSession` cleanly.
+
+**Trap worth remembering:** `pnpm test:medium -- --run <path>` silently drops the path
+filter and runs all 136 medium files, which exhausts Postgres connections and yields
+unrelated failures. Pass the file to vitest directly:
+`npx vitest --config test/vitest.config.medium.mjs --run <path>`.
