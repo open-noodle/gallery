@@ -186,7 +186,7 @@ function shouldIncludeAsset(
  * When albumId is provided, only includes buckets that contain assets from that album
  */
 function getBucketKey(dateKey: string, bucketSize: TimeBucketSize) {
-  const [year, month, day = '01'] = dateKey.split('-');
+  const [year, month, day = '01'] = dateKey.split('-', 3);
   if (bucketSize === TimeBucketSize.Year) {
     return `${year}-01-01`;
   }

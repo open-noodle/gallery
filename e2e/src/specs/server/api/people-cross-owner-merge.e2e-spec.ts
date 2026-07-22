@@ -157,7 +157,7 @@ describe('/people/same-person cross-owner merge (#733)', () => {
         .send({
           target: { type: 'person', id: fx.targetPersonId },
           sources: [{ type: 'space-person', id: fx.sourceSpacePersonId, spaceId: fx.spaceId }],
-          ...(confirmCrossOwner === undefined ? {} : { confirmCrossOwner }),
+          ...(confirmCrossOwner !== undefined && { confirmCrossOwner }),
         });
 
     const otherOwnerPeople = async () => {
@@ -196,7 +196,7 @@ describe('/people/same-person cross-owner merge (#733)', () => {
         .send({
           target: { type: 'person', id: fx.targetPersonId },
           sources: [{ type: 'space-person', id: fx.sourceSpacePersonId, spaceId: fx.spaceId }],
-          ...(confirmCrossOwner === undefined ? {} : { confirmCrossOwner }),
+          ...(confirmCrossOwner !== undefined && { confirmCrossOwner }),
         });
 
     const otherOwnerPersonIds = async () => {
