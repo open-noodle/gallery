@@ -343,11 +343,7 @@ Create `server/src/services/accessible-identity-reconciliation.ts`:
 
 ```ts
 export type ReconciliationBridge =
-  | 'member-join'
-  | 'space-evidence'
-  | 'personal-upload'
-  | 'explicit-space-add'
-  | 'manual-compatible';
+  'member-join' | 'space-evidence' | 'personal-upload' | 'explicit-space-add' | 'manual-compatible';
 
 export type ReconciliationClaim = {
   bridge: ReconciliationBridge;
