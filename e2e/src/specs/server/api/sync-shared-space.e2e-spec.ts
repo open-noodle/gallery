@@ -233,11 +233,8 @@ describe('/sync — shared-space streams', () => {
       );
 
       // The SharedSpaceAsset event carries the asset payload.
-      const assetEvents = lines.filter(
-        (l) =>
-          l.type === 'SharedSpaceAssetCreateV1' ||
-          l.type === 'SharedSpaceAssetUpdateV1' ||
-          l.type === 'SharedSpaceAssetBackfillV1',
+      const assetEvents = lines.filter((l) =>
+        ['SharedSpaceAssetCreateV1', 'SharedSpaceAssetUpdateV1', 'SharedSpaceAssetBackfillV1'].includes(l.type),
       );
       const assetIds = assetEvents.map((l) => (l.data as { id: string }).id);
       expect(assetIds).toContain(asset.id);
@@ -264,11 +261,8 @@ describe('/sync — shared-space streams', () => {
         [SyncRequestType.SharedSpaceAssetsV1, SyncRequestType.SharedSpaceToAssetsV1],
         true,
       );
-      const assetEvents = lines.filter(
-        (l) =>
-          l.type === 'SharedSpaceAssetCreateV1' ||
-          l.type === 'SharedSpaceAssetUpdateV1' ||
-          l.type === 'SharedSpaceAssetBackfillV1',
+      const assetEvents = lines.filter((l) =>
+        ['SharedSpaceAssetCreateV1', 'SharedSpaceAssetUpdateV1', 'SharedSpaceAssetBackfillV1'].includes(l.type),
       );
       const ids = assetEvents.map((l) => (l.data as { id: string }).id);
       expect(ids).not.toContain(asset.id);
@@ -333,11 +327,10 @@ describe('/sync — shared-space streams', () => {
         [SyncRequestType.SharedSpacesV1, SyncRequestType.SharedSpaceMembersV1, SyncRequestType.SharedSpaceAssetExifsV1],
         true,
       );
-      const exifEvents = lines.filter(
-        (l) =>
-          l.type === 'SharedSpaceAssetExifCreateV1' ||
-          l.type === 'SharedSpaceAssetExifUpdateV1' ||
-          l.type === 'SharedSpaceAssetExifBackfillV1',
+      const exifEvents = lines.filter((l) =>
+        ['SharedSpaceAssetExifCreateV1', 'SharedSpaceAssetExifUpdateV1', 'SharedSpaceAssetExifBackfillV1'].includes(
+          l.type,
+        ),
       );
       // Exactly one exif event for our uploaded asset should appear (exif
       // rows are auto-created on upload).
@@ -352,11 +345,10 @@ describe('/sync — shared-space streams', () => {
       await utils.addSpaceAssets(admin.accessToken, space.id, [asset.id]);
 
       const lines = await syncStream(stranger.accessToken, [SyncRequestType.SharedSpaceAssetExifsV1], true);
-      const exifEvents = lines.filter(
-        (l) =>
-          l.type === 'SharedSpaceAssetExifCreateV1' ||
-          l.type === 'SharedSpaceAssetExifUpdateV1' ||
-          l.type === 'SharedSpaceAssetExifBackfillV1',
+      const exifEvents = lines.filter((l) =>
+        ['SharedSpaceAssetExifCreateV1', 'SharedSpaceAssetExifUpdateV1', 'SharedSpaceAssetExifBackfillV1'].includes(
+          l.type,
+        ),
       );
       const matching = exifEvents.filter((l) => (l.data as { assetId: string }).assetId === asset.id);
       expect(matching).toHaveLength(0);
