@@ -153,15 +153,50 @@ and root `mise.lock` differs from the checkpoint in pnpm fields and nothing else
 **Rules this earns: never `git add -A` during a rebase, and run
 `git status -- '*mise.lock'` after any local `mise` invocation.**
 
-**2. `gallery-rebase-smoke.yml` built the SDK after installing.** The specs failed
-to import `@immich/sdk/build/index.js`. `pnpm-workspace.yaml` sets
-`injectWorkspacePackages`, so `pnpm install` _copies_ the SDK into
-`e2e/node_modules`; running that before `pnpm --filter @immich/sdk build` left the
-injected copy with no `build/` output. The ordering was always wrong and only
-began failing this run. Reordered to build-before-inject, matching `test.yml`'s
-"Run setup @immich/sdk" step and `server/Dockerfile`. `test.yml` already had the
-correct order — worth re-grepping fork-only workflows for this shape after any
-pnpm bump.
+**2. The lockfile regen silently switched workspace linking from symlink to
+injected copy — the single cause behind `Test` and `gallery-rebase-smoke`.**
+
+`pnpm-workspace.yaml` has carried `injectWorkspacePackages: true` since
+upstream's npm→pnpm migration (#19752), but the committed lockfile predates the
+flag and every install runs `--frozen-lockfile`, so it was **never actually
+applied**: upstream's lockfile resolves workspace deps as `link:` (symlink) and
+so did ours. Regenerating with `pnpm install --no-frozen-lockfile` in batch 26
+re-resolved them and applied the dormant flag, flipping 5 of 9 workspace deps
+from `link:` to `file:`.
+
+An injected dep is a **snapshot** taken when the consumer installs; pnpm does
+not re-sync it after the dependency is built later. On a cold CI checkout
+`packages/sdk/build` does not exist yet, so every consumer received an SDK with
+no build output — `Could not resolve "@immich/sdk"` from plugin-sdk's esbuild,
+and TS2307 across web. That is `SQL Schema Checks`, `Test Web`,
+`End-to-End Lint`, `Unit Test CLI`, the E2E suites, and `gallery-rebase-smoke`.
+
+Three wrong diagnoses were discarded on the way, each disproved by experiment:
+that the fork's `[tasks.plugins]` reorder was at fault (upstream's ordering
+fails identically on the fork tree), that pnpm 11.13.1 was at fault (pinning
+11.11.0 does fix the symptom, but a **pristine upstream worktree at the same
+commit builds fine cold on 11.13.1**), and that `injectWorkspacePackages` was a
+fork-only setting (it is upstream's, with the same value). The discriminator was
+the lockfile: `version: link:../sdk` upstream versus `version: file:packages/sdk`
+here.
+
+Fixed by regenerating from the batch-23 lockfile with the flag temporarily off,
+preserving the `link:` shape, then restoring the flag — `pnpm-workspace.yaml` is
+unchanged and still matches upstream, and the lock is back to `link:9 / file:0`.
+Verified cold (`rm -rf node_modules packages/sdk/build`, pnpm 11.13.1): the full
+`[tasks.plugins]` sequence builds plugin-sdk and plugin-core. No pnpm pin was
+needed, and no fork divergence was added.
+
+**The rule this earns: never run `pnpm install --no-frozen-lockfile` casually on
+this repo.** It does not merely refresh versions — it re-resolves workspace
+linking and can activate dormant `pnpm-workspace.yaml` settings the committed
+lockfile never had. After any regen, check
+`grep -c 'version: link:' pnpm-lock.yaml` against the previous value.
+
+`gallery-rebase-smoke.yml` was separately reordered to build the SDK before the
+full install, matching `test.yml`'s "Run setup @immich/sdk" step and
+`server/Dockerfile`. With `link:` restored that ordering is no longer
+load-bearing, but it is kept as defence in depth.
 
 ### Rebase audits — all green
 
