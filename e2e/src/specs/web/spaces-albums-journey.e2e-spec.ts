@@ -75,11 +75,15 @@ async function expectBlockedAt(page: Page, url: string) {
   await page.waitForLoadState('networkidle');
   const is403 = response?.status() === 403;
   const redirectedAway = !page.url().includes(url);
-  const blockedText = await page
-    .locator('text=/access denied|not found|no access|not a member|http 403/i')
-    .first()
-    .isVisible()
-    .catch(() => false);
+  let blockedText = false;
+  try {
+    blockedText = await page
+      .locator('text=/access denied|not found|no access|not a member|http 403/i')
+      .first()
+      .isVisible();
+  } catch {
+    // locator resolution can race with the client-side error render
+  }
   expect(is403 || redirectedAway || blockedText).toBeTruthy();
 }
 
