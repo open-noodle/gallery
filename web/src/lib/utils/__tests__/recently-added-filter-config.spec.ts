@@ -268,7 +268,7 @@ describe('buildRecentlyAddedFilterConfig in query mode', () => {
 
   it('falls back to the browse path when the query is blank', async () => {
     const config = buildRecentlyAddedFilterConfig(() => ({
-      query: '   ',
+      query: ' '.repeat(3),
       language: 'en',
       filters: createFilterState(),
     }));
