@@ -372,3 +372,106 @@ database before pushing — the spec passes (12 tests) and the run applies
 filter and runs all 136 medium files, which exhausts Postgres connections and yields
 unrelated failures. Pass the file to vitest directly:
 `npx vitest --config test/vitest.config.medium.mjs --run <path>`.
+
+## Cutover to `main` — fork sync + staging validation (2026-07-22, evening)
+
+The branch had been sitting complete-but-held-off-`main`. This section records what
+it took to actually land it.
+
+### Fork sync — #826, #827
+
+`make upstream-sync-fork-main` cherry-picked the two fork commits that landed on
+`origin/main` after the batch-35 run, advancing `integratedForkHead` to `d27c457f3c`
+(= `origin/main` HEAD). Both applied clean; all three gate checks green.
+
+| Commit       | PR   | What it carries                                                                                                                            |
+| ------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cddc3c5481` | #827 | Declarative-schema realignment + new fork migration `1784800000000-RepairSharedSpaceAlbumGrantDrift`, and its `revert-to-immich.sql` entry |
+| `02445dacb3` | #826 | cmdk "the"-hijacks-search fix (`cmdk-match.ts` almost-exact gate)                                                                          |
+
+Fork migration count is now **49** (was 48).
+
+### One real failure — a fork commit meeting a newer toolchain
+
+`Test` failed on **Lint Web**:
+
+```
+web/src/lib/managers/cmdk-match.ts
+  55:17  error  Prefer `Array#every()` with a negated predicate over negating `Array#some()`
+                unicorn/no-negated-array-predicate
+```
+
+#826 was authored against `main`'s **eslint-plugin-unicorn v70** and is clean there.
+This branch carries **v72** (batch 28), which added that rule. Nothing about the
+commit is wrong — it simply never met v72 before being replayed here. This is the
+same drift class as the TypeScript 7 / GHA-major propagations above, arriving from
+the _fork_ side instead of the upstream side, and it is the reason a fork sync onto
+a toolchain-advanced rolling branch cannot be assumed safe just because the
+cherry-pick was clean.
+
+Fixed in `fa932c2f97` by hoisting the predicate to a local rather than rewriting to
+`.every()` — the naive rewrite nests `!labelWords.some(...)` inside the callback and
+re-triggers the identical rule one level down. Pure refactor; the four cmdk /
+global-search / navigation-items / command-items specs pass (234 tests).
+
+**Local-gate blind spot worth recording:** `pnpm lint` in `web/` cannot catch this
+on this machine — `@koddsson/eslint-plugin-tscompat@0.2.0` crashes with
+`TypeError: Cannot read properties of undefined (reading 'Class')` while linting
+`web/src/lib/__mocks__/animate.mock.ts`, aborting the whole run before it reaches
+`cmdk-match.ts`. CI is unaffected (it lints all 3 700+ files and reported the error
+normally). Verified pre-existing: the file and eslint config are byte-identical to
+the CI-green tip `cd39912b71`, and the crash reproduces on that single unchanged
+file. Until it is fixed, lint individual files locally and treat CI's Lint Web as
+the authority.
+
+### Remote CI
+
+Nine workflows green on `02445dacb3`; `Test` and `Docker` re-dispatched and green on
+`fa932c2f97` (Docker re-run because it builds the shipped web bundle).
+
+Two environmental failures, each diagnosed from its log rather than assumed:
+
+| Workflow                | Cause                                     | Evidence                                                                                                                           |
+| ----------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Storage Migration Tests | runner disk exhaustion                    | `No space left on device (os error 28)` in the plugin-core wasm build; passed on re-run                                            |
+| Test — E2E (arm)        | **unauthenticated** GitHub API rate limit | `mise WARN GitHub rate limit exceeded`, `github auth: no`, `0/60 (core)`, 403 on `extism/js-pdk` releases → `extism-js: not found` |
+
+The rate-limit one is worth internalising: the Docker plugin stage resolves
+`github:extism/js-pdk@1.6.0` through `mise` with **no** GitHub token, so it shares a
+60-req/hour unauthenticated budget across whatever else is running on that runner
+IP. Dispatching ~13 workflows at once is enough to exhaust it. Stagger dispatches,
+or give that step a token.
+
+### Staging RC validation
+
+Built `rolling-v303-cutover-rc1` (**server-only**: `machine-learning/` is byte-identical
+to the `v5.1.1` tree staging's ml pin already tracks — tree hash `87e6953c6b` on both
+sides, so 35 batches of upstream touched zero ML files). infra-gitops `f0cd817`.
+
+Verified by **pod image**, not by `rollout status`:
+`gallery-server-678d499fbb-c5n29` → `gallery-server:rolling-v303-cutover-rc1`, ready.
+
+The migration path is the headline result — this ran on a real, populated database:
+
+```
+Migration "1784647658615-AddOAuthBearerTokenToSession" succeeded
+Migration "1784800000000-RepairSharedSpaceAlbumGrantDrift" succeeded
+Finished running migrations
+Checking for schema drift
+No schema drift detected          <- on BOTH Api and Microservices workers
+```
+
+That is exactly what #827 set out to achieve, now confirmed against the rebased tree
+rather than a synthetic DB.
+
+Fork surfaces smoke-tested via a temporary API key (since deleted):
+
+| Endpoint                           | Result                                    |
+| ---------------------------------- | ----------------------------------------- |
+| `/server/ml-health`                | `{"smartSearchHealthy":true}`             |
+| `/shared-spaces`                   | 200 — spaces returned                     |
+| `/people?withSharedSpaces=true`    | 200 — 362 people                          |
+| `/gallery/map/markers` (fork-only) | 200 — markers with coordinates            |
+| `/albums`, `/timeline/buckets`     | 200 — real data                           |
+| `POST /search/smart` `"beach"`     | 200 — 2 assets (CLIP + vector end-to-end) |
+| `GET /` (web bundle)               | 200, 9 787 bytes                          |
