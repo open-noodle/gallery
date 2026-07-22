@@ -13,6 +13,23 @@ vi.mock('$lib/services/database-backups.service', () => ({
   handleRestoreDatabaseBackup: vi.fn(),
 }));
 
+const mockAuthManager = vi.hoisted(() => ({ isReadOnlyDemo: false }));
+
+vi.mock('$lib/managers/auth-manager.svelte', () => ({
+  authManager: {
+    get isReadOnlyDemo() {
+      return mockAuthManager.isReadOnlyDemo;
+    },
+  },
+}));
+
+const backupProps = {
+  expectedVersion: '1.2.3',
+  filename: 'immich-db-backup-20260324T110000-v1.2.3-snapshot.sql.gz',
+  filesize: 1024,
+  timezone: 'Asia/Tokyo',
+};
+
 describe('MaintenanceBackupEntry', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -22,6 +39,7 @@ describe('MaintenanceBackupEntry', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    mockAuthManager.isReadOnlyDemo = false;
   });
 
   it('renders relative backup time using the user timezone instead of UTC', () => {
@@ -50,5 +68,34 @@ describe('MaintenanceBackupEntry', () => {
     });
 
     expect(screen.getByText(expectedRelativeTime!)).toBeInTheDocument();
+  });
+
+  describe('read-only demo', () => {
+    it('renders restore and the download/delete menu for real admins', () => {
+      renderWithTooltips(MaintenanceBackupEntry, backupProps);
+
+      expect(screen.getByRole('button', { name: 'restore' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'open' })).toBeInTheDocument();
+    });
+
+    // The demo user only gets GET /admin/database-backups. Restore is a POST the demo interceptor
+    // blocks, and download/delete hit routes outside the demo preview allowlist, so all three would
+    // fail with a 403 toast if they stayed clickable.
+    it('hides restore and the download/delete menu for demo preview users', () => {
+      mockAuthManager.isReadOnlyDemo = true;
+
+      renderWithTooltips(MaintenanceBackupEntry, backupProps);
+
+      expect(screen.queryByRole('button', { name: 'restore' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'open' })).not.toBeInTheDocument();
+    });
+
+    it('still renders the backup metadata for demo preview users', () => {
+      mockAuthManager.isReadOnlyDemo = true;
+
+      renderWithTooltips(MaintenanceBackupEntry, backupProps);
+
+      expect(screen.getByText(backupProps.filename)).toBeInTheDocument();
+    });
   });
 });

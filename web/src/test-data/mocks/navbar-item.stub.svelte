@@ -11,15 +11,7 @@
     onclick?: () => void;
   }
 
-  let {
-    title,
-    href = '#',
-    isActive,
-    expanded = $bindable(false),
-    items,
-    class: className,
-    onclick,
-  }: Props = $props();
+  let { title, href = '#', isActive, expanded = $bindable(false), items, class: className, onclick }: Props = $props();
 
   // @immich/ui's NavbarItem prefers an `isActive` override over its default `pathname.startsWith(href)`
   // match. Surface the override's verdict so tests can assert what the real component would highlight;
