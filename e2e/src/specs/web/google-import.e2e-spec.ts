@@ -64,10 +64,12 @@ test.describe('Google Photos Import', () => {
   });
 
   test.afterAll(() => {
-    if (zipPath) {
-      const tmpDir = join(zipPath, '..');
-      rmSync(tmpDir, { recursive: true, force: true });
+    if (!zipPath) {
+      return;
     }
+
+    const tmpDir = join(zipPath, '..');
+    rmSync(tmpDir, { recursive: true, force: true });
   });
 
   test('should complete the full Google Photos import flow', async ({ context, page }) => {
