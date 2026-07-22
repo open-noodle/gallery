@@ -256,15 +256,10 @@ const MIN_MATCH_LENGTH = 3;
  * "Top result" band above photos/places/etc. when the query unambiguously
  * points at its label.
  *
- * Rule: after case-folding and splitting both sides on non-alphanumerics, at
- * least one query word ≥ 3 chars must be a prefix of some label word. The
- * length floor keeps single-letter queries from promoting the first match in
- * the catalog, and working at word granularity lets compound queries like
- * `auto-classification` still promote `Classification Settings` by matching
- * on the second query word.
- *
- * Only the label is inspected, not the description — the description is
- * richer and would promote items the user did not visually intend to pick.
+ * See {@link isAlmostExactWordMatch} for the rule. The 3-char floor keeps
+ * single keystrokes from promoting the first match in the catalog, while
+ * working at word granularity lets compound queries like `auto-classification`
+ * still promote `Classification Settings` on their second token.
  */
 export function isAlmostExactNavMatch(query: string, label: string): boolean {
   return isAlmostExactWordMatch(query, label, MIN_MATCH_LENGTH);
