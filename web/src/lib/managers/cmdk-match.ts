@@ -52,7 +52,8 @@ export function isAlmostExactWordMatch(query: string, label: string, minLength: 
       continue;
     }
     significantWords++;
-    if (!tokens.some((token) => labelWords.some((labelWord) => isClosePrefix(token, labelWord)))) {
+    const wordMatches = tokens.some((token) => labelWords.some((labelWord) => isClosePrefix(token, labelWord)));
+    if (!wordMatches) {
       return false;
     }
   }
