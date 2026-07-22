@@ -338,7 +338,7 @@
           photoCount={space.assetCount ?? 0}
           albumCount={data.linkedAlbums.length}
           memberCount={members.length}
-          isAdmin={authManager.user?.isAdmin ?? false}
+          isAdmin={authManager.canPreviewAdmin}
           libraryCount={space.linkedLibraries?.length ?? 0}
         />
       {/if}
