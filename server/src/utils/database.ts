@@ -445,10 +445,14 @@ export function hasSpacePeople<O>(qb: SelectQueryBuilder<DB, 'asset', O>, spaceP
 type PeopleFilterIds = { personIds?: string[]; identityIds?: string[]; spacePersonIds?: string[] };
 
 export function hasAllPeople<O>(qb: SelectQueryBuilder<DB, 'asset', O>, filters: PeopleFilterIds) {
-  return hasSpacePeople(
-    hasFaceIdentities(hasPeople(qb, filters.personIds ?? []), filters.identityIds ?? []),
-    filters.spacePersonIds ?? [],
-  );
+  const personIds = uniqueTruthyIds(filters.personIds);
+  const identityIds = uniqueTruthyIds(filters.identityIds);
+  const spacePersonIds = uniqueTruthyIds(filters.spacePersonIds);
+
+  return qb
+    .$if(personIds.length > 0, (qb) => hasPeople(qb, personIds))
+    .$if(identityIds.length > 0, (qb) => hasFaceIdentities(qb, identityIds))
+    .$if(spacePersonIds.length > 0, (qb) => hasSpacePeople(qb, spacePersonIds));
 }
 
 export function hasAnyPeople<O>(qb: SelectQueryBuilder<DB, 'asset', O>, filters: PeopleFilterIds) {
