@@ -2833,6 +2833,34 @@ describe('topNavigationMatch', () => {
     m.setQuery('zzzzzz');
     expect(m.topNavigationMatch).toBeNull();
   });
+
+  it('leaves a smart search containing the word "the" searchable', () => {
+    // Regression: "the" prefix-matched "Theme", so the Theme command/settings
+    // took the top slot and — because promotion suppresses `topSearchMatch` —
+    // Enter toggled the theme instead of running the search.
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('the beach at sunset');
+
+    expect(m.topNavigationMatch).toBeNull();
+    expect(m.topCommandMatch).toBeNull();
+    expect(m.topSearchMatch).toEqual({
+      id: 'top-search',
+      query: 'the beach at sunset',
+      rawQuery: 'the beach at sunset',
+    });
+  });
+
+  it('still promotes Theme settings when the user actually types "theme"', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('theme');
+
+    // The command wins the slot over the settings page (command-wins tie-break),
+    // which is the intended behaviour for a high-intent verb.
+    expect(m.topCommandMatch?.id).toBe('cmd:theme');
+    expect(m.topSearchMatch).toBeNull();
+  });
 });
 
 describe('topSearchMatch', () => {

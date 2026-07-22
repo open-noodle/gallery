@@ -214,20 +214,23 @@ describe('NAVIGATION_ITEMS schema', () => {
 
 describe('isAlmostExactNavMatch', () => {
   // Promotes a navigation item to the palette's "Top result" band when the
-  // user's query unambiguously points at the item. Word-level prefix match is
-  // the sweet spot: strict enough to avoid promoting weak matches, loose
-  // enough to handle compound queries ("auto-classification") and prefixes
-  // ("album" → "Albums"). Rejects queries shorter than 3 chars and words
-  // shorter than 3 chars to avoid promoting on a single keystroke.
+  // user's query unambiguously points at the item. The gate is deliberately
+  // narrow, because promotion also suppresses the free-text "search for …" row:
+  // a query word must all but spell out a label word (one untyped character of
+  // slack, so "album" → "Albums" still lands), and every query word must match,
+  // so a sentence can never be promoted by one incidental collision.
 
   it('returns true on an exact case-insensitive match', () => {
     expect(isAlmostExactNavMatch('people', 'People')).toBe(true);
     expect(isAlmostExactNavMatch('PHOTOS', 'photos')).toBe(true);
   });
 
-  it('returns true when the label starts with the query (prefix match)', () => {
+  it('returns true when the query is one character short of the label word', () => {
     expect(isAlmostExactNavMatch('album', 'Albums')).toBe(true);
-    expect(isAlmostExactNavMatch('classif', 'Classification Settings')).toBe(true);
+  });
+
+  it('rejects a partial prefix that leaves more than one character untyped', () => {
+    expect(isAlmostExactNavMatch('classif', 'Classification Settings')).toBe(false);
   });
 
   it('returns true when a whole word in the label starts with the query', () => {
