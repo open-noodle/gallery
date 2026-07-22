@@ -113,7 +113,7 @@ const makeSub = () => ({
   getBackfill: vi.fn().mockReturnValue(makeStream([])),
   getCreatedAfter: vi.fn().mockResolvedValue([]),
   getAlbumUsers: vi.fn().mockResolvedValue([{ userId: 'u1', role: AlbumUserRole.Owner }]),
-   
+
   cleanupAuditTable: vi.fn().mockResolvedValue(undefined),
   getCreates: vi.fn().mockReturnValue(makeStream([])),
   getUpdates: vi.fn().mockReturnValue(makeStream([])),
