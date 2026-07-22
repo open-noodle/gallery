@@ -15,8 +15,12 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+      # pnpm-workspace.yaml sets injectWorkspacePackages, so a plain `pnpm install`
+      # COPIES @immich/sdk into e2e/node_modules. Build the SDK before that install
+      # or the injected copy has no build/ output and the specs fail to import it.
+      # Same build-before-inject ordering as test.yml and server/Dockerfile.
+      - run: pnpm --filter @immich/sdk install --frozen-lockfile && pnpm --filter @immich/sdk build
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @immich/sdk build
       - name: Install Playwright browser
         working-directory: e2e
         run: pnpm exec playwright install chromium --only-shell
