@@ -480,7 +480,7 @@ describe(`/oauth`, () => {
       });
 
       it(`should complete a full login round-trip via ${redirectUri}`, async () => {
-        const callbackParams = await loginWithOAuth(`oauth-scheme-${redirectUri.split(':')[0]}`, redirectUri);
+        const callbackParams = await loginWithOAuth(`oauth-scheme-${redirectUri.split(':', 1)[0]}`, redirectUri);
         expect(callbackParams.url).toEqual(expect.stringContaining(redirectUri));
 
         const { status, body } = await request(app).post('/oauth/callback').send(callbackParams);
