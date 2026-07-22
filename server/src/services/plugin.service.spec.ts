@@ -60,7 +60,6 @@ describe(PluginService.name, () => {
   });
 
   it('throws when a plugin cannot be found', async () => {
-     
     mocks.plugin.get.mockResolvedValue(undefined);
 
     await expect(sut.get(newUuid())).rejects.toBeInstanceOf(BadRequestException);
