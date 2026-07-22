@@ -89,7 +89,9 @@ describe('/system-config', () => {
       expect(body.classification).toEqual({ enabled: true, categories: [] });
       // Same top-level shape as the persisted config.
       const live = await getSystemConfig(admin.accessToken);
-      expect(Object.keys(body).toSorted()).toEqual(Object.keys(live).toSorted());
+      expect(Object.keys(body).toSorted((a, b) => a.localeCompare(b))).toEqual(
+        Object.keys(live).toSorted((a, b) => a.localeCompare(b)),
+      );
     });
   });
 

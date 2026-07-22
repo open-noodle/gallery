@@ -21,8 +21,7 @@ test.describe('Timeline grouping navigation', () => {
 
       if (year === 2024) {
         newestAsset = asset;
-      }
-      if (year === 2000) {
+      } else if (year === 2000) {
         oldAsset = asset;
       }
     }
