@@ -307,12 +307,13 @@ DELETE FROM "migration_overrides"
 -- skill covers this under "Post-rebase: revert-to-immich.sql maintenance".
 -- -----------------------------------------------------------------------------
 
--- CURRENTLY EMPTY: this branch is rebased onto exactly upstream Immich
--- v3.0.1, so `server/src/schema/migrations/` matches v3.0.1 file-for-file and
--- carries no upstream migration that v3.0.1 lacks — there is nothing to reverse
--- here. When a future rebase pulls in upstream migrations *after* v3.0.1, port
--- each one's `down()` logic here (per the mechanical diff above) and add its
--- name to the step-8 DELETE list.
+-- 1784647658615-AddOAuthBearerTokenToSession (upstream #29720) added
+-- session."oauthBearerToken" so the server can send id_token_hint on OIDC
+-- logout. The tagged upstream release in branding/config.json does not ship
+-- this migration, so the column has to go back for its schema-check to match.
+-- IF EXISTS because this script also runs against a tagged :main image whose
+-- database never had the column; the migration's own down() assumes it does.
+ALTER TABLE "session" DROP COLUMN IF EXISTS "oauthBearerToken";
 
 -- 1782000000000-AddAssetExifDescriptionTrigramIndex added a fork-only GIN
 -- trigram index on asset_exif.description (for timeline description filtering)
@@ -396,11 +397,11 @@ DELETE FROM "kysely_migrations"
    -- 1776735180298-ChangeDurationToInteger is missing". Drop the alias row here;
    -- the real 1777667825574 row is always present by revert time and matches the
    -- upstream file, so it stays.
-   '1776735180298-ChangeDurationToInteger'
+   '1776735180298-ChangeDurationToInteger',
 
-   -- Post-v3.0.1 upstream migrations pulled in by rebase would be listed here,
-   -- paired with the schema rollbacks in step 7. Currently none — the branch is
-   -- based on exactly upstream v3.0.1.
+   -- Post-tag upstream migrations pulled in by rebase, paired with the schema
+   -- rollbacks in step 7. Keep timestamp-sorted.
+   '1784647658615-AddOAuthBearerTokenToSession'
  );
 
 -- -----------------------------------------------------------------------------
