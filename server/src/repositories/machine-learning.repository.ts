@@ -90,11 +90,7 @@ export type PetDetectionRequest = {
 };
 
 export type MachineLearningRequest =
-  | ClipVisualRequest
-  | ClipTextualRequest
-  | FacialRecognitionRequest
-  | OcrRequest
-  | PetDetectionRequest;
+  ClipVisualRequest | ClipTextualRequest | FacialRecognitionRequest | OcrRequest | PetDetectionRequest;
 export type TextEncodingOptions = ModelOptions & { language?: string };
 
 @Injectable()
