@@ -14,6 +14,7 @@ async function _init(fetch: Fetch) {
   setFetch(fetch);
   await initLanguage();
   await serverConfigManager.init();
+  authManager.isDemo = serverConfigManager.value.demoMode;
   await authManager.load();
 
   if (!serverConfigManager.value.maintenanceMode) {

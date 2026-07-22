@@ -46,7 +46,13 @@ const { mockUser } = vi.hoisted(() => ({
   // id is used by the cmdk-recent store to scope localStorage per user — every
   // test in this suite runs under the same synthetic user unless it explicitly
   // flips `mockUser.current` to something else.
-  mockUser: { current: { id: 'test-user', isAdmin: true } as { id: string; isAdmin: boolean } | null },
+  mockUser: {
+    current: { id: 'test-user', isAdmin: true },
+    isDemo: false,
+  } as {
+    current: { id: string; isAdmin: boolean } | null;
+    isDemo: boolean;
+  },
 }));
 vi.mock('$lib/managers/auth-manager.svelte', () => ({
   authManager: {
@@ -55,6 +61,9 @@ vi.mock('$lib/managers/auth-manager.svelte', () => ({
     },
     get user() {
       return mockUser.current;
+    },
+    get canPreviewAdmin() {
+      return !!mockUser.current && (mockUser.current.isAdmin || mockUser.isDemo);
     },
   },
 }));
@@ -108,6 +117,7 @@ vi.mock('$lib/utils/typed-search/typed-search-name-cache', () => ({
 // guarantees that forgetting to reset cannot poison later tests.
 afterEach(() => {
   mockUser.current = { id: 'test-user', isAdmin: true };
+  mockUser.isDemo = false;
   mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
   mockI18nLocale.current = 'en';
   mockPage.route.id = null;
@@ -3670,6 +3680,20 @@ describe('runNavigationProvider', () => {
     }
   });
 
+  it('shows admin navigation results for demo preview users', async () => {
+    mockUser.current = { id: 'demo-user', isAdmin: false };
+    mockUser.isDemo = true;
+    const manager = new GlobalSearchManager();
+
+    manager.setQuery('users');
+    await flushMicrotasks();
+
+    expect(manager.sections.navigation.status).toBe('ok');
+    expect((manager.sections.navigation as { items: { route: string }[] }).items.map((item) => item.route)).toContain(
+      '/admin/users',
+    );
+  });
+
   it('filters items gated on a disabled feature flag', () => {
     // Query 'map' (admin=true) DEFINITELY matches:
     //   - nav:userPages:map            (featureFlag:'map')
@@ -4065,6 +4089,21 @@ describe('commands provider', () => {
         ).toBe(true);
       }
     }
+  });
+
+  it('shows admin command results for demo preview users', async () => {
+    mockUser.current = { id: 'demo-user', isAdmin: false };
+    mockUser.isDemo = true;
+    const manager = new GlobalSearchManager();
+    manager.open();
+
+    manager.setQuery('>');
+    await flushMicrotasks();
+
+    expect(manager.sections.commands.status).toBe('ok');
+    expect(
+      (manager.sections.commands as { items: { adminOnly?: boolean }[] }).items.some((item) => item.adminOnly),
+    ).toBe(true);
   });
 
   it('commandInFlight guard blocks rapid double-activation of cmd:run_thumbnail_gen', async () => {
@@ -4535,6 +4574,26 @@ describe('activateRecent stale admin purge', () => {
     m.activateRecent(userPageEntry);
     expect(goto).toHaveBeenCalledWith('/photos');
     expect(getEntries().some((e) => e.id === 'nav:userPages:photos')).toBe(true);
+  });
+
+  it('keeps admin navigation recents valid for demo preview users', () => {
+    mockUser.current = { id: 'demo-user', isAdmin: false };
+    mockUser.isDemo = true;
+    resetRecentStore();
+    addEntry({
+      kind: 'navigate',
+      id: 'nav:admin:users',
+      route: '/admin/users',
+      labelKey: 'users',
+      icon: 'x',
+      adminOnly: true,
+      lastUsed: Date.now(),
+    });
+    const manager = new GlobalSearchManager();
+
+    manager.activateRecent(getEntries()[0]);
+
+    expect(getEntries()).toHaveLength(1);
   });
 });
 

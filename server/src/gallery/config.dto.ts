@@ -158,8 +158,8 @@ export const galleryJobDefaults = {
 export const galleryMachineLearningDefaults = {
   clipMaxDistance: 0,
   faceSuggestions: { enabled: true, maxDistance: 0.7 },
-  petDetection: { enabled: false, modelName: 'rfdetr-nano', minScore: 0.3 },
-  petRecognition: { enabled: false, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
+  petDetection: { enabled: true, modelName: 'rfdetr-nano', minScore: 0.3 },
+  petRecognition: { enabled: true, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
 };
 
 export const galleryServerDefaults = { mergePeopleAcrossOwners: false };

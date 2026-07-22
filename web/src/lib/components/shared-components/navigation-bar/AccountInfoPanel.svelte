@@ -25,6 +25,8 @@
   onMount(async () => {
     info = userInteraction.aboutInfo ?? (await getAboutInfo());
   });
+
+  const canPreviewAdmin = $derived(authManager.canPreviewAdmin);
 </script>
 
 <div
@@ -75,7 +77,7 @@
           {$t('account_settings')}
         </div>
       </Button>
-      {#if authManager.user.isAdmin}
+      {#if canPreviewAdmin}
         <Button
           href={Route.systemSettings()}
           onclick={onClose}

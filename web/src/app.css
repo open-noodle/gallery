@@ -211,3 +211,15 @@
 .animate-cmdk-shimmer {
   animation: cmdk-shimmer 1.6s linear infinite;
 }
+
+.demo-admin-shell > header {
+  height: var(--navbar-height);
+  min-height: var(--navbar-height);
+}
+
+@media (max-width: 47.999rem) {
+  .demo-admin-shell > header {
+    height: var(--navbar-height-md);
+    min-height: var(--navbar-height-md);
+  }
+}

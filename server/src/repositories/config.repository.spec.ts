@@ -10,6 +10,10 @@ const resetEnv = () => {
   for (const env of [
     'IMMICH_ALLOW_EXTERNAL_PLUGINS',
     'IMMICH_ALLOW_SETUP',
+    'IMMICH_DEMO_AUTO_LOGIN',
+    'IMMICH_DEMO_MODE',
+    'IMMICH_DEMO_USER_EMAIL',
+    'IMMICH_DEMO_USER_PASSWORD',
     'IMMICH_ENV',
     'IMMICH_WORKERS_INCLUDE',
     'IMMICH_WORKERS_EXCLUDE',
@@ -89,6 +93,7 @@ describe('getEnv', () => {
 
     expect(config.plugins.external).toEqual({ allow: false });
     expect(config.setup).toEqual({ allow: true });
+    expect(config.demo).toEqual({ enabled: false, email: '', password: '', autoLogin: false });
   });
 
   describe('IMMICH_MEDIA_LOCATION', () => {
@@ -121,6 +126,14 @@ describe('getEnv', () => {
     it('should throw an error for invalid value', () => {
       process.env.IMMICH_ALLOW_SETUP = 'invalid';
       expect(() => getEnv()).toThrowError('[IMMICH_ALLOW_SETUP] Invalid option: expected one of');
+    });
+  });
+
+  describe('IMMICH_DEMO_AUTO_LOGIN', () => {
+    it('should enable demo auto-login', () => {
+      process.env.IMMICH_DEMO_AUTO_LOGIN = 'true';
+      const { demo } = getEnv();
+      expect(demo.autoLogin).toBe(true);
     });
   });
 

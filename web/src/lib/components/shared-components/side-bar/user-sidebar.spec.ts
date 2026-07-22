@@ -7,6 +7,7 @@ vi.mock('$app/state', () => ({ page: mockPage }));
 
 const mocks = vi.hoisted(() => ({
   authManager: {
+    isDemo: false,
     preferences: {
       folders: { enabled: false, sidebarWeb: false },
       memories: { enabled: true, sidebarWeb: true },
@@ -80,8 +81,11 @@ vi.mock('$lib/stores/sidebar-mode.svelte', () => ({ sidebarModeStore: sidebarMoc
 
 describe('UserSidebar', () => {
   beforeEach(() => {
+    localStorage.clear();
+    mocks.authManager.isDemo = false;
     mocks.authManager.preferences.memories.enabled = true;
     mocks.authManager.preferences.memories.sidebarWeb = true;
+    mocks.featureFlagsManager.value.map = false;
     mockPage.url = new URL('https://gallery.test/photos');
     sidebarMocks.sidebarModeStore.layout = 'expanded';
     sidebarMocks.sidebarModeStore.hoverExpanded = false;

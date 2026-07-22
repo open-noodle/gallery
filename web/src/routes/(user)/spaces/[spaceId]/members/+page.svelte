@@ -73,7 +73,7 @@
 <div class="mx-auto w-full max-w-3xl p-4">
   <div class="mb-3 flex items-center justify-between">
     <h2 class="text-base font-semibold">{$t('members')} ({members.length})</h2>
-    {#if isOwner}
+    {#if isOwner || authManager.isDemo}
       <Button size="small" leadingIcon={mdiAccountPlusOutline} onclick={handleAddMember} data-testid="members-invite">
         {$t('spaces_add_member')}
       </Button>
