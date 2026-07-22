@@ -141,7 +141,7 @@ test.describe('Detail Panel', () => {
     await updateAsset(
       {
         id: fullyTaggedAsset.id,
-        updateAssetDto: { latitude: 48.853_41, longitude: 2.3488, rating: 5 },
+        updateAssetDto: { latitude: 48.85341, longitude: 2.3488, rating: 5 },
       },
       { headers: asBearerAuth(admin.accessToken) },
     );
