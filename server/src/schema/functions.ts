@@ -711,6 +711,13 @@ export const shared_space_album_after_insert_user = registerFunction({
 // When a user joins a space (shared_space_member INSERT), grant
 // shared_space_album_user for every album already linked to that space and
 // bump album.updateId so AlbumSync re-delivers those album metadata rows.
+//
+// Refresh createId on conflict (#752 launch review F-A, migration 1783700000000): a re-added
+// member whose grant SURVIVED removal (album_user access or a second co-linking space) kept the
+// original createId, so the grant-keyed per-album backfill never re-fired and contributions made
+// during the absence were permanently undeliverable to that member's devices. Mirror of
+// shared_space_album_after_insert_user above. Keep byte-identical to that migration's DDL —
+// migration-override-parity.spec.ts pins it.
 export const shared_space_member_after_insert_album = registerFunction({
   name: 'shared_space_member_after_insert_album',
   returnType: 'TRIGGER',
@@ -721,7 +728,8 @@ export const shared_space_member_after_insert_album = registerFunction({
       SELECT DISTINCT ir."userId", ssa."albumId"
       FROM inserted_rows ir
       INNER JOIN shared_space_album ssa ON ssa."spaceId" = ir."spaceId"
-      ON CONFLICT DO NOTHING;
+      ON CONFLICT ("userId", "albumId")
+      DO UPDATE SET "createId" = immich_uuid_v7(), "createdAt" = now();
 
       UPDATE album
       SET "updatedAt" = clock_timestamp(), "updateId" = immich_uuid_v7(clock_timestamp())
@@ -816,6 +824,28 @@ export const album_soft_delete_shared_space_album = registerFunction({
         WHERE o."deletedAt" IS NOT NULL AND n."deletedAt" IS NULL
       );
 
+      RETURN NULL;
+    END`,
+});
+
+// --- gallery-fork: album_space_asset delete-audit (#764) ---
+//
+// Tombstones every deleted cross-owner contribution — explicit removal
+// (AlbumService.removeAssets) AND every FK cascade (asset/album/space delete) — driving
+// SharedSpaceAlbumToAssetSync's delete stream. Statement-level AFTER DELETE so cascades are
+// captured too; see AlbumSpaceAssetAuditTable.
+//
+// Created by migration 1783100000000; registered here so `migrations:generate` / schema-check
+// see a declarative counterpart. Keep byte-identical to that migration's DDL —
+// migration-override-parity.spec.ts pins it.
+export const album_space_asset_delete_audit = registerFunction({
+  name: 'album_space_asset_delete_audit',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      INSERT INTO album_space_asset_audit ("albumId", "assetId")
+      SELECT "albumId", "assetId" FROM "old";
       RETURN NULL;
     END`,
 });
