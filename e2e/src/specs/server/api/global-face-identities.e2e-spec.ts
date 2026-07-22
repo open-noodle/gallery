@@ -125,7 +125,11 @@ const setupGlobalFaceIdentityE2E = async (): Promise<GlobalFaceIdentityFixture> 
       space2PersonId: space2Person.rows[0].id,
     };
   } catch (error) {
-    await db.query('ROLLBACK').catch(() => {});
+    try {
+      await db.query('ROLLBACK');
+    } catch {
+      // best-effort rollback; surface the original error
+    }
     throw error;
   }
 };

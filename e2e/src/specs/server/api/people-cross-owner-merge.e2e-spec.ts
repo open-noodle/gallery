@@ -204,7 +204,7 @@ describe('/people/same-person cross-owner merge (#733)', () => {
       const { rows } = await db.query(`SELECT id FROM "person" WHERE "ownerId" = $1 ORDER BY id`, [
         fx.otherOwner.userId,
       ]);
-      return (rows as { id: string }[]).map(({ id }) => id).toSorted();
+      return (rows as { id: string }[]).map(({ id }) => id).toSorted((a, b) => a.localeCompare(b));
     };
 
     it('is blocked for a regular user when the toggle is off (default)', async () => {
@@ -213,7 +213,9 @@ describe('/people/same-person cross-owner merge (#733)', () => {
       expect(status).toBe(403);
       expect(body.code).toBe('cross_owner_merge_blocked');
       // Nothing written: userB still has both of their people.
-      expect(await otherOwnerPersonIds()).toEqual([fx.otherOwnerPersonId, fx.otherOwnerSecondPersonId!].toSorted());
+      expect(await otherOwnerPersonIds()).toEqual(
+        [fx.otherOwnerPersonId, fx.otherOwnerSecondPersonId!].toSorted((a, b) => a.localeCompare(b)),
+      );
     });
 
     it('requires explicit confirmation once an admin enables the toggle', async () => {
@@ -224,7 +226,9 @@ describe('/people/same-person cross-owner merge (#733)', () => {
       expect(status).toBe(409);
       expect(body.code).toBe('cross_owner_merge_confirmation_required');
       expect(body.impactedOwnerCount).toBe(1);
-      expect(await otherOwnerPersonIds()).toEqual([fx.otherOwnerPersonId, fx.otherOwnerSecondPersonId!].toSorted());
+      expect(await otherOwnerPersonIds()).toEqual(
+        [fx.otherOwnerPersonId, fx.otherOwnerSecondPersonId!].toSorted((a, b) => a.localeCompare(b)),
+      );
     });
 
     it('commits once confirmed, merging the other owner’s two people into one', async () => {
