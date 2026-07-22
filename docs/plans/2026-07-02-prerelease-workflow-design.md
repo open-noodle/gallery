@@ -78,7 +78,7 @@ Jobs:
 4. **`build-ml`** (matrix: cpu/cuda/openvino × platforms per GA workflow) —
    `apply-branding` with `version`, build + push-by-digest to `gallery-ml`.
 5. **`merge-ml`** (matrix: cpu → ``, cuda → `-cuda`, openvino → `-openvino`) —
-`imagetools create -t gallery-ml:<version><suffix>`.
+   `imagetools create -t gallery-ml:<version><suffix>`.
 6. **`tag-and-release`**:
    - Create the annotated git tag `<version>` at the resolved SHA. **Does not**
      move `release` / `vN` / `latest`.

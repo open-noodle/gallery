@@ -49,14 +49,7 @@ The helpers exist to make the matrix the unit of test, not the individual `it`.
 ```ts
 // e2e/src/actors.ts
 export type ActorId =
-  | 'anon'
-  | 'regularA'
-  | 'regularB'
-  | 'spaceOwner'
-  | 'spaceEditor'
-  | 'spaceViewer'
-  | 'spaceNonMember'
-  | 'admin';
+  'anon' | 'regularA' | 'regularB' | 'spaceOwner' | 'spaceEditor' | 'spaceViewer' | 'spaceNonMember' | 'admin';
 
 export type Actor = {
   id: ActorId;
