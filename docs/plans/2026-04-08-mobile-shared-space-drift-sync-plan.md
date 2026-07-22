@@ -477,12 +477,8 @@ export const shared_space_delete_audit = registerFunction({
     END`,
 });
 
-export const shared_space_member_delete_audit = registerFunction({
-  /* ... */
-});
-export const shared_space_asset_delete_audit = registerFunction({
-  /* ... */
-});
+export const shared_space_member_delete_audit = registerFunction({/* ... */});
+export const shared_space_asset_delete_audit = registerFunction({/* ... */});
 ```
 
 **Step 1b: Add `@AfterDeleteTrigger` decorators to the three table classes**
