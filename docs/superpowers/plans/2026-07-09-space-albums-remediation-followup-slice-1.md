@@ -84,7 +84,7 @@ git commit -m "fix(spaces): exclude trashed album assets from album-granted sear
 
 - Modify: `server/src/services/timeline.service.ts` — `timeBucketChecks` (~`:127-138`)
 - Modify: `server/src/repositories/asset.repository.ts` — album arm in `withTimeBucketAssetFilters`
-  (~`:295`) and the inline copy in `getTimeBucket` (~`:1368`)
+  (~~`:295`) and the inline copy in `getTimeBucket` (~~`:1368`)
 - Test (unit): `server/src/services/timeline.service.spec.ts`
 - Test (e2e): `e2e/src/**` — extend the space-albums visibility negatives spec that already pins
   `albumId + visibility=locked → 401` (find via `grep -rl "albumId" e2e/src | xargs grep -l "visibility"`)
@@ -118,8 +118,8 @@ if (spaceBrowse && dto.isTrashed === true) {
 ```
 
 - [ ] **Step 4: Data-layer belt-and-suspenders.** In `asset.repository.ts`, inside the `albumId` `$if`
-      block of `withTimeBucketAssetFilters` (~`:295-300`) add `.where('asset.deletedAt', 'is', null)`, and
-      mirror it in the inline `getTimeBucket` copy (~`:1368-1380`). This forces the album arm to `deletedAt
+      block of `withTimeBucketAssetFilters` (~~`:295-300`) add `.where('asset.deletedAt', 'is', null)`, and
+      mirror it in the inline `getTimeBucket` copy (~~`:1368-1380`). This forces the album arm to `deletedAt
 IS NULL` even if `isTrashed` flips the shared ternary at `:253`/`:1352`. Add a one-line comment tying
       it to H1 and note "keep the two copies in sync" (a comment already flags the sync requirement).
 

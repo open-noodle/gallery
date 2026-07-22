@@ -62,19 +62,21 @@ Mirror 4.B exactly, once per path: a **space-only** audit table + an explicit `e
 Two append-only audit tables, **explicit-emit only (no triggers)** — visibility flips don't delete rows, so nothing fires a trigger; the emit methods write these tables directly. Shape mirrors `shared_space_asset_audit` (`server/src/schema/tables/shared-space-asset-audit.table.ts`).
 
 `shared_space_album_asset_audit`:
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid v7 | PK, generated (`@PrimaryGeneratedUuidV7Column`) — the sync checkpoint key |
-| `albumId` | uuid | indexed |
-| `assetId` | uuid | indexed |
-| `deletedAt` | timestamptz | `clock_timestamp()`, indexed (retention prune key) |
+
+| Column      | Type        | Notes                                                                     |
+| ----------- | ----------- | ------------------------------------------------------------------------- |
+| `id`        | uuid v7     | PK, generated (`@PrimaryGeneratedUuidV7Column`) — the sync checkpoint key |
+| `albumId`   | uuid        | indexed                                                                   |
+| `assetId`   | uuid        | indexed                                                                   |
+| `deletedAt` | timestamptz | `clock_timestamp()`, indexed (retention prune key)                        |
 
 `shared_space_library_asset_audit`:
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid v7 | PK, generated |
-| `libraryId` | uuid | indexed |
-| `assetId` | uuid | indexed |
+
+| Column      | Type        | Notes                        |
+| ----------- | ----------- | ---------------------------- |
+| `id`        | uuid v7     | PK, generated                |
+| `libraryId` | uuid        | indexed                      |
+| `assetId`   | uuid        | indexed                      |
 | `deletedAt` | timestamptz | `clock_timestamp()`, indexed |
 
 Table classes live in `server/src/schema/tables/`. Fork migrations with spread-apart random timestamps (`1779309791424-…`, `1781181889688-…`) that don't collide with existing `migrations-gallery/` timestamps or in-flight migrations on other branches. Add both tables to the `scripts/revert-to-immich/` cleanup SQL (one `DROP TABLE` per new table).
