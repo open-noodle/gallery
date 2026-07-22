@@ -386,6 +386,7 @@ DELETE FROM "kysely_migrations"
    '1783100000000-AddAlbumSpaceAssetSyncAndAudit',
    '1783628194057-DisablePostgresJit',
    '1783700000000-FixSharedSpaceMemberJoinGrantCreateId',
+   '1784800000000-RepairSharedSpaceAlbumGrantDrift',
 
    -- Build-time compatibility alias (server/bin/sync-gallery-migrations.mjs).
    -- Gallery's postbuild records ChangeDurationToInteger under BOTH its current
