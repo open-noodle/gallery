@@ -440,7 +440,7 @@ export function minioSetupAlias(): void {
 export function minioCountPrefix(prefix: string): number {
   try {
     const out = dockerExec('minio', `mc ls --recursive local/immich-test/${prefix} 2>/dev/null | wc -l`);
-    return Number.parseInt(out, 10);
+    return Number(out);
   } catch {
     return 0;
   }

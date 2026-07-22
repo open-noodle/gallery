@@ -39,10 +39,12 @@ describe('GET /search/suggestions/tags', () => {
     ]);
 
     // Each user creates their own asset and tags it with a per-user tag value.
-    [userAAssetId, userBAssetId] = await Promise.all([
-      utils.createAsset(userA.accessToken).then((a) => a.id),
-      utils.createAsset(userB.accessToken).then((a) => a.id),
+    const [userAAsset, userBAsset] = await Promise.all([
+      utils.createAsset(userA.accessToken),
+      utils.createAsset(userB.accessToken),
     ]);
+    userAAssetId = userAAsset.id;
+    userBAssetId = userBAsset.id;
 
     // Drain metadata extraction before associating tags. Otherwise a late
     // metadata extraction calls applyTagList → replaceAssetTags which DELETEs
