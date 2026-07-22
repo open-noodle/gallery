@@ -556,7 +556,7 @@ DROP TRIGGER IF EXISTS "album_soft_delete_shared_space_album" ON "album";
 DROP FUNCTION IF EXISTS album_soft_delete_shared_space_album() CASCADE;
 ```
 
-(c) In section 6 (`migration_overrides` DELETE IN-list), add `'function_album_soft_delete_shared_space_album',` next to the other `function_shared_space_album_*` entries (~`:229`) and `'trigger_album_soft_delete_shared_space_album',` next to the other `trigger_shared_space_album_*` entries (~`:255`).
+(c) In section 6 (`migration_overrides` DELETE IN-list), add `'function_album_soft_delete_shared_space_album',` next to the other `function_shared_space_album_*` entries (~~`:229`) and `'trigger_album_soft_delete_shared_space_album',` next to the other `trigger_shared_space_album_*` entries (~~`:255`).
 
 - [ ] **Step 7: Run the tests to verify they pass**
 
