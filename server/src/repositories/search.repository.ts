@@ -190,15 +190,7 @@ export type SmartSearchOptions = SearchDateOptions &
 export type SmartSearchFacetsOptions = Omit<SmartSearchOptions, 'orderDirection'>;
 
 type SmartFacetExclude =
-  | 'time'
-  | 'people'
-  | 'location'
-  | 'city'
-  | 'camera'
-  | 'cameraModel'
-  | 'tags'
-  | 'rating'
-  | 'media';
+  'time' | 'people' | 'location' | 'city' | 'camera' | 'cameraModel' | 'tags' | 'rating' | 'media';
 
 export interface SmartSearchFacetsResult {
   total: number;
