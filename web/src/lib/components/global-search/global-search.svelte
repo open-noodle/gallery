@@ -188,7 +188,17 @@
       previousActiveItemId = manager.activeItemId;
       return;
     }
-    if (previousActiveItemId === topResultId && manager.activeItemId !== topResultId) {
+    // Only a *user* moving off the top row counts as a dismissal, and a user can
+    // only do that while the token is unchanged. When the query grows by another
+    // character the token changes and the promoted row is re-created, which
+    // transiently clears the cmdk selection — reading that as a dismissal would
+    // strand the palette with no active row (Enter then does nothing) for any
+    // query whose promotion turns on one keystroke before the last, e.g. "theme".
+    if (
+      previousActiveItemId === topResultId &&
+      manager.activeItemId !== topResultId &&
+      lastAutoSelectedTopResultToken === topResultToken
+    ) {
       lastDismissedTopResultToken = topResultToken;
     }
     if (lastAutoSelectedTopResultToken !== topResultToken && lastDismissedTopResultToken !== topResultToken) {
