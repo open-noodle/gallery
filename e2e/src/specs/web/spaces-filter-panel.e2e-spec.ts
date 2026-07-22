@@ -1,6 +1,17 @@
 import type { LoginResponseDto } from '@immich/sdk';
+import type { Locator } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import { utils } from 'src/utils';
+
+// isVisible() rejects if the locator resolution races with a navigation; the
+// empty-state probes below treat that the same as "not visible".
+const isVisibleOrFalse = async (locator: Locator, timeout: number): Promise<boolean> => {
+  try {
+    return await locator.isVisible({ timeout });
+  } catch {
+    return false;
+  }
+};
 
 async function selectPageSort(page: import('@playwright/test').Page, label: 'Newest first' | 'Oldest first') {
   const sortButton = page.locator('[data-testid="search-sort-btn"]');
@@ -878,7 +889,7 @@ test.describe('Spaces FilterPanel', () => {
       // Since our test assets have no ratings, the filtered count should be 0
       // and the empty state should appear
       const emptyState = page.locator('[data-testid="empty-state-message"]');
-      if (await emptyState.isVisible({ timeout: 2000 }).catch(() => false)) {
+      if (await isVisibleOrFalse(emptyState, 2000)) {
         await expect(emptyState).toContainText('No photos match your filters');
       }
     });
@@ -1000,7 +1011,7 @@ test.describe('Spaces FilterPanel', () => {
       // Test assets are images (not videos), so filtering to videos should yield 0 results
       // Check for empty state
       const emptyState = page.locator('[data-testid="empty-state-message"]');
-      if (await emptyState.isVisible({ timeout: 2000 }).catch(() => false)) {
+      if (await isVisibleOrFalse(emptyState, 2000)) {
         await expect(emptyState).toContainText('No photos match your filters');
       }
     });
@@ -1305,7 +1316,7 @@ test.describe('Spaces FilterPanel', () => {
 
       // Capture the count after the first filter
       const firstCountText = await countElem.textContent();
-      const firstCount = Number.parseInt(firstCountText?.match(/(\d+)/)?.[1] ?? '0', 10);
+      const firstCount = Number(firstCountText?.match(/(\d+)/)?.[1] ?? '0');
 
       // Apply second filter — count should not increase (AND logic reduces or equals)
       await page.locator('[data-testid="rating-star-5"]').click();
@@ -1313,7 +1324,7 @@ test.describe('Spaces FilterPanel', () => {
 
       await expect(countElem).toBeVisible();
       const secondCountText = await countElem.textContent();
-      const secondCount = Number.parseInt(secondCountText?.match(/(\d+)/)?.[1] ?? '0', 10);
+      const secondCount = Number(secondCountText?.match(/(\d+)/)?.[1] ?? '0');
 
       // AND logic: adding more filters should yield fewer or equal results
       expect(secondCount).toBeLessThanOrEqual(firstCount);
@@ -1479,7 +1490,7 @@ test.describe('Spaces FilterPanel', () => {
       // The empty state renders when totalAssetCount === 0 and filters are active
       const emptyState = page.locator('[data-testid="empty-state-message"]');
       // If it appears, verify the clear link exists
-      if (await emptyState.isVisible({ timeout: 3000 }).catch(() => false)) {
+      if (await isVisibleOrFalse(emptyState, 3000)) {
         await expect(emptyState).toContainText('No photos match your filters');
         await expect(emptyState.locator('button')).toContainText('Clear all filters');
       }
