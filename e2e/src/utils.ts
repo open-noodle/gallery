@@ -1,4 +1,3 @@
-/* eslint-disable unicorn/no-top-level-assignment-in-function */
 import {
   AddUsersDto,
   AlbumResponseDto,
@@ -638,7 +637,11 @@ export const utils = {
       await client.query('COMMIT');
       return { globalPersonId, spacePersonId, faceId };
     } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // best-effort rollback; surface the original error
+      }
       throw error;
     }
   },
@@ -1048,7 +1051,6 @@ export const utils = {
   },
 };
 
-// eslint-disable-next-line unicorn/no-top-level-side-effects
 utils.initSdk();
 
 if (!existsSync(`${testAssetDir}/albums`)) {
