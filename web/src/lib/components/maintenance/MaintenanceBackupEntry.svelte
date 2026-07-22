@@ -1,6 +1,7 @@
 <script lang="ts">
   import OnEvents from '$lib/components/OnEvents.svelte';
   import { BackupFileStatus } from '$lib/constants';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { getDatabaseBackupActions, handleRestoreDatabaseBackup } from '$lib/services/database-backups.service';
   import { locale } from '$lib/stores/preferences.store';
   import { getBytesWithUnit } from '$lib/utils/byte-units';
@@ -17,6 +18,8 @@
   };
 
   const { filename, filesize, expectedVersion, timezone }: Props = $props();
+
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
 
   const filesizeText = $derived(getBytesWithUnit(filesize, 1));
 
@@ -82,17 +85,19 @@
           {/if}
         </HStack>
 
-        <HStack gap={1}>
-          <Button size="small" onclick={() => handleRestoreDatabaseBackup(filename)} disabled={isDeleting}
-            >{$t('restore')}</Button
-          >
-          <ContextMenuButton
-            disabled={isDeleting}
-            position="top-right"
-            aria-label={$t('open')}
-            items={[Download, Delete]}
-          />
-        </HStack>
+        {#if !isReadOnlyDemo}
+          <HStack gap={1}>
+            <Button size="small" onclick={() => handleRestoreDatabaseBackup(filename)} disabled={isDeleting}
+              >{$t('restore')}</Button
+            >
+            <ContextMenuButton
+              disabled={isDeleting}
+              position="top-right"
+              aria-label={$t('open')}
+              items={[Download, Delete]}
+            />
+          </HStack>
+        {/if}
       </div>
 
       <HStack>

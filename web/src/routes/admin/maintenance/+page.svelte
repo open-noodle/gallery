@@ -1,9 +1,11 @@
 <script lang="ts">
   import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
+  import ReadOnlyDemoNotice from '$lib/components/admin/ReadOnlyDemoNotice.svelte';
   import MaintenanceBackupsList from '$lib/components/maintenance/MaintenanceBackupsList.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
   import ServerStatisticsCard from '$lib/components/server-statistics/ServerStatisticsCard.svelte';
   import SettingAccordion from '$lib/components/shared-components/settings/SettingAccordion.svelte';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { Route } from '$lib/route';
   import { handleCreateJob } from '$lib/services/job.service';
   import { getMaintenanceAdminActions } from '$lib/services/maintenance.service';
@@ -29,6 +31,8 @@
 
   const { data }: Props = $props();
   const { StartMaintenance } = $derived(getMaintenanceAdminActions($t));
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
+  const pageActions = $derived(isReadOnlyDemo ? [] : [StartMaintenance]);
 
   let integrityReport: IntegrityReportSummaryResponseDto = $state(data.integrityReport);
 
@@ -109,34 +113,37 @@
 
 <OnEvents {onJobCreate} />
 
-<AdminPageLayout breadcrumbs={[{ title: data.meta.title }]} actions={[StartMaintenance]}>
+<AdminPageLayout breadcrumbs={[{ title: data.meta.title }]} actions={pageActions}>
   <Container size="large" center class="my-4 flex flex-col gap-6">
     <section class="w-full pb-4">
+      <ReadOnlyDemoNotice />
       <HStack>
         <Text size="small">{$t('admin.maintenance_integrity_report')}</Text>
-        <Button
-          size="tiny"
-          variant="ghost"
-          onclick={() => {
-            for (const name of Object.values(jobNames)) {
-              void handleCreateJob({ name });
-            }
-          }}
-          class="mt-1 self-end"
-          disabled={activeJobs.size > 0}>{$t('admin.maintenance_integrity_check_all')}</Button
-        >
-        <Button
-          size="tiny"
-          variant="ghost"
-          onclick={() => {
-            for (const name of Object.values(refreshJobNames)) {
-              void handleCreateJob({ name });
-            }
-          }}
-          class="mt-1 self-end"
-          disabled={activeJobs.size > 0}>{$t('refresh')}</Button
-        ></HStack
-      >
+        {#if !isReadOnlyDemo}
+          <Button
+            size="tiny"
+            variant="ghost"
+            onclick={() => {
+              for (const name of Object.values(jobNames)) {
+                void handleCreateJob({ name });
+              }
+            }}
+            class="mt-1 self-end"
+            disabled={activeJobs.size > 0}>{$t('admin.maintenance_integrity_check_all')}</Button
+          >
+          <Button
+            size="tiny"
+            variant="ghost"
+            onclick={() => {
+              for (const name of Object.values(refreshJobNames)) {
+                void handleCreateJob({ name });
+              }
+            }}
+            class="mt-1 self-end"
+            disabled={activeJobs.size > 0}>{$t('refresh')}</Button
+          >
+        {/if}
+      </HStack>
 
       <div class="mt-5 flex justify-between gap-4 max-lg:flex-wrap">
         {#each reportTypes as reportType (reportType)}
@@ -148,24 +155,26 @@
             {#snippet footer()}
               <HStack gap={1} class="justify-between">
                 <HStack gap={0}>
-                  <Button
-                    onclick={() =>
-                      handleCreateJob({
-                        name: jobNames[reportType],
-                      })}
-                    size="tiny"
-                    variant="ghost"
-                    disabled={activeJobs.has(jobNames[reportType])}>{$t('admin.maintenance_integrity_check')}</Button
-                  >
-                  <Button
-                    onclick={() =>
-                      handleCreateJob({
-                        name: refreshJobNames[reportType],
-                      })}
-                    size="tiny"
-                    variant="ghost"
-                    disabled={activeJobs.has(refreshJobNames[reportType])}>{$t('refresh')}</Button
-                  >
+                  {#if !isReadOnlyDemo}
+                    <Button
+                      onclick={() =>
+                        handleCreateJob({
+                          name: jobNames[reportType],
+                        })}
+                      size="tiny"
+                      variant="ghost"
+                      disabled={activeJobs.has(jobNames[reportType])}>{$t('admin.maintenance_integrity_check')}</Button
+                    >
+                    <Button
+                      onclick={() =>
+                        handleCreateJob({
+                          name: refreshJobNames[reportType],
+                        })}
+                      size="tiny"
+                      variant="ghost"
+                      disabled={activeJobs.has(refreshJobNames[reportType])}>{$t('refresh')}</Button
+                    >
+                  {/if}
                 </HStack>
                 <Button href={Route.systemMaintenanceIntegrityReport({ reportType })} size="tiny">{$t('view')}</Button>
               </HStack>

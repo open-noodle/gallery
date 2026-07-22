@@ -2,6 +2,8 @@
   import type { BreadcrumbItem } from '@immich/ui';
   import type { Snippet } from 'svelte';
 
+  type Action = { title: string };
+
   // Test double for AdminPageLayout. Unlike sidebar.stub.svelte (which the face-cleanup specs used to share
   // with the sidebar's own tests), this one RENDERS the breadcrumbs prop, mirroring @immich/ui's Breadcrumbs:
   // an item with an href becomes a link, one without becomes plain text.
@@ -15,6 +17,8 @@
   // than production.
   interface Props {
     breadcrumbs?: BreadcrumbItem[];
+    // Rendered as buttons so the read-only-demo specs can assert which mutating actions a page still offers.
+    actions?: Action[];
     children?: Snippet;
     // Pages that pin an action bar to the bottom of the content region pass it as AdminPageLayout's `footer`
     // snippet, NOT as part of `children`. The stub has to render it too, or that whole bar — bulk actions,
@@ -22,7 +26,7 @@
     footer?: Snippet;
   }
 
-  let { breadcrumbs = [], children, footer }: Props = $props();
+  let { breadcrumbs = [], actions = [], children, footer }: Props = $props();
 </script>
 
 <nav data-testid="breadcrumbs">
@@ -34,6 +38,12 @@
     {/if}
   {/each}
 </nav>
+
+<div data-testid="page-actions">
+  {#each actions as action (action.title)}
+    <button type="button">{action.title}</button>
+  {/each}
+</div>
 
 {@render children?.()}
 {@render footer?.()}
