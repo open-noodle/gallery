@@ -57,10 +57,10 @@ describe('/search/suggestions/filters', () => {
 
     // Set distinct coordinates for different countries
     const coordinates = [
-      { latitude: 48.853_41, longitude: 2.3488 }, // Paris, France
-      { latitude: 35.6895, longitude: 139.691_71 }, // Tokyo, Japan
-      { latitude: 52.524_37, longitude: 13.410_53 }, // Berlin, Germany
-      { latitude: 35.6895, longitude: 139.691_71 }, // Tokyo, Japan (same as B)
+      { latitude: 48.85341, longitude: 2.3488 }, // Paris, France
+      { latitude: 35.6895, longitude: 139.69171 }, // Tokyo, Japan
+      { latitude: 52.52437, longitude: 13.41053 }, // Berlin, Germany
+      { latitude: 35.6895, longitude: 139.69171 }, // Tokyo, Japan (same as B)
       { latitude: 48.2082, longitude: 16.3738 }, // Vienna, Austria
       { latitude: 59.3293, longitude: 18.0686 }, // Stockholm, Sweden
     ];
