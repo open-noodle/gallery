@@ -198,7 +198,6 @@ export async function loginUser(email: string, password: string): Promise<string
 export async function downloadAssetOriginal(token: string, assetId: string): Promise<Buffer> {
   const res = await fetch(`${BASE_URL}/assets/${assetId}/original`, {
     headers: { Authorization: `Bearer ${token}` },
-    redirect: 'follow',
   });
   assert.ok(res.status === 200, `Expected 200 for asset ${assetId} original, got ${res.status}`);
   const arrayBuffer = await res.arrayBuffer();
@@ -651,7 +650,6 @@ async function phaseMigrateToS3(): Promise<void> {
     for (const id of savedState.adminAssetIds as string[]) {
       const res = await fetch(`${BASE_URL}/assets/${id}/original`, {
         headers: { Authorization: `Bearer ${token}` },
-        redirect: 'follow',
       });
       if (res.status !== 200) {
         const body = await res.text();
@@ -667,7 +665,6 @@ async function phaseMigrateToS3(): Promise<void> {
     for (const id of savedState.user2AssetIds as string[]) {
       const res: Response = await fetch(`${BASE_URL}/assets/${id}/original`, {
         headers: { Authorization: `Bearer ${user2Token as string}` },
-        redirect: 'follow',
       });
       if (res.status !== 200) {
         const body = await res.text();
@@ -811,7 +808,6 @@ async function phaseMigrateToDisk(): Promise<void> {
     for (const id of savedState.adminAssetIds as string[]) {
       const res = await fetch(`${BASE_URL}/assets/${id}/original`, {
         headers: { Authorization: `Bearer ${token}` },
-        redirect: 'follow',
       });
       if (res.status !== 200) {
         const body = await res.text();
@@ -827,7 +823,6 @@ async function phaseMigrateToDisk(): Promise<void> {
     for (const id of savedState.user2AssetIds as string[]) {
       const res: Response = await fetch(`${BASE_URL}/assets/${id}/original`, {
         headers: { Authorization: `Bearer ${user2Token as string}` },
-        redirect: 'follow',
       });
       if (res.status !== 200) {
         const body = await res.text();
@@ -1374,7 +1369,6 @@ async function phaseDeleteSourceFalse(): Promise<void> {
     for (const id of savedStateLocal.adminAssetIds as string[]) {
       const res = await fetch(`${BASE_URL}/assets/${id}/original`, {
         headers: { Authorization: `Bearer ${token}` },
-        redirect: 'follow',
       });
       if (res.status !== 200) {
         const body = await res.text();
@@ -1426,7 +1420,6 @@ async function phaseContentVerify(): Promise<void> {
     for (const id of savedState.adminAssetIds as string[]) {
       const res = await fetch(`${BASE_URL}/assets/${id}/thumbnail`, {
         headers: { Authorization: `Bearer ${token}` },
-        redirect: 'follow',
       });
       assert.ok(res.status === 200, `Expected 200 for admin asset ${id} thumbnail, got ${res.status}`);
       const body = await res.arrayBuffer();
@@ -1437,7 +1430,6 @@ async function phaseContentVerify(): Promise<void> {
     for (const id of savedState.user2AssetIds as string[]) {
       const res = await fetch(`${BASE_URL}/assets/${id}/thumbnail`, {
         headers: { Authorization: `Bearer ${user2Token}` },
-        redirect: 'follow',
       });
       assert.ok(res.status === 200, `Expected 200 for user2 asset ${id} thumbnail, got ${res.status}`);
       const body = await res.arrayBuffer();
