@@ -195,7 +195,7 @@ export class QueueService extends BaseService {
       this.jobRepository.isPaused(name),
       includeJobTypes ? this.jobRepository.getJobTypes(name) : [],
     ]);
-    return { name, isPaused, statistics, ...((jobTypes.length > 0) && { jobTypes }) };
+    return { name, isPaused, statistics, ...(jobTypes.length > 0 && { jobTypes }) };
   }
 
   private async start(name: QueueName, { force }: QueueCommandDto): Promise<void> {
