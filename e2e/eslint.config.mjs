@@ -46,6 +46,13 @@ export default typescriptEslint.config([
       'unicorn/no-declarations-before-early-exit': 'off',
       'unicorn/prefer-simple-condition-first': 'off',
       'unicorn/single-line-block-comment-style': ['error', 'single-line'],
+      // The e2e harness is a test fixture, not a library: modules legitimately own
+      // mutable setup state (asset counters, the pg client) and run setup at import
+      // time, and table-driven matrix specs read more clearly with a labelled
+      // break/continue than with an extracted function per loop body.
+      'unicorn/no-top-level-side-effects': 'off',
+      'unicorn/no-top-level-assignment-in-function': 'off',
+      'unicorn/no-break-in-nested-loop': 'off',
       curly: 2,
       'prettier/prettier': 0,
       'unicorn/name-replacements': 'off',
