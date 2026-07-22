@@ -150,7 +150,7 @@ Notable clusters (full list in the audit run output):
 These areas had no dedicated finder or only shallow coverage — candidates for a focused second-pass audit:
 
 1. **Server-side memories rule engine** (`server/src/services/memory-rules/**`, birthday + recent-trip rules). Spot-check: rules byte-identical to `main`, wiring/config toggles intact — but **memory-generation scheduling on the v3 job graph and mobile parsing of fork memory types via sync were never exercised.**
-2. **`tools/upstream-preflight/**`\** (~1,600 lines of drift vs main) — the tooling that *enforces this manifest\* (mobile-drift / ci-invariants checks). Unreviewed; a weakened safety net there degrades future rebase safety invisibly.
+2. *_`tools/upstream-preflight/**`\*_ (~1,600 lines of drift vs main) — the tooling that *enforces this manifest\* (mobile-drift / ci-invariants checks). Unreviewed; a weakened safety net there degrades future rebase safety invisibly.
 3. **New upstream workflows/plugins asset-triggers** — no finder traced a workflow firing on a shared-space or partner asset end-to-end against fork space RBAC, or where plugin artifacts land on S3-primary installs.
 4. **New upstream database-backup feature** — checked only for auth guards, not against the fork's dual-backend storage (likely fine — `pg_dump` targets local disk as upstream intends).
 

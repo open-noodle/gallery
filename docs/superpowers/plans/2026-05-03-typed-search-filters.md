@@ -59,16 +59,7 @@ Use these exported shapes so tasks stay consistent:
 
 ```ts
 export type TypedSearchFilterKey =
-  | 'person'
-  | 'tag'
-  | 'from'
-  | 'to'
-  | 'city'
-  | 'country'
-  | 'camera'
-  | 'type'
-  | 'favorite'
-  | 'rating';
+  'person' | 'tag' | 'from' | 'to' | 'city' | 'country' | 'camera' | 'type' | 'favorite' | 'rating';
 
 export type TypedSearchResolutionKey = 'person' | 'tag' | 'camera';
 export type TypedSearchIssueCode =
