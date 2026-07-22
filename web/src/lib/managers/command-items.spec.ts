@@ -405,9 +405,15 @@ describe('isAlmostExactCommandMatch', () => {
   it('returns false for queries shorter than 3 chars', () => {
     expect(isAlmostExactCommandMatch('up', 'Upload files')).toBe(false);
   });
-  it('matches when a query word is a prefix of a label word', () => {
+  it('matches when a query word all but spells out a label word', () => {
     expect(isAlmostExactCommandMatch('upload', 'Upload files')).toBe(true);
-    expect(isAlmostExactCommandMatch('upl', 'Upload files')).toBe(true);
+    expect(isAlmostExactCommandMatch('uploa', 'Upload files')).toBe(true);
+  });
+  it('rejects a partial prefix that leaves more than one character untyped', () => {
+    expect(isAlmostExactCommandMatch('upl', 'Upload files')).toBe(false);
+  });
+  it('rejects a sentence that only incidentally contains a label word', () => {
+    expect(isAlmostExactCommandMatch('upload files to the beach album', 'Upload files')).toBe(false);
   });
   it('is case-insensitive', () => {
     expect(isAlmostExactCommandMatch('UPLOAD', 'Upload files')).toBe(true);
