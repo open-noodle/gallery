@@ -470,7 +470,11 @@ describe(PersonRepository.name, () => {
       });
       const { person: hiddenNamed } = await ctx.newPerson({ ownerId: user.id, name: 'Hidden', isHidden: true });
       const { person: unnamedVisible } = await ctx.newPerson({ ownerId: user.id, name: '', isHidden: false });
-      const { person: whitespaceVisible } = await ctx.newPerson({ ownerId: user.id, name: ' '.repeat(3), isHidden: false });
+      const { person: whitespaceVisible } = await ctx.newPerson({
+        ownerId: user.id,
+        name: ' '.repeat(3),
+        isHidden: false,
+      });
       const { person: outOfScopeNamed } = await ctx.newPerson({ ownerId: user.id, name: 'Archived', isHidden: false });
       const { person: otherNamed } = await ctx.newPerson({ ownerId: otherUser.id, name: 'Other', isHidden: false });
 
