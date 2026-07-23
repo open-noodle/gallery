@@ -141,6 +141,14 @@ Two local-tooling notes worth recording, both of which shaped how this was fixed
 - `eslint --fix` could **not** be used: `@koddsson/eslint-plugin-tscompat@0.2.0` crashes with `TypeError: Cannot read properties of undefined (reading 'Class')` on `map-filter-options.spec.ts`, aborting the run before any fix is written. The three sites were therefore hand-edited.
 - To verify the fix locally, lint the files with the crashing rule disabled: `npx eslint --rule '{"tscompat/tscompat":"off"}' <files>` → exit 0.
 
+### Round 2 — all green
+
+`test.yml` re-dispatched on `56a5d172c23` → run **30047048512**, conclusion **success**, 20/20 jobs green (0 non-green).
+
+Only `test.yml` was re-run. The fix touches two `.spec.ts` files and this report — none of which enter the shipped bundle — so the other nine workflows remain valid as green on `635d158242e`, per the "re-run only what your fix can affect" rule.
+
+**Final: all 10 workflows green.**
+
 ## Post-Rebase Verification
 
 - Fork commits ahead of upstream: 977
