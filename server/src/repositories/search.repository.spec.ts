@@ -3,7 +3,7 @@ import { DummyDriver, Kysely, PostgresAdapter, PostgresIntrospector, PostgresQue
 import { AssetOrder } from 'src/enum';
 import { SearchRepository } from 'src/repositories/search.repository';
 import type { DB } from 'src/schema';
-import { searchAssetBuilder } from 'src/utils/database';
+import { searchAssetBuilderLegacy } from 'src/utils/database';
 import { describe, expect, it } from 'vitest';
 
 // Offline Kysely — compiles SQL without executing it. No DB connection needed.
@@ -26,7 +26,7 @@ const buildQueries = (
 ) => (sut as any).buildSearchSmartQueries(offlineKysely(), pagination, options);
 
 const buildAssetSearchSql = (options: Record<string, unknown>) =>
-  searchAssetBuilder(offlineKysely(), options as any)
+  searchAssetBuilderLegacy(offlineKysely(), options as any)
     .selectAll('asset')
     .compile().sql;
 
