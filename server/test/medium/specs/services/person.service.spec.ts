@@ -230,6 +230,22 @@ beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
 
+/** An owner's asset carrying one named face, shared with `viewer` through an album. */
+const albumSharedAsset = async (ctx: ReturnType<typeof setup>['ctx']) => {
+  const { user: owner } = await ctx.newUser();
+  const { user: viewer } = await ctx.newUser();
+  const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'Alice', birthDate: '1990-05-13' });
+  const { asset } = await ctx.newAsset({ ownerId: owner.id, width: 100, height: 100 });
+  await ctx.newExif({ assetId: asset.id, exifImageHeight: 100, exifImageWidth: 100 });
+  await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+
+  const { album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Shared Album' });
+  await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+  await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id });
+
+  return { owner, viewer, person, asset };
+};
+
 describe(PersonService.name, () => {
   describe('handleQueueDetectFaces safety', () => {
     it('preserves manual and EXIF roots while force face detection removes stale machine-learning state', async () => {
@@ -1741,6 +1757,72 @@ describe(PersonService.name, () => {
           }),
         ]),
       );
+    });
+  });
+
+  // #796: the asset-viewer info panel renders its People section from GET /faces for any viewer
+  // with no space context (shared-album recipient, partner). These pin what that endpoint actually
+  // serves a non-owner — the web panel can only display what survives mapFaces' owner check.
+  describe('getFacesById (non-owner read access)', () => {
+    it('grants a shared-album recipient read access to the faces', async () => {
+      const { sut, ctx } = setup();
+      const { viewer, asset } = await albumSharedAsset(ctx);
+
+      const faces = await sut.getFacesById(factory.auth({ user: viewer }), { id: asset.id });
+
+      expect(faces).toHaveLength(1);
+    });
+
+    it('returns the person identity to a shared-album recipient', async () => {
+      const { sut, ctx } = setup();
+      const { viewer, asset, person } = await albumSharedAsset(ctx);
+
+      const faces = await sut.getFacesById(factory.auth({ user: viewer }), { id: asset.id });
+
+      // #796: who is in a photo is metadata anyone with read access may see. The access check has
+      // already run (Permission.AssetRead), so every face reaching this mapper belongs to an asset
+      // the caller is entitled to.
+      expect(faces[0].person).toEqual(expect.objectContaining({ id: person.id, name: 'Alice' }));
+    });
+
+    it('includes the person birth date so the viewer sees an age', async () => {
+      const { sut, ctx } = setup();
+      const { viewer, asset } = await albumSharedAsset(ctx);
+
+      const faces = await sut.getFacesById(factory.auth({ user: viewer }), { id: asset.id });
+
+      expect(faces[0].person?.birthDate).toBe('1990-05-13');
+    });
+
+    it('hides a hidden person from a non-owner', async () => {
+      const { sut, ctx } = setup();
+      const { viewer, asset, person } = await albumSharedAsset(ctx);
+      await ctx.database.updateTable('person').set({ isHidden: true }).where('id', '=', person.id).execute();
+
+      const faces = await sut.getFacesById(factory.auth({ user: viewer }), { id: asset.id });
+
+      // A person the owner marked hidden must not leak to a viewer. Filtering this client-side
+      // would be cosmetic only — the identity would still be on the wire.
+      expect(faces).toEqual([]);
+    });
+
+    it('still returns a hidden person to the owner', async () => {
+      const { sut, ctx } = setup();
+      const { owner, asset, person } = await albumSharedAsset(ctx);
+      await ctx.database.updateTable('person').set({ isHidden: true }).where('id', '=', person.id).execute();
+
+      const faces = await sut.getFacesById(factory.auth({ user: owner }), { id: asset.id });
+
+      expect(faces[0].person).toEqual(expect.objectContaining({ id: person.id }));
+    });
+
+    it('returns the person identity to the owner', async () => {
+      const { sut, ctx } = setup();
+      const { owner, person, asset } = await albumSharedAsset(ctx);
+
+      const faces = await sut.getFacesById(factory.auth({ user: owner }), { id: asset.id });
+
+      expect(faces[0].person).toEqual(expect.objectContaining({ id: person.id, name: 'Alice' }));
     });
   });
 });

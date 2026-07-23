@@ -5,7 +5,7 @@
   import { Route } from '$lib/route';
   import { faceManager } from '$lib/stores/face.svelte';
   import { locale } from '$lib/stores/preferences.store';
-  import { createUrl, getPeopleThumbnailUrl } from '$lib/utils';
+  import { createUrl, getAssetUrls, getPeopleThumbnailUrl } from '$lib/utils';
   import { zoomImageToBase64 } from '$lib/utils/people-utils';
   import { type AssetResponseDto } from '@immich/sdk';
   import { IconButton, Text } from '@immich/ui';
@@ -26,12 +26,27 @@
 
   const isSpaceMember = $derived(!!spaceId);
   const people = $derived(isSpaceMember && !isOwner ? asset.people || [] : Array.from(faceManager.people));
-  const getPersonFallbackThumbnailUrl = (person: AssetPerson) =>
-    spaceId && person.spacePersonId
-      ? createUrl(`/shared-spaces/${spaceId}/people/${person.spacePersonId}/thumbnail`, {
-          updatedAt: person.updatedAt,
-        })
-      : getPeopleThumbnailUrl(person);
+  // `/people/{id}/thumbnail` is owner-gated AND is cropped from the person's feature photo — a
+  // DIFFERENT asset the viewer may have no right to see. Never request it for a non-owner (#796):
+  // their avatar is cropped client-side from the asset already on screen, and this asset's own
+  // thumbnail (which they can definitely see) stands in while that crop resolves.
+  const getPersonFallbackThumbnailUrl = (person: AssetPerson) => {
+    if (spaceId && person.spacePersonId) {
+      return createUrl(`/shared-spaces/${spaceId}/people/${person.spacePersonId}/thumbnail`, {
+        updatedAt: person.updatedAt,
+      });
+    }
+    return isOwner ? getPeopleThumbnailUrl(person) : getAssetUrls(asset).thumbnail;
+  };
+
+  // A non-owner has no access to the owner-scoped person page, so their name is rendered as plain
+  // text rather than a link into a 404.
+  const getPersonHref = (person: AssetPerson) => {
+    if (spaceId && person.spacePersonId) {
+      return Route.viewSpacePerson(spaceId, person.spacePersonId);
+    }
+    return isOwner ? Route.viewPerson(person, { previousRoute }) : undefined;
+  };
   const visiblePeople = $derived(
     people
       .filter((p) => assetViewerManager.isShowingHiddenPeople || !p.isHidden)
@@ -68,24 +83,20 @@
   );
 </script>
 
-{#if !authManager.isSharedLink && (isOwner || isSpaceMember)}
-  <section class="px-4 pt-4 text-sm">
-    {#if isOwner || visiblePeople.length > 0}
-      <div class="flex h-10 w-full items-center justify-between">
-        <Text size="small" color="muted">{$t('people')}</Text>
-        <div class="flex items-center gap-2">
-          {#if isOwner}
-            {#if people.some((person) => person.isHidden)}
-              <IconButton
-                aria-label={$t('show_hidden_people')}
-                icon={assetViewerManager.isShowingHiddenPeople ? mdiEyeOff : mdiEye}
-                size="medium"
-                shape="round"
-                color="secondary"
-                variant="ghost"
-                onclick={() => assetViewerManager.toggleHiddenPeople()}
-              />
-            {/if}
+<!--
+  Who is in a photo is read-only metadata: anyone with read access to the asset sees the panel
+  (#796) — `GET /faces` already authorizes on AssetRead (owner ∪ album ∪ partner ∪ space), so a
+  non-owner reaching this panel is entitled to the data. Only the affordances below (hidden-people
+  toggle, add-face, edit-faces) stay owner-gated. A non-owner with nobody to show gets no empty
+  section; the owner keeps it so the add-face affordance stays reachable on a face-less asset.
+-->
+{#if !authManager.isSharedLink && (isOwner || visiblePeople.length > 0)}
+  <section class="px-4 pt-4 text-sm" data-testid="detail-panel-people">
+    <div class="flex h-10 w-full items-center justify-between">
+      <Text size="small" color="muted">{$t('people')}</Text>
+      <div class="flex items-center gap-2">
+        {#if isOwner}
+          {#if people.some((person) => person.isHidden)}
             <IconButton
               aria-label={$t('tag_people')}
               icon={mdiPlus}
@@ -119,9 +130,7 @@
         {@const fallbackThumbnailUrl = getPersonFallbackThumbnailUrl(person)}
         <a
           class="group outline-none"
-          href={spaceId && person.spacePersonId
-            ? Route.viewSpacePerson(spaceId, person.spacePersonId)
-            : Route.viewPerson(person, { previousRoute })}
+          href={getPersonHref(person)}
           onfocus={() => assetViewerManager.setHighlightedFaces(personFaces)}
           onblur={() => assetViewerManager.clearHighlightedFaces()}
           onpointerenter={() => assetViewerManager.setHighlightedFaces(personFaces)}
