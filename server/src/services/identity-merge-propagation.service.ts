@@ -15,6 +15,15 @@ import { MERGE_ERROR_CODE } from 'src/utils/merge-error-code';
 
 export type MergeProfileKind = 'person' | 'space-person';
 
+export type SpaceReassignSourceFace = {
+  assetFaceId: string;
+  assetId: string;
+  personId: string | null;
+  assetOwnerId: string;
+};
+
+export type SpaceFaceReassignTarget = { type: 'new' } | { type: 'existing'; profile: ScopedPersonProfileRefDto };
+
 export type MergeProfile = {
   kind: MergeProfileKind;
   id: string;
@@ -168,6 +177,88 @@ export class IdentityMergePropagationService {
         data: { spaceId, assetId },
       });
     }
+  }
+
+  /**
+   * Reassign already-resolved source faces to a target person (#765).
+   *
+   * The target person is always owner-aligned: it is resolved (or created) under the *asset's* owner,
+   * matching how every other face-holding person is created in this codebase. Per D4, a `new` target
+   * mints one person per distinct asset owner, not one per face.
+   */
+  async reassignSpaceFacesToTarget(
+    faces: SpaceReassignSourceFace[],
+    target: SpaceFaceReassignTarget,
+  ): Promise<{ reassigned: number; targetPersonIds: string[] }> {
+    if (faces.length === 0) {
+      return { reassigned: 0, targetPersonIds: [] };
+    }
+
+    // A space-person target resolves to ONE identity for the whole batch; the per-owner person that
+    // carries it is resolved (or created) below, per face's asset owner.
+    let targetIdentityId: string | undefined;
+    if (target.type === 'existing' && target.profile.type === 'space-person') {
+      const identity = await this.deps.faceIdentityRepository.ensureSpacePersonIdentity(target.profile.id);
+      targetIdentityId = identity.id;
+    }
+
+    const personIdByOwner = new Map<string, string>();
+    const targetPersonIds = new Set<string>();
+    let reassigned = 0;
+
+    for (const face of faces) {
+      let targetPersonId: string;
+
+      if (target.type === 'existing' && target.profile.type === 'person') {
+        // A global person id the caller already holds — use it as-is.
+        targetPersonId = target.profile.id;
+      } else {
+        const cached = personIdByOwner.get(face.assetOwnerId);
+        if (cached) {
+          targetPersonId = cached;
+        } else if (targetIdentityId) {
+          const existing = await this.deps.faceIdentityRepository.getPersonByIdentity(
+            face.assetOwnerId,
+            targetIdentityId,
+          );
+          // The identity MUST be set at creation. replaceFaceIdentity below calls ensurePersonIdentity,
+          // which mints a BRAND-NEW identity for an identity-less person — that would project the face
+          // under a duplicate space person instead of the target, silently re-breaking #765.
+          if (existing) {
+            targetPersonId = existing.id;
+          } else {
+            const created = await this.deps.personRepository.create({
+              ownerId: face.assetOwnerId,
+              identityId: targetIdentityId,
+            });
+            targetPersonId = created.id;
+          }
+          personIdByOwner.set(face.assetOwnerId, targetPersonId);
+        } else {
+          // target.type === 'new': deliberately identity-less so ensurePersonIdentity mints a fresh
+          // identity, which is what makes this a genuinely new person/space person.
+          const created = await this.deps.personRepository.create({ ownerId: face.assetOwnerId });
+          targetPersonId = created.id;
+          personIdByOwner.set(face.assetOwnerId, targetPersonId);
+        }
+      }
+
+      await this.deps.personRepository.reassignFace(face.assetFaceId, targetPersonId);
+      const identity = await this.deps.faceIdentityRepository.ensurePersonIdentity(targetPersonId);
+      await this.deps.faceIdentityRepository.replaceFaceIdentity({
+        assetFaceId: face.assetFaceId,
+        identityId: identity.id,
+        source: 'manual',
+      });
+      // Must run AFTER the identity relink — the match job resolves the target space person from
+      // face_identity_face.
+      await this.refreshSharedSpaceFacesAfterReassign(face.assetId, face.assetFaceId);
+
+      targetPersonIds.add(targetPersonId);
+      reassigned += 1;
+    }
+
+    return { reassigned, targetPersonIds: [...targetPersonIds] };
   }
 
   async mergePersonalPeople(
