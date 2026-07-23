@@ -1,5 +1,5 @@
 import { AssetTypeEnum, AssetVisibility, MapMediaType } from '@immich/sdk';
-import { buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
+import { applyTextFilters, buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
 
 type MapTimelineSettings = {
   onlyFavorites?: boolean;
@@ -37,6 +37,8 @@ function applyCommonMapFilters(base: Record<string, unknown>, filters: FilterSta
   if (filters.country) {
     base.country = filters.country;
   }
+
+  applyTextFilters(base, filters);
 
   const context = buildFilterContext(filters);
   if (context?.takenAfter) {
