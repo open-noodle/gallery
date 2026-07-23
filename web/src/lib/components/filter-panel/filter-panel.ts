@@ -34,6 +34,27 @@ export function saveFilterCollapsed(collapsed: boolean): void {
 export type FilterSection =
   'timeline' | 'people' | 'location' | 'camera' | 'tags' | 'rating' | 'media' | 'favorites' | 'albums' | 'text';
 
+/**
+ * The canonical filter sections, in render order — the single source of truth every surface
+ * derives its section list from (#802: the Map view had silently drifted to 9 of 10 sections).
+ *
+ * A surface may only drop a section when the server physically cannot honour it there, and the
+ * omission must be justified in `filter-section-parity.spec.ts`. Adding a section here makes it
+ * appear on every surface at once, which is the point.
+ */
+export const ALL_FILTER_SECTIONS: readonly FilterSection[] = [
+  'timeline',
+  'people',
+  'location',
+  'camera',
+  'tags',
+  'rating',
+  'media',
+  'favorites',
+  'albums',
+  'text',
+] as const;
+
 export interface PersonOption {
   id: string;
   name: string;
@@ -183,6 +204,33 @@ function dateOnlyToExclusiveUtcEnd(value: string | undefined): string | undefine
 
   date.setUTCDate(date.getUTCDate() + 1);
   return date.toISOString();
+}
+
+/**
+ * Forward the three fields the `text` filter section produces onto a request payload, trimmed,
+ * omitting any that are blank. Shared by every surface's option builder so the map, album and
+ * photos views cannot drift apart again (#802).
+ */
+export function applyTextFilters(
+  base: Record<string, unknown>,
+  filters: Pick<FilterState, 'description' | 'originalFileName' | 'ocr'>,
+): Record<string, unknown> {
+  const description = filters.description?.trim();
+  if (description) {
+    base.description = description;
+  }
+
+  const originalFileName = filters.originalFileName?.trim();
+  if (originalFileName) {
+    base.originalFileName = originalFileName;
+  }
+
+  const ocr = filters.ocr?.trim();
+  if (ocr) {
+    base.ocr = ocr;
+  }
+
+  return base;
 }
 
 export function buildFilterContext(
