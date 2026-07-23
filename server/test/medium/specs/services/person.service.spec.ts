@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
 import { AssetEditAction, MirrorAxis } from 'src/dtos/editing.dto';
@@ -93,6 +94,48 @@ const setupFaceDetection = (db?: Kysely<DB>) => {
     });
 
   return { sut, ctx };
+};
+
+/**
+ * #808: reproduces the reported shape against a real database — `person.birthDate` is NULL and the
+ * birthday only ever existed on a `shared_space_person` profile reached through the shared
+ * `identityId`. This is the payload the asset viewer Info panel renders for the owner, so the age
+ * has to survive the trip. The small tests stub the resolver; these prove the real
+ * `hydrateAccessiblePeople` query actually returns the space birthday for this shape.
+ */
+const seedSpaceOnlyBirthday = async (birthDateSource: 'manual' | 'inherited') => {
+  const { sut, ctx } = setup();
+  const faceIdentityRepository = ctx.get(FaceIdentityRepository);
+  const { user } = await ctx.newUser();
+  const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Karolin', birthDate: null });
+  const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+  await ctx.newExif({ assetId: asset.id, exifImageWidth: 400, exifImageHeight: 500 });
+  const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+
+  const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+  await faceIdentityRepository.linkFace({ assetFaceId: faceId, identityId: identity.id, source: 'owner-person' });
+
+  const { space } = await ctx.newSharedSpace({ createdById: user.id });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+  await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+
+  const spacePerson = await ctx.database
+    .insertInto('shared_space_person')
+    .values({
+      spaceId: space.id,
+      name: 'Karolin',
+      identityId: identity.id,
+      birthDate: '2014-02-14',
+      birthDateSource,
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+  await ctx.database
+    .insertInto('shared_space_person_face')
+    .values({ personId: spacePerson.id, assetFaceId: faceId })
+    .execute();
+
+  return { sut, ctx, user, person, asset, identity, space };
 };
 
 const setupFaceRecognition = (db?: Kysely<DB>) => {
@@ -1823,6 +1866,54 @@ describe(PersonService.name, () => {
       const faces = await sut.getFacesById(factory.auth({ user: owner }), { id: asset.id });
 
       expect(faces[0].person).toEqual(expect.objectContaining({ id: person.id, name: 'Alice' }));
+    });
+  });
+
+  describe('getFacesById shared-space birthday resolution', () => {
+    it('returns a birthday that only exists on a manual shared-space profile', async () => {
+      const { sut, user, person, asset } = await seedSpaceOnlyBirthday('manual');
+
+      const faces = await sut.getFacesById(factory.auth({ user }), { id: asset.id });
+
+      expect(faces).toHaveLength(1);
+      expect(faces[0].person).toEqual(
+        expect.objectContaining({ id: person.id, name: 'Karolin', birthDate: '2014-02-14' }),
+      );
+    });
+
+    it('returns a birthday inherited across spaces from a sibling profile', async () => {
+      const { sut, user, asset } = await seedSpaceOnlyBirthday('inherited');
+
+      const faces = await sut.getFacesById(factory.auth({ user }), { id: asset.id });
+
+      expect(faces[0].person?.birthDate).toBe('2014-02-14');
+    });
+
+    it('leaves the birthday null when no profile of the identity carries one', async () => {
+      const { sut, ctx } = setup();
+      const faceIdentityRepository = ctx.get(FaceIdentityRepository);
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Karolin', birthDate: null });
+      const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      await ctx.newExif({ assetId: asset.id, exifImageWidth: 400, exifImageHeight: 500 });
+      const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+      await faceIdentityRepository.linkFace({ assetFaceId: faceId, identityId: identity.id, source: 'owner-person' });
+
+      const faces = await sut.getFacesById(factory.auth({ user }), { id: asset.id });
+
+      expect(faces[0].person).toEqual(expect.objectContaining({ id: person.id, birthDate: null }));
+    });
+
+    it("does not leak a space birthday to a viewer who cannot see the person's face", async () => {
+      const { sut, ctx, asset } = await seedSpaceOnlyBirthday('manual');
+      const { user: outsider } = await ctx.newUser();
+
+      // The outsider is not a member of the space and does not own the asset — `mapFaces` must keep
+      // returning no person at all rather than an identity-resolved one.
+      await expect(sut.getFacesById(factory.auth({ user: outsider }), { id: asset.id })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
   });
 });
