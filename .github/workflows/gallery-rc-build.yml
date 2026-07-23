@@ -31,6 +31,27 @@ on:
         required: false
         default: false
         type: boolean
+  workflow_call:
+    inputs:
+      rc_tag:
+        description: 'Custom image tag, e.g. pr-123. Must not be "release", "v<N>", or "v<N>.<N>.<N>".'
+        required: true
+        type: string
+      ref:
+        description: 'Git ref (branch/tag/SHA) to build. Leave empty to use the caller ref.'
+        required: false
+        default: ''
+        type: string
+      fork_version:
+        description: 'Override the stamped fork version (e.g. 5.1.0). Leave empty to derive from the latest v<N>.<N>.<N> git tag.'
+        required: false
+        default: ''
+        type: string
+      build_ml:
+        description: 'Also build the CPU machine-learning image under the same RC tag.'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ inputs.rc_tag }}
@@ -110,11 +131,13 @@ jobs:
         with:
           version: ${{ inputs.fork_version }}
 
-      - name: Prepare platform pair
+      - name: Prepare build metadata
         id: prepare
         env:
           PLATFORM: ${{ matrix.platform }}
-        run: echo "platform-pair=${PLATFORM//\//-}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "platform-pair=${PLATFORM//\//-}" >> "$GITHUB_OUTPUT"
+          echo "source-commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Build and push by digest
         id: build
@@ -127,7 +150,7 @@ jobs:
             DEVICE=cpu
             BUILD_ID=${{ github.run_id }}
             BUILD_SOURCE_REF=${{ github.ref_name }}
-            BUILD_SOURCE_COMMIT=${{ github.sha }}
+            BUILD_SOURCE_COMMIT=${{ steps.prepare.outputs.source-commit }}
           outputs: type=image,"name=ghcr.io/open-noodle/gallery-server",push-by-digest=true,name-resolution=short,push=true
           cache-from: type=gha,scope=server-${{ steps.prepare.outputs.platform-pair }}
           cache-to: type=gha,scope=server-${{ steps.prepare.outputs.platform-pair }},mode=max
@@ -222,11 +245,13 @@ jobs:
         with:
           version: ${{ inputs.fork_version }}
 
-      - name: Prepare platform pair
+      - name: Prepare build metadata
         id: prepare
         env:
           PLATFORM: ${{ matrix.platform }}
-        run: echo "platform-pair=${PLATFORM//\//-}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "platform-pair=${PLATFORM//\//-}" >> "$GITHUB_OUTPUT"
+          echo "source-commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Build and push by digest
         id: build
@@ -240,7 +265,7 @@ jobs:
             BUILD_ID=${{ github.run_id }}
             BUILD_IMAGE=ghcr.io/open-noodle/gallery-ml
             BUILD_SOURCE_REF=${{ github.ref_name }}
-            BUILD_SOURCE_COMMIT=${{ github.sha }}
+            BUILD_SOURCE_COMMIT=${{ steps.prepare.outputs.source-commit }}
           outputs: type=image,"name=ghcr.io/open-noodle/gallery-ml",push-by-digest=true,name-resolution=short,push=true
           cache-from: type=gha,scope=rc-ml-cpu-${{ steps.prepare.outputs.platform-pair }}
           cache-to: type=gha,scope=rc-ml-cpu-${{ steps.prepare.outputs.platform-pair }},mode=max
