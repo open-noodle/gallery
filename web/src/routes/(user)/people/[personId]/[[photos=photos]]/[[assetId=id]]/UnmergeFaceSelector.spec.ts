@@ -289,6 +289,79 @@ describe('UnmergeFaceSelector', () => {
     );
   });
 
+  it('does not call onConfirm when the space reassign (create path) throws', async () => {
+    sdkMock.reassignSpacePersonFaces.mockRejectedValue(new Error('403 forbidden'));
+
+    const { onConfirm } = renderSelector({ assetIds: ['asset-1'], personAssets: makeSpacePerson() });
+
+    await userEvent.click(screen.getByText('create_new_person'));
+
+    await waitFor(() => expect(toastManager.danger).toHaveBeenCalled());
+    // A rejection means nothing we can rely on moved. Firing onConfirm would drive the caller's
+    // optimistic removal (+page.svelte -> timelineManager.removeAssets) and vanish the photos behind
+    // the error toast — #765's exact symptom, relocated to the throw path. Newly reachable because
+    // the space endpoint rejects outright on the Editor gate and the assetIds cap.
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(toastManager.primary).not.toHaveBeenCalled();
+  });
+
+  it('does not call onConfirm when a "Reassign" to an existing person throws', async () => {
+    const candidate = makeSpaceCandidate();
+    sdkMock.getAllPeople.mockResolvedValue(peopleResponse([candidate]));
+    sdkMock.reassignSpacePersonFaces.mockRejectedValue(new Error('403 forbidden'));
+
+    const { onConfirm } = renderSelector({ assetIds: ['asset-1'], personAssets: makeSpacePerson() });
+
+    await userEvent.click(await screen.findByText('Bob'));
+    await userEvent.click(screen.getByText('reassign'));
+
+    await waitFor(() => expect(toastManager.danger).toHaveBeenCalled());
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(toastManager.primary).not.toHaveBeenCalled();
+  });
+
+  it('chunks a >100 asset selection into capped batches and sums the reported counts', async () => {
+    // SharedSpacePersonReassignDto.assetIds is max(100) server-side, and "Select all" sits on this
+    // toolbar unbounded — an unchunked call would 400 the whole reassign.
+    const assetIds = Array.from({ length: 250 }, (_, index) => `asset-${index}`);
+    sdkMock.reassignSpacePersonFaces
+      .mockResolvedValueOnce({ reassigned: 100 })
+      .mockResolvedValueOnce({ reassigned: 90 })
+      .mockResolvedValueOnce({ reassigned: 50 });
+
+    renderSelector({ assetIds, personAssets: makeSpacePerson() });
+
+    await userEvent.click(screen.getByText('create_new_person'));
+
+    await waitFor(() => expect(sdkMock.reassignSpacePersonFaces).toHaveBeenCalledTimes(3));
+    const batches = sdkMock.reassignSpacePersonFaces.mock.calls.map(
+      ([{ sharedSpacePersonReassignDto }]) => sharedSpacePersonReassignDto.assetIds,
+    );
+    expect(batches.map((batch: string[]) => batch.length)).toEqual([100, 100, 50]);
+    // Every id is sent exactly once, in order — a chunker that dropped or duplicated a slice would
+    // still produce three calls of the right sizes.
+    expect(batches.flat()).toEqual(assetIds);
+    expect(toastManager.primary).toHaveBeenCalledWith(
+      formatMessage('reassigned_assets_to_new_person', { values: { count: 240 } }),
+    );
+  });
+
+  it('treats a failing chunk as a failed reassign: danger toast, no optimistic removal', async () => {
+    const assetIds = Array.from({ length: 150 }, (_, index) => `asset-${index}`);
+    sdkMock.reassignSpacePersonFaces
+      .mockResolvedValueOnce({ reassigned: 100 })
+      .mockRejectedValueOnce(new Error('500 boom'));
+
+    const { onConfirm } = renderSelector({ assetIds, personAssets: makeSpacePerson() });
+
+    await userEvent.click(screen.getByText('create_new_person'));
+
+    await waitFor(() => expect(sdkMock.reassignSpacePersonFaces).toHaveBeenCalledTimes(2));
+    expect(toastManager.danger).toHaveBeenCalled();
+    expect(toastManager.primary).not.toHaveBeenCalled();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
   it('invokes onConfirm after a successful space reassign instead of refreshing a possibly-emptied source person', async () => {
     sdkMock.reassignSpacePersonFaces.mockResolvedValue({ reassigned: 2 });
 
