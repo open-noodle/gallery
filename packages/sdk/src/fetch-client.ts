@@ -5999,14 +5999,17 @@ export function reassignFacesById({ id, faceDto }: {
 /**
  * Get filtered map markers
  */
-export function getFilteredMapMarkers({ city, country, isFavorite, isInAlbum, isNotInAlbum, make, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }: {
+export function getFilteredMapMarkers({ city, country, description, isFavorite, isInAlbum, isNotInAlbum, make, model, ocr, originalFileName, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }: {
     city?: string;
     country?: string;
+    description?: string;
     isFavorite?: boolean;
     isInAlbum?: boolean;
     isNotInAlbum?: boolean;
     make?: string;
     model?: string;
+    ocr?: string;
+    originalFileName?: string;
     personIds?: string[];
     rating?: number;
     spaceId?: string;
@@ -6022,11 +6025,14 @@ export function getFilteredMapMarkers({ city, country, isFavorite, isInAlbum, is
     }>(`/gallery/map/markers${QS.query(QS.explode({
         city,
         country,
+        description,
         isFavorite,
         isInAlbum,
         isNotInAlbum,
         make,
         model,
+        ocr,
+        originalFileName,
         personIds,
         rating,
         spaceId,
