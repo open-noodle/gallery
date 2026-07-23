@@ -1,0 +1,136 @@
+name: PR Release Candidate
+
+# When a PR carries the `rc` (or `rc-ml`) label, build a release-candidate server
+# image (plus CPU ML when `rc-ml`) from the PR's head commit under the stable tag
+# `pr-<number>`, and keep one sticky PR comment showing how to run the latest build.
+# Server-only unless `rc-ml` is present. Same-repo PRs only (fork PRs can't push GHCR).
+
+on:
+  pull_request:
+    types: [labeled, synchronize]
+
+concurrency:
+  group: pr-rc-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  build:
+    name: Build RC image
+    if: >
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (
+        (github.event.action == 'labeled' &&
+          (github.event.label.name == 'rc' || github.event.label.name == 'rc-ml')) ||
+        (github.event.action == 'synchronize' &&
+          (contains(github.event.pull_request.labels.*.name, 'rc') ||
+           contains(github.event.pull_request.labels.*.name, 'rc-ml')))
+      )
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/gallery-rc-build.yml
+    with:
+      rc_tag: pr-${{ github.event.pull_request.number }}
+      ref: ${{ github.event.pull_request.head.sha }}
+      build_ml: ${{ contains(github.event.pull_request.labels.*.name, 'rc-ml') }}
+
+  comment:
+    name: Update RC comment
+    needs: build
+    if: ${{ always() && needs.build.result != 'skipped' && needs.build.result != 'cancelled' }}
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Post or update sticky RC comment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+        with:
+          script: |
+            const marker = '<!-- gallery-rc-build-comment -->';
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            const prNumber = pr.number;
+            const headSha = pr.head.sha;
+            const shortSha = headSha.substring(0, 7);
+            const labels = pr.labels.map((l) => l.name);
+            const mlBuilt = labels.includes('rc-ml');
+            const buildResult = process.env.BUILD_RESULT;
+            const tag = `pr-${prNumber}`;
+            const serverImage = `ghcr.io/open-noodle/gallery-server:${tag}`;
+            const mlImage = `ghcr.io/open-noodle/gallery-ml:${tag}`;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const commitUrl = `${context.serverUrl}/${owner}/${repo}/commit/${headSha}`;
+            const updated = new Date().toUTCString();
+
+            let body;
+            if (buildResult === 'success') {
+              const overrideMl = mlBuilt
+                ? `\n  immich-machine-learning:\n    image: ${mlImage}`
+                : '';
+              const pullTargets = mlBuilt
+                ? 'immich-server immich-machine-learning'
+                : 'immich-server';
+              const mlLine = mlBuilt
+                ? `\n- \`${mlImage}\` (CPU, linux/amd64 + linux/arm64)`
+                : '';
+              body = [
+                marker,
+                '### 🧪 Release candidate build',
+                '',
+                `Built from [\`${shortSha}\`](${commitUrl}) · [build run](${runUrl})`,
+                '',
+                '**Images published**',
+                '',
+                `- \`${serverImage}\` (linux/amd64 + linux/arm64)${mlLine}`,
+                '',
+                '<details><summary>How to run this RC</summary>',
+                '',
+                'In the directory containing your `docker-compose.yml`, create (or append to) a `docker-compose.override.yml`:',
+                '',
+                '```yaml',
+                'services:',
+                `  immich-server:\n    image: ${serverImage}${overrideMl}`,
+                '```',
+                '',
+                'Then pull and restart:',
+                '',
+                '```bash',
+                `docker compose pull ${pullTargets}`,
+                'docker compose up -d',
+                '```',
+                '',
+                'To roll back, delete the override (or the RC image block) and run `docker compose up -d` again.',
+                '',
+                '</details>',
+                '',
+                `_Last updated ${updated} — auto-updates on every push while the \`rc\`/\`rc-ml\` label is set._`,
+              ].join('\n');
+            } else {
+              body = [
+                marker,
+                '### 🧪 Release candidate build — ❌ failed',
+                '',
+                `The RC build for [\`${shortSha}\`](${commitUrl}) did not complete (\`${buildResult}\`). See the [build logs](${runUrl}).`,
+                '',
+                `_Last updated ${updated}._`,
+              ].join('\n');
+            }
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: prNumber,
+              per_page: 100,
+            });
+            const existing = comments.find(
+              (c) => c.body && c.body.includes(marker) && c.user?.type === 'Bot',
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number: prNumber, body });
+            }
