@@ -1471,6 +1471,139 @@ describe(PersonService.name, () => {
         BadRequestException,
       );
     });
+
+    // #808: a birthday set inside a shared space lives on `shared_space_person`, never on `person`.
+    // The asset viewer Info panel reads this endpoint for the owner, so it must apply the same
+    // identity-wide resolution as PersonService.getById — otherwise the age silently disappears.
+    it("should resolve the identity-wide birthday and name for the owner's own person", async () => {
+      const auth = AuthFactory.create();
+      const face = AssetFaceFactory.from()
+        .person({ ownerId: auth.user.id, identityId: newUuid(), name: 'Owner Local Name', birthDate: null })
+        .build();
+      const asset = AssetFactory.from({ id: face.assetId }).exif().build();
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.person.getFaces.mockResolvedValue([getForAssetFace(face)]);
+      mocks.asset.getForFaces.mockResolvedValue({ edits: [], ...asset.exifInfo });
+      (mocks.faceIdentity as any).getResolvedPersonByIdentityId.mockResolvedValue({
+        id: face.person!.id,
+        name: 'Karolin',
+        birthDate: '2014-02-14',
+      });
+
+      const [result] = await sut.getFacesById(auth, { id: face.assetId });
+
+      expect(result.person).toEqual(
+        expect.objectContaining({ id: face.person!.id, name: 'Karolin', birthDate: '2014-02-14' }),
+      );
+      expect((mocks.faceIdentity as any).getResolvedPersonByIdentityId).toHaveBeenCalledWith(
+        auth.user.id,
+        face.person!.identityId,
+      );
+    });
+
+    it('should not resolve via identity when the owned person has no identity', async () => {
+      const auth = AuthFactory.create();
+      const face = AssetFaceFactory.from()
+        .person({ ownerId: auth.user.id, identityId: null, name: 'Owner Local Name', birthDate: null })
+        .build();
+      const asset = AssetFactory.from({ id: face.assetId }).exif().build();
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.person.getFaces.mockResolvedValue([getForAssetFace(face)]);
+      mocks.asset.getForFaces.mockResolvedValue({ edits: [], ...asset.exifInfo });
+
+      const [result] = await sut.getFacesById(auth, { id: face.assetId });
+
+      expect(result.person).toEqual(expect.objectContaining({ name: 'Owner Local Name', birthDate: null }));
+      expect((mocks.faceIdentity as any).getResolvedPersonByIdentityId).not.toHaveBeenCalled();
+    });
+
+    it('should fall back to the raw person when identity resolution finds nothing', async () => {
+      const auth = AuthFactory.create();
+      const face = AssetFaceFactory.from()
+        .person({ ownerId: auth.user.id, identityId: newUuid(), name: 'Owner Local Name', birthDate: null })
+        .build();
+      const asset = AssetFactory.from({ id: face.assetId }).exif().build();
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.person.getFaces.mockResolvedValue([getForAssetFace(face)]);
+      mocks.asset.getForFaces.mockResolvedValue({ edits: [], ...asset.exifInfo });
+      (mocks.faceIdentity as any).getResolvedPersonByIdentityId.mockResolvedValue(void 0);
+
+      const [result] = await sut.getFacesById(auth, { id: face.assetId });
+
+      expect(result.person).toEqual(expect.objectContaining({ name: 'Owner Local Name', birthDate: null }));
+    });
+
+    it('should not resolve identities for faces belonging to another owner', async () => {
+      const auth = AuthFactory.create();
+      const face = AssetFaceFactory.from()
+        .person({ ownerId: newUuid(), identityId: newUuid(), birthDate: null })
+        .build();
+      const asset = AssetFactory.from({ id: face.assetId }).exif().build();
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.person.getFaces.mockResolvedValue([getForAssetFace(face)]);
+      mocks.asset.getForFaces.mockResolvedValue({ edits: [], ...asset.exifInfo });
+
+      const [result] = await sut.getFacesById(auth, { id: face.assetId });
+
+      // #796 surfaces the person to any viewer with asset read access; #808 must still not
+      // identity-resolve a face the caller does not own, so the person is returned raw (birthDate
+      // untouched) and the resolver is never called.
+      expect(result.person).toEqual(expect.objectContaining({ id: face.person!.id, birthDate: null }));
+      expect((mocks.faceIdentity as any).getResolvedPersonByIdentityId).not.toHaveBeenCalled();
+    });
+
+    it('should resolve each identity once when several faces share it', async () => {
+      const auth = AuthFactory.create();
+      const identityId = newUuid();
+      const assetId = newUuid();
+      const first = AssetFaceFactory.from({ assetId })
+        .person({ ownerId: auth.user.id, identityId, birthDate: null })
+        .build();
+      const second = AssetFaceFactory.from({ assetId })
+        .person({ ownerId: auth.user.id, identityId, birthDate: null })
+        .build();
+      const asset = AssetFactory.from({ id: assetId }).exif().build();
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
+      mocks.person.getFaces.mockResolvedValue([getForAssetFace(first), getForAssetFace(second)]);
+      mocks.asset.getForFaces.mockResolvedValue({ edits: [], ...asset.exifInfo });
+      (mocks.faceIdentity as any).getResolvedPersonByIdentityId.mockResolvedValue({
+        id: first.person!.id,
+        name: 'Karolin',
+        birthDate: '2014-02-14',
+      });
+
+      const results = await sut.getFacesById(auth, { id: assetId });
+
+      expect(results.map((r) => r.person?.birthDate)).toEqual(['2014-02-14', '2014-02-14']);
+      expect((mocks.faceIdentity as any).getResolvedPersonByIdentityId).toHaveBeenCalledTimes(1);
+    });
+
+    it("should keep the birthday when identity resolution echoes the base person's own value", async () => {
+      const auth = AuthFactory.create();
+      const face = AssetFaceFactory.from()
+        .person({ ownerId: auth.user.id, identityId: newUuid(), name: 'Karolin', birthDate: new Date('2014-02-14') })
+        .build();
+      const asset = AssetFactory.from({ id: face.assetId }).exif().build();
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.person.getFaces.mockResolvedValue([getForAssetFace(face)]);
+      mocks.asset.getForFaces.mockResolvedValue({ edits: [], ...asset.exifInfo });
+      // The resolver ranks a non-null birthDate first, so it echoes the base person's own value back.
+      (mocks.faceIdentity as any).getResolvedPersonByIdentityId.mockResolvedValue({
+        id: face.person!.id,
+        name: 'Karolin',
+        birthDate: '2014-02-14',
+      });
+
+      const [result] = await sut.getFacesById(auth, { id: face.assetId });
+
+      expect(result.person).toEqual(expect.objectContaining({ name: 'Karolin', birthDate: '2014-02-14' }));
+    });
   });
 
   describe('createFace', () => {
