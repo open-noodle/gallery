@@ -12,7 +12,7 @@ import { LoggingRepository } from 'src/repositories/logging.repository';
 import { AssetSearchBuilderOptions } from 'src/repositories/search.repository';
 import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
-import { searchAssetBuilder } from 'src/utils/database';
+import { searchAssetBuilderLegacy } from 'src/utils/database';
 import { newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 
@@ -30,7 +30,7 @@ const setup = () => {
 type Ctx = ReturnType<typeof setup>['ctx'];
 
 const builtIds = async (options: AssetSearchBuilderOptions): Promise<Set<string>> => {
-  const rows = await searchAssetBuilder(db, options).select('asset.id').execute();
+  const rows = await searchAssetBuilderLegacy(db, options).select('asset.id').execute();
   return new Set(rows.map((r) => r.id as string));
 };
 
