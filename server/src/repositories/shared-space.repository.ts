@@ -22,7 +22,7 @@ import { SharedSpacePersonAliasTable } from 'src/schema/tables/shared-space-pers
 import { SharedSpacePersonFaceTable } from 'src/schema/tables/shared-space-person-face.table';
 import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table';
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
-import { anyUuid, searchAssetBuilder } from 'src/utils/database';
+import { anyUuid, searchAssetBuilderLegacy } from 'src/utils/database';
 import {
   spaceAlbumAssetExists,
   spaceContributedAssetExists,
@@ -1544,7 +1544,7 @@ export class SharedSpaceRepository {
     params: [{ userIds: [DummyValue.UUID], visibility: AssetVisibility.Timeline }],
   })
   getFilteredMapMarkers(options: AssetSearchBuilderOptions) {
-    return searchAssetBuilder(this.db, options)
+    return searchAssetBuilderLegacy(this.db, options)
       .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
       .where('asset_exif.latitude', 'is not', null)
       .where('asset_exif.longitude', 'is not', null)
