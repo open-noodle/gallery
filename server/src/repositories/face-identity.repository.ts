@@ -2866,7 +2866,7 @@ export class FaceIdentityRepository {
     return rows.map((row) => row.id);
   }
 
-  private getPersonByIdentity(ownerId: string, identityId: string, excludePersonId?: string) {
+  getPersonByIdentity(ownerId: string, identityId: string, excludePersonId?: string) {
     return this.db
       .selectFrom('person')
       .select(['id'])
