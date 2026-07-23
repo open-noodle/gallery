@@ -156,7 +156,7 @@ describe('text filters (#802)', () => {
       const options = buildAlbumTimelineOptions('album-1', AssetOrder.Desc, {
         ...createFilterState(),
         description: '',
-        originalFileName: '   ',
+        originalFileName: ' '.repeat(3),
         ocr: '\t\n',
       });
 
