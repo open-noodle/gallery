@@ -7,6 +7,7 @@
   import FilterToolbar from '$lib/components/filter-panel/filter-toolbar.svelte';
   import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
   import {
+    ALL_FILTER_SECTIONS,
     buildFilterContext,
     clearFilters,
     createFilterState,
@@ -279,7 +280,7 @@
   };
 
   const filterConfig: FilterPanelConfig = {
-    sections: ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media', 'favorites', 'albums', 'text'],
+    sections: [...ALL_FILTER_SECTIONS],
     suggestionsProvider: async (nextFilters: FilterState) => {
       if (!showSearchResults) {
         return loadPhotoFilterSuggestions(nextFilters);
