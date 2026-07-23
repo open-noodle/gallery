@@ -4,45 +4,50 @@ from typing import Any
 import cv2
 import numpy as np
 from numpy.typing import NDArray
+from PIL import Image
 
 from immich_ml.config import clean_name
 from immich_ml.models.base import InferenceModel
-from immich_ml.models.transforms import decode_cv2
+from immich_ml.models.transforms import decode_pil
 from immich_ml.schemas import BoundingBox, ModelFormat, ModelSession, ModelTask, ModelType, PetDetectionOutput
 
 _HF_ORG = "Deeds67"
 
-# COCO animal class IDs and labels
+# The animals a household photo library actually contains, in RF-DETR's 91-class
+# COCO id space. bear/zebra/giraffe/elephant are deliberately absent: their only
+# practical effect was labelling bear-shaped dog breeds (newfoundland, keeshond,
+# great pyrenees) as bears.
 _ANIMAL_CLASSES: dict[int, str] = {
-    14: "bird",
-    15: "cat",
-    16: "dog",
-    17: "horse",
-    18: "sheep",
-    19: "cow",
-    20: "elephant",
-    21: "bear",
-    22: "zebra",
-    23: "giraffe",
+    16: "bird",
+    17: "cat",
+    18: "dog",
+    19: "horse",
+    20: "sheep",
+    21: "cow",
 }
+_ANIMAL_IDS = np.array(sorted(_ANIMAL_CLASSES), dtype=np.int64)
 
-_INPUT_SIZE = 640
-_NMS_IOU_THRESHOLD = 0.45
+# RF-DETR inherits DINOv2's ImageNet normalisation.
+_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+
+_DEFAULT_INPUT_SIZE = 384
 
 
 class PetDetector(InferenceModel):
     depends = []
     identity = (ModelType.DETECTION, ModelTask.PET_DETECTION)
 
-    def __init__(self, model_name: str, min_score: float = 0.6, **model_kwargs: Any) -> None:
+    def __init__(self, model_name: str, min_score: float = 0.3, **model_kwargs: Any) -> None:
         self.min_score = model_kwargs.pop("minScore", min_score)
+        self._input_size = _DEFAULT_INPUT_SIZE
         super().__init__(model_name, **model_kwargs)
 
     @property
     def model_path(self) -> Path:
         # Support both conventions:
         # 1. Standard: detection/model.onnx (matches base class)
-        # 2. Legacy: <model_name>.onnx at cache root (e.g. yolo11m.onnx)
+        # 2. Legacy: <model_name>.onnx at cache root
         standard = super().model_path
         if standard.is_file():
             return standard
@@ -68,92 +73,91 @@ class PetDetector(InferenceModel):
 
     def _load(self) -> ModelSession:
         session = self._make_session(self.model_path)
-        input_name = session.get_inputs()[0].name
-        if input_name is None:
+        model_input = session.get_inputs()[0]
+        if model_input.name is None:
             raise ValueError("Model input name is None")
-        self._input_name: str = input_name
+        self._input_name: str = model_input.name
+        # nano is 384, small is 512 — never assume.
+        shape = model_input.shape
+        if len(shape) == 4 and isinstance(shape[2], int):
+            self._input_size = shape[2]
         return session
 
-    def _predict(self, inputs: NDArray[np.uint8] | bytes) -> PetDetectionOutput:
-        image = decode_cv2(inputs)
-        orig_h, orig_w = image.shape[:2]
+    def _predict(self, inputs: Image.Image | bytes) -> PetDetectionOutput:
+        # main.py:201 already decodes the upload to a PIL image, so in production
+        # this receives an Image.Image. decode_pil passes one straight through.
+        image = decode_pil(inputs)
+        orig_w, orig_h = image.size
 
         blob = self._preprocess(image)
         outputs = self.session.run(None, {self._input_name: blob})
-        raw = outputs[0]  # shape (1, 84, 8400)
 
-        return self._postprocess(raw, orig_w, orig_h)
+        return self._postprocess(outputs, orig_w, orig_h)
 
-    def _preprocess(self, image: NDArray[np.uint8]) -> NDArray[np.float32]:
-        resized = cv2.resize(image, (_INPUT_SIZE, _INPUT_SIZE))
+    def _preprocess(self, image: Image.Image) -> NDArray[np.float32]:
+        # decode_pil only converts mode on the bytes path — handed an Image.Image
+        # it returns it untouched, so greyscale and palette inputs must be
+        # converted here or the normalisation below fails on a 2-D array.
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+        # Do NOT route through decode_cv2: its RGB->BGR conversion is the defect
+        # this rewrite exists to remove.
+        rgb: NDArray[np.uint8] = np.array(image)
+        resized = cv2.resize(rgb, (self._input_size, self._input_size), interpolation=cv2.INTER_LINEAR)
         blob: NDArray[np.float32] = resized.astype(np.float32) / 255.0
+        blob = (blob - _MEAN) / _STD
         blob = np.transpose(blob, (2, 0, 1))  # HWC -> CHW
-        blob = np.expand_dims(blob, axis=0)  # add batch dim -> NCHW
-        return blob
+        return np.expand_dims(blob, axis=0).astype(np.float32)
 
-    def _postprocess(self, raw: NDArray[np.float32], orig_w: int, orig_h: int) -> PetDetectionOutput:
-        # raw shape: (1, 84, 8400) -> transpose to (8400, 84)
-        predictions = raw[0].T  # (8400, 84)
+    def _postprocess(
+        self, outputs: list[NDArray[np.float32]], orig_w: int, orig_h: int
+    ) -> PetDetectionOutput:
+        boxes_raw, logits = self._resolve_outputs(outputs)
+        boxes_cxcywh = boxes_raw[0]
+        # RF-DETR emits pre-sigmoid logits over the 91-class COCO space.
+        scores_all = 1.0 / (1.0 + np.exp(-logits[0]))
 
-        # Extract box coords (cx, cy, w, h) and class scores
-        boxes_cxcywh = predictions[:, :4]
-        class_scores = predictions[:, 4:]  # (8400, 80)
+        # Restrict to the domestic subspace *before* taking the best class, so a
+        # query that scores bear highest still surfaces as its best pet class.
+        animal_scores = scores_all[:, _ANIMAL_IDS]
+        best = np.argmax(animal_scores, axis=1)
+        confidences = animal_scores[np.arange(len(best)), best]
+        class_ids = _ANIMAL_IDS[best]
 
-        # Get best class per detection
-        class_ids = np.argmax(class_scores, axis=1)
-        confidences = class_scores[np.arange(len(class_ids)), class_ids]
-
-        # Filter by confidence threshold
-        mask = confidences >= self.min_score
-        boxes_cxcywh = boxes_cxcywh[mask]
-        confidences = confidences[mask]
-        class_ids = class_ids[mask]
-
-        if len(boxes_cxcywh) == 0:
-            return []
-
-        # Filter to only animal classes
-        animal_mask = np.array([int(cid) in _ANIMAL_CLASSES for cid in class_ids])
-        boxes_cxcywh = boxes_cxcywh[animal_mask]
-        confidences = confidences[animal_mask]
-        class_ids = class_ids[animal_mask]
+        keep = confidences >= self.min_score
+        boxes_cxcywh = boxes_cxcywh[keep]
+        confidences = confidences[keep]
+        class_ids = class_ids[keep]
 
         if len(boxes_cxcywh) == 0:
             return []
 
-        # Convert from cx,cy,w,h to x1,y1,x2,y2
-        boxes_xyxy = np.empty_like(boxes_cxcywh)
-        boxes_xyxy[:, 0] = boxes_cxcywh[:, 0] - boxes_cxcywh[:, 2] / 2
-        boxes_xyxy[:, 1] = boxes_cxcywh[:, 1] - boxes_cxcywh[:, 3] / 2
-        boxes_xyxy[:, 2] = boxes_cxcywh[:, 0] + boxes_cxcywh[:, 2] / 2
-        boxes_xyxy[:, 3] = boxes_cxcywh[:, 1] + boxes_cxcywh[:, 3] / 2
+        cx, cy, w, h = (
+            boxes_cxcywh[:, 0],
+            boxes_cxcywh[:, 1],
+            boxes_cxcywh[:, 2],
+            boxes_cxcywh[:, 3],
+        )
+        x1 = np.clip((cx - w / 2) * orig_w, 0, orig_w)
+        y1 = np.clip((cy - h / 2) * orig_h, 0, orig_h)
+        x2 = np.clip((cx + w / 2) * orig_w, 0, orig_w)
+        y2 = np.clip((cy + h / 2) * orig_h, 0, orig_h)
 
-        # Scale boxes from input size to original image size
-        scale_x = orig_w / _INPUT_SIZE
-        scale_y = orig_h / _INPUT_SIZE
-        boxes_xyxy[:, 0] *= scale_x
-        boxes_xyxy[:, 2] *= scale_x
-        boxes_xyxy[:, 1] *= scale_y
-        boxes_xyxy[:, 3] *= scale_y
-
-        # Apply NMS
-        indices = self._nms(boxes_xyxy, confidences, _NMS_IOU_THRESHOLD)
-        boxes_xyxy = boxes_xyxy[indices]
-        confidences = confidences[indices]
-        class_ids = class_ids[indices]
-
-        # Build output
+        # No NMS: RF-DETR's queries are already deduplicated by the decoder.
         results: PetDetectionOutput = []
-        for i in range(len(boxes_xyxy)):
-            bbox: BoundingBox = {
-                "x1": max(0, min(int(round(boxes_xyxy[i, 0])), orig_w)),
-                "y1": max(0, min(int(round(boxes_xyxy[i, 1])), orig_h)),
-                "x2": max(0, min(int(round(boxes_xyxy[i, 2])), orig_w)),
-                "y2": max(0, min(int(round(boxes_xyxy[i, 3])), orig_h)),
+        for i in range(len(confidences)):
+            box: BoundingBox = {
+                "x1": int(round(float(x1[i]))),
+                "y1": int(round(float(y1[i]))),
+                "x2": int(round(float(x2[i]))),
+                "y2": int(round(float(y2[i]))),
             }
+            # A box clipped away to nothing is not a detection.
+            if box["x2"] <= box["x1"] or box["y2"] <= box["y1"]:
+                continue
             results.append(
                 {
-                    "boundingBox": bbox,
+                    "boundingBox": box,
                     "score": float(confidences[i]),
                     "label": _ANIMAL_CLASSES[int(class_ids[i])],
                 }
@@ -162,35 +166,13 @@ class PetDetector(InferenceModel):
         return results
 
     @staticmethod
-    def _nms(boxes: NDArray[np.float32], scores: NDArray[np.float32], iou_threshold: float) -> NDArray[np.intp]:
-        x1 = boxes[:, 0]
-        y1 = boxes[:, 1]
-        x2 = boxes[:, 2]
-        y2 = boxes[:, 3]
-        areas = (x2 - x1) * (y2 - y1)
-
-        order = scores.argsort()[::-1]
-        keep: list[int] = []
-
-        while len(order) > 0:
-            i = order[0]
-            keep.append(int(i))
-
-            if len(order) == 1:
-                break
-
-            xx1 = np.maximum(x1[i], x1[order[1:]])
-            yy1 = np.maximum(y1[i], y1[order[1:]])
-            xx2 = np.minimum(x2[i], x2[order[1:]])
-            yy2 = np.minimum(y2[i], y2[order[1:]])
-
-            inter = np.maximum(0.0, xx2 - xx1) * np.maximum(0.0, yy2 - yy1)
-            iou = inter / (areas[i] + areas[order[1:]] - inter)
-
-            remaining = np.where(iou <= iou_threshold)[0]
-            order = order[remaining + 1]
-
-        return np.array(keep, dtype=np.intp)
+    def _resolve_outputs(
+        outputs: list[NDArray[np.float32]],
+    ) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
+        """Identify boxes vs logits by trailing dimension, not export order."""
+        if outputs[0].shape[-1] == 4:
+            return outputs[0], outputs[1]
+        return outputs[1], outputs[0]
 
     def configure(self, **kwargs: Any) -> None:
         self.min_score = kwargs.pop("minScore", self.min_score)
