@@ -1,12 +1,15 @@
 <script lang="ts">
   import { timeBeforeShowLoadingSpinner } from '$lib/constants';
   import { handleError } from '$lib/utils/handle-error';
+  import { isSpaceScopedPerson, toScopedPersonRef } from '$lib/utils/scoped-person-ref';
   import {
     createPerson,
     getAllPeople,
     reassignFaces,
+    reassignSpacePersonFaces,
     type AssetFaceUpdateItem,
     type PersonResponseDto,
+    type ScopedPersonProfileRefDto,
   } from '@immich/sdk';
   import { Button, toastManager } from '@immich/ui';
   import { mdiMerge, mdiPlus } from '@mdi/js';
@@ -44,8 +47,16 @@
     personId: personAssets.id,
   }));
 
+  // The source space-person id (and its space id) live on primaryProfile, not on personAssets.id
+  // itself — sending personAssets.id to the space endpoint would match zero rows.
+  const spaceRef = $derived(
+    isSpaceScopedPerson(personAssets) && personAssets.primaryProfile?.spaceId
+      ? { spaceId: personAssets.primaryProfile.spaceId, personId: personAssets.primaryProfile.id }
+      : undefined,
+  );
+
   onMount(async () => {
-    const data = await getAllPeople({ withHidden: false });
+    const data = await getAllPeople({ withHidden: false, withSharedSpaces: true });
     people = data.people;
   });
 
@@ -63,14 +74,35 @@
     hasSelection = false;
   };
 
+  // Shared by both handlers so create/reassign cannot drift on the space-endpoint call shape.
+  const reassignInSpace = async (target: { type: 'new' } | { type: 'existing'; profile: ScopedPersonProfileRefDto }) => {
+    const { reassigned } = await reassignSpacePersonFaces({
+      id: spaceRef!.spaceId,
+      personId: spaceRef!.personId,
+      sharedSpacePersonReassignDto: { assetIds, target },
+    });
+    return reassigned;
+  };
+
   const handleCreate = async () => {
     const timeout = setTimeout(() => (showLoadingSpinnerCreate = true), timeBeforeShowLoadingSpinner);
 
     try {
       disableButtons = true;
-      const data = await createPerson({ personCreateDto: {} });
-      await reassignFaces({ id: data.id, assetFaceUpdateDto: { data: selectedPeople } });
-      toastManager.primary($t('reassigned_assets_to_new_person', { values: { count: assetIds.length } }));
+      let reassigned: number;
+      if (spaceRef) {
+        reassigned = await reassignInSpace({ type: 'new' });
+      } else {
+        const data = await createPerson({ personCreateDto: {} });
+        await reassignFaces({ id: data.id, assetFaceUpdateDto: { data: selectedPeople } });
+        reassigned = assetIds.length;
+      }
+
+      if (reassigned > 0) {
+        toastManager.primary($t('reassigned_assets_to_new_person', { values: { count: reassigned } }));
+      } else {
+        toastManager.danger($t('errors.unable_to_reassign_assets_new_person'));
+      }
     } catch (error) {
       handleError(error, $t('errors.unable_to_reassign_assets_new_person'));
     } finally {
@@ -86,12 +118,25 @@
     try {
       disableButtons = true;
       if (selectedPerson) {
-        await reassignFaces({ id: selectedPerson.id, assetFaceUpdateDto: { data: selectedPeople } });
-        toastManager.primary(
-          $t('reassigned_assets_to_existing_person', {
-            values: { count: assetIds.length, name: selectedPerson.name || null },
-          }),
-        );
+        let reassigned: number;
+        if (spaceRef) {
+          reassigned = await reassignInSpace({ type: 'existing', profile: toScopedPersonRef(selectedPerson) });
+        } else {
+          await reassignFaces({ id: selectedPerson.id, assetFaceUpdateDto: { data: selectedPeople } });
+          reassigned = assetIds.length;
+        }
+
+        if (reassigned > 0) {
+          toastManager.primary(
+            $t('reassigned_assets_to_existing_person', {
+              values: { count: reassigned, name: selectedPerson.name || null },
+            }),
+          );
+        } else {
+          toastManager.danger(
+            $t('errors.unable_to_reassign_assets_existing_person', { values: { name: selectedPerson.name || null } }),
+          );
+        }
       }
     } catch (error) {
       handleError(
