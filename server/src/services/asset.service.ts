@@ -141,7 +141,10 @@ export class AssetService extends BaseService {
         data.people = (data.people || []).filter((p) => p.spacePersonId && !spacePersonMap.get(p.id)?.isHidden);
         data.resolvedSpaceId = spaceForAsset.spaceId;
       } else {
-        data.people = [];
+        // #796: no space contains this asset for the viewer, so they reach it through an album
+        // share or partner sharing. Read access to the asset carries read access to who is in it —
+        // minus anyone the owner marked hidden, which must not leak off-box.
+        data.people = (data.people || []).filter((person) => !person.isHidden);
       }
     }
 
