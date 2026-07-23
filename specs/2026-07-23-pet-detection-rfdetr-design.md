@@ -228,11 +228,17 @@ each containing `detection/model.onnx`.
 
 - `server/src/config.ts:357-361` — default `modelName` becomes `rfdetr-nano`, `minScore`
   becomes `0.3`.
-- `server/src/dtos/model-config.dto.ts` — `PetDetectionConfigSchema` inherits an
-  unconstrained `modelName` string from `ModelConfigSchema`. Add a preprocess step mapping any
-  value beginning `yolo` to `rfdetr-nano`. Placing it in the schema means both the admin API
-  read path and internal `getConfig` see the migrated value, so the settings dropdown does not
-  render blank on existing installs.
+- `server/src/utils/config.ts` — normalise the legacy value inside `buildConfig`, after the
+  partial is merged over the defaults and before Zod validation. Every config read in the
+  server (admin API, jobs, the ML repository) funnels through `getConfig` → `buildConfig`, so
+  one normalisation there covers all of them and the settings dropdown does not render blank
+  on existing installs.
+
+  **Not** a Zod `.transform()` on `PetDetectionConfigSchema`, which was the first design:
+  transforming a field changes the schema's inferred output type, that type flows into the
+  generated OpenAPI document, and the TypeScript SDK plus the Dart client would have to be
+  regenerated via `make open-api`. That is a far larger blast radius than this migration
+  warrants, for no behavioural gain.
 
 `pet-detection.service.ts` is unchanged; it persists whatever label the ML service returns.
 
@@ -357,7 +363,7 @@ implement (green). The existing `_make_yolo_output` helper and its seven tests a
 
 **Goal:** New defaults ship, and existing installs holding `yolo*` migrate transparently.
 
-**Files:** `server/src/config.ts`, `server/src/dtos/model-config.dto.ts`,
+**Files:** `server/src/config.ts`, `server/src/utils/config.ts`,
 `server/src/services/pet-detection.service.spec.ts`,
 `server/src/services/system-config.service.spec.ts`,
 `server/src/repositories/machine-learning.repository.spec.ts`,
