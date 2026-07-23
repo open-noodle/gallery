@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { StorageCore } from 'src/cores/storage.core';
+import { AssetResponseDto } from 'src/dtos/asset-response.dto';
 import { AssetEditAction } from 'src/dtos/editing.dto';
 import { AssetFileType, AssetMetadataKey, AssetStatus, AssetVisibility, JobName, SharedLinkType } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
@@ -12,6 +13,7 @@ import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { MapRepository } from 'src/repositories/map.repository';
 import { OcrRepository } from 'src/repositories/ocr.repository';
+import { PersonRepository } from 'src/repositories/person.repository';
 import { SharedLinkAssetRepository } from 'src/repositories/shared-link-asset.repository';
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
@@ -35,6 +37,7 @@ const setup = (db?: Kysely<DB>) => {
       AssetJobRepository,
       AlbumRepository,
       AccessRepository,
+      PersonRepository,
       SharedLinkAssetRepository,
       SharedSpaceRepository,
       StackRepository,
@@ -47,6 +50,29 @@ const setup = (db?: Kysely<DB>) => {
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
+
+/** An owner's asset carrying a face and a tag, shared with `viewer` through an album. */
+const albumSharedAsset = async (ctx: ReturnType<typeof setup>['ctx']) => {
+  const { user: owner } = await ctx.newUser();
+  const { user: viewer } = await ctx.newUser();
+  const { asset } = await ctx.newAsset({ ownerId: owner.id });
+
+  const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'Alice' });
+  await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+
+  const tag = await ctx.database
+    .insertInto('tag')
+    .values({ userId: owner.id, value: 'Egypt' })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+  await ctx.database.insertInto('tag_asset').values({ tagId: tag.id, assetId: asset.id }).execute();
+
+  const { album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Shared Album' });
+  await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+  await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id });
+
+  return { owner, viewer, asset, album };
+};
 
 describe(AssetService.name, () => {
   describe('get', () => {
@@ -959,6 +985,63 @@ describe(AssetService.name, () => {
         expect.objectContaining({ isEdited: true }),
       );
       await expect(ctx.get(AssetEditRepository).getAll(asset.id)).resolves.toEqual([editResponse]);
+    });
+  });
+
+  // #796: what the asset-viewer info panel actually receives for a viewer with read access but no
+  // space context (shared-album recipient). The web panel can only render what lands in this DTO.
+  describe('get (shared-album recipient)', () => {
+    it('exposes the owner tags to the recipient', async () => {
+      const { sut, ctx } = setup();
+      const { viewer, asset } = await albumSharedAsset(ctx);
+
+      const result = (await sut.get(factory.auth({ user: viewer }), asset.id)) as AssetResponseDto;
+
+      // withTags is not user-scoped, so the owner's tags reach any viewer with read access. This is
+      // what makes the read-only Tags section in the info panel work (#796).
+      expect(result.tags?.map((tag) => tag.value)).toEqual(['Egypt']);
+    });
+
+    it('returns the people to the recipient', async () => {
+      const { sut, ctx } = setup();
+      const { viewer, asset } = await albumSharedAsset(ctx);
+
+      const result = (await sut.get(factory.auth({ user: viewer }), asset.id)) as AssetResponseDto;
+
+      // #796: read access to the asset carries read access to who is in it. No space is involved
+      // here, so this is the plain shared-album path.
+      expect(result.people?.map((person) => person.name)).toEqual(['Alice']);
+      expect(result.resolvedSpaceId).toBeUndefined();
+    });
+
+    it('omits hidden people from the recipient', async () => {
+      const { sut, ctx } = setup();
+      const { viewer, asset } = await albumSharedAsset(ctx);
+      await ctx.database.updateTable('person').set({ isHidden: true }).where('name', '=', 'Alice').execute();
+
+      const result = (await sut.get(factory.auth({ user: viewer }), asset.id)) as AssetResponseDto;
+
+      expect(result.people).toEqual([]);
+    });
+
+    it('still returns hidden people to the owner', async () => {
+      const { sut, ctx } = setup();
+      const { owner, asset } = await albumSharedAsset(ctx);
+      await ctx.database.updateTable('person').set({ isHidden: true }).where('name', '=', 'Alice').execute();
+
+      const result = (await sut.get(factory.auth({ user: owner }), asset.id)) as AssetResponseDto;
+
+      expect(result.people?.map((person) => person.name)).toEqual(['Alice']);
+    });
+
+    it('exposes the owner tags and people to the owner', async () => {
+      const { sut, ctx } = setup();
+      const { owner, asset } = await albumSharedAsset(ctx);
+
+      const result = (await sut.get(factory.auth({ user: owner }), asset.id)) as AssetResponseDto;
+
+      expect(result.tags?.map((tag) => tag.value)).toEqual(['Egypt']);
+      expect(result.people?.map((person) => person.name)).toEqual(['Alice']);
     });
   });
 });
