@@ -1,5 +1,5 @@
 import { AssetOrder, AssetTypeEnum } from '@immich/sdk';
-import { buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
+import { applyTextFilters, buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
 import { clearTimelineTemporalFilter } from '$lib/utils/timeline-temporal-filters';
 
 export function buildSpaceTimelineOptions(spaceId: string, filters: FilterState): Record<string, unknown> {
@@ -20,15 +20,7 @@ export function buildSpaceTimelineOptions(spaceId: string, filters: FilterState)
   if (filters.model) {
     base.model = filters.model;
   }
-  if (filters.description?.trim()) {
-    base.description = filters.description.trim();
-  }
-  if (filters.originalFileName?.trim()) {
-    base.originalFileName = filters.originalFileName.trim();
-  }
-  if (filters.ocr?.trim()) {
-    base.ocr = filters.ocr.trim();
-  }
+  applyTextFilters(base, filters);
   if (filters.tagIds.length > 0) {
     base.tagIds = filters.tagIds;
   }

@@ -2,7 +2,7 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import type { FilterSection } from '../filter-panel';
-import { createFilterState } from '../filter-panel';
+import { ALL_FILTER_SECTIONS, createFilterState } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
 
 beforeAll(async () => {
@@ -750,6 +750,70 @@ describe('Section Selector', () => {
     expect(screen.getByTestId('filter-section-media')).toBeTruthy();
     expect(screen.queryByTestId('filter-section-rating')).toBeNull();
     expect(screen.queryByTestId('filter-section-favorites')).toBeNull();
+  });
+
+  // #802 upgrade path: a returning Map user already has a stored section set whose `known` list
+  // is the pre-fix nine. The fix only reaches them if 'text' is treated as newly introduced — and
+  // it must not silently un-hide sections they deliberately turned off.
+  describe('#802 text section upgrade path', () => {
+    const PRE_FIX_MAP_SECTIONS: FilterSection[] = [
+      'timeline',
+      'people',
+      'location',
+      'camera',
+      'tags',
+      'rating',
+      'media',
+      'favorites',
+      'albums',
+    ];
+
+    it('reveals the newly introduced text section to a user with a pre-fix stored set', () => {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ selected: [...PRE_FIX_MAP_SECTIONS], known: [...PRE_FIX_MAP_SECTIONS] }),
+      );
+
+      renderPanel([...ALL_FILTER_SECTIONS]);
+
+      expect(screen.getByTestId('filter-section-text')).toBeTruthy();
+    });
+
+    it('reveals the text section without un-hiding sections the user deliberately hid', () => {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ selected: ['timeline', 'people'], known: [...PRE_FIX_MAP_SECTIONS] }),
+      );
+
+      renderPanel([...ALL_FILTER_SECTIONS]);
+
+      expect(screen.getByTestId('filter-section-text')).toBeTruthy();
+      expect(screen.getByTestId('filter-section-people')).toBeTruthy();
+      expect(screen.queryByTestId('filter-section-camera')).toBeNull();
+      expect(screen.queryByTestId('filter-section-albums')).toBeNull();
+    });
+
+    it('shows every section to a user who has never opened the panel', () => {
+      renderPanel([...ALL_FILTER_SECTIONS]);
+
+      for (const section of ALL_FILTER_SECTIONS) {
+        expect(screen.getByTestId(`filter-section-${section}`)).toBeTruthy();
+      }
+    });
+
+    it('does not re-introduce the text section once the user has hidden it post-fix', () => {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          selected: ALL_FILTER_SECTIONS.filter((section) => section !== 'text'),
+          known: [...ALL_FILTER_SECTIONS],
+        }),
+      );
+
+      renderPanel([...ALL_FILTER_SECTIONS]);
+
+      expect(screen.queryByTestId('filter-section-text')).toBeNull();
+    });
   });
 
   // Test 23

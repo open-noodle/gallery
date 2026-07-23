@@ -102,3 +102,124 @@ describe('buildAlbumAssetPickerOptions', () => {
     expect(options).not.toHaveProperty('withPartners');
   });
 });
+
+/**
+ * #802 — album views were missing the "Text" filter section. Both album builders feed
+ * TimeBucketDto, which already supports description/originalFileName/ocr server-side.
+ */
+describe('text filters (#802)', () => {
+  const textFilters = {
+    ...createFilterState(),
+    description: 'birthday cake',
+    originalFileName: 'IMG_1234.jpg',
+    ocr: 'happy birthday',
+  };
+
+  describe('buildAlbumTimelineOptions', () => {
+    it('forwards description, filename and OCR text', () => {
+      expect(buildAlbumTimelineOptions('album-1', AssetOrder.Desc, textFilters)).toEqual(
+        expect.objectContaining({
+          albumId: 'album-1',
+          description: 'birthday cake',
+          originalFileName: 'IMG_1234.jpg',
+          ocr: 'happy birthday',
+        }),
+      );
+    });
+
+    it('trims surrounding whitespace before forwarding', () => {
+      const options = buildAlbumTimelineOptions('album-1', AssetOrder.Desc, {
+        ...createFilterState(),
+        description: '  birthday cake  ',
+        originalFileName: '\tIMG_1234.jpg\n',
+        ocr: ' happy birthday ',
+      });
+
+      expect(options).toEqual(
+        expect.objectContaining({
+          description: 'birthday cake',
+          originalFileName: 'IMG_1234.jpg',
+          ocr: 'happy birthday',
+        }),
+      );
+    });
+
+    it('omits text filters that are undefined', () => {
+      const options = buildAlbumTimelineOptions('album-1', AssetOrder.Desc, createFilterState());
+
+      expect(options).not.toHaveProperty('description');
+      expect(options).not.toHaveProperty('originalFileName');
+      expect(options).not.toHaveProperty('ocr');
+    });
+
+    it('omits text filters that are blank or whitespace only', () => {
+      const options = buildAlbumTimelineOptions('album-1', AssetOrder.Desc, {
+        ...createFilterState(),
+        description: '',
+        originalFileName: '   ',
+        ocr: '\t\n',
+      });
+
+      expect(options).not.toHaveProperty('description');
+      expect(options).not.toHaveProperty('originalFileName');
+      expect(options).not.toHaveProperty('ocr');
+    });
+
+    it('forwards each text field independently of the others', () => {
+      const options = buildAlbumTimelineOptions('album-1', AssetOrder.Desc, {
+        ...createFilterState(),
+        originalFileName: 'DSC_0001.arw',
+      });
+
+      expect(options).toEqual(expect.objectContaining({ originalFileName: 'DSC_0001.arw' }));
+      expect(options).not.toHaveProperty('description');
+      expect(options).not.toHaveProperty('ocr');
+    });
+  });
+
+  describe('buildAlbumAssetPickerOptions', () => {
+    it('forwards description, filename and OCR text', () => {
+      expect(buildAlbumAssetPickerOptions('album-1', textFilters)).toEqual(
+        expect.objectContaining({
+          timelineAlbumId: 'album-1',
+          description: 'birthday cake',
+          originalFileName: 'IMG_1234.jpg',
+          ocr: 'happy birthday',
+        }),
+      );
+    });
+
+    it('forwards the album membership filters the picker can actually use', () => {
+      // The picker is not album-scoped server-side, so isInAlbum/isNotInAlbum are meaningful here
+      // and are the natural way to surface un-filed photos to add.
+      expect(buildAlbumAssetPickerOptions('album-1', { ...createFilterState(), isNotInAlbum: true })).toEqual(
+        expect.objectContaining({ isNotInAlbum: true }),
+      );
+      expect(buildAlbumAssetPickerOptions('album-1', { ...createFilterState(), isInAlbum: true })).toEqual(
+        expect.objectContaining({ isInAlbum: true }),
+      );
+    });
+
+    it('omits album membership filters when they are false', () => {
+      const options = buildAlbumAssetPickerOptions('album-1', {
+        ...createFilterState(),
+        isNotInAlbum: false,
+        isInAlbum: false,
+      });
+
+      expect(options).not.toHaveProperty('isNotInAlbum');
+      expect(options).not.toHaveProperty('isInAlbum');
+    });
+
+    it('omits blank text filters', () => {
+      const options = buildAlbumAssetPickerOptions('album-1', {
+        ...createFilterState(),
+        description: '  ',
+        ocr: '',
+      });
+
+      expect(options).not.toHaveProperty('description');
+      expect(options).not.toHaveProperty('ocr');
+    });
+  });
+});

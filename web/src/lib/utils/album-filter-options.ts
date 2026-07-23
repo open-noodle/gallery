@@ -1,5 +1,5 @@
 import { AssetTypeEnum, AssetVisibility, type AssetOrder } from '@immich/sdk';
-import { buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
+import { applyTextFilters, buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
 
 function applyCommonFilterFields(base: Record<string, unknown>, filters: FilterState): Record<string, unknown> {
   if (filters.personIds.length > 0) {
@@ -26,6 +26,15 @@ function applyCommonFilterFields(base: Record<string, unknown>, filters: FilterS
   if (filters.isFavorite !== undefined) {
     base.isFavorite = filters.isFavorite;
   }
+  // Only meaningful for the asset picker — the server drops both when `albumId` is set, so album
+  // detail (which does not render the section anyway) is unaffected.
+  if (filters.isNotInAlbum === true) {
+    base.isNotInAlbum = true;
+  }
+  if (filters.isInAlbum === true) {
+    base.isInAlbum = true;
+  }
+  applyTextFilters(base, filters);
   if (filters.mediaType !== 'all') {
     base.$type = filters.mediaType === 'image' ? AssetTypeEnum.Image : AssetTypeEnum.Video;
   }

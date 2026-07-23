@@ -5,28 +5,11 @@ import {
   SearchSuggestionType,
   type SmartSearchFacetsResponseDto,
 } from '@immich/sdk';
+import { ALL_FILTER_SECTIONS } from '$lib/components/filter-panel/filter-panel';
 import type { FilterPanelConfig, FilterState } from '$lib/components/filter-panel/filter-panel';
 import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '$lib/utils/photos-filter-options';
 import { buildRecentlyAddedSuggestionRequest } from '$lib/utils/recently-added-filter-options';
 import { buildSmartSearchFacetsParams, mapSmartSearchFacetsToFilterSuggestions } from '$lib/utils/space-search';
-
-/**
- * All ten filter sections. `'text'` renders as `<TextFilter>`, editing the description /
- * originalFileName / ocr metadata filters — those already round-trip through the URL and through
- * `buildRecentlyAddedTimelineOptions`, independent of the query/smart-search path below.
- */
-const sections = [
-  'timeline',
-  'people',
-  'location',
-  'camera',
-  'tags',
-  'rating',
-  'media',
-  'favorites',
-  'albums',
-  'text',
-] as const;
 
 function mapSuggestions(response: Awaited<ReturnType<typeof getFilterSuggestions>>) {
   return {
@@ -83,7 +66,11 @@ export function buildRecentlyAddedFilterConfig(
   };
 
   return {
-    sections: [...sections],
+    // Derived from the canonical list (#802) so this view cannot drift from the others. `'text'`
+    // renders as `<TextFilter>`, editing the description / originalFileName / ocr metadata
+    // filters — those already round-trip through the URL and through
+    // `buildRecentlyAddedTimelineOptions`, independent of the query/smart-search path below.
+    sections: [...ALL_FILTER_SECTIONS],
     suggestionsProvider: async (filters) => {
       const context = activeSearch();
       if (!context) {
