@@ -1,4 +1,4 @@
-# Contributing to Immich
+# Contributing to Noodle Gallery
 
 We appreciate every contribution, and we're happy about every new contributor. So please feel invited to help make Immich a better product!
 
