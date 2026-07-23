@@ -5,6 +5,7 @@
   import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
   import FilterToolbar from '$lib/components/filter-panel/filter-toolbar.svelte';
   import {
+    ALL_FILTER_SECTIONS,
     buildFilterContext,
     createFilterState,
     clearFilters,
@@ -303,7 +304,7 @@
   };
 
   const filterConfig: FilterPanelConfig = {
-    sections: ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media', 'favorites', 'albums', 'text'],
+    sections: [...ALL_FILTER_SECTIONS],
     suggestionsProvider: async (nextFilters: FilterState) => {
       if (!showSearchResults) {
         return loadSpaceFilterSuggestions(nextFilters);
