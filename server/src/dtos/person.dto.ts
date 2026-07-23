@@ -339,12 +339,21 @@ function mapFacesWithoutPerson(
   };
 }
 
+/**
+ * #796: who is in a photo is read-only metadata that anyone with read access to the asset may see,
+ * not just the owner. The sole caller (PersonService.getFacesById) authorizes Permission.AssetRead
+ * before mapping, so every face reaching here belongs to an asset the caller is entitled to; the
+ * caller is also responsible for dropping faces of hidden people for non-owners.
+ *
+ * `auth` is retained for signature stability and future per-viewer projection.
+ */
 export function mapFaces(
   face: AssetFace,
   auth: AuthDto,
   edits?: AssetEditActionItem[],
   assetDimensions?: ImageDimensions,
 ): AssetFaceResponseDto {
+  void auth;
   return {
     ...mapFacesWithoutPerson(face, edits, assetDimensions),
     person: face.person ? mapPerson(face.person) : null,

@@ -285,7 +285,12 @@ export class PersonService extends BaseService {
     const asset = await this.assetRepository.getForFaces(dto.id);
     const assetDimensions = getDimensions(asset);
 
-    return faces.map((face) => mapFaces(face, auth, asset.edits, assetDimensions));
+    // A person the owner marked hidden must never reach another viewer (#796). Filtering on the
+    // client would be cosmetic — the identity would still be on the wire — so drop the face here.
+    // The owner keeps seeing their hidden people; the web decides whether to display them.
+    return faces
+      .filter((face) => !face.person?.isHidden || face.person?.ownerId === auth.user.id)
+      .map((face) => mapFaces(face, auth, asset.edits, assetDimensions));
   }
 
   async createNewFeaturePhoto(changeFeaturePhoto: PersonId[]) {
