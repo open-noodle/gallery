@@ -202,6 +202,7 @@ Upstream Immich references are rewritten to Gallery at build time by `branding/a
   - **Release Gallery Server** (`.github/workflows/gallery-release-server-only.yml`): takes a required `version` and an optional `commit` (defaults to branch HEAD; pass the SHA the mobile run recorded to ship a matching build). Builds + pushes `gallery-server` / `gallery-ml` / `gallery-ml:*-cuda`, moves the `vX.Y.Z` / `vX` / `release` tags, creates the GitHub Release, and flips the version endpoint self-hosted instances poll. See `docs/plans/2026-05-18-decoupled-release-design.md`.
 - **Deploy targets**: `demo.opennoodle.de` (demo), `docs.opennoodle.de` (Docusaurus). Each has a corresponding skill in `.claude/skills/` (see `/deploy-gallery-*` slash commands).
 - **RC builds**: `rc-personal` skill ships a tagged server image to the personal instance via a compose override — remember to remove the override after merge or release deploys will ship stale RC images.
+- **Automatic PR RC builds**: labelling a PR `rc` builds `ghcr.io/open-noodle/gallery-server:pr-<number>` from the PR head on every push and keeps one sticky PR comment with tester instructions; add `rc-ml` to also build `gallery-ml:pr-<number>`. See `.github/workflows/gallery-pr-rc-comment.yml`.
 
 ## Contributing & Docs
 
