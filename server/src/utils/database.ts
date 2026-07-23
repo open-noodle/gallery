@@ -763,7 +763,8 @@ export function albumSharedSpaceScope<O>(qb: SelectQueryBuilder<DB, 'asset', O>,
 
 const joinDeduplicationPlugin = new DeduplicateJoinsPlugin();
 /** TODO: This should only be used for search-related queries, not as a general purpose query builder */
-
+// fork's live search path — carries the owner/space RBAC gate. All fork search call-sites use this,
+// NOT the dormant V3 searchAssetBuilder below. See the search V3 coexistence spec.
 export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearchBuilderOptions) {
   options.withDeleted ||= !!(options.trashedAfter || options.trashedBefore || options.isOffline);
 
@@ -1201,6 +1202,11 @@ function branchPredicates(eb: AssetExpressionBuilder, branch: SearchFilterBranch
   ];
 }
 
+// ─── UPSTREAM SEARCH V3 — DORMANT ───────────────────────────────
+// Not wired to any controller/service. The fork's live search uses searchAssetBuilderLegacy
+// (above), which carries the owner/space RBAC gate. Do not call this V3 builder from fork code.
+// Switch-over plan: docs/superpowers/specs/2026-07-23-search-v3-coexistence-design.md
+//
 // ordering is deliberately left to the caller so aggregate-only consumers (counts, stats)
 // can compose the same filters without stripping an order by
 export function searchAssetBuilder(kysely: Kysely<DB>, options: AssetSearchBuilderV3Options, scope: AssetSearchScope) {
