@@ -64,6 +64,7 @@ import { ImmichMediaResponse } from 'src/utils/file';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy';
 import { mimeTypes } from 'src/utils/mime-types';
 import { batched, findOrFail, isFacialRecognitionEnabled } from 'src/utils/misc';
+import { applyResolvedIdentityMetadata } from 'src/utils/person-identity';
 import { getPreferences } from 'src/utils/preferences';
 import { Point, transformPoints } from 'src/utils/transform';
 
@@ -288,9 +289,29 @@ export class PersonService extends BaseService {
     // A person the owner marked hidden must never reach another viewer (#796). Filtering on the
     // client would be cosmetic — the identity would still be on the wire — so drop the face here.
     // The owner keeps seeing their hidden people; the web decides whether to display them.
-    return faces
+    const response = faces
       .filter((face) => !face.person?.isHidden || face.person?.ownerId === auth.user.id)
       .map((face) => mapFaces(face, auth, asset.edits, assetDimensions));
+
+    // #808: a name or birthday set inside a shared space lives on `shared_space_person` and is
+    // resolved at read time — it is never written back to `person`. The asset viewer Info panel
+    // reads this endpoint for the owner, so it has to apply the same identity-wide resolution
+    // PersonService.getById does; otherwise the age silently disappears for every person whose
+    // birthday only ever existed on a space profile. `mapFaces` already nulls people the caller
+    // does not own, so only owned faces are resolved here.
+    const identityByPersonId = new Map<string, string>();
+    for (const face of faces) {
+      if (face.person?.ownerId === auth.user.id && face.person.identityId) {
+        identityByPersonId.set(face.person.id, face.person.identityId);
+      }
+    }
+    await applyResolvedIdentityMetadata({
+      people: response.map((face) => face.person).filter((person) => person !== null),
+      identityByPersonId,
+      resolve: (identityId) => this.faceIdentityRepository.getResolvedPersonByIdentityId(auth.user.id, identityId),
+    });
+
+    return response;
   }
 
   async createNewFeaturePhoto(changeFeaturePhoto: PersonId[]) {
