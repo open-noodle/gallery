@@ -7,9 +7,11 @@
     getAllPeople,
     reassignFaces,
     reassignSpacePersonFaces,
+    Type3 as SpaceReassignNewTarget,
+    Type4 as SpaceReassignExistingTarget,
     type AssetFaceUpdateItem,
     type PersonResponseDto,
-    type ScopedPersonProfileRefDto,
+    type SharedSpacePersonReassignDto,
   } from '@immich/sdk';
   import { Button, toastManager } from '@immich/ui';
   import { mdiMerge, mdiPlus } from '@mdi/js';
@@ -78,18 +80,35 @@
     hasSelection = false;
   };
 
+  // SharedSpacePersonReassignDto.assetIds is capped at 100 server-side, and "Select all" on this very
+  // toolbar is unbounded — a >100 selection would 400 outright. Chunk instead.
+  const SPACE_REASSIGN_ASSET_ID_LIMIT = 100;
+
   // Shared by both handlers so create/reassign cannot drift on the space-endpoint call shape.
   // spaceRef is a parameter (not read from the closure) so the "only call this for a space
   // source" invariant lives with the callers, who already narrow it via `if (spaceRef)`.
+  //
+  // Chunks are issued sequentially and their server-reported counts summed. A throw from any chunk
+  // propagates: the callers treat a partially-applied reassign as a failure (danger toast, no
+  // optimistic removal), which is the only safe reading when we cannot know what landed.
+  // Caveat for a `new` target beyond one chunk: the endpoint mints the new person per request, so a
+  // >100 selection lands as one new person per chunk. Strictly better than the 400 it used to be.
   const reassignInSpace = async (
     spaceRef: { spaceId: string; personId: string },
-    target: { type: 'new' } | { type: 'existing'; profile: ScopedPersonProfileRefDto },
+    target: SharedSpacePersonReassignDto['target'],
   ) => {
-    const { reassigned } = await reassignSpacePersonFaces({
-      id: spaceRef.spaceId,
-      personId: spaceRef.personId,
-      sharedSpacePersonReassignDto: { assetIds, target },
-    });
+    let reassigned = 0;
+    for (let offset = 0; offset < assetIds.length; offset += SPACE_REASSIGN_ASSET_ID_LIMIT) {
+      const result = await reassignSpacePersonFaces({
+        id: spaceRef.spaceId,
+        personId: spaceRef.personId,
+        sharedSpacePersonReassignDto: {
+          assetIds: assetIds.slice(offset, offset + SPACE_REASSIGN_ASSET_ID_LIMIT),
+          target,
+        },
+      });
+      reassigned += result.reassigned;
+    }
     return reassigned;
   };
 
@@ -99,14 +118,16 @@
     // onConfirm() drives the caller's optimistic removal (+page.svelte -> timelineManager.removeAssets).
     // Only fire it when something actually moved — a reassigned: 0 result already surfaces the
     // danger toast below, and advancing the UI as if it succeeded would empty the grid of assets
-    // that never left. Left true on a thrown error, matching existing behaviour on that path.
+    // that never left. A thrown error means the same thing (nothing we can rely on moved), so the
+    // catch clears it too: the space endpoint can reject outright (Editor gate, assetIds cap) and a
+    // danger toast plus a silently emptied grid is exactly #765's symptom relocated.
     let shouldConfirm = true;
 
     try {
       disableButtons = true;
       let reassigned: number;
       if (spaceRef) {
-        reassigned = await reassignInSpace(spaceRef, { type: 'new' });
+        reassigned = await reassignInSpace(spaceRef, { type: SpaceReassignNewTarget.New });
       } else {
         const data = await createPerson({ personCreateDto: {} });
         await reassignFaces({ id: data.id, assetFaceUpdateDto: { data: selectedPeople } });
@@ -121,6 +142,7 @@
       }
     } catch (error) {
       handleError(error, $t('errors.unable_to_reassign_assets_new_person'));
+      shouldConfirm = false;
     } finally {
       clearTimeout(timeout);
     }
@@ -142,7 +164,7 @@
         let reassigned: number;
         if (spaceRef) {
           reassigned = await reassignInSpace(spaceRef, {
-            type: 'existing',
+            type: SpaceReassignExistingTarget.Existing,
             profile: toScopedPersonRef(selectedPerson),
           });
         } else {
@@ -168,6 +190,7 @@
         error,
         $t('errors.unable_to_reassign_assets_existing_person', { values: { name: selectedPerson?.name || null } }),
       );
+      shouldConfirm = false;
     } finally {
       clearTimeout(timeout);
     }
