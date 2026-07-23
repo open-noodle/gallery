@@ -109,9 +109,7 @@ class PetDetector(InferenceModel):
         blob = np.transpose(blob, (2, 0, 1))  # HWC -> CHW
         return np.expand_dims(blob, axis=0).astype(np.float32)
 
-    def _postprocess(
-        self, outputs: list[NDArray[np.float32]], orig_w: int, orig_h: int
-    ) -> PetDetectionOutput:
+    def _postprocess(self, outputs: list[NDArray[np.float32]], orig_w: int, orig_h: int) -> PetDetectionOutput:
         boxes_raw, logits = self._resolve_outputs(outputs)
         boxes_cxcywh = boxes_raw[0]
         # RF-DETR emits pre-sigmoid logits over the 91-class COCO space.

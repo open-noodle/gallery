@@ -416,6 +416,14 @@ unmatched predictions as YOLO on COCO. The measurement is confounded (see above)
 spurious pet entries appear in real libraries, raising `minScore` above 0.3 is the first
 response.
 
+**A few bear-like dogs now yield no detection rather than a wrong one.** Verified against the
+shipped code with real weights: for `keeshond_149.jpg`, RF-DETR scores `bear` at 0.962 and
+`dog` at 0.006, and the best domestic-class score across all 300 queries is 0.043. No
+threshold recovers it. Dropping the safari classes therefore converts a confidently wrong
+"bear" into silence, which is the intended trade — but it is expected behaviour, not a bug,
+and should not be filed as one. Same effect measured on Oxford: removing the safari classes
+moved the no-detection rate from 3.0% to 4.7% at `minScore` 0.6.
+
 **Model download grows from 38 MB to ~108 MB** per instance, a one-time cost on first use.
 
 **All measurements come from public datasets, not real user libraries.** Before release,

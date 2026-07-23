@@ -29,11 +29,11 @@ from immich_ml.models.base import InferenceModel
 from immich_ml.models.cache import ModelCache
 from immich_ml.models.clip.textual import MClipTextualEncoder, OpenClipTextualEncoder
 from immich_ml.models.clip.visual import OpenClipVisualEncoder
+from immich_ml.models.constants import get_model_source
 from immich_ml.models.facial_recognition.detection import FaceDetector
 from immich_ml.models.facial_recognition.recognition import FaceRecognizer
 from immich_ml.models.ocr.detection import TextDetector
 from immich_ml.models.ocr.recognition import TextRecognizer
-from immich_ml.models.constants import get_model_source
 from immich_ml.models.ocr.schemas import OcrOptions
 from immich_ml.models.pet_detection import PetDetector
 from immich_ml.models.pet_recognition import PetRecognizer
@@ -1273,9 +1273,7 @@ class TestPetDetection:
         expected = {16: "bird", 17: "cat", 18: "dog", 19: "horse", 20: "sheep", 21: "cow"}
         for class_id, label in expected.items():
             detector = self._detector(mocker)
-            detector.session.run.return_value = self._make_rfdetr_output(
-                [(0.5, 0.5, 0.2, 0.2, class_id, 0.9)]
-            )
+            detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.2, 0.2, class_id, 0.9)])
             results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
             assert len(results) == 1
             assert results[0]["label"] == label
@@ -1284,9 +1282,7 @@ class TestPetDetection:
         """Spec #9. elephant/bear/zebra/giraffe at 0.99 emit nothing — the reported bug."""
         for class_id in (22, 23, 24, 25):
             detector = self._detector(mocker)
-            detector.session.run.return_value = self._make_rfdetr_output(
-                [(0.5, 0.5, 0.2, 0.2, class_id, 0.99)]
-            )
+            detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.2, 0.2, class_id, 0.99)])
             results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
             assert results == []
 
@@ -1294,9 +1290,7 @@ class TestPetDetection:
         """Spec #10. person=1, car=3."""
         for class_id in (1, 3):
             detector = self._detector(mocker)
-            detector.session.run.return_value = self._make_rfdetr_output(
-                [(0.5, 0.5, 0.2, 0.2, class_id, 0.99)]
-            )
+            detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.2, 0.2, class_id, 0.99)])
             results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
             assert results == []
 
@@ -1319,9 +1313,7 @@ class TestPetDetection:
     def test_converts_boxes_to_pixels(self, mocker: MockerFixture) -> None:
         """Spec #12. Normalised cxcywh -> pixel xyxy against ORIGINAL dimensions."""
         detector = self._detector(mocker)
-        detector.session.run.return_value = self._make_rfdetr_output(
-            [(0.5, 0.5, 0.4, 0.2, 18, 0.9)]
-        )
+        detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.4, 0.2, 18, 0.9)])
 
         results = detector.predict(Image.new("RGB", (200, 100), (0, 0, 0)))
 
@@ -1332,9 +1324,7 @@ class TestPetDetection:
     def test_clips_boxes_to_image_bounds(self, mocker: MockerFixture) -> None:
         """Spec #13. A box overhanging the edge is clipped, not emitted negative."""
         detector = self._detector(mocker)
-        detector.session.run.return_value = self._make_rfdetr_output(
-            [(0.1, 0.1, 0.6, 0.6, 18, 0.9)]
-        )
+        detector.session.run.return_value = self._make_rfdetr_output([(0.1, 0.1, 0.6, 0.6, 18, 0.9)])
 
         results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
 
@@ -1347,14 +1337,10 @@ class TestPetDetection:
     def test_honours_min_score(self, mocker: MockerFixture) -> None:
         """Spec #14. Just below is dropped, just above is kept."""
         detector = self._detector(mocker, min_score=0.5)
-        detector.session.run.return_value = self._make_rfdetr_output(
-            [(0.5, 0.5, 0.2, 0.2, 18, 0.49)]
-        )
+        detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.2, 0.2, 18, 0.49)])
         assert detector.predict(Image.new("RGB", (100, 100), (0, 0, 0))) == []
 
-        detector.session.run.return_value = self._make_rfdetr_output(
-            [(0.5, 0.5, 0.2, 0.2, 18, 0.51)]
-        )
+        detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.2, 0.2, 18, 0.51)])
         assert len(detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))) == 1
 
     def test_resolves_outputs_by_shape_not_order(self, mocker: MockerFixture) -> None:
@@ -1371,10 +1357,12 @@ class TestPetDetection:
     def test_returns_multiple_detections(self, mocker: MockerFixture) -> None:
         """Spec #16."""
         detector = self._detector(mocker)
-        detector.session.run.return_value = self._make_rfdetr_output([
-            (0.25, 0.25, 0.2, 0.2, 18, 0.9),
-            (0.75, 0.75, 0.2, 0.2, 17, 0.8),
-        ])
+        detector.session.run.return_value = self._make_rfdetr_output(
+            [
+                (0.25, 0.25, 0.2, 0.2, 18, 0.9),
+                (0.75, 0.75, 0.2, 0.2, 17, 0.8),
+            ]
+        )
 
         results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
 
@@ -1392,26 +1380,20 @@ class TestPetDetection:
     def test_degenerate_box_does_not_raise(self, mocker: MockerFixture) -> None:
         """Spec #18. Zero width/height."""
         detector = self._detector(mocker)
-        detector.session.run.return_value = self._make_rfdetr_output(
-            [(0.5, 0.5, 0.0, 0.0, 18, 0.9)]
-        )
+        detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.0, 0.0, 18, 0.9)])
         results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
         assert isinstance(results, list)
 
     def test_box_fully_outside_is_dropped(self, mocker: MockerFixture) -> None:
         """Spec #19. Clipping leaves zero area, so it must not be emitted."""
         detector = self._detector(mocker)
-        detector.session.run.return_value = self._make_rfdetr_output(
-            [(1.8, 1.8, 0.2, 0.2, 18, 0.9)]
-        )
+        detector.session.run.return_value = self._make_rfdetr_output([(1.8, 1.8, 0.2, 0.2, 18, 0.9)])
         assert detector.predict(Image.new("RGB", (100, 100), (0, 0, 0))) == []
 
     def test_extreme_aspect_ratio(self, mocker: MockerFixture) -> None:
         """Spec #20."""
         detector = self._detector(mocker)
-        detector.session.run.return_value = self._make_rfdetr_output(
-            [(0.5, 0.5, 0.1, 0.5, 18, 0.9)]
-        )
+        detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.1, 0.5, 18, 0.9)])
         results = detector.predict(Image.new("RGB", (4000, 100), (0, 0, 0)))
         box = results[0]["boundingBox"]
         assert box["x1"] == 1800 and box["x2"] == 2200
@@ -1420,18 +1402,14 @@ class TestPetDetection:
     def test_tiny_image(self, mocker: MockerFixture) -> None:
         """Spec #21."""
         detector = self._detector(mocker)
-        detector.session.run.return_value = self._make_rfdetr_output(
-            [(0.5, 0.5, 0.5, 0.5, 18, 0.9)]
-        )
+        detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.5, 0.5, 18, 0.9)])
         results = detector.predict(Image.new("RGB", (10, 10), (0, 0, 0)))
         assert isinstance(results, list)
 
     def test_all_queries_above_threshold(self, mocker: MockerFixture) -> None:
         """Spec #22. The 300-query maximum."""
         detector = self._detector(mocker)
-        detector.session.run.return_value = self._make_rfdetr_output(
-            [(0.5, 0.5, 0.1, 0.1, 18, 0.9)] * 300
-        )
+        detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.1, 0.1, 18, 0.9)] * 300)
         results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
         assert len(results) == 300
 
