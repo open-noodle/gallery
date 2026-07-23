@@ -214,7 +214,7 @@ export class IdentityMergePropagationService {
         targetPersonId = target.profile.id;
       } else {
         const cached = personIdByOwner.get(face.assetOwnerId);
-        if (cached) {
+        if (cached !== undefined) {
           targetPersonId = cached;
         } else if (target.type === 'existing' && target.profile.type === 'space-person') {
           // Branch on the discriminant, not on targetIdentityId's truthiness: this is the resolution
@@ -238,6 +238,10 @@ export class IdentityMergePropagationService {
               faceAssetId: face.assetFaceId,
             });
             targetPersonId = created.id;
+            // Every other site that sets faceAssetId at creation also queues thumbnail generation
+            // (person.service.ts, pet-detection.service.ts, media.service.ts) — without it the person
+            // has a feature face but thumbnailPath stays '', and getThumbnail rejects that outright.
+            await this.deps.jobRepository.queue({ name: JobName.PersonGenerateThumbnail, data: { id: created.id } });
           }
           personIdByOwner.set(face.assetOwnerId, targetPersonId);
         } else {
@@ -248,6 +252,7 @@ export class IdentityMergePropagationService {
             faceAssetId: face.assetFaceId,
           });
           targetPersonId = created.id;
+          await this.deps.jobRepository.queue({ name: JobName.PersonGenerateThumbnail, data: { id: created.id } });
           personIdByOwner.set(face.assetOwnerId, targetPersonId);
         }
       }
