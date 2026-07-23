@@ -105,6 +105,22 @@
   <button type="button" data-testid="select-favorites-filter" onclick={selectFavorites}>Favorites</button>
   <button type="button" data-testid="select-has-no-album-filter" onclick={selectHasNoAlbum}>Has no album</button>
   <button type="button" data-testid="select-has-album-filter" onclick={selectHasAlbum}>Has album</button>
+  <button
+    type="button"
+    data-testid="filter-panel-set-text"
+    onclick={() => {
+      if (filters) {
+        updateFilters({
+          ...filters,
+          description: 'birthday cake',
+          originalFileName: 'IMG_1234.jpg',
+          ocr: 'happy birthday',
+        });
+      }
+    }}
+  >
+    Set text filters
+  </button>
   <button type="button" data-testid="load-city-suggestions" onclick={loadCitySuggestions}>Load cities</button>
   <button type="button" data-testid="load-camera-model-suggestions" onclick={loadCameraModelSuggestions}>
     Load camera models

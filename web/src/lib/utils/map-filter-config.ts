@@ -6,6 +6,7 @@ import {
   type FilterSuggestionsPersonDto,
 } from '@immich/sdk';
 import {
+  ALL_FILTER_SECTIONS,
   buildFilterContext,
   type FilterPanelConfig,
   type FilterState,
@@ -14,18 +15,6 @@ import { createUrl } from '$lib/utils';
 import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '$lib/utils/photos-filter-options';
 
 export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
-  const sections = [
-    'timeline',
-    'people',
-    'location',
-    'camera',
-    'tags',
-    'rating',
-    'media',
-    'favorites',
-    'albums',
-  ] as const;
-
   const suggestionsProvider = async (filters: FilterState) => {
     const context = buildFilterContext(filters);
     const response = await getFilterSuggestions({
@@ -67,7 +56,7 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
   };
 
   return {
-    sections: [...sections],
+    sections: [...ALL_FILTER_SECTIONS],
     suggestionsProvider,
     providers: {
       cities: (country: string, context) =>
