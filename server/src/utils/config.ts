@@ -16,6 +16,25 @@ type RepoDeps = {
   logger: LoggingRepository;
 };
 
+const LEGACY_PET_MODEL_PREFIX = 'yolo';
+const DEFAULT_PET_MODEL = 'rfdetr-nano';
+
+/**
+ * Pet detection moved from YOLO11 to RF-DETR. Installs that persisted a `yolo*`
+ * model name would otherwise keep requesting a model the ML service no longer
+ * knows how to build, so rewrite it to the current default on read. Applied in
+ * `buildConfig` rather than in the Zod schema on purpose: transforming the DTO
+ * field would change the generated OpenAPI types and force an SDK regeneration.
+ */
+export const migrateLegacyPetDetectionModel = (config: SystemConfig): SystemConfig => {
+  const { petDetection } = config.machineLearning;
+  if (petDetection.modelName.toLowerCase().startsWith(LEGACY_PET_MODEL_PREFIX)) {
+    petDetection.modelName = DEFAULT_PET_MODEL;
+  }
+
+  return config;
+};
+
 const asyncLock = new AsyncLock();
 let config: SystemConfig | null = null;
 let lastUpdated: number | null = null;
@@ -180,6 +199,10 @@ const buildConfig = async (repos: RepoDeps) => {
   for (const property of getKeysDeep(partial)) {
     _.set(rawConfig, property, _.get(partial, property));
   }
+
+  // Rewrite retired model names before validation so every consumer, including the
+  // admin settings UI, sees the migrated value rather than a stale one.
+  migrateLegacyPetDetectionModel(rawConfig);
 
   // check for extra properties. Enumerate defaults with empty objects kept as leaves so sparse-map
   // defaults (e.g. `memories.types: {}`) count as known keys instead of being reported as unknown.
