@@ -241,6 +241,7 @@ const setupIdentityBackedDedupFixture = (
 const useIdentityMergePropagation = (sut: SharedSpaceService) => {
   const identityMergePropagation = {
     mergeSpacePeople: vi.fn().mockResolvedValue(void 0),
+    reassignSpaceFacesToTarget: vi.fn().mockResolvedValue({ reassigned: 0, targetPersonIds: [] }),
   };
   (
     sut as unknown as { identityMergePropagationService: typeof identityMergePropagation }
@@ -9260,6 +9261,212 @@ describe(SharedSpaceService.name, () => {
       );
 
       expect(identityMergePropagation.mergeSpacePeople).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reassignSpacePersonFaces', () => {
+    it('rejects viewer-initiated requests before resolving faces or delegating', async () => {
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+
+      await expect(
+        sut.reassignSpacePersonFaces(factory.auth(), 'space-1', 'person-1', {
+          assetIds: [newUuid()],
+          target: { type: 'new' },
+        }),
+      ).rejects.toThrow('Insufficient role');
+
+      expect(mocks.sharedSpace.getSourceFacesForSpacePersonAssets).not.toHaveBeenCalled();
+      expect(identityMergePropagation.reassignSpaceFacesToTarget).not.toHaveBeenCalled();
+    });
+
+    it('rejects non-member requests before resolving faces or delegating', async () => {
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      mocks.sharedSpace.getMember.mockResolvedValue(void 0);
+
+      await expect(
+        sut.reassignSpacePersonFaces(factory.auth(), 'space-1', 'person-1', {
+          assetIds: [newUuid()],
+          target: { type: 'new' },
+        }),
+      ).rejects.toThrow('Not a member of this space');
+
+      expect(mocks.sharedSpace.getSourceFacesForSpacePersonAssets).not.toHaveBeenCalled();
+      expect(identityMergePropagation.reassignSpaceFacesToTarget).not.toHaveBeenCalled();
+    });
+
+    it('rejects when the source space person is missing or belongs to a different space', async () => {
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      const spaceId = newUuid();
+      const personId = newUuid();
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(void 0);
+
+      await expect(
+        sut.reassignSpacePersonFaces(factory.auth(), spaceId, personId, {
+          assetIds: [newUuid()],
+          target: { type: 'new' },
+        }),
+      ).rejects.toThrow('Person not found');
+
+      mocks.sharedSpace.getPersonById.mockReset();
+      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(
+        factory.sharedSpacePerson({ id: personId, spaceId: newUuid() }),
+      );
+
+      await expect(
+        sut.reassignSpacePersonFaces(factory.auth(), spaceId, personId, {
+          assetIds: [newUuid()],
+          target: { type: 'new' },
+        }),
+      ).rejects.toThrow('Person not found');
+
+      expect(mocks.sharedSpace.getSourceFacesForSpacePersonAssets).not.toHaveBeenCalled();
+      expect(identityMergePropagation.reassignSpaceFacesToTarget).not.toHaveBeenCalled();
+    });
+
+    it('rejects a space-person target that does not belong to this space', async () => {
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      const spaceId = newUuid();
+      const personId = newUuid();
+      const targetId = newUuid();
+      const source = factory.sharedSpacePerson({ id: personId, spaceId });
+      const otherSpaceTarget = factory.sharedSpacePerson({ id: targetId, spaceId: newUuid() });
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(source).mockResolvedValueOnce(otherSpaceTarget);
+
+      await expect(
+        sut.reassignSpacePersonFaces(factory.auth(), spaceId, personId, {
+          assetIds: [newUuid()],
+          target: { type: 'existing', profile: { type: 'space-person', id: targetId, spaceId } },
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mocks.sharedSpace.getSourceFacesForSpacePersonAssets).not.toHaveBeenCalled();
+      expect(identityMergePropagation.reassignSpaceFacesToTarget).not.toHaveBeenCalled();
+    });
+
+    it('rejects a space-person target equal to the source person', async () => {
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      const spaceId = newUuid();
+      const personId = newUuid();
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(factory.sharedSpacePerson({ id: personId, spaceId }));
+
+      await expect(
+        sut.reassignSpacePersonFaces(factory.auth(), spaceId, personId, {
+          assetIds: [newUuid()],
+          target: { type: 'existing', profile: { type: 'space-person', id: personId, spaceId } },
+        }),
+      ).rejects.toThrow('Cannot reassign a person into themselves');
+
+      // The self-reassign guard must fire before any target lookup — otherwise this would also pass
+      // with a second (unmocked) getPersonById call resolving undefined and tripping a different guard.
+      expect(mocks.sharedSpace.getPersonById).toHaveBeenCalledTimes(1);
+      expect(mocks.sharedSpace.getSourceFacesForSpacePersonAssets).not.toHaveBeenCalled();
+      expect(identityMergePropagation.reassignSpaceFacesToTarget).not.toHaveBeenCalled();
+    });
+
+    it('rejects a global-person target the caller can neither own nor space-edit', async () => {
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      const spaceId = newUuid();
+      const personId = newUuid();
+      const globalPersonId = newUuid();
+      const auth = factory.auth();
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(factory.sharedSpacePerson({ id: personId, spaceId }));
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.person.checkSharedSpaceEditAccess.mockResolvedValue(new Set());
+
+      await expect(
+        sut.reassignSpacePersonFaces(auth, spaceId, personId, {
+          assetIds: [newUuid()],
+          target: { type: 'existing', profile: { type: 'person', id: globalPersonId } },
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([globalPersonId]));
+      expect(mocks.access.person.checkSharedSpaceEditAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([globalPersonId]),
+      );
+      expect(mocks.sharedSpace.getSourceFacesForSpacePersonAssets).not.toHaveBeenCalled();
+      expect(identityMergePropagation.reassignSpaceFacesToTarget).not.toHaveBeenCalled();
+    });
+
+    it('allows a global-person target the caller owns and delegates it verbatim', async () => {
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      identityMergePropagation.reassignSpaceFacesToTarget.mockResolvedValue({
+        reassigned: 2,
+        targetPersonIds: ['global-person'],
+      });
+      const spaceId = newUuid();
+      const personId = newUuid();
+      const globalPersonId = newUuid();
+      const auth = factory.auth();
+      const assetIds = [newUuid()];
+      const faces = [{ assetFaceId: newUuid(), assetId: assetIds[0], personId, assetOwnerId: auth.user.id }];
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(factory.sharedSpacePerson({ id: personId, spaceId }));
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([globalPersonId]));
+      mocks.sharedSpace.getSourceFacesForSpacePersonAssets.mockResolvedValue(faces as any);
+
+      const target = { type: 'existing' as const, profile: { type: 'person' as const, id: globalPersonId } };
+      const result = await sut.reassignSpacePersonFaces(auth, spaceId, personId, { assetIds, target });
+
+      // The owner fast path must short-circuit the shared-space-edit check entirely.
+      expect(mocks.access.person.checkSharedSpaceEditAccess).not.toHaveBeenCalled();
+      expect(identityMergePropagation.reassignSpaceFacesToTarget).toHaveBeenCalledWith(faces, target);
+      expect(result).toEqual({ reassigned: 2 });
+    });
+
+    it('resolves source faces and delegates exactly those rows plus dto.target, returning the propagation result', async () => {
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      identityMergePropagation.reassignSpaceFacesToTarget.mockResolvedValue({
+        reassigned: 3,
+        targetPersonIds: ['new-person'],
+      });
+      const spaceId = newUuid();
+      const personId = newUuid();
+      const auth = factory.auth();
+      const assetIds = [newUuid(), newUuid()];
+      const faces = [
+        { assetFaceId: newUuid(), assetId: assetIds[0], personId, assetOwnerId: auth.user.id },
+        { assetFaceId: newUuid(), assetId: assetIds[1], personId: null, assetOwnerId: auth.user.id },
+      ];
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(factory.sharedSpacePerson({ id: personId, spaceId }));
+      mocks.sharedSpace.getSourceFacesForSpacePersonAssets.mockResolvedValue(faces as any);
+
+      const target = { type: 'new' as const };
+      const result = await sut.reassignSpacePersonFaces(auth, spaceId, personId, { assetIds, target });
+
+      expect(mocks.sharedSpace.getSourceFacesForSpacePersonAssets).toHaveBeenCalledWith(personId, assetIds);
+      expect(identityMergePropagation.reassignSpaceFacesToTarget).toHaveBeenCalledWith(faces, target);
+      expect(result).toEqual({ reassigned: 3 });
+    });
+
+    it('returns { reassigned: 0 } without throwing when no faces resolve', async () => {
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      identityMergePropagation.reassignSpaceFacesToTarget.mockResolvedValue({ reassigned: 0, targetPersonIds: [] });
+      const spaceId = newUuid();
+      const personId = newUuid();
+      const auth = factory.auth();
+      const assetIds = [newUuid()];
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(factory.sharedSpacePerson({ id: personId, spaceId }));
+      mocks.sharedSpace.getSourceFacesForSpacePersonAssets.mockResolvedValue([]);
+
+      const target = { type: 'new' as const };
+
+      await expect(sut.reassignSpacePersonFaces(auth, spaceId, personId, { assetIds, target })).resolves.toEqual({
+        reassigned: 0,
+      });
+
+      // Deliberate: the implementation does not short-circuit on an empty resolved-faces array — it still
+      // calls the propagation delegate once with [], which itself no-ops and returns { reassigned: 0 }.
+      expect(identityMergePropagation.reassignSpaceFacesToTarget).toHaveBeenCalledTimes(1);
+      expect(identityMergePropagation.reassignSpaceFacesToTarget).toHaveBeenCalledWith([], target);
     });
   });
 

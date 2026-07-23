@@ -56,7 +56,7 @@ const MergePersonSchema = z
   })
   .meta({ id: 'MergePersonDto' });
 
-const ScopedPersonProfileRefSchema = z
+export const ScopedPersonProfileRefSchema = z
   .object({
     type: z.enum(['person', 'space-person']).describe('Scoped profile type'),
     id: z.uuidv4().describe('Scoped profile ID'),

@@ -1,4 +1,5 @@
 import { createZodDto } from 'nestjs-zod';
+import { ScopedPersonProfileRefSchema } from 'src/dtos/person.dto';
 import { emptyStringToNull, isoDatetimeToDate, stringToBool } from 'src/validation';
 import z from 'zod';
 
@@ -69,6 +70,24 @@ const SpacePersonFaceSuggestionParamsSchema = SpacePersonParamsSchema.extend({
   assetFaceId: z.uuidv4().describe('Unassigned asset face ID being reviewed'),
 }).meta({ id: 'SpacePersonFaceSuggestionParamsDto' });
 
+const SharedSpacePersonReassignSchema = z
+  .object({
+    assetIds: z.array(z.uuidv4()).min(1).max(100).describe('Assets whose face on this person is misassigned'),
+    target: z
+      .discriminatedUnion('type', [
+        z.object({ type: z.literal('new') }),
+        z.object({ type: z.literal('existing'), profile: ScopedPersonProfileRefSchema }),
+      ])
+      .describe('Where the faces should be reassigned to'),
+  })
+  .meta({ id: 'SharedSpacePersonReassignDto' });
+
+const SharedSpacePersonReassignResponseSchema = z
+  .object({
+    reassigned: z.int().min(0).describe('Number of faces actually reassigned'),
+  })
+  .meta({ id: 'SharedSpacePersonReassignResponseDto' });
+
 const SharedSpacePersonResponseSchema = z
   .object({
     id: z.string().describe('Person ID'),
@@ -103,5 +122,8 @@ export class SpaceRepresentativeFaceUpdateDto extends createZodDto(SpaceRepresen
 export class SharedSpacePersonMergeDto extends createZodDto(SharedSpacePersonMergeSchema) {}
 export class SpacePersonParamsDto extends createZodDto(SpacePersonParamsSchema) {}
 export class SpacePersonFaceSuggestionParamsDto extends createZodDto(SpacePersonFaceSuggestionParamsSchema) {}
+
+export class SharedSpacePersonReassignDto extends createZodDto(SharedSpacePersonReassignSchema) {}
+export class SharedSpacePersonReassignResponseDto extends createZodDto(SharedSpacePersonReassignResponseSchema) {}
 export class SharedSpacePersonResponseDto extends createZodDto(SharedSpacePersonResponseSchema) {}
 export class SharedSpacePeopleStatisticsResponseDto extends createZodDto(SharedSpacePeopleStatisticsResponseSchema) {}
