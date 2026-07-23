@@ -11160,6 +11160,85 @@ describe(SharedSpaceService.name, () => {
       );
     });
 
+    // #802 — the Map filter panel gained the "Text" section, so markers must honour the same
+    // three text predicates the map timeline already does. searchAssetBuilder already implements
+    // all three; only this mapping was missing.
+    it('should pass description, originalFileName and ocr to repository', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
+
+      await sut.getFilteredMapMarkers(auth, {
+        description: 'birthday cake',
+        originalFileName: 'IMG_1234.jpg',
+        ocr: 'happy birthday',
+      });
+
+      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: 'birthday cake',
+          originalFileName: 'IMG_1234.jpg',
+          ocr: 'happy birthday',
+        }),
+      );
+    });
+
+    it('should pass text filters when scoped to a space', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
+      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
+
+      await sut.getFilteredMapMarkers(auth, { spaceId, description: 'birthday cake', ocr: 'happy birthday' });
+
+      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          spaceId,
+          description: 'birthday cake',
+          ocr: 'happy birthday',
+        }),
+      );
+    });
+
+    it('should leave text filters undefined when not provided', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
+
+      await sut.getFilteredMapMarkers(auth, {});
+
+      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: undefined,
+          originalFileName: undefined,
+          ocr: undefined,
+        }),
+      );
+    });
+
+    // The DTO documents `rating` as "Minimum star rating" and every other surface sets
+    // ratingIsMinimum. Without it searchAssetBuilder falls to the `=` branch, so map markers
+    // silently did exact-rating matching while the map timeline did >=.
+    it('should request minimum-rating matching so markers agree with every other surface', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
+
+      await sut.getFilteredMapMarkers(auth, { rating: 4 });
+
+      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.objectContaining({ rating: 4, ratingIsMinimum: true }),
+      );
+    });
+
+    it('should not request minimum-rating matching when no rating filter is set', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
+
+      await sut.getFilteredMapMarkers(auth, {});
+
+      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.objectContaining({ rating: undefined, ratingIsMinimum: undefined }),
+      );
+    });
+
     it('should pass city and country to repository', async () => {
       const auth = factory.auth();
       mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);

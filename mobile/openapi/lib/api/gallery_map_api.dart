@@ -30,6 +30,9 @@ class GalleryMapApi {
   /// * [String] country:
   ///   Filter by country
   ///
+  /// * [String] description:
+  ///   Filter by description text
+  ///
   /// * [bool] isFavorite:
   ///   Filter by favorite status
   ///
@@ -44,6 +47,12 @@ class GalleryMapApi {
   ///
   /// * [String] model:
   ///   Camera model
+  ///
+  /// * [String] ocr:
+  ///   Filter by text recognised in the image
+  ///
+  /// * [String] originalFileName:
+  ///   Filter by original file name
   ///
   /// * [List<String>] personIds:
   ///   Filter by person IDs
@@ -68,7 +77,7 @@ class GalleryMapApi {
   ///
   /// * [bool] withSharedSpaces:
   ///   Include shared space assets
-  Future<Response> getFilteredMapMarkersWithHttpInfo({ String? city, String? country, bool? isFavorite, bool? isInAlbum, bool? isNotInAlbum, String? make, String? model, List<String>? personIds, num? rating, String? spaceId, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, MapMediaType? type, bool? withSharedSpaces, Future<void>? abortTrigger, }) async {
+  Future<Response> getFilteredMapMarkersWithHttpInfo({ String? city, String? country, String? description, bool? isFavorite, bool? isInAlbum, bool? isNotInAlbum, String? make, String? model, String? ocr, String? originalFileName, List<String>? personIds, num? rating, String? spaceId, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, MapMediaType? type, bool? withSharedSpaces, Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/gallery/map/markers';
 
@@ -85,6 +94,9 @@ class GalleryMapApi {
     if (country != null) {
       queryParams.addAll(_queryParams('', 'country', country));
     }
+    if (description != null) {
+      queryParams.addAll(_queryParams('', 'description', description));
+    }
     if (isFavorite != null) {
       queryParams.addAll(_queryParams('', 'isFavorite', isFavorite));
     }
@@ -99,6 +111,12 @@ class GalleryMapApi {
     }
     if (model != null) {
       queryParams.addAll(_queryParams('', 'model', model));
+    }
+    if (ocr != null) {
+      queryParams.addAll(_queryParams('', 'ocr', ocr));
+    }
+    if (originalFileName != null) {
+      queryParams.addAll(_queryParams('', 'originalFileName', originalFileName));
     }
     if (personIds != null) {
       queryParams.addAll(_queryParams('multi', 'personIds', personIds));
@@ -152,6 +170,9 @@ class GalleryMapApi {
   /// * [String] country:
   ///   Filter by country
   ///
+  /// * [String] description:
+  ///   Filter by description text
+  ///
   /// * [bool] isFavorite:
   ///   Filter by favorite status
   ///
@@ -166,6 +187,12 @@ class GalleryMapApi {
   ///
   /// * [String] model:
   ///   Camera model
+  ///
+  /// * [String] ocr:
+  ///   Filter by text recognised in the image
+  ///
+  /// * [String] originalFileName:
+  ///   Filter by original file name
   ///
   /// * [List<String>] personIds:
   ///   Filter by person IDs
@@ -190,8 +217,8 @@ class GalleryMapApi {
   ///
   /// * [bool] withSharedSpaces:
   ///   Include shared space assets
-  Future<List<MapMarkerResponseDto>?> getFilteredMapMarkers({ String? city, String? country, bool? isFavorite, bool? isInAlbum, bool? isNotInAlbum, String? make, String? model, List<String>? personIds, num? rating, String? spaceId, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, MapMediaType? type, bool? withSharedSpaces, Future<void>? abortTrigger, }) async {
-    final response = await getFilteredMapMarkersWithHttpInfo(city: city, country: country, isFavorite: isFavorite, isInAlbum: isInAlbum, isNotInAlbum: isNotInAlbum, make: make, model: model, personIds: personIds, rating: rating, spaceId: spaceId, tagIds: tagIds, takenAfter: takenAfter, takenBefore: takenBefore, type: type, withSharedSpaces: withSharedSpaces, abortTrigger: abortTrigger,);
+  Future<List<MapMarkerResponseDto>?> getFilteredMapMarkers({ String? city, String? country, String? description, bool? isFavorite, bool? isInAlbum, bool? isNotInAlbum, String? make, String? model, String? ocr, String? originalFileName, List<String>? personIds, num? rating, String? spaceId, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, MapMediaType? type, bool? withSharedSpaces, Future<void>? abortTrigger, }) async {
+    final response = await getFilteredMapMarkersWithHttpInfo(city: city, country: country, description: description, isFavorite: isFavorite, isInAlbum: isInAlbum, isNotInAlbum: isNotInAlbum, make: make, model: model, ocr: ocr, originalFileName: originalFileName, personIds: personIds, rating: rating, spaceId: spaceId, tagIds: tagIds, takenAfter: takenAfter, takenBefore: takenBefore, type: type, withSharedSpaces: withSharedSpaces, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
