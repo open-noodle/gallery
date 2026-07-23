@@ -393,6 +393,7 @@ features:
         - server/src/schema/migrations-gallery/1783100000000-AddAlbumSpaceAssetSyncAndAudit.ts
         - server/src/schema/migrations-gallery/1783628194057-DisablePostgresJit.ts
         - server/src/schema/migrations-gallery/1783700000000-FixSharedSpaceMemberJoinGrantCreateId.ts
+        - server/src/schema/migrations-gallery/1784800000000-RepairSharedSpaceAlbumGrantDrift.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
 checks:
