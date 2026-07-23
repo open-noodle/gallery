@@ -37,6 +37,7 @@ describe('buildMapFilterConfig', () => {
       'media',
       'favorites',
       'albums',
+      'text',
     ]);
   });
 
