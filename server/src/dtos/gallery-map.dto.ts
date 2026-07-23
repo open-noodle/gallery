@@ -39,6 +39,12 @@ const FilteredMapMarkerSchema = z
     isInAlbum: stringToBool.optional().describe('Filter assets in at least one album'),
     city: z.string().optional().describe('Filter by city'),
     country: z.string().optional().describe('Filter by country'),
+    // The Map filter panel renders the same "Text" section as every other surface (#802), so
+    // markers accept the same three predicates the map timeline (TimeBucketDto) already does.
+    // searchAssetBuilder already implements all three.
+    description: z.string().optional().describe('Filter by description text'),
+    originalFileName: z.string().optional().describe('Filter by original file name'),
+    ocr: z.string().optional().describe('Filter by text recognised in the image'),
     withSharedSpaces: stringToBool.optional().describe('Include shared space assets'),
   })
   .meta({ id: 'FilteredMapMarkerDto' });
