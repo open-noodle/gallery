@@ -132,15 +132,52 @@ from
   "album"
   inner join "album_asset" on "album_asset"."albumId" = "album"."id"
 where
-  exists (
-    select
-    from
-      "album_user"
-    where
-      "album_user"."albumId" = "album"."id"
-      and "album_user"."userId" = $2
+  (
+    exists (
+      select
+      from
+        "album_user"
+      where
+        "album_user"."albumId" = "album"."id"
+        and "album_user"."userId" = $2
+    )
+    or (
+      "album"."id" in (
+        select
+          "shared_space_album"."albumId" as "id"
+        from
+          "shared_space_album"
+          inner join "album" on "album"."id" = "shared_space_album"."albumId"
+        where
+          "album"."deletedAt" is null
+          and "shared_space_album"."spaceId" in (
+            select
+              "shared_space"."id"
+            from
+              "shared_space"
+            where
+              "shared_space"."createdById" = $3
+            union
+            select
+              "shared_space_member"."spaceId" as "id"
+            from
+              "shared_space_member"
+            where
+              "shared_space_member"."userId" = $4
+          )
+      )
+      and exists (
+        select
+          1 as "exists"
+        from
+          "asset"
+        where
+          "asset"."id" = "album_asset"."assetId"
+          and "asset"."visibility" in ($5, $6)
+      )
+    )
   )
-  and "album_asset"."assetId" = $3
+  and "album_asset"."assetId" = $7
   and "album"."deletedAt" is null
 order by
   "album"."createdAt" desc
