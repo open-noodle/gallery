@@ -194,6 +194,21 @@ export class IdentityMergePropagationService {
       return { reassigned: 0, targetPersonIds: [] };
     }
 
+    // The two feature-photo repairs the global reassign path performs (PersonService.reassignFaces /
+    // reassignFacesById) and which this path must mirror:
+    //   (a) the moved face WAS the source person's feature face — leaving it would show that person's
+    //       owner (often a different member) a face that now belongs to someone else as its avatar;
+    //   (b) the resolved target person had no feature face at all.
+    // Both are collected here and applied after the loop, so getRandomFace never picks a face that is
+    // about to move (same ordering as PersonService.reassignFaces).
+    const featurePhotoRepairPersonIds = new Set<string>();
+    // Keyed by person id, not "already inspected": a source person's feature face may be the SECOND
+    // face in the batch, so the answer has to be remembered rather than the question skipped.
+    const featureFaceBySourcePersonId = new Map<string, string | null>();
+    // Persons created below always get faceAssetId set at creation, so they are pre-marked as
+    // inspected — (b) can never apply to them, and the lookup would be a wasted round trip.
+    const inspectedTargetPersonIds = new Set<string>();
+
     // A space-person target resolves to ONE identity for the whole batch; the per-owner person that
     // carries it is resolved (or created) below, per face's asset owner.
     let targetIdentityId: string | undefined;
@@ -238,6 +253,7 @@ export class IdentityMergePropagationService {
               faceAssetId: face.assetFaceId,
             });
             targetPersonId = created.id;
+            inspectedTargetPersonIds.add(targetPersonId);
             // Every other site that sets faceAssetId at creation also queues thumbnail generation
             // (person.service.ts, pet-detection.service.ts, media.service.ts) — without it the person
             // has a feature face but thumbnailPath stays '', and getThumbnail rejects that outright.
@@ -252,8 +268,33 @@ export class IdentityMergePropagationService {
             faceAssetId: face.assetFaceId,
           });
           targetPersonId = created.id;
+          inspectedTargetPersonIds.add(targetPersonId);
           await this.deps.jobRepository.queue({ name: JobName.PersonGenerateThumbnail, data: { id: created.id } });
           personIdByOwner.set(face.assetOwnerId, targetPersonId);
+        }
+      }
+
+      // (b) A resolved-but-empty target (getPersonByIdentity hit, or a global `person` target the
+      // client named) has no feature face; without this it stays avatar-less forever.
+      if (!inspectedTargetPersonIds.has(targetPersonId)) {
+        inspectedTargetPersonIds.add(targetPersonId);
+        const targetPerson = await this.deps.personRepository.getById(targetPersonId);
+        if (targetPerson && targetPerson.faceAssetId === null) {
+          featurePhotoRepairPersonIds.add(targetPersonId);
+        }
+      }
+
+      // (a) Read BEFORE reassignFace rewrites asset_face.personId, which is what identifies the
+      // source person at all.
+      if (face.personId) {
+        let sourceFeatureFaceId = featureFaceBySourcePersonId.get(face.personId);
+        if (sourceFeatureFaceId === undefined) {
+          const sourcePerson = await this.deps.personRepository.getById(face.personId);
+          sourceFeatureFaceId = sourcePerson?.faceAssetId ?? null;
+          featureFaceBySourcePersonId.set(face.personId, sourceFeatureFaceId);
+        }
+        if (sourceFeatureFaceId === face.assetFaceId) {
+          featurePhotoRepairPersonIds.add(face.personId);
         }
       }
 
@@ -272,7 +313,26 @@ export class IdentityMergePropagationService {
       reassigned += 1;
     }
 
+    await this.repairFeaturePhotos(featurePhotoRepairPersonIds);
+
     return { reassigned, targetPersonIds: [...targetPersonIds] };
+  }
+
+  /**
+   * The space-path equivalent of PersonService.createNewFeaturePhoto: re-point each person at a face it
+   * still holds and re-generate its thumbnail. A person left with no eligible face keeps its stale
+   * pointer — same as the global path, which also only repairs what it can.
+   */
+  private async repairFeaturePhotos(personIds: Set<string>): Promise<void> {
+    for (const personId of personIds) {
+      const assetFace = await this.deps.personRepository.getRandomFace(personId);
+      if (!assetFace) {
+        continue;
+      }
+
+      await this.deps.personRepository.update({ id: personId, faceAssetId: assetFace.id });
+      await this.deps.jobRepository.queue({ name: JobName.PersonGenerateThumbnail, data: { id: personId } });
+    }
   }
 
   async mergePersonalPeople(

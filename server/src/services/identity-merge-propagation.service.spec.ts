@@ -490,6 +490,9 @@ const makeService = (profiles: MergeProfile[], options: { unrepairableSpaceIds?:
     lockPeopleForMerge: vi.fn().mockResolvedValue(void 0),
     mergePersonProfile: vi.fn().mockResolvedValue({ deletedThumbnailPath: null, targetNeedsFeatureFaceRepair: false }),
     getRandomFace: vi.fn().mockResolvedValue(null),
+    // Feature-photo repair (#765) reads the source/target person rows. Default "row not found" keeps
+    // every test that does not care about feature photos on the no-repair path.
+    getById: vi.fn().mockResolvedValue(void 0),
     update: vi.fn().mockResolvedValue(void 0),
     updatePersonIdentity: vi.fn().mockResolvedValue(void 0),
     create: vi.fn().mockResolvedValue({ id: 'created-person-id' }),
@@ -2587,6 +2590,144 @@ describe('IdentityMergePropagationService', () => {
       expect(matchCalls[1][0]).toEqual({
         name: JobName.SharedSpaceFaceMatch,
         data: { spaceId: 'space-1', assetId: 'a2' },
+      });
+    });
+
+    // The two feature-photo repairs PersonService.reassignFaces/reassignFacesById perform and which the
+    // space path must mirror (#765 review). Without (a) the source person's OWNER — often another member —
+    // keeps seeing a face that now belongs to someone else as their person's avatar; without (b) an
+    // existing-but-empty target gains the face with no feature photo at all. Nothing repairs a stale
+    // person.faceAssetId in the background.
+    it("re-points the source person's feature photo when the moved face was its avatar", async () => {
+      const { sut, mocks } = setupReassign();
+      mocks.person.create.mockResolvedValue({ id: 'p-new' });
+      mocks.person.getById.mockImplementation((personId: string) =>
+        Promise.resolve(personId === 'p-old' ? { id: 'p-old', faceAssetId: 'f1' } : void 0),
+      );
+      mocks.person.getRandomFace.mockResolvedValue({ id: 'f-remaining' });
+
+      await sut.reassignSpaceFacesToTarget([sourceFace()], { type: 'new' });
+
+      expect(mocks.person.update).toHaveBeenCalledWith({ id: 'p-old', faceAssetId: 'f-remaining' });
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.PersonGenerateThumbnail,
+        data: { id: 'p-old' },
+      });
+      // The repair must run AFTER the reassign, or getRandomFace could hand back the very face that is
+      // about to leave — the same ordering PersonService.reassignFaces uses.
+      expect(mocks.person.getRandomFace.mock.invocationCallOrder[0]).toBeGreaterThan(
+        mocks.person.reassignFace.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('leaves the source person alone when the moved face was not its feature photo', async () => {
+      const { sut, mocks } = setupReassign();
+      mocks.person.create.mockResolvedValue({ id: 'p-new' });
+      mocks.person.getById.mockImplementation((personId: string) =>
+        Promise.resolve(personId === 'p-old' ? { id: 'p-old', faceAssetId: 'f-other' } : void 0),
+      );
+      mocks.person.getRandomFace.mockResolvedValue({ id: 'f-remaining' });
+
+      await sut.reassignSpaceFacesToTarget([sourceFace()], { type: 'new' });
+
+      expect(mocks.person.update).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({
+        name: JobName.PersonGenerateThumbnail,
+        data: { id: 'p-old' },
+      });
+    });
+
+    it('repairs the source person when its feature face is not the FIRST face of the batch', async () => {
+      const { sut, mocks } = setupReassign();
+      mocks.person.create.mockResolvedValue({ id: 'p-new' });
+      mocks.person.getById.mockImplementation((personId: string) =>
+        Promise.resolve(personId === 'p-old' ? { id: 'p-old', faceAssetId: 'f2' } : void 0),
+      );
+      mocks.person.getRandomFace.mockResolvedValue({ id: 'f-remaining' });
+
+      // Both faces belong to the same source person. An implementation that merely remembers "already
+      // looked this person up" (instead of remembering the answer) would decide on f1, never re-check
+      // f2, and silently skip the repair.
+      await sut.reassignSpaceFacesToTarget(
+        [sourceFace({ assetFaceId: 'f1', assetId: 'a1' }), sourceFace({ assetFaceId: 'f2', assetId: 'a2' })],
+        { type: 'new' },
+      );
+
+      expect(mocks.person.update).toHaveBeenCalledWith({ id: 'p-old', faceAssetId: 'f-remaining' });
+    });
+
+    it('gives a resolved-but-empty space-person target a feature photo', async () => {
+      const { sut, mocks } = setupReassign();
+      mocks.faceIdentity.ensureSpacePersonIdentity.mockResolvedValue({ id: 'identity-1', type: 'user' } as never);
+      mocks.faceIdentity.getPersonByIdentity.mockResolvedValue({ id: 'p-existing' });
+      mocks.person.getById.mockImplementation((personId: string) =>
+        Promise.resolve(personId === 'p-existing' ? { id: 'p-existing', faceAssetId: null } : void 0),
+      );
+      mocks.person.getRandomFace.mockResolvedValue({ id: 'f1' });
+
+      const target: SpaceFaceReassignTarget = {
+        type: 'existing',
+        profile: { type: 'space-person', id: 'sp-1', spaceId: 'space-1' },
+      };
+      await sut.reassignSpaceFacesToTarget([sourceFace()], target);
+
+      expect(mocks.person.update).toHaveBeenCalledWith({ id: 'p-existing', faceAssetId: 'f1' });
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.PersonGenerateThumbnail,
+        data: { id: 'p-existing' },
+      });
+    });
+
+    it('gives a global person target with no feature photo one, and leaves one that already has it', async () => {
+      const { sut, mocks } = setupReassign();
+      mocks.person.getById.mockImplementation((personId: string) =>
+        Promise.resolve(personId === 'p-global' ? { id: 'p-global', faceAssetId: null } : void 0),
+      );
+      mocks.person.getRandomFace.mockResolvedValue({ id: 'f1' });
+
+      const target: SpaceFaceReassignTarget = { type: 'existing', profile: { type: 'person', id: 'p-global' } };
+      await sut.reassignSpaceFacesToTarget([sourceFace()], target);
+
+      expect(mocks.person.update).toHaveBeenCalledWith({ id: 'p-global', faceAssetId: 'f1' });
+
+      const second = setupReassign();
+      second.mocks.person.getById.mockImplementation((personId: string) =>
+        Promise.resolve(personId === 'p-global' ? { id: 'p-global', faceAssetId: 'f-existing' } : void 0),
+      );
+      second.mocks.person.getRandomFace.mockResolvedValue({ id: 'f1' });
+      await second.sut.reassignSpaceFacesToTarget([sourceFace()], target);
+
+      expect(second.mocks.person.update).not.toHaveBeenCalled();
+    });
+
+    it('does not re-read a freshly created target person: it already carries the feature face', async () => {
+      const { sut, mocks } = setupReassign();
+      mocks.person.create.mockResolvedValue({ id: 'p-new' });
+
+      await sut.reassignSpaceFacesToTarget([sourceFace()], { type: 'new' });
+
+      expect(mocks.person.create).toHaveBeenCalledWith({ ownerId: 'owner-1', faceAssetId: 'f1' });
+      expect(mocks.person.getById).not.toHaveBeenCalledWith('p-new');
+      expect(mocks.person.update).not.toHaveBeenCalled();
+    });
+
+    it('leaves a stale pointer alone when the person has no face left to feature', async () => {
+      const { sut, mocks } = setupReassign();
+      mocks.person.create.mockResolvedValue({ id: 'p-new' });
+      mocks.person.getById.mockImplementation((personId: string) =>
+        Promise.resolve(personId === 'p-old' ? { id: 'p-old', faceAssetId: 'f1' } : void 0),
+      );
+      // The source person was emptied by the reassign — same tolerance as PersonService's
+      // createNewFeaturePhoto, which also only repairs what it can.
+      mocks.person.getRandomFace.mockResolvedValue(null);
+
+      await sut.reassignSpaceFacesToTarget([sourceFace()], { type: 'new' });
+
+      expect(mocks.person.getRandomFace).toHaveBeenCalledWith('p-old');
+      expect(mocks.person.update).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({
+        name: JobName.PersonGenerateThumbnail,
+        data: { id: 'p-old' },
       });
     });
 

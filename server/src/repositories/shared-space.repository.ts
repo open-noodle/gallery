@@ -3997,6 +3997,29 @@ export class SharedSpaceRepository {
       .where('personId', 'in', personIds)
       .execute();
 
+    // A space person whose avatar WAS this face must not keep showing it once the face has left
+    // (#765). Neither repair helper covers this: repairInvalidRepresentativeFaces only inspects
+    // manual picks, repairOrphanedRepresentativeFaces only fills NULLs. Re-pick after the delete so
+    // the evicted face cannot be chosen again; a manual pick that is no longer valid degrades to
+    // 'auto', exactly as repairInvalidRepresentativeFaces does.
+    const staleRepresentatives = await this.db
+      .selectFrom('shared_space_person')
+      .select('id')
+      .where('id', 'in', personIds)
+      .where('representativeFaceId', '=', assetFaceId)
+      .execute();
+
+    for (const { id } of staleRepresentatives) {
+      await this.db
+        .updateTable('shared_space_person')
+        .set({
+          representativeFaceId: await this.getFirstValidRepresentativeFaceForPerson(id),
+          representativeFaceSource: 'auto',
+        })
+        .where('id', '=', id)
+        .execute();
+    }
+
     return personIds;
   }
 
