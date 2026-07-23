@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, UnauthorizedException } from '
 import { DateTime } from 'luxon';
 import path from 'node:path';
 import { Readable } from 'node:stream';
+import type { AssetResponseDto } from 'src/dtos/asset-response.dto.js';
 import { AssetJobName, AssetStatsResponseDto } from 'src/dtos/asset.dto.js';
 import { AssetEditAction } from 'src/dtos/editing.dto.js';
 import {
@@ -370,7 +371,9 @@ describe(AssetService.name, () => {
       expect(result).not.toHaveProperty('unassignedFaces');
     });
 
-    it('should strip people for space member without spaceId', async () => {
+    // #796 POLICY REVERSAL (was 'should strip people for space member without spaceId'): when no
+    // space resolves for the asset, the viewer is treated as a plain reader and sees the people.
+    it('should expose people for space member without spaceId', async () => {
       const asset = AssetFactory.from()
         .exif()
         .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
@@ -381,7 +384,7 @@ describe(AssetService.name, () => {
 
       const result = await sut.get(authStub.admin, asset.id);
 
-      expect(result).toHaveProperty('people', []);
+      expect((result as AssetResponseDto).people).toEqual([expect.objectContaining({ id: 'person-1' })]);
     });
 
     it('should reject non-member spaceId', async () => {
@@ -430,7 +433,12 @@ describe(AssetService.name, () => {
       expect(result).toHaveProperty('people', []);
     });
 
-    it('should still strip people for partner access', async () => {
+    // #796 POLICY REVERSAL: these two previously asserted people were stripped for partner and
+    // album access ("should still strip people for ..."). Who is in a photo is now treated as
+    // read-only metadata that travels with read access to the asset, so a viewer reaching an asset
+    // outside any space sees the people on it. Hidden people are still withheld (below), and the
+    // shared-link case below is unchanged — an anonymous link holder still gets nothing.
+    it('should expose people for partner access', async () => {
       const asset = AssetFactory.from()
         .exif()
         .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
@@ -441,13 +449,27 @@ describe(AssetService.name, () => {
 
       const result = await sut.get(authStub.admin, asset.id);
 
-      expect(result).toHaveProperty('people', []);
+      expect((result as AssetResponseDto).people).toEqual([expect.objectContaining({ id: 'person-1' })]);
     });
 
-    it('should still strip people for album access', async () => {
+    it('should expose people for album access', async () => {
       const asset = AssetFactory.from()
         .exif()
         .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .build();
+      mocks.access.asset.checkAlbumAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
+
+      const result = await sut.get(authStub.admin, asset.id);
+
+      expect((result as AssetResponseDto).people).toEqual([expect.objectContaining({ id: 'person-1' })]);
+    });
+
+    it('should withhold hidden people for album access', async () => {
+      const asset = AssetFactory.from()
+        .exif()
+        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person', isHidden: true }))
         .build();
       mocks.access.asset.checkAlbumAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
@@ -565,7 +587,8 @@ describe(AssetService.name, () => {
       expect((result as any).resolvedSpaceId).toBe('space-1');
     });
 
-    it('should strip people when fallback finds no space', async () => {
+    // #796 POLICY REVERSAL (was 'should strip people when fallback finds no space').
+    it('should expose people when fallback finds no space', async () => {
       const asset = AssetFactory.from()
         .exif()
         .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
@@ -576,7 +599,7 @@ describe(AssetService.name, () => {
 
       const result = await sut.get(authStub.admin, asset.id);
 
-      expect(result).toHaveProperty('people', []);
+      expect((result as AssetResponseDto).people).toEqual([expect.objectContaining({ id: 'person-1' })]);
       expect(result).not.toHaveProperty('resolvedSpaceId');
     });
 
