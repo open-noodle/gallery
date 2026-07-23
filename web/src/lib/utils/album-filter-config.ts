@@ -1,12 +1,26 @@
 import { AssetTypeEnum, getFilterSuggestions, getSearchSuggestions, SearchSuggestionType } from '@immich/sdk';
 import {
+  ALL_FILTER_SECTIONS,
   buildFilterContext,
   type FilterPanelConfig,
   type FilterState,
 } from '$lib/components/filter-panel/filter-panel';
 import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '$lib/utils/photos-filter-options';
 
-const sections = ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media', 'favorites'] as const;
+/**
+ * Album *detail* is scoped to a single album, and asset.repository.ts guards both `isInAlbum` and
+ * `isNotInAlbum` with `&& !options.albumId` — inside an album the former is a tautology and the
+ * latter an always-empty set, so the server drops them. Rendering the section would give the user
+ * two controls that do nothing. Every other section is shared with the rest of the app (#802).
+ */
+const albumDetailSections = ALL_FILTER_SECTIONS.filter((section) => section !== 'albums');
+
+/**
+ * The asset *picker* is not album-scoped server-side — `timelineAlbumId` is stripped from the
+ * request before it leaves the timeline manager — so the album-membership filters do work here,
+ * and "not in any album" is the natural way to find un-filed photos to add.
+ */
+const albumPickerSections = ALL_FILTER_SECTIONS;
 
 function mapSuggestions(response: Awaited<ReturnType<typeof getFilterSuggestions>>) {
   return {
@@ -48,7 +62,7 @@ function toSuggestionRequest(filters: FilterState) {
 
 export function buildAlbumDetailFilterConfig(albumId: string): FilterPanelConfig {
   return {
-    sections: [...sections],
+    sections: [...albumDetailSections],
     suggestionsProvider: async (filters) =>
       mapSuggestions(await getFilterSuggestions({ albumId, ...toSuggestionRequest(filters) })),
     providers: {
@@ -62,7 +76,7 @@ export function buildAlbumDetailFilterConfig(albumId: string): FilterPanelConfig
 
 export function buildAlbumAssetPickerFilterConfig(): FilterPanelConfig {
   return {
-    sections: [...sections],
+    sections: [...albumPickerSections],
     suggestionsProvider: async (filters) => mapSuggestions(await getFilterSuggestions(toSuggestionRequest(filters))),
     providers: {
       cities: (country, context) => getSearchSuggestions({ $type: SearchSuggestionType.City, country, ...context }),
