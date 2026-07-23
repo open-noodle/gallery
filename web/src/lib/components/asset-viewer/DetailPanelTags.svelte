@@ -17,7 +17,6 @@
 
   let { asset = $bindable(), isOwner, spaceId }: Props = $props();
   let effectiveSpaceId = $derived(spaceId || asset.resolvedSpaceId);
-  let isSpaceMember = $derived(!!effectiveSpaceId);
 
   let tags = $derived(asset.tags || []);
 
@@ -39,7 +38,12 @@
 
 <OnEvents {onAssetsTag} />
 
-{#if (isOwner || isSpaceMember) && !authManager.isSharedLink}
+<!--
+  Tags are read-only metadata: anyone with read access to the asset sees them (#796). Only the
+  edit affordances below (per-tag remove, "add tag") stay owner-gated. Non-owners with no tags to
+  show get no empty section; the owner keeps it so the "add tag" affordance is always reachable.
+-->
+{#if !authManager.isSharedLink && (isOwner || tags.length > 0)}
   <section class="mt-4 px-4">
     <div class="flex h-10 w-full items-center justify-between text-sm">
       <Text color="muted">{$t('tags')}</Text>
