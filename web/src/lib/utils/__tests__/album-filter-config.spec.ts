@@ -27,6 +27,8 @@ beforeEach(() => {
 describe('buildAlbumDetailFilterConfig', () => {
   it('keeps the album filter sections in plan order', () => {
     const config = buildAlbumDetailFilterConfig('album-1');
+    // 'albums' is deliberately absent: the server drops isInAlbum/isNotInAlbum when scoped to a
+    // single album, so the controls would do nothing. See filter-section-parity.spec.ts.
     expect(config.sections).toEqual([
       'timeline',
       'people',
@@ -36,6 +38,7 @@ describe('buildAlbumDetailFilterConfig', () => {
       'rating',
       'media',
       'favorites',
+      'text',
     ]);
   });
 
@@ -177,6 +180,7 @@ describe('buildAlbumDetailFilterConfig', () => {
 describe('buildAlbumAssetPickerFilterConfig', () => {
   it('keeps the picker filter sections in plan order', () => {
     const config = buildAlbumAssetPickerFilterConfig();
+    // The picker is not album-scoped server-side, so it gets the full set including 'albums'.
     expect(config.sections).toEqual([
       'timeline',
       'people',
@@ -186,6 +190,8 @@ describe('buildAlbumAssetPickerFilterConfig', () => {
       'rating',
       'media',
       'favorites',
+      'albums',
+      'text',
     ]);
   });
 

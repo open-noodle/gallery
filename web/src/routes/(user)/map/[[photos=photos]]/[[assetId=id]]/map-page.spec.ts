@@ -120,13 +120,33 @@ describe('Map page query intersection', () => {
     });
   });
 
-  it('exposes has-no-album in the map filter panel', () => {
+  it('exposes the full canonical section set in the map filter panel', () => {
+    // #802 — the Map panel used to stop at 'albums', one section short of every other view.
     renderPage();
 
     expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute(
       'data-sections',
-      'timeline,people,location,camera,tags,rating,media,favorites,albums',
+      'timeline,people,location,camera,tags,rating,media,favorites,albums,text',
     );
+  });
+
+  // #802 — the Text section is only a real fix if the value actually reaches the marker query.
+  // Before this change FilteredMapMarkerDto had no text fields at all, so the pins would have
+  // kept showing assets the timeline had already filtered out.
+  it('passes text filters to filtered map markers when set', async () => {
+    renderPage();
+    await fireEvent.click(screen.getByTestId('filter-panel-set-text'));
+    await flushQueryDebounce();
+
+    await waitFor(() => {
+      expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: 'birthday cake',
+          originalFileName: 'IMG_1234.jpg',
+          ocr: 'happy birthday',
+        }),
+      );
+    });
   });
 
   it('passes has-no-album to filtered map markers when selected', async () => {

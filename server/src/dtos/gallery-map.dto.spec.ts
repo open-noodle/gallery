@@ -128,4 +128,63 @@ describe('FilteredMapMarkerDto', () => {
       expect(result.data?.isInAlbum).toBeUndefined();
     });
   });
+
+  // #802 — the Map filter panel now renders the "Text" section, so the marker endpoint has to
+  // accept the same three predicates the map timeline (TimeBucketDto) already accepts.
+  describe.each(['description', 'originalFileName', 'ocr'] as const)('%s', (field) => {
+    it('should accept a plain string', () => {
+      const result = parse({ [field]: 'birthday cake' });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.[field]).toBe('birthday cake');
+    });
+
+    it('should accept a string containing regex and wildcard characters verbatim', () => {
+      const result = parse({ [field]: '100% off (2024) [draft].jpg' });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.[field]).toBe('100% off (2024) [draft].jpg');
+    });
+
+    it('should accept an empty string', () => {
+      const result = parse({ [field]: '' });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.[field]).toBe('');
+    });
+
+    it('should leave undefined when not provided', () => {
+      const result = parse({});
+
+      expect(result.success).toBe(true);
+      expect(result.data?.[field]).toBeUndefined();
+    });
+
+    it('should reject a non-string value', () => {
+      const result = parse({ [field]: 42 });
+
+      expect(result.success).toBe(false);
+    });
+  });
+
+  it('should accept all three text filters together alongside the existing filters', () => {
+    const result = parse({
+      description: 'birthday cake',
+      originalFileName: 'IMG_1234.jpg',
+      ocr: 'happy birthday',
+      rating: '4',
+      isFavorite: 'true',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual(
+      expect.objectContaining({
+        description: 'birthday cake',
+        originalFileName: 'IMG_1234.jpg',
+        ocr: 'happy birthday',
+        rating: 4,
+        isFavorite: true,
+      }),
+    );
+  });
 });
