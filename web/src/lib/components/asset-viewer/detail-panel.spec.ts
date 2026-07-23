@@ -308,6 +308,106 @@ describe('DetailPanel', () => {
     ).toHaveLength(0);
   });
 
+  // #808: for the owner the People section renders `faceManager.people` (GET /faces), not
+  // `asset.people`. The server now resolves a birthday that only lives on a shared-space profile
+  // onto that payload, so the age must appear here. The birth date is asserted via the title
+  // attribute because it is locale-formatted by luxon rather than translated.
+  it('renders the age for a person whose birthday arrives on the faces payload', async () => {
+    const person: PersonResponseDto = {
+      id: 'global-person-1',
+      name: 'Karolin',
+      thumbnailPath: '/person.jpg',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      isHidden: false,
+      birthDate: '2014-02-14',
+      type: 'person',
+    };
+    const face = makeFace('face-1', person, {
+      boundingBoxX1: 100,
+      boundingBoxY1: 200,
+      boundingBoxX2: 300,
+      boundingBoxY2: 400,
+    });
+    faceManagerMock.data = [face];
+    faceManagerMock.people = [person];
+    faceManagerMock.facesByPersonId = new Map([[person.id, [face]]]);
+
+    const asset = assetFactory.build({
+      ownerId: 'owner-1',
+      localDateTime: '2026-01-01T00:00:00.000Z',
+      people: [],
+    });
+
+    const { container } = renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+
+    await waitFor(() => expect(screen.getByText('Karolin')).toBeInTheDocument());
+    expect(container.querySelector('p[title="February 14, 2014"]')).toBeTruthy();
+  });
+
+  it('renders no age for a person without a birthday', async () => {
+    const person: PersonResponseDto = {
+      id: 'global-person-1',
+      name: 'Karolin',
+      thumbnailPath: '/person.jpg',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      isHidden: false,
+      birthDate: null,
+      type: 'person',
+    };
+    const face = makeFace('face-1', person, {
+      boundingBoxX1: 100,
+      boundingBoxY1: 200,
+      boundingBoxX2: 300,
+      boundingBoxY2: 400,
+    });
+    faceManagerMock.data = [face];
+    faceManagerMock.people = [person];
+    faceManagerMock.facesByPersonId = new Map([[person.id, [face]]]);
+
+    const asset = assetFactory.build({
+      ownerId: 'owner-1',
+      localDateTime: '2026-01-01T00:00:00.000Z',
+      people: [],
+    });
+
+    const { container } = renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+
+    await waitFor(() => expect(screen.getByText('Karolin')).toBeInTheDocument());
+    expect(container.querySelector('p[title*="2014"]')).toBeNull();
+  });
+
+  it('renders no age when the birthday is after the photo was taken', async () => {
+    const person: PersonResponseDto = {
+      id: 'global-person-1',
+      name: 'Karolin',
+      thumbnailPath: '/person.jpg',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      isHidden: false,
+      birthDate: '2027-02-14',
+      type: 'person',
+    };
+    const face = makeFace('face-1', person, {
+      boundingBoxX1: 100,
+      boundingBoxY1: 200,
+      boundingBoxX2: 300,
+      boundingBoxY2: 400,
+    });
+    faceManagerMock.data = [face];
+    faceManagerMock.people = [person];
+    faceManagerMock.facesByPersonId = new Map([[person.id, [face]]]);
+
+    const asset = assetFactory.build({
+      ownerId: 'owner-1',
+      localDateTime: '2026-01-01T00:00:00.000Z',
+      people: [],
+    });
+
+    const { container } = renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+
+    await waitFor(() => expect(screen.getByText('Karolin')).toBeInTheDocument());
+    expect(container.querySelector('p[title*="2027"]')).toBeNull();
+  });
+
   it('renders Google, Apple, and OpenStreetMap links in the image info panel map popup', async () => {
     const lat = 48.85341;
     const lon = 2.3488;
