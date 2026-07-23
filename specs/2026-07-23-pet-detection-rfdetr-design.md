@@ -306,6 +306,9 @@ Written **red first** in every slice. Grouped by concern; each row is one test.
 | 28  | Unknown legacy      | Any other `yolo*` value maps to `rfdetr-nano`                   |
 | 29  | Passthrough         | `rfdetr-nano` and `rfdetr-small` are left untouched             |
 | 30  | Persisted overrides | A stored `yolo11s` config surfaces as `rfdetr-nano` via the API |
+| 30a | e2e default         | `GET /server/config` reports `rfdetr-nano` / `0.3` / disabled   |
+| 30b | e2e model switch    | Switching to `rfdetr-small` persists and reads back unchanged   |
+| 30c | e2e legacy switch   | Writing `yolo11m` reads back as `rfdetr-nano`, not `yolo11m`    |
 
 ### Integration (Slice 1, needs published weights)
 
@@ -329,6 +332,12 @@ Sized for `impl-loop`. Each slice is independently verifiable and leaves the tre
 that loads in onnxruntime with input shape `[1,3,384,384]` and outputs `dets`/`labels`.
 
 **Tests:** #31.
+
+> **This slice is a merge gate.** Slices 2–5 can be built and unit-tested without it, but the
+> branch must not merge until the weights are published. Slice 3 points the default
+> `modelName` at `rfdetr-nano`; if the repository does not exist, every install's first pet
+> detection job fails at download. Verify Slice 1 acceptance before merging, not before
+> coding.
 
 ### Slice 2 — ML service RF-DETR detector
 
@@ -354,9 +363,19 @@ implement (green). The existing `_make_yolo_output` helper and its seven tests a
 `server/src/repositories/machine-learning.repository.spec.ts`,
 `e2e/src/specs/server/api/pet-detection.e2e-spec.ts`.
 
-The e2e spec asserts default config and ships in this slice; splitting it would break e2e.
+The e2e spec ships in this slice; splitting it would break e2e. It needs more than a fixture
+update — three of its tests actively exercise YOLO model switching and will fail against the
+migration:
 
-**Acceptance:** `pnpm test` green in `server/`; tests #26–#30 passing.
+- `e2e/src/specs/server/api/pet-detection.e2e-spec.ts:40,45` — asserts the default is
+  `yolo11s` / `0.6`. Update to `rfdetr-nano` / `0.3`.
+- `:61-67` ("should change model to yolo11n") and `:70-76` ("should change model to yolo11m")
+  — these write a `yolo*` value and assert it reads back unchanged. Under the migration it
+  reads back as `rfdetr-nano`, so both must be rewritten: one switching to `rfdetr-small` and
+  asserting it persists (#30b), one writing `yolo11m` and asserting it migrates (#30c).
+- `:154` — a `yolo11s` fixture in a later block; update to `rfdetr-nano`.
+
+**Acceptance:** `pnpm test` green in `server/`; tests #26–#30c passing.
 
 ### Slice 4 — Web admin UI
 
