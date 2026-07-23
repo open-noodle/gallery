@@ -31,7 +31,6 @@ import {
   TrimParameters,
 } from 'src/dtos/editing.dto';
 import { AssetOcrResponseDto } from 'src/dtos/ocr.dto';
-import { PersonResponseDto } from 'src/dtos/person.dto';
 import {
   AssetFileType,
   AssetStatus,
@@ -59,6 +58,7 @@ import {
 import { updateLockedColumns } from 'src/utils/database';
 import { asDateTimeString, extractTimeZone } from 'src/utils/date';
 import { batched, findOrFail } from 'src/utils/misc';
+import { applyResolvedIdentityMetadata } from 'src/utils/person-identity';
 import { transformOcrBoundingBox } from 'src/utils/transform';
 
 @Injectable()
@@ -167,29 +167,14 @@ export class AssetService extends BaseService {
         identityByPersonId.set(face.person.id, face.person.identityId);
       }
     }
-    if (identityByPersonId.size === 0) {
-      return;
-    }
 
-    const uniqueIdentityIds = [...new Set(identityByPersonId.values())];
-    const resolvedByIdentity = new Map<string, PersonResponseDto>();
-    await Promise.all(
-      uniqueIdentityIds.map(async (identityId) => {
-        const resolved = await this.faceIdentityRepository.getResolvedPersonByIdentityId(auth.user.id, identityId);
-        if (resolved) {
-          resolvedByIdentity.set(identityId, resolved);
-        }
-      }),
-    );
-
-    for (const person of people) {
-      const identityId = identityByPersonId.get(person.id);
-      const resolved = identityId ? resolvedByIdentity.get(identityId) : undefined;
-      if (resolved) {
-        person.name = resolved.name;
-        person.birthDate = resolved.birthDate;
-      }
-    }
+    // Shared with PersonService.getFacesById, the sibling read path the Info panel uses for the
+    // owner — the two have to resolve identically or the age appears on one surface only (#808).
+    await applyResolvedIdentityMetadata({
+      people,
+      identityByPersonId,
+      resolve: (identityId) => this.faceIdentityRepository.getResolvedPersonByIdentityId(auth.user.id, identityId),
+    });
   }
 
   private applySpacePeople(data: AssetResponseDto, spacePersonMap: Map<string, LinkedSpacePerson>) {
