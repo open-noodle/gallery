@@ -2402,6 +2402,12 @@ describe('IdentityMergePropagationService', () => {
       expect(mocks.person.create).toHaveBeenCalledTimes(1);
       expect(mocks.person.create).toHaveBeenCalledWith({ ownerId: 'owner-1', faceAssetId: 'f1' });
       expect(mocks.person.create.mock.calls[0][0]).not.toHaveProperty('identityId');
+      // Every other faceAssetId-at-creation site also queues thumbnail generation; without this the
+      // person has a feature face but thumbnailPath stays '' and never renders on the People page.
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.PersonGenerateThumbnail,
+        data: { id: 'p-new' },
+      });
       expect(mocks.person.reassignFace).toHaveBeenCalledWith('f1', 'p-new');
       // The relink step is the load-bearing half of #765: it must target the newly-resolved person's
       // identity, not the face's OLD person. A regression back to ensurePersonIdentity(face.personId) —
@@ -2480,6 +2486,12 @@ describe('IdentityMergePropagationService', () => {
         identityId: 'identity-1',
         faceAssetId: 'f1',
       });
+      // Same thumbnail-job pairing as the `type: 'new'` case — this create-if-absent path mints a person
+      // with a feature face too, and must not skip the job that turns it into a real thumbnail.
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.PersonGenerateThumbnail,
+        data: { id: 'p-new' },
+      });
     });
 
     it('resolves the space-person identity once per batch, not once per face', async () => {
@@ -2491,9 +2503,13 @@ describe('IdentityMergePropagationService', () => {
         type: 'existing',
         profile: { type: 'space-person', id: 'sp-1', spaceId: 'space-1' },
       };
+      // Distinct owners: with a shared owner, face 2 would short-circuit on the per-owner cache and
+      // never re-enter the resolution branch at all, so an implementation that (wrongly) resolves the
+      // identity INSIDE that branch on cache-miss would still call it once here and pass. Distinct
+      // owners force face 2 into the branch again, so such a variant is actually caught.
       const faces: SpaceReassignSourceFace[] = [
         sourceFace({ assetFaceId: 'f1', assetId: 'a1', assetOwnerId: 'owner-1' }),
-        sourceFace({ assetFaceId: 'f2', assetId: 'a2', assetOwnerId: 'owner-1' }),
+        sourceFace({ assetFaceId: 'f2', assetId: 'a2', assetOwnerId: 'owner-2' }),
       ];
       await sut.reassignSpaceFacesToTarget(faces, target);
 
@@ -2512,7 +2528,9 @@ describe('IdentityMergePropagationService', () => {
         profile: { type: 'space-person', id: 'sp-1', spaceId: 'space-1' },
       };
 
-      await expect(sut.reassignSpaceFacesToTarget([sourceFace()], target)).rejects.toThrow();
+      await expect(sut.reassignSpaceFacesToTarget([sourceFace()], target)).rejects.toThrow(
+        /resolved without an identity/,
+      );
       expect(mocks.person.create).not.toHaveBeenCalled();
     });
 
@@ -2567,12 +2585,16 @@ describe('IdentityMergePropagationService', () => {
       await sut.reassignSpaceFacesToTarget(faces, { type: 'new' });
 
       expect(mocks.sharedSpace.getSpaceIdsForAsset).toHaveBeenCalledTimes(2);
-      expect(mocks.job.queue).toHaveBeenCalledTimes(2);
-      expect(mocks.job.queue).toHaveBeenNthCalledWith(1, {
+      // Filtered to this job: `type: 'new'` also queues a PersonGenerateThumbnail job per created
+      // person (one per distinct owner here), interleaved with these — irrelevant to what this test
+      // pins, which is the match job firing once per face rather than once per batch.
+      const matchCalls = mocks.job.queue.mock.calls.filter(([job]) => job.name === JobName.SharedSpaceFaceMatch);
+      expect(matchCalls).toHaveLength(2);
+      expect(matchCalls[0][0]).toEqual({
         name: JobName.SharedSpaceFaceMatch,
         data: { spaceId: 'space-1', assetId: 'a1' },
       });
-      expect(mocks.job.queue).toHaveBeenNthCalledWith(2, {
+      expect(matchCalls[1][0]).toEqual({
         name: JobName.SharedSpaceFaceMatch,
         data: { spaceId: 'space-1', assetId: 'a2' },
       });
