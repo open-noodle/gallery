@@ -42,8 +42,9 @@ vi.mock('$lib/components/assets/thumbnail/ImageThumbnail.svelte', async () => {
 });
 
 function makePerson(overrides: Partial<PersonResponseDto> = {}): PersonResponseDto {
+  const id = overrides.id ?? 'person-1';
   return {
-    id: 'person-1',
+    id,
     name: 'Alice',
     birthDate: null,
     thumbnailPath: '/thumb.jpg',
@@ -53,6 +54,9 @@ function makePerson(overrides: Partial<PersonResponseDto> = {}): PersonResponseD
     updatedAt: '2026-01-02T00:00:00.000Z',
     type: 'person',
     species: null,
+    // A real owned person always carries a user-person primaryProfile; keep it present so a guard
+    // rewritten as `!!personAssets.primaryProfile` would still correctly treat this as personal.
+    primaryProfile: { type: Type.UserPerson, id },
     ...overrides,
   };
 }
@@ -78,11 +82,14 @@ function makeSpaceCandidate(): PersonResponseDto {
   });
 }
 
+// Same trick as makeSpacePerson: person.id ('candidate-personal-1') deliberately differs from
+// primaryProfile.id ('candidate-personal-profile-1') so a test asserting the SDK call used
+// primaryProfile.id proves the fix rather than passing by coincidence.
 function makePersonalCandidate(): PersonResponseDto {
   return makePerson({
     id: 'candidate-personal-1',
     name: 'Carol',
-    primaryProfile: { type: Type.UserPerson, id: 'candidate-personal-1' },
+    primaryProfile: { type: Type.UserPerson, id: 'candidate-personal-profile-1' },
   });
 }
 
@@ -123,6 +130,13 @@ describe('UnmergeFaceSelector', () => {
     await waitFor(() =>
       expect(sdkMock.getAllPeople).toHaveBeenCalledWith({ withHidden: false, withSharedSpaces: true }),
     );
+  });
+
+  it('does not request shared-space candidates for a normal owned-person source (would recreate #765 in reverse)', async () => {
+    renderSelector({ personAssets: makePerson() });
+
+    await waitFor(() => expect(sdkMock.getAllPeople).toHaveBeenCalled());
+    expect(sdkMock.getAllPeople).toHaveBeenCalledWith({ withHidden: false });
   });
 
   it('routes "Create new person" to the space reassign endpoint for a space-scoped source person', async () => {
@@ -166,6 +180,7 @@ describe('UnmergeFaceSelector', () => {
         },
       }),
     );
+    expect(sdkMock.reassignFaces).not.toHaveBeenCalled();
   });
 
   it('maps a personal candidate profile ref to the "person" enum, not "user-person" (would otherwise 400)', async () => {
@@ -184,10 +199,11 @@ describe('UnmergeFaceSelector', () => {
         personId: 'space-person-1',
         sharedSpacePersonReassignDto: {
           assetIds: ['asset-1'],
-          target: { type: 'existing', profile: { type: 'person', id: 'candidate-personal-1' } },
+          target: { type: 'existing', profile: { type: 'person', id: 'candidate-personal-profile-1' } },
         },
       }),
     );
+    expect(sdkMock.reassignFaces).not.toHaveBeenCalled();
   });
 
   it('keeps the personal (owned-person) reassign path on createPerson + global reassignFaces', async () => {
@@ -217,13 +233,46 @@ describe('UnmergeFaceSelector', () => {
   it('does not show a success toast when the space reassign moves zero faces, and surfaces an error instead', async () => {
     sdkMock.reassignSpacePersonFaces.mockResolvedValue({ reassigned: 0 });
 
-    renderSelector({ assetIds: ['asset-1'], personAssets: makeSpacePerson() });
+    const { onConfirm } = renderSelector({ assetIds: ['asset-1'], personAssets: makeSpacePerson() });
 
     await userEvent.click(screen.getByText('create_new_person'));
 
     await waitFor(() => expect(sdkMock.reassignSpacePersonFaces).toHaveBeenCalled());
     expect(toastManager.primary).not.toHaveBeenCalled();
-    expect(toastManager.danger).toHaveBeenCalled();
+    expect(toastManager.danger).toHaveBeenCalledWith('errors.unable_to_reassign_assets_new_person');
+    // A zero-result must not drive the caller's optimistic removal (+page.svelte's onConfirm ->
+    // timelineManager.removeAssets): that would empty the grid of assets that never moved,
+    // compounding the danger toast with a UI lie.
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('invokes onConfirm when the space reassign (create path) moves at least one face', async () => {
+    sdkMock.reassignSpacePersonFaces.mockResolvedValue({ reassigned: 1 });
+
+    const { onConfirm } = renderSelector({ assetIds: ['asset-1'], personAssets: makeSpacePerson() });
+
+    await userEvent.click(screen.getByText('create_new_person'));
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not show a success toast or call onConfirm when a "Reassign" to an existing person moves zero faces', async () => {
+    const candidate = makeSpaceCandidate();
+    sdkMock.getAllPeople.mockResolvedValue(peopleResponse([candidate]));
+    sdkMock.reassignSpacePersonFaces.mockResolvedValue({ reassigned: 0 });
+
+    const { onConfirm } = renderSelector({ assetIds: ['asset-1'], personAssets: makeSpacePerson() });
+
+    await userEvent.click(await screen.findByText('Bob'));
+    await userEvent.click(screen.getByText('reassign'));
+
+    await waitFor(() => expect(sdkMock.reassignSpacePersonFaces).toHaveBeenCalled());
+    expect(toastManager.primary).not.toHaveBeenCalled();
+    expect(toastManager.danger).toHaveBeenCalledWith(
+      formatMessage('errors.unable_to_reassign_assets_existing_person', { values: { name: 'Bob' } }),
+    );
+    expect(sdkMock.reassignFaces).not.toHaveBeenCalled();
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 
   it('shows a success toast keyed on the server-reported reassigned count, not assetIds.length', async () => {

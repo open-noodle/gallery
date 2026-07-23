@@ -56,7 +56,11 @@
   );
 
   onMount(async () => {
-    const data = await getAllPeople({ withHidden: false, withSharedSpaces: true });
+    // Only ask for shared-space candidates when the source itself is a space person. A normal
+    // owned person must keep seeing own people only — surfacing shared-space people here too
+    // would let picking one send a shared-space id to the personal reassignFaces branch below,
+    // recreating #765's id-mismatch bug in reverse.
+    const data = await getAllPeople({ withHidden: false, ...(spaceRef && { withSharedSpaces: true }) });
     people = data.people;
   });
 
@@ -75,12 +79,15 @@
   };
 
   // Shared by both handlers so create/reassign cannot drift on the space-endpoint call shape.
+  // spaceRef is a parameter (not read from the closure) so the "only call this for a space
+  // source" invariant lives with the callers, who already narrow it via `if (spaceRef)`.
   const reassignInSpace = async (
+    spaceRef: { spaceId: string; personId: string },
     target: { type: 'new' } | { type: 'existing'; profile: ScopedPersonProfileRefDto },
   ) => {
     const { reassigned } = await reassignSpacePersonFaces({
-      id: spaceRef!.spaceId,
-      personId: spaceRef!.personId,
+      id: spaceRef.spaceId,
+      personId: spaceRef.personId,
       sharedSpacePersonReassignDto: { assetIds, target },
     });
     return reassigned;
@@ -89,11 +96,17 @@
   const handleCreate = async () => {
     const timeout = setTimeout(() => (showLoadingSpinnerCreate = true), timeBeforeShowLoadingSpinner);
 
+    // onConfirm() drives the caller's optimistic removal (+page.svelte -> timelineManager.removeAssets).
+    // Only fire it when something actually moved — a reassigned: 0 result already surfaces the
+    // danger toast below, and advancing the UI as if it succeeded would empty the grid of assets
+    // that never left. Left true on a thrown error, matching existing behaviour on that path.
+    let shouldConfirm = true;
+
     try {
       disableButtons = true;
       let reassigned: number;
       if (spaceRef) {
-        reassigned = await reassignInSpace({ type: 'new' });
+        reassigned = await reassignInSpace(spaceRef, { type: 'new' });
       } else {
         const data = await createPerson({ personCreateDto: {} });
         await reassignFaces({ id: data.id, assetFaceUpdateDto: { data: selectedPeople } });
@@ -104,6 +117,7 @@
         toastManager.primary($t('reassigned_assets_to_new_person', { values: { count: reassigned } }));
       } else {
         toastManager.danger($t('errors.unable_to_reassign_assets_new_person'));
+        shouldConfirm = false;
       }
     } catch (error) {
       handleError(error, $t('errors.unable_to_reassign_assets_new_person'));
@@ -112,17 +126,25 @@
     }
 
     showLoadingSpinnerCreate = false;
-    onConfirm();
+    disableButtons = false;
+    if (shouldConfirm) {
+      onConfirm();
+    }
   };
 
   const handleReassign = async () => {
     const timeout = setTimeout(() => (showLoadingSpinnerReassign = true), timeBeforeShowLoadingSpinner);
+    // See handleCreate: only fire onConfirm's optimistic removal when something actually moved.
+    let shouldConfirm = true;
     try {
       disableButtons = true;
       if (selectedPerson) {
         let reassigned: number;
         if (spaceRef) {
-          reassigned = await reassignInSpace({ type: 'existing', profile: toScopedPersonRef(selectedPerson) });
+          reassigned = await reassignInSpace(spaceRef, {
+            type: 'existing',
+            profile: toScopedPersonRef(selectedPerson),
+          });
         } else {
           await reassignFaces({ id: selectedPerson.id, assetFaceUpdateDto: { data: selectedPeople } });
           reassigned = assetIds.length;
@@ -138,6 +160,7 @@
           toastManager.danger(
             $t('errors.unable_to_reassign_assets_existing_person', { values: { name: selectedPerson.name || null } }),
           );
+          shouldConfirm = false;
         }
       }
     } catch (error) {
@@ -150,7 +173,10 @@
     }
 
     showLoadingSpinnerReassign = false;
-    onConfirm();
+    disableButtons = false;
+    if (shouldConfirm) {
+      onConfirm();
+    }
   };
 </script>
 
