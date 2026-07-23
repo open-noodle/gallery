@@ -2241,6 +2241,31 @@ export class SharedSpaceRepository {
       .execute();
   }
 
+  @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
+  getSourceFacesForSpacePersonAssets(spacePersonId: string, assetIds: string[]) {
+    if (assetIds.length === 0) {
+      return Promise.resolve(
+        [] as Array<{ assetFaceId: string; assetId: string; personId: string | null; assetOwnerId: string }>,
+      );
+    }
+    return this.db
+      .selectFrom('shared_space_person_face')
+      .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .select([
+        'asset_face.id as assetFaceId',
+        'asset_face.assetId as assetId',
+        'asset_face.personId as personId',
+        'asset.ownerId as assetOwnerId',
+      ])
+      .where('shared_space_person_face.personId', '=', spacePersonId)
+      .where('asset_face.assetId', 'in', assetIds)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .where('asset.deletedAt', 'is', null)
+      .execute();
+  }
+
   createPerson(values: Insertable<SharedSpacePersonTable>) {
     return this.db.insertInto('shared_space_person').values(values).returningAll().executeTakeFirstOrThrow();
   }

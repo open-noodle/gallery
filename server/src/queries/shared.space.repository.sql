@@ -1602,6 +1602,23 @@ limit
 offset
   $8
 
+-- SharedSpaceRepository.getSourceFacesForSpacePersonAssets
+select
+  "asset_face"."id" as "assetFaceId",
+  "asset_face"."assetId" as "assetId",
+  "asset_face"."personId" as "personId",
+  "asset"."ownerId" as "assetOwnerId"
+from
+  "shared_space_person_face"
+  inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
+  inner join "asset" on "asset"."id" = "asset_face"."assetId"
+where
+  "shared_space_person_face"."personId" = $1
+  and "asset_face"."assetId" in ($2)
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" is true
+  and "asset"."deletedAt" is null
+
 -- SharedSpaceRepository.getSpacePersonByIdentity
 select
   *

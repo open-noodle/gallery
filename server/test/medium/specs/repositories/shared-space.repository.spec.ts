@@ -3974,6 +3974,64 @@ describe(SharedSpaceRepository.name, () => {
     });
   });
 
+  describe('getSourceFacesForSpacePersonAssets', () => {
+    it('resolves only the projected, visible faces for a space person + assets (#765)', async () => {
+      const { ctx, sut } = setup();
+      // Arrange: space person SP with projected face F1 on asset A1 (owner U); asset A2 has face F2 not projecting to SP.
+      const { user: U } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: U.id });
+      const { person } = await ctx.newPerson({ ownerId: U.id });
+      const { asset: A1 } = await ctx.newAsset({ ownerId: U.id });
+      const { assetFace: F1 } = await ctx.newAssetFace({ assetId: A1.id, personId: person.id });
+      const { asset: A2 } = await ctx.newAsset({ ownerId: U.id });
+      await ctx.newAssetFace({ assetId: A2.id });
+      const SP = await sut.createPerson({ spaceId: space.id, type: 'person' });
+      await sut.addPersonFaces([{ personId: SP.id, assetFaceId: F1.id }]);
+
+      const rows = await sut.getSourceFacesForSpacePersonAssets(SP.id, [A1.id, A2.id]);
+
+      expect(rows).toEqual([{ assetFaceId: F1.id, assetId: A1.id, personId: person.id, assetOwnerId: U.id }]);
+      await expect(sut.getSourceFacesForSpacePersonAssets(SP.id, [])).resolves.toEqual([]);
+    });
+
+    it.each([
+      [
+        'deleted face',
+        async (ctx: ReturnType<typeof setup>['ctx'], faceId: string) => {
+          await ctx.database
+            .updateTable('asset_face')
+            .set({ deletedAt: new Date() })
+            .where('id', '=', faceId)
+            .execute();
+        },
+      ],
+      [
+        'invisible face',
+        async (ctx: ReturnType<typeof setup>['ctx'], faceId: string) => {
+          await ctx.database.updateTable('asset_face').set({ isVisible: false }).where('id', '=', faceId).execute();
+        },
+      ],
+      [
+        'deleted asset',
+        async (ctx: ReturnType<typeof setup>['ctx'], _faceId: string, assetId: string) => {
+          await ctx.database.updateTable('asset').set({ deletedAt: new Date() }).where('id', '=', assetId).execute();
+        },
+      ],
+    ])('excludes the projected face when it is a %s', async (_label, invalidate) => {
+      const { ctx, sut } = setup();
+      const { user: U } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: U.id });
+      const { asset: A1 } = await ctx.newAsset({ ownerId: U.id });
+      const { assetFace: F1 } = await ctx.newAssetFace({ assetId: A1.id });
+      const SP = await sut.createPerson({ spaceId: space.id, type: 'person' });
+      await sut.addPersonFaces([{ personId: SP.id, assetFaceId: F1.id }]);
+
+      await invalidate(ctx, F1.id, A1.id);
+
+      await expect(sut.getSourceFacesForSpacePersonAssets(SP.id, [A1.id])).resolves.toEqual([]);
+    });
+  });
+
   describe('getFilteredMapMarkers — space filter interaction', () => {
     it('should include tagged space assets when tagIds filter is applied with timelineSpaceIds', async () => {
       const { ctx, sut } = setup();
