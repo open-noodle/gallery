@@ -295,7 +295,7 @@ describe('text filters (#802)', () => {
     it('omits text filters that are whitespace only', () => {
       const options = buildMapMarkerOptions({
         ...createFilterState(),
-        description: '   ',
+        description: ' '.repeat(3),
         originalFileName: '\t\n',
         ocr: ' ',
       });
@@ -374,7 +374,7 @@ describe('text filters (#802)', () => {
 
     it('omits blank text filters', () => {
       const options = buildMapTimelineOptions(
-        { ...createFilterState(), description: '   ', originalFileName: '', ocr: '\t' },
+        { ...createFilterState(), description: ' '.repeat(3), originalFileName: '', ocr: '\t' },
         '1,2,3,4',
         new Set(),
       );
