@@ -218,3 +218,170 @@ describe('buildMapTimelineOptions', () => {
     expect(options).not.toHaveProperty('isFavorite');
   });
 });
+
+/**
+ * #802 — the Map view was missing the "Text" filter section entirely. These cover the option
+ * builders forwarding the three text fields the section produces. The map timeline hits
+ * TimeBucketDto (which already supports them); markers hit FilteredMapMarkerDto.
+ */
+describe('text filters (#802)', () => {
+  const textFilters = {
+    ...createFilterState(),
+    description: 'birthday cake',
+    originalFileName: 'IMG_1234.jpg',
+    ocr: 'happy birthday',
+  };
+
+  describe('buildMapMarkerOptions', () => {
+    it('forwards description, filename and OCR text to map markers', () => {
+      expect(buildMapMarkerOptions(textFilters)).toEqual(
+        expect.objectContaining({
+          description: 'birthday cake',
+          originalFileName: 'IMG_1234.jpg',
+          ocr: 'happy birthday',
+        }),
+      );
+    });
+
+    it('forwards text filters when scoped to a space', () => {
+      expect(buildMapMarkerOptions(textFilters, 'space-1')).toEqual(
+        expect.objectContaining({
+          spaceId: 'space-1',
+          description: 'birthday cake',
+          originalFileName: 'IMG_1234.jpg',
+          ocr: 'happy birthday',
+        }),
+      );
+    });
+
+    it('trims surrounding whitespace before forwarding', () => {
+      const filters = {
+        ...createFilterState(),
+        description: '  birthday cake  ',
+        originalFileName: '\tIMG_1234.jpg\n',
+        ocr: '  happy birthday ',
+      };
+
+      expect(buildMapMarkerOptions(filters)).toEqual(
+        expect.objectContaining({
+          description: 'birthday cake',
+          originalFileName: 'IMG_1234.jpg',
+          ocr: 'happy birthday',
+        }),
+      );
+    });
+
+    it('omits text filters that are undefined', () => {
+      const options = buildMapMarkerOptions(createFilterState());
+
+      expect(options).not.toHaveProperty('description');
+      expect(options).not.toHaveProperty('originalFileName');
+      expect(options).not.toHaveProperty('ocr');
+    });
+
+    it('omits text filters that are empty strings', () => {
+      const options = buildMapMarkerOptions({
+        ...createFilterState(),
+        description: '',
+        originalFileName: '',
+        ocr: '',
+      });
+
+      expect(options).not.toHaveProperty('description');
+      expect(options).not.toHaveProperty('originalFileName');
+      expect(options).not.toHaveProperty('ocr');
+    });
+
+    it('omits text filters that are whitespace only', () => {
+      const options = buildMapMarkerOptions({
+        ...createFilterState(),
+        description: '   ',
+        originalFileName: '\t\n',
+        ocr: ' ',
+      });
+
+      expect(options).not.toHaveProperty('description');
+      expect(options).not.toHaveProperty('originalFileName');
+      expect(options).not.toHaveProperty('ocr');
+    });
+
+    it('forwards each text field independently of the others', () => {
+      const options = buildMapMarkerOptions({ ...createFilterState(), ocr: 'receipt total' });
+
+      expect(options).toEqual(expect.objectContaining({ ocr: 'receipt total' }));
+      expect(options).not.toHaveProperty('description');
+      expect(options).not.toHaveProperty('originalFileName');
+    });
+  });
+
+  describe('buildMapTimeBucketOptions', () => {
+    it('forwards description, filename and OCR text', () => {
+      expect(buildMapTimeBucketOptions(textFilters)).toEqual(
+        expect.objectContaining({
+          description: 'birthday cake',
+          originalFileName: 'IMG_1234.jpg',
+          ocr: 'happy birthday',
+        }),
+      );
+    });
+
+    it('forwards text filters when scoped to a space', () => {
+      expect(buildMapTimeBucketOptions(textFilters, 'space-1')).toEqual(
+        expect.objectContaining({
+          spaceId: 'space-1',
+          description: 'birthday cake',
+          ocr: 'happy birthday',
+        }),
+      );
+    });
+
+    it('omits blank text filters', () => {
+      const options = buildMapTimeBucketOptions({ ...createFilterState(), description: '  ', ocr: '' });
+
+      expect(options).not.toHaveProperty('description');
+      expect(options).not.toHaveProperty('ocr');
+    });
+  });
+
+  describe('buildMapTimelineOptions', () => {
+    it('forwards description, filename and OCR text', () => {
+      expect(buildMapTimelineOptions(textFilters, '1,2,3,4', new Set())).toEqual(
+        expect.objectContaining({
+          description: 'birthday cake',
+          originalFileName: 'IMG_1234.jpg',
+          ocr: 'happy birthday',
+        }),
+      );
+    });
+
+    it('forwards text filters when scoped to a space', () => {
+      expect(buildMapTimelineOptions(textFilters, '1,2,3,4', new Set(), 'space-1')).toEqual(
+        expect.objectContaining({
+          spaceId: 'space-1',
+          description: 'birthday cake',
+          ocr: 'happy birthday',
+        }),
+      );
+    });
+
+    it('omits text filters when the filter state is undefined', () => {
+      const options = buildMapTimelineOptions(undefined, '1,2,3,4', new Set());
+
+      expect(options).not.toHaveProperty('description');
+      expect(options).not.toHaveProperty('originalFileName');
+      expect(options).not.toHaveProperty('ocr');
+    });
+
+    it('omits blank text filters', () => {
+      const options = buildMapTimelineOptions(
+        { ...createFilterState(), description: '   ', originalFileName: '', ocr: '\t' },
+        '1,2,3,4',
+        new Set(),
+      );
+
+      expect(options).not.toHaveProperty('description');
+      expect(options).not.toHaveProperty('originalFileName');
+      expect(options).not.toHaveProperty('ocr');
+    });
+  });
+});
