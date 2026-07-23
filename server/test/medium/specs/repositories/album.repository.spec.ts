@@ -169,4 +169,197 @@ describe(AlbumRepository.name, () => {
       expect(contributorRow?.assetCount).toBe(2);
     });
   });
+
+  describe('getByAssetId', () => {
+    it('returns an album the user is shared into directly', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      const { album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Shared Album' });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+      await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id });
+
+      const rows = await sut.getByAssetId(viewer.id, asset.id);
+
+      expect(rows.map((row) => row.id)).toEqual([album.id]);
+    });
+
+    it('returns an album linked into a shared space the user is a member of', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      const { album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Space Linked Album' });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      const rows = await sut.getByAssetId(viewer.id, asset.id);
+
+      expect(rows.map((row) => row.id)).toEqual([album.id]);
+    });
+
+    it('does not return an album the user has no access path to', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: stranger } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      const { album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Private Album' });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+
+      const rows = await sut.getByAssetId(stranger.id, asset.id);
+
+      expect(rows).toEqual([]);
+    });
+
+    it('does not return an album linked only to a space the user is not in', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: outsider } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      const { album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Other Space Album' });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+
+      // The album is linked into space A; the outsider is a member of unrelated space B.
+      const { space: spaceA } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: spaceA.id, albumId: album.id });
+      const { space: spaceB } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: outsider.id });
+
+      const rows = await sut.getByAssetId(outsider.id, asset.id);
+
+      expect(rows).toEqual([]);
+    });
+
+    it('stops returning a space-linked album once the album is unlinked from the space', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      const { album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Unlinked Album' });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      expect(await sut.getByAssetId(viewer.id, asset.id)).toHaveLength(1);
+
+      await ctx.database.deleteFrom('shared_space_album').where('albumId', '=', album.id).execute();
+
+      expect(await sut.getByAssetId(viewer.id, asset.id)).toEqual([]);
+    });
+
+    it('stops returning a space-linked album once the user leaves the space', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      const { album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Departed Album' });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      expect(await sut.getByAssetId(viewer.id, asset.id)).toHaveLength(1);
+
+      await ctx.database.deleteFrom('shared_space_member').where('userId', '=', viewer.id).execute();
+
+      expect(await sut.getByAssetId(viewer.id, asset.id)).toEqual([]);
+    });
+
+    it('does not reveal a space-linked album for another member Hidden asset', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Hidden });
+      const { album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Album With Hidden Asset' });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      const rows = await sut.getByAssetId(viewer.id, asset.id);
+
+      expect(rows).toEqual([]);
+    });
+
+    it('does not reveal a space-linked album for another member Locked asset', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Locked });
+      const { album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Album With Locked Asset' });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      const rows = await sut.getByAssetId(viewer.id, asset.id);
+
+      expect(rows).toEqual([]);
+    });
+
+    it('still shows the owner their own Hidden asset album membership', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Hidden });
+      const { album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'My Hidden Asset Album' });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+      // newAlbum already creates the owner's album_user row — the owner reaches this album through
+      // the album_user arm, which is why gating the SPACE arm on visibility cannot regress them.
+
+      const rows = await sut.getByAssetId(owner.id, asset.id);
+
+      expect(rows.map((row) => row.id)).toEqual([album.id]);
+    });
+
+    // Known incompleteness, pinned so it stays visible: a cross-owner contribution (#764) lives in
+    // album_space_asset, not album_asset, and this query inner-joins album_asset. A contributor
+    // therefore sees no "Contained in" for their own contributed asset. This under-reports rather
+    // than over-reports, so it is not a disclosure — but it is a gap worth closing separately.
+    it('does not yet surface a linked album for a cross-owner contributed asset', async () => {
+      const { ctx, sut } = setup();
+      const { user: albumOwner } = await ctx.newUser();
+      const { user: contributor } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: contributor.id });
+      const { album } = await ctx.newAlbum({ ownerId: albumOwner.id, albumName: 'Contribution Album' });
+
+      const { space } = await ctx.newSharedSpace({ createdById: albumOwner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: contributor.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+      await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: asset.id, spaceId: space.id });
+
+      const rows = await sut.getByAssetId(contributor.id, asset.id);
+
+      expect(rows).toEqual([]);
+    });
+
+    it('does not return a space-linked album that has been soft-deleted', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      const { album } = await ctx.newAlbum({
+        ownerId: owner.id,
+        albumName: 'Deleted Album',
+        deletedAt: new Date(),
+      });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      const rows = await sut.getByAssetId(viewer.id, asset.id);
+
+      expect(rows).toEqual([]);
+    });
+  });
 });
