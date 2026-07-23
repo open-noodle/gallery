@@ -132,6 +132,44 @@ type ExecutedPlanFollowUps = {
 export class IdentityMergePropagationService {
   constructor(private deps: IdentityMergePropagationDependencies) {}
 
+  // Relocated from PersonService (#765) so both the owner reassign path (PersonService) and the
+  // space-editor reassign path (SharedSpaceService, via this service) share one implementation.
+  //
+  // A reassign rewrites asset_face.personId, but every space-scoped person view reads the
+  // shared_space_person_face projection instead. Evict the stale assignment synchronously so the
+  // face leaves the wrong person immediately, then queue the match job to re-add it under the
+  // correct one. Must run AFTER the identity swap (replaceFaceIdentity): the match job resolves the
+  // target space person from face_identity_face, so evicting before the swap would re-add the OLD person.
+  async refreshSharedSpaceFacesAfterReassign(assetId: string, assetFaceId: string): Promise<void> {
+    const spaceIds = await this.deps.sharedSpaceRepository.getSpaceIdsForAsset(assetId);
+    const refreshedSpaceIds = new Set<string>();
+    for (const { spaceId } of spaceIds) {
+      if (refreshedSpaceIds.has(spaceId)) {
+        continue;
+      }
+      refreshedSpaceIds.add(spaceId);
+
+      // getSpaceIdsForAsset is broader than the match job's own isAssetInSpace guard, which also
+      // requires the asset to be present, online and visible. Only evict where that guard will
+      // pass, otherwise the face would be dropped from the space with nothing to re-add it.
+      if (await this.deps.sharedSpaceRepository.isAssetInSpace(spaceId, assetId)) {
+        const vacatedPersonIds = await this.deps.sharedSpaceRepository.removePersonFaceAssignmentsForSpaceFace(
+          spaceId,
+          assetFaceId,
+        );
+        if (vacatedPersonIds.length > 0) {
+          await this.deps.sharedSpaceRepository.recountPersons(vacatedPersonIds);
+          await this.deps.sharedSpaceRepository.deleteOrphanedPersonsByIds(spaceId, vacatedPersonIds);
+        }
+      }
+
+      await this.deps.jobRepository.queue({
+        name: JobName.SharedSpaceFaceMatch,
+        data: { spaceId, assetId },
+      });
+    }
+  }
+
   async mergePersonalPeople(
     auth: AuthDto,
     targetPersonId: string,
