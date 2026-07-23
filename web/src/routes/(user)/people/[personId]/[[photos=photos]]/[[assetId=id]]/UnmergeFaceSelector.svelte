@@ -75,7 +75,9 @@
   };
 
   // Shared by both handlers so create/reassign cannot drift on the space-endpoint call shape.
-  const reassignInSpace = async (target: { type: 'new' } | { type: 'existing'; profile: ScopedPersonProfileRefDto }) => {
+  const reassignInSpace = async (
+    target: { type: 'new' } | { type: 'existing'; profile: ScopedPersonProfileRefDto },
+  ) => {
     const { reassigned } = await reassignSpacePersonFaces({
       id: spaceRef!.spaceId,
       personId: spaceRef!.personId,
