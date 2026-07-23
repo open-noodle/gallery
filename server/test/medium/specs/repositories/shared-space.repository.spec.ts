@@ -3975,13 +3975,15 @@ describe(SharedSpaceRepository.name, () => {
   });
 
   describe('getSourceFacesForSpacePersonAssets', () => {
-    it('resolves only the projected, visible faces for a space person + assets (#765)', async () => {
+    it('resolves only the projected, visible, in-scope faces for a space person + assets (#765)', async () => {
       const { ctx, sut } = setup();
-      // Arrange: space person SP with projected face F1 on asset A1 (owner U); asset A2 has face F2 not projecting to SP.
+      // Arrange: space person SP with projected face F1 on asset A1 (owner U, directly added to the space);
+      // asset A2 has face F2 not projecting to SP.
       const { user: U } = await ctx.newUser();
       const { space } = await ctx.newSharedSpace({ createdById: U.id });
       const { person } = await ctx.newPerson({ ownerId: U.id });
       const { asset: A1 } = await ctx.newAsset({ ownerId: U.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: A1.id });
       const { assetFace: F1 } = await ctx.newAssetFace({ assetId: A1.id, personId: person.id });
       const { asset: A2 } = await ctx.newAsset({ ownerId: U.id });
       await ctx.newAssetFace({ assetId: A2.id });
@@ -4017,16 +4019,65 @@ describe(SharedSpaceRepository.name, () => {
           await ctx.database.updateTable('asset').set({ deletedAt: new Date() }).where('id', '=', assetId).execute();
         },
       ],
+      [
+        // Finding 1 (guard parity with getSpaceRepresentativeFaceForUpdate): offline assets must not
+        // resolve to a reassignable face.
+        'offline asset',
+        async (ctx: ReturnType<typeof setup>['ctx'], _faceId: string, assetId: string) => {
+          await ctx.database.updateTable('asset').set({ isOffline: true }).where('id', '=', assetId).execute();
+        },
+      ],
+      [
+        // Finding 1: non-space-visible visibility (Hidden is not in visibleSpaceAssetVisibilities).
+        'non-space-visible (hidden) asset',
+        async (ctx: ReturnType<typeof setup>['ctx'], _faceId: string, assetId: string) => {
+          await ctx.database
+            .updateTable('asset')
+            .set({ visibility: AssetVisibility.Hidden })
+            .where('id', '=', assetId)
+            .execute();
+        },
+      ],
+      [
+        // Finding 1: an asset that is no longer in-scope for the space (removed from
+        // shared_space_asset, and not reachable via a linked library/album either) must not resolve.
+        "asset removed from the space's scope",
+        async (ctx: ReturnType<typeof setup>['ctx'], _faceId: string, assetId: string, spaceId: string) => {
+          await ctx.database
+            .deleteFrom('shared_space_asset')
+            .where('spaceId', '=', spaceId)
+            .where('assetId', '=', assetId)
+            .execute();
+        },
+      ],
     ])('excludes the projected face when it is a %s', async (_label, invalidate) => {
       const { ctx, sut } = setup();
       const { user: U } = await ctx.newUser();
       const { space } = await ctx.newSharedSpace({ createdById: U.id });
       const { asset: A1 } = await ctx.newAsset({ ownerId: U.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: A1.id });
       const { assetFace: F1 } = await ctx.newAssetFace({ assetId: A1.id });
       const SP = await sut.createPerson({ spaceId: space.id, type: 'person' });
       await sut.addPersonFaces([{ personId: SP.id, assetFaceId: F1.id }]);
 
-      await invalidate(ctx, F1.id, A1.id);
+      await invalidate(ctx, F1.id, A1.id, space.id);
+
+      await expect(sut.getSourceFacesForSpacePersonAssets(SP.id, [A1.id])).resolves.toEqual([]);
+    });
+
+    it('excludes a face projected onto a different (sibling) space person in the same space (#765 finding 2)', async () => {
+      // Proves the personId equality filter itself, not merely that the inner join is required: the
+      // face IS registered under shared_space_person_face (PK (personId, assetFaceId) allows the same
+      // face under more than one space person), just for a sibling person, not the queried source.
+      const { ctx, sut } = setup();
+      const { user: U } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: U.id });
+      const { asset: A1 } = await ctx.newAsset({ ownerId: U.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: A1.id });
+      const { assetFace: F1 } = await ctx.newAssetFace({ assetId: A1.id });
+      const SP = await sut.createPerson({ spaceId: space.id, type: 'person' });
+      const siblingSP = await sut.createPerson({ spaceId: space.id, type: 'person' });
+      await sut.addPersonFaces([{ personId: siblingSP.id, assetFaceId: F1.id }]);
 
       await expect(sut.getSourceFacesForSpacePersonAssets(SP.id, [A1.id])).resolves.toEqual([]);
     });

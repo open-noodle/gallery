@@ -1610,6 +1610,7 @@ select
   "asset"."ownerId" as "assetOwnerId"
 from
   "shared_space_person_face"
+  inner join "shared_space_person" on "shared_space_person"."id" = "shared_space_person_face"."personId"
   inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
   inner join "asset" on "asset"."id" = "asset_face"."assetId"
 where
@@ -1618,6 +1619,55 @@ where
   and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" is true
   and "asset"."deletedAt" is null
+  and "asset"."isOffline" = $3
+  and "asset"."visibility" in ($4, $5)
+  and (
+    exists (
+      select
+        "shared_space_asset"."assetId"
+      from
+        "shared_space_asset"
+      where
+        "shared_space_asset"."assetId" = "asset_face"."assetId"
+        and "shared_space_asset"."spaceId" = "shared_space_person"."spaceId"
+    )
+    or exists (
+      select
+        "shared_space_library"."libraryId"
+      from
+        "shared_space_library"
+      where
+        "shared_space_library"."libraryId" = "asset"."libraryId"
+        and "shared_space_library"."spaceId" = "shared_space_person"."spaceId"
+    )
+    or (
+      exists (
+        select
+          1 as "exists"
+        from
+          "shared_space_album"
+          inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+          inner join "album" on "album"."id" = "shared_space_album"."albumId"
+          and "album"."deletedAt" is null
+        where
+          "album_asset"."assetId" = "asset_face"."assetId"
+          and "shared_space_album"."spaceId" = "shared_space_person"."spaceId"
+      )
+      or exists (
+        select
+          1 as "exists"
+        from
+          "shared_space_album"
+          inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+          and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+          inner join "album" on "album"."id" = "shared_space_album"."albumId"
+          and "album"."deletedAt" is null
+        where
+          "album_space_asset"."assetId" = "asset_face"."assetId"
+          and "shared_space_album"."spaceId" = "shared_space_person"."spaceId"
+      )
+    )
+  )
 
 -- SharedSpaceRepository.getSpacePersonByIdentity
 select
