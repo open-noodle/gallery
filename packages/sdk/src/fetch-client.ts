@@ -3129,6 +3129,21 @@ export type SharedSpacePersonMergeDto = {
     /** Person IDs to merge into target */
     ids: string[];
 };
+export type SharedSpacePersonReassignDto = {
+    /** Assets whose face on this person is misassigned */
+    assetIds: string[];
+    /** Where the faces should be reassigned to */
+    target: {
+        "type": Type3;
+    } | {
+        "type": Type4;
+        profile: ScopedPersonProfileRefDto;
+    };
+};
+export type SharedSpacePersonReassignResponseDto = {
+    /** Number of faces actually reassigned */
+    reassigned: number;
+};
 export type SpaceRepresentativeFaceUpdateDto = {
     /** Asset face ID used as the space representative face */
     assetFaceId: string | null;
@@ -8721,6 +8736,23 @@ export function mergeSpacePeople({ id, personId, sharedSpacePersonMergeDto }: {
     })));
 }
 /**
+ * Reassign faces from a person in a shared space
+ */
+export function reassignSpacePersonFaces({ id, personId, sharedSpacePersonReassignDto }: {
+    id: string;
+    personId: string;
+    sharedSpacePersonReassignDto: SharedSpacePersonReassignDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpacePersonReassignResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/reassign`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: sharedSpacePersonReassignDto
+    })));
+}
+/**
  * Update space person representative face
  */
 export function updateSpacePersonRepresentativeFace({ id, personId, spaceRepresentativeFaceUpdateDto }: {
@@ -10424,6 +10456,12 @@ export enum SharedSpaceRole {
 export enum RepresentativeFaceSource {
     Auto = "auto",
     Manual = "manual"
+}
+export enum Type3 {
+    New = "new"
+}
+export enum Type4 {
+    Existing = "existing"
 }
 export enum StorageMigrationDirection {
     ToS3 = "toS3",

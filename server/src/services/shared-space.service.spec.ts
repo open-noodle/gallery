@@ -9420,6 +9420,39 @@ describe(SharedSpaceService.name, () => {
       expect(result).toEqual({ reassigned: 2 });
     });
 
+    it('allows a global-person target the caller does not own but can shared-space-edit, and delegates it verbatim', async () => {
+      // The non-owner fallback: checkOwnerAccess comes back empty, and it's the
+      // checkSharedSpaceEditAccess call — not the owner fast path above — that
+      // grants access. Deleting this fallback (making the gate owner-only) would
+      // make this the only failing test in the file.
+      const identityMergePropagation = useIdentityMergePropagation(sut);
+      identityMergePropagation.reassignSpaceFacesToTarget.mockResolvedValue({
+        reassigned: 1,
+        targetPersonIds: ['global-person'],
+      });
+      const spaceId = newUuid();
+      const personId = newUuid();
+      const globalPersonId = newUuid();
+      const auth = factory.auth();
+      const assetIds = [newUuid()];
+      const faces = [{ assetFaceId: newUuid(), assetId: assetIds[0], personId, assetOwnerId: auth.user.id }];
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(factory.sharedSpacePerson({ id: personId, spaceId }));
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.person.checkSharedSpaceEditAccess.mockResolvedValue(new Set([globalPersonId]));
+      mocks.sharedSpace.getSourceFacesForSpacePersonAssets.mockResolvedValue(faces as any);
+
+      const target = { type: 'existing' as const, profile: { type: 'person' as const, id: globalPersonId } };
+      const result = await sut.reassignSpacePersonFaces(auth, spaceId, personId, { assetIds, target });
+
+      expect(mocks.access.person.checkSharedSpaceEditAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([globalPersonId]),
+      );
+      expect(identityMergePropagation.reassignSpaceFacesToTarget).toHaveBeenCalledWith(faces, target);
+      expect(result).toEqual({ reassigned: 1 });
+    });
+
     it('resolves source faces and delegates exactly those rows plus dto.target, returning the propagation result', async () => {
       const identityMergePropagation = useIdentityMergePropagation(sut);
       identityMergePropagation.reassignSpaceFacesToTarget.mockResolvedValue({

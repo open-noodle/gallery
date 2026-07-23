@@ -18487,6 +18487,83 @@
         "x-immich-state": "Beta"
       }
     },
+    "/shared-spaces/{id}/people/{personId}/reassign": {
+      "post": {
+        "description": "Reassign the selected assets' faces from this person to another person, or to a new person.",
+        "operationId": "reassignSpacePersonFaces",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "personId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharedSpacePersonReassignDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedSpacePersonReassignResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Reassign faces from a person in a shared space",
+        "tags": [
+          "Shared Spaces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "sharedSpace.update",
+        "x-immich-state": "Beta"
+      }
+    },
     "/shared-spaces/{id}/people/{personId}/representative-face": {
       "put": {
         "description": "Update or clear the exact face crop used as the space person thumbnail.",
@@ -33269,6 +33346,77 @@
         },
         "required": [
           "ids"
+        ],
+        "type": "object"
+      },
+      "SharedSpacePersonReassignDto": {
+        "properties": {
+          "assetIds": {
+            "description": "Assets whose face on this person is misassigned",
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array"
+          },
+          "target": {
+            "description": "Where the faces should be reassigned to",
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "new"
+                    ]
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "existing"
+                    ]
+                  },
+                  "profile": {
+                    "$ref": "#/components/schemas/ScopedPersonProfileRefDto"
+                  }
+                },
+                "required": [
+                  "type",
+                  "profile"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "assetIds",
+          "target"
+        ],
+        "type": "object"
+      },
+      "SharedSpacePersonReassignResponseDto": {
+        "properties": {
+          "reassigned": {
+            "description": "Number of faces actually reassigned",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reassigned"
         ],
         "type": "object"
       },
