@@ -216,7 +216,12 @@ export class IdentityMergePropagationService {
         const cached = personIdByOwner.get(face.assetOwnerId);
         if (cached) {
           targetPersonId = cached;
-        } else if (targetIdentityId) {
+        } else if (target.type === 'existing' && target.profile.type === 'space-person') {
+          // Branch on the discriminant, not on targetIdentityId's truthiness: this is the resolution
+          // that #765's trap lives in, and it must not be reachable by an accidentally-falsy id.
+          if (!targetIdentityId) {
+            throw new Error('reassignSpaceFacesToTarget: space-person target resolved without an identity');
+          }
           const existing = await this.deps.faceIdentityRepository.getPersonByIdentity(
             face.assetOwnerId,
             targetIdentityId,
@@ -230,6 +235,7 @@ export class IdentityMergePropagationService {
             const created = await this.deps.personRepository.create({
               ownerId: face.assetOwnerId,
               identityId: targetIdentityId,
+              faceAssetId: face.assetFaceId,
             });
             targetPersonId = created.id;
           }
@@ -237,7 +243,10 @@ export class IdentityMergePropagationService {
         } else {
           // target.type === 'new': deliberately identity-less so ensurePersonIdentity mints a fresh
           // identity, which is what makes this a genuinely new person/space person.
-          const created = await this.deps.personRepository.create({ ownerId: face.assetOwnerId });
+          const created = await this.deps.personRepository.create({
+            ownerId: face.assetOwnerId,
+            faceAssetId: face.assetFaceId,
+          });
           targetPersonId = created.id;
           personIdByOwner.set(face.assetOwnerId, targetPersonId);
         }
