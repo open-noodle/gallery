@@ -1132,107 +1132,321 @@ class TestPetDetectionModelSource:
 
 class TestPetDetection:
     @staticmethod
-    def _make_yolo_output(
+    def _make_rfdetr_output(
         detections: list[tuple[float, float, float, float, int, float]],
+        num_queries: int = 300,
     ) -> list[NDArray[np.float32]]:
-        """Build a mock YOLOv8 output tensor (1, 84, 8400).
+        """Build mock RF-DETR outputs: dets (1, N, 4) + labels (1, N, 91).
 
-        Each detection is (cx, cy, w, h, class_id, score).
+        Each detection is (cx, cy, w, h, class_id, probability), with the box
+        normalised to [0, 1] and the probability given post-sigmoid. Logits are
+        back-computed so the detector's own sigmoid recovers the probability.
         """
-        num_proposals = 8400
-        output = np.zeros((1, 84, num_proposals), dtype=np.float32)
-        for i, (cx, cy, w, h, class_id, score) in enumerate(detections):
-            output[0, 0, i] = cx
-            output[0, 1, i] = cy
-            output[0, 2, i] = w
-            output[0, 3, i] = h
-            output[0, 4 + class_id, i] = score
-        return [output]
+        dets = np.zeros((1, num_queries, 4), dtype=np.float32)
+        # -30 -> sigmoid ~= 1e-13, i.e. "off" without risking overflow warnings.
+        logits = np.full((1, num_queries, 91), -30.0, dtype=np.float32)
+        for i, (cx, cy, w, h, class_id, prob) in enumerate(detections):
+            dets[0, i] = (cx, cy, w, h)
+            prob = min(max(prob, 1e-6), 1 - 1e-6)
+            logits[0, i, class_id] = float(np.log(prob / (1 - prob)))
+        return [dets, logits]
 
-    def test_basic_detection(self, cv_image: cv2.Mat, mocker: MockerFixture) -> None:
+    @staticmethod
+    def _detector(mocker: MockerFixture, min_score: float = 0.3, input_size: int = 384) -> PetDetector:
         mocker.patch.object(PetDetector, "load")
-        detector = PetDetector("yolo11n", min_score=0.5, cache_dir="test_cache")
-
+        detector = PetDetector("rfdetr-nano", min_score=min_score, cache_dir="test_cache")
         session = mock.Mock()
-        # Cat at center of 640x640 input, class_id=15 (cat), score=0.9
-        session.run.return_value = self._make_yolo_output([(320, 320, 100, 80, 15, 0.9)])
+        model_input = mock.Mock()
+        model_input.name = "input"
+        model_input.shape = [1, 3, input_size, input_size]
+        session.get_inputs.return_value = [model_input]
         detector.session = session
-        detector._input_name = "images"
+        detector._input_name = "input"
+        detector._input_size = input_size
+        return detector
 
-        results = detector.predict(cv_image)
+    # ---- preprocessing (spec #1-#6) ----
 
-        assert isinstance(results, list)
+    def test_feeds_rgb_not_bgr(self, mocker: MockerFixture) -> None:
+        """Spec #1. The original defect: a red image must arrive red, not blue."""
+        detector = self._detector(mocker)
+        detector.session.run.return_value = self._make_rfdetr_output([])
+
+        red = Image.new("RGB", (64, 48), (255, 0, 0))
+        detector.predict(red)
+
+        blob = detector.session.run.call_args[0][1]["input"]
+        # After ImageNet normalisation the red channel is the largest of the three.
+        assert blob[0, 0].mean() > blob[0, 1].mean()
+        assert blob[0, 0].mean() > blob[0, 2].mean()
+
+    def test_preprocess_honours_input_size(self, mocker: MockerFixture) -> None:
+        """Spec #2, consumer half: the blob matches the configured size."""
+        for size in (384, 512):
+            detector = self._detector(mocker, input_size=size)
+            detector.session.run.return_value = self._make_rfdetr_output([])
+            detector.predict(Image.new("RGB", (100, 200), (10, 20, 30)))
+            blob = detector.session.run.call_args[0][1]["input"]
+            assert blob.shape == (1, 3, size, size)
+
+    def test_load_reads_input_size_from_session(self, mocker: MockerFixture) -> None:
+        """Spec #2, producer half: _load must take the size from the ONNX signature.
+
+        Without this, the consumer test above would still pass against a
+        hardcoded 384 and rfdetr-small would silently run at the wrong size.
+        """
+        for size in (384, 512):
+            detector = PetDetector("rfdetr-small", cache_dir="test_cache")
+            session = mock.Mock()
+            model_input = mock.Mock()
+            model_input.name = "input"
+            model_input.shape = [1, 3, size, size]
+            session.get_inputs.return_value = [model_input]
+            mocker.patch.object(PetDetector, "_make_session", return_value=session)
+            mocker.patch.object(PetDetector, "model_path", Path("unused.onnx"))
+
+            detector._load()
+
+            assert detector._input_size == size
+            assert detector._input_name == "input"
+
+    def test_applies_imagenet_normalisation(self, mocker: MockerFixture) -> None:
+        """Spec #3. Scale to [0,1], then (v - mean) / std."""
+        detector = self._detector(mocker)
+        detector.session.run.return_value = self._make_rfdetr_output([])
+
+        detector.predict(Image.new("RGB", (32, 32), (255, 255, 255)))
+
+        blob = detector.session.run.call_args[0][1]["input"]
+        expected = [(1.0 - 0.485) / 0.229, (1.0 - 0.456) / 0.224, (1.0 - 0.406) / 0.225]
+        for channel, value in enumerate(expected):
+            assert blob[0, channel].mean() == pytest.approx(value, abs=1e-4)
+
+    def test_blob_is_nchw_float32(self, mocker: MockerFixture) -> None:
+        """Spec #4."""
+        detector = self._detector(mocker)
+        detector.session.run.return_value = self._make_rfdetr_output([])
+        detector.predict(Image.new("RGB", (64, 48), (128, 128, 128)))
+        blob = detector.session.run.call_args[0][1]["input"]
+        assert blob.dtype == np.float32
+        assert blob.shape == (1, 3, 384, 384)
+
+    def test_does_not_letterbox(self, mocker: MockerFixture) -> None:
+        """Spec #5. A letterboxed 2:1 image would carry a grey 114 band; RF-DETR stretches."""
+        detector = self._detector(mocker)
+        detector.session.run.return_value = self._make_rfdetr_output([])
+
+        detector.predict(Image.new("RGB", (200, 100), (255, 255, 255)))
+
+        blob = detector.session.run.call_args[0][1]["input"]
+        padded = (114 / 255.0 - 0.485) / 0.229
+        assert not np.any(np.isclose(blob[0, 0], padded, atol=1e-3))
+
+    def test_converts_non_rgb_input(self, mocker: MockerFixture) -> None:
+        """Spec #6. Greyscale and palette images are converted, not rejected."""
+        detector = self._detector(mocker)
+        detector.session.run.return_value = self._make_rfdetr_output([])
+
+        for mode in ("L", "P"):
+            detector.predict(Image.new(mode, (32, 32)))
+            blob = detector.session.run.call_args[0][1]["input"]
+            assert blob.shape == (1, 3, 384, 384)
+
+    # ---- postprocessing (spec #7-#17) ----
+
+    def test_applies_sigmoid_to_logits(self, mocker: MockerFixture) -> None:
+        """Spec #7. A raw logit of 0 is probability 0.5."""
+        detector = self._detector(mocker, min_score=0.4)
+        dets = np.zeros((1, 300, 4), dtype=np.float32)
+        logits = np.full((1, 300, 91), -30.0, dtype=np.float32)
+        dets[0, 0] = (0.5, 0.5, 0.2, 0.2)
+        logits[0, 0, 18] = 0.0
+        detector.session.run.return_value = [dets, logits]
+
+        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+
         assert len(results) == 1
-        detection = results[0]
-        assert detection["label"] == "cat"
-        assert detection["score"] == pytest.approx(0.9, abs=1e-5)
-        assert set(detection["boundingBox"]) == {"x1", "y1", "x2", "y2"}
-        assert all(isinstance(v, int) for v in detection["boundingBox"].values())
-        session.run.assert_called_once()
+        assert results[0]["score"] == pytest.approx(0.5, abs=1e-4)
 
-    def test_filters_non_animal_classes(self, cv_image: cv2.Mat, mocker: MockerFixture) -> None:
-        mocker.patch.object(PetDetector, "load")
-        detector = PetDetector("yolo11n", min_score=0.5, cache_dir="test_cache")
+    def test_maps_all_domestic_labels(self, mocker: MockerFixture) -> None:
+        """Spec #8. 91-class ids, not YOLO's 80-class space."""
+        expected = {16: "bird", 17: "cat", 18: "dog", 19: "horse", 20: "sheep", 21: "cow"}
+        for class_id, label in expected.items():
+            detector = self._detector(mocker)
+            detector.session.run.return_value = self._make_rfdetr_output(
+                [(0.5, 0.5, 0.2, 0.2, class_id, 0.9)]
+            )
+            results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+            assert len(results) == 1
+            assert results[0]["label"] == label
 
-        session = mock.Mock()
-        # class_id=0 is "person" in COCO — should be excluded
-        session.run.return_value = self._make_yolo_output([(320, 320, 100, 80, 0, 0.95)])
-        detector.session = session
-        detector._input_name = "images"
+    def test_excludes_safari_classes(self, mocker: MockerFixture) -> None:
+        """Spec #9. elephant/bear/zebra/giraffe at 0.99 emit nothing — the reported bug."""
+        for class_id in (22, 23, 24, 25):
+            detector = self._detector(mocker)
+            detector.session.run.return_value = self._make_rfdetr_output(
+                [(0.5, 0.5, 0.2, 0.2, class_id, 0.99)]
+            )
+            results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+            assert results == []
 
-        results = detector.predict(cv_image)
+    def test_excludes_non_animal_classes(self, mocker: MockerFixture) -> None:
+        """Spec #10. person=1, car=3."""
+        for class_id in (1, 3):
+            detector = self._detector(mocker)
+            detector.session.run.return_value = self._make_rfdetr_output(
+                [(0.5, 0.5, 0.2, 0.2, class_id, 0.99)]
+            )
+            results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+            assert results == []
 
+    def test_score_is_max_over_domestic_subspace(self, mocker: MockerFixture) -> None:
+        """Spec #11. A query scoring bear 0.99 / dog 0.60 reports dog at 0.60."""
+        detector = self._detector(mocker)
+        dets = np.zeros((1, 300, 4), dtype=np.float32)
+        logits = np.full((1, 300, 91), -30.0, dtype=np.float32)
+        dets[0, 0] = (0.5, 0.5, 0.2, 0.2)
+        logits[0, 0, 23] = float(np.log(0.99 / 0.01))  # bear
+        logits[0, 0, 18] = float(np.log(0.60 / 0.40))  # dog
+        detector.session.run.return_value = [dets, logits]
+
+        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+
+        assert len(results) == 1
+        assert results[0]["label"] == "dog"
+        assert results[0]["score"] == pytest.approx(0.60, abs=1e-3)
+
+    def test_converts_boxes_to_pixels(self, mocker: MockerFixture) -> None:
+        """Spec #12. Normalised cxcywh -> pixel xyxy against ORIGINAL dimensions."""
+        detector = self._detector(mocker)
+        detector.session.run.return_value = self._make_rfdetr_output(
+            [(0.5, 0.5, 0.4, 0.2, 18, 0.9)]
+        )
+
+        results = detector.predict(Image.new("RGB", (200, 100), (0, 0, 0)))
+
+        box = results[0]["boundingBox"]
+        assert box == {"x1": 60, "y1": 40, "x2": 140, "y2": 60}
+        assert all(isinstance(v, int) for v in box.values())
+
+    def test_clips_boxes_to_image_bounds(self, mocker: MockerFixture) -> None:
+        """Spec #13. A box overhanging the edge is clipped, not emitted negative."""
+        detector = self._detector(mocker)
+        detector.session.run.return_value = self._make_rfdetr_output(
+            [(0.1, 0.1, 0.6, 0.6, 18, 0.9)]
+        )
+
+        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+
+        box = results[0]["boundingBox"]
+        assert box["x1"] == 0
+        assert box["y1"] == 0
+        assert box["x2"] <= 100
+        assert box["y2"] <= 100
+
+    def test_honours_min_score(self, mocker: MockerFixture) -> None:
+        """Spec #14. Just below is dropped, just above is kept."""
+        detector = self._detector(mocker, min_score=0.5)
+        detector.session.run.return_value = self._make_rfdetr_output(
+            [(0.5, 0.5, 0.2, 0.2, 18, 0.49)]
+        )
+        assert detector.predict(Image.new("RGB", (100, 100), (0, 0, 0))) == []
+
+        detector.session.run.return_value = self._make_rfdetr_output(
+            [(0.5, 0.5, 0.2, 0.2, 18, 0.51)]
+        )
+        assert len(detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))) == 1
+
+    def test_resolves_outputs_by_shape_not_order(self, mocker: MockerFixture) -> None:
+        """Spec #15. Export order is not guaranteed; identify by trailing dimension."""
+        detector = self._detector(mocker)
+        dets, logits = self._make_rfdetr_output([(0.5, 0.5, 0.2, 0.2, 17, 0.9)])
+        detector.session.run.return_value = [logits, dets]  # swapped
+
+        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+
+        assert len(results) == 1
+        assert results[0]["label"] == "cat"
+
+    def test_returns_multiple_detections(self, mocker: MockerFixture) -> None:
+        """Spec #16."""
+        detector = self._detector(mocker)
+        detector.session.run.return_value = self._make_rfdetr_output([
+            (0.25, 0.25, 0.2, 0.2, 18, 0.9),
+            (0.75, 0.75, 0.2, 0.2, 17, 0.8),
+        ])
+
+        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+
+        assert len(results) == 2
+        assert {r["label"] for r in results} == {"dog", "cat"}
+
+    def test_returns_empty_list_when_nothing_passes(self, mocker: MockerFixture) -> None:
+        """Spec #17. Empty is a list, not an error."""
+        detector = self._detector(mocker)
+        detector.session.run.return_value = self._make_rfdetr_output([])
+        assert detector.predict(Image.new("RGB", (100, 100), (0, 0, 0))) == []
+
+    # ---- edge cases (spec #18-#25) ----
+
+    def test_degenerate_box_does_not_raise(self, mocker: MockerFixture) -> None:
+        """Spec #18. Zero width/height."""
+        detector = self._detector(mocker)
+        detector.session.run.return_value = self._make_rfdetr_output(
+            [(0.5, 0.5, 0.0, 0.0, 18, 0.9)]
+        )
+        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
         assert isinstance(results, list)
-        assert len(results) == 0
 
-    def test_filters_low_confidence(self, cv_image: cv2.Mat, mocker: MockerFixture) -> None:
-        mocker.patch.object(PetDetector, "load")
-        detector = PetDetector("yolo11n", min_score=0.7, cache_dir="test_cache")
+    def test_box_fully_outside_is_dropped(self, mocker: MockerFixture) -> None:
+        """Spec #19. Clipping leaves zero area, so it must not be emitted."""
+        detector = self._detector(mocker)
+        detector.session.run.return_value = self._make_rfdetr_output(
+            [(1.8, 1.8, 0.2, 0.2, 18, 0.9)]
+        )
+        assert detector.predict(Image.new("RGB", (100, 100), (0, 0, 0))) == []
 
-        session = mock.Mock()
-        # Dog with score 0.4 — below threshold of 0.7
-        session.run.return_value = self._make_yolo_output([(320, 320, 100, 80, 16, 0.4)])
-        detector.session = session
-        detector._input_name = "images"
+    def test_extreme_aspect_ratio(self, mocker: MockerFixture) -> None:
+        """Spec #20."""
+        detector = self._detector(mocker)
+        detector.session.run.return_value = self._make_rfdetr_output(
+            [(0.5, 0.5, 0.1, 0.5, 18, 0.9)]
+        )
+        results = detector.predict(Image.new("RGB", (4000, 100), (0, 0, 0)))
+        box = results[0]["boundingBox"]
+        assert box["x1"] == 1800 and box["x2"] == 2200
+        assert box["y1"] == 25 and box["y2"] == 75
 
-        results = detector.predict(cv_image)
-
+    def test_tiny_image(self, mocker: MockerFixture) -> None:
+        """Spec #21."""
+        detector = self._detector(mocker)
+        detector.session.run.return_value = self._make_rfdetr_output(
+            [(0.5, 0.5, 0.5, 0.5, 18, 0.9)]
+        )
+        results = detector.predict(Image.new("RGB", (10, 10), (0, 0, 0)))
         assert isinstance(results, list)
-        assert len(results) == 0
+
+    def test_all_queries_above_threshold(self, mocker: MockerFixture) -> None:
+        """Spec #22. The 300-query maximum."""
+        detector = self._detector(mocker)
+        detector.session.run.return_value = self._make_rfdetr_output(
+            [(0.5, 0.5, 0.1, 0.1, 18, 0.9)] * 300
+        )
+        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+        assert len(results) == 300
 
     def test_configure_updates_min_score(self, mocker: MockerFixture) -> None:
+        """Spec #23."""
         mocker.patch.object(PetDetector, "load")
-        detector = PetDetector("yolo11n", min_score=0.6, cache_dir="test_cache")
-
+        detector = PetDetector("rfdetr-nano", min_score=0.6, cache_dir="test_cache")
         assert detector.min_score == 0.6
         detector.configure(minScore=0.3)
         assert detector.min_score == 0.3
 
-    def test_nms_removes_overlapping_boxes(self, cv_image: cv2.Mat, mocker: MockerFixture) -> None:
-        mocker.patch.object(PetDetector, "load")
-        detector = PetDetector("yolo11n", min_score=0.5, cache_dir="test_cache")
-
-        session = mock.Mock()
-        # Two nearly identical cat detections — NMS should keep only the higher-scoring one
-        session.run.return_value = self._make_yolo_output(
-            [
-                (320, 320, 100, 80, 15, 0.9),
-                (322, 322, 100, 80, 15, 0.7),
-            ]
-        )
-        detector.session = session
-        detector._input_name = "images"
-
-        results = detector.predict(cv_image)
-
-        assert isinstance(results, list)
-        assert len(results) == 1
-        assert results[0]["score"] == pytest.approx(0.9, abs=1e-5)
-
     def test_min_score_from_kwargs(self, mocker: MockerFixture) -> None:
+        """Spec #23, constructor form."""
         mocker.patch.object(PetDetector, "load")
-        detector = PetDetector("yolo11n", minScore=0.8, cache_dir="test_cache")
-
+        detector = PetDetector("rfdetr-nano", minScore=0.8, cache_dir="test_cache")
         assert detector.min_score == 0.8
 
     def test_detector_clamps_boxes_to_image_bounds(self, mocker: MockerFixture) -> None:
@@ -1260,6 +1474,24 @@ class TestPetDetection:
             box = detection["boundingBox"]
             assert 0 <= box["x1"] <= box["x2"] <= 600
             assert 0 <= box["y1"] <= box["y2"] <= 800
+
+    def test_model_path_prefers_standard_then_legacy(self, mocker: MockerFixture) -> None:
+        """Spec #24."""
+        mocker.patch.object(PetDetector, "load")
+        detector = PetDetector("rfdetr-nano", cache_dir="test_cache")
+
+        mocker.patch.object(Path, "is_file", return_value=True)
+        assert detector.model_path.name == "model.onnx"
+
+    def test_download_targets_expected_repo(self, mocker: MockerFixture) -> None:
+        """Spec #25."""
+        mocker.patch.object(PetDetector, "load")
+        detector = PetDetector("rfdetr-nano", cache_dir="test_cache")
+        snapshot_download = mocker.patch("huggingface_hub.snapshot_download")
+
+        detector._download()
+
+        assert snapshot_download.call_args[0][0] == "Deeds67/rfdetr-nano"
 
 
 class TestPetRecognition:
