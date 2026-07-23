@@ -39,12 +39,12 @@ enum SettingsKey<T> {
   albumIsGrid<bool>(),
 
   // People
-  peopleSortBy<PeopleSortBy>(codec: _EnumCodec(PeopleSortBy.values)),
+  peopleSortBy<PeopleSortBy>(codec: EnumCodec(PeopleSortBy.values)),
 
   // Spaces
-  spaceAlbumsSortMode<SpaceAlbumSortMode>(codec: _EnumCodec(SpaceAlbumSortMode.values)),
+  spaceAlbumsSortMode<SpaceAlbumSortMode>(codec: EnumCodec(SpaceAlbumSortMode.values)),
   spaceAlbumsIsReverse<bool>(),
-  spacesSortMode<SpaceSortMode>(codec: _EnumCodec(SpaceSortMode.values)),
+  spacesSortMode<SpaceSortMode>(codec: EnumCodec(SpaceSortMode.values)),
   spacesIsReverse<bool>(),
 
   // Backup
