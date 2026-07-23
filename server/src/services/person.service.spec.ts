@@ -5834,5 +5834,18 @@ describe(PersonService.name, () => {
     it('should not map person if person is null', () => {
       expect(mapFaces(getForAssetFace(AssetFaceFactory.create()), AuthFactory.create()).person).toBeNull();
     });
+
+    // #796 POLICY REVERSAL (was 'should not map person if person does not match auth user id').
+    // mapFaces no longer gates on ownership: its only caller, getFacesById, has already authorized
+    // Permission.AssetRead and is responsible for dropping hidden people for non-owners.
+    it('should map person even when the person does not belong to the auth user', () => {
+      expect(
+        mapFaces(getForAssetFace(AssetFaceFactory.from().person().build()), AuthFactory.create()).person,
+      ).not.toBeNull();
+    });
+
+    it('should map a null person when the face has none', () => {
+      expect(mapFaces(getForAssetFace(AssetFaceFactory.from().build()), AuthFactory.create()).person).toBeNull();
+    });
   });
 });

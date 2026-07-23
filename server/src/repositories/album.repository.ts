@@ -19,6 +19,7 @@ import { DB } from 'src/schema';
 import { AlbumTable } from 'src/schema/tables/album.table';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table';
 import { asUuid, dummy, withDefaultVisibility } from 'src/utils/database';
+import { accessibleSpaceAlbums, spaceVisibilityGate } from 'src/utils/shared-space-album-scope';
 
 export interface AlbumAssetCount {
   albumId: string;
@@ -101,6 +102,15 @@ export class AlbumRepository {
       .executeTakeFirst();
   }
 
+  /**
+   * Albums containing `assetId` that the caller can actually open — the asset-viewer info panel
+   * reads this to render "Contained in" (#796). Two access paths are unioned: shared directly into
+   * the album (`album_user`), or the album is linked into a shared space the caller can access.
+   *
+   * Deliberately NOT every album containing the asset: album names are user-authored and a space
+   * member must not learn the owner's private album titles. Callers do not separately authorize
+   * `assetId` (see AlbumService.getAll) — this scoping IS the access check.
+   */
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   getByAssetId(ownerId: string, assetId: string) {
     return this.db
@@ -108,12 +118,29 @@ export class AlbumRepository {
       .selectAll('album')
       .innerJoin('album_asset', 'album_asset.albumId', 'album.id')
       .where((eb) =>
-        eb.exists(
-          eb
-            .selectFrom('album_user')
-            .whereRef('album_user.albumId', '=', 'album.id')
-            .where('album_user.userId', '=', ownerId),
-        ),
+        eb.or([
+          eb.exists(
+            eb
+              .selectFrom('album_user')
+              .whereRef('album_user.albumId', '=', 'album.id')
+              .where('album_user.userId', '=', ownerId),
+          ),
+          eb.and([
+            eb('album.id', 'in', (e) => accessibleSpaceAlbums(e, ownerId)),
+            // A space member must never learn that another member's Hidden/Locked asset sits in a
+            // linked album, so the space arm carries the space-shareable visibility gate
+            // (Archive/Timeline). The album_user arm above is deliberately NOT gated: an album
+            // member — including the owner, who always has an album_user row — keeps seeing
+            // "Contained in" for their own Hidden/Locked assets.
+            eb.exists(
+              eb
+                .selectFrom('asset')
+                .select(eb.lit(1).as('exists'))
+                .whereRef('asset.id', '=', 'album_asset.assetId')
+                .where((e) => spaceVisibilityGate(e)),
+            ),
+          ]),
+        ]),
       )
       .where('album_asset.assetId', '=', assetId)
       .where('album.deletedAt', 'is', null)
