@@ -547,6 +547,130 @@ describe('Shared space person face reassign (#765)', () => {
     expect(afterA[0].identityId).toBe(afterB[0].identityId);
   });
 
+  // The two avatar repairs the global reassign path already performs (PersonService.reassignFaces ->
+  // createNewFeaturePhoto) plus the space-side equivalent on shared_space_person.representativeFaceId.
+  // Without them the face that just LEFT a person is still what that person shows as its avatar — to
+  // the source person's owner (a different member) and to everyone browsing the space.
+
+  it("re-points the source global person's feature photo when the reassigned face was its avatar", async () => {
+    const fx = await setupSingleFaceFixture({ retainedFace: true });
+    await fx.ctx.database
+      .updateTable('person')
+      .set({ faceAssetId: fx.wrong.faceId })
+      .where('id', '=', fx.wrong.person.id)
+      .execute();
+
+    await fx.sharedSpaceService.reassignSpacePersonFaces(authFor(fx.editor), fx.space.id, fx.sourcePerson.id, {
+      assetIds: [fx.wrong.asset.id],
+      target: { type: 'new' },
+    });
+
+    const sourcePerson = await fx.ctx.database
+      .selectFrom('person')
+      .select('faceAssetId')
+      .where('id', '=', fx.wrong.person.id)
+      .executeTakeFirstOrThrow();
+    // The moved face now belongs to someone else — its old person must not still advertise it.
+    expect(sourcePerson.faceAssetId).not.toBe(fx.wrong.faceId);
+    expect(sourcePerson.faceAssetId).toBe(fx.retained!.faceId);
+    expect(fx.jobs.queue.mock.calls.map(([job]) => job)).toContainEqual({
+      name: JobName.PersonGenerateThumbnail,
+      data: { id: fx.wrong.person.id },
+    });
+  });
+
+  it('leaves the source global person feature photo alone when a different face was its avatar', async () => {
+    const fx = await setupSingleFaceFixture({ retainedFace: true });
+    await fx.ctx.database
+      .updateTable('person')
+      .set({ faceAssetId: fx.retained!.faceId })
+      .where('id', '=', fx.wrong.person.id)
+      .execute();
+
+    await fx.sharedSpaceService.reassignSpacePersonFaces(authFor(fx.editor), fx.space.id, fx.sourcePerson.id, {
+      assetIds: [fx.wrong.asset.id],
+      target: { type: 'new' },
+    });
+
+    const sourcePerson = await fx.ctx.database
+      .selectFrom('person')
+      .select('faceAssetId')
+      .where('id', '=', fx.wrong.person.id)
+      .executeTakeFirstOrThrow();
+    expect(sourcePerson.faceAssetId).toBe(fx.retained!.faceId);
+  });
+
+  it("clears the source space person's representative face when the reassigned face was it", async () => {
+    const fx = await setupSingleFaceFixture({ retainedFace: true });
+    await fx.ctx.database
+      .updateTable('shared_space_person')
+      .set({ representativeFaceId: fx.wrong.faceId, representativeFaceSource: 'auto' })
+      .where('id', '=', fx.sourcePerson.id)
+      .execute();
+
+    await fx.sharedSpaceService.reassignSpacePersonFaces(authFor(fx.editor), fx.space.id, fx.sourcePerson.id, {
+      assetIds: [fx.wrong.asset.id],
+      target: { type: 'new' },
+    });
+
+    const after = await fx.ctx.database
+      .selectFrom('shared_space_person')
+      .select(['representativeFaceId', 'representativeFaceSource'])
+      .where('id', '=', fx.sourcePerson.id)
+      .executeTakeFirstOrThrow();
+    // Neither repair helper covers this case (repairInvalidRepresentativeFaces only inspects manual
+    // picks, repairOrphanedRepresentativeFaces only fills NULLs), so nothing else would fix it.
+    expect(after.representativeFaceId).not.toBe(fx.wrong.faceId);
+    expect(after.representativeFaceId).toBe(fx.retained!.faceId);
+    expect(after.representativeFaceSource).toBe('auto');
+  });
+
+  it('degrades a manual representative face to auto when the reassign takes that face away', async () => {
+    const fx = await setupSingleFaceFixture({ retainedFace: true });
+    await fx.ctx.database
+      .updateTable('shared_space_person')
+      .set({ representativeFaceId: fx.wrong.faceId, representativeFaceSource: 'manual' })
+      .where('id', '=', fx.sourcePerson.id)
+      .execute();
+
+    await fx.sharedSpaceService.reassignSpacePersonFaces(authFor(fx.editor), fx.space.id, fx.sourcePerson.id, {
+      assetIds: [fx.wrong.asset.id],
+      target: { type: 'new' },
+    });
+
+    const after = await fx.ctx.database
+      .selectFrom('shared_space_person')
+      .select(['representativeFaceId', 'representativeFaceSource'])
+      .where('id', '=', fx.sourcePerson.id)
+      .executeTakeFirstOrThrow();
+    expect(after.representativeFaceId).toBe(fx.retained!.faceId);
+    // Same degrade repairInvalidRepresentativeFaces applies: the manual choice is gone, so the person
+    // goes back to picking automatically rather than pinning a face it no longer holds.
+    expect(after.representativeFaceSource).toBe('auto');
+  });
+
+  it('keeps a representative face that points at a face the reassign did not touch', async () => {
+    const fx = await setupSingleFaceFixture({ retainedFace: true });
+    await fx.ctx.database
+      .updateTable('shared_space_person')
+      .set({ representativeFaceId: fx.retained!.faceId, representativeFaceSource: 'manual' })
+      .where('id', '=', fx.sourcePerson.id)
+      .execute();
+
+    await fx.sharedSpaceService.reassignSpacePersonFaces(authFor(fx.editor), fx.space.id, fx.sourcePerson.id, {
+      assetIds: [fx.wrong.asset.id],
+      target: { type: 'new' },
+    });
+
+    const after = await fx.ctx.database
+      .selectFrom('shared_space_person')
+      .select(['representativeFaceId', 'representativeFaceSource'])
+      .where('id', '=', fx.sourcePerson.id)
+      .executeTakeFirstOrThrow();
+    expect(after.representativeFaceId).toBe(fx.retained!.faceId);
+    expect(after.representativeFaceSource).toBe('manual');
+  });
+
   it('is idempotent when the same reassign-to-new is submitted twice back to back', async () => {
     // retainedFace: true keeps the source space person alive across both calls — modeling a real
     // double-submit race (the second click still targets a person that exists), not an edge case where
