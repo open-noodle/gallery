@@ -131,17 +131,22 @@ const drainQueuedFaceMatchJobs = async (sharedSpaceService: SharedSpaceService, 
   }
 };
 
-// Owner + asset owns the misassigned face; Editor performs the reassign on another member's asset (the
-// literal #765 scenario); Viewer is present for the permission guard (AC3). With `retainedFace: true` the
-// source space person keeps a second, correctly-matched face so it survives the reassign (distinguishing
-// "this face left" from "the person was emptied", asserted separately by the reap test).
+// `owner` owns the misassigned face's asset; Editor performs the reassign on another member's asset (the
+// literal #765 scenario); Viewer is present for the permission guard (AC3). `spaceCreator` is a SEPARATE
+// user who creates the space and holds the Owner role — kept distinct from `owner` so ownership
+// assertions (e.g. "the new person belongs to the asset's owner") can't pass vacuously just because the
+// asset owner and the space creator/owner-role member happen to be the same person. With `retainedFace:
+// true` the source space person keeps a second, correctly-matched face so it survives the reassign
+// (distinguishing "this face left" from "the person was emptied", asserted separately by the reap test).
 const setupSingleFaceFixture = async (options?: { retainedFace?: boolean }) => {
   const { ctx, sut: sharedSpaceService, faceIdentityRepository, jobs } = setupSharedSpace();
+  const { user: spaceCreator } = await ctx.newUser();
   const { user: owner } = await ctx.newUser();
   const { user: editor } = await ctx.newUser();
   const { user: viewer } = await ctx.newUser();
-  const { space } = await ctx.newSharedSpace({ createdById: owner.id });
-  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+  const { space } = await ctx.newSharedSpace({ createdById: spaceCreator.id });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: spaceCreator.id, role: SharedSpaceRole.Owner });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Viewer });
   await ctx.newSharedSpaceMember({ spaceId: space.id, userId: editor.id, role: SharedSpaceRole.Editor });
   await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id, role: SharedSpaceRole.Viewer });
 
@@ -177,6 +182,7 @@ const setupSingleFaceFixture = async (options?: { retainedFace?: boolean }) => {
     sharedSpaceService,
     faceIdentityRepository,
     jobs,
+    spaceCreator,
     owner,
     editor,
     viewer,
@@ -190,14 +196,19 @@ const setupSingleFaceFixture = async (options?: { retainedFace?: boolean }) => {
 // AC2 fixture: 'Grandma' is a space person whose identity was established from a DIFFERENT member's own
 // photo (grandmaOwner), not the asset owner's. Reassigning the misassigned face (which lives on OWNER's
 // asset) to Grandma therefore must resolve-or-create an owner-aligned person from scratch — exactly the
-// path the identity-link trap (see reassignSpaceFacesToTarget's comment) lives in.
+// path the identity-link trap (see reassignSpaceFacesToTarget's comment) lives in. As in
+// setupSingleFaceFixture, `spaceCreator` is kept SEPARATE from `owner` (the misassigned asset's owner) so
+// the owner-aligned-person lookup below pins the asset owner specifically, not whoever happens to have
+// created the space.
 const setupCrossOwnerReassignFixture = async () => {
   const { ctx, sut: sharedSpaceService, faceIdentityRepository, jobs } = setupSharedSpace();
+  const { user: spaceCreator } = await ctx.newUser();
   const { user: owner } = await ctx.newUser();
   const { user: grandmaOwner } = await ctx.newUser();
   const { user: editor } = await ctx.newUser();
-  const { space } = await ctx.newSharedSpace({ createdById: owner.id });
-  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+  const { space } = await ctx.newSharedSpace({ createdById: spaceCreator.id });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: spaceCreator.id, role: SharedSpaceRole.Owner });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Viewer });
   await ctx.newSharedSpaceMember({ spaceId: space.id, userId: grandmaOwner.id, role: SharedSpaceRole.Viewer });
   await ctx.newSharedSpaceMember({ spaceId: space.id, userId: editor.id, role: SharedSpaceRole.Editor });
 
@@ -234,6 +245,7 @@ const setupCrossOwnerReassignFixture = async () => {
     sharedSpaceService,
     faceIdentityRepository,
     jobs,
+    spaceCreator,
     owner,
     grandmaOwner,
     editor,
@@ -306,6 +318,12 @@ describe('Shared space person face reassign (#765)', () => {
   it('AC1: reassign-to-new never lets the face reappear under the original space person', async () => {
     const fx = await setupSingleFaceFixture({ retainedFace: true });
 
+    // Pre-condition: the misassigned face is actually projected under the source person before the
+    // reassign runs, so the post-call `toEqual([])` below can't pass vacuously (e.g. a fixture change
+    // that never projected it there in the first place).
+    const beforeCall = await spacePersonFacesFor(fx.ctx, { spaceId: fx.space.id, assetFaceId: fx.wrong.faceId });
+    expect(beforeCall).toEqual([expect.objectContaining({ personId: fx.sourcePerson.id })]);
+
     const result = await fx.sharedSpaceService.reassignSpacePersonFaces(
       authFor(fx.editor),
       fx.space.id,
@@ -323,7 +341,9 @@ describe('Shared space person face reassign (#765)', () => {
     expect(faceRow.personId).not.toBe(fx.wrong.person.id);
     const newPersonId = faceRow.personId!;
 
-    // The new global person is owned by the ASSET'S OWNER, not the acting editor.
+    // The new global person is owned by the ASSET'S OWNER — not the acting editor, and not the
+    // space's creator/owner-role member either (a distinct third user in this fixture, so this can't
+    // pass by accident of the fixture conflating the two).
     const newPerson = await fx.ctx.database
       .selectFrom('person')
       .select(['id', 'ownerId'])
@@ -331,10 +351,11 @@ describe('Shared space person face reassign (#765)', () => {
       .executeTakeFirstOrThrow();
     expect(newPerson.ownerId).toBe(fx.owner.id);
     expect(newPerson.ownerId).not.toBe(fx.editor.id);
+    expect(newPerson.ownerId).not.toBe(fx.spaceCreator.id);
 
     // Synchronous half: evicted from the original space person immediately, before any job runs.
     const afterCall = await spacePersonFacesFor(fx.ctx, { spaceId: fx.space.id, assetFaceId: fx.wrong.faceId });
-    expect(afterCall).toEqual([]);
+    expect(afterCall, 'face must leave the wrong space person synchronously').toEqual([]);
     expect(fx.jobs.queue.mock.calls.map(([job]) => job)).toContainEqual({
       name: JobName.SharedSpaceFaceMatch,
       data: { spaceId: fx.space.id, assetId: fx.wrong.asset.id },
@@ -353,7 +374,10 @@ describe('Shared space person face reassign (#765)', () => {
       .select('assetFaceId')
       .where('personId', '=', fx.sourcePerson.id)
       .execute();
-    expect(originalFaces.map((row) => row.assetFaceId)).not.toContain(fx.wrong.faceId);
+    expect(
+      originalFaces.map((row) => row.assetFaceId),
+      'the #765 regression: reassigned face must not reappear under the original space person',
+    ).not.toContain(fx.wrong.faceId);
     expect(originalFaces.map((row) => row.assetFaceId)).toContain(fx.retained!.faceId);
 
     const originalPersonPage = await fx.sharedSpaceService.getSpacePersonFaces(
@@ -362,7 +386,14 @@ describe('Shared space person face reassign (#765)', () => {
       fx.sourcePerson.id,
       { page: 1, size: 50 },
     );
-    expect(originalPersonPage.faces.map((face) => face.id)).not.toContain(fx.wrong.faceId);
+    // Positive control: the page isn't just empty for an unrelated reason (getSpacePersonFaces reads
+    // through isVisible/asset.visibility/deletedAt/isOffline filters) — it does still show the retained,
+    // correctly-matched face on this same person.
+    expect(originalPersonPage.faces.map((face) => face.id)).toContain(fx.retained!.faceId);
+    expect(
+      originalPersonPage.faces.map((face) => face.id),
+      'the #765 regression via the public read API: reassigned face must not reappear under the original space person',
+    ).not.toContain(fx.wrong.faceId);
   });
 
   it('AC2: reassign-to-existing cross-owner space person joins the target identity without minting a duplicate', async () => {
@@ -392,20 +423,29 @@ describe('Shared space person face reassign (#765)', () => {
     expect(link.source).toBe('manual');
 
     // An owner-aligned person carrying that identity is resolved-or-created (the asset owner had none).
-    const ownerAlignedPerson = await fx.ctx.database
+    // Use .execute() rather than .executeTakeFirst(): if production wrongly minted TWO owner-aligned
+    // people on this identity, executeTakeFirst would pick one non-deterministically and could mask the
+    // duplicate entirely.
+    const ownerAlignedPeople = await fx.ctx.database
       .selectFrom('person')
       .select(['id', 'ownerId', 'identityId'])
       .where('ownerId', '=', fx.owner.id)
       .where('identityId', '=', fx.grandma.identity.id)
-      .executeTakeFirst();
-    expect(ownerAlignedPerson).toBeDefined();
+      .execute();
+    expect(ownerAlignedPeople).toHaveLength(1);
+    const ownerAlignedPerson = ownerAlignedPeople[0];
 
     const faceRow = await fx.ctx.database
       .selectFrom('asset_face')
       .select('personId')
       .where('id', '=', fx.wrong.faceId)
       .executeTakeFirstOrThrow();
-    expect(faceRow.personId).toBe(ownerAlignedPerson!.id);
+    expect(faceRow.personId).toBe(ownerAlignedPerson.id);
+
+    // Synchronous half: evicted from the wrong space person immediately, before any job runs — #765's
+    // sync-eviction requirement applies to reassign-to-existing too, not just reassign-to-new (AC1).
+    const afterCallSync = await spacePersonFacesFor(fx.ctx, { spaceId: fx.space.id, assetFaceId: fx.wrong.faceId });
+    expect(afterCallSync, 'face must leave the wrong space person synchronously').toEqual([]);
 
     await drainQueuedFaceMatchJobs(fx.sharedSpaceService, fx.jobs);
 
@@ -460,13 +500,25 @@ describe('Shared space person face reassign (#765)', () => {
       .executeTakeFirst();
     expect(remaining).toBeUndefined();
 
-    await expect(
-      fx.sharedSpaceService.getSpacePerson(authFor(fx.owner), fx.space.id, fx.sourcePerson.id),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    // Pin the rejection to the reaped-person path specifically, not just any BadRequestException —
+    // getSpacePerson throws the same class for other guards (e.g. pets-disabled) too.
+    const reapedLookup = fx.sharedSpaceService.getSpacePerson(authFor(fx.owner), fx.space.id, fx.sourcePerson.id);
+    await expect(reapedLookup).rejects.toBeInstanceOf(BadRequestException);
+    await expect(reapedLookup).rejects.toThrow('Person not found');
   });
 
   it('refreshes both projections when the misassigned asset is shared into two spaces', async () => {
     const fx = await setupTwoSpaceFixture();
+
+    // Pre-condition: the misassigned face is actually projected under each space's source person before
+    // the reassign runs, so the post-call `toEqual([])` assertions below can't pass vacuously. This
+    // fixture has no other test covering it, so it matters most here.
+    expect(await spacePersonFacesFor(fx.ctx, { spaceId: fx.spaceA.id, assetFaceId: fx.wrong.faceId })).toEqual([
+      expect.objectContaining({ personId: fx.sourcePersonA.id }),
+    ]);
+    expect(await spacePersonFacesFor(fx.ctx, { spaceId: fx.spaceB.id, assetFaceId: fx.wrong.faceId })).toEqual([
+      expect.objectContaining({ personId: fx.sourcePersonB.id }),
+    ]);
 
     await fx.sharedSpaceService.reassignSpacePersonFaces(authFor(fx.editor), fx.spaceA.id, fx.sourcePersonA.id, {
       assetIds: [fx.wrong.asset.id],
@@ -474,8 +526,14 @@ describe('Shared space person face reassign (#765)', () => {
     });
 
     // Synchronous eviction happens in BOTH spaces, not just the one the reassign was called against.
-    expect(await spacePersonFacesFor(fx.ctx, { spaceId: fx.spaceA.id, assetFaceId: fx.wrong.faceId })).toEqual([]);
-    expect(await spacePersonFacesFor(fx.ctx, { spaceId: fx.spaceB.id, assetFaceId: fx.wrong.faceId })).toEqual([]);
+    expect(
+      await spacePersonFacesFor(fx.ctx, { spaceId: fx.spaceA.id, assetFaceId: fx.wrong.faceId }),
+      'face must leave spaceA synchronously',
+    ).toEqual([]);
+    expect(
+      await spacePersonFacesFor(fx.ctx, { spaceId: fx.spaceB.id, assetFaceId: fx.wrong.faceId }),
+      'face must leave spaceB synchronously (the reassign was only called against spaceA)',
+    ).toEqual([]);
 
     await drainQueuedFaceMatchJobs(fx.sharedSpaceService, fx.jobs);
 
