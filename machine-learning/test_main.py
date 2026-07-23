@@ -33,10 +33,18 @@ from immich_ml.models.facial_recognition.detection import FaceDetector
 from immich_ml.models.facial_recognition.recognition import FaceRecognizer
 from immich_ml.models.ocr.detection import TextDetector
 from immich_ml.models.ocr.recognition import TextRecognizer
+from immich_ml.models.constants import get_model_source
 from immich_ml.models.ocr.schemas import OcrOptions
 from immich_ml.models.pet_detection import PetDetector
 from immich_ml.models.pet_recognition import PetRecognizer
-from immich_ml.schemas import ModelFormat, ModelPrecision, ModelTask, ModelType, PetDetectionOutput
+from immich_ml.schemas import (
+    ModelFormat,
+    ModelPrecision,
+    ModelSource,
+    ModelTask,
+    ModelType,
+    PetDetectionOutput,
+)
 from immich_ml.sessions.ann import AnnSession
 from immich_ml.sessions.ort import OrtSession
 from immich_ml.sessions.rknn import RknnSession, run_inference
@@ -1109,6 +1117,17 @@ class TestOcr:
                 model_root_dir=text_recognizer.cache_dir,
             )
         )
+
+
+class TestPetDetectionModelSource:
+    def test_resolves_rfdetr_models(self) -> None:
+        assert get_model_source("rfdetr-nano") == ModelSource.RFDETR
+        assert get_model_source("rfdetr-small") == ModelSource.RFDETR
+
+    def test_yolo_names_are_no_longer_recognised(self) -> None:
+        assert get_model_source("yolo11n") is None
+        assert get_model_source("yolo11s") is None
+        assert get_model_source("yolo11m") is None
 
 
 class TestPetDetection:
