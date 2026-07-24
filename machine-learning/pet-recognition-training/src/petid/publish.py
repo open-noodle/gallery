@@ -13,7 +13,7 @@ from pathlib import Path
 
 from petid.model import OUT_DIM, resolve_backbone
 
-HF_ORG = "noodle-gallery"
+HF_ORG = "open-noodle"
 
 _SHORT = {"facebook/dinov2-small": "small", "facebook/dinov2-base": "base", "facebook/dinov2-large": "large"}
 _PARAMS = {"small": "22M", "base": "86M", "large": "300M"}

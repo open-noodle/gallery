@@ -12,8 +12,8 @@
 Three selectable models, all emitting a **uniform 512-d L2-normalized** embedding, so they share
 one `pet_search` schema and a model switch only requires re-embedding.
 
-| Model            | Backbone (frozen)       | ONNX   | 🐕 dog EER | 🐈 cat EER | 🐕 dog Top-1 | torch↔ORT parity |
-| ---------------- | ----------------------- | ------ | ---------- | ---------- | ------------ | ---------------- |
+| Model                   | Backbone (frozen)       | ONNX   | 🐕 dog EER | 🐈 cat EER | 🐕 dog Top-1 | torch↔ORT parity |
+| ----------------------- | ----------------------- | ------ | ---------- | ---------- | ------------ | ---------------- |
 | `pet-recognition-small` | `facebook/dinov2-small` | 85 MB  | 0.068      | 0.065      | 0.535        | 6.3e-07          |
 | `pet-recognition-base`  | `facebook/dinov2-base`  | 332 MB | 0.047      | 0.045      | 0.612        | 8.6e-07          |
 | `pet-recognition-large` | `facebook/dinov2-large` | 1.1 GB | **0.034**  | **0.041**  | **0.672**    | 1.3e-06          |
@@ -119,8 +119,8 @@ over real libraries.
 - **No landmark alignment**: whole-animal crop, unlike ArcFace's aligned face.
 - **Cosine similarity == dot product** (outputs are unit vectors).
 - **Model names** for `petRecognition.modelName`: `pet-recognition-small` /
-  `pet-recognition-base` (default) / `pet-recognition-large`, under the **`noodle-gallery`** HF org
-  (the pet *detectors* still live under `Deeds67`, so `PetRecognizer` needs its own org constant —
+  `pet-recognition-base` (default) / `pet-recognition-large`, under the **`open-noodle`** HF org
+  (the pet _detectors_ still live under `Deeds67`, so `PetRecognizer` needs its own org constant —
   do not reuse `pet_detection.detection._HF_ORG`).
 
 ## Publishing

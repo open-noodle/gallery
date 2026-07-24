@@ -21,9 +21,9 @@ def test_model_card_names_the_dataset_behind_each_split():
 
 
 def test_repo_id_uses_the_gallery_org_and_product_naming():
-    assert HF_ORG == "noodle-gallery"
-    assert repo_id_for("facebook/dinov2-large") == "noodle-gallery/pet-recognition-large"
-    assert repo_id_for("small") == "noodle-gallery/pet-recognition-small"
+    assert HF_ORG == "open-noodle"
+    assert repo_id_for("facebook/dinov2-large") == "open-noodle/pet-recognition-large"
+    assert repo_id_for("small") == "open-noodle/pet-recognition-small"
 
 
 def test_repo_id_accepts_an_org_override():

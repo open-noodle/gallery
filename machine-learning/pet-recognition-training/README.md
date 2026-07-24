@@ -1,7 +1,7 @@
 # Pet Re-ID Model Training
 
 Isolated training project that produces Gallery's **pet recognition** models —
-`noodle-gallery/pet-recognition-{small,base,large}`. Not part of the production ML service; the service
+`open-noodle/pet-recognition-{small,base,large}`. Not part of the production ML service; the service
 only consumes the published ONNX.
 
 ## The recipe
