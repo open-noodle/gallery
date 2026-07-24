@@ -753,7 +753,7 @@ export interface SystemMetadata extends Record<SystemMetadataKey, Record<string,
   [SystemMetadataKey.ClassificationConfigState]: SystemConfig['classification'];
   [SystemMetadataKey.FaceSuggestionDefaultOnState]: { sweptAt?: string };
   [SystemMetadataKey.FacialRecognitionState]: { lastRun?: string };
-  [SystemMetadataKey.PetRecognitionState]: { lastRun?: string };
+  [SystemMetadataKey.PetRecognitionState]: { lastRun?: string; modelName?: string };
   [SystemMetadataKey.License]: { licenseKey: string; activationKey: string; activatedAt: Date };
   [SystemMetadataKey.MaintenanceMode]: MaintenanceModeState;
   [SystemMetadataKey.MediaLocation]: MediaLocation;

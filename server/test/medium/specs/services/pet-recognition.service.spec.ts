@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import { JobStatus, SystemMetadataKey } from 'src/enum';
+import { JobName, JobStatus, SystemMetadataKey } from 'src/enum';
 import { ConfigRepository } from 'src/repositories/config.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
 import { JobRepository } from 'src/repositories/job.repository';
@@ -222,5 +222,113 @@ describe('PetRecognitionService.handlePetRecognition (medium)', () => {
       )
       .execute();
     expect(new Set(people.map((p) => p.ownerId))).toEqual(new Set([ownerA.id, ownerB.id]));
+  });
+});
+
+describe('PetRecognitionService.handleQueuePetRecognition (medium)', () => {
+  it(
+    'force purge empties pet_search, deletes pet people/asset_face rows and their shared-space copies, ' +
+      'and leaves a human person, asset_face, face_search row and shared-space copy untouched (6.7)',
+    async () => {
+      const { sut, ctx } = setup();
+      await enablePetRecognition(ctx);
+      const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+
+      // A pet: person + asset_face + pet_search embedding + shared-space copy, all to be purged.
+      const { person: petPerson } = await ctx.newPerson({ ownerId: user.id, type: 'pet', species: 'dog' });
+      const { asset: petAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: petFace } = await ctx.newAssetFace({ assetId: petAsset.id, personId: petPerson.id });
+      await ctx.database
+        .insertInto('pet_search')
+        .values({ faceId: petFace.id, embedding: axisEmbedding('first') })
+        .execute();
+      const spacePet = await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: space.id, type: 'pet', name: 'Space Pet' })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+
+      // A human: person + asset_face + face_search embedding + shared-space copy, which the purge
+      // must not touch.
+      const { person: humanPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Human' });
+      const { asset: humanAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: humanFace } = await ctx.newAssetFace({ assetId: humanAsset.id, personId: humanPerson.id });
+      await ctx.database
+        .insertInto('face_search')
+        .values({ faceId: humanFace.id, embedding: axisEmbedding('second') })
+        .execute();
+      const spaceHuman = await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: space.id, type: 'person', name: 'Space Human' })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+
+      expect(await sut.handleQueuePetRecognition({ force: true })).toBe(JobStatus.Success);
+
+      // pet_search is emptied entirely (truncate), including the pet embedding above.
+      const petSearchRows = await ctx.database.selectFrom('pet_search').selectAll().execute();
+      expect(petSearchRows).toHaveLength(0);
+
+      // The pet person, its face, and its shared-space copy are gone.
+      const petPersonRows = await ctx.database
+        .selectFrom('person')
+        .select(['id'])
+        .where('id', '=', petPerson.id)
+        .execute();
+      expect(petPersonRows).toHaveLength(0);
+      const petFaceRows = await ctx.database
+        .selectFrom('asset_face')
+        .select(['id'])
+        .where('id', '=', petFace.id)
+        .execute();
+      expect(petFaceRows).toHaveLength(0);
+      const spacePetRows = await ctx.database
+        .selectFrom('shared_space_person')
+        .select(['id'])
+        .where('id', '=', spacePet.id)
+        .execute();
+      expect(spacePetRows).toHaveLength(0);
+
+      // The human person, face, face_search embedding and shared-space copy all survive untouched.
+      const humanPersonRow = await ctx.database
+        .selectFrom('person')
+        .selectAll()
+        .where('id', '=', humanPerson.id)
+        .executeTakeFirstOrThrow();
+      expect(humanPersonRow.type).toBe('person');
+
+      const humanFaceRow = await ctx.database
+        .selectFrom('asset_face')
+        .selectAll()
+        .where('id', '=', humanFace.id)
+        .executeTakeFirstOrThrow();
+      expect(humanFaceRow.personId).toBe(humanPerson.id);
+
+      const faceSearchRows = await ctx.database.selectFrom('face_search').selectAll().execute();
+      expect(faceSearchRows).toHaveLength(1);
+      expect(faceSearchRows[0].faceId).toBe(humanFace.id);
+
+      const spaceHumanRow = await ctx.database
+        .selectFrom('shared_space_person')
+        .selectAll()
+        .where('id', '=', spaceHuman.id)
+        .executeTakeFirstOrThrow();
+      expect(spaceHumanRow.type).toBe('person');
+
+      // The purge requeues detection so assets are re-detected/re-embedded with the current model.
+      expect(jobMock.queue).toHaveBeenCalledWith({ name: JobName.PetDetectionQueueAll, data: { force: true } });
+    },
+  );
+
+  it('deleteAllPetSearch on an empty pet_search table is a no-op, not an error', async () => {
+    const { sut, ctx } = setup();
+    await enablePetRecognition(ctx);
+
+    await expect(sut.handleQueuePetRecognition({ force: true })).resolves.toBe(JobStatus.Success);
+
+    const petSearchRows = await ctx.database.selectFrom('pet_search').selectAll().execute();
+    expect(petSearchRows).toHaveLength(0);
   });
 });

@@ -362,6 +362,7 @@ describe(QueueService.name, () => {
         { name: JobName.AssetGenerateThumbnailsQueueAll, data: { force: false } },
         { name: JobName.FacialRecognitionQueueAll, data: { force: false, nightly: true } },
         { name: JobName.SharedSpaceIdentityReconciliationSweep },
+        { name: JobName.PetRecognitionQueueAll, data: { force: false, nightly: true } },
       ]);
     });
 
@@ -412,6 +413,7 @@ describe(QueueService.name, () => {
           syncQuotaUsage: false,
           missingThumbnails: true,
           clusterNewFaces: false,
+          clusterNewPets: false,
         },
       });
 
@@ -526,6 +528,39 @@ describe(QueueService.name, () => {
       });
     });
 
+    it('should queue nightly pet recognition clustering when enabled (6.6)', async () => {
+      await sut.handleNightlyJobs();
+
+      const jobs = mocks.job.queueAll.mock.calls[0][0];
+      expect(jobs).toContainEqual({
+        name: JobName.PetRecognitionQueueAll,
+        data: { force: false, nightly: true },
+      });
+      expect(jobs).not.toContainEqual(
+        expect.objectContaining({
+          name: JobName.PetRecognitionQueueAll,
+          data: expect.objectContaining({ force: true }),
+        }),
+      );
+    });
+
+    it('should skip clustering new pets when disabled (6.6)', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        nightlyTasks: {
+          ...defaults.nightlyTasks,
+          clusterNewPets: false,
+        },
+      });
+
+      await sut.handleNightlyJobs();
+
+      const call = mocks.job.queueAll.mock.calls[0][0];
+      expect(call).not.toContainEqual({
+        name: JobName.PetRecognitionQueueAll,
+        data: { force: false, nightly: true },
+      });
+    });
+
     it('should queue empty array when all nightly tasks are disabled', async () => {
       mocks.systemMetadata.get.mockResolvedValue({
         nightlyTasks: {
@@ -535,6 +570,7 @@ describe(QueueService.name, () => {
           syncQuotaUsage: false,
           missingThumbnails: false,
           clusterNewFaces: false,
+          clusterNewPets: false,
         },
       });
 

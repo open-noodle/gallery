@@ -344,6 +344,18 @@ export class PersonRepository {
     });
   }
 
+  /**
+   * Truncates `pet_search` outright, independent of `deleteAllPets()`'s delete order. Used by
+   * {@link PetRecognitionService.handleQueuePetRecognition}'s force purge (enabling recognition or
+   * switching model) as the explicit, order-independent guarantee that no stale embedding survives
+   * — `deleteAllPets()` already removes most rows via the `asset_face` CASCADE, but a truncate
+   * doesn't depend on that cascade to have run first or completely. A no-op (not an error) when the
+   * table is already empty.
+   */
+  async deleteAllPetSearch(): Promise<void> {
+    await sql`truncate ${sql.table('pet_search')}`.execute(this.db);
+  }
+
   getAllFaces(options: GetAllFacesOptions = {}) {
     return this.db
       .selectFrom('asset_face')
@@ -365,6 +377,24 @@ export class PersonRepository {
           ),
         ),
       )
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .stream();
+  }
+
+  /**
+   * Pet-recognition equivalent of {@link getAllFaces}'s `{ personId: null }` case, used by
+   * {@link PetRecognitionService.handleQueuePetRecognition}'s non-force fan-out: every pet face that
+   * has been embedded (has a `pet_search` row) but not yet assigned to a person. The inner join on
+   * `pet_search` is the "has an embedding" filter — a face detected before recognition was enabled
+   * has no `pet_search` row and is deliberately excluded (it gets one the next time detection runs).
+   */
+  getUnassignedPetFaces() {
+    return this.db
+      .selectFrom('asset_face')
+      .innerJoin('pet_search', 'pet_search.faceId', 'asset_face.id')
+      .select(['asset_face.id'])
+      .where('asset_face.personId', 'is', null)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', 'is', true)
       .stream();
@@ -1230,6 +1260,21 @@ export class PersonRepository {
     const result = (await this.db
       .selectFrom('asset_job_status')
       .select((eb) => sql`${eb.fn.max('asset_job_status.facesRecognizedAt')}::text`.as('latestDate'))
+      .executeTakeFirst()) as { latestDate: string } | undefined;
+
+    return result?.latestDate;
+  }
+
+  /**
+   * Pet-recognition equivalent of {@link getLatestFaceDate}, used by the nightly
+   * `handleQueuePetRecognition` skip check: pets have no `personsAssignedAt`-style column, so
+   * `petsDetectedAt` (stamped by `handlePetDetection`) is the closest analogue of "a pet was added
+   * since the last nightly run".
+   */
+  async getLatestPetDate(): Promise<string | undefined> {
+    const result = (await this.db
+      .selectFrom('asset_job_status')
+      .select((eb) => sql`${eb.fn.max('asset_job_status.petsDetectedAt')}::text`.as('latestDate'))
       .executeTakeFirst()) as { latestDate: string } | undefined;
 
     return result?.latestDate;

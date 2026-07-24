@@ -339,6 +339,10 @@ export class QueueService extends BaseService {
       );
     }
 
+    if (config.nightlyTasks.clusterNewPets) {
+      jobs.push({ name: JobName.PetRecognitionQueueAll, data: { force: false, nightly: true } });
+    }
+
     await this.jobRepository.queueAll(jobs);
   }
 }

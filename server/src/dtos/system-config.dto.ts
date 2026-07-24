@@ -262,6 +262,7 @@ const SystemConfigNightlyTasksSchema = z
     databaseCleanup: configBool.describe('Database cleanup'),
     missingThumbnails: configBool.describe('Missing thumbnails'),
     clusterNewFaces: configBool.describe('Cluster new faces'),
+    clusterNewPets: configBool.describe('Cluster new pets'),
     generateMemories: configBool.describe('Generate memories'),
     syncQuotaUsage: configBool.describe('Sync quota usage'),
   })

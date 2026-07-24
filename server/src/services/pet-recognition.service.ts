@@ -1,22 +1,62 @@
 import { Injectable } from '@nestjs/common';
+import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants';
 import { OnJob } from 'src/decorators';
-import { JobName, JobStatus, QueueName } from 'src/enum';
+import { JobName, JobStatus, QueueName, SystemMetadataKey } from 'src/enum';
 import { BaseService } from 'src/services/base.service';
-import { JobOf } from 'src/types';
+import { JobItem, JobOf } from 'src/types';
 import { isPetRecognitionEnabled } from 'src/utils/misc';
 
 @Injectable()
 export class PetRecognitionService extends BaseService {
   @OnJob({ name: JobName.PetRecognitionQueueAll, queue: QueueName.PetRecognition })
-  async handleQueuePetRecognition(_data: JobOf<JobName.PetRecognitionQueueAll>): Promise<JobStatus> {
+  async handleQueuePetRecognition({ force, nightly }: JobOf<JobName.PetRecognitionQueueAll>): Promise<JobStatus> {
     const { machineLearning } = await this.getConfig({ withCache: false });
     if (!isPetRecognitionEnabled(machineLearning)) {
       return JobStatus.Skipped;
     }
 
-    // Reprocess-on-force (purge + requeue detection), the nightly skip-if-fresh check, and the
-    // fan-out over embedded/unassigned pet faces are implemented in Slice 6 (reprocess, model
-    // switch, nightly).
+    if (nightly) {
+      const [state, latestPetDate] = await Promise.all([
+        this.systemMetadataRepository.get(SystemMetadataKey.PetRecognitionState),
+        this.personRepository.getLatestPetDate(),
+      ]);
+
+      if (state?.lastRun && latestPetDate && state.lastRun > latestPetDate) {
+        this.logger.debug('Skipping pet recognition nightly since no pet has been added since the last run');
+        return JobStatus.Skipped;
+      }
+    }
+
+    if (force) {
+      // Purge pet people (and their shared-space copies) plus every stored pet embedding, then
+      // requeue detection so assets are re-detected and re-embedded with the *current* model. This
+      // is the explicit, order-independent reset for enabling recognition or switching model:
+      // deleteAllPets() removes the pet asset_face rows via CASCADE from their people, and the
+      // pet_search truncate is a belt-and-braces guarantee independent of that delete order.
+      await this.personRepository.deleteAllPets();
+      await this.sharedSpaceRepository.deleteAllPets();
+      await this.personRepository.deleteAllPetSearch();
+      await this.jobRepository.queue({ name: JobName.PetDetectionQueueAll, data: { force: true } });
+    } else {
+      let jobs: JobItem[] = [];
+      for await (const face of this.personRepository.getUnassignedPetFaces()) {
+        jobs.push({ name: JobName.PetRecognition, data: { id: face.id, deferred: false } });
+
+        if (jobs.length >= JOBS_ASSET_PAGINATION_SIZE) {
+          await this.jobRepository.queueAll(jobs);
+          jobs = [];
+        }
+      }
+      await this.jobRepository.queueAll(jobs);
+    }
+
+    // Recording the model name (not just lastRun) is what lets a future run detect a model switch
+    // and decide to force-reprocess.
+    await this.systemMetadataRepository.set(SystemMetadataKey.PetRecognitionState, {
+      lastRun: new Date().toISOString(),
+      modelName: machineLearning.petRecognition.modelName,
+    });
+
     return JobStatus.Success;
   }
 

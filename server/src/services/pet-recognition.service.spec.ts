@@ -1,6 +1,6 @@
-import { JobName, JobStatus } from 'src/enum';
+import { JobName, JobStatus, SystemMetadataKey } from 'src/enum';
 import { PetRecognitionService } from 'src/services/pet-recognition.service';
-import { newTestService, ServiceMocks } from 'test/utils';
+import { makeStream, newTestService, ServiceMocks } from 'test/utils';
 
 const enabledConfig = {
   machineLearning: {
@@ -52,6 +52,10 @@ describe(PetRecognitionService.name, () => {
   describe('handleQueuePetRecognition', () => {
     it('should skip when pet recognition is disabled (default)', async () => {
       expect(await sut.handleQueuePetRecognition({ force: false })).toEqual(JobStatus.Skipped);
+
+      expect(mocks.person.deleteAllPets).not.toHaveBeenCalled();
+      expect(mocks.person.getUnassignedPetFaces).not.toHaveBeenCalled();
+      expect(mocks.systemMetadata.set).not.toHaveBeenCalled();
     });
 
     it('should skip when machine learning is disabled even if pet recognition is enabled', async () => {
@@ -60,6 +64,96 @@ describe(PetRecognitionService.name, () => {
       });
 
       expect(await sut.handleQueuePetRecognition({ force: false })).toEqual(JobStatus.Skipped);
+    });
+
+    describe('when pet recognition is enabled', () => {
+      beforeEach(() => {
+        mocks.systemMetadata.get.mockResolvedValue(enabledConfig);
+        mocks.sharedSpace.deleteAllPets.mockResolvedValue(void 0);
+      });
+
+      it('force: true purges pet people, space copies and pet_search, then requeues detection with force (6.1)', async () => {
+        expect(await sut.handleQueuePetRecognition({ force: true })).toEqual(JobStatus.Success);
+
+        expect(mocks.person.deleteAllPets).toHaveBeenCalled();
+        expect(mocks.sharedSpace.deleteAllPets).toHaveBeenCalled();
+        expect(mocks.person.deleteAllPetSearch).toHaveBeenCalled();
+        expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PetDetectionQueueAll, data: { force: true } });
+        expect(mocks.person.getUnassignedPetFaces).not.toHaveBeenCalled();
+      });
+
+      it('force: false queues PetRecognition only for embedded, unassigned pet faces (6.2)', async () => {
+        mocks.person.getUnassignedPetFaces.mockReturnValue(makeStream([{ id: 'face-1' }, { id: 'face-2' }]));
+
+        expect(await sut.handleQueuePetRecognition({ force: false })).toEqual(JobStatus.Success);
+
+        expect(mocks.job.queueAll).toHaveBeenCalledWith([
+          { name: JobName.PetRecognition, data: { id: 'face-1', deferred: false } },
+          { name: JobName.PetRecognition, data: { id: 'face-2', deferred: false } },
+        ]);
+        expect(mocks.person.deleteAllPets).not.toHaveBeenCalled();
+        expect(mocks.person.deleteAllPetSearch).not.toHaveBeenCalled();
+        expect(mocks.job.queue).not.toHaveBeenCalledWith(
+          expect.objectContaining({ name: JobName.PetDetectionQueueAll }),
+        );
+      });
+
+      it('nightly: true skips without queueing when lastRun is newer than the newest pet face (6.3)', async () => {
+        const lastRun = new Date('2026-07-20T00:00:00.000Z');
+        mocks.systemMetadata.get.mockResolvedValue({ ...enabledConfig, lastRun: lastRun.toISOString() });
+        mocks.person.getLatestPetDate.mockResolvedValue(new Date(lastRun.getTime() - 1000).toISOString());
+
+        expect(await sut.handleQueuePetRecognition({ force: false, nightly: true })).toEqual(JobStatus.Skipped);
+
+        expect(mocks.person.getUnassignedPetFaces).not.toHaveBeenCalled();
+        expect(mocks.job.queueAll).not.toHaveBeenCalled();
+        expect(mocks.job.queue).not.toHaveBeenCalled();
+        expect(mocks.systemMetadata.set).not.toHaveBeenCalled();
+      });
+
+      it('nightly: true with an older lastRun queues work (6.4)', async () => {
+        const lastRun = new Date('2026-07-20T00:00:00.000Z');
+        mocks.systemMetadata.get.mockResolvedValue({ ...enabledConfig, lastRun: lastRun.toISOString() });
+        mocks.person.getLatestPetDate.mockResolvedValue(new Date(lastRun.getTime() + 1000).toISOString());
+        mocks.person.getUnassignedPetFaces.mockReturnValue(makeStream([{ id: 'face-1' }]));
+
+        expect(await sut.handleQueuePetRecognition({ force: false, nightly: true })).toEqual(JobStatus.Success);
+
+        expect(mocks.job.queueAll).toHaveBeenCalledWith([
+          { name: JobName.PetRecognition, data: { id: 'face-1', deferred: false } },
+        ]);
+      });
+
+      it('nightly: true with no prior lastRun queues work (first-ever nightly run)', async () => {
+        mocks.person.getLatestPetDate.mockResolvedValue('2026-07-20T00:00:00.000Z');
+        mocks.person.getUnassignedPetFaces.mockReturnValue(makeStream([{ id: 'face-1' }]));
+
+        expect(await sut.handleQueuePetRecognition({ force: false, nightly: true })).toEqual(JobStatus.Success);
+
+        expect(mocks.job.queueAll).toHaveBeenCalledWith([
+          { name: JobName.PetRecognition, data: { id: 'face-1', deferred: false } },
+        ]);
+      });
+
+      it('records lastRun and modelName in system metadata after a run (6.5)', async () => {
+        mocks.person.getUnassignedPetFaces.mockReturnValue(makeStream([]));
+
+        expect(await sut.handleQueuePetRecognition({ force: false })).toEqual(JobStatus.Success);
+
+        expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.PetRecognitionState, {
+          lastRun: expect.any(String),
+          modelName: 'pet-recognition-base',
+        });
+      });
+
+      it('records lastRun and modelName on a force run too', async () => {
+        expect(await sut.handleQueuePetRecognition({ force: true })).toEqual(JobStatus.Success);
+
+        expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.PetRecognitionState, {
+          lastRun: expect.any(String),
+          modelName: 'pet-recognition-base',
+        });
+      });
     });
   });
 
