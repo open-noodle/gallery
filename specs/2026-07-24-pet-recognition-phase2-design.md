@@ -55,13 +55,44 @@ how `face_identity` already splits `type IN ('person','pet')`.
 
 ## 4. Architecture (mirror facial-recognition, isolated for pets)
 
-### 4.1 Models (prerequisite)
+### 4.1 Model production (train + fuse + export + validate + publish)
 
-For each of small/base/large: export a **fused ONNX** (DINOv2 backbone → projection → L2-normalize
-→ 512-d), opset 17, input `[N,3,224,224]` float32 ImageNet-normalized, output `[N,512]` normalized,
-dynamic batch. Upload to `Deeds67/pet-reid-{small,base,large}` with model cards documenting the I/O
-contract (RF-DETR discipline). Training uses the Phase-1 projection recipe (extract frozen
-embeddings once, train the projection, fuse + export).
+Phase 1 proved the recipe with a throwaway script (`runs/proj_experiment.py`); this section
+productionizes it into the committed `machine-learning/pet-recognition-training/` project and
+produces the 3 shippable models. **This part is built inline (interactively)** so the training and
+quality can be watched and tuned; the rest of Phase 2 (§4.2+) is built via `/impl-loop`.
+
+**(a) Model — backbone selection + a real projection head.** Rework `src/petid/model.py`:
+`PetEmbedder(backbone, out_dim=512)` loads `facebook/dinov2-{small,base,large}` (frozen) and appends
+a **trained projection** `Linear(hidden→512)` whose L2-normalized output **is** the embedding at
+inference. This replaces both the hard-coded `dinov2-small` and the no-op "head" config. `hidden` =
+384/768/1024 for small/base/large; `out_dim=512` is uniform so all three feed the same `pet_search`.
+Keep `ArcMarginProduct` (the training-time classifier, discarded at inference).
+
+**(b) Training — the validated projection recipe.** Rework `src/petid/train.py` to the recipe that
+won the spike: **extract frozen backbone embeddings once (cached), then train only the
+projection + ArcFace head** on the cache (no per-epoch backbone passes; minutes per model). Backbone
+stays frozen (full fine-tune overfits — see RESULTS). Reuse the committed real-layout parsers /
+leak-free manifest; train on the full train split. Seed the run.
+
+**(c) Fused ONNX export.** Rework `src/petid/export_onnx.py` to export the **whole** `PetEmbedder`
+(backbone → projection → L2-normalize) as one ONNX per backbone: opset 17, input `input`
+`[N,3,224,224]` float32 ImageNet-normalized, output `embedding` `[N,512]` normalized, dynamic batch,
+with a torch↔onnxruntime parity check (< 1e-3). `dinov2-large` (~1.2 GB) stays under ONNX's 2 GB
+single-file limit — confirm at export (giant would not, which is why it was dropped).
+
+**(d) Scalable eval.** Phase-1's O(N²) metrics were run on a capped ~600-id sample. Add a
+memory-bounded eval (chunked/sampled query-gallery) so the **full** dog/cat test splits (16,469 /
+102 identities) can be scored, and **re-validate all 3 models** — the numbers must hold at
+full-test-scale before the models are locked (a Phase-1 risk item). Report per-species EER/Top-1.
+
+**(e) Publish.** Upload the 3 ONNX + model cards (I/O contract, license, dataset attribution) to
+`Deeds67/pet-reid-{small,base,large}` — same flow as the RF-DETR detector. Model cards document:
+frozen DINOv2 backbone + projection, whole-animal crop, 512-d normalized output, CC0/CC-BY training
+data attribution.
+
+**Deliverable:** 3 published, quality-validated ONNX models + a committed, reproducible training
+pipeline (the scratch `runs/` scripts are replaced by first-class `src/petid/` code).
 
 ### 4.2 ML service (`machine-learning/`)
 
