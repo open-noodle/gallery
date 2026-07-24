@@ -312,9 +312,7 @@ describe(MachineLearningRepository.name, () => {
       mockReadFile.mockResolvedValue(imageData);
 
       const petResponse = {
-        [ModelTask.PET_DETECTION]: [
-          { boundingBox: { x1: 1, y1: 2, x2: 3, y2: 4 }, score: 0.9, label: 'dog' },
-        ],
+        [ModelTask.PET_DETECTION]: [{ boundingBox: { x1: 1, y1: 2, x2: 3, y2: 4 }, score: 0.9, label: 'dog' }],
         imageHeight: 480,
         imageWidth: 640,
       };

@@ -119,10 +119,7 @@ describe('pet_search', () => {
     const { user } = await ctx.newUser();
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     const { assetFace } = await ctx.newAssetFace({ assetId: asset.id });
-    await ctx.database
-      .insertInto('pet_search')
-      .values({ faceId: assetFace.id, embedding: newEmbedding() })
-      .execute();
+    await ctx.database.insertInto('pet_search').values({ faceId: assetFace.id, embedding: newEmbedding() }).execute();
 
     await ctx.database.deleteFrom('asset_face').where('id', '=', assetFace.id).execute();
 
@@ -208,11 +205,7 @@ describe('PersonRepository.refreshPetFaces', () => {
     );
 
     expect(faceIds).toHaveLength(2);
-    const rows = await ctx.database
-      .selectFrom('pet_search')
-      .selectAll()
-      .where('faceId', 'in', faceIds)
-      .execute();
+    const rows = await ctx.database.selectFrom('pet_search').selectAll().where('faceId', 'in', faceIds).execute();
     const byFaceId = new Map(rows.map((row) => [row.faceId, row.embedding]));
     expect(JSON.parse(byFaceId.get(faceIds[0])!)).toEqual(JSON.parse(firstEmbedding));
     expect(JSON.parse(byFaceId.get(faceIds[1])!)).toEqual(JSON.parse(secondEmbedding));

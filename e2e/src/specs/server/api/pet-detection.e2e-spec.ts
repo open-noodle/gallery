@@ -157,6 +157,104 @@ describe('/pet-detection', () => {
     });
   });
 
+  describe('Pet Recognition Config Management', () => {
+    it('should have pet recognition disabled by default with pet-recognition-base, 0.55 maxDistance and 1 minFaces', async () => {
+      const config = await getSystemConfig(admin.accessToken);
+
+      expect(config.machineLearning.petRecognition).toEqual({
+        enabled: false,
+        modelName: 'pet-recognition-base',
+        maxDistance: 0.55,
+        minFaces: 1,
+      });
+    });
+
+    it('should enable pet recognition and round-trip the change', async () => {
+      const config = await getSystemConfig(admin.accessToken);
+      config.machineLearning.petRecognition.enabled = true;
+      const updated = await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+
+      expect(updated.machineLearning.petRecognition.enabled).toBe(true);
+
+      const refetched = await getSystemConfig(admin.accessToken);
+      expect(refetched.machineLearning.petRecognition.enabled).toBe(true);
+
+      await utils.resetAdminConfig(admin.accessToken);
+    });
+
+    it('should reject maxDistance below 0.1', async () => {
+      const config = await getSystemConfig(admin.accessToken);
+      config.machineLearning.petRecognition.maxDistance = 0.05;
+
+      const { status, body } = await request(app)
+        .put('/system-config')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send(config);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(
+        errorDto.validationError([
+          {
+            path: ['machineLearning', 'petRecognition', 'maxDistance'],
+            message: 'Too small: expected number to be >=0.1',
+          },
+        ]),
+      );
+    });
+
+    it('should reject maxDistance above 2', async () => {
+      const config = await getSystemConfig(admin.accessToken);
+      config.machineLearning.petRecognition.maxDistance = 2.5;
+
+      const { status, body } = await request(app)
+        .put('/system-config')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send(config);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(
+        errorDto.validationError([
+          {
+            path: ['machineLearning', 'petRecognition', 'maxDistance'],
+            message: 'Too big: expected number to be <=2',
+          },
+        ]),
+      );
+    });
+
+    it('should reject minFaces below 1', async () => {
+      const config = await getSystemConfig(admin.accessToken);
+      config.machineLearning.petRecognition.minFaces = 0;
+
+      const { status, body } = await request(app)
+        .put('/system-config')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send(config);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(
+        errorDto.validationError([
+          {
+            path: ['machineLearning', 'petRecognition', 'minFaces'],
+            message: 'Too small: expected number to be >=1',
+          },
+        ]),
+      );
+    });
+
+    it('should reset to defaults', async () => {
+      await utils.resetAdminConfig(admin.accessToken);
+
+      const config = await getSystemConfig(admin.accessToken);
+      expect(config.machineLearning.petRecognition).toEqual({
+        enabled: false,
+        modelName: 'pet-recognition-base',
+        maxDistance: 0.55,
+        minFaces: 1,
+      });
+    });
+  });
+
   describe('Queue Operations', () => {
     it('should list petDetection in queues', async () => {
       const { status, body } = await request(app).get('/jobs').set('Authorization', `Bearer ${admin.accessToken}`);
@@ -222,6 +320,57 @@ describe('/pet-detection', () => {
       await utils.waitForQueueFinish(admin.accessToken, 'petDetection');
 
       await utils.resetAdminConfig(admin.accessToken);
+    });
+  });
+
+  describe('Pet Recognition Queue Operations', () => {
+    it('should list petRecognition in queues', async () => {
+      const { status, body } = await request(app).get('/jobs').set('Authorization', `Bearer ${admin.accessToken}`);
+
+      expect(status).toBe(200);
+      expect(body).toHaveProperty('petRecognition');
+    });
+
+    it('should accept start command on petRecognition queue', async () => {
+      const config = await getSystemConfig(admin.accessToken);
+      config.machineLearning.petRecognition.enabled = true;
+      config.machineLearning.enabled = true;
+      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+
+      const { status } = await request(app)
+        .put('/jobs/petRecognition')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ command: QueueCommand.Start, force: false });
+
+      expect(status).toBe(200);
+      await utils.waitForQueueFinish(admin.accessToken, 'petRecognition');
+
+      await utils.resetAdminConfig(admin.accessToken);
+    });
+
+    it('should pause and resume petRecognition queue', async () => {
+      const { status: pauseStatus } = await request(app)
+        .put('/jobs/petRecognition')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ command: QueueCommand.Pause, force: false });
+
+      expect(pauseStatus).toBe(200);
+
+      const { status: resumeStatus } = await request(app)
+        .put('/jobs/petRecognition')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ command: QueueCommand.Resume, force: false });
+
+      expect(resumeStatus).toBe(200);
+    });
+
+    it('should empty petRecognition queue', async () => {
+      const { status } = await request(app)
+        .put('/jobs/petRecognition')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ command: QueueCommand.Empty, force: false });
+
+      expect(status).toBe(200);
     });
   });
 

@@ -673,6 +673,7 @@ Class | Method | HTTP request | Description
  - [PersonStatisticsResponseDto](doc//PersonStatisticsResponseDto.md)
  - [PersonUpdateDto](doc//PersonUpdateDto.md)
  - [PetDetectionConfig](doc//PetDetectionConfig.md)
+ - [PetRecognitionConfig](doc//PetRecognitionConfig.md)
  - [PinCodeChangeDto](doc//PinCodeChangeDto.md)
  - [PinCodeResetDto](doc//PinCodeResetDto.md)
  - [PinCodeSetupDto](doc//PinCodeSetupDto.md)

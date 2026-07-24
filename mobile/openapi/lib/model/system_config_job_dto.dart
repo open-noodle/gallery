@@ -25,6 +25,7 @@ class SystemConfigJobDto {
     required this.ocr,
     required this.peopleBackfill,
     required this.petDetection,
+    required this.petRecognition,
     required this.search,
     required this.sidecar,
     required this.smartSearch,
@@ -57,6 +58,8 @@ class SystemConfigJobDto {
 
   JobSettingsDto petDetection;
 
+  JobSettingsDto petRecognition;
+
   JobSettingsDto search;
 
   JobSettingsDto sidecar;
@@ -83,6 +86,7 @@ class SystemConfigJobDto {
     other.ocr == ocr &&
     other.peopleBackfill == peopleBackfill &&
     other.petDetection == petDetection &&
+    other.petRecognition == petRecognition &&
     other.search == search &&
     other.sidecar == sidecar &&
     other.smartSearch == smartSearch &&
@@ -105,6 +109,7 @@ class SystemConfigJobDto {
     (ocr.hashCode) +
     (peopleBackfill.hashCode) +
     (petDetection.hashCode) +
+    (petRecognition.hashCode) +
     (search.hashCode) +
     (sidecar.hashCode) +
     (smartSearch.hashCode) +
@@ -113,7 +118,7 @@ class SystemConfigJobDto {
     (workflow.hashCode);
 
   @override
-  String toString() => 'SystemConfigJobDto[backgroundTask=$backgroundTask, classification=$classification, editor=$editor, faceDetection=$faceDetection, integrityCheck=$integrityCheck, library_=$library_, metadataExtraction=$metadataExtraction, migration=$migration, notifications=$notifications, ocr=$ocr, peopleBackfill=$peopleBackfill, petDetection=$petDetection, search=$search, sidecar=$sidecar, smartSearch=$smartSearch, thumbnailGeneration=$thumbnailGeneration, videoConversion=$videoConversion, workflow=$workflow]';
+  String toString() => 'SystemConfigJobDto[backgroundTask=$backgroundTask, classification=$classification, editor=$editor, faceDetection=$faceDetection, integrityCheck=$integrityCheck, library_=$library_, metadataExtraction=$metadataExtraction, migration=$migration, notifications=$notifications, ocr=$ocr, peopleBackfill=$peopleBackfill, petDetection=$petDetection, petRecognition=$petRecognition, search=$search, sidecar=$sidecar, smartSearch=$smartSearch, thumbnailGeneration=$thumbnailGeneration, videoConversion=$videoConversion, workflow=$workflow]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -129,6 +134,7 @@ class SystemConfigJobDto {
       json[r'ocr'] = this.ocr;
       json[r'peopleBackfill'] = this.peopleBackfill;
       json[r'petDetection'] = this.petDetection;
+      json[r'petRecognition'] = this.petRecognition;
       json[r'search'] = this.search;
       json[r'sidecar'] = this.sidecar;
       json[r'smartSearch'] = this.smartSearch;
@@ -159,6 +165,7 @@ class SystemConfigJobDto {
         ocr: JobSettingsDto.fromJson(json[r'ocr'])!,
         peopleBackfill: JobSettingsDto.fromJson(json[r'peopleBackfill'])!,
         petDetection: JobSettingsDto.fromJson(json[r'petDetection'])!,
+        petRecognition: JobSettingsDto.fromJson(json[r'petRecognition'])!,
         search: JobSettingsDto.fromJson(json[r'search'])!,
         sidecar: JobSettingsDto.fromJson(json[r'sidecar'])!,
         smartSearch: JobSettingsDto.fromJson(json[r'smartSearch'])!,
@@ -224,6 +231,7 @@ class SystemConfigJobDto {
     'ocr',
     'peopleBackfill',
     'petDetection',
+    'petRecognition',
     'search',
     'sidecar',
     'smartSearch',
