@@ -31,10 +31,11 @@ a small trained projection head** on whole-animal crops:
 
 **Backbone scaling: dogs keep improving, cats plateau.** Dog EER falls monotonically with
 backbone size (0.060 → 0.039 → **0.023**), but cat EER is flat at 0.044 for base **and** large —
-a clean signal that **cats are data-limited (407 train identities), not model-limited**. The cat
-lever is more data (LCW, ~140k), not a bigger backbone. **giant was skipped**: cats can't benefit,
-dogs are already excellent at 0.023, and it crosses ONNX's 2 GB single-file limit (external-data
-format) for ~4.5 GB of download — cost far exceeds the marginal dog gain.
+cats are limited by their **data**, not the model (only 407 train identities). But note (see
+§"Cat ceiling"): more data alone does **not** fix it — the ceiling is data _quality_, not volume.
+**giant was skipped**: cats can't benefit, dogs are already excellent at 0.023, and it crosses
+ONNX's 2 GB single-file limit (external-data format) for ~4.5 GB — cost far exceeds the marginal
+dog gain.
 
 ## What the spike learned (the arc)
 
@@ -51,6 +52,25 @@ format) for ~4.5 GB of download — cost far exceeds the marginal dog gain.
 4. **Bigger backbone helps dogs (and cats plateau).** Dog EER fell 0.060→0.039→0.023 across
    small→base→large; cat EER flattened at 0.044 (base=large) because cats are data-limited. So
    backbone size and cat data are independent levers.
+5. **But the cat ceiling is data _quality_, not volume** — see below.
+
+## Cat ceiling — LCW does NOT break the plateau
+
+We tested the obvious cat lever: add **LCW** (135,267 cats, Apache-2.0) to the 407-cat training
+pool. Result (base backbone, +30k LCW cats = 74× more cat data, projection retrained):
+
+| Eval set               | cats WITHOUT LCW | cats WITH +30k LCW |
+| ---------------------- | ---------------- | ------------------ |
+| Cat-Individual (clean) | **0.044**        | 0.052 (≈flat)      |
+| LCW held-out (noisy)   | 0.109 (zeroshot) | 0.074 (proj)       |
+
+**74× more cat data left the clean Cat-Individual EER flat** (0.044→0.052, within run-to-run
+variance — the projection training isn't seeded). LCW's label noise (Petfinder re-listings → the
+same cat under multiple IDs = contradictory supervision) cancels its volume. So the cat ceiling is
+a **data-quality** limit, not volume — more noisy data won't fix it, and no genuinely-clean large
+cat set exists off-the-shelf (surveyed). LCW _does_ add cross-distribution robustness (it improves
+LCW-style cats, 0.109→0.074), just not clean-cat quality. **Decision: ship cats at ~0.044 for v1**
+(strong, Top-1 0.916); cleaning/dedup-merging LCW is a deferred Phase-1.5 experiment.
 
 ## Datasets — what's full vs. sampled
 
@@ -72,8 +92,8 @@ format) for ~4.5 GB of download — cost far exceeds the marginal dog gain.
 - **Dogs-World mapping:** the image→dog link is **not** in the folder structure — it's in
   `metadata/<image_hash>.json` sidecars (`identities[].identity` + `path`). We use only
   single-dog images (multi-dog photos dropped, no per-dog crop).
-- **Not yet used:** LCW (~140k cats, Apache-2.0) — would materially strengthen the (currently
-  ~509-cat) cat side.
+- **LCW (~135k cats, Apache-2.0):** tested (see §"Cat ceiling") — its label noise cancels the
+  volume, so it does NOT improve clean cats. Not used for v1.
 
 ## Cost / timing — the projection recipe is cheap
 
@@ -107,12 +127,17 @@ selectable models). Key design points:
   is the Phase 2 recognition subsystem (ML embedder + server clustering + admin/UI + tests + docs),
   needed regardless of model count.
 
-## Phase 1.5 — the real ceiling-raiser (deferred)
+## Phase 1.5 — the ceiling-raisers (deferred)
 
-DogFaceNet **aligned-face** zeroshot (EER 0.045) beat whole-animal dog zeroshot (0.103) — faces
-carry cleaner identity signal. A **pet-face detect + align** stage in front, with the projection
-trained on face crops, would likely push dogs lower still. It's a genuine infrastructure
-investment (a pet-face detector), so it's deferred out of v1, not skipped for lack of value.
+Two independent levers, both deferred out of v1:
+
+- **Dogs → face crops.** DogFaceNet **aligned-face** zeroshot (EER 0.045) beat whole-animal dog
+  zeroshot (0.103) — faces carry cleaner identity signal. A **pet-face detect + align** stage in
+  front, with the projection trained on face crops, would likely push dogs below 0.023. Needs a new
+  pet-face detector (real infrastructure).
+- **Cats → cleaned LCW.** The cat ceiling is LCW's label noise, not volume (above). **Dedup-merging
+  LCW's re-listed cats** (cluster near-identical individuals by embedding, merge IDs) could unlock
+  its 135k volume as _clean_ supervision. Uncertain payoff, so it's an R&D experiment, not v1.
 
 ## Reproducibility
 
