@@ -27,14 +27,17 @@ class ArcMarginProduct(nn.Module):
     def __init__(self, in_features: int, out_features: int, s: float = 30.0, m: float = 0.5):
         super().__init__()
         self.s = s
-        self.m = m
         self.weight = nn.Parameter(torch.empty(out_features, in_features))
         nn.init.xavier_uniform_(self.weight)
+        self.cos_m = math.cos(m)
+        self.sin_m = math.sin(m)
+        self.th = math.cos(math.pi - m)  # threshold: cos(pi - m)
+        self.mm = math.sin(math.pi - m) * m  # linear fallback below threshold
 
     def forward(self, emb: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
         cosine = F.linear(F.normalize(emb, dim=1), F.normalize(self.weight, dim=1)).clamp(-1.0, 1.0)
-        theta = torch.acos(cosine)
-        target = torch.cos(theta + self.m)
+        sine = torch.sqrt((1.0 - cosine**2).clamp(min=1e-9))
+        phi = cosine * self.cos_m - sine * self.sin_m  # = cos(theta + m)
+        phi = torch.where(cosine > self.th, phi, cosine - self.mm)  # monotonicity guard
         one_hot = F.one_hot(labels, num_classes=self.weight.shape[0]).float()
-        logits = torch.where(one_hot.bool(), target, cosine) * self.s
-        return logits
+        return torch.where(one_hot.bool(), phi, cosine) * self.s
