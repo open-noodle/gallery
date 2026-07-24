@@ -26,6 +26,7 @@ def export(checkpoint: str, out_onnx: str, device: str = "cpu") -> str:
         output_names=["embedding"],
         dynamic_axes={"input": {0: "batch"}, "embedding": {0: "batch"}},
         opset_version=17,
+        dynamo=False,
     )
     return out_onnx
 
