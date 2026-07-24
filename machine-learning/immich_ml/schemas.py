@@ -52,6 +52,7 @@ class ModelSource(StrEnum):
     MCLIP = "mclip"
     OPENCLIP = "openclip"
     PADDLE = "paddle"
+    PET_RECOGNITION = "pet-recognition"
     YOLO = "yolo"
 
 
@@ -110,6 +111,16 @@ class DetectedPet(TypedDict):
 
 
 PetDetectionOutput = list[DetectedPet]
+
+
+class RecognizedPet(TypedDict):
+    boundingBox: BoundingBox
+    score: float
+    label: str
+    embedding: str
+
+
+PetRecognitionOutput = list[RecognizedPet]
 
 
 class PipelineEntry(TypedDict):

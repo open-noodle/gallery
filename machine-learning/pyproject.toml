@@ -95,3 +95,6 @@ per-file-ignores = { "test_main.py" = ["F403"] }
 
 [tool.pytest.ini_options]
 markers = ["providers", "ov_device_ids"]
+# pet-recognition-training is a separate uv project with its own venv and dependencies;
+# collecting it from here fails on imports (torch, petid) the ML service does not have.
+norecursedirs = ["pet-recognition-training"]
