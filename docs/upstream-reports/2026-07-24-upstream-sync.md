@@ -6,7 +6,7 @@
 - **Fork commits synced from `origin/main`**: 1 (#837)
 - **Conflicts resolved**: 1 (`server/src/services/media.service.ts`)
 - **Risk level**: LOW–MEDIUM
-- **Recommendation**: PROCEED (CI dispatch pending)
+- **Recommendation**: PROCEED — all 10 CI workflows GREEN (1 E2E infra flake, green on re-run)
 - **Product-direction gate**: did NOT fire
 - **Rolling branch**: `rebase/upstream-rolling-v3.0.3`
 - **Backup**: `backup/rolling-pre-batch48-20260724` @ `8832cab8104`
@@ -129,18 +129,28 @@ commits ahead of the tag. `branding/config.json` (`upstream.version` = 3.0.3) an
 ## Remote CI Verification
 
 - **Branch**: `rebase/upstream-rolling-v3.0.3`
-- **Commit validated**: (pending — filled after CI dispatch)
+- **Commit validated**: `e55905c64f0`
+- **Result**: all 10 dispatched workflows GREEN.
 
-| Workflow                                  | Status  | Notes                                       |
-| ----------------------------------------- | ------- | ------------------------------------------- |
-| `test.yml`                                | PENDING |                                             |
-| `docker.yml`                              | PENDING | server touched (media.service)              |
-| `static_analysis.yml`                     | PENDING |                                             |
-| `gallery-build-mobile.yml`                | PENDING | iOS widget touched by #30173                |
-| `gallery-rebase-smoke.yml`                | PENDING |                                             |
-| `storage-migration-tests.yml`             | PENDING |                                             |
-| `storage-migration-e2e.yml`               | PENDING |                                             |
-| `gallery-revert-to-immich-validation.yml` | PENDING | validates the new revert-to-immich coverage |
+| Workflow                                  | Status | Notes                                                             |
+| ----------------------------------------- | ------ | ----------------------------------------------------------------- |
+| `test.yml`                                | GREEN  | 20/20 jobs (after 1 E2E-stack re-run — infra flake, see below)    |
+| `docker.yml`                              | GREEN  | server/web/cli/ml images build (validates media.service change)   |
+| `static_analysis.yml`                     | GREEN  | dart analyze + format + generated-file freshness                  |
+| `gallery-build-mobile.yml`                | GREEN  | iOS + Android compile (validates #30173 widget)                   |
+| `gallery-rebase-smoke.yml`                | GREEN  |                                                                   |
+| `storage-migration-tests.yml`             | GREEN  |                                                                   |
+| `storage-migration-e2e.yml`               | GREEN  |                                                                   |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | validates the new revert-to-immich coverage for MinFacePreference |
+| `gallery-ml-smoke.yml`                    | GREEN  | ML image boots                                                    |
+| `gallery-mobile-smoke.yml`                | GREEN  | Android codegen/analyze                                           |
+
+- **Confirmed flake**: `test.yml`'s "End-to-End Tests (Server & CLI) (ubuntu-latest)" failed on the
+  first run at the **Start Docker Compose** step — buildkit `target immich-server: failed to receive
+status: rpc error: code = Unavailable ... connection reset by peer`, preceded by npm-registry
+  requests taking 10–12s each. Environmental (slow registry + buildkit RPC reset), not code:
+  `docker.yml` and `storage-migration-e2e.yml` built the same images successfully in the same run
+  set. Re-run of the failed jobs (`gh run rerun --failed`) went 20/20 green.
 
 ## Post-Rebase Verification
 
