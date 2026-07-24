@@ -326,6 +326,13 @@ DELETE FROM "migration_overrides" WHERE "name" = 'index_idx_asset_exif_descripti
 -- planner tuning.
 ALTER ROLE CURRENT_USER RESET jit;
 
+-- 1784836013770-MinFacePreferenceMigration (upstream #30177) is data-only: it
+-- backfills each user's user_metadata 'preferences' with people.minimumFaces
+-- from the old system-config machineLearning.facialRecognition.minFaces. Its
+-- down() is a no-op, there is no schema change to reverse, and the extra JSONB
+-- key is inert for the tagged release's schema-check and boot — only its
+-- kysely_migrations row must go (step 8).
+
 -- -----------------------------------------------------------------------------
 -- 8. Delete Gallery + post-v<branding upstream.version> upstream migration rows
 --    from kysely_migrations.
@@ -402,7 +409,8 @@ DELETE FROM "kysely_migrations"
 
    -- Post-tag upstream migrations pulled in by rebase, paired with the schema
    -- rollbacks in step 7. Keep timestamp-sorted.
-   '1784647658615-AddOAuthBearerTokenToSession'
+   '1784647658615-AddOAuthBearerTokenToSession',
+   '1784836013770-MinFacePreferenceMigration'
  );
 
 -- -----------------------------------------------------------------------------
