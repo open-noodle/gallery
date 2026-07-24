@@ -1,6 +1,7 @@
 # Pet Recognition — Phase 2 §4.1 Model Production: Results
 
-- **Status:** ✅ Models built, validated at full test scale, exported and staged. **Not yet uploaded** to the Hub.
+- **Status:** ✅ Complete — models built, validated at full test scale, exported and **published** to
+  [`open-noodle/pet-recognition-{small,base,large}`](https://huggingface.co/open-noodle).
 - **Date:** 2026-07-24
 - **Design:** [`2026-07-24-pet-recognition-phase2-design.md`](../specs/2026-07-24-pet-recognition-phase2-design.md) §4.1
 - **Supersedes the model numbers in:** [`2026-07-24-pet-recognition-phase1-RESULTS.md`](2026-07-24-pet-recognition-phase1-RESULTS.md)
@@ -125,8 +126,18 @@ over real libraries.
 
 ## Publishing
 
-All three repos are staged locally at `runs/publish/pet-recognition-{small,base,large}/`. Upload is a
-deliberate, separate step and is **still pending approval**:
+Published (public) 2026-07-24:
+
+- <https://huggingface.co/open-noodle/pet-recognition-small>
+- <https://huggingface.co/open-noodle/pet-recognition-base>
+- <https://huggingface.co/open-noodle/pet-recognition-large>
+
+Verified after upload by downloading each repo fresh with `snapshot_download` — the same call
+`InferenceModel._download` makes — and running it: every repo serves
+`recognition/model.onnx` + `README.md` + `metrics.json`, and each model loads with signature
+`input[batch,3,224,224] -> embedding[batch,512]` returning unit-norm vectors.
+
+Rebuilding and re-publishing is one command per model:
 
 ```bash
 uv run python -m petid.publish --onnx runs/pet-recognition-base/model.onnx --backbone base \
