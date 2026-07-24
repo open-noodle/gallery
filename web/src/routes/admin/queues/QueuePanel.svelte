@@ -83,6 +83,10 @@
       allText: $t('reset'),
       missingText: $t('missing'),
     },
+    [QueueName.PetRecognition]: {
+      allText: $t('reset'),
+      missingText: $t('missing'),
+    },
     [QueueName.Classification]: {
       allText: $t('all'),
       missingText: $t('missing'),
@@ -120,6 +124,18 @@
       case QueueName.PetDetection: {
         if (dto.force) {
           const confirmed = await modalManager.showDialog({ prompt: $t('admin.confirm_reprocess_all_pets') });
+          if (!confirmed) {
+            return;
+          }
+        }
+        break;
+      }
+
+      case QueueName.PetRecognition: {
+        if (dto.force) {
+          const confirmed = await modalManager.showDialog({
+            prompt: $t('admin.confirm_reprocess_all_pet_recognition'),
+          });
           if (!confirmed) {
             return;
           }

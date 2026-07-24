@@ -94,6 +94,10 @@ export const getQueueJobTypeLabel = (name: JobName) => {
     case JobName.SpacePersonSuggestionScanQueueAll: {
       return 'Shared-space face suggestion scan';
     }
+    case JobName.PetRecognition:
+    case JobName.PetRecognitionQueueAll: {
+      return 'Pet recognition';
+    }
     default: {
       return name.replaceAll(/([a-z])([A-Z])/g, '$1 $2');
     }
@@ -268,6 +272,11 @@ export const asQueueItem = ($t: MessageFormatter, queue: { name: QueueName }): Q
       icon: mdiPaw,
       title: $t('admin.machine_learning_pet_detection'),
       subtitle: $t('admin.pet_detection_job_description'),
+    },
+    [QueueName.PetRecognition]: {
+      icon: mdiPaw,
+      title: $t('admin.machine_learning_pet_recognition'),
+      subtitle: $t('admin.pet_recognition_job_description'),
     },
     [QueueName.VideoConversion]: {
       icon: mdiVideo,

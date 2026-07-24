@@ -15,8 +15,17 @@
   import { zoomImageToBase64 } from '$lib/utils/people-utils';
   import { getRepresentativeThumbnailUrl, resolvePersonAvatar } from '$lib/utils/person-avatar';
   import { type AssetResponseDto } from '@immich/sdk';
-  import { IconButton, Text } from '@immich/ui';
-  import { mdiAccountBoxOutline, mdiCropFree, mdiEye, mdiEyeOff, mdiOpenInNew, mdiPencil, mdiPlus } from '@mdi/js';
+  import { Icon, IconButton, Text } from '@immich/ui';
+  import {
+    mdiAccountBoxOutline,
+    mdiCropFree,
+    mdiEye,
+    mdiEyeOff,
+    mdiOpenInNew,
+    mdiPaw,
+    mdiPencil,
+    mdiPlus,
+  } from '@mdi/js';
   import { DateTime } from 'luxon';
   import { t } from 'svelte-i18n';
 
@@ -214,7 +223,7 @@
       -->
         <div class="relative">
           <a
-            class="group block outline-none"
+            class="group relative block outline-none"
             href={filterHref ?? personPageHref}
             aria-label={filterHref ? `${$t('filter_by_person')}: ${person.name}` : undefined}
             onclick={filterHref ? () => rememberPersonName(person, filterHref) : undefined}
@@ -231,6 +240,15 @@
               {/await}
             {:else}
               {@render avatar(avatarSource.url, person, isHighlighted)}
+            {/if}
+            {#if person.type === 'pet'}
+              <div
+                class="absolute bottom-1 right-1 rounded-full bg-immich-primary p-1 text-white"
+                data-testid="pet-badge"
+                title={person.species ?? undefined}
+              >
+                <Icon icon={mdiPaw} size="16" class="text-white" />
+              </div>
             {/if}
             <p class="mt-1 truncate font-medium" title={person.name}>{person.name}</p>
             {#if person.birthDate && person.formattedAge}
