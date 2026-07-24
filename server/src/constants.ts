@@ -42,6 +42,7 @@ export const VECTOR_EXTENSIONS = [DatabaseExtension.VectorChord, DatabaseExtensi
 export const VECTOR_INDEX_TABLES = {
   [VectorIndex.Clip]: 'smart_search',
   [VectorIndex.Face]: 'face_search',
+  [VectorIndex.Pet]: 'pet_search',
 } as const;
 
 export const VECTORCHORD_LIST_SLACK_FACTOR = 1.2;

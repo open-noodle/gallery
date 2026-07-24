@@ -140,6 +140,9 @@ DROP TABLE IF EXISTS "face_repair_scan" CASCADE;
 DROP TABLE IF EXISTS "face_identity_face" CASCADE;
 DROP TABLE IF EXISTS "face_identity" CASCADE;
 
+-- Pet recognition embeddings
+DROP TABLE IF EXISTS "pet_search" CASCADE;
+
 -- User groups
 DROP TABLE IF EXISTS "user_group_member" CASCADE;
 DROP TABLE IF EXISTS "user_group" CASCADE;
@@ -439,6 +442,7 @@ DELETE FROM "kysely_migrations"
    '1784000000000-FixFaceRepairScanInFlightIndexOverride',
    '1784800000000-RepairSharedSpaceAlbumGrantDrift',
    '1785000000000-AddFaceRepairLock',
+   '1785000000000-CreatePetSearchTable',
    '1786000000000-FaceRepairLockPersonNullable',
    '1787000000000-AddFacePersonVerdict',
    '1788000000000-ReconcileFacePersonVerdictConstraints',
@@ -539,7 +543,8 @@ BEGIN
        'classification_prompt_embedding', 'classification_category',
        'storage_migration_log', 'asset_duplicate_checksum',
        'face_person_verdict', 'face_repair_scan', 'face_repair_decline',
-       'face_repair_scan_flagged_face', 'face_repair_lock'
+       'face_repair_scan_flagged_face', 'face_repair_lock',
+       'pet_search'
      );
   IF fork_tables_left > 0 THEN
     RAISE EXCEPTION 'revert-to-immich: % Gallery table(s) still present after cleanup — aborting.', fork_tables_left;

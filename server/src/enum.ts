@@ -1067,6 +1067,7 @@ export enum QueueCleanType {
 export enum VectorIndex {
   Clip = 'clip_index',
   Face = 'face_index',
+  Pet = 'pet_index',
 }
 
 export enum DatabaseLock {
