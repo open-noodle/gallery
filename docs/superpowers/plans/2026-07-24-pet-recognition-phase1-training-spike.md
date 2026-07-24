@@ -94,6 +94,11 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/petid"]
+
+# Anchors pytest's rootdir to this project so it does not ascend into the parent
+# gallery repo's machine-learning/conftest.py (which imports fastapi, absent here).
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 ```
 
 - [ ] **Step 2: Write `.gitignore`**
@@ -794,8 +799,11 @@ class PetEmbedder(nn.Module):
         if pretrained:
             self.backbone = Dinov2Model.from_pretrained("facebook/dinov2-small")
         else:
+            # image_size=518 matches facebook/dinov2-small's config so a checkpoint trained
+            # with pretrained=True loads cleanly via load_state_dict (position-embedding shapes
+            # match); DINOv2 interpolates pos-encodings at runtime, so 224x224 input still works.
             self.backbone = Dinov2Model(
-                Dinov2Config(hidden_size=EMBED_DIM, num_hidden_layers=12, num_attention_heads=6, patch_size=14, image_size=224)
+                Dinov2Config(hidden_size=EMBED_DIM, num_hidden_layers=12, num_attention_heads=6, patch_size=14, image_size=518)
             )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -807,17 +815,22 @@ class ArcMarginProduct(nn.Module):
     def __init__(self, in_features: int, out_features: int, s: float = 30.0, m: float = 0.5):
         super().__init__()
         self.s = s
-        self.m = m
         self.weight = nn.Parameter(torch.empty(out_features, in_features))
         nn.init.xavier_uniform_(self.weight)
+        self.cos_m = math.cos(m)
+        self.sin_m = math.sin(m)
+        self.th = math.cos(math.pi - m)  # threshold: cos(pi - m)
+        self.mm = math.sin(math.pi - m) * m  # linear fallback below threshold
 
     def forward(self, emb: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
         cosine = F.linear(F.normalize(emb, dim=1), F.normalize(self.weight, dim=1)).clamp(-1.0, 1.0)
-        theta = torch.acos(cosine)
-        target = torch.cos(theta + self.m)
+        # Standard ArcFace with the threshold/easy-margin guard: avoids the acos
+        # non-monotonicity + infinite-gradient instability when the target cosine < cos(pi - m).
+        sine = torch.sqrt((1.0 - cosine**2).clamp(min=1e-9))
+        phi = cosine * self.cos_m - sine * self.sin_m  # = cos(theta + m)
+        phi = torch.where(cosine > self.th, phi, cosine - self.mm)  # monotonicity guard
         one_hot = F.one_hot(labels, num_classes=self.weight.shape[0]).float()
-        logits = torch.where(one_hot.bool(), target, cosine) * self.s
-        return logits
+        return torch.where(one_hot.bool(), phi, cosine) * self.s
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -933,13 +946,15 @@ def identification(emb: np.ndarray, ids: np.ndarray) -> tuple[float, float]:
     n = len(ids)
     top1_hits, aps = 0, []
     for i in range(n):
-        order = np.argsort(-sim[i])
+        # -inf on the diagonal guarantees self sorts last; drop it so the probe
+        # is never scored against itself as a gallery entry.
+        order = np.argsort(-sim[i])[:-1]
         rel = (ids[order] == ids[i]).astype(int)
         if rel[0] == 1:
             top1_hits += 1
         # average precision
         cum = np.cumsum(rel)
-        ranks = np.arange(1, n + 1)
+        ranks = np.arange(1, n)
         precision_at_hits = cum[rel == 1] / ranks[rel == 1]
         aps.append(precision_at_hits.mean() if rel.sum() else 0.0)
     return top1_hits / n, float(np.mean(aps))
