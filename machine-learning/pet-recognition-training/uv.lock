@@ -568,6 +568,7 @@ name = "petid"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "huggingface-hub" },
     { name = "numpy" },
     { name = "onnx" },
     { name = "onnxruntime" },
@@ -585,6 +586,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "huggingface-hub", specifier = ">=0.30" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "onnx", specifier = ">=1.16" },
     { name = "onnxruntime", specifier = ">=1.20" },
