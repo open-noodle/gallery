@@ -333,6 +333,43 @@ where
   "asset_face"."id" = $1
   and "asset_face"."deletedAt" is null
 
+-- PersonRepository.getPetFaceForRecognition
+select
+  "asset_face"."id",
+  "asset_face"."assetId",
+  "asset_face"."personId",
+  (
+    select
+      to_json(obj)
+    from
+      (
+        select
+          "asset"."ownerId"
+        from
+          "asset"
+        where
+          "asset"."id" = "asset_face"."assetId"
+      ) as obj
+  ) as "asset",
+  (
+    select
+      to_json(obj)
+    from
+      (
+        select
+          "pet_search".*
+        from
+          "pet_search"
+        where
+          "pet_search"."faceId" = "asset_face"."id"
+      ) as obj
+  ) as "petSearch"
+from
+  "asset_face"
+where
+  "asset_face"."id" = $1
+  and "asset_face"."deletedAt" is null
+
 -- PersonRepository.getDataForThumbnailGenerationJob
 select
   "person"."ownerId",
@@ -669,6 +706,16 @@ from
     select
       1
   ) as "dummy"
+
+-- PersonRepository.refreshPetFaces
+begin
+insert into
+  "asset_face" ("assetId")
+values
+  ($1)
+returning
+  "id"
+rollback
 
 -- PersonRepository.getFacesByIds
 select
