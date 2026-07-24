@@ -82,6 +82,10 @@ export type DetectedPet = {
   boundingBox: BoundingBox;
   score: number;
   label: string;
+  // Present only when the request included a RECOGNITION entry — the Python side writes both
+  // models' output under the same `pet-detection` response key, and the recognizer (which runs
+  // second) is what adds this field. Absent on the recognition-disabled path.
+  embedding?: string;
 };
 
 export type PetDetectionResponse = { [ModelTask.PET_DETECTION]: DetectedPet[] } & VisualResponse;
@@ -89,6 +93,7 @@ export type PetDetectionResponse = { [ModelTask.PET_DETECTION]: DetectedPet[] } 
 export type PetDetectionRequest = {
   [ModelTask.PET_DETECTION]: {
     [ModelType.DETECTION]: ModelOptions & { options: { minScore: number } };
+    [ModelType.RECOGNITION]?: ModelOptions;
   };
 };
 
@@ -307,10 +312,15 @@ export class MachineLearningRepository {
     }
   }
 
-  async detectPets(imagePath: string, { modelName, minScore }: { modelName: string; minScore: number }) {
-    const request = {
+  async detectPets(
+    imagePath: string,
+    { modelName, minScore }: { modelName: string; minScore: number },
+    recognition?: { modelName: string },
+  ) {
+    const request: PetDetectionRequest = {
       [ModelTask.PET_DETECTION]: {
         [ModelType.DETECTION]: { modelName, options: { minScore } },
+        ...(recognition ? { [ModelType.RECOGNITION]: { modelName: recognition.modelName } } : {}),
       },
     };
     const response = await this.predict<PetDetectionResponse>({ imagePath }, request);

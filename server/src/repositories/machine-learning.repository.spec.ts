@@ -303,6 +303,101 @@ describe(MachineLearningRepository.name, () => {
     });
   });
 
+  describe('detectPets', () => {
+    // 4.1: regression guard for the recognition-disabled path — this must keep passing unchanged.
+    // When `recognition` is omitted, the posted `entries` JSON must have exactly one key
+    // (`detection`) under `pet-detection`, byte-identical to today's request shape.
+    it('sends only the detection entry when recognition is not requested (regression guard)', async () => {
+      const imageData = Buffer.from('disk-pet-image');
+      mockReadFile.mockResolvedValue(imageData);
+
+      const petResponse = {
+        [ModelTask.PET_DETECTION]: [
+          { boundingBox: { x1: 1, y1: 2, x2: 3, y2: 4 }, score: 0.9, label: 'dog' },
+        ],
+        imageHeight: 480,
+        imageWidth: 640,
+      };
+      mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(petResponse) });
+
+      await sut.detectPets('/data/upload/preview.webp', { modelName: 'yolo11s', minScore: 0.6 });
+
+      const [, options] = mockFetch.mock.calls[0];
+      const formData = options.body as FormData;
+      const entries = JSON.parse(formData.get('entries') as string);
+      expect(entries).toEqual({
+        [ModelTask.PET_DETECTION]: {
+          [ModelType.DETECTION]: { modelName: 'yolo11s', options: { minScore: 0.6 } },
+        },
+      });
+      expect(Object.keys(entries[ModelTask.PET_DETECTION])).toEqual(['detection']);
+    });
+
+    it('sends both detection and recognition entries when recognition is requested', async () => {
+      const imageData = Buffer.from('disk-pet-image');
+      mockReadFile.mockResolvedValue(imageData);
+
+      const petResponse = {
+        [ModelTask.PET_DETECTION]: [
+          {
+            boundingBox: { x1: 1, y1: 2, x2: 3, y2: 4 },
+            score: 0.9,
+            label: 'dog',
+            embedding: 'pet-embedding',
+          },
+        ],
+        imageHeight: 480,
+        imageWidth: 640,
+      };
+      mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(petResponse) });
+
+      await sut.detectPets(
+        '/data/upload/preview.webp',
+        { modelName: 'yolo11s', minScore: 0.6 },
+        { modelName: 'pet-recognition-base' },
+      );
+
+      const [, options] = mockFetch.mock.calls[0];
+      const formData = options.body as FormData;
+      const entries = JSON.parse(formData.get('entries') as string);
+      expect(entries).toEqual({
+        [ModelTask.PET_DETECTION]: {
+          [ModelType.DETECTION]: { modelName: 'yolo11s', options: { minScore: 0.6 } },
+          [ModelType.RECOGNITION]: { modelName: 'pet-recognition-base' },
+        },
+      });
+    });
+
+    it('maps embedding through onto each parsed pet', async () => {
+      const imageData = Buffer.from('disk-pet-image');
+      mockReadFile.mockResolvedValue(imageData);
+
+      const petResponse = {
+        [ModelTask.PET_DETECTION]: [
+          {
+            boundingBox: { x1: 1, y1: 2, x2: 3, y2: 4 },
+            score: 0.9,
+            label: 'cat',
+            embedding: 'cat-embedding-string',
+          },
+        ],
+        imageHeight: 480,
+        imageWidth: 640,
+      };
+      mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(petResponse) });
+
+      const result = await sut.detectPets(
+        '/data/upload/preview.webp',
+        { modelName: 'yolo11s', minScore: 0.6 },
+        { modelName: 'pet-recognition-base' },
+      );
+
+      expect(result.pets).toHaveLength(1);
+      expect(result.pets[0].embedding).toBe('cat-embedding-string');
+      expect(result.pets[0].label).toBe('cat');
+    });
+  });
+
   describe('ocr', () => {
     it('should perform OCR with S3 path', async () => {
       const imageData = Buffer.from('s3-ocr-image');

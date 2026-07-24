@@ -9,6 +9,7 @@ import { DB } from 'src/schema';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table';
 import { PersonTable } from 'src/schema/tables/person.table';
+import { PetSearchTable } from 'src/schema/tables/pet-search.table';
 import { dummy, removeUndefinedKeys, withFilePath } from 'src/utils/database';
 import { retargetDeclinePersonId } from 'src/utils/face-decline-merge';
 import { reviewableAssetVisibility } from 'src/utils/face-review';
@@ -1016,6 +1017,44 @@ export class PersonRepository {
     }
 
     await query.selectFrom(dummy).execute();
+  }
+
+  /**
+   * Pet-recognition equivalent of {@link refreshFaces}, simplified: pets have no "remove stale
+   * faces" step here (that lives in the detection pipeline, not recognition). Unlike
+   * `refreshFaces` — where the caller pre-generates each face's id client-side so it can be
+   * reused as `face_search.faceId` in the same statement — `facesToAdd` here carries no `id`, so
+   * `asset_face.id` is DB-generated. The caller (Slice 5) needs those generated ids to queue one
+   * `PetRecognition` job per face, so this returns them. `embeddingsToAdd[i]` is paired
+   * positionally with `facesToAdd[i]` (not by an explicit `faceId`, which the caller cannot know
+   * ahead of the insert); pass a shorter `embeddingsToAdd` to skip embeddings for the trailing
+   * faces (e.g. a defensive path where the ML service returned a pet with no embedding).
+   */
+  @GenerateSql({
+    params: [[{ assetId: DummyValue.UUID }], [DummyValue.VECTOR]],
+  })
+  async refreshPetFaces(
+    facesToAdd: (Insertable<AssetFaceTable> & { assetId: string })[],
+    embeddingsToAdd: string[],
+  ): Promise<string[]> {
+    if (facesToAdd.length === 0) {
+      return [];
+    }
+
+    return this.db.transaction().execute(async (trx) => {
+      const inserted = await trx.insertInto('asset_face').values(facesToAdd).returning('id').execute();
+      const faceIds = inserted.map(({ id }) => id);
+
+      if (embeddingsToAdd.length > 0) {
+        const embeddingRows: Insertable<PetSearchTable>[] = embeddingsToAdd.map((embedding, index) => ({
+          faceId: faceIds[index],
+          embedding,
+        }));
+        await trx.insertInto('pet_search').values(embeddingRows).execute();
+      }
+
+      return faceIds;
+    });
   }
 
   async update(person: Updateable<PersonTable> & { id: string }, db: Kysely<DB> | Transaction<DB> = this.db) {

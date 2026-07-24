@@ -285,6 +285,20 @@ export interface FaceSearchResult {
   personId: string | null;
 }
 
+// Pet equivalent of FaceEmbeddingSearch, scoped to pet_search instead of face_search. Deliberately
+// drops `minBirthDate` — a person's birthdate has no pet analogue, so the filter is meaningless here.
+export interface PetEmbeddingSearch extends SearchEmbeddingOptions {
+  hasPerson?: boolean;
+  numResults: number;
+  maxDistance: number;
+}
+
+export interface PetSearchResult {
+  distance: number;
+  id: string;
+  personId: string | null;
+}
+
 export interface AssetDuplicateResult {
   assetId: string;
   duplicateId: string | null;
@@ -1148,6 +1162,50 @@ export class SearchRepository {
                 eb.or([eb('person.birthDate', 'is', null), eb('person.birthDate', '<=', minBirthDate!)]),
               ),
             )
+            .orderBy('distance')
+            .limit(numResults),
+        )
+        .selectFrom('cte')
+        .selectAll()
+        .where('cte.distance', '<=', maxDistance)
+        .execute();
+    });
+  }
+
+  // Copy of searchFaces (above) scoped to pet_search instead of face_search — see the isolation
+  // decision in PetEmbeddingSearch's comment. No `person` join / `minBirthDate` filter: pets have
+  // no birthdate concept, and hasPerson only needs asset_face.personId, already on the base table.
+  @GenerateSql({
+    params: [
+      {
+        userIds: [DummyValue.UUID],
+        embedding: DummyValue.VECTOR,
+        numResults: 10,
+        maxDistance: 0.6,
+      },
+    ],
+  })
+  searchPets({ userIds, embedding, numResults, maxDistance, hasPerson }: PetEmbeddingSearch) {
+    if (!z.int().min(1).max(1000).safeParse(numResults).success) {
+      throw new Error(`Invalid value for 'numResults': ${numResults}`);
+    }
+
+    return this.db.transaction().execute(async (trx) => {
+      await sql`set local vchordrq.probes = ${sql.lit(probes[VectorIndex.Pet])}`.execute(trx);
+      return await trx
+        .with('cte', (qb) =>
+          qb
+            .selectFrom('asset_face')
+            .select([
+              'asset_face.id',
+              'asset_face.personId',
+              sql<number>`pet_search.embedding <=> ${embedding}`.as('distance'),
+            ])
+            .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+            .innerJoin('pet_search', 'pet_search.faceId', 'asset_face.id')
+            .where('asset.ownerId', '=', anyUuid(userIds))
+            .where('asset.deletedAt', 'is', null)
+            .$if(!!hasPerson, (qb) => qb.where('asset_face.personId', 'is not', null))
             .orderBy('distance')
             .limit(numResults),
         )

@@ -1,24 +1,77 @@
 // Slice 2 (pet recognition phase 2): pet_search stores one 512-d embedding per pet asset_face,
 // mirroring face_search but isolated to its own table so pet and human embeddings never mix in a
-// kNN search (see spec §4.4). This file only proves the schema/migration land correctly — a
-// dedicated repository arrives in a later slice, so these tests talk to ctx.database directly,
-// mirroring face-backfill-contributions.medium.spec.ts.
+// kNN search (see spec §4.4). The `describe('pet_search', ...)` block below only proves the
+// schema/migration land correctly, so those tests talk to ctx.database directly, mirroring
+// face-backfill-contributions.medium.spec.ts. Slice 4 (below) adds the repository methods
+// (PersonRepository.refreshPetFaces, SearchRepository.searchPets) that write/read pet_search.
 import { Kysely, sql } from 'kysely';
 import { VECTOR_INDEX_TABLES } from 'src/constants';
 import { VectorIndex } from 'src/enum';
 import { probes } from 'src/repositories/database.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
+import { PersonRepository } from 'src/repositories/person.repository';
+import { SearchRepository } from 'src/repositories/search.repository';
 import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
 import { newMediumService } from 'test/medium.factory';
-import { newEmbedding } from 'test/small.factory';
+import { newEmbedding, newUuid } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
 
 let db: Kysely<DB>;
 
 const setup = () => {
-  const { ctx } = newMediumService(BaseService, { database: db, real: [], mock: [LoggingRepository] });
+  const { ctx } = newMediumService(BaseService, {
+    database: db,
+    real: [PersonRepository, SearchRepository],
+    mock: [LoggingRepository],
+  });
   return { ctx };
+};
+
+// Two clusters on disjoint embedding axes are maximally dissimilar (cosine distance ~1.0). Mirrors
+// axisEmbedding/blendedEmbedding in face-identity.repository.spec.ts:244-267 — reused here (rather
+// than random newEmbedding() vectors) so distance-threshold tests (4.5) have known, reproducible
+// distances instead of relying on the all-positive random components of newEmbedding() staying apart.
+const axisEmbedding = (axis: 'first' | 'second') => {
+  const values = Array.from({ length: 512 }, (_, index) => {
+    const inFirstHalf = index < 256;
+    return (axis === 'first' ? inFirstHalf : !inFirstHalf) ? 1 : 0;
+  });
+  return '[' + values.join(',') + ']';
+};
+
+// A 0/1 vector with `firstHalfOnes` ones in [0,256) and `secondHalfOnes` ones in [256,512). Against an
+// all-ones-first-half centroid (axisEmbedding('first')), cosine distance = 1 - firstHalfOnes/256 when the
+// total ones = 256. So blendedEmbedding(140,116) sits at distance ~0.453 and (116,140) at ~0.547 —
+// straddling a 0.5 maxDistance guard.
+const blendedEmbedding = (firstHalfOnes: number, secondHalfOnes: number) => {
+  const values = Array.from({ length: 512 }, (_, index) => {
+    if (index < firstHalfOnes) {
+      return 1;
+    }
+    if (index >= 256 && index < 256 + secondHalfOnes) {
+      return 1;
+    }
+    return 0;
+  });
+  return '[' + values.join(',') + ']';
+};
+
+const newPetFace = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  input: { ownerId: string; embedding: string; personId?: string | null },
+) => {
+  const { asset } = await ctx.newAsset({ ownerId: input.ownerId });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: input.personId ?? null });
+  await ctx.database.insertInto('pet_search').values({ faceId: assetFace.id, embedding: input.embedding }).execute();
+  return { asset, assetFace };
+};
+
+const newHumanFace = async (ctx: ReturnType<typeof setup>['ctx'], input: { ownerId: string; embedding: string }) => {
+  const { asset } = await ctx.newAsset({ ownerId: input.ownerId });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id });
+  await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: input.embedding }).execute();
+  return { asset, assetFace };
 };
 
 beforeAll(async () => {
@@ -88,5 +141,201 @@ describe('pet_search', () => {
     }>`SELECT indexname FROM pg_indexes WHERE tablename = 'pet_search'`.execute(ctx.database);
 
     expect(rows.map((row) => row.indexname)).toContain('pet_index');
+  });
+});
+
+describe('PersonRepository.refreshPetFaces', () => {
+  // 4.4
+  it('inserts an asset_face and a pet_search row and returns the created face id', async () => {
+    const { ctx } = setup();
+    const personRepository = ctx.get(PersonRepository);
+    const { user } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    const embedding = newEmbedding();
+
+    const faceIds = await personRepository.refreshPetFaces(
+      [
+        {
+          assetId: asset.id,
+          imageWidth: 200,
+          imageHeight: 200,
+          boundingBoxX1: 10,
+          boundingBoxY1: 10,
+          boundingBoxX2: 60,
+          boundingBoxY2: 60,
+        },
+      ],
+      [embedding],
+    );
+
+    expect(faceIds).toHaveLength(1);
+    const [faceId] = faceIds;
+    expect(typeof faceId).toBe('string');
+
+    const faceRow = await ctx.database
+      .selectFrom('asset_face')
+      .selectAll()
+      .where('id', '=', faceId)
+      .executeTakeFirstOrThrow();
+    expect(faceRow.assetId).toBe(asset.id);
+    expect(faceRow.boundingBoxX1).toBe(10);
+
+    const petSearchRow = await ctx.database
+      .selectFrom('pet_search')
+      .selectAll()
+      .where('faceId', '=', faceId)
+      .executeTakeFirstOrThrow();
+    expect(petSearchRow.faceId).toBe(faceId);
+    const stored = JSON.parse(petSearchRow.embedding) as number[];
+    const inserted = JSON.parse(embedding) as number[];
+    expect(stored).toHaveLength(inserted.length);
+  });
+
+  it('inserts multiple faces and pairs each with its positionally-matched embedding', async () => {
+    const { ctx } = setup();
+    const personRepository = ctx.get(PersonRepository);
+    const { user } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    const firstEmbedding = axisEmbedding('first');
+    const secondEmbedding = axisEmbedding('second');
+
+    const faceIds = await personRepository.refreshPetFaces(
+      [
+        { assetId: asset.id, boundingBoxX1: 1, boundingBoxY1: 1, boundingBoxX2: 2, boundingBoxY2: 2 },
+        { assetId: asset.id, boundingBoxX1: 3, boundingBoxY1: 3, boundingBoxX2: 4, boundingBoxY2: 4 },
+      ],
+      [firstEmbedding, secondEmbedding],
+    );
+
+    expect(faceIds).toHaveLength(2);
+    const rows = await ctx.database
+      .selectFrom('pet_search')
+      .selectAll()
+      .where('faceId', 'in', faceIds)
+      .execute();
+    const byFaceId = new Map(rows.map((row) => [row.faceId, row.embedding]));
+    expect(JSON.parse(byFaceId.get(faceIds[0])!)).toEqual(JSON.parse(firstEmbedding));
+    expect(JSON.parse(byFaceId.get(faceIds[1])!)).toEqual(JSON.parse(secondEmbedding));
+  });
+
+  it('is a no-op for empty input rather than issuing malformed SQL', async () => {
+    const { ctx } = setup();
+    const personRepository = ctx.get(PersonRepository);
+
+    await expect(personRepository.refreshPetFaces([], [])).resolves.toEqual([]);
+  });
+});
+
+describe('SearchRepository.searchPets', () => {
+  // 4.5
+  it('orders results by cosine distance and honours maxDistance', async () => {
+    const { ctx } = setup();
+    const searchRepository = ctx.get(SearchRepository);
+    const { user } = await ctx.newUser();
+    const query = axisEmbedding('first');
+    const { assetFace: nearFace } = await newPetFace(ctx, {
+      ownerId: user.id,
+      embedding: blendedEmbedding(140, 116), // distance ~0.453
+    });
+    const { assetFace: farFace } = await newPetFace(ctx, {
+      ownerId: user.id,
+      embedding: blendedEmbedding(116, 140), // distance ~0.547
+    });
+
+    const loose = await searchRepository.searchPets({
+      userIds: [user.id],
+      embedding: query,
+      numResults: 10,
+      maxDistance: 0.6,
+    });
+    expect(loose.map((result) => result.id)).toEqual([nearFace.id, farFace.id]);
+
+    const tight = await searchRepository.searchPets({
+      userIds: [user.id],
+      embedding: query,
+      numResults: 10,
+      maxDistance: 0.5,
+    });
+    expect(tight.map((result) => result.id)).toEqual([nearFace.id]);
+  });
+
+  // 4.6
+  it('only returns pet faces owned by the given user', async () => {
+    const { ctx } = setup();
+    const searchRepository = ctx.get(SearchRepository);
+    const { user: owner } = await ctx.newUser();
+    const { user: otherUser } = await ctx.newUser();
+    const query = axisEmbedding('first');
+    const { assetFace: ownFace } = await newPetFace(ctx, { ownerId: owner.id, embedding: query });
+    await newPetFace(ctx, { ownerId: otherUser.id, embedding: query });
+
+    const results = await searchRepository.searchPets({
+      userIds: [owner.id],
+      embedding: query,
+      numResults: 10,
+      maxDistance: 0.1,
+    });
+
+    expect(results.map((result) => result.id)).toEqual([ownFace.id]);
+  });
+
+  // 4.7
+  it('excludes unassigned faces when hasPerson is true', async () => {
+    const { ctx } = setup();
+    const searchRepository = ctx.get(SearchRepository);
+    const { user } = await ctx.newUser();
+    const { person } = await ctx.newPerson({ ownerId: user.id });
+    const query = axisEmbedding('first');
+    const { assetFace: assignedFace } = await newPetFace(ctx, {
+      ownerId: user.id,
+      embedding: query,
+      personId: person.id,
+    });
+    await newPetFace(ctx, { ownerId: user.id, embedding: query, personId: null });
+
+    const results = await searchRepository.searchPets({
+      userIds: [user.id],
+      embedding: query,
+      numResults: 10,
+      maxDistance: 0.1,
+      hasPerson: true,
+    });
+
+    expect(results.map((result) => result.id)).toEqual([assignedFace.id]);
+  });
+
+  // 4.8: proves the separate-table design decision (§4.4) — a human face_search row with a
+  // matching embedding must never leak into a pet search.
+  it('never returns rows from face_search, even with a matching embedding', async () => {
+    const { ctx } = setup();
+    const searchRepository = ctx.get(SearchRepository);
+    const { user } = await ctx.newUser();
+    const query = axisEmbedding('first');
+    const { assetFace: petFace } = await newPetFace(ctx, { ownerId: user.id, embedding: query });
+    const { assetFace: humanFace } = await newHumanFace(ctx, { ownerId: user.id, embedding: query });
+
+    const results = await searchRepository.searchPets({
+      userIds: [user.id],
+      embedding: query,
+      numResults: 10,
+      maxDistance: 0.1,
+    });
+
+    expect(results.map((result) => result.id)).toEqual([petFace.id]);
+    expect(results.map((result) => result.id)).not.toContain(humanFace.id);
+  });
+
+  it('rejects a numResults below 1, mirroring searchFaces', () => {
+    const { ctx } = setup();
+    const searchRepository = ctx.get(SearchRepository);
+
+    expect(() =>
+      searchRepository.searchPets({
+        userIds: [newUuid()],
+        embedding: axisEmbedding('first'),
+        numResults: 0,
+        maxDistance: 0.5,
+      }),
+    ).toThrow();
   });
 });
