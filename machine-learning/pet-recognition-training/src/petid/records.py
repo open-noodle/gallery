@@ -12,11 +12,11 @@ class ImageRecord:
 
 
 def write_manifest(records: list[ImageRecord], path: str) -> None:
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         json.dump({"records": [asdict(r) for r in records]}, f, indent=2)
 
 
 def read_manifest(path: str) -> list[ImageRecord]:
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         data = json.load(f)
     return [ImageRecord(**r) for r in data["records"]]

@@ -35,3 +35,13 @@ def test_evaluate_smoke(synthetic_data_root, tmp_path):
     result = evaluate(str(manifest), ckpt, str(report), device="cpu")
     assert report.exists()
     assert "dog" in result or "cat" in result  # at least one species evaluated
+
+
+def test_full_config_smoke(synthetic_data_root, tmp_path):
+    manifest = tmp_path / "m.json"
+    build(str(synthetic_data_root), str(manifest), min_images=2, test_frac=0.5, seed=0)
+    ckpt = train_run(
+        str(manifest), str(tmp_path / "f"), config="full", epochs=1, batch=2, bf16=False, device="cpu", limit=6
+    )
+    blob = torch.load(ckpt, map_location="cpu")
+    assert blob["config"] == "full" and "embedder" in blob

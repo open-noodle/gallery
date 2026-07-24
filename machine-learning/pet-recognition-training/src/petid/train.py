@@ -20,7 +20,9 @@ def train_run(
     bf16: bool,
     device: str,
     limit: int | None = None,
+    seed: int = 0,
 ) -> str:
+    torch.manual_seed(seed)
     os.makedirs(out_dir, exist_ok=True)
     recs = [r for r in read_manifest(manifest) if r.split == "train"]
     if limit:
@@ -71,8 +73,9 @@ def main() -> None:
     ap.add_argument("--bf16", action="store_true")
     ap.add_argument("--device", default="mps")
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--seed", type=int, default=0)
     a = ap.parse_args()
-    path = train_run(a.manifest, a.out, a.config, a.epochs, a.batch, a.bf16, a.device, a.limit)
+    path = train_run(a.manifest, a.out, a.config, a.epochs, a.batch, a.bf16, a.device, a.limit, a.seed)
     print(f"checkpoint: {path}")
 
 

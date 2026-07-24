@@ -15,7 +15,7 @@ def verification_scores(emb: np.ndarray, ids: np.ndarray) -> tuple[float, float]
     auc = float(roc_auc_score(labels, scores))
     # EER: sweep thresholds, find |FAR - FRR| minimum
     order = np.argsort(-scores)
-    s_sorted, l_sorted = scores[order], labels[order]
+    l_sorted = labels[order]
     P, N = l_sorted.sum(), len(l_sorted) - l_sorted.sum()
     tp = np.cumsum(l_sorted)
     fp = np.cumsum(1 - l_sorted)
