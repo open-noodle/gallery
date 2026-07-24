@@ -284,6 +284,17 @@ export interface IFacialRecognitionJob extends IDeferrableJob {
   skipSharedSpaceMatch?: boolean;
 }
 
+export interface IPetRecognitionJob extends IDeferrableJob {
+  /**
+   * The species/breed label from ML pet detection. `asset_face` has no species column, so this is
+   * how the label reaches the point (Part B, brand-new-person creation) that needs it — set by
+   * `handlePetDetection` when it queues the job, and carried through the one deferred re-queue.
+   * Optional because a future caller without a freshly-detected label (e.g. Slice 6 reprocessing
+   * an existing unassigned face) may have none to offer.
+   */
+  label?: string;
+}
+
 export interface INightlyJob extends IBaseJob {
   nightly?: boolean;
 }
@@ -587,7 +598,7 @@ export type JobItem =
 
   // Pet Recognition
   | { name: JobName.PetRecognitionQueueAll; data: INightlyJob }
-  | { name: JobName.PetRecognition; data: IDeferrableJob & IEntityJob }
+  | { name: JobName.PetRecognition; data: IPetRecognitionJob }
 
   // Workflow
   | { name: JobName.WorkflowAssetTrigger; data: { workflowId: string; assetId: string } }

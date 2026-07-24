@@ -164,6 +164,12 @@ const withFaceSearch = (eb: ExpressionBuilder<DB, 'asset_face'>) => {
   ).as('faceSearch');
 };
 
+const withPetSearch = (eb: ExpressionBuilder<DB, 'asset_face'>) => {
+  return jsonObjectFrom(
+    eb.selectFrom('pet_search').selectAll('pet_search').whereRef('pet_search.faceId', '=', 'asset_face.id'),
+  ).as('petSearch');
+};
+
 @Injectable()
 export class PersonRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
@@ -697,6 +703,28 @@ export class PersonRepository {
         ).as('asset'),
       )
       .select(withFaceSearch)
+      .where('asset_face.id', '=', id)
+      .where('asset_face.deletedAt', 'is', null)
+      .executeTakeFirst();
+  }
+
+  /**
+   * Pet-recognition equivalent of {@link getFaceForFacialRecognitionJob}: face + owning asset +
+   * `pet_search` embedding for {@link PetRecognitionService.handlePetRecognition}. Pets have no
+   * birthdate/visibility gating (see `PetEmbeddingSearch`), so the asset selection is narrower —
+   * just `ownerId`.
+   */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getPetFaceForRecognition(id: string) {
+    return this.db
+      .selectFrom('asset_face')
+      .select(['asset_face.id', 'asset_face.assetId', 'asset_face.personId'])
+      .select((eb) =>
+        jsonObjectFrom(
+          eb.selectFrom('asset').select(['asset.ownerId']).whereRef('asset.id', '=', 'asset_face.assetId'),
+        ).as('asset'),
+      )
+      .select(withPetSearch)
       .where('asset_face.id', '=', id)
       .where('asset_face.deletedAt', 'is', null)
       .executeTakeFirst();
