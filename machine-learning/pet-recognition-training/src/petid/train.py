@@ -2,6 +2,7 @@
 import argparse
 import contextlib
 import os
+import time
 
 import torch
 from torch.utils.data import DataLoader
@@ -21,6 +22,8 @@ def train_run(
     device: str,
     limit: int | None = None,
     seed: int = 0,
+    num_workers: int = 0,
+    lr: float = 1e-4,
 ) -> str:
     torch.manual_seed(seed)
     os.makedirs(out_dir, exist_ok=True)
@@ -43,22 +46,41 @@ def train_run(
 
     head = ArcMarginProduct(384, out_features=len(label_map)).to(device)
     params = [p for p in embedder.parameters() if p.requires_grad] + list(head.parameters())
-    opt = torch.optim.AdamW(params, lr=1e-4)
+    opt = torch.optim.AdamW(params, lr=lr)
     loss_fn = torch.nn.CrossEntropyLoss()
-    loader = DataLoader(PetDataset(recs, label_map, train=True), batch_size=batch, shuffle=True)
+    loader = DataLoader(
+        PetDataset(recs, label_map, train=True),
+        batch_size=batch,
+        shuffle=True,
+        num_workers=num_workers,
+        persistent_workers=num_workers > 0,
+        **({"prefetch_factor": 4} if num_workers > 0 else {}),
+    )
 
     def ctx():
         return torch.autocast(device_type=device, dtype=torch.bfloat16) if bf16 else contextlib.nullcontext()
 
     embedder.train()
-    for _epoch in range(epochs):
+    n = len(recs)
+    for epoch in range(epochs):
+        t0 = time.perf_counter()
+        epoch_loss = torch.zeros((), device=device)
+        n_batches = 0
         for x, y in loader:
-            x, y = x.to(device), y.to(device)
+            x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
             opt.zero_grad()
             with ctx():
                 loss = loss_fn(head(embedder(x), y), y)
             loss.backward()
             opt.step()
+            epoch_loss += loss.detach()
+            n_batches += 1
+        dt = time.perf_counter() - t0
+        print(
+            f"epoch {epoch + 1}/{epochs}  loss={epoch_loss.item() / max(n_batches, 1):.3f}  "
+            f"{n / dt:.0f} img/s  ({dt:.0f}s)",
+            flush=True,
+        )
     torch.save({"embedder": embedder.state_dict(), "config": config}, ckpt_path)
     return ckpt_path
 
@@ -74,8 +96,12 @@ def main() -> None:
     ap.add_argument("--device", default="mps")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--num-workers", type=int, default=0)
+    ap.add_argument("--lr", type=float, default=1e-4)
     a = ap.parse_args()
-    path = train_run(a.manifest, a.out, a.config, a.epochs, a.batch, a.bf16, a.device, a.limit, a.seed)
+    path = train_run(
+        a.manifest, a.out, a.config, a.epochs, a.batch, a.bf16, a.device, a.limit, a.seed, a.num_workers, a.lr
+    )
     print(f"checkpoint: {path}")
 
 
