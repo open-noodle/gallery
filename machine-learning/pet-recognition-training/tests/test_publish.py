@@ -20,9 +20,14 @@ def test_model_card_names_the_dataset_behind_each_split():
     assert "dog_dogfacenet" not in card, "raw split keys should not leak into the card"
 
 
-def test_repo_id_follows_the_pet_reid_naming():
-    assert repo_id_for("facebook/dinov2-large") == f"{HF_ORG}/pet-reid-large"
-    assert repo_id_for("small") == f"{HF_ORG}/pet-reid-small"
+def test_repo_id_uses_the_gallery_org_and_product_naming():
+    assert HF_ORG == "noodle-gallery"
+    assert repo_id_for("facebook/dinov2-large") == "noodle-gallery/pet-recognition-large"
+    assert repo_id_for("small") == "noodle-gallery/pet-recognition-small"
+
+
+def test_repo_id_accepts_an_org_override():
+    assert repo_id_for("base", org="someone-else") == "someone-else/pet-recognition-base"
 
 
 def test_model_card_documents_the_io_contract_and_licensing():
@@ -36,6 +41,10 @@ def test_model_card_documents_the_io_contract_and_licensing():
     assert "Cat Individual Images" in card and "CC BY" in card
     # measured quality, not vague claims
     assert "0.023" in card and "0.044" in card
+
+
+def test_model_card_titles_the_model_by_its_repo_name():
+    assert "# pet-recognition-base" in model_card("base", _metrics(), out_dim=512)
 
 
 def test_model_card_frontmatter_is_first_and_well_formed():

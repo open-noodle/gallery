@@ -1,7 +1,7 @@
 # Pet Re-ID Model Training
 
 Isolated training project that produces Gallery's **pet recognition** models —
-`Deeds67/pet-reid-{small,base,large}`. Not part of the production ML service; the service
+`noodle-gallery/pet-recognition-{small,base,large}`. Not part of the production ML service; the service
 only consumes the published ONNX.
 
 ## The recipe
@@ -35,12 +35,12 @@ scripts/build_models.sh            # train + evaluate + export + stage, for all 
 `build_models.sh` runs, per backbone:
 
 ```bash
-uv run python -m petid.train      --backbone base --out runs/pet-reid-base --manifest manifest.json
-uv run python -m petid.evaluate   --checkpoint runs/pet-reid-base/best.pt --manifest manifest.json \
-                                  --out runs/pet-reid-base/report.md --json runs/pet-reid-base/metrics.json
-uv run python -m petid.export_onnx --checkpoint runs/pet-reid-base/best.pt --out runs/pet-reid-base/model.onnx
-uv run python -m petid.publish    --onnx runs/pet-reid-base/model.onnx --backbone base \
-                                  --metrics runs/pet-reid-base/metrics.json   # add --upload to push
+uv run python -m petid.train      --backbone base --out runs/pet-recognition-base --manifest manifest.json
+uv run python -m petid.evaluate   --checkpoint runs/pet-recognition-base/best.pt --manifest manifest.json \
+                                  --out runs/pet-recognition-base/report.md --json runs/pet-recognition-base/metrics.json
+uv run python -m petid.export_onnx --checkpoint runs/pet-recognition-base/best.pt --out runs/pet-recognition-base/model.onnx
+uv run python -m petid.publish    --onnx runs/pet-recognition-base/model.onnx --backbone base \
+                                  --metrics runs/pet-recognition-base/metrics.json   # add --upload to push
 ```
 
 ## Caches

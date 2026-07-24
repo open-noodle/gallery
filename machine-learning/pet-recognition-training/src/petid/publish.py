@@ -13,14 +13,16 @@ from pathlib import Path
 
 from petid.model import OUT_DIM, resolve_backbone
 
-HF_ORG = "Deeds67"
+HF_ORG = "noodle-gallery"
 
 _SHORT = {"facebook/dinov2-small": "small", "facebook/dinov2-base": "base", "facebook/dinov2-large": "large"}
 _PARAMS = {"small": "22M", "base": "86M", "large": "300M"}
 
 
-def repo_id_for(backbone: str) -> str:
-    return f"{HF_ORG}/pet-reid-{_SHORT[resolve_backbone(backbone)]}"
+#: Repo name doubles as the user-facing `petRecognition.modelName` in the admin UI, so it
+#: follows the product's vocabulary ("pet recognition") rather than the ML term "re-ID".
+def repo_id_for(backbone: str, org: str = HF_ORG) -> str:
+    return f"{org}/pet-recognition-{_SHORT[resolve_backbone(backbone)]}"
 
 
 _SPLIT_LABELS = {
@@ -55,7 +57,7 @@ tags:
 library_name: onnx
 ---
 
-# pet-reid-{short}
+# pet-recognition-{short}
 
 Individual **pet re-identification** embeddings (dogs and cats) — the "which pet is this"
 layer used by [Gallery](https://opennoodle.de)'s pet recognition, on top of whole-animal
@@ -102,8 +104,8 @@ this model is safe for commercial use.
 
 ## Siblings
 
-`pet-reid-small` / `pet-reid-base` / `pet-reid-large` trade accuracy against cost; `base`
-is Gallery's default.
+`pet-recognition-small` / `pet-recognition-base` / `pet-recognition-large` trade accuracy
+against cost; `base` is Gallery's default.
 """
 
 
@@ -135,12 +137,13 @@ def main() -> None:
     ap.add_argument("--backbone", required=True)
     ap.add_argument("--metrics", required=True, help="metrics.json written by petid.evaluate --json")
     ap.add_argument("--staging", default=None)
+    ap.add_argument("--org", default=HF_ORG)
     ap.add_argument("--upload", action="store_true", help="actually push to the Hub")
     a = ap.parse_args()
 
     with open(a.metrics) as f:
         metrics = json.load(f)
-    repo_id = repo_id_for(a.backbone)
+    repo_id = repo_id_for(a.backbone, a.org)
     staging = a.staging or os.path.join("runs", "publish", repo_id.split("/")[-1])
     staged = stage_repo(a.onnx, a.backbone, metrics, staging)
     print(f"staged {repo_id} at {staged}")

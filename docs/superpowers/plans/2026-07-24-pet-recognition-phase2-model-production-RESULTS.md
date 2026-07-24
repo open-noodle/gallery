@@ -14,9 +14,9 @@ one `pet_search` schema and a model switch only requires re-embedding.
 
 | Model            | Backbone (frozen)       | ONNX   | 🐕 dog EER | 🐈 cat EER | 🐕 dog Top-1 | torch↔ORT parity |
 | ---------------- | ----------------------- | ------ | ---------- | ---------- | ------------ | ---------------- |
-| `pet-reid-small` | `facebook/dinov2-small` | 85 MB  | 0.068      | 0.065      | 0.535        | 6.3e-07          |
-| `pet-reid-base`  | `facebook/dinov2-base`  | 332 MB | 0.047      | 0.045      | 0.612        | 8.6e-07          |
-| `pet-reid-large` | `facebook/dinov2-large` | 1.1 GB | **0.034**  | **0.041**  | **0.672**    | 1.3e-06          |
+| `pet-recognition-small` | `facebook/dinov2-small` | 85 MB  | 0.068      | 0.065      | 0.535        | 6.3e-07          |
+| `pet-recognition-base`  | `facebook/dinov2-base`  | 332 MB | 0.047      | 0.045      | 0.612        | 8.6e-07          |
+| `pet-recognition-large` | `facebook/dinov2-large` | 1.1 GB | **0.034**  | **0.041**  | **0.672**    | 1.3e-06          |
 
 `base` stays the default: it captures most of large's quality at a quarter of the size.
 
@@ -118,17 +118,19 @@ over real libraries.
   Getting the channel order or normalization wrong silently degrades embeddings without erroring.
 - **No landmark alignment**: whole-animal crop, unlike ArcFace's aligned face.
 - **Cosine similarity == dot product** (outputs are unit vectors).
-- **Model names** for `petRecognition.modelName`: `pet-reid-small` / `pet-reid-base` (default) /
-  `pet-reid-large`.
+- **Model names** for `petRecognition.modelName`: `pet-recognition-small` /
+  `pet-recognition-base` (default) / `pet-recognition-large`, under the **`noodle-gallery`** HF org
+  (the pet *detectors* still live under `Deeds67`, so `PetRecognizer` needs its own org constant —
+  do not reuse `pet_detection.detection._HF_ORG`).
 
 ## Publishing
 
-All three repos are staged locally at `runs/publish/pet-reid-{small,base,large}/`. Upload is a
+All three repos are staged locally at `runs/publish/pet-recognition-{small,base,large}/`. Upload is a
 deliberate, separate step and is **still pending approval**:
 
 ```bash
-uv run python -m petid.publish --onnx runs/pet-reid-base/model.onnx --backbone base \
-  --metrics runs/pet-reid-base/metrics.json --upload
+uv run python -m petid.publish --onnx runs/pet-recognition-base/model.onnx --backbone base \
+  --metrics runs/pet-recognition-base/metrics.json --upload
 ```
 
 ## Out of scope here

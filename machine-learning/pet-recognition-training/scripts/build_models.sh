@@ -17,7 +17,7 @@ INIT="${INIT:-identity}"
 MANIFEST="${MANIFEST:-manifest.json}"
 
 for B in $BACKBONES; do
-  OUT="runs/pet-reid-$B"
+  OUT="runs/pet-recognition-$B"
   echo "=== $B: train ==="
   $PY -m petid.train --backbone "$B" --out "$OUT" --manifest "$MANIFEST" --init "$INIT" --device "$DEVICE"
 
@@ -30,7 +30,7 @@ for B in $BACKBONES; do
 
   echo "=== $B: stage HF repo ==="
   $PY -m petid.publish --onnx "$OUT/model.onnx" --backbone "$B" \
-    --metrics "$OUT/metrics.json" --staging "runs/publish/pet-reid-$B"
+    --metrics "$OUT/metrics.json" --staging "runs/publish/pet-recognition-$B"
 done
 
-echo "done. reports: runs/pet-reid-*/report.md"
+echo "done. reports: runs/pet-recognition-*/report.md"
