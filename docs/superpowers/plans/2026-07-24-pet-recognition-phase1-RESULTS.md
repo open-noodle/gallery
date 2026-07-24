@@ -1,5 +1,11 @@
 # Pet Recognition — Phase 1 Spike Results & Go/No-Go
 
+> **The EERs below are superseded.** They were measured on a capped ~600-identity dog sample. The
+> shipped models were re-validated on the full test splits in
+> [`2026-07-24-pet-recognition-phase2-model-production-RESULTS.md`](2026-07-24-pet-recognition-phase2-model-production-RESULTS.md)
+> — dogs land ~1.5× higher there (base 0.039 → 0.047, large 0.023 → 0.034); cats, already scored in
+> full here, hold. Quote the full-split numbers. This document stands as the spike's record.
+
 - **Status:** ✅ **GO** — feasible, with a validated license-clean recipe
 - **Date:** 2026-07-24
 - **Spec:** `docs/superpowers/specs/2026-07-24-pet-recognition-phase1-training-spike-design.md`
