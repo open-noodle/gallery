@@ -61,6 +61,20 @@ Write these tests first and capture red (spec tests 6.1–6.7):
 Test 6.7 is the important one: it proves the purge is scoped to pets and cannot destroy human face
 embeddings.
 
+## Also in this slice: wire `VectorIndex.Pet` into vector maintenance
+
+Slice 2 registered `VectorIndex.Pet` in `VECTOR_INDEX_TABLES` and `probes` but deliberately left the
+maintenance call sites alone, because they live in service code that was out of that slice's scope.
+They hardcode Clip/Face and must now learn about Pet, or `pet_index` silently rots:
+
+- `server/src/repositories/database.repository.ts` — the `dropIndex` list in `updateVectorExtension`
+  (otherwise switching vector extension leaves a stale pet index of the wrong type)
+- `server/src/services/database.service.ts` — the `reindexVectors(VectorIndex.Clip, VectorIndex.Face)`
+  call sites (otherwise the pet index is never rebuilt or repaired)
+
+Add a test asserting the pet index is included wherever the face index is, so a future index cannot
+be added without maintenance coverage.
+
 ## Verify
 
 ```bash
