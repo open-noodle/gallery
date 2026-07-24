@@ -14,8 +14,12 @@ class PetEmbedder(nn.Module):
         if pretrained:
             self.backbone = Dinov2Model.from_pretrained("facebook/dinov2-small")
         else:
+            # image_size=518 matches facebook/dinov2-small's config so the resulting
+            # position_embeddings shape (and thus state_dict) is compatible with the
+            # pretrained backbone's checkpoint — DINOv2 interpolates position encodings
+            # at runtime, so actual (224x224) inputs are unaffected.
             self.backbone = Dinov2Model(
-                Dinov2Config(hidden_size=EMBED_DIM, num_hidden_layers=12, num_attention_heads=6, patch_size=14, image_size=224)
+                Dinov2Config(hidden_size=EMBED_DIM, num_hidden_layers=12, num_attention_heads=6, patch_size=14, image_size=518)
             )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
