@@ -17,7 +17,7 @@ import numpy as np
 import torch
 
 from petid.embed_cache import extract_features, load_backbone
-from petid.metrics import clustering_quality, streaming_metrics
+from petid.metrics import cluster_sweep, clustering_quality, streaming_metrics
 from petid.model import PetProjection, resolve_backbone
 from petid.records import ImageRecord, ids_to_int, read_manifest
 
@@ -74,6 +74,7 @@ def _score(emb: np.ndarray, ids: np.ndarray, chunk: int, cluster_threshold: floa
     hom, comp = clustering_quality(sample_emb, sample_ids, distance_threshold=cluster_threshold)
     m["homogeneity"], m["completeness"] = hom, comp
     m["cluster_n"] = float(len(sample_emb))
+    m["cluster_sweep"] = cluster_sweep(sample_emb, sample_ids)
     return m
 
 
@@ -142,6 +143,16 @@ def _write_report(out_md: str, checkpoint: str, backbone: str, blob: dict, resul
                     f"{m['eer']:.3f} | {m['top1']:.3f} | {m['map']:.3f} | "
                     f"{m['homogeneity']:.3f} | {m['completeness']:.3f} |\n"
                 )
+        f.write("\n## Clustering threshold sweep (projection, cosine distance)\n\n")
+        f.write("Input for the production `maxDistance`: low = pure but fragmented clusters, ")
+        f.write("high = distinct pets merged into one.\n\n")
+        for name, variants in result.items():
+            sweep = variants["projection"].get("cluster_sweep") or []
+            if not sweep:
+                continue
+            f.write(f"\n**{name}**\n\n| Distance | Homogeneity | Completeness |\n| --- | --- | --- |\n")
+            for row in sweep:
+                f.write(f"| {row['threshold']:.2f} | {row['homogeneity']:.3f} | {row['completeness']:.3f} |\n")
 
 
 def main() -> None:

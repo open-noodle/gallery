@@ -2,6 +2,7 @@ import torch
 
 from petid.evaluate import evaluate
 from petid.manifest import build
+from petid.metrics import SWEEP_THRESHOLDS
 from petid.model import OUT_DIM, PetProjection
 from petid.train import train_run
 
@@ -75,6 +76,23 @@ def test_evaluate_reuses_the_feature_cache(synthetic_data_root, tmp_path):
         str(tmp_path / "gone.json"), ckpt, str(tmp_path / "r2.md"), device="cpu", cache=cache, pretrained=False
     )
     assert "dog" in result
+
+
+def test_evaluate_reports_a_clustering_threshold_sweep(synthetic_data_root, tmp_path):
+    """Phase 2 has to pick a production `maxDistance`; the report supplies the evidence."""
+    manifest = _manifest(synthetic_data_root, tmp_path)
+    result = evaluate(
+        manifest,
+        _checkpoint(tmp_path),
+        str(tmp_path / "r.md"),
+        device="cpu",
+        cache=str(tmp_path / "eval.pt"),
+        pretrained=False,
+        batch=2,
+    )
+    sweep = next(iter(result.values()))["projection"]["cluster_sweep"]
+    assert [row["threshold"] for row in sweep] == list(SWEEP_THRESHOLDS)
+    assert "cosine distance" in (tmp_path / "r.md").read_text()
 
 
 def test_evaluate_writes_machine_readable_metrics(synthetic_data_root, tmp_path):

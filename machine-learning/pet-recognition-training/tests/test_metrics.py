@@ -75,6 +75,19 @@ def test_streaming_matches_dense_on_separable():
     assert m["map"] == pytest.approx(mAP, abs=1e-6)
 
 
+def test_cluster_sweep_reports_the_expected_tradeoff():
+    """Tighter thresholds split identities (high homogeneity, low completeness)."""
+    from petid.metrics import cluster_sweep
+
+    emb, ids = _noisy(spread=0.6)
+    sweep = cluster_sweep(emb, ids, thresholds=[0.1, 0.5, 0.9])
+
+    assert [row["threshold"] for row in sweep] == [0.1, 0.5, 0.9]
+    assert all({"homogeneity", "completeness"} <= set(row) for row in sweep)
+    assert sweep[0]["homogeneity"] > sweep[-1]["homogeneity"]
+    assert sweep[0]["completeness"] < sweep[-1]["completeness"]
+
+
 def test_streaming_is_invariant_to_chunk_size():
     emb, ids = _noisy(seed=2)
     small = streaming_metrics(emb, ids, chunk=3)

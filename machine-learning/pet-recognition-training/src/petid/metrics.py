@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 import numpy as np
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics import homogeneity_completeness_v_measure, roc_auc_score
@@ -107,6 +109,26 @@ def streaming_metrics(
     eer = float((fpr[idx] + (1.0 - tpr[idx])) / 2)
     auc = float(np.trapezoid(np.concatenate([[0.0], tpr]), np.concatenate([[0.0], fpr])))
     return {"n": float(n), "auc": auc, "eer": eer, "top1": top1_hits / n, "map": ap_sum / n}
+
+
+#: Cosine distances to probe when reporting clustering behaviour — the production
+#: `maxDistance` for pet clustering has to be picked from something.
+SWEEP_THRESHOLDS = (0.2, 0.3, 0.4, 0.5, 0.6, 0.7)
+
+
+def cluster_sweep(
+    emb: np.ndarray, ids: np.ndarray, thresholds: Sequence[float] = SWEEP_THRESHOLDS
+) -> list[dict[str, float]]:
+    """Homogeneity/completeness across candidate clustering thresholds.
+
+    Low threshold -> pure but fragmented clusters (one pet split across several people);
+    high threshold -> merged clusters (two pets collapsed into one person).
+    """
+    rows = []
+    for t in thresholds:
+        hom, comp = clustering_quality(emb, ids, distance_threshold=t)
+        rows.append({"threshold": float(t), "homogeneity": hom, "completeness": comp})
+    return rows
 
 
 def clustering_quality(emb: np.ndarray, ids: np.ndarray, distance_threshold: float) -> tuple[float, float]:
