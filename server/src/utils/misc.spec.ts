@@ -16,6 +16,7 @@ import {
   isFaceSuggestionEnabled,
   isFacialRecognitionEnabled,
   isOcrEnabled,
+  isPetRecognitionEnabled,
   isSmartSearchEnabled,
   isStartUpError,
   routeToErrorMessage,
@@ -260,6 +261,7 @@ const createMlConfig = (overrides: Partial<SystemConfig['machineLearning']> = {}
     clip: { enabled: true },
     facialRecognition: { enabled: true },
     ocr: { enabled: true },
+    petRecognition: { enabled: true },
     duplicateDetection: { enabled: true },
     ...overrides,
   }) as SystemConfig['machineLearning'];
@@ -304,6 +306,20 @@ describe('machine learning feature flags', () => {
 
     it('should return false when facial recognition is disabled', () => {
       expect(isFacialRecognitionEnabled(createMlConfig({ facialRecognition: { enabled: false } } as any))).toBe(false);
+    });
+  });
+
+  describe('isPetRecognitionEnabled', () => {
+    it('should return true when ML and pet recognition are both enabled', () => {
+      expect(isPetRecognitionEnabled(createMlConfig())).toBe(true);
+    });
+
+    it('should return false when ML is disabled', () => {
+      expect(isPetRecognitionEnabled(createMlConfig({ enabled: false }))).toBe(false);
+    });
+
+    it('should return false when pet recognition is disabled', () => {
+      expect(isPetRecognitionEnabled(createMlConfig({ petRecognition: { enabled: false } } as any))).toBe(false);
     });
   });
 

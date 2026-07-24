@@ -75,6 +75,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
     [QueueName.Notification]: { concurrency: 5 },
     [QueueName.Ocr]: { concurrency: 1 },
     [QueueName.PetDetection]: { concurrency: 1 },
+    [QueueName.PetRecognition]: { concurrency: 1 },
     [QueueName.Workflow]: { concurrency: 5 },
     [QueueName.IntegrityCheck]: { concurrency: 1 },
     [QueueName.Editor]: { concurrency: 2 },
@@ -176,6 +177,12 @@ const updatedConfig = Object.freeze<SystemConfig>({
       enabled: false,
       modelName: 'yolo11s',
       minScore: 0.6,
+    },
+    petRecognition: {
+      enabled: false,
+      modelName: 'pet-recognition-base',
+      maxDistance: 0.55,
+      minFaces: 1,
     },
   },
   map: {

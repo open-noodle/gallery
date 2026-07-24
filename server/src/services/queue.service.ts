@@ -264,6 +264,10 @@ export class QueueService extends BaseService {
         return this.jobRepository.queue({ name: JobName.PetDetectionQueueAll, data: { force } });
       }
 
+      case QueueName.PetRecognition: {
+        return this.jobRepository.queue({ name: JobName.PetRecognitionQueueAll, data: { force } });
+      }
+
       case QueueName.Classification: {
         return this.jobRepository.queue({ name: JobName.AssetClassifyQueueAll, data: { force } });
       }

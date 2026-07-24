@@ -67,6 +67,16 @@ export const PetDetectionConfigSchema = ModelConfigSchema.extend({
     .describe('Minimum confidence score for pet detection'),
 }).meta({ id: 'PetDetectionConfig' });
 
+export const PetRecognitionConfigSchema = ModelConfigSchema.extend({
+  maxDistance: z
+    .number()
+    .meta({ format: 'double' })
+    .min(0.1)
+    .max(2)
+    .describe('Maximum distance threshold for pet recognition'),
+  minFaces: z.int().min(1).describe('Minimum number of faces required for recognition'),
+}).meta({ id: 'PetRecognitionConfig' });
+
 export const OcrConfigSchema = ModelConfigSchema.extend({
   maxResolution: z.int().min(1).describe('Maximum resolution for OCR processing'),
   minDetectionScore: z

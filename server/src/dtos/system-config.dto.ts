@@ -7,6 +7,7 @@ import {
   FacialRecognitionConfigSchema,
   OcrConfigSchema,
   PetDetectionConfigSchema,
+  PetRecognitionConfigSchema,
 } from 'src/dtos/model-config.dto';
 import {
   AudioCodecSchema,
@@ -145,6 +146,7 @@ const SystemConfigJobSchema = z
     notifications: JobSettingsSchema,
     ocr: JobSettingsSchema,
     petDetection: JobSettingsSchema,
+    petRecognition: JobSettingsSchema,
     workflow: JobSettingsSchema,
     editor: JobSettingsSchema,
     integrityCheck: JobSettingsSchema,
@@ -192,6 +194,7 @@ const SystemConfigMachineLearningSchema = z
     facialRecognition: FacialRecognitionConfigSchema,
     ocr: OcrConfigSchema,
     petDetection: PetDetectionConfigSchema,
+    petRecognition: PetRecognitionConfigSchema,
   })
   .meta({ id: 'SystemConfigMachineLearningDto' });
 

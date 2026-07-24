@@ -75,7 +75,7 @@ describe(QueueService.name, () => {
     it('should update concurrency', () => {
       sut.onConfigUpdate({ newConfig: defaults, oldConfig: {} as SystemConfig });
 
-      expect(mocks.job.setConcurrency).toHaveBeenCalledTimes(23);
+      expect(mocks.job.setConcurrency).toHaveBeenCalledTimes(24);
       expect(mocks.job.setConcurrency).toHaveBeenNthCalledWith(5, QueueName.FacialRecognition, 1);
       expect(mocks.job.setConcurrency).toHaveBeenNthCalledWith(7, QueueName.DuplicateDetection, 1);
       expect(mocks.job.setConcurrency).toHaveBeenNthCalledWith(8, QueueName.BackgroundTask, 5);
@@ -571,6 +571,7 @@ describe(QueueService.name, () => {
         [QueueName.BackupDatabase]: expected,
         [QueueName.Ocr]: expected,
         [QueueName.PetDetection]: expected,
+        [QueueName.PetRecognition]: expected,
         [QueueName.Workflow]: expected,
         [QueueName.IntegrityCheck]: expected,
         [QueueName.Editor]: expected,
@@ -895,6 +896,15 @@ describe(QueueService.name, () => {
       await sut.runCommandLegacy(QueueName.Ocr, { command: QueueCommand.Start, force: false });
 
       expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.OcrQueueAll, data: { force: false } });
+    });
+
+    it('should handle a start pet recognition command', async () => {
+      mocks.job.isActive.mockResolvedValue(false);
+      mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
+
+      await sut.runCommandLegacy(QueueName.PetRecognition, { command: QueueCommand.Start, force: false });
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PetRecognitionQueueAll, data: { force: false } });
     });
 
     it('should handle a start people backfill command', async () => {
