@@ -1,7 +1,7 @@
 [project]
 name = "petid"
 version = "0.1.0"
-description = "Pet recognition training spike (Phase 1)"
+description = "Pet re-ID model training (frozen DINOv2 + projection head)"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "torch>=2.13",
@@ -12,6 +12,7 @@ dependencies = [
     "numpy>=1.26",
     "onnxruntime>=1.20",
     "onnx>=1.16",
+    "huggingface-hub>=0.30",
 ]
 
 [project.optional-dependencies]
