@@ -10,9 +10,22 @@ name: PR Release Candidate Cleanup
 # Kept out of gallery-pr-rc-comment.yml on purpose: a `closed` event must not join
 # that workflow's per-PR `cancel-in-progress` concurrency group and cancel a build
 # that is still pushing, and `packages: write` stays scoped to this workflow alone.
+#
+# `pull_request_target`, NOT `pull_request`: a `pull_request` run reads its own
+# workflow definition from `refs/pull/<n>/merge`, which GitHub DELETES when the PR
+# merges. Losing that race means the run fails at startup with zero jobs ("workflow
+# file issue") and the PR's RC tags are orphaned forever — re-running cannot help,
+# because the ref is permanently gone. Observed on PR #845's own merge, which took
+# `cache-cleanup.yml` (same trigger, untouched for months) down with it.
+# `pull_request_target` reads the workflow from the base branch, which always exists.
+#
+# The usual `pull_request_target` danger — running untrusted PR code with a
+# write-capable token — does not apply: this workflow never checks out the PR and
+# never executes anything from it. It is one first-party github-script step whose
+# only PR-derived input is the PR number, an integer.
 
 on:
-  pull_request:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] nothing from the PR is checked out or executed
     types: [closed]
 
 concurrency:
@@ -24,9 +37,12 @@ permissions: {}
 jobs:
   cleanup:
     name: Delete RC images
-    # Fork PRs get a read-only token and could not delete anyway. Deliberately NOT
-    # gated on the `rc`/`rc-ml` label: a label removed before closing would otherwise
-    # orphan that PR's tags forever. With nothing to delete this is a cheap no-op.
+    # Same-repo only because RC images only ever exist for same-repo PRs — the build
+    # workflow skips forks. (Under `pull_request_target` the token would in fact be
+    # write-capable for a fork PR; the guard is now about not making pointless API
+    # calls, not about permissions.) Deliberately NOT gated on the `rc`/`rc-ml` label:
+    # a label removed before closing would otherwise orphan that PR's tags forever.
+    # With nothing to delete this is a cheap no-op.
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
