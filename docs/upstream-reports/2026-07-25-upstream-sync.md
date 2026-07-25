@@ -178,6 +178,53 @@ unchanged.
 `packages/sdk/src/fetch-client.ts` fails `prettier --check`, but it fails identically on
 the pre-sync tip `0f2cce28e5b` — pre-existing on this generated file, not introduced here.
 
+### Remote CI — fork sync
+
+- **Commit validated**: `eb834a28f60` (all 10), then `c009e7d73b1` for the mobile-smoke fix.
+
+9 of 10 workflows GREEN on the first run. `gallery-mobile-smoke.yml` failed, **twice**, on a
+cause unrelated to this sync — fixed below, then GREEN.
+
+| Workflow                                  | Conclusion                   |
+| ----------------------------------------- | ---------------------------- |
+| `test.yml` (20-job suite)                 | GREEN                        |
+| `docker.yml`                              | GREEN                        |
+| `static_analysis.yml`                     | GREEN                        |
+| `gallery-rebase-smoke.yml`                | GREEN                        |
+| `storage-migration-tests.yml`             | GREEN                        |
+| `gallery-revert-to-immich-validation.yml` | GREEN                        |
+| `gallery-ml-smoke.yml`                    | GREEN                        |
+| `storage-migration-e2e.yml`               | GREEN                        |
+| `gallery-build-mobile.yml`                | GREEN                        |
+| `gallery-mobile-smoke.yml`                | RED ×2 → GREEN after the fix |
+
+### `gallery-mobile-smoke` Android OOM — root cause and fix (`c009e7d73b1`)
+
+`Build unsigned Android APK` failed with `Java heap space` inside `JetifyTransform` while
+transforming the Flutter engine jars (`:app:checkDebugDuplicateClasses`). The second run
+OOM'd on the `arm64_v8a` and `x86_64` engine jars simultaneously.
+
+**Not caused by this sync.** The only mobile delta versus the last green run
+(`b64cc4705ef`, 3 h earlier) is the 198-byte `job_name.dart` enum addition, and
+`gallery-build-mobile` — which compiles the real iOS **and** Android app — was green on the
+same commit. Every step before the APK build passed, including `Run Build Runner`,
+`Generate platform APIs` and `Find generated file changes` (no drift found, so the verify
+step correctly skipped).
+
+**Root cause**: `mobile/android/gradle.properties` pairs `android.enableJetifier=true` with
+`org.gradle.jvmargs=-Xmx4096M` and `org.gradle.parallel=true`. The debug APK pulls all three
+arch-specific engine jars, so jetifier transforms them concurrently inside one 4 GB heap and
+tips over depending on runner memory. That non-determinism is on the record: run
+`29926406617` failed and run `29928042203` passed on the **same SHA** `6e952c8855f`
+(2026-07-22). The release path doesn't pull all three debug engine jars, which is why
+`gallery-build-mobile` never saw it.
+
+**Fix**: set `GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx8g` on that one step in
+`.github/workflows/gallery-mobile-smoke.yml` — a fork-only file that has already diverged.
+`mobile/android/gradle.properties` stays **byte-identical to upstream**, so this adds no new
+rebase-conflict surface. Verified: the previously-failing `Build unsigned Android APK` step
+succeeds (run `30160078632`).
+
 ## Not done — deliberately
 
 No cutover to `main`: ruleset 13531204 (`non_fast_forward`, zero bypass actors) still
