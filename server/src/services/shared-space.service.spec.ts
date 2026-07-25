@@ -21,6 +21,7 @@ import {
   QueueName,
   SharedSpaceActivityType,
   SharedSpaceRole,
+  SystemMetadataKey,
   UserAvatarColor,
 } from 'src/enum';
 import { SHARED_SPACE_DEDUP_MAX_PASSES, SharedSpaceService } from 'src/services/shared-space.service';
@@ -3960,7 +3961,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
       mocks.sharedSpace.getSpacePersonByIdentity.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
-      mocks.sharedSpace.createPerson.mockResolvedValue(
+      mocks.sharedSpace.createOrGetPersonForIdentity.mockResolvedValue(
         factory.sharedSpacePerson({ id: spacePersonId, spaceId, identityId }),
       );
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
@@ -3969,7 +3970,7 @@ describe(SharedSpaceService.name, () => {
       const result = await sut.handleSharedSpaceFaceMatch({ spaceId, assetId });
 
       expect(result).toBe(JobStatus.Success);
-      expect(mocks.sharedSpace.createPerson).toHaveBeenCalledWith({
+      expect(mocks.sharedSpace.createOrGetPersonForIdentity).toHaveBeenCalledWith({
         spaceId,
         identityId,
         name: '',
@@ -4004,7 +4005,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([
         { personId: nearbySpacePersonId, name: '', distance: 0.1, identityId: nearbyIdentityId, type: 'person' },
       ]);
-      mocks.sharedSpace.createPerson.mockResolvedValue(
+      mocks.sharedSpace.createOrGetPersonForIdentity.mockResolvedValue(
         factory.sharedSpacePerson({ id: createdSpacePersonId, spaceId, identityId: sourceIdentityId }),
       );
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
@@ -4013,7 +4014,7 @@ describe(SharedSpaceService.name, () => {
       const result = await sut.handleSharedSpaceFaceMatch({ spaceId, assetId });
 
       expect(result).toBe(JobStatus.Success);
-      expect(mocks.sharedSpace.createPerson).toHaveBeenCalledWith({
+      expect(mocks.sharedSpace.createOrGetPersonForIdentity).toHaveBeenCalledWith({
         spaceId,
         identityId: sourceIdentityId,
         name: '',
@@ -4054,7 +4055,7 @@ describe(SharedSpaceService.name, () => {
         }),
       );
       mocks.sharedSpace.isFaceInSpace.mockResolvedValue(true);
-      mocks.sharedSpace.createPerson.mockResolvedValue(
+      mocks.sharedSpace.createOrGetPersonForIdentity.mockResolvedValue(
         factory.sharedSpacePerson({
           id: spacePersonId,
           spaceId,
@@ -4070,7 +4071,7 @@ describe(SharedSpaceService.name, () => {
       expect(result).toBe(JobStatus.Success);
       expect(mocks.person.getById).toHaveBeenCalledWith(personalPersonId);
       expect(mocks.sharedSpace.isFaceInSpace).toHaveBeenCalledWith(spaceId, personalRepresentativeFaceId);
-      expect(mocks.sharedSpace.createPerson).toHaveBeenCalledWith({
+      expect(mocks.sharedSpace.createOrGetPersonForIdentity).toHaveBeenCalledWith({
         spaceId,
         identityId,
         name: '',
@@ -5180,6 +5181,50 @@ describe(SharedSpaceService.name, () => {
 
       expect(result).toBe(JobStatus.Success);
       expect(mocks.sharedSpace.reconcileAlbumGrants).toHaveBeenCalledWith([]);
+    });
+  });
+
+  describe('onBootstrap', () => {
+    it('clears blocked failed face jobs from both pipeline queues and kicks identity maintenance', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(null);
+      mocks.job.removeFailedJobsByJobIdPrefix.mockResolvedValueOnce(1).mockResolvedValueOnce(2);
+
+      await sut.onBootstrap();
+
+      expect(mocks.job.removeFailedJobsByJobIdPrefix).toHaveBeenCalledWith(QueueName.PeopleBackfill, [
+        'shared-space-face-match',
+        'space-identity-reconcile-',
+      ]);
+      expect(mocks.job.removeFailedJobsByJobIdPrefix).toHaveBeenCalledWith(QueueName.FacialRecognition, [
+        'shared-space-face-match',
+        'space-identity-reconcile-',
+      ]);
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.FaceIdentityBackfill, data: {} });
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.SharedSpaceFaceJobCleanupState, {
+        cleanedAt: expect.any(String),
+      });
+    });
+
+    it('does not kick identity maintenance when no blocked jobs were removed', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(null);
+      mocks.job.removeFailedJobsByJobIdPrefix.mockResolvedValue(0);
+
+      await sut.onBootstrap();
+
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.SharedSpaceFaceJobCleanupState, {
+        cleanedAt: expect.any(String),
+      });
+    });
+
+    it('skips the cleanup entirely once it has already run', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ cleanedAt: '2026-07-25T00:00:00.000Z' });
+
+      await sut.onBootstrap();
+
+      expect(mocks.job.removeFailedJobsByJobIdPrefix).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.systemMetadata.set).not.toHaveBeenCalled();
     });
   });
 
