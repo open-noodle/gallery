@@ -63,6 +63,31 @@ export function sortPeople<T extends SortablePerson>(people: T[], sortBy: People
   return [...people].sort((a, b) => comparePeople(a, b, sortBy));
 }
 
+/**
+ * Appends a freshly fetched page onto the already-loaded rows, skipping ids that are present.
+ *
+ * Paginated people lists render in a keyed `{#each}`, and a single repeated id throws
+ * `each_key_duplicate` — which stops the block updating for the rest of the session, so the grid
+ * freezes while requests keep firing. The server pages with OFFSET over an ordering that keys on
+ * favourite status, name and visible asset count, so a rename or a background face job between two
+ * page requests can shift the window and re-emit a row an earlier page already returned. Existing
+ * rows win, because they may carry edits made since they were fetched.
+ */
+export function appendUniqueById<T extends { id: string }>(existing: T[], incoming: T[]): T[] {
+  const seen = new Set(existing.map((item) => item.id));
+  const additions: T[] = [];
+
+  for (const item of incoming) {
+    if (seen.has(item.id)) {
+      continue;
+    }
+    seen.add(item.id);
+    additions.push(item);
+  }
+
+  return additions.length === 0 ? existing : [...existing, ...additions];
+}
+
 export function comparePeopleForManagement(a: SortablePerson, b: SortablePerson): number {
   return comparePeople(a, b, PeopleSortBy.Name);
 }
