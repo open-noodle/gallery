@@ -17,24 +17,13 @@
   import OnEvents from '$lib/components/OnEvents.svelte';
   import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
   import ControlAppBar from '$lib/components/shared-components/ControlAppBar.svelte';
-  import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import SpaceNewAssetsDivider from '$lib/components/spaces/space-new-assets-divider.svelte';
   import SpaceOnboardingBanner from '$lib/components/spaces/space-onboarding-banner.svelte';
   import SpaceAssetLimitWarning from '$lib/components/spaces/space-asset-limit-warning.svelte';
-  import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
-  import ArchiveAction from '$lib/components/timeline/actions/ArchiveAction.svelte';
-  import ChangeDate from '$lib/components/timeline/actions/ChangeDateAction.svelte';
-  import ChangeDescription from '$lib/components/timeline/actions/ChangeDescriptionAction.svelte';
-  import ChangeLocation from '$lib/components/timeline/actions/ChangeLocationAction.svelte';
-  import DownloadAction from '$lib/components/timeline/actions/DownloadAction.svelte';
-  import FavoriteAction from '$lib/components/timeline/actions/FavoriteAction.svelte';
-  import RemoveFromSpaceAction from '$lib/components/timeline/actions/RemoveFromSpaceAction.svelte';
-  import SelectAllAssets from '$lib/components/timeline/actions/SelectAllAction.svelte';
-  import TagAction from '$lib/components/timeline/actions/TagAction.svelte';
-  import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
+  import SelectionToolbar from '$lib/components/timeline/SelectionToolbar.svelte';
   import Timeline from '$lib/components/timeline/Timeline.svelte';
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-  import type { TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
+  import type { TimelineAsset, TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
   import { registerSelectionContext, registerSpaceContext } from '$lib/managers/command-context-manager.svelte';
   import { eventManager } from '$lib/managers/event-manager.svelte';
   import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
@@ -87,7 +76,7 @@
     type SmartSearchFacetsResponseDto,
   } from '@immich/sdk';
   import { IconButton, modalManager, toastManager } from '@immich/ui';
-  import { mdiDotsVertical, mdiImageOutline, mdiPlus } from '@mdi/js';
+  import { mdiImageOutline, mdiPlus } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import { untrack } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
@@ -521,7 +510,7 @@
   registerSelectionContext({
     getAssets: () => assetMultiSelectManager.assets,
     clearSelection: () => assetMultiSelectManager.clear(),
-    canAddToAlbum: () => false,
+    canAddToAlbum: () => true,
     getOnFavorite: () =>
       viewMode === 'view' && timelineManager
         ? (ids, isFavorite) => timelineManager.update(ids, (asset) => (asset.isFavorite = isFavorite))
@@ -539,6 +528,32 @@
     await refreshSpace();
     // Also revalidate layout data so the shell's Photos tab count badge updates.
     await invalidateAll();
+  };
+
+  // Mirrors the album page's `handleSetVisibility`: moving assets to/from the locked folder
+  // takes them out of this (non-locked) timeline view. Unlike remove-from-space, this isn't a
+  // space-membership change, so it doesn't touch the space's asset count.
+  const handleSetVisibility = (assetIds: string[]) => {
+    timelineManager.removeAssets(assetIds);
+    assetMultiSelectManager.clear();
+  };
+
+  // DeleteAssets already performed the server-side trash before calling this — it's a
+  // VIEW-UPDATE-only handler, mirroring the album page's `handleRemoveAssets` used for
+  // `onAssetDelete`. Deletion is not a remove-from-space, so `handleRemoveAssets` above
+  // (which also refreshes the space + revalidates layout data) is NOT reused here: the
+  // websocket-driven `on_asset_trash` → `AssetsDelete` event already triggers `refreshSpace`
+  // via the page's `<OnEvents onAssetsDelete={refreshSpace} />` (see below), so refreshing
+  // again here would be redundant.
+  const handleAssetDelete = (assetIds: string[]) => {
+    timelineManager.removeAssets(assetIds);
+  };
+
+  // Mirrors the album page's `handleUndoRemoveAssets`. There's no websocket event for restore,
+  // so re-add the assets to the local view directly; no space-count refresh is needed since
+  // undoing a delete doesn't change space membership either.
+  const handleUndoAssetDelete = (assets: TimelineAsset[]) => {
+    timelineManager.upsertAssets(assets);
   };
 
   const handleSetAsCover = async () => {
@@ -880,37 +895,18 @@
 
 {#if assetMultiSelectManager.selectionActive && viewMode === 'view'}
   <div class="fixed inset-s-0 top-0 z-2 w-full">
-    <AssetSelectControlBar>
-      <SelectAllAssets {timelineManager} assetInteraction={assetMultiSelectManager} />
-      {#if isEditor}
-        <RemoveFromSpaceAction spaceId={space.id} onRemove={handleRemoveAssets} />
-      {/if}
-      {#if assetMultiSelectManager.isAllUserOwned}
-        <FavoriteAction
-          removeFavorite={assetMultiSelectManager.isAllFavorite}
-          onFavorite={(ids, isFavorite) => timelineManager.update(ids, (asset) => (asset.isFavorite = isFavorite))}
-        />
-      {/if}
-      <ButtonContextMenu icon={mdiDotsVertical} title={$t('menu')} offset={{ x: 175, y: 25 }}>
-        <DownloadAction menuItem />
-        {#if assetMultiSelectManager.isAllUserOwned}
-          <ChangeDate menuItem />
-          <ChangeDescription menuItem />
-          <ChangeLocation menuItem />
-          <ArchiveAction
-            menuItem
-            unarchive={assetMultiSelectManager.isAllArchived}
-            onArchive={(ids, visibility) => timelineManager.update(ids, (asset) => (asset.visibility = visibility))}
-          />
-        {/if}
-        {#if authManager.preferences.tags.enabled && assetMultiSelectManager.isAllUserOwned}
-          <TagAction menuItem />
-        {/if}
-        {#if isEditor && assetMultiSelectManager.assets.length === 1}
-          <MenuOption text={$t('set_as_space_cover')} icon={mdiImageOutline} onClick={handleSetAsCover} />
-        {/if}
-      </ButtonContextMenu>
-    </AssetSelectControlBar>
+    <SelectionToolbar
+      {timelineManager}
+      assetInteraction={assetMultiSelectManager}
+      space={{ id: space.id, canWrite: isEditor }}
+      onRemove={handleRemoveAssets}
+      onSetCover={handleSetAsCover}
+      onFavorite={(ids, isFavorite) => timelineManager.update(ids, (asset) => (asset.isFavorite = isFavorite))}
+      onArchive={(ids, visibility) => timelineManager.update(ids, (asset) => (asset.visibility = visibility))}
+      onVisibilitySet={handleSetVisibility}
+      onAssetDelete={handleAssetDelete}
+      onUndoDelete={handleUndoAssetDelete}
+    />
   </div>
 {/if}
 
