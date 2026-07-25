@@ -962,6 +962,56 @@ describe(FaceIdentityRepository.name, () => {
     }
   });
 
+  // Regression for the same duplicate-key crash class on the repair path. A space person stamped
+  // with identity A but whose face actually belongs to identity C must be split — repair INSERTs a
+  // new space person for C. Two concurrent backfill passes both miss the not-yet-committed C row and
+  // race to INSERT it, tripping `shared_space_person_spaceId_identityId_key`; the loser crashed the
+  // FaceIdentityBackfill job.
+  it('does not crash when concurrent backfill passes create the space person for a split-out identity', async () => {
+    const { ctx, sut } = setup();
+    const { user } = await ctx.newUser();
+    try {
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+
+      const { person: personA } = await ctx.newPerson({ ownerId: user.id });
+      const identityA = await sut.ensurePersonIdentity(personA.id);
+
+      const { person: personC } = await ctx.newPerson({ ownerId: user.id });
+      const identityC = await sut.ensurePersonIdentity(personC.id);
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: personC.id });
+      await sut.linkFace({ assetFaceId: assetFace.id, identityId: identityC.id, source: 'backfill' });
+
+      // Space person carries identity A, but its only face belongs to identity C → repair splits it out.
+      const spacePerson = await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: space.id, identityId: identityA.id, representativeFaceId: assetFace.id, type: 'person' })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      await linkSpaceFace(ctx, spacePerson.id, assetFace.id);
+
+      // Two backfill passes at once both race to INSERT the C space person.
+      await expect(
+        Promise.all([
+          sut.backfillSpacePersonIdentities({ limit: 100 }),
+          sut.backfillSpacePersonIdentities({ limit: 100 }),
+        ]),
+      ).resolves.toBeDefined();
+
+      // Exactly one space person exists for the split-out identity.
+      const cPeople = await ctx.database
+        .selectFrom('shared_space_person')
+        .select('id')
+        .where('spaceId', '=', space.id)
+        .where('identityId', '=', identityC.id)
+        .execute();
+      expect(cPeople).toHaveLength(1);
+    } finally {
+      await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+    }
+  });
+
   it('does not rewrite already-consistent space people on repeated identity backfill passes', async () => {
     const { ctx, sut } = setup(await getKyselyDB());
     const { user } = await ctx.newUser();
