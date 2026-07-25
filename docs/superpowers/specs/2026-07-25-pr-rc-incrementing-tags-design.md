@@ -199,11 +199,30 @@ to name.
 
 ```yaml
 on:
-  pull_request:
+  pull_request_target:
     types: [closed]
 ```
 
-Same trigger `cache-cleanup.yml` already uses. Kept in its own file rather than as a job in
+**`pull_request_target`, not `pull_request`** — corrected after PR #845's own merge. A
+`pull_request` run reads its own workflow definition from `refs/pull/<n>/merge`, which GitHub
+**deletes when the PR merges**. Lose that race and the run fails at startup with zero jobs
+("This run likely failed because of a workflow file issue"), the PR's RC tags are orphaned
+forever, and re-running cannot help because the ref is permanently gone (confirmed: attempt 2
+failed identically, and `refs/pull/845/merge` returns 404). The same merge took
+`cache-cleanup.yml` down with it — same trigger, untouched for months, 19/20 prior successes —
+which is what rules out the workflow file itself. It usually works, which makes it worse: the
+failure is intermittent and silent.
+
+`pull_request_target` reads the workflow from the base branch, which always exists.
+
+The usual `pull_request_target` hazard — running untrusted PR code with a write-capable token —
+does not apply: the job never checks out the PR and never executes anything from it. It is one
+first-party `github-script` step whose only PR-derived input is the PR number, an integer
+interpolated into a regex. zizmor's `dangerous-triggers` audit is suppressed inline with that
+justification, matching the existing `# zizmor: ignore[...]` precedent in `gallery-rc-build.yml`.
+`auto-close.yml` and `close-duplicates.yml` already use `pull_request_target` in this repo.
+
+Kept in its own file rather than as a job in
 `gallery-pr-rc-comment.yml` so a PR-close event does not join the build workflow's
 `cancel-in-progress` group and cancel an in-flight build, and so `packages: write` is scoped to
 this workflow alone.
