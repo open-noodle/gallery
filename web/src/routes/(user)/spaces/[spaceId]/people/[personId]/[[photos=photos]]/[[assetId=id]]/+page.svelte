@@ -4,25 +4,15 @@
   import { listNavigation } from '$lib/actions/list-navigation';
   import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
   import PeopleMergeSelector from '$lib/components/people/people-merge-selector.svelte';
-  import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import ControlAppBar from '$lib/components/shared-components/ControlAppBar.svelte';
-  import ArchiveAction from '$lib/components/timeline/actions/ArchiveAction.svelte';
-  import ChangeDate from '$lib/components/timeline/actions/ChangeDateAction.svelte';
-  import ChangeDescription from '$lib/components/timeline/actions/ChangeDescriptionAction.svelte';
-  import ChangeLocation from '$lib/components/timeline/actions/ChangeLocationAction.svelte';
-  import DownloadAction from '$lib/components/timeline/actions/DownloadAction.svelte';
-  import FavoriteAction from '$lib/components/timeline/actions/FavoriteAction.svelte';
-  import RemoveFromSpaceAction from '$lib/components/timeline/actions/RemoveFromSpaceAction.svelte';
-  import SelectAllAssets from '$lib/components/timeline/actions/SelectAllAction.svelte';
-  import TagAction from '$lib/components/timeline/actions/TagAction.svelte';
-  import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
+  import SelectionToolbar from '$lib/components/timeline/SelectionToolbar.svelte';
   import Timeline from '$lib/components/timeline/Timeline.svelte';
   import TimelineRouteGroupingBar from '$lib/components/timeline/TimelineRouteGroupingBar.svelte';
   import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-  import type { TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
+  import type { TimelineAsset, TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
   import { timeBeforeShowLoadingSpinner } from '$lib/constants';
   import PersonEditBirthDateModal from '$lib/modals/PersonEditBirthDateModal.svelte';
   import RepresentativeFacePickerModal from '$lib/modals/RepresentativeFacePickerModal.svelte';
@@ -63,7 +53,6 @@
     mdiAccountMultipleCheckOutline,
     mdiArrowLeft,
     mdiCalendarEditOutline,
-    mdiDotsVertical,
     mdiEyeOffOutline,
   } from '@mdi/js';
   import { DateTime } from 'luxon';
@@ -358,6 +347,33 @@
     setPerson({ ...person, assetCount: Math.max(0, person.assetCount - removedAssetCount) });
     setStatistics({ ...statistics, assets: Math.max(0, statistics.assets - removedAssetCount) });
     await invalidateAll();
+  };
+
+  // Mirrors the space timeline page's `handleSetVisibility`: moving assets to/from the locked
+  // folder takes them out of this (non-locked) timeline view. It isn't a space-membership
+  // change, so it doesn't touch the person's/space's asset count.
+  const handleSetVisibility = (assetIds: string[]) => {
+    timelineManager.removeAssets(assetIds);
+    assetMultiSelectManager.clear();
+  };
+
+  // DeleteAssets already performed the server-side trash before calling this. The space
+  // timeline page's equivalent handler is view-update-only because that page has an
+  // `<OnEvents onAssetsDelete={refreshSpace} />` websocket listener that re-fetches
+  // server-truth counts after a trash. This page has no such wiring, so — unlike that page —
+  // we also force a data reload here to keep the header's asset/face counts in sync with the
+  // server (rather than guessing a local decrement, since it isn't clear the server excludes
+  // trashed assets from these counts).
+  const handleAssetDelete = (assetIds: string[]) => {
+    timelineManager.removeAssets(assetIds);
+    void invalidateAll();
+  };
+
+  // Mirrors the space timeline page's `handleUndoAssetDelete`. There's no websocket event for
+  // restore, so re-add the assets to the local view directly; no count refresh is needed since
+  // undoing a delete doesn't change space membership either.
+  const handleUndoAssetDelete = (assets: TimelineAsset[]) => {
+    timelineManager.upsertAssets(assets);
   };
 
   function handleTimelineGroupingChange(grouping: TimelineGrouping) {
@@ -711,34 +727,18 @@
 
 <header>
   {#if assetMultiSelectManager.selectionActive}
-    <AssetSelectControlBar>
-      <SelectAllAssets {timelineManager} assetInteraction={assetMultiSelectManager} />
-      {#if isEditor}
-        <RemoveFromSpaceAction spaceId={space.id} onRemove={handleRemoveAssets} />
-      {/if}
-      {#if assetMultiSelectManager.isAllUserOwned}
-        <FavoriteAction
-          removeFavorite={assetMultiSelectManager.isAllFavorite}
-          onFavorite={(ids, isFavorite) => timelineManager.update(ids, (asset) => (asset.isFavorite = isFavorite))}
-        />
-      {/if}
-      <ButtonContextMenu icon={mdiDotsVertical} title={$t('menu')} offset={{ x: 175, y: 25 }}>
-        <DownloadAction menuItem filename="{person.name || space.name || 'immich'}.zip" />
-        {#if assetMultiSelectManager.isAllUserOwned}
-          <ChangeDate menuItem />
-          <ChangeDescription menuItem />
-          <ChangeLocation menuItem />
-          <ArchiveAction
-            menuItem
-            unarchive={assetMultiSelectManager.isAllArchived}
-            onArchive={(ids, visibility) => timelineManager.update(ids, (asset) => (asset.visibility = visibility))}
-          />
-        {/if}
-        {#if authManager.preferences.tags.enabled && assetMultiSelectManager.isAllUserOwned}
-          <TagAction menuItem />
-        {/if}
-      </ButtonContextMenu>
-    </AssetSelectControlBar>
+    <SelectionToolbar
+      {timelineManager}
+      assetInteraction={assetMultiSelectManager}
+      space={{ id: space.id, canWrite: isEditor }}
+      downloadFilename={`${person.name || space.name || 'immich'}.zip`}
+      onRemove={handleRemoveAssets}
+      onFavorite={(ids, isFavorite) => timelineManager.update(ids, (asset) => (asset.isFavorite = isFavorite))}
+      onArchive={(ids, visibility) => timelineManager.update(ids, (asset) => (asset.visibility = visibility))}
+      onVisibilitySet={handleSetVisibility}
+      onAssetDelete={handleAssetDelete}
+      onUndoDelete={handleUndoAssetDelete}
+    />
   {:else}
     <ControlAppBar backIcon={mdiArrowLeft} onClose={handleBack}>
       {#snippet trailing()}

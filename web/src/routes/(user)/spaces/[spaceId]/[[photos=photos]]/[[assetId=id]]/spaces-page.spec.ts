@@ -585,7 +585,9 @@ describe('Spaces page search URL state', () => {
 
     expect(mockRegisterSelectionContext).toHaveBeenCalledOnce();
     const options = mockRegisterSelectionContext.mock.calls[0][0];
-    expect(options.canAddToAlbum()).toBe(false);
+    // #839 slice 4: add-to-album is now enabled on the space timeline (the toolbar owner-gates it,
+    // and this flag keeps the ⌘K palette consistent with the toolbar).
+    expect(options.canAddToAlbum()).toBe(true);
     expect(options.getAssets()).toBe(mockAssetMultiSelectManager.assets);
     expect(options.getOnFavorite()).toEqual(expect.any(Function));
     expect(options.getOnArchive()).toEqual(expect.any(Function));
