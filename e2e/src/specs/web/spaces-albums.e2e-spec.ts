@@ -286,6 +286,12 @@ test.describe('Spaces — Albums UI (editor flows + viewer-denied gating)', () =
       await expect(page.getByTestId('space-album-card-menu').first()).toBeVisible();
     });
 
+    // Slice 6 of docs/superpowers/specs/2026-07-24-selection-toolbar-consistency-design.md
+    // replaced the space-album detail's stripped Download+Remove-only bar with the full
+    // album-equivalent <SelectionToolbar>. RemoveFromAlbum now lives as a menu item inside the
+    // toolbar's "⋮" overflow menu (mirrors spaces-selection-toolbar-timeline.e2e-spec.ts's
+    // `openOverflowMenu`), so it must be opened before the visibility assertion below is
+    // meaningful — collapsed menu content isn't visible even when present in the DOM.
     test('viewer sees no remove-from-album affordance in the space album detail', async ({ context, page }) => {
       await utils.setAuthCookies(context, viewer.accessToken);
       await page.goto(`/spaces/${space.id}/albums/${album.id}`);
@@ -295,7 +301,9 @@ test.describe('Spaces — Albums UI (editor flows + viewer-denied gating)', () =
       await thumbnailUtils.selectButton(page, asset.id).click();
 
       await expect(page.getByTestId('add-photos-button')).not.toBeVisible();
-      await expect(page.getByTestId('album-remove-from-album')).not.toBeVisible();
+
+      await page.getByRole('button', { name: 'Menu' }).click();
+      await expect(page.getByRole('menuitem', { name: 'Remove from album' })).toHaveCount(0);
     });
 
     test('editor sees the remove-from-album affordance in the space album detail', async ({ context, page }) => {
@@ -305,7 +313,8 @@ test.describe('Spaces — Albums UI (editor flows + viewer-denied gating)', () =
       await thumbnailUtils.withAssetId(page, asset.id).hover();
       await thumbnailUtils.selectButton(page, asset.id).click();
 
-      await expect(page.getByTestId('album-remove-from-album')).toBeVisible();
+      await page.getByRole('button', { name: 'Menu' }).click();
+      await expect(page.getByRole('menuitem', { name: 'Remove from album' })).toBeVisible();
     });
   });
 });
