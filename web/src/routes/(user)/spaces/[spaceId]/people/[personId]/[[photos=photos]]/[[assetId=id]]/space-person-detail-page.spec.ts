@@ -46,11 +46,16 @@ const { gotoMock, invalidateAllMock, authenticateMock, featureFlagsMock, formatM
       formatMessage,
       mockAssetMultiSelectManager: {
         selectionActive: false,
-        assets: [],
+        assets: [] as { id: string }[],
         clear: vi.fn(),
         isAllUserOwned: true,
         isAllFavorite: false,
         isAllArchived: false,
+        // Mirrors the real manager's derived field; these fixtures only model the
+        // all-owned and none-owned ends of the range.
+        get ownedAssets() {
+          return this.isAllUserOwned ? this.assets : [];
+        },
       },
     };
   });
