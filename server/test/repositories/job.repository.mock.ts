@@ -25,6 +25,7 @@ export const newJobRepositoryMock = (): Mocked<RepositoryInterface<JobRepository
     clear: vitest.fn(),
     reconcileOrphanedActiveJobs: vitest.fn().mockImplementation(() => Promise.resolve()),
     removeOrphanedActiveJobs: vitest.fn().mockImplementation(() => Promise.resolve([])),
+    removeFailedJobsByJobIdPrefix: vitest.fn().mockResolvedValue(0),
     waitForQueueCompletion: vitest.fn(),
     removeJob: vitest.fn(),
   };
