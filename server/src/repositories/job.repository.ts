@@ -261,6 +261,31 @@ export class JobRepository {
     return removed;
   }
 
+  /**
+   * Removes failed jobs whose jobId starts with one of the given prefixes. Stable-jobId jobs that
+   * failed while `removeOnFail` was unset permanently occupy their dedup jobIds — BullMQ silently
+   * ignores any later add() with the same id, blocking every re-queue of that work. Collects all
+   * matches before removing anything: removal shifts the failed set's ranks, so a
+   * remove-while-paging walk would skip entries.
+   */
+  async removeFailedJobsByJobIdPrefix(name: QueueName, prefixes: string[]): Promise<number> {
+    const queue = this.getQueue(name);
+    const pageSize = 1000;
+    const matches = [];
+    for (let start = 0; ; start += pageSize) {
+      const jobs = await queue.getJobs(['failed'], start, start + pageSize - 1);
+      matches.push(...jobs.filter((job) => job?.id && prefixes.some((prefix) => job.id!.startsWith(prefix))));
+      if (jobs.length < pageSize) {
+        break;
+      }
+    }
+
+    for (const job of matches) {
+      await job.remove();
+    }
+    return matches.length;
+  }
+
   getJobCounts(name: QueueName): Promise<JobCounts> {
     return this.getQueue(name).getJobCounts(
       'active',
@@ -505,6 +530,11 @@ export class JobRepository {
         // L8: single stable jobId — a nightly trigger while a previous run is still active is a
         // harmless dedup, and removeOnFail keeps a hard failure from blocking the next run.
         return { jobId: 'space-album-grant-reconcile-sweep', removeOnComplete: true, removeOnFail: true };
+      }
+      case JobName.SharedSpaceIdentityReconciliationSweep: {
+        // Single stable jobId — a nightly trigger while a previous sweep is still active dedups
+        // harmlessly, and removeOnFail keeps a hard failure from blocking the next run.
+        return { jobId: 'shared-space-identity-reconciliation-sweep', removeOnComplete: true, removeOnFail: true };
       }
       case JobName.SharedSpaceFaceMatch: {
         const prefix =

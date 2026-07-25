@@ -361,6 +361,31 @@ const createLinkedLibraryIdentityFixture = async (input?: {
 const authFor = (user: { id: string; name: string; email: string; isAdmin?: boolean }) =>
   factory.auth({ user: { id: user.id, name: user.name, email: user.email, isAdmin: user.isAdmin } });
 
+// Adds `photoCount` timeline photos of one person for `memberId`, all with `embedding`, and links
+// every face to that person's identity. Returns the person + identity.
+const addMatchingMemberPerson = async (
+  fx: Awaited<ReturnType<typeof createLinkedLibraryIdentityFixture>>,
+  input: { memberId: string; name: string; embedding: string; photoCount: number },
+) => {
+  const { result: person } = await fx.ctx.newPerson({ ownerId: input.memberId, name: input.name });
+  const identity = await fx.faceIdentityRepository.ensurePersonIdentity(person.id);
+  for (let i = 0; i < input.photoCount; i++) {
+    const { asset } = await fx.ctx.newAsset({ ownerId: input.memberId, visibility: AssetVisibility.Timeline });
+    const { result: face } = await fx.ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    await fx.ctx.database.insertInto('face_search').values({ faceId: face, embedding: input.embedding }).execute();
+    await fx.faceIdentityRepository.linkFace({ assetFaceId: face, identityId: identity.id, source: 'owner-person' });
+  }
+  return { person, identityId: identity.id };
+};
+
+const spacePersonEmbedding = (fx: Awaited<ReturnType<typeof createLinkedLibraryIdentityFixture>>) =>
+  fx.ctx.database
+    .selectFrom('face_search')
+    .select('embedding')
+    .where('faceId', '=', fx.face.faceId)
+    .executeTakeFirstOrThrow()
+    .then((row) => row.embedding);
+
 type IdentityRbacContext = ReturnType<typeof setup>['ctx'] | ReturnType<typeof setupSearch>['ctx'];
 
 const setSpaceTimeline = async (
@@ -888,6 +913,106 @@ describe('People identity RBAC projection', () => {
       expect.objectContaining({
         primaryProfile: { type: 'user-person', id: memberPerson.id },
         numberOfAssets: 2,
+      }),
+    ]);
+  });
+
+  // Count-invariance: searchFaces caps at numResults:2, so 1/2/3/5 photos of the member's one person
+  // all collapse to a single candidate identity. The photo count must never change the outcome — the
+  // bug bailed the moment there were >= 2 photos.
+  it.each([1, 2, 3, 5])(
+    'reconciles a late member local person whether they have %i matching photo(s)',
+    async (photoCount) => {
+      const fx = await createLinkedLibraryIdentityFixture({ memberInitiallyJoined: false });
+      const embedding = await spacePersonEmbedding(fx);
+      const { person: memberPerson } = await addMatchingMemberPerson(fx, {
+        memberId: fx.member.id,
+        name: 'Member Private Name',
+        embedding,
+        photoCount,
+      });
+
+      await fx.sharedSpaceService.addMember(authFor(fx.source), fx.space.id, {
+        userId: fx.member.id,
+        role: SharedSpaceRole.Viewer,
+      });
+      await fx.sharedSpaceService.handleSharedSpaceIdentityReconciliation({
+        spaceId: fx.space.id,
+        userId: fx.member.id,
+      });
+
+      // One unified tile: the member's own photos plus the owner's one shared photo.
+      const result = await fx.personService.getAll(authFor(fx.member), {
+        withHidden: false,
+        withSharedSpaces: true,
+        page: 1,
+        size: 50,
+      } as any);
+      expect(result.people).toEqual([
+        expect.objectContaining({
+          primaryProfile: { type: 'user-person', id: memberPerson.id },
+          numberOfAssets: photoCount + 1,
+        }),
+      ]);
+    },
+  );
+
+  // Ambiguity guard: two DISTINCT member people both match the space person. The dedup fix must still
+  // bail (two distinct candidate identities), never arbitrarily pick one to merge.
+  it('does not auto-link when two distinct member people both match the space person', async () => {
+    const fx = await createLinkedLibraryIdentityFixture({ memberInitiallyJoined: false });
+    const embedding = await spacePersonEmbedding(fx);
+    const a = await addMatchingMemberPerson(fx, { memberId: fx.member.id, name: 'Member A', embedding, photoCount: 1 });
+    const b = await addMatchingMemberPerson(fx, { memberId: fx.member.id, name: 'Member B', embedding, photoCount: 1 });
+
+    await fx.sharedSpaceService.addMember(authFor(fx.source), fx.space.id, {
+      userId: fx.member.id,
+      role: SharedSpaceRole.Viewer,
+    });
+    await fx.sharedSpaceService.handleSharedSpaceIdentityReconciliation({ spaceId: fx.space.id, userId: fx.member.id });
+
+    // Neither person was merged into the space identity — both keep their own identity untouched.
+    const rows = await fx.ctx.database
+      .selectFrom('person')
+      .select(['id', 'identityId'])
+      .where('id', 'in', [a.person.id, b.person.id])
+      .execute();
+    const byId = new Map(rows.map((r) => [r.id, r.identityId]));
+    expect(byId.get(a.person.id)).toBe(a.identityId);
+    expect(byId.get(b.person.id)).toBe(b.identityId);
+  });
+
+  // End-to-end self-heal: the nightly sweep queues space-level reconciliation (no per-user
+  // targeting); draining it collapses a pre-existing multi-photo member duplicate into one tile.
+  it('nightly sweep heals a member duplicate with no per-user targeting', async () => {
+    const fx = await createLinkedLibraryIdentityFixture({ memberInitiallyJoined: true });
+    const embedding = await spacePersonEmbedding(fx);
+    const { person: memberPerson } = await addMatchingMemberPerson(fx, {
+      memberId: fx.member.id,
+      name: 'Member Private Name',
+      embedding,
+      photoCount: 2,
+    });
+
+    await fx.sharedSpaceService.handleSharedSpaceIdentityReconciliationSweep();
+    expect(fx.sharedJobs.queue.mock.calls.map(([job]) => job)).toContainEqual({
+      name: JobName.SharedSpaceIdentityReconciliation,
+      data: { spaceId: fx.space.id },
+    });
+
+    // Run the space-level reconciliation the sweep queued (no userId → every member).
+    await fx.sharedSpaceService.handleSharedSpaceIdentityReconciliation({ spaceId: fx.space.id });
+
+    const result = await fx.personService.getAll(authFor(fx.member), {
+      withHidden: false,
+      withSharedSpaces: true,
+      page: 1,
+      size: 50,
+    } as any);
+    expect(result.people).toEqual([
+      expect.objectContaining({
+        primaryProfile: { type: 'user-person', id: memberPerson.id },
+        numberOfAssets: 3,
       }),
     ]);
   });
