@@ -57,8 +57,24 @@ describe('AssetAddToCollectionModal', () => {
     render(AssetAddToCollectionModal, { assetIds: ['1', '2'], onClose });
     const tripButtons = await screen.findAllByRole('button', { name: /Trip/ });
     await fireEvent.click(tripButtons[0]);
-    expect(mockAdd).toHaveBeenCalledWith([expect.objectContaining({ id: 'a1', kind: 'album' })], ['1', '2']);
+    expect(mockAdd).toHaveBeenCalledWith([expect.objectContaining({ id: 'a1', kind: 'album' })], ['1', '2'], {
+      contributionMode: false,
+    });
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+  });
+
+  it('restricts the picker to the space and dispatches in contribution mode when given restrictToSpaceId', async () => {
+    sdkMock.getSharedSpaceAlbums.mockResolvedValue([{ ...album('sa1', 'Space Trip'), ownerId: 'them' }] as never);
+    const onClose = vi.fn();
+    render(AssetAddToCollectionModal, { assetIds: ['1', '2'], onClose, restrictToSpaceId: 'space-1' });
+
+    const rows = await screen.findAllByRole('button', { name: /Space Trip/ });
+    await fireEvent.click(rows[0]);
+
+    expect(sdkMock.getSharedSpaceAlbums).toHaveBeenCalledWith({ id: 'space-1' });
+    expect(mockAdd).toHaveBeenCalledWith([expect.objectContaining({ id: 'sa1', kind: 'album' })], ['1', '2'], {
+      contributionMode: true,
+    });
   });
 
   it('closes without dispatching when the picker is dismissed', async () => {
