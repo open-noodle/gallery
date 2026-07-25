@@ -1,8 +1,15 @@
 name: PR Release Candidate
 
 # When a PR carries the `rc` (or `rc-ml`) label, build a release-candidate server
-# image (plus CPU ML when `rc-ml`) from the PR's head commit under the stable tag
-# `pr-<number>`, and keep one sticky PR comment showing how to run the latest build.
+# image (plus CPU ML when `rc-ml`) from the PR's head commit under an incrementing,
+# immutable tag `pr-<number>-rc.<n>`, and keep one sticky PR comment showing the
+# latest build plus the history of earlier ones.
+#
+# Tags are never overwritten: `n` is resolved from the tags that already exist in
+# GHCR, so a tester always knows exactly which build they are running and can stay
+# on (or go back to) an earlier RC. All of a PR's RC tags are deleted when it closes
+# — see gallery-pr-rc-cleanup.yml.
+#
 # Server-only unless `rc-ml` is present. Same-repo PRs only (fork PRs can't push GHCR).
 
 on:
@@ -10,14 +17,26 @@ on:
     types: [labeled, synchronize]
 
 concurrency:
-  group: pr-rc-${{ github.event.pull_request.number }}
+  # Concurrency is evaluated at workflow level, BEFORE any job `if:` gate — so a run
+  # triggered by an unrelated label (`changelog:chore`, …) would join the per-PR group
+  # and cancel an in-flight RC build, even though every one of its jobs then skips.
+  # Only RC-relevant events share the per-PR group; everything else gets a group of its
+  # own keyed on run id, so it can never cancel anything.
+  group: >-
+    ${{ (github.event.action == 'synchronize' ||
+         github.event.label.name == 'rc' ||
+         github.event.label.name == 'rc-ml')
+        && format('pr-rc-{0}', github.event.pull_request.number)
+        || format('pr-rc-ignored-{0}', github.run_id) }}
   cancel-in-progress: true
 
 permissions: {}
 
 jobs:
-  build:
-    name: Build RC image
+  resolve:
+    name: Resolve RC number
+    # The whole trigger gate lives here; `build` and `comment` hang off this job's
+    # result, so an unlabelled PR skips the chain without consuming a runner.
     if: >
       github.event.pull_request.head.repo.full_name == github.repository &&
       (
@@ -27,19 +46,118 @@ jobs:
           (contains(github.event.pull_request.labels.*.name, 'rc') ||
            contains(github.event.pull_request.labels.*.name, 'rc-ml')))
       )
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read
+    outputs:
+      rc_tag: ${{ steps.next.outputs.rc_tag }}
+    steps:
+      - name: Resolve next RC tag
+        id: next
+        env:
+          # The registry is the source of truth for the counter, not the PR comment:
+          # a deleted or edited comment must not be able to reset numbering and
+          # overwrite a live tag. Every failure path below exits non-zero rather than
+          # falling back to 0, because silently reusing a number is the one outcome
+          # this whole change exists to prevent.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          IMAGE_REPO: open-noodle/gallery-server
+        run: |
+          set -euo pipefail
+
+          # Authenticate so this keeps working if the package is ever made private.
+          # The package is public today, so fall back to an anonymous pull token
+          # rather than blocking every RC build on a token-endpoint hiccup.
+          token=$(curl -fsS -u "${GITHUB_ACTOR}:${GH_TOKEN}" \
+            "https://ghcr.io/token?service=ghcr.io&scope=repository:${IMAGE_REPO}:pull" \
+            | jq -r '.token // empty') || token=""
+          if [[ -z "$token" ]]; then
+            echo "::warning::Authenticated GHCR token request failed; retrying anonymously."
+            token=$(curl -fsS \
+              "https://ghcr.io/token?service=ghcr.io&scope=repository:${IMAGE_REPO}:pull" \
+              | jq -r '.token // empty')
+          fi
+          if [[ -z "$token" ]]; then
+            echo "::error::Could not obtain a GHCR pull token for ${IMAGE_REPO}."
+            exit 1
+          fi
+
+          prefix="pr-${PR_NUMBER}-rc."
+          url="https://ghcr.io/v2/${IMAGE_REPO}/tags/list?n=1000"
+          highest=-1
+          page=0
+
+          while [[ -n "$url" ]]; do
+            page=$((page + 1))
+            if (( page > 20 )); then
+              echo "::error::GHCR tag list exceeded 20 pages; refusing to guess the next RC number."
+              exit 1
+            fi
+
+            headers=$(mktemp)
+            body=$(mktemp)
+            if ! curl -fsS -D "$headers" -o "$body" -H "Authorization: Bearer ${token}" "$url"; then
+              echo "::error::GHCR tag list request failed for ${IMAGE_REPO}; refusing to guess the next RC number."
+              exit 1
+            fi
+
+            # startswith on "pr-<n>-rc." is exact: "pr-8371-rc.0" does not start with
+            # "pr-837-rc.", so neighbouring PR numbers can never bleed into the count.
+            page_highest=$(jq -r --arg prefix "$prefix" '
+              [ (.tags // [])[]
+                | select(startswith($prefix))
+                | ltrimstr($prefix)
+                | select(test("^[0-9]+$"))
+                | tonumber
+              ] | max // -1' "$body")
+            if (( page_highest > highest )); then
+              highest=$page_highest
+            fi
+
+            # A silently truncated page would restart the counter at 0, so follow
+            # pagination if the registry ever starts sending it (it does not today).
+            next=$(grep -i '^link:' "$headers" \
+              | sed -n 's/.*<\([^>]*\)>; *rel="next".*/\1/p' | head -1 || true)
+            rm -f "$headers" "$body"
+
+            if [[ -z "$next" ]]; then
+              url=""
+            elif [[ "$next" == http* ]]; then
+              url="$next"
+            else
+              url="https://ghcr.io${next}"
+            fi
+          done
+
+          rc_tag="${prefix}$((highest + 1))"
+          echo "rc_tag=${rc_tag}" >> "$GITHUB_OUTPUT"
+          echo "Next RC tag: ${rc_tag}"
+
+  build:
+    name: Build RC image
+    # No `if:` needed — a skipped or failed `resolve` skips this job automatically.
+    needs: resolve
     permissions:
       contents: read
       packages: write
     uses: ./.github/workflows/gallery-rc-build.yml
     with:
-      rc_tag: pr-${{ github.event.pull_request.number }}
+      rc_tag: ${{ needs.resolve.outputs.rc_tag }}
       ref: ${{ github.event.pull_request.head.sha }}
       build_ml: ${{ contains(github.event.pull_request.labels.*.name, 'rc-ml') }}
 
   comment:
     name: Update RC comment
-    needs: build
-    if: ${{ always() && needs.build.result != 'skipped' && needs.build.result != 'cancelled' }}
+    needs: [resolve, build]
+    # Keyed on `resolve`, not `build`: a failed `resolve` makes `build` report
+    # `skipped`, and gating on that would silently swallow the failure on a PR that
+    # is labelled for RC. `cancelled` is excluded on both so a superseded run never
+    # overwrites a good comment with a spurious failure.
+    if: >
+      always() &&
+      needs.resolve.result != 'skipped' && needs.resolve.result != 'cancelled' &&
+      needs.build.result != 'cancelled'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -47,41 +165,117 @@ jobs:
       - name: Post or update sticky RC comment
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
+          RESOLVE_RESULT: ${{ needs.resolve.result }}
           BUILD_RESULT: ${{ needs.build.result }}
+          RC_TAG: ${{ needs.resolve.outputs.rc_tag }}
         with:
           script: |
-            const marker = '<!-- gallery-rc-build-comment -->';
+            const BUILD_MARKER = '<!-- gallery-rc-build-comment -->';
+            const STATE_RE = /<!-- gallery-rc-state: (.*?) -->/;
+            const MAX_STORED = 20;
+            const MAX_SHOWN = 10;
+
             const { owner, repo } = context.repo;
             const pr = context.payload.pull_request;
             const prNumber = pr.number;
             const headSha = pr.head.sha;
-            const shortSha = headSha.substring(0, 7);
-            const labels = pr.labels.map((l) => l.name);
-            const mlBuilt = labels.includes('rc-ml');
+            const mlBuilt = pr.labels.map((l) => l.name).includes('rc-ml');
+            const resolveResult = process.env.RESOLVE_RESULT;
             const buildResult = process.env.BUILD_RESULT;
-            const tag = `pr-${prNumber}`;
-            const serverImage = `ghcr.io/open-noodle/gallery-server:${tag}`;
-            const mlImage = `ghcr.io/open-noodle/gallery-ml:${tag}`;
-            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
-            const commitUrl = `${context.serverUrl}/${owner}/${repo}/commit/${headSha}`;
-            const updated = new Date().toUTCString();
+            const rcTag = process.env.RC_TAG;
 
-            let body;
-            if (buildResult === 'success') {
-              const overrideMl = mlBuilt
+            const commitUrl = (sha) => `${context.serverUrl}/${owner}/${repo}/commit/${sha}`;
+            const runUrl = (id) => `${context.serverUrl}/${owner}/${repo}/actions/runs/${id}`;
+            const short = (sha) => sha.substring(0, 7);
+            const when = (iso) => `${iso.replace('T', ' ').substring(0, 16)} UTC`;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: prNumber,
+              per_page: 100,
+            });
+            // Requiring a Bot author stops GitHub's "Quote reply" from tricking this
+            // into editing a human's comment that happens to contain the marker.
+            const existing = comments.find(
+              (c) => c.body && c.body.includes(BUILD_MARKER) && c.user?.type === 'Bot',
+            );
+
+            // History is presentation data only. Losing it cannot corrupt the counter,
+            // which is resolved from the registry — hence a parse failure just resets it.
+            let builds = [];
+            if (existing) {
+              const match = existing.body.match(STATE_RE);
+              if (match) {
+                try {
+                  const parsed = JSON.parse(match[1]);
+                  if (Array.isArray(parsed.builds)) {
+                    builds = parsed.builds;
+                  }
+                } catch {
+                  core.warning('Could not parse the RC state blob; starting a fresh history.');
+                }
+              }
+            }
+
+            const succeeded =
+              resolveResult === 'success' && buildResult === 'success' && Boolean(rcTag);
+
+            // Only successful builds enter the history, so a number retried after a
+            // failure appears exactly once and never maps to two different commits.
+            if (succeeded) {
+              builds = [
+                {
+                  tag: rcTag,
+                  sha: headSha,
+                  ml: mlBuilt,
+                  runId: context.runId,
+                  at: new Date().toISOString(),
+                },
+                ...builds.filter((b) => b.tag !== rcTag),
+              ].slice(0, MAX_STORED);
+            }
+
+            const latest = builds[0];
+            const lines = [
+              BUILD_MARKER,
+              `<!-- gallery-rc-state: ${JSON.stringify({ builds })} -->`,
+              '### 🧪 Release candidate build',
+              '',
+            ];
+
+            if (!succeeded) {
+              lines.push('> [!WARNING]');
+              if (resolveResult !== 'success') {
+                lines.push(
+                  `> Could not work out the next RC tag for [\`${short(headSha)}\`](${commitUrl(headSha)}) — the GHCR tag lookup failed, so nothing was built. See the [logs](${runUrl(context.runId)}).`,
+                );
+              } else {
+                const tagNote = rcTag ? ` (\`${rcTag}\`)` : '';
+                lines.push(
+                  `> The RC build for [\`${short(headSha)}\`](${commitUrl(headSha)})${tagNote} did not complete (\`${buildResult}\`). See the [build logs](${runUrl(context.runId)}).`,
+                );
+              }
+              if (latest) {
+                lines.push('>', '> The last successful RC below is unchanged and still pullable.', '');
+              }
+            }
+
+            if (latest) {
+              const serverImage = `ghcr.io/open-noodle/gallery-server:${latest.tag}`;
+              const mlImage = `ghcr.io/open-noodle/gallery-ml:${latest.tag}`;
+              const overrideMl = latest.ml
                 ? `\n  immich-machine-learning:\n    image: ${mlImage}`
                 : '';
-              const pullTargets = mlBuilt
+              const pullTargets = latest.ml
                 ? 'immich-server immich-machine-learning'
                 : 'immich-server';
-              const mlLine = mlBuilt
+              const mlLine = latest.ml
                 ? `\n- \`${mlImage}\` (CPU, linux/amd64 + linux/arm64)`
                 : '';
-              body = [
-                marker,
-                '### 🧪 Release candidate build',
-                '',
-                `Built from [\`${shortSha}\`](${commitUrl}) · [build run](${runUrl})`,
+
+              lines.push(
+                `**Latest RC** \`${latest.tag}\` — built from [\`${short(latest.sha)}\`](${commitUrl(latest.sha)}) · [build run](${runUrl(latest.runId)})`,
                 '',
                 '**Images published**',
                 '',
@@ -103,32 +297,42 @@ jobs:
                 'docker compose up -d',
                 '```',
                 '',
-                'To roll back, delete the override (or the RC image block) and run `docker compose up -d` again.',
+                'Each push publishes a new numbered tag, so update the image line to move to a newer RC. To roll back, point it at an earlier `rc.<n>` or delete the override and run `docker compose up -d` again.',
                 '',
                 '</details>',
-                '',
-                `_Last updated ${updated} — auto-updates on every push while the \`rc\`/\`rc-ml\` label is set._`,
-              ].join('\n');
-            } else {
-              body = [
-                marker,
-                '### 🧪 Release candidate build — ❌ failed',
-                '',
-                `The RC build for [\`${shortSha}\`](${commitUrl}) did not complete (\`${buildResult}\`). See the [build logs](${runUrl}).`,
-                '',
-                `_Last updated ${updated}._`,
-              ].join('\n');
+              );
             }
 
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner,
-              repo,
-              issue_number: prNumber,
-              per_page: 100,
-            });
-            const existing = comments.find(
-              (c) => c.body && c.body.includes(marker) && c.user?.type === 'Bot',
+            const previous = builds.slice(1);
+            if (previous.length > 0) {
+              const shown = previous.slice(0, MAX_SHOWN);
+              lines.push(
+                '',
+                `<details><summary>Previous builds (${previous.length})</summary>`,
+                '',
+                '| Tag | Commit | Built |',
+                '| --- | --- | --- |',
+              );
+              for (const b of shown) {
+                lines.push(
+                  `| \`${b.tag}\` | [\`${short(b.sha)}\`](${commitUrl(b.sha)}) | ${when(b.at)} |`,
+                );
+              }
+              if (previous.length > shown.length) {
+                lines.push(
+                  '',
+                  `_${previous.length - shown.length} older build(s) omitted. Their tags are still in GHCR until this PR closes._`,
+                );
+              }
+              lines.push('', '</details>');
+            }
+
+            lines.push(
+              '',
+              `_Last updated ${new Date().toUTCString()} — every push while the \`rc\`/\`rc-ml\` label is set publishes a new numbered RC. All \`pr-${prNumber}\` RC images are deleted when this PR closes._`,
             );
+
+            const body = lines.join('\n');
             if (existing) {
               await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
             } else {
