@@ -425,6 +425,7 @@ export enum SystemMetadataKey {
   License = 'license',
   IntegrityChecksumCheckpoint = 'integrity-checksum-checkpoint',
   ClassificationConfigState = 'classification-config-state',
+  SharedSpaceFaceJobCleanupState = 'shared-space-face-job-cleanup-state',
 }
 
 export enum UserMetadataKey {
@@ -1034,6 +1035,11 @@ export enum JobName {
   // L8: low-frequency nightly backstop — reconciles every album with a live grant, making the
   // mechanism path-independent (covers M6 durability gaps, L7 residue, and cascade strands).
   SharedSpaceAlbumGrantReconcileSweep = 'SharedSpaceAlbumGrantReconcileSweep',
+
+  // Self-heal backstop: nightly re-queue of identity reconciliation for every face-enabled space,
+  // collapsing pre-fix duplicate people (a member's local person left unlinked from the space
+  // identity) without any user action.
+  SharedSpaceIdentityReconciliationSweep = 'SharedSpaceIdentityReconciliationSweep',
 
   // Classification
   AssetClassifyQueueAll = 'AssetClassifyQueueAll',

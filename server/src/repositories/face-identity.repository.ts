@@ -2652,7 +2652,11 @@ export class FaceIdentityRepository {
         if (existingPerson) {
           targetPersonId = existingPerson.id;
         } else if (currentIdentityId) {
-          const createdPerson = await this.db
+          // Race-safe: a concurrent backfill/face-match pass may create this identity's space person
+          // between the getSpacePersonByIdentity lookup above and here. ON CONFLICT DO NOTHING lets
+          // the loser reuse the winner's row instead of crashing on the (spaceId, identityId) unique
+          // index.
+          const inserted = await this.db
             .insertInto('shared_space_person')
             .values({
               spaceId: person.spaceId,
@@ -2660,8 +2664,17 @@ export class FaceIdentityRepository {
               representativeFaceId: group.representativeFaceId,
               type: group.type,
             })
+            .onConflict((oc) => oc.columns(['spaceId', 'identityId']).where('identityId', 'is not', null).doNothing())
             .returning(['id'])
-            .executeTakeFirstOrThrow();
+            .executeTakeFirst();
+          const createdPerson =
+            inserted ??
+            (await this.db
+              .selectFrom('shared_space_person')
+              .select(['id'])
+              .where('spaceId', '=', person.spaceId)
+              .where('identityId', '=', group.identityId)
+              .executeTakeFirstOrThrow());
           targetPersonId = createdPerson.id;
         } else {
           const update: { identityId: string; type: string; representativeFaceId?: string } = {
