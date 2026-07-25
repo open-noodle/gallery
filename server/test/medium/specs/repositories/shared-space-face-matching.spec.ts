@@ -1417,4 +1417,54 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       expect(assetIds).toContain(asset.id);
     });
   });
+
+  // Regression for the duplicate-key crash the shared-space face-match backfill hit when a person
+  // has multiple photos: FaceIdentityBackfill fans out one SharedSpaceFaceMatchFromBackfill job per
+  // affected asset, and those parallel jobs — all carrying faces of the SAME identity — each read
+  // "no space person yet" and then race to INSERT, tripping the `shared_space_person_spaceId_identityId_key`
+  // unique index. All but the winner threw `duplicate key value ...`, crashing the handler and
+  // aborting the face-match/link chain, which left the member's person unlinked as a duplicate tile.
+  describe('concurrent space-person creation for the same identity', () => {
+    it('returns the existing space person instead of throwing on a duplicate (spaceId, identityId)', async () => {
+      const { ctx, sut, faceIdentityRepository } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { result: person } = await ctx.newPerson({ ownerId: user.id, name: 'Brad' });
+      const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+      const faceId = await createFaceWithEmbedding(ctx, { assetId: asset.id, personId: person.id });
+
+      // A concurrent job already created the space person for this identity.
+      const existing = await sut.createPerson({
+        spaceId: space.id,
+        identityId: identity.id,
+        name: '',
+        representativeFaceId: faceId,
+        type: 'person',
+      });
+
+      // The racing job must get the existing row back — not crash on the unique index.
+      const result = await sut.createOrGetPersonForIdentity({
+        spaceId: space.id,
+        identityId: identity.id,
+        name: '',
+        representativeFaceId: faceId,
+        type: 'person',
+      });
+
+      expect(result.id).toBe(existing.id);
+
+      // No duplicate row was inserted for the identity — the loser reused the winner's row.
+      const rows = await ctx.database
+        .selectFrom('shared_space_person')
+        .select('id')
+        .where('spaceId', '=', space.id)
+        .where('identityId', '=', identity.id)
+        .execute();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].id).toBe(existing.id);
+    });
+  });
 });
