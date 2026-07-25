@@ -326,7 +326,13 @@ export class QueueService extends BaseService {
     }
 
     if (config.nightlyTasks.clusterNewFaces) {
-      jobs.push({ name: JobName.FacialRecognitionQueueAll, data: { force: false, nightly: true } });
+      jobs.push(
+        { name: JobName.FacialRecognitionQueueAll, data: { force: false, nightly: true } },
+        // Self-heal backstop: re-queue identity reconciliation for every face-enabled space so
+        // pre-fix duplicate shared-space people (a member's local person left unlinked from the space
+        // identity) collapse without any user action. Gated with face clustering — moot when off.
+        { name: JobName.SharedSpaceIdentityReconciliationSweep },
+      );
     }
 
     await this.jobRepository.queueAll(jobs);
