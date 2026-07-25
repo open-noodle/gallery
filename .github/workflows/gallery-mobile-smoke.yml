@@ -86,4 +86,13 @@ jobs:
 
       - name: Build unsigned Android APK
         working-directory: ./mobile
+        # mobile/android/gradle.properties (upstream-owned, no fork drift) pairs
+        # android.enableJetifier=true with org.gradle.jvmargs=-Xmx4096M and
+        # org.gradle.parallel=true. The debug APK pulls all three arch-specific
+        # Flutter engine jars, and jetifying them concurrently inside a 4 GB heap
+        # OOMs depending on runner memory ("Java heap space" in JetifyTransform) —
+        # non-deterministic, seen failing and passing on the same SHA. Override the
+        # daemon heap here so upstream's gradle.properties stays byte-identical.
+        env:
+          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx8g
         run: flutter build apk --debug
