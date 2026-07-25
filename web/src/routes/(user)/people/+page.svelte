@@ -25,7 +25,7 @@
   import { getGlobalPersonHref, getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
   import { handleError } from '$lib/utils/handle-error';
   import { clearQueryParam } from '$lib/utils/navigation';
-  import { sortPeople } from '$lib/utils/people-utils';
+  import { appendUniqueById, sortPeople } from '$lib/utils/people-utils';
   import { formatPeopleHeaderDescription } from '$lib/utils/people-statistics';
   import {
     getAllPeople,
@@ -68,6 +68,10 @@
   let editingPerson: PersonResponseDto | null = $state(null);
   let searchedPeopleLocal: PersonResponseDto[] = $state([]);
   let searchPeopleElement = $state<ReturnType<typeof SearchPeople>>();
+  // The grid has two independent next-page triggers (the IntersectionObserver and the rAF sentinel
+  // re-check), and both are gated on the `loading` prop below. Without it the same page is fetched
+  // concurrently and appended twice.
+  let loadingPage = $state(false);
 
   onMount(() => {
     const getSearchedPeople = $page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE);
@@ -96,6 +100,7 @@
           pagesToLoad = Number.parseInt(newNextPage) - nextPage;
 
         if (pagesToLoad) {
+          loadingPage = true;
           handlePromiseError(
             Promise.all(
               Array.from({ length: pagesToLoad }, (_, i) => {
@@ -106,14 +111,18 @@
                   size: PEOPLE_PAGE_SIZE,
                 });
               }),
-            ).then((pages) => {
-              for (const page of pages) {
-                people = people.concat(page.people);
-              }
-              currentPage = startingPage + pagesToLoad - 1;
-              nextPage = pages.at(-1)?.hasNextPage ? startingPage + pagesToLoad : null;
-              resolve(); // wait until extra pages are loaded
-            }),
+            )
+              .then((pages) => {
+                for (const page of pages) {
+                  people = appendUniqueById(people, page.people);
+                }
+                currentPage = startingPage + pagesToLoad - 1;
+                nextPage = pages.at(-1)?.hasNextPage ? startingPage + pagesToLoad : null;
+                resolve(); // wait until extra pages are loaded
+              })
+              .finally(() => {
+                loadingPage = false;
+              }),
           );
         } else {
           resolve();
@@ -123,10 +132,11 @@
     });
 
   const loadNextPage = async () => {
-    if (!nextPage) {
+    if (loadingPage || !nextPage) {
       return;
     }
 
+    loadingPage = true;
     try {
       const { people: newPeople, hasNextPage } = await getAllPeople({
         withHidden: true,
@@ -134,13 +144,15 @@
         page: nextPage,
         size: PEOPLE_PAGE_SIZE,
       });
-      people = people.concat(newPeople);
+      people = appendUniqueById(people, newPeople);
       if (nextPage !== null) {
         currentPage = nextPage;
       }
       nextPage = hasNextPage ? nextPage + 1 : null;
     } catch (error) {
       handleError(error, $t('errors.failed_to_load_people'));
+    } finally {
+      loadingPage = false;
     }
   };
 
@@ -469,6 +481,7 @@
       people={showPeople}
       {toManagedPerson}
       hasNextPage={!!nextPage && !searchName}
+      loading={loadingPage}
       {loadNextPage}
       canEditNames={canEditName}
       canShowActions={isPersonalPrimary}
