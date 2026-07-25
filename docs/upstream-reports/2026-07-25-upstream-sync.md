@@ -111,6 +111,73 @@ first run** — no flakes, no re-dispatches:
 - Commits behind upstream: 0
 - Fork diff clean: YES
 
+## Fork Sync — later the same day (#840, #842)
+
+Two fork PRs landed on `origin/main` after the batch-51 run above, advancing
+`integratedForkHead` `652544fd2f6` → `b19653e2829`. Upstream did not move
+(`upstream/main` still `409734e1db3`), so this is a fork-only append — no new batch.
+
+| SHA           | Summary                                                                    | Area         | Result                      |
+| ------------- | -------------------------------------------------------------------------- | ------------ | --------------------------- |
+| `8aaac5b22a8` | fix(shared-space): idempotent space-person creation (#840, carries #841)   | server + gen | 1 conflict (see below)      |
+| `b19653e2829` | fix(web): unify the multi-select toolbar across Space surfaces (#839/#842) | web + e2e    | clean (auto-merged 5 files) |
+
+### Applied by hand — `make upstream-sync-fork-main` aborted
+
+The script threw on the first commit and left the cherry-pick in progress rather than
+rolling back. The remaining commit was cherry-picked by hand, the gate checks were run
+manually, and `integratedForkHead` + `appendHistory` were advanced by hand to match what
+the script would have written.
+
+### Conflict: `mobile/openapi/lib/model/job_name.dart`
+
+- **Why it conflicted**: `.gitattributes` sets `merge: unset` (and `diff: unset`) for
+  `mobile/openapi/**`, so git cannot text-merge this generated file — **any** concurrent
+  change to it conflicts wholesale. Upstream regenerated the Dart client with a newer
+  generator during the rolling batches (`class JobName` with `static const` members →
+  `enum JobName` with `._(r'…')` members), while #840 was authored against `main`'s older
+  `class` form.
+- **Fork side (`main`/#840)**: old `class` form + `SharedSpaceIdentityReconciliationSweep`.
+- **Branch side**: new `enum` form, without the new job name.
+- **Resolution**: took the branch's newer generator output and inserted
+  `sharedSpaceIdentityReconciliationSweep` plus its decoder `case` in spec order (directly
+  after `SharedSpaceAlbumGrantReconcileSweep`).
+- **Risk**: LOW.
+- **Verification**: the file's 87 enum members and 87 decoder cases now match
+  `open-api/immich-openapi-specs.json`'s `JobName` enum exactly, element-for-element and
+  in order. `grep -rn JobName mobile/lib/` returns nothing — the app code never switches
+  on this enum, so the added value is inert for the Flutter app.
+
+### Local verification (toolchain-drift check)
+
+A clean fork sync is not CI-safe on this branch — these commits were CI-verified against
+`main`'s toolchain, which is 51 batches behind the branch's. #842 lands ~2 800 lines of web
+and e2e specs, the exact shape that tripped `unicorn` rules on the #826 and #810 syncs.
+All gates re-run here on the branch toolchain:
+
+| Check                                                       | Status                     |
+| ----------------------------------------------------------- | -------------------------- |
+| `server` `tsc --noEmit`                                     | PASS                       |
+| `web` `tsc --noEmit`                                        | PASS                       |
+| `web` `check:svelte`                                        | PASS (569 files, 0 errors) |
+| `e2e` `tsc --noEmit`                                        | PASS                       |
+| eslint — changed web files (`tscompat` rule off, see skill) | PASS                       |
+| eslint — changed e2e specs                                  | PASS                       |
+| eslint — changed server files                               | PASS                       |
+| prettier — all changed files (server / web / e2e / docs)    | PASS                       |
+| server unit tests (shared-space, queue, job repository)     | PASS (647)                 |
+| web unit tests (toolbar, capabilities, managers)            | PASS (515)                 |
+| web unit tests (`routes/(user)/spaces`)                     | PASS (233)                 |
+| `fork-ownership-coverage-check`                             | OK                         |
+| `ci-invariants-check`                                       | OK                         |
+| `fork-patches-check`                                        | OK                         |
+
+No migrations (gallery count still 49), no Drift changes → `revert-to-immich.sql`
+unchanged.
+
+`packages/sdk/src/fetch-client.ts` fails `prettier --check`, but it fails identically on
+the pre-sync tip `0f2cce28e5b` — pre-existing on this generated file, not introduced here.
+
 ## Not done — deliberately
 
 No cutover to `main`: ruleset 13531204 (`non_fast_forward`, zero bypass actors) still
