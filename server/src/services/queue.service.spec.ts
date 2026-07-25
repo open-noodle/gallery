@@ -81,6 +81,10 @@ describe(QueueService.name, () => {
       expect(mocks.job.setConcurrency).toHaveBeenNthCalledWith(8, QueueName.BackgroundTask, 5);
       expect(mocks.job.setConcurrency).toHaveBeenNthCalledWith(9, QueueName.PeopleBackfill, 1);
       expect(mocks.job.setConcurrency).toHaveBeenNthCalledWith(10, QueueName.StorageTemplateMigration, 1);
+      // Pet recognition clusters faces one at a time (search -> create person -> assign). Running it
+      // concurrently races two faces of the same pet into two separate people, so it is pinned to 1
+      // the same way facial recognition is.
+      expect(mocks.job.setConcurrency).toHaveBeenCalledWith(QueueName.PetRecognition, 1);
     });
 
     it('should update cron expression on non-microservices worker when lock held', async () => {

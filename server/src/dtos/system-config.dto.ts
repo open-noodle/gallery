@@ -146,7 +146,6 @@ const SystemConfigJobSchema = z
     notifications: JobSettingsSchema,
     ocr: JobSettingsSchema,
     petDetection: JobSettingsSchema,
-    petRecognition: JobSettingsSchema,
     workflow: JobSettingsSchema,
     editor: JobSettingsSchema,
     integrityCheck: JobSettingsSchema,

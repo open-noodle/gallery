@@ -37287,9 +37287,6 @@
           "petDetection": {
             "$ref": "#/components/schemas/JobSettingsDto"
           },
-          "petRecognition": {
-            "$ref": "#/components/schemas/JobSettingsDto"
-          },
           "search": {
             "$ref": "#/components/schemas/JobSettingsDto"
           },
@@ -37322,7 +37319,6 @@
           "ocr",
           "peopleBackfill",
           "petDetection",
-          "petRecognition",
           "search",
           "sidecar",
           "smartSearch",

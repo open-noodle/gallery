@@ -3337,7 +3337,6 @@ export type SystemConfigJobDto = {
     ocr: JobSettingsDto;
     peopleBackfill: JobSettingsDto;
     petDetection: JobSettingsDto;
-    petRecognition: JobSettingsDto;
     search: JobSettingsDto;
     sidecar: JobSettingsDto;
     smartSearch: JobSettingsDto;

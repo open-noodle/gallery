@@ -289,6 +289,7 @@ export class QueueService extends BaseService {
   private isConcurrentQueue(name: QueueName): name is ConcurrentQueueName {
     return ![
       QueueName.FacialRecognition,
+      QueueName.PetRecognition,
       QueueName.StorageTemplateMigration,
       QueueName.DuplicateDetection,
       QueueName.BackupDatabase,

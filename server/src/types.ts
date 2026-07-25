@@ -216,6 +216,7 @@ export type ConcurrentQueueName = Exclude<
   QueueName,
   | QueueName.StorageTemplateMigration
   | QueueName.FacialRecognition
+  | QueueName.PetRecognition
   | QueueName.DuplicateDetection
   | QueueName.BackupDatabase
   | QueueName.StorageBackendMigration
