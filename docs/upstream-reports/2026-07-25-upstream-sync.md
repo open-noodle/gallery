@@ -89,11 +89,21 @@ Web and mobile deltas are upstream-only files; validation deferred to the remote
 - **Branch**: `rebase/upstream-rolling-v3.0.3`
 - **Commit validated**: `b64cc4705ef`
 
-All 10 `workflow_dispatch` workflows dispatched (staggered): test, docker,
-static_analysis, gallery-rebase-smoke, storage-migration-tests,
-gallery-revert-to-immich-validation, gallery-ml-smoke, gallery-mobile-smoke,
-storage-migration-e2e, gallery-build-mobile. Results recorded in the rolling-state
-notes / memory once complete.
+All 10 `workflow_dispatch` workflows dispatched (staggered) and **all 10 GREEN on the
+first run** — no flakes, no re-dispatches:
+
+| Workflow                                  | Conclusion |
+| ----------------------------------------- | ---------- |
+| `test.yml` (20-job suite)                 | GREEN      |
+| `docker.yml`                              | GREEN      |
+| `static_analysis.yml`                     | GREEN      |
+| `gallery-rebase-smoke.yml`                | GREEN      |
+| `storage-migration-tests.yml`             | GREEN      |
+| `gallery-revert-to-immich-validation.yml` | GREEN      |
+| `gallery-ml-smoke.yml`                    | GREEN      |
+| `gallery-mobile-smoke.yml`                | GREEN      |
+| `storage-migration-e2e.yml`               | GREEN      |
+| `gallery-build-mobile.yml`                | GREEN      |
 
 ## Post-Rebase Verification
 
