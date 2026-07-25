@@ -3,7 +3,13 @@ import { get } from 'svelte/store';
 import type { Faces } from '$lib/managers/asset-viewer-manager.svelte';
 import { PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
 import type { Size } from '$lib/utils/container-utils';
-import { getBoundingBox, sortPeople, sortPeopleForManagement, zoomImageToBase64 } from '$lib/utils/people-utils';
+import {
+  appendUniqueById,
+  getBoundingBox,
+  sortPeople,
+  sortPeopleForManagement,
+  zoomImageToBase64,
+} from '$lib/utils/people-utils';
 
 const makeFace = (overrides: Partial<Faces> = {}): Faces => ({
   id: 'face-1',
@@ -186,6 +192,40 @@ describe('sortPeople', () => {
     for (const mode of [PeopleSortBy.PhotoCount, PeopleSortBy.Name]) {
       expect(sortPeople(people, mode).map((person) => person.id)).toEqual(['visible', 'hidden-fav']);
     }
+  });
+});
+
+describe('appendUniqueById', () => {
+  it('appends rows that are not loaded yet', () => {
+    expect(appendUniqueById([{ id: 'a' }, { id: 'b' }], [{ id: 'c' }])).toEqual([
+      { id: 'a' },
+      { id: 'b' },
+      { id: 'c' },
+    ]);
+  });
+
+  it('drops incoming rows that are already loaded', () => {
+    expect(appendUniqueById([{ id: 'a' }, { id: 'b' }], [{ id: 'b' }, { id: 'c' }])).toEqual([
+      { id: 'a' },
+      { id: 'b' },
+      { id: 'c' },
+    ]);
+  });
+
+  it('keeps the already-loaded row rather than the incoming copy', () => {
+    const loaded = { id: 'a', name: 'renamed locally' };
+
+    expect(appendUniqueById([loaded], [{ id: 'a', name: 'stale' }])).toEqual([loaded]);
+  });
+
+  it('drops duplicates within a single incoming batch', () => {
+    expect(appendUniqueById([], [{ id: 'a' }, { id: 'a' }, { id: 'b' }])).toEqual([{ id: 'a' }, { id: 'b' }]);
+  });
+
+  it('returns the existing array untouched when every incoming row is a duplicate', () => {
+    const existing = [{ id: 'a' }];
+
+    expect(appendUniqueById(existing, [{ id: 'a' }])).toBe(existing);
   });
 });
 
