@@ -73,6 +73,12 @@ Pet detection extends two existing tables rather than creating new ones:
 
 Detected pets are stored as `person` rows with `type = 'pet'`. Each species creates one person entry per user (e.g., one "dog" person, one "cat" person), and individual detections are stored as `asset_face` rows with bounding box coordinates linked to that person. This reuses the existing face/person infrastructure for thumbnails, naming, merging, and browsing.
 
+:::note Pet Recognition covers dogs and cats only
+When Pet Recognition is enabled, **dogs and cats** are grouped into individual pets you can name, instead of one shared bucket per species. The other eight detected categories (bird, horse, sheep, cow, elephant, bear, zebra, giraffe) always keep the one-person-per-species behaviour described above.
+
+This is a limit of the recognition model, not an oversight: it is trained on dog and cat identities, so it has no basis for telling one bird or one horse apart from another. Restricting it also contains the cost of a misdetection — the detector occasionally labels a person as an animal, and a shared species bucket absorbs that far more gracefully than an individual identity would.
+:::
+
 ### Job Flow
 
 Pet detection runs as a dedicated BullMQ queue (`petDetection`) with concurrency of 1:

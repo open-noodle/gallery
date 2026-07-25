@@ -111,6 +111,15 @@ export const isPetDetectionEnabled = (machineLearning: SystemConfig['machineLear
   isMachineLearningEnabled(machineLearning) && machineLearning.petDetection.enabled;
 export const isPetRecognitionEnabled = (machineLearning: SystemConfig['machineLearning']) =>
   isMachineLearningEnabled(machineLearning) && machineLearning.petRecognition.enabled;
+/**
+ * Species eligible for individual pet recognition. The re-ID model is a DINOv2 backbone trained on
+ * dog and cat identities only, so it has no notion of what distinguishes one bird or one horse from
+ * another — embedding those produces arbitrary neighbours and arbitrary clusters. The detector is
+ * YOLO11, a general COCO model that emits all ten COCO animal classes, so everything outside this
+ * set must stay on the species-bucket path it used before individual recognition existed.
+ */
+export const RECOGNIZABLE_PET_SPECIES: ReadonlySet<string> = new Set(['dog', 'cat']);
+export const isRecognizablePetSpecies = (species: string) => RECOGNIZABLE_PET_SPECIES.has(species.toLowerCase());
 export const isFacialRecognitionEnabled = (machineLearning: SystemConfig['machineLearning']) =>
   isMachineLearningEnabled(machineLearning) && machineLearning.facialRecognition.enabled;
 // Deliberately gated on `facialRecognition.enabled` rather than `isFacialRecognitionEnabled`: face
