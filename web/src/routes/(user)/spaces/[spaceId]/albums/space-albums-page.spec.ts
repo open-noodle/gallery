@@ -175,6 +175,17 @@ describe('Space albums page', () => {
     expect(screen.getByTestId('empty-link-album-button')).toBeInTheDocument();
   });
 
+  it('offers Create album alongside Link album on the empty state — a space with no albums yet is exactly where creating one is most useful', () => {
+    renderPage([], SharedSpaceRole.Editor);
+    expect(screen.getByTestId('empty-create-album-button')).toBeInTheDocument();
+    expect(screen.getByTestId('empty-link-album-button')).toBeInTheDocument();
+  });
+
+  it('viewer with empty albums list sees no Create album button either', () => {
+    renderPage([], SharedSpaceRole.Viewer);
+    expect(screen.queryByTestId('empty-create-album-button')).not.toBeInTheDocument();
+  });
+
   describe('interactions', () => {
     it('clicking "Link album" opens the SpaceLinkAlbumModal with the linked album ids', async () => {
       modalManagerMock.show.mockResolvedValue(undefined);
@@ -324,6 +335,17 @@ describe('Space albums page', () => {
       sdkMock.linkAlbum.mockResolvedValue(undefined as never);
       renderPage([makeAlbum({ id: 'a' })], SharedSpaceRole.Owner);
       await fireEvent.click(screen.getByTestId('create-album-button'));
+      await waitFor(() => expect(sdkMock.linkAlbum).toHaveBeenCalledWith({ id: BASE_SPACE.id, albumId: 'new-1' }));
+      expect(goto).toHaveBeenCalledWith(`/spaces/${BASE_SPACE.id}/albums/new-1`);
+    });
+
+    it('empty-state create: creates an album, links it, and navigates to the space album route', async () => {
+      sdkMock.createAlbum.mockResolvedValue({ id: 'new-1', albumName: '' } as AlbumResponseDto);
+      sdkMock.linkAlbum.mockResolvedValue(undefined as never);
+      renderPage([], SharedSpaceRole.Editor);
+
+      await fireEvent.click(screen.getByTestId('empty-create-album-button'));
+
       await waitFor(() => expect(sdkMock.linkAlbum).toHaveBeenCalledWith({ id: BASE_SPACE.id, albumId: 'new-1' }));
       expect(goto).toHaveBeenCalledWith(`/spaces/${BASE_SPACE.id}/albums/new-1`);
     });

@@ -5,12 +5,33 @@ import { addAssetsToAlbums } from '$lib/services/album.service';
 import { addAssetsToSpace } from '$lib/services/space.service';
 import { getFormatter } from '$lib/utils/i18n';
 
-export const addAssetsToCollections = async (collections: PickerCollection[], assetIds: string[]): Promise<boolean> => {
+type AddToCollectionsOptions = {
+  /**
+   * The selection contains assets the caller does not own, so they can only land as #764
+   * space contributions. Two consequences:
+   *
+   * - every album is dispatched on its own, because only the single-album endpoint
+   *   (`POST /albums/:id/assets`) runs `tryContributeDeniedAssets`; the batched
+   *   `PUT /albums/assets` would silently drop every non-owned asset;
+   * - spaces are dropped, because `POST /shared-spaces/:id/assets` requires
+   *   `Permission.AssetShare` on every id and rejects the whole request otherwise.
+   *
+   * The picker already hides spaces in this mode; dropping them here keeps the guarantee
+   * even if a caller passes some anyway.
+   */
+  contributionMode?: boolean;
+};
+
+export const addAssetsToCollections = async (
+  collections: PickerCollection[],
+  assetIds: string[],
+  { contributionMode = false }: AddToCollectionsOptions = {},
+): Promise<boolean> => {
   const $t = await getFormatter();
 
   const albumIds = collections.filter((c) => c.kind === 'album').map((c) => c.id);
   const spaceIds =
-    assetIds.length > MAX_SPACE_ASSETS_PER_REQUEST
+    contributionMode || assetIds.length > MAX_SPACE_ASSETS_PER_REQUEST
       ? []
       : collections.filter((c) => c.kind === 'space').map((c) => c.id);
 
@@ -27,7 +48,11 @@ export const addAssetsToCollections = async (collections: PickerCollection[], as
   }
 
   const tasks: { count: number; run: () => Promise<boolean> }[] = [];
-  if (albumIds.length > 0) {
+  if (contributionMode) {
+    for (const id of albumIds) {
+      tasks.push({ count: 1, run: () => addAssetsToAlbums([id], assetIds, { notify: false }) });
+    }
+  } else if (albumIds.length > 0) {
     tasks.push({ count: albumIds.length, run: () => addAssetsToAlbums(albumIds, assetIds, { notify: false }) });
   }
   for (const id of spaceIds) {

@@ -139,11 +139,14 @@
     if (!assetInteraction.selectionActive) {
       return null;
     }
+    // `ownedAssets` drives canShare (the share action sends the owned subset), so it must
+    // reflect the real selection rather than the empty placeholder it once held.
+    const ownedAssets = assetInteraction.ownedAssets;
     return {
       assets: assetInteraction.assets,
       selectedAssetIds: assetInteraction.assets.map((asset) => asset.id),
-      ownedAssets: [],
-      ownedSelectedAssetIds: [],
+      ownedAssets,
+      ownedSelectedAssetIds: ownedAssets.map((asset) => asset.id),
       canAddToAlbum: false,
       canAddToSpace: false,
       isAllUserOwned: assetInteraction.isAllUserOwned,
@@ -166,11 +169,16 @@
 
   const tagsEnabled = $derived(authManager.authenticated ? authManager.preferences.tags.enabled : false);
   const caps = $derived(getSelectionCapabilities(ctx, tagsEnabled));
+
+  // Non-owned assets in the selection can only land as #764 contributions into an album linked
+  // to THIS space, so the picker is narrowed to those. `caps` already encodes the space-editor
+  // check; `space` is non-null whenever that flag is set.
+  const restrictToSpaceId = $derived(caps.addToAlbumRestrictedToSpace ? space?.id : undefined);
 </script>
 
 {#if assetInteraction.selectionActive}
   <AssetSelectControlBar>
-    {@const Actions = getAssetBulkActions($t)}
+    {@const Actions = getAssetBulkActions($t, { restrictToSpaceId })}
     <CommandPaletteDefaultProvider name={$t('assets')} actions={Object.values(Actions)} />
     {#if caps.canShare}
       <CreateSharedLink />

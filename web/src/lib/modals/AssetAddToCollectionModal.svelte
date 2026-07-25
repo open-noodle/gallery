@@ -6,9 +6,14 @@
   type Props = {
     assetIds: string[];
     onClose: () => void;
+    /**
+     * Set when the selection contains assets the user does not own: the picker then offers only
+     * albums linked to this space, and the dispatch runs in contribution mode (#764).
+     */
+    restrictToSpaceId?: string;
   };
 
-  const { assetIds, onClose }: Props = $props();
+  const { assetIds, onClose, restrictToSpaceId }: Props = $props();
 
   let pending = false;
 
@@ -21,7 +26,9 @@
       return; // re-entrancy guard: a dispatch is already in flight
     }
     pending = true;
-    const ok = await addAssetsToCollections(collections, assetIds);
+    const ok = await addAssetsToCollections(collections, assetIds, {
+      contributionMode: restrictToSpaceId !== undefined,
+    });
     pending = false;
     if (ok) {
       onClose();
@@ -29,4 +36,4 @@
   };
 </script>
 
-<CollectionPickerModal assetCount={assetIds.length} onClose={handleClose} />
+<CollectionPickerModal assetCount={assetIds.length} onClose={handleClose} {restrictToSpaceId} />
