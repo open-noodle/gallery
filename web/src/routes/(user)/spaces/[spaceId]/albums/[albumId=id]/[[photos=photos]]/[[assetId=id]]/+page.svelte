@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { goto, onNavigate } from '$app/navigation';
+  import { goto, invalidateAll, onNavigate } from '$app/navigation';
   import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
   import AlbumTitle from '$lib/components/album-page/AlbumTitle.svelte';
   import AlbumDescription from '$lib/components/album-page/AlbumDescription.svelte';
@@ -15,9 +15,7 @@
   import FilterToggleButton from '$lib/components/filter-panel/filter-toggle-button.svelte';
   import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
   import ControlAppBar from '$lib/components/shared-components/ControlAppBar.svelte';
-  import DownloadAction from '$lib/components/timeline/actions/DownloadAction.svelte';
-  import RemoveFromAlbum from '$lib/components/timeline/actions/RemoveFromAlbumAction.svelte';
-  import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
+  import SelectionToolbar from '$lib/components/timeline/SelectionToolbar.svelte';
   import Timeline from '$lib/components/timeline/Timeline.svelte';
   import TimelineGroupingControl from '$lib/components/timeline/TimelineGroupingControl.svelte';
   import { assetMultiSelectManager, AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
@@ -44,12 +42,14 @@
     AlbumUserRole,
     getAlbumInfo,
     SharedSpaceRole,
+    updateAlbumInfo,
     type AlbumResponseDto,
     type SharedSpaceMemberResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
   import HeaderActionButton from '$lib/components/HeaderActionButton.svelte';
-  import { Icon, IconButton, modalManager } from '@immich/ui';
+  import { Icon, IconButton, modalManager, toastManager } from '@immich/ui';
+  import { handleError } from '$lib/utils/handle-error';
   import { mdiArrowLeft, mdiImageOutline, mdiImagePlusOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
@@ -172,6 +172,51 @@
     // selection internally before firing onRemove, so we only need to defensively clear here.
     timelineManager?.removeAssets(assetIds);
     assetMultiSelectManager.clear();
+  };
+
+  // Mirrors the space timeline page's `handleSetVisibility`: moving assets to/from the locked
+  // folder takes them out of this (non-locked) timeline view. It isn't an album-membership
+  // change (RemoveFromAlbum is the only membership mutation this route offers), so it doesn't
+  // touch album.assetCount either.
+  const handleSetVisibility = (assetIds: string[]) => {
+    timelineManager?.removeAssets(assetIds);
+    assetMultiSelectManager.clear();
+  };
+
+  // DeleteAssets already performed the server-side trash before calling this. Unlike the space
+  // timeline page (which has `<OnEvents onAssetsDelete={refreshSpace} />` to pick up
+  // server-truth counts after a trash), this page has no such websocket wiring — mirroring the
+  // space-person page's identical reasoning — so force a data reload here to keep
+  // album.assetCount in sync with the server.
+  const handleAssetDelete = (assetIds: string[]) => {
+    timelineManager?.removeAssets(assetIds);
+    void invalidateAll();
+  };
+
+  // Mirrors the space timeline page's `handleUndoAssetDelete`. There's no websocket event for
+  // restore, so re-add the assets to the local view directly; no count refresh is needed since
+  // undoing a delete doesn't change album membership either.
+  const handleUndoAssetDelete = (assets: TimelineAsset[]) => {
+    timelineManager?.upsertAssets(assets);
+  };
+
+  // Cover setter for the full toolbar's "set_as_album_cover" menu item (canManage-gated, single
+  // asset only — see getSelectionCapabilities' canSetCover). Mirrors the regular album page's
+  // `updateThumbnailUsingCurrentSelection`; this route has no dedicated SELECT_THUMBNAIL mode, so
+  // it always operates on the current bulk selection.
+  const handleSetAlbumCover = async () => {
+    const assets = assetMultiSelectManager.assets;
+    if (assets.length !== 1) {
+      return;
+    }
+    try {
+      await updateAlbumInfo({ id: album.id, updateAlbumDto: { albumThumbnailAssetId: assets[0].id } });
+      await refreshAlbum();
+      toastManager.primary($t('album_cover_updated'));
+      assetMultiSelectManager.clear();
+    } catch (error) {
+      handleError(error, $t('errors.unable_to_update_album_cover'));
+    }
   };
 
   function resetPicker() {
@@ -400,24 +445,44 @@
   {/if}
 </UserPageLayout>
 
-<!-- Browse selection control bar (shows when assets are selected in browse mode). Rendered OUTSIDE
-     UserPageLayout: its wrapper is `relative z-0`, which is a stacking context, so a control bar nested
+<!-- Browse selection toolbar (shows when assets are selected in browse mode). Rendered OUTSIDE
+     UserPageLayout: its wrapper is `relative z-0`, which is a stacking context, so a toolbar nested
      inside it (and before the Timeline) paints UNDER the asset grid and the z-1 scrubber. Matching the
-     other timeline pages (recently-added/favorites/…), the bar sits after the layout so it paints on top.
-     rbac-5/albums-8: album-path assets never grant space-editor metadata-edit (checkSpaceEditAccess
-     omits the album arm, pinned by shared-space-album-scope.guard.spec.ts). This route is entirely
-     album-path, so it intentionally exposes ONLY Download + RemoveFromAlbum — never Archive / Change
-     date/location / Tag / visibility. In the MERGED direct-space timeline those metadata-edit actions
-     are separately gated by `isAllUserOwned`, so an editor can never trigger them on a non-owned
-     album-path asset; the residual mixed-bulk case is refused server-side (400 on album-path-only ids),
-     which the client cannot pre-empt without a per-asset origin signal (none exists on TimelineAsset). -->
+     other timeline pages (recently-added/favorites/space timeline/…), the bar sits after the layout so
+     it paints on top.
+
+     rbac-5/albums-8 REVERSED (Slice 6): this route now renders the full album-equivalent
+     <SelectionToolbar> — the same component the regular album page and the direct-space/space-person
+     timelines use — instead of the stripped Download+Remove-only bar it originally shipped with. Two
+     RBAC facts make the reversal safe:
+       - Owner-gated mutations (Share/Add-to-album/Favorite/Rotate/ChangeDate/ChangeDescription/
+         ChangeLocation/Archive/SetVisibility/Tag/Delete) are gated by `sel.isAllUserOwned` in
+         getSelectionCapabilities, and the server's AssetUpdate access check (access.ts:155-159) checks
+         asset OWNERSHIP first, before any album/space role: `isOwner = checkOwnerAccess(...)` is unioned
+         with the space-editor arm, so an owner editing their own asset is NEVER blocked by the album
+         path. Exposing these actions here for an all-owned selection is exactly as safe as on the
+         regular album page.
+       - `canRemoveFromAlbum` stays `canManage`-only (space.canWrite || album.isEditor) — ownership alone
+         never grants it — because the server's `AlbumAssetDelete` is role-gated
+         (shared-space-album-scope.guard.spec.ts pins this): a non-manager can't remove even their own
+         asset from the album (decision C).
+     Space-editor cross-owner metadata edits are still never offered on a mixed/not-owned selection:
+     `isAllUserOwned` gates the whole metadata-edit block, matching the merged direct-space timeline. -->
 {#if mode === 'browse' && assetMultiSelectManager.selectionActive}
-  <AssetSelectControlBar>
-    <DownloadAction filename="{album.albumName}.zip" />
-    {#if canManage}
-      <RemoveFromAlbum bind:album onRemove={handleRemoveAssets} data-testid="album-remove-from-album" />
-    {/if}
-  </AssetSelectControlBar>
+  <SelectionToolbar
+    {timelineManager}
+    assetInteraction={assetMultiSelectManager}
+    {album}
+    space={{ id: space.id, canWrite: isSpaceEditor }}
+    downloadFilename={`${album.albumName}.zip`}
+    onRemove={handleRemoveAssets}
+    onSetCover={handleSetAlbumCover}
+    onFavorite={(ids, isFavorite) => timelineManager.update(ids, (asset) => (asset.isFavorite = isFavorite))}
+    onArchive={(ids, visibility) => timelineManager.update(ids, (asset) => (asset.visibility = visibility))}
+    onVisibilitySet={handleSetVisibility}
+    onAssetDelete={handleAssetDelete}
+    onUndoDelete={handleUndoAssetDelete}
+  />
 {/if}
 
 {#if mode === 'add'}
