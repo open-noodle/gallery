@@ -1102,6 +1102,15 @@ export class SharedSpaceRepository {
     return rows.map((row) => row.albumId);
   }
 
+  async getFaceRecognitionEnabledSpaceIds(): Promise<string[]> {
+    const rows = await this.db
+      .selectFrom('shared_space')
+      .select('id')
+      .where('faceRecognitionEnabled', '=', true)
+      .execute();
+    return rows.map((row) => row.id);
+  }
+
   // Album sync fan-out: used by the AlbumAssetsAdd/Remove handlers to find every space
   // a linked album feeds, with its face-recognition flag. Mirrors getSpacesLinkedToLibrary.
   @GenerateSql({ params: [DummyValue.UUID] })
@@ -2223,6 +2232,32 @@ export class SharedSpaceRepository {
 
   createPerson(values: Insertable<SharedSpacePersonTable>) {
     return this.db.insertInto('shared_space_person').values(values).returningAll().executeTakeFirstOrThrow();
+  }
+
+  // Race-safe insert-or-get for the `(spaceId, identityId)` unique index. Concurrent
+  // SharedSpaceFaceMatch* jobs carrying faces of the same identity all miss the not-yet-committed
+  // space person and then race to INSERT; the losers previously crashed the handler with a
+  // duplicate-key error. ON CONFLICT DO NOTHING lets the loser fall through to re-read the winner's
+  // committed row instead of throwing.
+  async createOrGetPersonForIdentity(
+    values: Insertable<SharedSpacePersonTable> & { spaceId: string; identityId: string },
+  ) {
+    const inserted = await this.db
+      .insertInto('shared_space_person')
+      .values(values)
+      .onConflict((oc) => oc.columns(['spaceId', 'identityId']).where('identityId', 'is not', null).doNothing())
+      .returningAll()
+      .executeTakeFirst();
+    if (inserted) {
+      return inserted;
+    }
+
+    return this.db
+      .selectFrom('shared_space_person')
+      .selectAll()
+      .where('spaceId', '=', values.spaceId)
+      .where('identityId', '=', values.identityId)
+      .executeTakeFirstOrThrow();
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
