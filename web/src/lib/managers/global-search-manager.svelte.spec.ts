@@ -1167,6 +1167,7 @@ describe('activate("command")', () => {
       albumName: 'X',
       ownerId: 'u',
       isOwner: true,
+      isEditor: false,
       isMember: false,
       raw: { id: 'a1' } as unknown as import('@immich/sdk').AlbumResponseDto,
     });
@@ -1220,6 +1221,7 @@ describe('activate("command")', () => {
       albumName: 'X',
       ownerId: 'u',
       isOwner: true,
+      isEditor: false,
       isMember: false,
       raw: { id: 'a1' } as unknown as import('@immich/sdk').AlbumResponseDto,
     });

@@ -17,6 +17,8 @@ export interface AlbumContext {
   albumName: string;
   ownerId: string;
   isOwner: boolean;
+  /** Current user has an `albumUsers` role of Owner or Editor (mirrors the space-album page's `isAlbumEditor`). */
+  isEditor: boolean;
   isMember: boolean;
   /** Original DTO — passed through for handlers that open modals or call SDKs needing the full object. */
   raw: AlbumResponseDto;
@@ -198,11 +200,17 @@ export function registerAlbumContext(albumDto: () => AlbumResponseDto) {
     const ownerId =
       albumUsers.find(({ role }) => role === AlbumUserRole.Owner)?.user.id ?? albumUsers[0]?.user.id ?? '';
     const isMember = currentUserId !== null && albumUsers.some((u) => u.user.id === currentUserId);
+    const isEditor =
+      currentUserId !== null &&
+      albumUsers.some(
+        (u) => u.user.id === currentUserId && (u.role === AlbumUserRole.Owner || u.role === AlbumUserRole.Editor),
+      );
     commandContextManager.setAlbum({
       id: album.id,
       albumName: album.albumName,
       ownerId,
       isOwner: currentUserId !== null && currentUserId === ownerId,
+      isEditor,
       isMember,
       raw: album,
     });
