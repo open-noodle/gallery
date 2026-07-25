@@ -93,6 +93,11 @@ const { mockAssetMultiSelectManager } = vi.hoisted(() => ({
     isAllFavorite: false,
     isAllArchived: false,
     isAllUserOwned: true,
+    // Mirrors the real manager's derived field. These fixtures only model the all-owned and
+    // none-owned ends of the range, so deriving it from isAllUserOwned keeps the two in step.
+    get ownedAssets() {
+      return this.isAllUserOwned ? this.assets : [];
+    },
   },
 }));
 
@@ -105,6 +110,9 @@ vi.mock('$lib/managers/asset-multi-select-manager.svelte', () => ({
     isAllFavorite = false;
     isAllArchived = false;
     isAllUserOwned = true;
+    get ownedAssets() {
+      return this.isAllUserOwned ? this.assets : [];
+    }
   },
 }));
 
@@ -858,14 +866,16 @@ describe('Space album detail page', () => {
       expect(screen.getByRole('menuitem', { name: 'Set as album cover' })).toBeInTheDocument();
     });
 
-    it('manager + NOT-owned selection: RemoveFromAlbum + Set-cover present (canManage-gated), metadata-edit + Delete + Share absent (ownership-gated)', async () => {
+    it('manager + NOT-owned selection: RemoveFromAlbum + Set-cover + Add-to-album present (canManage-gated), metadata-edit + Delete + Share absent (ownership-gated)', async () => {
       mockAssetMultiSelectManager.selectionActive = true;
       mockAssetMultiSelectManager.isAllUserOwned = false;
       mockAssetMultiSelectManager.assets = [{ id: 'asset-1' }];
       renderPage({ members: [makeMember(SharedSpaceRole.Editor)] });
 
       expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Add to album or space' })).not.toBeInTheDocument();
+      // A space Editor may contribute non-owned assets into an album linked to this space
+      // (#764), so the "+" stays — it opens the picker restricted to that space's albums.
+      expect(screen.getByRole('button', { name: 'Add to album or space' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /favorite/i })).not.toBeInTheDocument();
 
       await openOverflowMenu();
