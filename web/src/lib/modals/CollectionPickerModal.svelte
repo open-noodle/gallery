@@ -25,6 +25,7 @@
     createSpace,
     getAllAlbums,
     getAllSpaces,
+    getSharedSpaceAlbums,
     type AlbumResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
@@ -36,9 +37,17 @@
   interface Props {
     assetCount: number;
     onClose: (collections?: PickerCollection[]) => void;
+    /**
+     * Restrict the picker to albums linked to this space. Set when the selection contains
+     * assets the user does not own: those can only land as #764 space contributions
+     * (`album_space_asset`), which the server accepts solely for albums linked to a space
+     * where the caller is Owner/Editor. Personal albums, brand-new albums and space pools
+     * would all silently drop them, so none are offered.
+     */
+    restrictToSpaceId?: string;
   }
 
-  let { assetCount, onClose }: Props = $props();
+  let { assetCount, onClose, restrictToSpaceId }: Props = $props();
 
   let albums = $state<AlbumResponseDto[]>([]);
   let spaces = $state<SharedSpaceResponseDto[]>([]);
@@ -48,7 +57,8 @@
   const multiSelectedKeys = $state<string[]>([]);
   const multiSelectActive = $derived(multiSelectedKeys.length > 0);
 
-  const showSpaces = $derived(assetCount <= MAX_SPACE_ASSETS_PER_REQUEST);
+  const restricted = $derived(restrictToSpaceId !== undefined);
+  const showSpaces = $derived(!restricted && assetCount <= MAX_SPACE_ASSETS_PER_REQUEST);
   const currentUserId = $derived(authManager.authenticated ? (authManager.user?.id ?? null) : null);
 
   const albumCollections = $derived(albums.map((a) => albumToCollection(a)));
@@ -63,11 +73,26 @@
   const rows = $derived(
     converter.toModalRows(search, recentCollections, allCollections, selectedRowIndex, multiSelectedKeys, {
       showSpaces,
+      allowCreate: !restricted,
+      // Restricted mode never lists spaces, so the default "no albums or spaces" wording
+      // would name a collection type that was never on offer.
+      emptyText: restricted ? $t('no_albums_in_space_yet') : undefined,
+      noMatchText: restricted ? $t('no_albums_found') : undefined,
     }),
   );
   const selectableRowCount = $derived(rows.filter((row) => isSelectableRowType(row.type)).length);
 
   onMount(async () => {
+    if (restrictToSpaceId) {
+      try {
+        await loadSpaceAlbums(restrictToSpaceId);
+      } catch (error) {
+        handleError(error, $t('errors.unable_to_load_albums'));
+      }
+      loading = false;
+      return;
+    }
+
     const [albumResult, spaceResult] = await Promise.allSettled([loadAlbums(), loadSpaces()]);
     if (albumResult.status === 'rejected') {
       handleError(albumResult.reason, $t('errors.unable_to_load_albums'));
@@ -82,6 +107,13 @@
     const owned = await getAllAlbums({ isOwned: true });
     owned.push(...(await getAllAlbums({ isShared: true })));
     albums = owned;
+  };
+
+  // `SharedSpaceLinkedAlbumDto` is `AlbumResponseDto` minus `albumUsers` (plus link metadata),
+  // so shim the missing field back in for AlbumListItem. The membership list is unused here.
+  const loadSpaceAlbums = async (spaceId: string) => {
+    const linked = await getSharedSpaceAlbums({ id: spaceId });
+    albums = linked.map((album) => ({ ...album, albumUsers: [] }) as AlbumResponseDto);
   };
 
   const loadSpaces = async () => {
@@ -227,7 +259,15 @@
           bind:value={search}
           use:initInput
         />
-        {#if !showSpaces}
+        {#if restricted}
+          <div
+            class="flex items-center gap-2 px-6 py-2 text-sm text-gray-500 dark:text-gray-400"
+            data-testid="restricted-to-space-notice"
+          >
+            <Icon icon={mdiInformationOutline} size="1rem" />
+            <span>{$t('add_to_collection_restricted_to_space')}</span>
+          </div>
+        {:else if !showSpaces}
           <div
             class="flex items-center gap-2 px-6 py-2 text-sm text-gray-500 dark:text-gray-400"
             data-testid="spaces-hidden-notice"
