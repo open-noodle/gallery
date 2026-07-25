@@ -89,13 +89,19 @@ function makeAsset(overrides: Partial<TimelineAsset> = {}): TimelineAsset {
 
 type FakeAssetInteraction = Pick<
   AssetMultiSelectManager,
-  'selectionActive' | 'assets' | 'isAllUserOwned' | 'isAllFavorite' | 'isAllArchived' | 'selectAll'
+  'selectionActive' | 'assets' | 'ownedAssets' | 'isAllUserOwned' | 'isAllFavorite' | 'isAllArchived' | 'selectAll'
 > & { clear: () => void };
 
+/**
+ * `ownedAssets` defaults to the real manager's rule — the assets whose `ownerId` is the
+ * logged-in user — so a fixture cannot accidentally disagree with its own `assets` list.
+ */
 function makeAssetInteraction(overrides: Partial<FakeAssetInteraction> = {}): AssetMultiSelectManager {
+  const assets = overrides.assets ?? [makeAsset()];
   const base: FakeAssetInteraction = {
     selectionActive: true,
-    assets: [makeAsset()],
+    assets,
+    ownedAssets: assets.filter((asset) => asset.ownerId === mockUser.current?.id),
     isAllUserOwned: true,
     isAllFavorite: false,
     isAllArchived: false,
@@ -222,6 +228,68 @@ describe('SelectionToolbar', () => {
     expect(screen.queryByLabelText('share')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('to_favorite')).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'delete' })).not.toBeInTheDocument();
+  });
+
+  it('Given a space editor with a MIXED selection, When the toolbar renders, Then both Share and Add-to-album are shown', () => {
+    renderToolbar({
+      timelineManager: fakeTimelineManager,
+      assetInteraction: makeAssetInteraction({
+        isAllUserOwned: false,
+        assets: [makeAsset({ id: 'mine', ownerId: 'me' }), makeAsset({ id: 'theirs', ownerId: 'other' })],
+      }),
+      space: { id: 'space-1', canWrite: true },
+      onRemove: vi.fn(),
+    });
+
+    expect(screen.getByLabelText('share')).toBeInTheDocument();
+    expect(screen.getByLabelText('add_to_album_or_space')).toBeInTheDocument();
+    // Still hidden: these mutate every selected asset and the server refuses the non-owned ones.
+    expect(screen.queryByLabelText('to_favorite')).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'delete' })).not.toBeInTheDocument();
+  });
+
+  it("Given a space editor selecting only other members' assets, When the toolbar renders, Then Add-to-album is shown for contribution but Share is not", () => {
+    renderToolbar({
+      timelineManager: fakeTimelineManager,
+      assetInteraction: makeAssetInteraction({
+        isAllUserOwned: false,
+        assets: [makeAsset({ id: 'theirs', ownerId: 'other' })],
+      }),
+      space: { id: 'space-1', canWrite: true },
+      onRemove: vi.fn(),
+    });
+
+    expect(screen.getByLabelText('add_to_album_or_space')).toBeInTheDocument();
+    expect(screen.queryByLabelText('share')).not.toBeInTheDocument();
+  });
+
+  it('Given a space VIEWER with a mixed selection, When the toolbar renders, Then Share is shown for the owned subset but Add-to-album is not — a viewer cannot contribute', () => {
+    renderToolbar({
+      timelineManager: fakeTimelineManager,
+      assetInteraction: makeAssetInteraction({
+        isAllUserOwned: false,
+        assets: [makeAsset({ id: 'mine', ownerId: 'me' }), makeAsset({ id: 'theirs', ownerId: 'other' })],
+      }),
+      space: { id: 'space-1', canWrite: false },
+    });
+
+    expect(screen.getByLabelText('share')).toBeInTheDocument();
+    expect(screen.queryByLabelText('add_to_album_or_space')).not.toBeInTheDocument();
+  });
+
+  it('Given a REGULAR album editor with a mixed selection, When the toolbar renders, Then Add-to-album stays hidden — contribution needs a space link', () => {
+    renderToolbar({
+      timelineManager: fakeTimelineManager,
+      assetInteraction: makeAssetInteraction({
+        isAllUserOwned: false,
+        assets: [makeAsset({ id: 'mine', ownerId: 'me' }), makeAsset({ id: 'theirs', ownerId: 'other' })],
+      }),
+      album: makeAlbum({ albumUsers: [{ user: { id: 'me' }, role: AlbumUserRole.Editor }] }),
+      onRemove: vi.fn(),
+    });
+
+    expect(screen.queryByLabelText('add_to_album_or_space')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('share')).toBeInTheDocument();
   });
 
   it('Given no active selection, When the toolbar renders, Then nothing is rendered', () => {

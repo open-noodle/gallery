@@ -134,3 +134,92 @@ describe('CollectionPickerModal', () => {
     expect(screen.queryByTestId('row-album-a1')).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Restricted mode: the selection contains assets the user does not own, so the
+// only targets that can accept the whole selection are albums linked to THIS
+// space (#764 contribution). Everything else is filtered out rather than
+// offered and silently half-applied.
+// ---------------------------------------------------------------------------
+
+describe('CollectionPickerModal — restricted to a space', () => {
+  const linkedAlbum = (id: string, name: string) =>
+    ({
+      id,
+      albumName: name,
+      assetCount: 2,
+      albumThumbnailAssetId: null,
+      shared: true,
+      updatedAt: '2024-01-01T00:00:00Z',
+      ownerId: 'someone-else',
+      showInTimeline: true,
+      addedById: 'me',
+      linkedAt: '2024-01-01T00:00:00Z',
+    }) as never;
+
+  const renderRestricted = (onClose = vi.fn()) =>
+    render(CollectionPickerModal, { assetCount: 3, onClose, restrictToSpaceId: 'space-1' });
+
+  it('lists the albums linked to that space instead of the user’s own albums', async () => {
+    sdkMock.getSharedSpaceAlbums.mockResolvedValue([linkedAlbum('sa1', 'Space Trip')]);
+    renderRestricted();
+
+    await waitFor(() => expect(screen.getAllByTestId('row-album-sa1').length).toBeGreaterThan(0));
+    expect(sdkMock.getSharedSpaceAlbums).toHaveBeenCalledWith({ id: 'space-1' });
+    expect(sdkMock.getAllAlbums).not.toHaveBeenCalled();
+  });
+
+  it('never offers spaces — no space pool accepts an asset the caller does not own', async () => {
+    sdkMock.getSharedSpaceAlbums.mockResolvedValue([linkedAlbum('sa1', 'Space Trip')]);
+    sdkMock.getAllSpaces.mockResolvedValue([space('s1', 'Family')]);
+    renderRestricted();
+
+    await waitFor(() => expect(screen.getAllByTestId('row-album-sa1').length).toBeGreaterThan(0));
+    expect(sdkMock.getAllSpaces).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('row-space-s1')).toBeNull();
+  });
+
+  it('hides both create rows — a brand-new album is not space-linked, so contributions could not land in it', async () => {
+    sdkMock.getSharedSpaceAlbums.mockResolvedValue([linkedAlbum('sa1', 'Space Trip')]);
+    renderRestricted();
+
+    await waitFor(() => expect(screen.getAllByTestId('row-album-sa1').length).toBeGreaterThan(0));
+    expect(screen.queryByTestId('new-album-row')).toBeNull();
+    expect(screen.queryByTestId('new-space-row')).toBeNull();
+  });
+
+  it('explains why the list is narrowed', async () => {
+    sdkMock.getSharedSpaceAlbums.mockResolvedValue([linkedAlbum('sa1', 'Space Trip')]);
+    renderRestricted();
+
+    await waitFor(() => expect(screen.getByTestId('restricted-to-space-notice')).toBeTruthy());
+  });
+
+  it('confirms with the chosen linked album', async () => {
+    const onClose = vi.fn();
+    sdkMock.getSharedSpaceAlbums.mockResolvedValue([linkedAlbum('sa1', 'Space Trip')]);
+    renderRestricted(onClose);
+
+    const rows = await screen.findAllByRole('button', { name: /Space Trip/ });
+    await fireEvent.click(rows[0]);
+    expect(onClose).toHaveBeenCalledWith([expect.objectContaining({ kind: 'album', id: 'sa1' })]);
+  });
+
+  it('explains the empty state in space terms when the space has no linked albums', async () => {
+    sdkMock.getSharedSpaceAlbums.mockResolvedValue([]);
+    renderRestricted();
+
+    // Rendered as the raw i18n key in unit tests. The default wording ("no albums or spaces")
+    // names a collection type that is never on offer in this mode.
+    await waitFor(() => expect(screen.getByText('no_albums_in_space_yet')).toBeTruthy());
+    expect(screen.queryByText('no_albums_or_spaces_yet')).toBeNull();
+  });
+
+  it('reports an error when the space albums fail to load', async () => {
+    sdkMock.getSharedSpaceAlbums.mockRejectedValue(new Error('boom'));
+    renderRestricted();
+
+    await waitFor(() => expect(mockHandleError).toHaveBeenCalledOnce());
+    expect(screen.queryByTestId('new-album-row')).toBeNull();
+  });
+});
