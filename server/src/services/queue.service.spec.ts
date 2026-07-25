@@ -361,6 +361,7 @@ describe(QueueService.name, () => {
         { name: JobName.UserSyncUsage },
         { name: JobName.AssetGenerateThumbnailsQueueAll, data: { force: false } },
         { name: JobName.FacialRecognitionQueueAll, data: { force: false, nightly: true } },
+        { name: JobName.SharedSpaceIdentityReconciliationSweep },
       ]);
     });
 
@@ -391,6 +392,7 @@ describe(QueueService.name, () => {
         name: JobName.FacialRecognitionQueueAll,
         data: { force: false, nightly: true },
       });
+      expect(jobs).toContainEqual({ name: JobName.SharedSpaceIdentityReconciliationSweep });
       expect(jobs).not.toContainEqual(
         expect.objectContaining({
           name: JobName.FacialRecognitionQueueAll,
