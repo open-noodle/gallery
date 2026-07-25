@@ -51,6 +51,7 @@ describe('CommandContextManager', () => {
       albumName: 'Test',
       ownerId: 'u1',
       isOwner: true,
+      isEditor: false,
       isMember: false,
       raw: { id: 'a1', albumName: 'Test', ownerId: 'u1' } as unknown as AlbumResponseDto,
     });
@@ -63,6 +64,7 @@ describe('CommandContextManager', () => {
       albumName: 'Test',
       ownerId: 'u1',
       isOwner: true,
+      isEditor: false,
       isMember: false,
       raw: { id: 'a1' } as unknown as AlbumResponseDto,
     });
