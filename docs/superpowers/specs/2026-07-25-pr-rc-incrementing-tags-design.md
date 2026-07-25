@@ -285,3 +285,5 @@ behaviour.
 - Deleting RC tags when the `rc` label is removed from an open PR (close is the lifecycle boundary).
 - Retention while the PR is open — all RCs are kept until close. Revisit only if GHCR gets noisy.
 - An interim "building…" comment before the build completes.
+
+<!-- scratch branch for verifying RC cleanup on close; not for merge -->
