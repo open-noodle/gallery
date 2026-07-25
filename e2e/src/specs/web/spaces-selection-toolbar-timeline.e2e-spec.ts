@@ -11,8 +11,12 @@ import { utils } from 'src/utils';
 // set for a direct-space surface across the role x ownership matrix the rule engine encodes:
 //
 //   - canSelectAll / canDownload: always true once a selection is active, regardless of role.
-//   - canShare / canAddToAlbum / canFavorite / canEditMetadata (incl. Delete): gated on the
-//     selection being entirely owned by the current viewer (`isAllUserOwned`), NOT on space role.
+//   - canFavorite / canEditMetadata (incl. Delete): gated on the selection being entirely owned
+//     by the current viewer (`isAllUserOwned`), NOT on space role.
+//   - canShare: gated on owning SOME of the selection — the action sends only the owned subset.
+//   - canAddToAlbum: `isAllUserOwned` OR space Editor/Owner. A space manager may contribute
+//     non-owned assets into an album linked to the space (#764); the picker then narrows to
+//     that space's albums. See 2026-07-25-space-add-to-collection-design.md.
 //   - canRemoveFromSpace / canSetCover: gated on the space role being Editor or Owner
 //     (`space.canWrite`), NOT on asset ownership.
 //
@@ -145,10 +149,10 @@ test.describe('Spaces — SelectionToolbar timeline control bar (Slice 4)', () =
   });
 
   // Case 3: a space Editor selecting the owner's (not their own) asset. isAllUserOwned is false
-  // (ownership-gated actions hidden: Share/Add-to-album/Favorite/Delete) but space.canWrite is
-  // still true (role-gated actions visible: Remove-from-space/Set-cover) — ownership and role
-  // gating are independent axes, exactly as selection-capabilities.ts encodes them.
-  test("editor selecting the owner's asset sees only role-gated actions", async ({ context, page }) => {
+  // (Share/Favorite/Delete hidden) but space.canWrite is still true, so the role-gated actions
+  // stay visible: Remove-from-space, Set-cover, and Add-to-album — the last because a space
+  // manager may contribute a non-owned asset into an album linked to this space (#764).
+  test("editor selecting the owner's asset sees role-gated actions plus add-to-album", async ({ context, page }) => {
     const space = await createDirectSpaceFixture(
       owner.accessToken,
       [{ userId: editor.userId, role: SharedSpaceRole.Editor }],
@@ -164,8 +168,9 @@ test.describe('Spaces — SelectionToolbar timeline control bar (Slice 4)', () =
     await expect(controlBar.getByRole('button', { name: 'Select all' })).toBeVisible();
     await expect(controlBar.getByRole('button', { name: 'Remove from space' })).toBeVisible();
 
+    await expect(controlBar.getByRole('button', { name: 'Add to album or space' })).toBeVisible();
+
     await expect(controlBar.getByRole('button', { name: 'Share' })).toHaveCount(0);
-    await expect(controlBar.getByRole('button', { name: 'Add to album or space' })).toHaveCount(0);
     await expect(controlBar.getByRole('button', { name: /favorite/i })).toHaveCount(0);
 
     await openOverflowMenu(controlBar);
@@ -173,6 +178,40 @@ test.describe('Spaces — SelectionToolbar timeline control bar (Slice 4)', () =
     await expect(controlBar.getByRole('menuitem', { name: 'Download' })).toBeVisible();
     await expect(controlBar.getByRole('menuitem', { name: 'Set as space cover' })).toBeVisible();
     await expect(controlBar.getByRole('menuitem', { name: /delete/i })).toHaveCount(0);
+  });
+
+  // Case 5: the mixed selection that motivated this change — a space Editor selecting one of
+  // their own assets AND one of the owner's. Share reappears (it sends only the owned subset)
+  // and Add-to-album opens the picker narrowed to this space's albums, because a personal album
+  // or another space could not accept the owner's asset.
+  test('editor with a mixed selection sees share and a space-restricted add-to-album', async ({ context, page }) => {
+    const space = await createDirectSpaceFixture(
+      owner.accessToken,
+      [{ userId: editor.userId, role: SharedSpaceRole.Editor }],
+      'STT-5',
+    );
+    const ownerAsset = await utils.createAsset(owner.accessToken);
+    const editorAsset = await utils.createAsset(editor.accessToken);
+    await utils.addSpaceAssets(owner.accessToken, space.id, [ownerAsset.id]);
+    await utils.addSpaceAssets(editor.accessToken, space.id, [editorAsset.id]);
+
+    await utils.setAuthCookies(context, editor.accessToken);
+    await gotoAndWaitForTimeline(page, `/spaces/${space.id}`);
+    await selectAsset(page, editorAsset.id);
+    const controlBar = await selectAsset(page, ownerAsset.id);
+
+    await expect(controlBar.getByRole('button', { name: 'Share' })).toBeVisible();
+    const addButton = controlBar.getByRole('button', { name: 'Add to album or space' });
+    await expect(addButton).toBeVisible();
+    // Mixed ownership still blocks the all-asset mutations.
+    await expect(controlBar.getByRole('button', { name: /favorite/i })).toHaveCount(0);
+
+    await addButton.click();
+    // Restricted picker: the explanatory notice is shown and neither create row is offered,
+    // since a brand-new album would not be linked to the space.
+    await expect(page.getByTestId('restricted-to-space-notice')).toBeVisible();
+    await expect(page.getByTestId('new-album-row')).toHaveCount(0);
+    await expect(page.getByTestId('new-space-row')).toHaveCount(0);
   });
 
   // Case 4: the space Owner selecting their own asset. Both axes are satisfied (owner owns the

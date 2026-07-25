@@ -63,7 +63,19 @@ import { downloadUrl } from '$lib/utils';
 import { handleError } from '$lib/utils/handle-error';
 import { getFormatter } from '$lib/utils/i18n';
 
-export const getAssetBulkActions = ($t: MessageFormatter) => {
+export const getAssetBulkActions = (
+  $t: MessageFormatter,
+  {
+    restrictToSpaceId,
+  }: {
+    /**
+     * Set when the selection contains assets the user does not own: the add-to-collection
+     * picker then offers only albums linked to this space, because those are the only targets
+     * that can accept the non-owned assets (#764 contribution).
+     */
+    restrictToSpaceId?: string;
+  } = {},
+) => {
   const ownedAssets = assetMultiSelectManager.ownedAssets;
 
   const onAction = async (name: AssetJobName) => {
@@ -78,6 +90,7 @@ export const getAssetBulkActions = ($t: MessageFormatter) => {
     onAction: () =>
       modalManager.show(AssetAddToCollectionModal, {
         assetIds: assetMultiSelectManager.assets.map((asset) => asset.id),
+        restrictToSpaceId,
       }),
   };
 
