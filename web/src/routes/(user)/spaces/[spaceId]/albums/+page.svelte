@@ -20,7 +20,7 @@
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
   import { Button, Icon, modalManager } from '@immich/ui';
-  import { mdiImageMultipleOutline } from '@mdi/js';
+  import { mdiImageMultipleOutline, mdiLinkVariantPlus, mdiPlus } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
 
@@ -135,9 +135,25 @@
           {$t('space_albums_empty')}
         </p>
         {#if isEditor}
-          <Button onclick={() => void openLinkAlbumModal()} data-testid="empty-link-album-button">
-            {$t('space_albums_empty_editor_cta')}
-          </Button>
+          <!-- Same pair as the populated view's toolbar (space-albums-controls.svelte): creating a
+               fresh album is the primary action, linking an existing one the secondary. -->
+          <div class="flex flex-wrap items-center justify-center gap-2">
+            <Button
+              leadingIcon={mdiPlus}
+              onclick={() => void handleCreateAlbum()}
+              data-testid="empty-create-album-button"
+            >
+              {$t('create_album')}
+            </Button>
+            <Button
+              variant="ghost"
+              leadingIcon={mdiLinkVariantPlus}
+              onclick={() => void openLinkAlbumModal()}
+              data-testid="empty-link-album-button"
+            >
+              {$t('space_albums_empty_editor_cta')}
+            </Button>
+          </div>
         {/if}
       </div>
     </div>
