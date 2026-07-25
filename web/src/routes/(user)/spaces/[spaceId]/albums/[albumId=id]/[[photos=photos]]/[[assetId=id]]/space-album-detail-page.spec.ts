@@ -9,8 +9,10 @@ import {
 } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import type { Component } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { getAnimateMock } from '$lib/__mocks__/animate.mock';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { addAssetsToAlbums, getAlbumAssetsActions } from '$lib/services/album.service';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
@@ -59,7 +61,7 @@ vi.mock('$lib/components/filter-panel/active-filters-bar.svelte', async () => {
   return { default: MockComponent };
 });
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn(), onNavigate: vi.fn() }));
+vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn(), onNavigate: vi.fn() }));
 
 vi.mock('$lib/components/timeline/TimelineGroupingControl.svelte', async () => {
   const { default: MockComponent } = await import('./mock-grouping-control.test-wrapper.svelte');
@@ -75,12 +77,21 @@ vi.mock('$lib/utils/timeline-zoom-navigation', () => ({
   getTimelineManagerTimeBuckets: vi.fn().mockReturnValue([]),
 }));
 
+// Slice 6: the browse selection bar now renders the full <SelectionToolbar>, which wires
+// DeleteAssetsAction — its `force` derivation reads featureFlagsManager.value.trash, which
+// throws until the (real, module-singleton) manager is initialized. Mirrors the mock already
+// used by SelectionToolbar.spec.ts and the space-person-detail-page spec.
+vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+  featureFlagsManager: { value: { trash: true } },
+}));
+
 const { mockAssetMultiSelectManager } = vi.hoisted(() => ({
   mockAssetMultiSelectManager: {
     selectionActive: false,
     assets: [] as { id: string }[],
     clear: vi.fn(),
     isAllFavorite: false,
+    isAllArchived: false,
     isAllUserOwned: true,
   },
 }));
@@ -92,6 +103,7 @@ vi.mock('$lib/managers/asset-multi-select-manager.svelte', () => ({
     assets: { id: string }[] = [];
     clear = vi.fn();
     isAllFavorite = false;
+    isAllArchived = false;
     isAllUserOwned = true;
   },
 }));
@@ -194,9 +206,29 @@ function renderPage({
   authManager.setUser(userAdminFactory.build({ id: 'current-user-id' }));
   authManager.setPreferences(preferencesFactory.build());
 
-  return render(SpaceAlbumDetailPage, {
-    props: { data: makePageData(album, members, space) },
-  });
+  // Slice 6: the browse selection bar now renders the full <SelectionToolbar>, which (like the
+  // regular album page and the direct-space/space-person timelines) renders real @immich/ui
+  // IconButtons that resolve a bits-ui Tooltip against a "Tooltip.Provider" context. That
+  // provider only exists app-wide via the root +layout.svelte, which isn't part of this render —
+  // TestWrapper supplies it (mirrors spaces-page.spec.ts / space-person-detail-page.spec.ts).
+  return render(
+    TestWrapper as Component<{
+      component: typeof SpaceAlbumDetailPage;
+      componentProps: { data: ReturnType<typeof makePageData> };
+    }>,
+    {
+      component: SpaceAlbumDetailPage,
+      componentProps: { data: makePageData(album, members, space) },
+    },
+  );
+}
+
+// Slice 6: RemoveFromAlbum/Download/Delete/etc. now live as menu items inside the
+// <SelectionToolbar>'s "⋮" ButtonContextMenu instead of top-level in the control bar. Open it
+// before asserting on any menu item, mirroring the Slice 4/5 Playwright specs
+// (spaces-selection-toolbar-timeline.e2e-spec.ts's `openOverflowMenu`).
+async function openOverflowMenu() {
+  await fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
 }
 
 describe('Space album detail page', () => {
@@ -215,6 +247,11 @@ describe('Space album detail page', () => {
     resetMockTimelineState();
     mockAssetMultiSelectManager.selectionActive = false;
     mockAssetMultiSelectManager.assets = [];
+    // Slice 6: a handful of tests below flip these to exercise ownership/manager gating
+    // independently — reset to the long-standing defaults so that leaks between tests.
+    mockAssetMultiSelectManager.isAllUserOwned = true;
+    mockAssetMultiSelectManager.isAllFavorite = false;
+    mockAssetMultiSelectManager.isAllArchived = false;
     // Restore the default getAlbumAssetsActions return after resetAllMocks clears it
     vi.mocked(getAlbumAssetsActions).mockReturnValue({
       AddAssets: {
@@ -392,18 +429,20 @@ describe('Space album detail page', () => {
     expect(screen.getByTestId('asset-select-control-bar')).toBeInTheDocument();
   });
 
-  it('in browse mode with selection active and canManage=true, RemoveFromAlbum and Download actions are wired', () => {
+  it('in browse mode with selection active and canManage=true, RemoveFromAlbum and Download actions are wired', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
     renderPage({ members: [makeMember(SharedSpaceRole.Editor)] });
     // AssetSelectControlBar renders its children
     expect(screen.getByTestId('asset-select-control-bar')).toBeInTheDocument();
-    // RemoveFromAlbumAction is rendered
+
+    // RemoveFromAlbumAction and DownloadAction are now menu items inside the "⋮" overflow menu.
+    await openOverflowMenu();
     expect(screen.getByTestId('album-remove-from-album')).toBeInTheDocument();
     // DownloadAction is rendered for all members
     expect(screen.getByTestId('download-action')).toBeInTheDocument();
   });
 
-  it('in browse mode with selection active and canManage=false, control bar shown with Download but no Remove action', () => {
+  it('in browse mode with selection active and canManage=false, control bar shown with Download but no Remove action', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
     renderPage({
       members: [makeMember(SharedSpaceRole.Viewer)],
@@ -418,6 +457,8 @@ describe('Space album detail page', () => {
     });
     // Control bar shows
     expect(screen.getByTestId('asset-select-control-bar')).toBeInTheDocument();
+
+    await openOverflowMenu();
     // DownloadAction is available to all members (bar is not empty for viewers)
     expect(screen.getByTestId('download-action')).toBeInTheDocument();
     // But RemoveFromAlbumAction is NOT rendered
@@ -765,7 +806,7 @@ describe('Space album detail page', () => {
 
   // ── RemoveFromAlbum gating — additional role combos ──────────────────────────
 
-  it('space=Viewer + album=Editor + selection active: RemoveFromAlbum is present', () => {
+  it('space=Viewer + album=Editor + selection active: RemoveFromAlbum is present', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
     renderPage({
       members: [makeMember(SharedSpaceRole.Viewer)],
@@ -778,34 +819,71 @@ describe('Space album detail page', () => {
         ],
       }),
     });
+    await openOverflowMenu();
     expect(screen.getByTestId('album-remove-from-album')).toBeInTheDocument();
   });
 
-  it('space=Owner + default album + selection active: RemoveFromAlbum is present', () => {
+  it('space=Owner + default album + selection active: RemoveFromAlbum is present', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
     renderPage({ members: [makeMember(SharedSpaceRole.Owner)] });
+    await openOverflowMenu();
     expect(screen.getByTestId('album-remove-from-album')).toBeInTheDocument();
   });
 
-  describe('rbac-5/albums-8: album-path control bar exposes no editor metadata affordances', () => {
-    // This route is entirely album-path (see the +page.svelte control-bar comment). The control
-    // bar only ever imports DownloadAction + RemoveFromAlbumAction — no Archive / ChangeDate /
-    // ChangeLocation / Tag action is wired here at all, regardless of role. These assertions pin
-    // that shape so a future change can't silently add a metadata-edit affordance to this route.
-    it('shows Download + RemoveFromAlbum for a manager and no metadata-edit affordances', () => {
+  // Slice 6 — rbac-5/albums-8 REVERSED: the browse control bar now renders the full
+  // album-equivalent <SelectionToolbar> (see the +page.svelte control-bar comment for the RBAC
+  // reasoning) instead of the stripped Download+Remove-only bar it originally shipped with.
+  // `canRemoveFromAlbum` stays `canManage`-gated (ownership grants nothing — decision C), while
+  // the metadata-edit affordances (Archive/ChangeDate/ChangeLocation/Delete/…) and Share/
+  // Add-to-album/Favorite are gated independently on `isAllUserOwned` — the same two
+  // independent axes the merged direct-space timeline and SelectionToolbar.spec.ts encode.
+  describe('Slice 6: full album-equivalent toolbar (reversal of the stripped bar)', () => {
+    it('manager + all-owned selection: Download + RemoveFromAlbum + metadata-edit + Set-cover all present', async () => {
       mockAssetMultiSelectManager.selectionActive = true;
+      mockAssetMultiSelectManager.isAllUserOwned = true;
+      mockAssetMultiSelectManager.assets = [{ id: 'asset-1' }];
       renderPage({ members: [makeMember(SharedSpaceRole.Editor)] });
 
+      expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Add to album or space' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /favorite/i })).toBeInTheDocument();
+
+      await openOverflowMenu();
       expect(screen.getByTestId('download-action')).toBeInTheDocument();
       expect(screen.getByTestId('album-remove-from-album')).toBeInTheDocument();
-      expect(screen.queryByTestId('change-date-action')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('change-location-action')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('archive-action')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('tag-action')).not.toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Change date' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Change location' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Archive' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Set as album cover' })).toBeInTheDocument();
     });
 
-    it('hides RemoveFromAlbum for a non-manager (viewer) and still has no metadata-edit affordances', () => {
+    it('manager + NOT-owned selection: RemoveFromAlbum + Set-cover present (canManage-gated), metadata-edit + Delete + Share absent (ownership-gated)', async () => {
       mockAssetMultiSelectManager.selectionActive = true;
+      mockAssetMultiSelectManager.isAllUserOwned = false;
+      mockAssetMultiSelectManager.assets = [{ id: 'asset-1' }];
+      renderPage({ members: [makeMember(SharedSpaceRole.Editor)] });
+
+      expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Add to album or space' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /favorite/i })).not.toBeInTheDocument();
+
+      await openOverflowMenu();
+      expect(screen.getByTestId('download-action')).toBeInTheDocument();
+      // canRemoveFromAlbum / canSetCover key off canManage (space.canWrite || album.isEditor),
+      // NOT ownership — both stay visible even though the selection isn't owned.
+      expect(screen.getByTestId('album-remove-from-album')).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Set as album cover' })).toBeInTheDocument();
+      // Ownership-gated actions are hidden regardless of manager status.
+      expect(screen.queryByRole('menuitem', { name: 'Change date' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: 'Archive' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: 'Delete' })).not.toBeInTheDocument();
+    });
+
+    it('non-manager (viewer) + all-owned selection: metadata-edit affordances present, RemoveFromAlbum + Set-cover absent', async () => {
+      mockAssetMultiSelectManager.selectionActive = true;
+      mockAssetMultiSelectManager.isAllUserOwned = true;
+      mockAssetMultiSelectManager.assets = [{ id: 'asset-1' }];
       renderPage({
         members: [makeMember(SharedSpaceRole.Viewer)],
         album: makeAlbum({
@@ -818,11 +896,48 @@ describe('Space album detail page', () => {
         }),
       });
 
+      expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Add to album or space' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /favorite/i })).toBeInTheDocument();
+
+      await openOverflowMenu();
+      expect(screen.getByTestId('download-action')).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Change date' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Archive' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument();
+
+      // canManage is false for a plain album/space Viewer — Remove and Set-cover stay hidden
+      // even though the selection is entirely their own.
       expect(screen.queryByTestId('album-remove-from-album')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('change-date-action')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('change-location-action')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('archive-action')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('tag-action')).not.toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: 'Set as album cover' })).not.toBeInTheDocument();
+    });
+
+    it('non-manager (viewer) + NOT-owned selection: only Select-all and Download are shown', async () => {
+      mockAssetMultiSelectManager.selectionActive = true;
+      mockAssetMultiSelectManager.isAllUserOwned = false;
+      mockAssetMultiSelectManager.assets = [{ id: 'asset-1' }];
+      renderPage({
+        members: [makeMember(SharedSpaceRole.Viewer)],
+        album: makeAlbum({
+          albumUsers: [
+            {
+              user: { id: 'current-user-id', email: 'user@example.com', name: 'Current User' } as never,
+              role: AlbumUserRole.Viewer,
+            },
+          ],
+        }),
+      });
+
+      expect(screen.getByRole('button', { name: 'Select all' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Add to album or space' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /favorite/i })).not.toBeInTheDocument();
+
+      await openOverflowMenu();
+      expect(screen.getByTestId('download-action')).toBeInTheDocument();
+      expect(screen.queryByTestId('album-remove-from-album')).not.toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: 'Delete' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: 'Set as album cover' })).not.toBeInTheDocument();
     });
   });
 
@@ -831,8 +946,11 @@ describe('Space album detail page', () => {
   // only `data` changes. The page has to re-seed its local album state from it, or the URL moves
   // while the timeline keeps showing the album you came from.
   describe('navigating between sibling albums (same route, new params)', () => {
+    // Rendered via TestWrapper (see renderPage), so `rerender` needs the full
+    // `{ component, componentProps }` shape, not just the inner page's props.
     const rerenderWith = (album: AlbumResponseDto, members = [makeMember()]) => ({
-      data: makePageData(album, members),
+      component: SpaceAlbumDetailPage,
+      componentProps: { data: makePageData(album, members) },
     });
 
     const albumWithRole = (id: string, role: AlbumUserRole) =>
