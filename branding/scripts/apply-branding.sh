@@ -86,9 +86,23 @@ patch_i18n() {
   # kaufen") and re-leaks on each Weblate sync. Patch them at build time so the
   # leak can't regress in source:
   #   - merge a per-locale branded override (overrides-<lang>.json) when present
-  #     so that language keeps a proper localized translation;
-  #   - then drop any remaining overridden key whose localized value still
-  #     contains the upstream name, so it falls back to the branded en.json.
+  #     so that language keeps a hand-written branded translation;
+  #   - then rewrite any remaining upstream name in that locale to the fork's
+  #     name, keeping the translation intact.
+  #
+  # Step 3 used to DELETE the leaking keys so the locale fell back to the branded
+  # en.json. That silently reverted ~2,100 already-translated strings to English
+  # across 69 locales — including the "Delete Permanently" body text in the
+  # mobile delete dialog, whose German translation exists but says "in Immich
+  # gesichert" (issue #844). The dialog title and buttons don't name the upstream
+  # project, so they stayed German while the one explanatory sentence flipped to
+  # English — on a destructive, irreversible action.
+  #
+  # Substituting in place is safe where deleting was not: the upstream name is a
+  # proper noun, so swapping it preserves the surrounding grammar in every
+  # language ("nicht in Immich gesichert" -> "nicht in Noodle Gallery
+  # gesichert"). Matching stays case-sensitive on purpose so lowercase
+  # identifiers (docs.immich.app, the app.immich:// OAuth scheme) are untouched.
   [[ -f "$en_overrides" ]] || return 0
 
   local locale_file lang lang_overrides
@@ -106,24 +120,21 @@ patch_i18n() {
       echo "  Merged $(jq 'length' "$lang_overrides") override keys into ${lang}.json"
     fi
 
-    # 3. Drop overridden keys that still leak the upstream name -> en fallback.
-    #    Overrides may nest (e.g. the admin.* descriptions — issue #672), so walk
-    #    the override's leaf paths and delete the leaking ones at any depth rather
-    #    than only inspecting top-level keys.
+    # 3. Rewrite every remaining upstream-name leak in this locale to the fork
+    #    name. `walk` reaches leaves at any depth, so the nested admin.*
+    #    descriptions (issue #672) are covered without enumerating override
+    #    paths. split/join is a LITERAL replace — unlike gsub, it cannot
+    #    reinterpret the name as a regex or the replacement as a capture ref.
     tmp=$(mktemp)
-    jq --slurpfile ov "$en_overrides" --arg upstream "$UPSTREAM_NAME" '
-      . as $loc
-      | [ $ov[0] | paths(scalars) as $p
-          | select(($loc | getpath($p)) as $v
-                   | ($v | type) == "string" and ($v | contains($upstream)))
-          | $p ]
-      | . as $leaking
-      | $loc | delpaths($leaking)
+    jq --arg upstream "$UPSTREAM_NAME" --arg name "$NAME" '
+      walk(if type == "string" and contains($upstream)
+           then split($upstream) | join($name)
+           else . end)
     ' "$locale_file" > "$tmp"
     chmod 644 "$tmp"
     mv "$tmp" "$locale_file"
   done
-  echo "  Stripped upstream-brand leaks from non-English locales (fallback to en.json)"
+  echo "  Rebranded upstream-name leaks in non-English locales (translations preserved)"
 }
 
 #
