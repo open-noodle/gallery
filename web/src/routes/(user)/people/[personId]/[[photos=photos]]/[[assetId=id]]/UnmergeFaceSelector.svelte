@@ -5,13 +5,16 @@
   import {
     createPerson,
     getAllPeople,
+    getSpacePeople,
     reassignFaces,
     reassignSpacePersonFaces,
+    Type as ScopedPrimaryProfileType,
     Type3 as SpaceReassignNewTarget,
     Type4 as SpaceReassignExistingTarget,
     type AssetFaceUpdateItem,
     type PersonResponseDto,
     type SharedSpacePersonReassignDto,
+    type SharedSpacePersonResponseDto,
   } from '@immich/sdk';
   import { Button, toastManager } from '@immich/ui';
   import { mdiMerge, mdiPlus } from '@mdi/js';
@@ -57,12 +60,42 @@
       : undefined,
   );
 
+  // The space people endpoint caps limit at 100 (same page size the space People tab loads with).
+  const SPACE_PEOPLE_LIMIT = 100;
+
+  // A space person carries no `person` row, so it is shaped into the PersonResponseDto the picker
+  // renders. primaryProfile is the load-bearing field: FaceThumbnail resolves the avatar through it,
+  // and toScopedPersonRef turns it into the space-scoped target ref the endpoint expects.
+  const toSpaceCandidate = (person: SharedSpacePersonResponseDto, spaceId: string): PersonResponseDto => ({
+    id: person.id,
+    name: person.name,
+    birthDate: person.birthDate ?? null,
+    thumbnailPath: person.thumbnailPath,
+    isHidden: person.isHidden,
+    updatedAt: person.updatedAt,
+    primaryProfile: { type: ScopedPrimaryProfileType.SpacePerson, id: person.id, spaceId },
+  });
+
   onMount(async () => {
-    // Only ask for shared-space candidates when the source itself is a space person. A normal
-    // owned person must keep seeing own people only — surfacing shared-space people here too
+    // A space source may only reassign into a person of ITS OWN space: the endpoint rejects any other
+    // target with "Target person not found in this space". getAllPeople({ withSharedSpaces: true })
+    // spans every space the viewer belongs to and collapses each identity to one primary profile, so
+    // it offers cross-space candidates that can only ever 400 — and hides the in-space profile of any
+    // identity whose primary profile lives elsewhere. Ask the space itself for its people instead.
+    if (spaceRef) {
+      const spacePeople = await getSpacePeople({
+        id: spaceRef.spaceId,
+        limit: SPACE_PEOPLE_LIMIT,
+        withHidden: false,
+      });
+      people = spacePeople.map((person) => toSpaceCandidate(person, spaceRef.spaceId));
+      return;
+    }
+
+    // A normal owned person must keep seeing own people only — surfacing shared-space people here
     // would let picking one send a shared-space id to the personal reassignFaces branch below,
     // recreating #765's id-mismatch bug in reverse.
-    const data = await getAllPeople({ withHidden: false, ...(spaceRef && { withSharedSpaces: true }) });
+    const data = await getAllPeople({ withHidden: false });
     people = data.people;
   });
 
