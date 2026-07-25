@@ -68,6 +68,8 @@ const setHandlers = (sut: JobRepository, jobs: JobName[]) => {
   ) as Record<JobName, { queueName: QueueName }>;
 };
 
+const failedJob = (id: string) => ({ id, remove: vi.fn().mockResolvedValue(void 0) });
+
 describe(JobRepository.name, () => {
   beforeEach(() => {
     setTimeoutMock.mockClear();
@@ -156,6 +158,44 @@ describe(JobRepository.name, () => {
 
       expect(removed).toEqual([]);
       expect(client.lrem).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('removeFailedJobsByJobIdPrefix', () => {
+    it('removes only the failed jobs whose id matches a prefix and reports the count', async () => {
+      const { sut, queue } = setup();
+      const blocked = failedJob('shared-space-face-match/from-backfill/space-1/asset-1');
+      const reconcile = failedJob('space-identity-reconcile-space-1-all-members-all-people');
+      const unrelated = failedJob('face-identity-backfill/root');
+      const anonymous = { remove: vi.fn().mockResolvedValue(void 0) };
+      queue.getJobs.mockResolvedValueOnce([blocked, unrelated, reconcile, anonymous] as any);
+
+      const removed = await sut.removeFailedJobsByJobIdPrefix(QueueName.PeopleBackfill, [
+        'shared-space-face-match',
+        'space-identity-reconcile-',
+      ]);
+
+      expect(removed).toBe(2);
+      expect(queue.getJobs).toHaveBeenCalledWith(['failed'], 0, 999);
+      expect(blocked.remove).toHaveBeenCalled();
+      expect(reconcile.remove).toHaveBeenCalled();
+      expect(unrelated.remove).not.toHaveBeenCalled();
+    });
+
+    it('walks every page of the failed set before removing so shifting ranks cannot skip jobs', async () => {
+      const { sut, queue } = setup();
+      const firstPageMatch = failedJob('shared-space-face-match/space-1/asset-1');
+      const firstPage = [firstPageMatch, ...Array.from({ length: 999 }, (_, i) => failedJob(`unrelated-${i}`))];
+      const secondPageMatch = failedJob('shared-space-face-match/space-1/asset-2');
+      queue.getJobs.mockResolvedValueOnce(firstPage as any).mockResolvedValueOnce([secondPageMatch] as any);
+
+      const removed = await sut.removeFailedJobsByJobIdPrefix(QueueName.FacialRecognition, ['shared-space-face-match']);
+
+      expect(removed).toBe(2);
+      expect(queue.getJobs).toHaveBeenCalledWith(['failed'], 0, 999);
+      expect(queue.getJobs).toHaveBeenCalledWith(['failed'], 1000, 1999);
+      expect(firstPageMatch.remove).toHaveBeenCalled();
+      expect(secondPageMatch.remove).toHaveBeenCalled();
     });
   });
 

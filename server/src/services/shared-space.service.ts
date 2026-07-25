@@ -44,6 +44,7 @@ import {
   AssetType,
   AssetVisibility,
   CacheControl,
+  ImmichWorker,
   JobName,
   JobStatus,
   NotificationLevel,
@@ -52,6 +53,7 @@ import {
   QueueName,
   SharedSpaceActivityType,
   SharedSpaceRole,
+  SystemMetadataKey,
   UserAvatarColor,
 } from 'src/enum';
 import { AlbumAssetCount } from 'src/repositories/album.repository';
@@ -1602,6 +1604,51 @@ export class SharedSpaceService extends BaseService {
     return JobStatus.Success;
   }
 
+  // One-time recovery for the pre-idempotency-fix crashes: the duplicate-key failures left
+  // SharedSpaceFaceMatch*/reconciliation jobs in the failed set with `removeOnFail` unset, where
+  // they permanently occupy their stable dedup jobIds — BullMQ silently ignores any later add()
+  // with the same id, so identity maintenance could never re-queue exactly the crashed work.
+  // Deliberately NOT `removeOnFail: true` on the job options: jobs that fail *after* this cleanup
+  // should park visibly in the failed set instead of being retried on every trigger forever.
+  // The flag is written after the sweep so a crash mid-cleanup retries on the next boot
+  // (removals are idempotent), and only a non-zero cleanup kicks identity maintenance.
+  @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Microservices] })
+  async onBootstrap(): Promise<void> {
+    const state = await this.systemMetadataRepository.get(SystemMetadataKey.SharedSpaceFaceJobCleanupState);
+    if (state?.cleanedAt) {
+      return;
+    }
+
+    const prefixes = ['shared-space-face-match', 'space-identity-reconcile-'];
+    const removed =
+      (await this.jobRepository.removeFailedJobsByJobIdPrefix(QueueName.PeopleBackfill, prefixes)) +
+      (await this.jobRepository.removeFailedJobsByJobIdPrefix(QueueName.FacialRecognition, prefixes));
+
+    if (removed > 0) {
+      this.logger.log(
+        `Removed ${removed} failed shared-space face job(s) that were blocking their dedup jobIds; queueing face identity maintenance`,
+      );
+      await this.jobRepository.queue({ name: JobName.FaceIdentityBackfill, data: {} });
+    }
+
+    await this.systemMetadataRepository.set(SystemMetadataKey.SharedSpaceFaceJobCleanupState, {
+      cleanedAt: new Date().toISOString(),
+    });
+  }
+
+  // Self-heal backstop (see queue.service.ts's handleNightlyJobs): re-queues identity reconciliation
+  // for every face-enabled space. A member's local person that was left unlinked from the space
+  // identity — by the pre-fix crash or the multi-face reconciliation bail — collapses into one tile
+  // on the next sweep, without the user doing anything.
+  @OnJob({ name: JobName.SharedSpaceIdentityReconciliationSweep, queue: QueueName.BackgroundTask })
+  async handleSharedSpaceIdentityReconciliationSweep(): Promise<JobStatus> {
+    const spaceIds = await this.sharedSpaceRepository.getFaceRecognitionEnabledSpaceIds();
+    for (const spaceId of spaceIds) {
+      await this.queueSpaceIdentityReconciliation({ spaceId });
+    }
+    return JobStatus.Success;
+  }
+
   // correctness-4: enqueue a post-commit reconciliation for the given albums. Idempotent
   // and deadlock-free — it runs after the triggering transaction commits, resolving the
   // TOCTOU race in the delete-side grant-revocation triggers. No-op for an empty set.
@@ -1842,7 +1889,10 @@ export class SharedSpaceService extends BaseService {
       hasPerson: true,
     });
 
-    const candidates: Array<{ identityId: string }> = [];
+    // Dedup by identity: the member's nearest faces (searchFaces returns raw face rows, not distinct
+    // people) are often several faces of their own single person. Those collapse to one candidate
+    // identity — only a genuinely ambiguous match against two *distinct* local identities should bail.
+    const candidateIdentityIds = new Set<string>();
     for (const match of matches) {
       if (!match.personId) {
         continue;
@@ -1858,25 +1908,26 @@ export class SharedSpaceService extends BaseService {
         return;
       }
 
-      candidates.push({ identityId: identity.id });
+      candidateIdentityIds.add(identity.id);
     }
 
-    if (candidates.length !== 1) {
+    if (candidateIdentityIds.size !== 1) {
       return;
     }
+    const [candidateIdentityId] = candidateIdentityIds;
 
     const { sourceIdentityId, targetIdentityId: selectedTargetIdentityId } = chooseAutomaticTargetIdentity({
       bridge: 'member-join',
-      localIdentityId: candidates[0].identityId,
+      localIdentityId: candidateIdentityId,
       spaceIdentityId: targetIdentityId,
     });
     const claim = buildAutomaticReconciliationClaim({
       bridge: 'member-join',
-      localIdentityId: candidates[0].identityId,
+      localIdentityId: candidateIdentityId,
       spaceIdentityId: targetIdentityId,
       sourceIdentityId,
       targetIdentityId: selectedTargetIdentityId,
-      sourceProfileKey: `user:${input.memberUserId}:${candidates[0].identityId}`,
+      sourceProfileKey: `user:${input.memberUserId}:${candidateIdentityId}`,
       targetProfileKey: `space-person:${input.spacePerson.id}`,
       hasAccessBridge: true,
       compatibleType: true,
@@ -2772,13 +2823,22 @@ export class SharedSpaceService extends BaseService {
       personalPersonId: input.personId,
     });
 
-    return this.sharedSpaceRepository.createPerson({
+    // Race-safe create: concurrent SharedSpaceFaceMatch* jobs carrying faces of this same identity
+    // may have created the space person between our getSpacePersonByIdentity check above and here.
+    // createOrGetPersonForIdentity returns the winner's row instead of crashing on the
+    // (spaceId, identityId) unique index; re-apply the type-compat check since the raced-in row may
+    // belong to a different type.
+    const spacePerson = await this.sharedSpaceRepository.createOrGetPersonForIdentity({
       spaceId: input.spaceId,
       identityId: input.identityId,
       name: '',
       representativeFaceId,
       type: input.type,
     });
+    if (spacePerson.type && spacePerson.type !== input.type) {
+      return undefined;
+    }
+    return spacePerson;
   }
 
   private isExactSelectedSpaceAssignment(
