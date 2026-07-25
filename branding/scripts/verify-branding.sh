@@ -83,8 +83,9 @@ if [[ -f "$overrides_file" && -f "$i18n_file" ]]; then
 
   # Issue #703: the upstream name must not leak through *any* locale for a key
   # the fork rebrands. Non-English locales carry upstream Weblate translations
-  # of these keys; patch_i18n() either replaces them with a per-locale override
-  # or drops them so they fall back to the branded en.json. Verify every locale.
+  # of these keys; patch_i18n() replaces them with a per-locale override where
+  # one exists, then rewrites the upstream name in place everywhere else so the
+  # translation survives (issue #844). Verify every locale.
   locale_leaks=0
   for locale_file in "$REPO_ROOT"/i18n/*.json; do
     [[ -f "$locale_file" ]] || continue
