@@ -69,7 +69,25 @@ import {
 import type { MessageFormatter } from 'svelte-i18n';
 import { goto } from '$app/navigation';
 
-export const getAssetBulkActions = ($t: MessageFormatter, album?: AlbumResponseDto) => {
+export const getAssetBulkActions = (
+  $t: MessageFormatter,
+  {
+    restrictToSpaceId,
+    album,
+  }: {
+    /**
+     * Set when the selection contains assets the user does not own: the add-to-collection
+     * picker then offers only albums linked to this space, because those are the only targets
+     * that can accept the non-owned assets (#764 contribution).
+     */
+    restrictToSpaceId?: string;
+    /**
+     * The album whose page is showing this selection. Upstream passed it positionally; it moved
+     * into this bag so the fork's restrictToSpaceId and it can coexist. Gates RemoveFromAlbum.
+     */
+    album?: AlbumResponseDto;
+  } = {},
+) => {
   const assetIds = assetMultiSelectManager.assets.map((asset) => asset.id);
   const ownedAssets = assetMultiSelectManager.ownedAssets;
   const isAlbumOwner = album?.albumUsers[0].user.id === authManager.user.id;
@@ -83,7 +101,7 @@ export const getAssetBulkActions = ($t: MessageFormatter, album?: AlbumResponseD
     title: $t('add_to_album_or_space'),
     icon: mdiPlus,
     shortcuts: [{ key: 'l' }],
-    onAction: () => modalManager.show(AssetAddToCollectionModal, { assetIds }),
+    onAction: () => modalManager.show(AssetAddToCollectionModal, { assetIds, restrictToSpaceId }),
   };
 
   const CreateSharedLink: ActionItem = {
