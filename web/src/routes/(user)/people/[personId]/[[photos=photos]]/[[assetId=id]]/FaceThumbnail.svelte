@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getPeopleThumbnailUrl } from '$lib/utils';
+  import { getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
   import { type PersonResponseDto } from '@immich/sdk';
   import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
 
@@ -45,8 +45,17 @@
     class:border-immich-primary={border}
   >
     <!-- Trigger a re-render on person change as <Image> captures only the first src -->
+    <!-- Space-person candidates (reassign picker) have no row in the owner-only person table, so the
+         owner-only thumbnail endpoint 400s for them; this routes them to the membership-gated space
+         endpoint and falls through to the owner-only URL for personal people. -->
     {#key person.id}
-      <ImageThumbnail {circle} url={getPeopleThumbnailUrl(person)} altText={person.name} widthStyle="100%" shadow />
+      <ImageThumbnail
+        {circle}
+        url={getGlobalPersonThumbnailUrl(person)}
+        altText={person.name}
+        widthStyle="100%"
+        shadow
+      />
     {/key}
   </div>
 
