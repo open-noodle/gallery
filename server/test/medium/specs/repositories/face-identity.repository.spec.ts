@@ -114,6 +114,49 @@ const createAccessibleSpaceIdentity = async (
   return { space, spacePerson, identity };
 };
 
+// One identity, two spaces the viewer belongs to. `getAccessiblePersonByProfileId` uses the requested
+// profile id only to look up the identity and then re-picks a profile from scratch, so without the
+// requested-profile preference the answer comes down to alias > name > updatedAt > uuid — i.e.
+// `/people/{fv-profile}` can hand back the Photography Club profile, and every write on that page
+// (rename, birthday, merge, reassign) then targets a space the caller never asked for.
+const seedIdentityInTwoSpaces = async (ctx: ReturnType<typeof setup>['ctx'], sut: FaceIdentityRepository) => {
+  const { user: owner } = await ctx.newUser();
+  const { user: viewer } = await ctx.newUser();
+
+  const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'Bob' });
+  const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  const identity = await sut.ensurePersonIdentity(person.id);
+  await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
+
+  const addSpace = async (profileName: string) => {
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id, role: SharedSpaceRole.Editor });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+    const spacePerson = await ctx.database
+      .insertInto('shared_space_person')
+      .values({
+        spaceId: space.id,
+        identityId: identity.id,
+        name: profileName,
+        representativeFaceId: assetFace.id,
+        type: 'person',
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    await linkSpaceFace(ctx, spacePerson.id, assetFace.id);
+    return { space, spacePerson };
+  };
+
+  // 'Amy' sorts before 'Zoe' on lower(name), so the ranking picks the Amy profile for this identity no
+  // matter which of the two the caller actually asked for.
+  const amySpace = await addSpace('Amy');
+  const zoeSpace = await addSpace('Zoe');
+
+  return { owner, viewer, person, identity, amySpace, zoeSpace };
+};
+
 // One real-life person (identity I) appears in three places: Alice's library person (no birthday),
 // space S where Bob set the birthday, and Dave's own library person (no birthday, never shared into
 // S). Used by the birthday-visibility permission matrix to prove who may read the space-set birthday
@@ -1969,6 +2012,50 @@ describe(FaceIdentityRepository.name, () => {
       expect(result).toEqual(expect.objectContaining({ id: person.id, name: 'Ina', birthDate: '2014-02-14' }));
     } finally {
       await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+    }
+  });
+
+  it('returns the space profile that was actually requested, not the ranking winner', async () => {
+    const { ctx, sut } = setup();
+    const { owner, viewer, zoeSpace, amySpace } = await seedIdentityInTwoSpaces(ctx, sut);
+
+    try {
+      const result = await sut.getAccessiblePersonByProfileId(viewer.id, zoeSpace.spacePerson.id);
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: zoeSpace.spacePerson.id,
+          primaryProfile: { type: 'space-person', id: zoeSpace.spacePerson.id, spaceId: zoeSpace.space.id },
+        }),
+      );
+      // ...and the other space's profile is still reachable by its own id.
+      const other = await sut.getAccessiblePersonByProfileId(viewer.id, amySpace.spacePerson.id);
+      expect(other).toEqual(
+        expect.objectContaining({
+          id: amySpace.spacePerson.id,
+          primaryProfile: { type: 'space-person', id: amySpace.spacePerson.id, spaceId: amySpace.space.id },
+        }),
+      );
+    } finally {
+      await ctx.database.deleteFrom('user').where('id', 'in', [owner.id, viewer.id]).execute();
+    }
+  });
+
+  it("keeps the caller's own person ahead of a requested space profile", async () => {
+    const { ctx, sut } = setup();
+    const { owner, viewer, zoeSpace } = await seedIdentityInTwoSpaces(ctx, sut);
+
+    try {
+      // The owner deep-links a space profile of an identity they also hold in their own library.
+      // Preferring the requested profile must not demote their own person: that page is the richer
+      // one (their whole library, not one space's slice) and the only one they can always edit.
+      const result = await sut.getAccessiblePersonByProfileId(owner.id, zoeSpace.spacePerson.id);
+
+      expect(result).toEqual(
+        expect.objectContaining({ primaryProfile: expect.objectContaining({ type: 'user-person' }) }),
+      );
+    } finally {
+      await ctx.database.deleteFrom('user').where('id', 'in', [owner.id, viewer.id]).execute();
     }
   });
 

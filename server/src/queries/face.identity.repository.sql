@@ -1620,7 +1620,8 @@ WITH
         ORDER BY
           CASE
             WHEN profiles."profileType" = 'user-person' THEN 0
-            ELSE profiles."profileRank"
+            WHEN profiles."profileId" = $9::uuid THEN 1
+            ELSE profiles."profileRank" + 1
           END,
           NULLIF(profiles.name, '') IS NULL,
           lower(profiles.name),

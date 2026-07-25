@@ -1304,7 +1304,12 @@ export class FaceIdentityRepository {
       return;
     }
 
-    const people = await this.hydrateAccessiblePeople({ userId, identityIds: [identityId], withHidden: false });
+    const people = await this.hydrateAccessiblePeople({
+      userId,
+      identityIds: [identityId],
+      withHidden: false,
+      preferProfileId: profileId,
+    });
     return people[0];
   }
 
@@ -1897,7 +1902,15 @@ export class FaceIdentityRepository {
   @GenerateSql({
     // As above: documents the shared-space form, which is also the uncounted path (the counted
     // path emits no accessibility predicate at all).
-    params: [{ userId: DummyValue.UUID, identityIds: [DummyValue.UUID], withHidden: true, hasTimelineSpaces: true }],
+    params: [
+      {
+        userId: DummyValue.UUID,
+        identityIds: [DummyValue.UUID],
+        withHidden: true,
+        hasTimelineSpaces: true,
+        preferProfileId: DummyValue.UUID,
+      },
+    ],
   })
   async hydrateAccessiblePeople(input: {
     userId: string;
@@ -1922,6 +1935,13 @@ export class FaceIdentityRepository {
     assetCounts?: ReadonlyMap<string, number>;
     /** Resolved by the caller when it runs several of these queries, to avoid repeating the lookup. */
     hasTimelineSpaces?: boolean;
+    /**
+     * The profile the caller explicitly addressed, when there is one. Ranked directly below the
+     * caller's own person so a deep link resolves to the profile it names instead of whatever the
+     * alias/name/updatedAt tiebreakers happen to elect. Omitted by the list paths, which have no
+     * single requested profile and keep the existing ranking.
+     */
+    preferProfileId?: string;
   }): Promise<PersonResponseDto[]> {
     const countedIdentities = input.assetCounts
       ? input.identityIds
@@ -2079,7 +2099,8 @@ export class FaceIdentityRepository {
             ORDER BY
               CASE
                 WHEN profiles."profileType" = 'user-person' THEN 0
-                ELSE profiles."profileRank"
+                WHEN profiles."profileId" = ${input.preferProfileId ?? null}::uuid THEN 1
+                ELSE profiles."profileRank" + 1
               END,
               NULLIF(profiles.name, '') IS NULL,
               lower(profiles.name),
