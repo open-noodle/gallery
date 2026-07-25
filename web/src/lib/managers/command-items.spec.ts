@@ -552,6 +552,7 @@ describe('album-context commands', () => {
       albumName: 'Test',
       ownerId: 'u-owner',
       isOwner: true,
+      isEditor: false,
       isMember: false,
       raw: baseAlbum,
     },
