@@ -752,4 +752,107 @@ describe('SharedSpaceService linked-library face identity repair', () => {
       unassignedFaceCount: 1,
     });
   });
+
+  // Regression for the user-reported crash: a person with multiple photos makes FaceIdentityBackfill
+  // fan out one SharedSpaceFaceMatchFromBackfill job per asset, all carrying the SAME identity. Run
+  // in parallel they each miss the not-yet-committed space person and race to INSERT it, tripping the
+  // `shared_space_person_spaceId_identityId_key` unique index — the losers crashed the handler and
+  // left the face-match/link chain half-done (the duplicate-person symptom).
+  it('links all faces to one space person when parallel backfill jobs race to create it', async () => {
+    const { ctx, sut, faceIdentityRepository, sharedSpaceRepository } = setup();
+    const { user } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+    const { library } = await ctx.newLibrary({ ownerId: user.id });
+    await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: user.id });
+
+    // Four assets, all faces of the SAME identity — the reporter's four-photo case.
+    const first = await createIdentityFace(ctx, faceIdentityRepository, {
+      ownerId: user.id,
+      libraryId: library.id,
+      name: 'Brad',
+    });
+    const rest = await Promise.all(
+      [0, 1, 2].map(() =>
+        createIdentityFace(ctx, faceIdentityRepository, {
+          ownerId: user.id,
+          libraryId: library.id,
+          personId: first.person.id,
+          identityId: first.identity.id,
+        }),
+      ),
+    );
+    const faces = [first, ...rest];
+
+    // Fire every backfill job at once, exactly as the queue would.
+    const results = await Promise.all(
+      faces.map((f) => sut.handleSharedSpaceFaceMatchFromBackfill({ spaceId: space.id, assetId: f.asset.id })),
+    );
+    expect(results).toEqual(faces.map(() => JobStatus.Success));
+
+    // Exactly one space person for the identity, with every face assigned to it.
+    const people = await ctx.database
+      .selectFrom('shared_space_person')
+      .selectAll()
+      .where('spaceId', '=', space.id)
+      .where('identityId', '=', first.identity.id)
+      .execute();
+    expect(people).toHaveLength(1);
+
+    for (const f of faces) {
+      await expect(sharedSpaceRepository.getPersonFaceAssignmentsForSpace(f.assetFace.id, space.id)).resolves.toEqual([
+        { personId: people[0].id, identityId: first.identity.id, type: 'person' },
+      ]);
+    }
+  });
+
+  // Self-heal backstop: existing duplicate people (created before the crash/dedup fixes) only
+  // collapse when reconciliation runs again for their space, and nothing retriggers it for
+  // already-assigned faces. The nightly sweep re-queues reconciliation for every face-enabled space
+  // so those duplicates heal without the user doing anything.
+  it('sweep queues identity reconciliation for every face-recognition-enabled space', async () => {
+    const { ctx, sut, jobs } = setup();
+    const { user } = await ctx.newUser();
+    const { space: enabled1 } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+    const { space: enabled2 } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+    const { space: disabled } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: false });
+
+    await expect(sut.handleSharedSpaceIdentityReconciliationSweep()).resolves.toBe(JobStatus.Success);
+
+    expect(jobs.queue).toHaveBeenCalledWith({
+      name: JobName.SharedSpaceIdentityReconciliation,
+      data: { spaceId: enabled1.id },
+    });
+    expect(jobs.queue).toHaveBeenCalledWith({
+      name: JobName.SharedSpaceIdentityReconciliation,
+      data: { spaceId: enabled2.id },
+    });
+    expect(jobs.queue).not.toHaveBeenCalledWith({
+      name: JobName.SharedSpaceIdentityReconciliation,
+      data: { spaceId: disabled.id },
+    });
+  });
+
+  // One-time recovery for the pre-idempotency-fix crashes: those failed jobs occupy their stable
+  // dedup jobIds forever (removeOnFail unset), silently blocking the post-fix re-queue of exactly
+  // the crashed work. The bootstrap sweep must run once per install — the flag persists in
+  // system_metadata, so a second bootstrap (each instance here simulates a fresh process after a
+  // restart) must not sweep or kick identity maintenance again, even if new jobs failed since.
+  it('sweeps blocked failed face jobs on the first bootstrap only', async () => {
+    const firstBoot = setup();
+    firstBoot.jobs.removeFailedJobsByJobIdPrefix.mockResolvedValue(3);
+
+    await firstBoot.sut.onBootstrap();
+
+    expect(firstBoot.jobs.removeFailedJobsByJobIdPrefix).toHaveBeenCalledTimes(2);
+    expect(firstBoot.jobs.queue).toHaveBeenCalledWith({ name: JobName.FaceIdentityBackfill, data: {} });
+
+    const secondBoot = setup();
+    secondBoot.jobs.removeFailedJobsByJobIdPrefix.mockResolvedValue(3);
+
+    await secondBoot.sut.onBootstrap();
+
+    expect(secondBoot.jobs.removeFailedJobsByJobIdPrefix).not.toHaveBeenCalled();
+    expect(secondBoot.jobs.queue).not.toHaveBeenCalled();
+  });
 });
