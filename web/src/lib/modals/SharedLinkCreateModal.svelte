@@ -10,9 +10,15 @@
     onClose: () => void;
     albumId?: string;
     assetIds?: string[];
+    /**
+     * How many selected assets were dropped because the user does not own them. A shared link
+     * can only cover the caller's own assets, so the caller narrows `assetIds` and reports the
+     * remainder here rather than letting the request fail or the narrowing go unnoticed.
+     */
+    excludedCount?: number;
   }
 
-  let { onClose, albumId, assetIds }: Props = $props();
+  let { onClose, albumId, assetIds, excludedCount = 0 }: Props = $props();
 
   let description = $state('');
   let allowDownload = $state(true);
@@ -57,6 +63,12 @@
 
   {#if type === SharedLinkType.Individual}
     <div>{$t('create_link_to_share_description')}</div>
+  {/if}
+
+  {#if excludedCount > 0}
+    <div class="text-sm text-gray-500 dark:text-gray-400" data-testid="shared-link-excluded-notice">
+      {$t('shared_link_excludes_other_owners', { values: { count: excludedCount } })}
+    </div>
   {/if}
 
   <SharedLinkFormFields
