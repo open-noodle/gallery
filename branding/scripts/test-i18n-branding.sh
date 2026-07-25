@@ -14,8 +14,13 @@
 # copy of i18n/ and asserts that for every branded key:
 #   - en.json carries the branded English override,
 #   - locales with a per-locale override (de, fr) carry the branded translation,
-#   - every other locale drops the key so it falls back to branded English,
+#   - every other locale KEEPS its own translation with the name swapped,
 #   - no locale renders the upstream name for any overridden key.
+#
+# That third rule is issue #844. Leaking keys used to be deleted so the locale
+# fell back to branded English, which silently reverted ~2,100 already-translated
+# strings across 69 locales — so the assertions below check that a translation
+# survives, not merely that the brand name is correct.
 #
 # The working tree is never mutated (patch runs against a temp REPO_ROOT), so
 # this is safe to run locally and in CI. No image tooling or network required.
@@ -56,16 +61,6 @@ eq() { # <lang> <key> <expected> <description>
     fails=$((fails + 1))
   fi
 }
-absent() { # <lang> <key> <description>  — key must be deleted (falls back to en)
-  local got
-  got=$(jq -r --arg k "$2" 'has($k)' "$TMP/i18n/$1.json")
-  if [[ "$got" == "false" ]]; then
-    echo "  ok:   $3"
-  else
-    echo "  FAIL: $3 — ${1}.json still defines '$2' = '$(jq -r --arg k "$2" '.[$k]' "$TMP/i18n/$1.json")'"
-    fails=$((fails + 1))
-  fi
-}
 
 # Dot-path variants for nested keys (issue #672 — overrides that live under
 # .admin.*). `getpath(split("."))` resolves a dotted path into the locale object.
@@ -88,17 +83,6 @@ branded_at() { # <lang> <dotpath> <description>  — present, carries $NAME, no 
     echo "  ok:   $3"
   fi
 }
-absent_at() { # <lang> <dotpath> <description>  — leaf undefined (falls back to en)
-  local got
-  got=$(jq -r --arg k "$2" 'getpath($k | split(".")) == null' "$TMP/i18n/$1.json")
-  if [[ "$got" == "true" ]]; then
-    echo "  ok:   $3"
-  else
-    echo "  FAIL: $3 — ${1}.json still defines '$2' = '$(val_at "$1" "$2")'"
-    fails=$((fails + 1))
-  fi
-}
-
 KEY="purchase_button_buy_immich"
 
 echo "English override applied:"
@@ -109,11 +93,39 @@ eq de "$KEY" "Noodle Gallery unterstützen" 'de buy button is branded German (is
 eq fr "$KEY" "Soutenir Noodle Gallery" 'fr buy button is branded French'
 eq de purchase_panel_info_2 "$(jq -r '.purchase_panel_info_2' "$REPO/branding/i18n/overrides-de.json")" 'de purchase panel is branded German'
 
-echo "Locales without an override fall back to branded English:"
-absent es "$KEY" 'es buy button dropped -> falls back to en override'
-absent it "$KEY" 'it buy button dropped -> falls back to en override'
-absent nl "$KEY" 'nl buy button dropped -> falls back to en override'
-absent de welcome_to_immich 'de non-panel brand key dropped -> falls back to en override'
+# Issue #844: these used to be DELETED so the locale fell back to branded
+# English. That threw away a real translation for every leaking key — ~2,100
+# strings across 69 locales. They must now keep their translation with only the
+# brand name swapped.
+echo "Locales without an override keep their translation, rebranded (issue #844):"
+branded_at es "$KEY" 'es buy button stays Spanish, rebranded'
+branded_at it "$KEY" 'it buy button stays Italian, rebranded'
+branded_at nl "$KEY" 'nl buy button stays Dutch, rebranded'
+branded_at de welcome_to_immich 'de non-panel brand key stays German, rebranded'
+
+# Issue #844 verbatim: the mobile "Endgültig löschen" dialog. Its title and three
+# buttons never named the upstream project so they stayed German, while this one
+# explanatory sentence — the only part that did — was deleted and fell back to
+# English, on a destructive, irreversible action. Assert the German survives, not
+# just that the brand is right: a fallback to branded English would pass
+# branded_at on its own.
+echo "Mobile delete-dialog body keeps its translation (issue #844):"
+d844=$(val_at de delete_dialog_alert_local_non_backed_up)
+if [[ -z "$d844" ]]; then
+  echo "  FAIL: de delete_dialog_alert_local_non_backed_up is ABSENT (regressed to en fallback)"
+  fails=$((fails + 1))
+elif echo "$d844" | grep -q "$UPSTREAM_NAME"; then
+  echo "  FAIL: de delete_dialog_alert_local_non_backed_up still names '$UPSTREAM_NAME': '$d844'"
+  fails=$((fails + 1))
+elif ! echo "$d844" | grep -qF "$NAME"; then
+  echo "  FAIL: de delete_dialog_alert_local_non_backed_up is not branded '$NAME': '$d844'"
+  fails=$((fails + 1))
+elif ! echo "$d844" | grep -q "gesichert"; then
+  echo "  FAIL: de delete_dialog_alert_local_non_backed_up is no longer German: '$d844'"
+  fails=$((fails + 1))
+else
+  echo "  ok:   de delete-dialog body stays German and branded ('$d844')"
+fi
 
 # Issue #672: nine admin.* descriptions were overridden as TOP-LEVEL keys, so the
 # top-level shallow merge ('.[0] * .[1]') added dead top-level keys while the real
@@ -134,10 +146,10 @@ ADMIN_KEYS=(
 for admin_key in "${ADMIN_KEYS[@]}"; do
   branded_at en "$admin_key" "en $admin_key branded under .admin (not a dead top-level key)"
 done
-# These admin descriptions have no per-locale override, so every non-English locale
-# must drop them (their upstream-named translation) and fall back to branded en.
-absent_at de admin.theme_settings_description 'de drops admin.theme_settings_description -> falls back to en'
-absent_at fr admin.maintenance_settings_description 'fr drops admin.maintenance_settings_description -> falls back to en'
+# These admin descriptions have no per-locale override. `walk` must still reach
+# them at .admin.* depth and rebrand them in place, keeping the translation.
+branded_at de admin.theme_settings_description 'de keeps admin.theme_settings_description, rebranded'
+branded_at fr admin.maintenance_settings_description 'fr keeps admin.maintenance_settings_description, rebranded'
 
 # Issue #743 item 4: asset_offline_description exists BOTH top-level and under
 # .admin — a top-level-only override recreates the #672 bug shape (the override
