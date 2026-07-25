@@ -53,6 +53,9 @@ jobs:
             machine-learning:
               - 'machine-learning/**'
               - 'mise.toml'
+            branding:
+              - 'branding/**'
+              - 'i18n/**'
             upstream-preflight:
               - '.github/workflows/test.yml'
               - 'tools/upstream-preflight/**'
@@ -244,6 +247,28 @@ jobs:
 
       - name: Run ci-unit
         run: mise run ci-unit
+
+  # Behavioural gate for the branding pipeline. ShellCheck only lints these
+  # scripts; nothing in CI ran patch_i18n() and asserted what it produces, which
+  # is how the delete-and-fall-back-to-English behaviour behind issue #844 went
+  # unnoticed. The script patches a throwaway copy of i18n/, so it needs no
+  # image tooling, no network and no build — just bash and jq.
+  branding-i18n-tests:
+    name: Test i18n Branding
+    needs: pre-job
+    if: ${{ fromJSON(needs.pre-job.outputs.should_run).branding == true }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          token: ${{ github.token }}
+
+      - name: Run i18n branding regression tests
+        run: ./branding/scripts/test-i18n-branding.sh
 
   i18n-tests:
     name: Test i18n
