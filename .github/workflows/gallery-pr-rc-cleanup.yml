@@ -1,0 +1,106 @@
+name: PR Release Candidate Cleanup
+
+# Deletes a PR's release-candidate images from GHCR when the PR closes.
+#
+# Since RC builds publish an incrementing, immutable tag per push
+# (`pr-<number>-rc.<n>`, see gallery-pr-rc-comment.yml), a long-lived PR accumulates
+# one image tag per push. Closing the PR is the lifecycle boundary at which they all
+# go away.
+#
+# Kept out of gallery-pr-rc-comment.yml on purpose: a `closed` event must not join
+# that workflow's per-PR `cancel-in-progress` concurrency group and cancel a build
+# that is still pushing, and `packages: write` stays scoped to this workflow alone.
+
+on:
+  pull_request:
+    types: [closed]
+
+concurrency:
+  group: pr-rc-cleanup-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  cleanup:
+    name: Delete RC images
+    # Fork PRs get a read-only token and could not delete anyway. Deliberately NOT
+    # gated on the `rc`/`rc-ml` label: a label removed before closing would otherwise
+    # orphan that PR's tags forever. With nothing to delete this is a cheap no-op.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Delete RC package versions
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const org = 'open-noodle';
+            const packages = ['gallery-server', 'gallery-ml'];
+            const prNumber = context.payload.pull_request.number;
+            // Also matches the bare `pr-<number>` left behind by the pre-increment
+            // scheme, so old floating tags get swept too.
+            const rcTag = new RegExp(`^pr-${prNumber}(-rc\\.\\d+)?$`);
+
+            let deleted = 0;
+            const failures = [];
+
+            for (const pkg of packages) {
+              let versions;
+              try {
+                versions = await github.paginate(
+                  github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg,
+                  { package_type: 'container', package_name: pkg, org, per_page: 100 },
+                );
+              } catch (error) {
+                if (error.status === 404) {
+                  core.info(`${pkg}: package not found — nothing to clean up.`);
+                  continue;
+                }
+                throw error;
+              }
+
+              // Deleting a version deletes its digest and every tag pointing at it, so
+              // only take versions whose tags are ENTIRELY this PR's. A digest that is
+              // also tagged something else (`release`, say) is left alone. Untagged
+              // versions are skipped: the per-arch children orphaned by deleting a
+              // manifest list are a separate sweep.
+              const doomed = versions.filter((version) => {
+                const tags = version.metadata?.container?.tags ?? [];
+                return tags.length > 0 && tags.every((tag) => rcTag.test(tag));
+              });
+
+              if (doomed.length === 0) {
+                core.info(`${pkg}: no RC versions for PR #${prNumber}.`);
+                continue;
+              }
+
+              for (const version of doomed) {
+                const tags = (version.metadata?.container?.tags ?? []).join(', ');
+                try {
+                  await github.rest.packages.deletePackageVersionForOrg({
+                    package_type: 'container',
+                    package_name: pkg,
+                    org,
+                    package_version_id: version.id,
+                  });
+                  core.info(`${pkg}: deleted ${tags}`);
+                  deleted += 1;
+                } catch (error) {
+                  failures.push(`${pkg} [${tags}]: ${error.status ?? ''} ${error.message}`);
+                }
+              }
+            }
+
+            core.summary.addHeading(`RC cleanup for PR #${prNumber}`, 3);
+            core.summary.addRaw(`Deleted ${deleted} package version(s).`, true);
+            await core.summary.write();
+
+            // Fail loudly rather than logging a warning: a permissions problem here is
+            // silent tag accumulation, which is exactly what this workflow prevents.
+            if (failures.length > 0) {
+              core.setFailed(
+                `Failed to delete ${failures.length} package version(s):\n${failures.join('\n')}`,
+              );
+            }
