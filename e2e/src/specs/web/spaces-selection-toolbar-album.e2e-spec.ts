@@ -146,8 +146,11 @@ test.describe('Spaces — SelectionToolbar space-album control bar (Slice 6)', (
 
     // Ownership-gated, top-level: hidden (editor doesn't own the asset).
     await expect(controlBar.getByRole('button', { name: 'Share' })).toHaveCount(0);
-    await expect(controlBar.getByRole('button', { name: 'Add to album or space' })).toHaveCount(0);
     await expect(controlBar.getByRole('button', { name: /favorite/i })).toHaveCount(0);
+
+    // Role-gated: a space Editor may contribute a non-owned asset into an album linked to this
+    // space (#764), so Add-to-album stays — it opens the picker restricted to the space.
+    await expect(controlBar.getByRole('button', { name: 'Add to album or space' })).toBeVisible();
 
     await openOverflowMenu(controlBar);
 
