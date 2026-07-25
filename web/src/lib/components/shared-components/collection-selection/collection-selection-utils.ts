@@ -81,11 +81,16 @@ export class CollectionModalRowConverter {
     all: PickerCollection[],
     selectedRowIndex: number,
     multiSelectedKeys: string[],
-    options: { showSpaces: boolean },
+    options: { showSpaces: boolean; allowCreate?: boolean; emptyText?: string; noMatchText?: string },
   ): CollectionModalRow[] {
     const $t = get(t);
-    const rows: CollectionModalRow[] = [{ type: CollectionModalRowType.NEW_ALBUM, selected: selectedRowIndex === 0 }];
-    if (options.showSpaces) {
+    // Restricted mode passes allowCreate:false — a freshly created album is not linked to the
+    // space, so cross-owner contributions could never land in it.
+    const allowCreate = options.allowCreate ?? true;
+    const rows: CollectionModalRow[] = allowCreate
+      ? [{ type: CollectionModalRowType.NEW_ALBUM, selected: selectedRowIndex === 0 }]
+      : [];
+    if (allowCreate && options.showSpaces) {
       rows.push({ type: CollectionModalRowType.NEW_SPACE, selected: selectedRowIndex === 1 });
     }
     const createCount = rows.length;
@@ -98,7 +103,10 @@ export class CollectionModalRowConverter {
     if (filtered.length === 0) {
       rows.push({
         type: CollectionModalRowType.MESSAGE,
-        text: visible.length > 0 ? $t('no_albums_or_spaces_with_name') : $t('no_albums_or_spaces_yet'),
+        text:
+          visible.length > 0
+            ? (options.noMatchText ?? $t('no_albums_or_spaces_with_name'))
+            : (options.emptyText ?? $t('no_albums_or_spaces_yet')),
       });
       return rows;
     }

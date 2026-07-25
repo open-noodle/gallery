@@ -83,3 +83,61 @@ describe('addAssetsToCollections', () => {
     expect(addAssetsToSpace).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Contribution mode (#764): the selection contains assets the user does not own,
+// so every album must go through the SINGLE-album endpoint. The bulk
+// `PUT /albums/assets` path has no `tryContributeDeniedAssets` arm and would
+// silently drop the non-owned assets.
+// ---------------------------------------------------------------------------
+
+describe('addAssetsToCollections — contribution mode', () => {
+  it('dispatches one single-album call per album, never a batched call', async () => {
+    await expect(
+      addAssetsToCollections([albumCol('a1'), albumCol('a2')], ['mine', 'theirs'], { contributionMode: true }),
+    ).resolves.toBe(true);
+
+    expect(addAssetsToAlbums).toHaveBeenCalledTimes(2);
+    expect(addAssetsToAlbums).toHaveBeenCalledWith(['a1'], ['mine', 'theirs'], { notify: false });
+    expect(addAssetsToAlbums).toHaveBeenCalledWith(['a2'], ['mine', 'theirs'], { notify: false });
+    // The batched form is what loses the contributions.
+    expect(addAssetsToAlbums).not.toHaveBeenCalledWith(['a1', 'a2'], expect.anything(), expect.anything());
+    expect(primary).toHaveBeenCalledWith('added_to_collections_count:2');
+  });
+
+  it('a single album still notifies inline so the per-asset add/contribute breakdown is shown', async () => {
+    await expect(
+      addAssetsToCollections([albumCol('a1')], ['mine', 'theirs'], { contributionMode: true }),
+    ).resolves.toBe(true);
+
+    expect(addAssetsToAlbums).toHaveBeenCalledWith(['a1'], ['mine', 'theirs'], { notify: true });
+    expect(primary).not.toHaveBeenCalled();
+  });
+
+  it('drops spaces defensively — no space pool accepts an asset the caller does not own', async () => {
+    await expect(
+      addAssetsToCollections([albumCol('a1'), spaceCol('s1')], ['mine', 'theirs'], { contributionMode: true }),
+    ).resolves.toBe(true);
+
+    expect(addAssetsToSpace).not.toHaveBeenCalled();
+    expect(addAssetsToAlbums).toHaveBeenCalledWith(['a1'], ['mine', 'theirs'], { notify: true });
+  });
+
+  it('counts only the albums that succeeded', async () => {
+    addAssetsToAlbums.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+
+    await expect(
+      addAssetsToCollections([albumCol('a1'), albumCol('a2')], ['mine', 'theirs'], { contributionMode: true }),
+    ).resolves.toBe(true);
+    expect(primary).toHaveBeenCalledWith('added_to_collections_count:1');
+  });
+
+  it('returns false when every album failed', async () => {
+    addAssetsToAlbums.mockResolvedValue(false);
+
+    await expect(
+      addAssetsToCollections([albumCol('a1'), albumCol('a2')], ['mine', 'theirs'], { contributionMode: true }),
+    ).resolves.toBe(false);
+    expect(primary).not.toHaveBeenCalled();
+  });
+});

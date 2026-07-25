@@ -181,4 +181,42 @@ describe('CollectionModalRowConverter', () => {
     expect(items).toHaveLength(1);
     expect(items[0].collection!.kind).toBe('album');
   });
+
+  // Restricted (space-contribution) mode: no create rows, and both empty-state messages
+  // are overridable so they never name a collection type that was not on offer.
+  describe('allowCreate / message overrides', () => {
+    const restricted = { showSpaces: false, allowCreate: false };
+
+    it('omits both create rows when allowCreate is false', () => {
+      const rows = conv.toModalRows('', [], [a('a1', 'A')], -1, [], restricted);
+      expect(rows.some((r) => r.type === CollectionModalRowType.NEW_ALBUM)).toBe(false);
+      expect(rows.some((r) => r.type === CollectionModalRowType.NEW_SPACE)).toBe(false);
+    });
+
+    it('keeps row indices contiguous from 0 so keyboard navigation still lands on the first item', () => {
+      const rows = conv.toModalRows('', [], [a('a1', 'A')], 0, [], restricted);
+      const firstItem = rows.find((r) => r.type === CollectionModalRowType.COLLECTION_ITEM);
+      // With no create rows consuming indices 0/1, selectedRowIndex 0 must select the first item.
+      expect(firstItem!.selected).toBe(true);
+    });
+
+    it('uses emptyText when there is nothing to show', () => {
+      const rows = conv.toModalRows('', [], [], -1, [], { ...restricted, emptyText: 'nothing here' });
+      const message = rows.find((r) => r.type === CollectionModalRowType.MESSAGE);
+      expect(message!.text).toBe('nothing here');
+    });
+
+    it('uses noMatchText when a search matches nothing', () => {
+      const rows = conv.toModalRows('zzz', [], [a('a1', 'A')], -1, [], { ...restricted, noMatchText: 'no match' });
+      const message = rows.find((r) => r.type === CollectionModalRowType.MESSAGE);
+      expect(message!.text).toBe('no match');
+    });
+
+    it('falls back to the default messages when no override is supplied', () => {
+      const empty = conv.toModalRows('', [], [], -1, [], { showSpaces: true });
+      const noMatch = conv.toModalRows('zzz', [], [a('a1', 'A')], -1, [], { showSpaces: true });
+      expect(empty.find((r) => r.type === CollectionModalRowType.MESSAGE)!.text).toBeTruthy();
+      expect(noMatch.find((r) => r.type === CollectionModalRowType.MESSAGE)!.text).toBeTruthy();
+    });
+  });
 });

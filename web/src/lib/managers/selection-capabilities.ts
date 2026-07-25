@@ -10,9 +10,20 @@ import type { CommandContext } from '$lib/managers/command-context-manager.svelt
 export interface SelectionCapabilities {
   canSelectAll: boolean;
   canDownload: boolean;
-  /** CreateSharedLink */
+  /**
+   * CreateSharedLink. True when *any* of the selection is the user's own — the action
+   * shares the owned subset, because `Permission.AssetShare` rejects the whole request
+   * if it names one asset the caller does not own.
+   */
   canShare: boolean;
   canAddToAlbum: boolean;
+  /**
+   * The add-to-collection picker must offer only albums linked to this space, because the
+   * selection contains assets the user does not own. Those can only land as #764
+   * contributions (`album_space_asset`), which requires a space-linked album — never a
+   * personal album, a brand-new album, or any space's direct pool.
+   */
+  addToAlbumRestrictedToSpace: boolean;
   canFavorite: boolean;
   /** Rotate, ChangeDate/Description/Location, Archive, SetVisibility */
   canEditMetadata: boolean;
@@ -28,6 +39,7 @@ const NO_CAPABILITIES: SelectionCapabilities = {
   canDownload: false,
   canShare: false,
   canAddToAlbum: false,
+  addToAlbumRestrictedToSpace: false,
   canFavorite: false,
   canEditMetadata: false,
   canTag: false,
@@ -70,11 +82,20 @@ export function getSelectionCapabilities(ctx: CommandContext, tagsEnabled: boole
 
   const canRemoveFromSpace = isDirectSpace && space !== null && space.canWrite;
 
+  // A space Owner/Editor is the one role that can act on assets they do not own: the server's
+  // #764 contribution path (album.service.tryContributeDeniedAssets) accepts them into any album
+  // linked to a space where the caller is Owner/Editor. A regular album editor has no such path,
+  // so this arm is deliberately keyed on `space`, not on `isEditorOfContext`.
+  const isSpaceEditor = space !== null && space.canWrite;
+
   return {
     canSelectAll: true,
     canDownload: true,
-    canShare: sel.isAllUserOwned,
-    canAddToAlbum: sel.isAllUserOwned,
+    // Not `isAllUserOwned`: the action sends only the owned subset, so it stays useful on a
+    // mixed selection and is denied only when nothing in the selection is the user's.
+    canShare: sel.ownedSelectedAssetIds.length > 0,
+    canAddToAlbum: sel.isAllUserOwned || isSpaceEditor,
+    addToAlbumRestrictedToSpace: !sel.isAllUserOwned && isSpaceEditor,
     canFavorite: sel.isAllUserOwned,
     canEditMetadata: sel.isAllUserOwned,
     canTag: sel.isAllUserOwned && tagsEnabled,

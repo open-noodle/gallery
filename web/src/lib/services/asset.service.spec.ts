@@ -233,7 +233,19 @@ describe('add to album/space entry points', () => {
   it('timeline bulk "+" opens the unified collection modal with the selected ids', () => {
     const action = getAssetBulkActions(((k: string) => k) as never).AddToAlbum;
     action.onAction(action);
-    expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, { assetIds: ['x1', 'x2'] });
+    expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, {
+      assetIds: ['x1', 'x2'],
+      restrictToSpaceId: undefined,
+    });
+  });
+
+  it('bulk "+" carries the space restriction through to the modal when the selection is not all-owned', () => {
+    const action = getAssetBulkActions(((k: string) => k) as never, { restrictToSpaceId: 'space-1' }).AddToAlbum;
+    action.onAction(action);
+    expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, {
+      assetIds: ['x1', 'x2'],
+      restrictToSpaceId: 'space-1',
+    });
   });
 
   it('single-photo viewer "+" opens the unified collection modal with the one id', () => {
