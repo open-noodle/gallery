@@ -3,6 +3,7 @@ import {
   SharedSpaceRole,
   Type,
   type PeopleFaceStatisticsResponseDto,
+  type PeopleResponseDto,
   type PeopleStatisticsResponseDto,
   type PersonResponseDto,
   type SharedSpacePersonResponseDto,
@@ -133,6 +134,46 @@ function renderPage(
       },
     },
   });
+}
+
+/**
+ * Renders the page with page 1 loaded and a second page available, and hands back a trigger that
+ * reports the infinite-scroll sentinel as intersecting so pagination can be driven deterministically.
+ */
+function renderPaginatedPage() {
+  let intersectionCallback: IntersectionObserverCallback | undefined;
+  let observedSentinel: Element | undefined;
+  vi.stubGlobal(
+    'IntersectionObserver',
+    vi.fn(function (callback: IntersectionObserverCallback) {
+      intersectionCallback = callback;
+      return {
+        observe: (element: Element) => (observedSentinel = element),
+        disconnect: vi.fn(),
+        unobserve: vi.fn(),
+        takeRecords: vi.fn(),
+      };
+    }),
+  );
+
+  const rendered = renderPage(
+    [
+      makePerson({ id: 'p1', name: 'Alice', numberOfAssets: 5 }),
+      makePerson({ id: 'p2', name: 'Bob', numberOfAssets: 4 }),
+    ],
+    { total: 4, hidden: 0, detectedFaceCount: 0 },
+    true,
+  );
+
+  const intersect = async () => {
+    await waitFor(() => expect(observedSentinel).toBeDefined());
+    intersectionCallback?.(
+      [{ target: observedSentinel, isIntersecting: true } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    );
+  };
+
+  return { ...rendered, intersect };
 }
 
 describe('Global people page', () => {
@@ -613,37 +654,8 @@ describe('Global people page', () => {
       hasNextPage: false,
     });
 
-    // Drive the infinite-scroll sentinel deterministically: capture the grid's IntersectionObserver
-    // callback and the element it observes, then report an intersection.
-    let intersectionCallback: IntersectionObserverCallback | undefined;
-    let observedSentinel: Element | undefined;
-    vi.stubGlobal(
-      'IntersectionObserver',
-      vi.fn(function (callback: IntersectionObserverCallback) {
-        intersectionCallback = callback;
-        return {
-          observe: (element: Element) => (observedSentinel = element),
-          disconnect: vi.fn(),
-          unobserve: vi.fn(),
-          takeRecords: vi.fn(),
-        };
-      }),
-    );
-
-    renderPage(
-      [
-        makePerson({ id: 'p1', name: 'Alice', numberOfAssets: 5 }),
-        makePerson({ id: 'p2', name: 'Bob', numberOfAssets: 4 }),
-      ],
-      { total: 4, hidden: 0, detectedFaceCount: 0 },
-      true,
-    );
-
-    await waitFor(() => expect(observedSentinel).toBeDefined());
-    intersectionCallback?.(
-      [{ target: observedSentinel, isIntersecting: true } as IntersectionObserverEntry],
-      {} as IntersectionObserver,
-    );
+    const { intersect } = renderPaginatedPage();
+    await intersect();
 
     await waitFor(() => {
       expect(sdkMock.getAllPeople).toHaveBeenCalledWith({
@@ -662,5 +674,95 @@ describe('Global people page', () => {
     expect(screen.getByDisplayValue('Alice')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Bob')).toBeInTheDocument();
     expect(screen.getAllByPlaceholderText('add_a_name')).toHaveLength(4);
+  });
+
+  it('requests a page only once while that request is still in flight', async () => {
+    // The grid has two independent next-page triggers (the IntersectionObserver and the rAF
+    // sentinel re-check) and both are gated on `loading`. Without an in-flight guard the same
+    // page is fetched twice, both responses are appended, and the duplicate ids blow up the
+    // keyed {#each} — the grid then stops rendering while requests keep firing.
+    let resolvePage2: ((value: PeopleResponseDto) => void) | undefined;
+    sdkMock.getAllPeople.mockReturnValue(
+      new Promise<PeopleResponseDto>((resolve) => {
+        resolvePage2 = resolve;
+      }),
+    );
+
+    const { intersect } = renderPaginatedPage();
+    await intersect();
+    await intersect();
+
+    expect(sdkMock.getAllPeople).toHaveBeenCalledTimes(1);
+
+    resolvePage2!({
+      people: [
+        makePerson({ id: 'p3', name: 'Carol', numberOfAssets: 3 }),
+        makePerson({ id: 'p4', name: 'Dave', numberOfAssets: 2 }),
+      ],
+      total: 4,
+      hidden: 0,
+      hasNextPage: false,
+    });
+
+    await waitFor(() => expect(screen.getByDisplayValue('Carol')).toBeInTheDocument());
+    expect(screen.getAllByPlaceholderText('add_a_name')).toHaveLength(4);
+  });
+
+  it('releases the in-flight guard so scrolling keeps paging past the second page', async () => {
+    // The guard must gate concurrent requests for the SAME page without wedging the cascade.
+    sdkMock.getAllPeople
+      .mockResolvedValueOnce({
+        people: [makePerson({ id: 'p3', name: 'Carol', numberOfAssets: 3 })],
+        total: 4,
+        hidden: 0,
+        hasNextPage: true,
+      })
+      .mockResolvedValueOnce({
+        people: [makePerson({ id: 'p4', name: 'Dave', numberOfAssets: 2 })],
+        total: 4,
+        hidden: 0,
+        hasNextPage: false,
+      });
+
+    const { intersect } = renderPaginatedPage();
+    await intersect();
+    await waitFor(() => expect(screen.getByDisplayValue('Carol')).toBeInTheDocument());
+
+    await intersect();
+
+    await waitFor(() => expect(screen.getByDisplayValue('Dave')).toBeInTheDocument());
+    expect(sdkMock.getAllPeople).toHaveBeenNthCalledWith(2, {
+      withHidden: true,
+      withSharedSpaces: true,
+      page: 3,
+      size: PEOPLE_PAGE_SIZE,
+    });
+    expect(screen.getAllByPlaceholderText('add_a_name')).toHaveLength(4);
+  });
+
+  it('renders each person once when the server repeats a row across the page boundary', async () => {
+    // OFFSET pagination is not a snapshot: the accessible-people ORDER BY keys on favourite
+    // status, name and visible asset count, so a rename or a background face job between page
+    // requests can shift the window and re-emit a row that page 1 already returned. That must
+    // not wedge the keyed {#each}.
+    sdkMock.getAllPeople.mockResolvedValue({
+      people: [
+        makePerson({ id: 'p2', name: 'Bob', numberOfAssets: 4 }),
+        makePerson({ id: 'p3', name: 'Carol', numberOfAssets: 3 }),
+      ],
+      total: 3,
+      hidden: 0,
+      hasNextPage: false,
+    });
+
+    const { intersect } = renderPaginatedPage();
+    await intersect();
+
+    await waitFor(() => expect(screen.getByDisplayValue('Carol')).toBeInTheDocument());
+    expect(screen.getAllByPlaceholderText('add_a_name').map((input) => (input as HTMLInputElement).value)).toEqual([
+      'Alice',
+      'Bob',
+      'Carol',
+    ]);
   });
 });
