@@ -1,7 +1,11 @@
 import { AssetOrder, AssetTypeEnum, AssetVisibility } from '@immich/sdk';
 import { describe, expect, it } from 'vitest';
 import { createFilterState } from '$lib/components/filter-panel/filter-panel';
-import { buildAlbumAssetPickerOptions, buildAlbumTimelineOptions } from '$lib/utils/album-filter-options';
+import {
+  buildAlbumAssetPickerOptions,
+  buildAlbumTimelineOptions,
+  buildSpaceAlbumAssetPickerOptions,
+} from '$lib/utils/album-filter-options';
 
 describe('buildAlbumTimelineOptions', () => {
   it('maps all supported filters without changing the passed album order', () => {
@@ -221,5 +225,45 @@ describe('text filters (#802)', () => {
       expect(options).not.toHaveProperty('description');
       expect(options).not.toHaveProperty('ocr');
     });
+  });
+});
+
+// The Space tab of the space-album picker. Its contract is narrow but load-bearing: `spaceId` is
+// the query SCOPE, `timelineAlbumId` is only the already-in-album MARKER, and person filters must
+// stay in `personIds` (scoped tokens) rather than being rewritten to the uuid-only
+// `spacePersonIds` — the mistake that 400s every bucket request.
+describe('buildSpaceAlbumAssetPickerOptions', () => {
+  it('scopes by spaceId and keeps timelineAlbumId as the marker', () => {
+    const options = buildSpaceAlbumAssetPickerOptions('space-1', 'album-1', createFilterState());
+
+    expect(options).toMatchObject({ spaceId: 'space-1', timelineAlbumId: 'album-1' });
+  });
+
+  it('keeps scoped person TOKENS in personIds and never emits spacePersonIds', () => {
+    const options = buildSpaceAlbumAssetPickerOptions('space-1', 'album-1', {
+      ...createFilterState(),
+      personIds: ['person:11111111-1111-4111-8111-111111111111'],
+    });
+
+    // `spacePersonIds` is validated server-side as bare uuidv4; a token there is a hard 400.
+    expect(options).not.toHaveProperty('spacePersonIds');
+    expect(options.personIds).toEqual(['person:11111111-1111-4111-8111-111111111111']);
+  });
+
+  it('pins visibility to Timeline so the Space tab does not offer archived photos the My-photos tab hides', () => {
+    const options = buildSpaceAlbumAssetPickerOptions('space-1', 'album-1', createFilterState());
+
+    expect(options.visibility).toBe(AssetVisibility.Timeline);
+  });
+
+  it('carries the ordinary filters through', () => {
+    const options = buildSpaceAlbumAssetPickerOptions('space-1', 'album-1', {
+      ...createFilterState(),
+      city: 'Berlin',
+      tagIds: ['tag-1'],
+      rating: 4,
+    });
+
+    expect(options).toMatchObject({ city: 'Berlin', tagIds: ['tag-1'], rating: 4 });
   });
 });
