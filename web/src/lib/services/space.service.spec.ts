@@ -1,10 +1,10 @@
-import { addAssets } from '@immich/sdk';
+import { addAssets, updateSpace, UserAvatarColor } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
 import { eventManager } from '$lib/managers/event-manager.svelte';
 import * as handleErrorModule from '$lib/utils/handle-error';
-import { addAssetsToSpace } from './space.service';
+import { addAssetsToSpace, updateSpaceDetails } from './space.service';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn().mockResolvedValue(undefined) }));
 
@@ -19,6 +19,7 @@ vi.mock('@immich/ui', async (orig) => {
 vi.mock('@immich/sdk', async (orig) => ({
   ...(await orig<typeof import('@immich/sdk')>()),
   addAssets: vi.fn().mockResolvedValue(undefined),
+  updateSpace: vi.fn().mockResolvedValue(undefined),
 }));
 
 let handleErrorSpy: ReturnType<typeof vi.spyOn>;
@@ -27,6 +28,7 @@ let emitSpy: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(addAssets).mockResolvedValue(undefined as never);
+  vi.mocked(updateSpace).mockResolvedValue(undefined as never);
   handleErrorSpy = vi.spyOn(handleErrorModule, 'handleError').mockImplementation(() => {});
   emitSpy = vi.spyOn(eventManager, 'emit');
 });
@@ -73,6 +75,36 @@ describe('addAssetsToSpace', () => {
 
     expect(handleErrorSpy).toHaveBeenCalledWith(error, expect.any(String));
     expect(emitSpy).not.toHaveBeenCalled();
+    expect(toastManager.primary).not.toHaveBeenCalled();
+  });
+});
+
+describe('updateSpaceDetails', () => {
+  const dto = { name: 'Family & Friends', description: 'Our photos', color: UserAvatarColor.Blue };
+
+  it('sends the edited fields and reports success', async () => {
+    await expect(updateSpaceDetails('space-1', dto)).resolves.toBe(true);
+
+    expect(updateSpace).toHaveBeenCalledWith({ id: 'space-1', sharedSpaceUpdateDto: dto });
+    expect(toastManager.primary).toHaveBeenCalledOnce();
+  });
+
+  it('sends an emptied description as an empty string, not undefined', async () => {
+    // The server builds its update payload from keys that are `!== undefined`, so sending
+    // `undefined` for a cleared description would silently keep the old value.
+    await updateSpaceDetails('space-1', { ...dto, description: '' });
+
+    const [call] = vi.mocked(updateSpace).mock.calls[0];
+    expect(call.sharedSpaceUpdateDto.description).toBe('');
+  });
+
+  it('handles failures without throwing and reports failure', async () => {
+    const error = new Error('forbidden');
+    vi.mocked(updateSpace).mockRejectedValueOnce(error);
+
+    await expect(updateSpaceDetails('space-1', dto)).resolves.toBe(false);
+
+    expect(handleErrorSpy).toHaveBeenCalledWith(error, expect.any(String));
     expect(toastManager.primary).not.toHaveBeenCalled();
   });
 });
