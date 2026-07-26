@@ -1,6 +1,9 @@
-# Upstream Sync Report — 2026-07-26 (fork sync only)
+# Upstream Sync Report — 2026-07-26
 
-## Summary
+This day has three cycles, in order: two fork-only syncs (below), then **upstream batch 51**
+(the first upstream commit of the day — see the last section).
+
+## Summary — fork sync #1
 
 - **Upstream commits pulled**: 0 — `upstream/main` is still `409734e1db3` (verified against
   the live remote; the branch remains 0 behind, batches 51/51 complete)
@@ -120,6 +123,122 @@ the #772 plan/spec markdown passes the docs prettier gate.
 
 The storage-migration suites were added to the dispatch set because #772 modifies their
 workflow file, the e2e harness, and the disk/S3 backends they exercise.
+
+## Upstream batch 51 — `3606144190f`
+
+The first upstream commits of the day landed after both fork syncs above. `upstream/main`
+advanced `409734e1db3..3606144190f` — **one commit**.
+
+### Summary
+
+- **Upstream commits pulled**: 1
+- **Fork commits synced**: 0 — `integratedForkHead` already equals `origin/main` (`9230c433c87`)
+- **Conflicts resolved**: 0
+- **Risk level**: LOW
+- **Recommendation**: PROCEED
+- **Branch tip**: `10afa6023aa` → `9ac72a21af4` (1009 fork commits ahead, **0 behind**)
+
+### Incoming upstream change
+
+| SHA           | Summary                                                 | Area   | Risk to Fork | Notes                                                             |
+| ------------- | ------------------------------------------------------- | ------ | ------------ | ----------------------------------------------------------------- |
+| `3606144190f` | chore: clarify MediaRepository extract logging (#30249) | server | LOW          | One `logger.debug` line inside the existing `extract()` try-block |
+
+The whole diff is a single added line in `server/src/repositories/media.repository.ts`:
+
+```
++        this.logger.debug(`Successfully extracted ${tag} buffer from image`);
+```
+
+### Product-direction gate: CLEAR
+
+A debug log string changes no feature direction, data model, access/sync contract or API
+shape. Nothing touching sharing/Shared Spaces, faces & people, albums, timeline, library,
+storage, memories, search or RBAC. No new entity, no reworked model.
+
+### Fork-surface analysis
+
+`media.repository.ts` **is** fork-extended, so it was checked rather than assumed:
+
+- Fork additions are `extractVideoFrames()` (video dedup) and `trim()` (video trimming),
+  plus a `node:path` import — all far from `extract()`.
+- Post-rebase `git diff upstream/main..HEAD` for the file is **+61 / −0** — purely additive,
+  so no upstream content was displaced (the "lost upstream content" check, step 7a).
+- The upstream line is present at line 85 of the rebased tree.
+
+Not applicable this cycle: no migrations (server or mobile Drift), no DTO/controller/enum
+changes, no generated OpenAPI/Dart artifacts, no lockfile or toolchain changes, no CI or
+workflow changes, no dependency bumps, no broad refactor (so no pattern-propagation work).
+`make sql` was deliberately **not** run — no database was up, and that combination deletes
+every query file.
+
+### Gate checks
+
+| Check                                     | Status | Notes                                                                   |
+| ----------------------------------------- | ------ | ----------------------------------------------------------------------- |
+| `upstream-postrebase-audit BATCH=51`      | PASS   | All 7 sub-checks OK, incl. Generated Artifact Review (no review needed) |
+| `fork-patches-check`                      | PASS   | `@immich/ui` patch metadata consistent                                  |
+| `ci-invariants-check`                     | PASS   | no-PUSH_O_MATIC, gallery image names, docs-deploy stays dispatch-only   |
+| `mobile-drift-rebase-check BATCH=51`      | PASS   | schemaVersion 36, snapshots + Gallery callbacks consistent              |
+| Gallery migration count                   | PASS   | 49 (expected 49)                                                        |
+| `revert-to-immich.sql` coverage (step 7i) | PASS   | 0 missing across 49 fork + post-v3.0.3 upstream migrations              |
+
+### Fork invariant spot-checks
+
+| Invariant                                  | Status | Evidence                                                                                                                                                                  |
+| ------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S3 profile-image branch                    | OK     | `DiskStorageBackend` guard live at `auth.service.ts:409`, `user.service.ts:129`                                                                                           |
+| Search V3 stays dormant                    | OK     | All fork call-sites on `searchAssetBuilderLegacy`; the only bare `searchAssetBuilder(` uses are the V3 definition + the two unwired V3 methods; 3 dormancy banners intact |
+| No upstream image leak in workflows        | OK     | Only 2 `ghcr.io/immich-app/immich-server` refs, both the intentional boot of tagged upstream in `gallery-revert-to-immich-validation.yml`                                 |
+| Lockfile workspace linking                 | OK     | 9 `version: link:` entries, 0 `version: file:` (injected-copy trap absent)                                                                                                |
+| `mise.lock` / `mobile/mise.lock` untouched | OK     | `git status` clean for both                                                                                                                                               |
+| Postbuild migration merge                  | OK     | Build synced 49 migrations + 1 compatibility alias (`ChangeDurationToInteger`)                                                                                            |
+
+### Local verification
+
+| Check                                       | Status | Notes                                       |
+| ------------------------------------------- | ------ | ------------------------------------------- |
+| `server pnpm build` (nest + postbuild sync) | PASS   |                                             |
+| `server pnpm check` (tsc)                   | PASS   |                                             |
+| `web check:typescript`                      | PASS   |                                             |
+| `web check:svelte`                          | PASS   | 571 files, 0 errors, 0 warnings             |
+| Server unit tests                           | PASS   | 153 files, 5206 passed / 14 skipped         |
+| Web unit tests                              | PASS   | 293 files, 3950 passed / 2 skipped / 8 todo |
+| `gallery-branding-check`                    | PASS   | branding + mobile image assets verified     |
+
+Lint was left to CI this cycle: no fork-side edit was made — the tree is the previous
+CI-green tip plus one upstream log line — and the local web lint gate still crashes in
+`tscompat` unless the rule is disabled.
+
+### Remote CI — full 10-workflow set, all GREEN first try
+
+Test branch `rebase/upstream-rolling-2026-07-26` @ `4e613bbf150` — the branch tip moved to
+`3d3b564743c` afterwards purely to fold these CI results into this report; the source tree is
+byte-identical to the validated commit. (Not the batch-plan's
+suggested `rebase/upstream-batch-51`: that ref already exists from the pre-restart batch
+numbering, and clobbering it would corrupt an older audit trail.)
+
+| Workflow                                  | Run         | Status                           |
+| ----------------------------------------- | ----------- | -------------------------------- |
+| `test.yml`                                | 30217262255 | GREEN (21/21 jobs, none skipped) |
+| `docker.yml`                              | 30217263366 | GREEN                            |
+| `static_analysis.yml`                     | 30217264116 | GREEN                            |
+| `gallery-rebase-smoke.yml`                | 30217264874 | GREEN                            |
+| `storage-migration-tests.yml`             | 30217269351 | GREEN                            |
+| `gallery-revert-to-immich-validation.yml` | 30217270233 | GREEN                            |
+| `gallery-ml-smoke.yml`                    | 30217271000 | GREEN                            |
+| `gallery-mobile-smoke.yml`                | 30217271877 | GREEN                            |
+| `storage-migration-e2e.yml`               | 30217272669 | GREEN                            |
+| `gallery-build-mobile.yml`                | 30217273574 | GREEN                            |
+
+No retries, no flakes, no fixes. The full set was dispatched (rather than the reduced
+fork-sync set) because this cycle pulled a real upstream commit.
+
+### Code review
+
+Step 7g was not run: there were **zero conflict resolutions and zero fork-side edits** this
+cycle, so no new code exists to review. Fork-file and fork-symbol survival were verified
+mechanically by the post-rebase audit instead.
 
 ## Not done — deliberately
 
