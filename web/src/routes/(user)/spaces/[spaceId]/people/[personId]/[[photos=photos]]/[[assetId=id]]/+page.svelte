@@ -224,8 +224,10 @@
   };
 
   const selectSuggestedPerson = async (suggestedPerson: SharedSpacePersonResponseDto) => {
-    cancelPreviousSearch();
-    suggestedPeople = [];
+    // Close the name editor before prompting: picking a suggestion means "merge", not "rename", and the
+    // prompt is portalled outside the header, so confirming it would otherwise register as the
+    // click-outside-to-save gesture and commit an unrelated rename alongside the merge (issue #859).
+    cancelEditingName();
 
     const isConfirm = await modalManager.showDialog({ prompt: $t('merge_people_prompt') });
     if (!isConfirm) {
@@ -255,8 +257,6 @@
       await goto(getSpacePersonRoute(suggestedPerson.id), { replaceState: true });
     } catch (error) {
       handleError(error, $t('cannot_merge_people'));
-    } finally {
-      isEditingName = false;
     }
   };
 
