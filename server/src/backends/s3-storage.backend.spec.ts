@@ -513,6 +513,25 @@ describe('S3StorageBackend', () => {
     });
   });
 
+  describe('getReadableUrl', () => {
+    it('returns a presigned GET url for the key', async () => {
+      const url = await backend.getReadableUrl('upload/admin/ab/cd/video.mp4');
+
+      expect(url).toBe('https://bucket.s3.amazonaws.com/key?X-Amz-Signature=abc123');
+      expect(GetObjectCommand).toHaveBeenCalledWith(expect.objectContaining({ Key: 'upload/admin/ab/cd/video.mp4' }));
+    });
+
+    it('signs the probe url with a short expiry, not the client serve TTL', async () => {
+      // The backend is configured with presignedUrlExpiry: 3600 (client serving). This URL is
+      // consumed server-side within the request and is a bearer credential, so it must be
+      // short-lived to bound exposure if it ever reaches a log.
+      await backend.getReadableUrl('upload/admin/ab/cd/video.mp4');
+
+      const lastCall = vi.mocked(getSignedUrl).mock.calls.at(-1);
+      expect(lastCall?.[2]).toEqual(expect.objectContaining({ expiresIn: 60 }));
+    });
+  });
+
   describe('deletePrefix', () => {
     it('should not send DeleteObjectsCommand when the prefix matches nothing', async () => {
       mockSend.mockResolvedValueOnce({ Contents: [], IsTruncated: false });

@@ -1,7 +1,8 @@
 import { ShallowDehydrateObject } from 'kysely';
 import { OutputInfo } from 'sharp';
-import { Exif } from 'src/database';
 import { SystemConfig } from 'src/dtos/config.dto';
+import { StorageCore } from 'src/cores/storage.core';
+import { Exif } from 'src/database';
 import { AssetEditAction } from 'src/dtos/editing.dto';
 import {
   AssetFileType,
@@ -46,6 +47,40 @@ describe(MediaService.name, () => {
 
   it('should be defined', () => {
     expect(sut).toBeDefined();
+  });
+
+  describe('persistFile', () => {
+    afterEach(() => {
+      // vitest.config.mjs sets no restoreMocks and there are no setupFiles, so a
+      // getWriteBackend spy would leak into every later test in this file and
+      // silently run the disk-mode tests against S3.
+      vi.restoreAllMocks();
+    });
+
+    it('uploads to the write backend and removes the local temp (S3 mode)', async () => {
+      const put = vi.fn().mockResolvedValue(void 0);
+      const stream = makeStream([Buffer.from('data')]);
+      const { StorageService } = await import('src/services/storage.service.js');
+      vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
+      mocks.storage.createPlainReadStream.mockReturnValue(stream as any);
+
+      const result = await (sut as any).persistFile('/local/out.jpg', 'thumbs/aa/bb/x.jpg', 'image/jpeg');
+
+      expect(mocks.storage.createPlainReadStream).toHaveBeenCalledWith('/local/out.jpg');
+      expect(put).toHaveBeenCalledWith('thumbs/aa/bb/x.jpg', stream, { contentType: 'image/jpeg' });
+      expect(mocks.storage.unlink).toHaveBeenCalledWith('/local/out.jpg');
+      expect(result).toBe('thumbs/aa/bb/x.jpg');
+    });
+
+    it('returns the local path and deletes nothing (disk mode)', async () => {
+      // StorageService.diskBackend is undefined in this spec file, so getWriteBackend()
+      // returns undefined and persistFile takes its disk branch.
+      const result = await (sut as any).persistFile('/local/out.jpg', 'thumbs/aa/bb/x.jpg', 'image/jpeg');
+
+      expect(result).toBe('/local/out.jpg');
+      expect(mocks.storage.createPlainReadStream).not.toHaveBeenCalled();
+      expect(mocks.storage.unlink).not.toHaveBeenCalled();
+    });
   });
 
   // TODO these should all become medium tests of either the service or the repository.
@@ -1606,6 +1641,27 @@ describe(MediaService.name, () => {
       expect(mocks.media.trim).toHaveBeenCalledWith(expect.any(String), expect.any(String), 5, 20);
     });
 
+    it('always trims the original, even if an encoded video row is present', async () => {
+      const asset = AssetFactory.from({ type: AssetType.Video })
+        .exif()
+        .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
+        .files([{ type: AssetFileType.EncodedVideo, isEdited: false, path: 'encoded-video/owner/ab/cd/video.mp4' }])
+        .build();
+      mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+      mocks.media.probe.mockResolvedValue({
+        ...videoInfoStub.noAudioStreams,
+        format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
+      });
+      mocks.media.decodeImage.mockResolvedValue({ data: rawBuffer, info: rawInfo as OutputInfo });
+      mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
+
+      await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
+
+      // The encoded video is never a valid ffmpeg input: on S3 its path is a relative key.
+      // The original is both readable and higher quality.
+      expect(mocks.media.trim).toHaveBeenCalledWith(asset.originalPath, expect.any(String), 5, 20);
+    });
+
     it('should update asset duration after trimming', async () => {
       const asset = AssetFactory.from({ type: AssetType.Video })
         .exif()
@@ -1746,6 +1802,26 @@ describe(MediaService.name, () => {
       expect(mocks.storage.rename).toHaveBeenCalledWith(trimOutputPath, expect.stringMatching(/_edited\.mp4$/));
     });
 
+    it('cleans up the trimmed video when a post-trim step fails', async () => {
+      const asset = AssetFactory.from({ type: AssetType.Video })
+        .exif()
+        .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
+        .build();
+      mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+      mocks.media.probe.mockResolvedValue({
+        ...videoInfoStub.noAudioStreams,
+        format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
+      });
+      // trim() succeeds, but a later step (frame extraction) throws. The locally-written
+      // trimmed video must not be left behind — on S3 outputPath is a pod-local temp.
+      mocks.media.extractFrame.mockRejectedValue(new Error('bad frame'));
+
+      await expect(sut.handleAssetEditThumbnailGeneration({ id: asset.id })).rejects.toThrow('bad frame');
+
+      const outputPath = StorageCore.getEditedEncodedVideoPath(asset as any);
+      expect(mocks.storage.unlink).toHaveBeenCalledWith(outputPath);
+    });
+
     it('should handle video undo by cleaning up edited files', async () => {
       const asset = AssetFactory.from({ type: AssetType.Video })
         .exif()
@@ -1762,6 +1838,307 @@ describe(MediaService.name, () => {
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.AssetGenerateThumbnails,
         data: { id: asset.id },
+      });
+    });
+
+    it('deletes the edited encoded video when the trim is undone', async () => {
+      const asset = AssetFactory.from({ type: AssetType.Video })
+        .exif()
+        .files([{ type: AssetFileType.Preview, isEdited: true, path: '/data/preview_edited.jpeg' }])
+        .build();
+      // no edits => the undo path
+      mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue({
+        ...getForGenerateThumbnail(asset),
+        edits: [],
+      } as any);
+      mocks.asset.getEditedEncodedVideo.mockResolvedValue({
+        id: 'file-id-1',
+        path: 'encoded-video/owner/ab/cd/video_edited.mp4',
+      });
+
+      await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
+
+      // Without this, getForVideo (isEdited DESC) keeps serving the TRIMMED video after an undo.
+      expect(mocks.asset.deleteFiles).toHaveBeenCalledWith([expect.objectContaining({ id: 'file-id-1' })]);
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.FileDelete,
+        data: { files: ['encoded-video/owner/ab/cd/video_edited.mp4'] },
+      });
+    });
+
+    it('undoes cleanly when there is no edited encoded video', async () => {
+      // No edited files at all — unlike U1, this isolates the assertion to the
+      // getEditedEncodedVideo guard: an unrelated edited Preview row would also
+      // produce a deleteFiles call via syncFiles' own cleanup, which would make
+      // the "no deleteFiles call" assertion below pass/fail for the wrong reason.
+      const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
+      mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue({
+        ...getForGenerateThumbnail(asset),
+        edits: [],
+      } as any);
+      mocks.asset.getEditedEncodedVideo.mockResolvedValue(void 0);
+
+      const result = await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
+
+      expect(result).toBe(JobStatus.Success);
+      expect(mocks.asset.deleteFiles).not.toHaveBeenCalled();
+    });
+
+    describe('trim video persistence (S3)', () => {
+      afterEach(() => {
+        // vitest.config.mjs sets no restoreMocks and there are no setupFiles, so a
+        // getWriteBackend spy would leak into every later test in this file and
+        // silently run the disk-mode tests against S3.
+        vi.restoreAllMocks();
+      });
+
+      it('uploads the trimmed video under the _edited key and stores that key (S3)', async () => {
+        const put = vi.fn().mockResolvedValue(void 0);
+        const { StorageService } = await import('src/services/storage.service.js');
+        vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
+        mocks.storage.createPlainReadStream.mockReturnValue(makeStream([Buffer.from('mp4')]) as any);
+
+        const asset = AssetFactory.from({ type: AssetType.Video })
+          .exif()
+          .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
+          .build();
+        mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+        mocks.media.probe.mockResolvedValue({
+          ...videoInfoStub.noAudioStreams,
+          format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
+        });
+        mocks.media.decodeImage.mockResolvedValue({ data: rawBuffer, info: rawInfo as OutputInfo });
+        mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
+
+        await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
+
+        const editedKey = StorageCore.getRelativeEditedEncodedVideoPath(asset as any);
+        expect(put).toHaveBeenCalledWith(editedKey, expect.anything(), { contentType: 'video/mp4' });
+        expect(mocks.asset.upsertFiles).toHaveBeenCalledWith(
+          expect.arrayContaining([
+            expect.objectContaining({ type: AssetFileType.EncodedVideo, isEdited: true, path: editedKey }),
+          ]),
+        );
+      });
+
+      it('does not commit the trimmed duration when persisting the video fails (S3)', async () => {
+        // Upload fails part-way. The new duration must NOT already be committed, or the DB would
+        // report the trimmed length while getForVideo still serves the full-length original.
+        const put = vi.fn().mockRejectedValue(new Error('s3 down'));
+        const { StorageService } = await import('src/services/storage.service.js');
+        vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
+        mocks.storage.createPlainReadStream.mockReturnValue(makeStream([Buffer.from('mp4')]) as any);
+
+        const asset = AssetFactory.from({ type: AssetType.Video })
+          .exif()
+          .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
+          .build();
+        mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+        mocks.media.probe.mockResolvedValue({
+          ...videoInfoStub.noAudioStreams,
+          format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
+        });
+        mocks.media.decodeImage.mockResolvedValue({ data: rawBuffer, info: rawInfo as OutputInfo });
+        mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
+
+        await expect(sut.handleAssetEditThumbnailGeneration({ id: asset.id })).rejects.toThrow('s3 down');
+
+        expect(mocks.asset.update).not.toHaveBeenCalledWith(expect.objectContaining({ duration: expect.anything() }));
+      });
+
+      it('never uploads the trimmed video over the transcoded original (S3)', async () => {
+        const put = vi.fn().mockResolvedValue(void 0);
+        const { StorageService } = await import('src/services/storage.service.js');
+        vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
+        mocks.storage.createPlainReadStream.mockReturnValue(makeStream([Buffer.from('mp4')]) as any);
+
+        const asset = AssetFactory.from({ type: AssetType.Video })
+          .exif()
+          .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
+          .build();
+        mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+        mocks.media.probe.mockResolvedValue({
+          ...videoInfoStub.noAudioStreams,
+          format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
+        });
+        mocks.media.decodeImage.mockResolvedValue({ data: rawBuffer, info: rawInfo as OutputInfo });
+        mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
+
+        await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
+
+        const nonEditedKey = StorageCore.getRelativeEncodedVideoPath(asset as any);
+        const keys = put.mock.calls.map((call) => call[0]);
+        expect(keys).not.toContain(nonEditedKey);
+      });
+
+      it('uploads the trimmed video only after the thumbnail frame is extracted (S3)', async () => {
+        const put = vi.fn().mockResolvedValue(void 0);
+        const { StorageService } = await import('src/services/storage.service.js');
+        vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
+        mocks.storage.createPlainReadStream.mockReturnValue(makeStream([Buffer.from('mp4')]) as any);
+
+        const asset = AssetFactory.from({ type: AssetType.Video })
+          .exif()
+          .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
+          .build();
+        mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+        mocks.media.probe.mockResolvedValue({
+          ...videoInfoStub.noAudioStreams,
+          format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
+        });
+        mocks.media.decodeImage.mockResolvedValue({ data: rawBuffer, info: rawInfo as OutputInfo });
+        mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
+
+        await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
+
+        // persistFile unlinks the local file after upload, so extractFrame MUST run first.
+        const extractOrder = mocks.media.extractFrame.mock.invocationCallOrder[0];
+        const putOrder = put.mock.invocationCallOrder[0];
+        expect(extractOrder).toBeLessThan(putOrder);
+      });
+
+      it('does not delete the edited video it just re-uploaded when re-trimming (S3)', async () => {
+        const put = vi.fn().mockResolvedValue(void 0);
+        const { StorageService } = await import('src/services/storage.service.js');
+        vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
+        mocks.storage.createPlainReadStream.mockReturnValue(makeStream([Buffer.from('mp4')]) as any);
+
+        const asset = AssetFactory.from({ type: AssetType.Video })
+          .exif()
+          .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
+          .build();
+        const editedKey = StorageCore.getRelativeEditedEncodedVideoPath(asset as any);
+        const withExistingEdit = {
+          ...getForGenerateThumbnail(asset),
+          files: [
+            {
+              type: AssetFileType.EncodedVideo,
+              isEdited: true,
+              path: editedKey,
+              isProgressive: false,
+              isTransparent: false,
+            },
+          ],
+        };
+        mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(withExistingEdit as any);
+        mocks.media.probe.mockResolvedValue({
+          ...videoInfoStub.noAudioStreams,
+          format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
+        });
+        mocks.media.decodeImage.mockResolvedValue({ data: rawBuffer, info: rawInfo as OutputInfo });
+        mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
+
+        await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
+
+        // The key is deterministic, so the re-trim overwrote the same object. syncFiles must
+        // NOT then queue a delete for it — that would erase what we just uploaded.
+        const deletedFiles = mocks.job.queue.mock.calls
+          .filter(([job]) => job.name === JobName.FileDelete)
+          .flatMap(([job]) => (job as any).data.files as string[]);
+        expect(deletedFiles).not.toContain(editedKey);
+      });
+
+      it('uploads the trim thumbnails under _edited keys and stores those keys (S3)', async () => {
+        const put = vi.fn().mockResolvedValue(void 0);
+        const { StorageService } = await import('src/services/storage.service.js');
+        vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
+        mocks.storage.createPlainReadStream.mockReturnValue(makeStream([Buffer.from('data')]) as any);
+
+        const asset = AssetFactory.from({ type: AssetType.Video })
+          .exif()
+          .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
+          .build();
+        mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+        mocks.media.probe.mockResolvedValue({
+          ...videoInfoStub.noAudioStreams,
+          format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
+        });
+        mocks.media.decodeImage.mockResolvedValue({ data: rawBuffer, info: rawInfo as OutputInfo });
+        mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
+
+        await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
+
+        const putKeys = put.mock.calls.map((call) => call[0] as string);
+        const thumbnailKeys = putKeys.filter((key) => key.startsWith('thumbs/'));
+
+        // preview + thumbnail at minimum (fullsize too, when the config generates one)
+        expect(thumbnailKeys.length).toBeGreaterThanOrEqual(2);
+        for (const key of thumbnailKeys) {
+          expect(key).toContain('_edited');
+        }
+
+        // and the keys — not local paths — are what get written to the DB
+        const upserted = mocks.asset.upsertFiles.mock.calls.flatMap(([files]) => files as any[]);
+        const upsertedThumbs = upserted.filter((file) => file.type !== AssetFileType.EncodedVideo);
+        expect(upsertedThumbs.length).toBeGreaterThanOrEqual(2);
+        for (const file of upsertedThumbs) {
+          expect(file.path.startsWith('/')).toBe(false);
+          expect(file.path).toContain('_edited');
+        }
+      });
+
+      it('never overwrites the non-edited preview or thumbnail objects (S3)', async () => {
+        const put = vi.fn().mockResolvedValue(void 0);
+        const { StorageService } = await import('src/services/storage.service.js');
+        vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
+        mocks.storage.createPlainReadStream.mockReturnValue(makeStream([Buffer.from('data')]) as any);
+
+        const asset = AssetFactory.from({ type: AssetType.Video })
+          .exif()
+          .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
+          .build();
+        mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+        mocks.media.probe.mockResolvedValue({
+          ...videoInfoStub.noAudioStreams,
+          format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
+        });
+        mocks.media.decodeImage.mockResolvedValue({ data: rawBuffer, info: rawInfo as OutputInfo });
+        mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
+
+        await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
+
+        // A trim must not clobber the asset's normal preview/thumbnail objects: every
+        // image key it writes carries the _edited marker.
+        //
+        // Asserted without a bare for-of over a filtered array: with zero thumbnail uploads
+        // such a loop never executes and the test passes with no assertions at all.
+        const putKeys = put.mock.calls.map((call) => call[0] as string);
+        const thumbnailKeys = putKeys.filter((key) => key.startsWith('thumbs/'));
+
+        expect(thumbnailKeys.length).toBeGreaterThanOrEqual(2);
+        expect(thumbnailKeys.every((key) => key.includes('_edited'))).toBe(true);
+
+        // and specifically not the non-edited keys, which belong to the untrimmed asset.
+        // Derived from the edited keys themselves, so this cannot pass by comparing against
+        // a key string that was never a real target.
+        for (const editedKey of thumbnailKeys) {
+          expect(putKeys).not.toContain(editedKey.replace('_edited', ''));
+        }
+      });
+
+      it('keeps disk-mode trim paths absolute and uploads nothing (regression guard)', async () => {
+        // No getWriteBackend spy: StorageService.diskBackend is undefined in this spec file,
+        // so persistFile takes its disk branch. Nothing here may become a relative key.
+        const asset = AssetFactory.from({ type: AssetType.Video })
+          .exif()
+          .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
+          .build();
+        mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+        mocks.media.probe.mockResolvedValue({
+          ...videoInfoStub.noAudioStreams,
+          format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
+        });
+        mocks.media.decodeImage.mockResolvedValue({ data: rawBuffer, info: rawInfo as OutputInfo });
+        mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
+
+        await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
+
+        const upserted = mocks.asset.upsertFiles.mock.calls.flatMap(([files]) => files);
+        expect(upserted.length).toBeGreaterThanOrEqual(3); // edited video + preview + thumbnail
+        for (const file of upserted) {
+          expect(file.path.startsWith('/')).toBe(true);
+        }
+        expect(mocks.storage.createPlainReadStream).not.toHaveBeenCalled();
       });
     });
   });
