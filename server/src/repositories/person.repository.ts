@@ -1376,15 +1376,18 @@ export class PersonRepository {
    * Pet-recognition equivalent of {@link getLatestFaceDate}, used by the nightly
    * `handleQueuePetRecognition` skip check: pets have no `personsAssignedAt`-style column, so
    * `petsDetectedAt` (stamped by `handlePetDetection`) is the closest analogue of "a pet was added
-   * since the last nightly run".
+   * since the last nightly run". Unlike the sibling, this returns the `Date` directly rather than
+   * pg-text (F11) — `state.lastRun` is an ISO string with a `T` separator, and comparing it against
+   * pg's `::text` timestamp format (space-separated) mis-ordered same-day timestamps. The service
+   * compares two `Date`s instead.
    */
-  async getLatestPetDate(): Promise<string | undefined> {
-    const result = (await this.db
+  async getLatestPetDate(): Promise<Date | undefined> {
+    const result = await this.db
       .selectFrom('asset_job_status')
-      .select((eb) => sql`${eb.fn.max('asset_job_status.petsDetectedAt')}::text`.as('latestDate'))
-      .executeTakeFirst()) as { latestDate: string } | undefined;
+      .select((eb) => eb.fn.max('asset_job_status.petsDetectedAt').as('latestDate'))
+      .executeTakeFirst();
 
-    return result?.latestDate;
+    return result?.latestDate ?? undefined;
   }
 
   getByOwnerAndSpecies(ownerId: string, species: string) {

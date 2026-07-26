@@ -327,7 +327,9 @@ export class MachineLearningRepository {
     return {
       imageHeight: response.imageHeight,
       imageWidth: response.imageWidth,
-      pets: response[ModelTask.PET_DETECTION],
+      // A missing key (e.g. an older/misbehaving ML service) must not crash the caller's
+      // `pets.filter(...)` — an absent response key is treated as "no pets detected".
+      pets: response[ModelTask.PET_DETECTION] ?? [],
     };
   }
 

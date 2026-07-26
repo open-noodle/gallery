@@ -17,6 +17,7 @@ import {
   isFacialRecognitionEnabled,
   isOcrEnabled,
   isPetRecognitionEnabled,
+  isRecognizablePetSpecies,
   isSmartSearchEnabled,
   isStartUpError,
   routeToErrorMessage,
@@ -320,6 +321,16 @@ describe('machine learning feature flags', () => {
 
     it('should return false when pet recognition is disabled', () => {
       expect(isPetRecognitionEnabled(createMlConfig({ petRecognition: { enabled: false } } as any))).toBe(false);
+    });
+  });
+
+  describe('isRecognizablePetSpecies', () => {
+    it.each(['dog', 'cat', 'Dog', 'CAT'])('pin: %s is recognizable', (species) => {
+      expect(isRecognizablePetSpecies(species)).toBe(true);
+    });
+
+    it.each(['bird', ''])('pin: %s is not recognizable', (species) => {
+      expect(isRecognizablePetSpecies(species)).toBe(false);
     });
   });
 

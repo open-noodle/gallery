@@ -394,6 +394,41 @@ describe(MachineLearningRepository.name, () => {
       expect(result.pets[0].embedding).toBe('cat-embedding-string');
       expect(result.pets[0].label).toBe('cat');
     });
+
+    it('pin: parses a pet with no embedding field (older ML service) as embedding: undefined', async () => {
+      const imageData = Buffer.from('disk-pet-image');
+      mockReadFile.mockResolvedValue(imageData);
+
+      const petResponse = {
+        [ModelTask.PET_DETECTION]: [{ boundingBox: { x1: 1, y1: 2, x2: 3, y2: 4 }, score: 0.9, label: 'dog' }],
+        imageHeight: 480,
+        imageWidth: 640,
+      };
+      mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(petResponse) });
+
+      const result = await sut.detectPets(
+        '/data/upload/preview.webp',
+        { modelName: 'yolo11s', minScore: 0.6 },
+        { modelName: 'pet-recognition-base' },
+      );
+
+      expect(result.pets).toHaveLength(1);
+      expect(result.pets[0].embedding).toBeUndefined();
+    });
+
+    it('a response missing the pet-detection key parses as an empty pets array (red against the pre-guard code)', async () => {
+      const imageData = Buffer.from('disk-pet-image');
+      mockReadFile.mockResolvedValue(imageData);
+
+      // Simulates a misbehaving/older ML service that omits the response key entirely — must not
+      // crash the caller's `pets.filter(...)` (pet-detection.service.ts).
+      const petResponse = { imageHeight: 480, imageWidth: 640 };
+      mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(petResponse) });
+
+      const result = await sut.detectPets('/data/upload/preview.webp', { modelName: 'yolo11s', minScore: 0.6 });
+
+      expect(result.pets).toEqual([]);
+    });
   });
 
   describe('ocr', () => {

@@ -690,6 +690,48 @@ describe(PetDetectionService.name, () => {
         );
       });
 
+      it('pin: fails and does not stamp petsDetectedAt when refreshPetFaces rejects', async () => {
+        const asset = AssetFactory.create();
+        mocks.systemMetadata.get.mockResolvedValue(recognitionConfig);
+        mocks.machineLearning.detectPets.mockResolvedValue({
+          imageHeight: 100,
+          imageWidth: 200,
+          pets: [{ boundingBox: { x1: 10, y1: 20, x2: 30, y2: 40 }, score: 0.9, label: 'dog', embedding: '[1,2,3]' }],
+        });
+        mocks.crypto.randomUUID.mockReturnValue('face-1');
+        mocks.person.refreshPetFaces.mockRejectedValue(new Error('embedding dimension mismatch'));
+
+        expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Failed);
+
+        expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+        expect(mocks.job.queueAll).not.toHaveBeenCalled();
+      });
+
+      it('pin: species routing accepts a capitalized label (e.g. "Dog") case-insensitively', async () => {
+        const asset = AssetFactory.create();
+        mocks.systemMetadata.get.mockResolvedValue(recognitionConfig);
+        mocks.machineLearning.detectPets.mockResolvedValue({
+          imageHeight: 100,
+          imageWidth: 200,
+          pets: [{ boundingBox: { x1: 10, y1: 20, x2: 30, y2: 40 }, score: 0.9, label: 'Dog', embedding: '[1,2,3]' }],
+        });
+        mocks.crypto.randomUUID.mockReturnValue('face-1');
+        mocks.person.refreshPetFaces.mockResolvedValue();
+
+        expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Success);
+
+        // 'Dog' (capitalized) still resolves as a recognizable species, so it reaches the
+        // individual recognition pipeline rather than falling through to a species bucket.
+        expect(mocks.person.refreshPetFaces).toHaveBeenCalledWith(
+          [expect.objectContaining({ id: 'face-1' })],
+          [{ faceId: 'face-1', embedding: '[1,2,3]', species: 'Dog' }],
+        );
+        expect(mocks.job.queueAll).toHaveBeenCalledWith([
+          { name: JobName.PetRecognition, data: { id: 'face-1', deferred: false, label: 'Dog' } },
+        ]);
+        expect(mocks.person.create).not.toHaveBeenCalled();
+      });
+
       it('R5.12 mid-flight model-switch guard: skips the write when the config model changed while the ML call was in flight', async () => {
         const asset = AssetFactory.create();
         mocks.systemMetadata.get.mockResolvedValue(recognitionConfig);

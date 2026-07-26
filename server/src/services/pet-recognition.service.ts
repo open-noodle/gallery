@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { SystemConfig } from 'src/config';
 import { JOBS_ASSET_PAGINATION_SIZE, PET_RECOGNITION_MODEL_NAMES } from 'src/constants';
 import { OnEvent, OnJob } from 'src/decorators';
-import { DatabaseLock, ImmichWorker, JobName, JobStatus, QueueName, SystemMetadataKey } from 'src/enum';
+import { DatabaseLock, ImmichWorker, JobName, JobStatus, QueueName, SystemMetadataKey, VectorIndex } from 'src/enum';
 import { ArgOf } from 'src/repositories/event.repository';
 import { BaseService } from 'src/services/base.service';
 import { JobItem, JobOf } from 'src/types';
@@ -71,12 +71,33 @@ export class PetRecognitionService extends BaseService {
       }
 
       if (nightly) {
+        // getLatestPetDate returns a Date directly (F11) — compared against a parsed Date rather
+        // than pg-text vs. an ISO-`T` string, which mis-ordered same-day timestamps.
         const latestPetDate = await this.personRepository.getLatestPetDate();
-        if (state?.lastRun && latestPetDate && state.lastRun > latestPetDate) {
+        if (state?.lastRun && latestPetDate && new Date(state.lastRun) > latestPetDate) {
           this.logger.debug('Skipping pet recognition nightly since no pet has been added since the last run');
           return JobStatus.Skipped;
         }
       }
+
+      // Parity with handleQueueRecognizeFaces (person.service.ts): skip when the PetRecognition
+      // queue already has pending work, so overlapping queue-all invocations (a manual Start
+      // racing the scheduled nightly, or two nightly firings racing a slow run) don't duplicate
+      // the fan-out. Placed after the drift check and nightly date-skip above — it must never gate
+      // the drift check (F9's non-force half).
+      const { active, delayed, paused, waiting } = await this.jobRepository.getJobCounts(QueueName.PetRecognition);
+      const hasOtherActivePetRecognitionWork = active > 1;
+      const hasPendingPetRecognitionWork = waiting > 0 || delayed > 0 || paused > 0 || hasOtherActivePetRecognitionWork;
+
+      if (hasPendingPetRecognitionWork) {
+        this.logger.debug(
+          `Skipping pet recognition queueing because recognition work is already pending ` +
+            `(${active} active, ${waiting} waiting, ${delayed} delayed, ${paused} paused)`,
+        );
+        return JobStatus.Skipped;
+      }
+
+      await this.databaseRepository.prewarm(VectorIndex.Pet);
 
       let jobs: JobItem[] = [];
       for await (const face of this.personRepository.getUnassignedPetFaces()) {
@@ -121,6 +142,11 @@ export class PetRecognitionService extends BaseService {
     if (face.personId) {
       this.logger.debug(`Pet face ${id} already has a person assigned`);
       await this.linkFaceIdentity(face.personId, face.id);
+
+      // Still queue space face matching because this face may belong to a space
+      // that was created or linked after the face was originally recognized.
+      await this.queueSharedSpaceFaceMatchesForAsset(face.assetId);
+
       return JobStatus.Skipped;
     }
 
