@@ -4,6 +4,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Readable } from 'node:stream';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
 import { AssetFile } from 'src/database';
 import { AssetMediaStatus, AssetRejectReason, AssetUploadAction } from 'src/dtos/asset-media-response.dto';
@@ -11,12 +12,13 @@ import { AssetMediaCreateDto, AssetMediaSize, UploadFieldName } from 'src/dtos/a
 import { MapAsset } from 'src/dtos/asset-response.dto';
 import { AssetEditAction } from 'src/dtos/editing.dto';
 import { AssetFileType, AssetType, AssetVisibility, CacheControl, JobName } from 'src/enum';
+import { RangeNotSatisfiableError } from 'src/interfaces/storage-backend.interface';
 import { AuthRequest } from 'src/middleware/auth.guard';
 import { AssetMediaService } from 'src/services/asset-media.service';
 import { StorageService } from 'src/services/storage.service';
 import { UploadBody } from 'src/types';
 import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database';
-import { ImmichFileResponse, ImmichRedirectResponse } from 'src/utils/file';
+import { ImmichFileResponse, ImmichRedirectResponse, ImmichStreamResponse } from 'src/utils/file';
 import { AssetFileFactory } from 'test/factories/asset-file.factory';
 import { AssetFactory } from 'test/factories/asset.factory';
 import { AuthFactory } from 'test/factories/auth.factory';
@@ -858,6 +860,38 @@ describe(AssetMediaService.name, () => {
       }
     });
 
+    it('should thread the client range down to the backend so resumable downloads work', async () => {
+      const asset = AssetFactory.create({
+        originalPath: 'upload/admin/aa/bb/image.jpg',
+        originalFileName: 'image.jpg',
+      });
+      const s3Backend = {
+        getServeStrategy: vi.fn().mockResolvedValue({
+          type: 'stream',
+          stream: Readable.from([Buffer.from('partial')]),
+          length: 1024,
+          contentRange: 'bytes 0-1023/1048576',
+        }),
+      };
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getForOriginal.mockResolvedValue(asset);
+      const previousS3Backend = (StorageService as any).s3Backend;
+      (StorageService as any).s3Backend = s3Backend;
+
+      try {
+        await expect(sut.downloadOriginal(authStub.admin, asset.id, {}, 'bytes=0-1023')).resolves.toEqual(
+          expect.objectContaining({ length: 1024, contentRange: 'bytes 0-1023/1048576' }),
+        );
+        expect(s3Backend.getServeStrategy).toHaveBeenCalledWith(
+          'upload/admin/aa/bb/image.jpg',
+          expect.objectContaining({ range: 'bytes=0-1023' }),
+        );
+      } finally {
+        (StorageService as any).s3Backend = previousS3Backend;
+      }
+    });
+
     it('should download edited file by default when edits exist', async () => {
       const editedAsset = AssetFactory.from()
         .edit()
@@ -1034,6 +1068,37 @@ describe(AssetMediaService.name, () => {
       }
     });
 
+    it('should not claim range support for proxied thumbnails, which ignore the Range header', async () => {
+      const asset = AssetFactory.from()
+        .file({ type: AssetFileType.Thumbnail, path: 'thumbs/admin/aa/bb/thumb.jpg' })
+        .build();
+      const path = asset.files[0].path;
+      const s3Backend = {
+        getServeStrategy: vi.fn().mockResolvedValue({
+          type: 'stream',
+          stream: Readable.from([Buffer.from('thumb')]),
+          length: 5,
+        }),
+      };
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getForThumbnail.mockResolvedValue({ ...asset, path });
+      const previousS3Backend = (StorageService as any).s3Backend;
+      (StorageService as any).s3Backend = s3Backend;
+
+      try {
+        const response = (await sut.viewThumbnail(authStub.admin, asset.id, {
+          size: AssetMediaSize.THUMBNAIL,
+        })) as ImmichStreamResponse;
+
+        // Accept-Ranges must stay off for endpoints that drop the header, so a resuming
+        // client is never told it can range-request this URL
+        expect(response.acceptsRanges).toBeUndefined();
+      } finally {
+        (StorageService as any).s3Backend = previousS3Backend;
+      }
+    });
+
     it('should get preview file', async () => {
       const asset = AssetFactory.from().file({ type: AssetFileType.Preview }).build();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
@@ -1203,6 +1268,94 @@ describe(AssetMediaService.name, () => {
           contentType: 'application/octet-stream',
         }),
       );
+    });
+
+    it('should relay a partial stream from an S3 proxy backend as a 206 response', async () => {
+      const stream = Readable.from([Buffer.from('partial')]);
+      const s3Backend = {
+        getServeStrategy: vi.fn().mockResolvedValue({
+          type: 'stream',
+          stream,
+          length: 1024,
+          contentRange: 'bytes 0-1023/1048576',
+        }),
+      };
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.asset.getForVideo.mockResolvedValue({
+        originalPath: 'upload/admin/aa/bb/video.mp4',
+        encodedVideoPath: null,
+      });
+      const previousS3Backend = (StorageService as any).s3Backend;
+      (StorageService as any).s3Backend = s3Backend;
+
+      try {
+        await expect(sut.playbackVideo(authStub.admin, 'asset-1', 'bytes=0-1023')).resolves.toEqual(
+          new ImmichStreamResponse({
+            stream,
+            contentType: 'video/mp4',
+            length: 1024,
+            contentRange: 'bytes 0-1023/1048576',
+            acceptsRanges: true,
+            cacheControl: CacheControl.PrivateWithCache,
+          }),
+        );
+        expect(s3Backend.getServeStrategy).toHaveBeenCalledWith(
+          'upload/admin/aa/bb/video.mp4',
+          expect.objectContaining({ range: 'bytes=0-1023' }),
+        );
+      } finally {
+        (StorageService as any).s3Backend = previousS3Backend;
+      }
+    });
+
+    it('should not send a range to the backend when the client did not ask for one', async () => {
+      const s3Backend = {
+        getServeStrategy: vi.fn().mockResolvedValue({
+          type: 'stream',
+          stream: Readable.from([Buffer.from('whole')]),
+          length: 5,
+        }),
+      };
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.asset.getForVideo.mockResolvedValue({
+        originalPath: 'upload/admin/aa/bb/video.mp4',
+        encodedVideoPath: null,
+      });
+      const previousS3Backend = (StorageService as any).s3Backend;
+      (StorageService as any).s3Backend = s3Backend;
+
+      try {
+        const response = await sut.playbackVideo(authStub.admin, 'asset-1');
+
+        expect(s3Backend.getServeStrategy).toHaveBeenCalledWith(
+          'upload/admin/aa/bb/video.mp4',
+          expect.objectContaining({ range: undefined }),
+        );
+        expect((response as ImmichStreamResponse).contentRange).toBeUndefined();
+      } finally {
+        (StorageService as any).s3Backend = previousS3Backend;
+      }
+    });
+
+    it('should surface an unsatisfiable range as a 416', async () => {
+      const s3Backend = {
+        getServeStrategy: vi.fn().mockRejectedValue(new RangeNotSatisfiableError('upload/admin/aa/bb/video.mp4')),
+      };
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.asset.getForVideo.mockResolvedValue({
+        originalPath: 'upload/admin/aa/bb/video.mp4',
+        encodedVideoPath: null,
+      });
+      const previousS3Backend = (StorageService as any).s3Backend;
+      (StorageService as any).s3Backend = s3Backend;
+
+      try {
+        await expect(sut.playbackVideo(authStub.admin, 'asset-1', 'bytes=999999999-')).rejects.toMatchObject({
+          status: 416,
+        });
+      } finally {
+        (StorageService as any).s3Backend = previousS3Backend;
+      }
     });
   });
 

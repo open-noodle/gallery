@@ -3,6 +3,7 @@ import {
   DeleteObjectsCommand,
   GetObjectCommand,
   GetObjectCommandInput,
+  GetObjectCommandOutput,
   HeadObjectCommand,
   ListObjectsV2Command,
   S3Client,
@@ -16,7 +17,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { ServeOptions, ServeStrategy, StorageBackend } from 'src/interfaces/storage-backend.interface';
+import {
+  RangeNotSatisfiableError,
+  ServeOptions,
+  ServeStrategy,
+  StorageBackend,
+} from 'src/interfaces/storage-backend.interface';
 import { getContentDispositionHeader } from 'src/utils/file';
 
 class AsyncLimiter {
@@ -97,14 +103,35 @@ export class S3StorageBackend implements StorageBackend {
     await upload.done();
   }
 
-  async get(key: string): Promise<{ stream: Readable; contentType?: string; length?: number }> {
-    const response = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+  /**
+   * `range` is the client's raw `Range` header, handed to S3 untouched — S3
+   * understands `bytes=a-b`, `bytes=a-`, and `bytes=-n`, and answers with
+   * `ContentRange` plus a `ContentLength` covering only the returned bytes.
+   */
+  private async getObject(
+    key: string,
+    range?: string,
+  ): Promise<{ stream: Readable; contentType?: string; length?: number; contentRange?: string }> {
+    let response: GetObjectCommandOutput;
+    try {
+      response = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key, Range: range }));
+    } catch (error: any) {
+      if (range && (error.name === 'InvalidRange' || error.$metadata?.httpStatusCode === 416)) {
+        throw new RangeNotSatisfiableError(key);
+      }
+      throw error;
+    }
 
     return {
       stream: response.Body as Readable,
       contentType: response.ContentType,
       length: response.ContentLength,
+      contentRange: response.ContentRange,
     };
+  }
+
+  async get(key: string): Promise<{ stream: Readable; contentType?: string; length?: number }> {
+    return this.getObject(key);
   }
 
   async exists(key: string): Promise<boolean> {
@@ -170,14 +197,18 @@ export class S3StorageBackend implements StorageBackend {
     if (this.serveMode === 'proxy') {
       const release = await this.proxyReadLimiter.acquire();
       try {
-        const { stream, length } = await this.get(key);
-        return { type: 'stream', stream: this.releaseWhenStreamCloses(stream, release), length };
+        // forward the client's Range to S3 and relay its partial response, so
+        // <video> elements (which require 206) can stream and seek in proxy mode
+        const { stream, length, contentRange } = await this.getObject(key, options.range);
+        return { type: 'stream', stream: this.releaseWhenStreamCloses(stream, release), length, contentRange };
       } catch (error) {
         release();
         throw error;
       }
     }
 
+    // redirect mode needs no range handling: the browser re-sends its Range header
+    // to S3 on the presigned URL, and S3 answers it natively
     const commandInput: GetObjectCommandInput = {
       Bucket: this.bucket,
       Key: key,
