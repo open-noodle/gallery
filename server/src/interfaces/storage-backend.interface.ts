@@ -58,6 +58,13 @@ export interface StorageBackend {
   getServeStrategy(key: string, options: ServeOptions): Promise<ServeStrategy>;
 
   /**
+   * A path or URL that external tools (ffmpeg/ffprobe) can read directly,
+   * without downloading the object first. Disk returns a filesystem path;
+   * S3 returns a presigned URL.
+   */
+  getReadableUrl(key: string): Promise<string>;
+
+  /**
    * Download content to a local temp file for processing by tools
    * that require filesystem paths (ffmpeg, sharp, exiftool).
    * Returns the temp path and a cleanup function.
