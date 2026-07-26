@@ -730,6 +730,62 @@ describe('Spaces person detail page', () => {
     expect(gotoMock).not.toHaveBeenCalledWith('/spaces/space-1/people/person-2', { replaceState: true });
   });
 
+  it('never renames the person while confirming an autosuggest merge outside the name editor (#859)', async () => {
+    sdkMock.isHttpError.mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
+    const person = makePerson({ id: 'person-1', name: '' });
+    const existingPerson = makePerson({ id: 'person-2', name: 'Ange' });
+    sdkMock.getSpacePeople.mockResolvedValue([existingPerson]);
+    sdkMock.updateSpacePerson.mockResolvedValue({ ...person, name: 'Ange' });
+    sdkMock.mergeSpacePeople.mockRejectedValueOnce({
+      __http: true,
+      status: 403,
+      data: { code: 'cross_owner_merge_blocked', message: 'An administrator can enable it.' },
+      message: 'raw',
+    });
+    // The merge prompt is portalled outside the person header, so the click that confirms it lands
+    // outside the name editor — the same "click outside to save" gesture that commits a rename.
+    let confirmMerge: (confirmed: boolean) => void = () => {};
+    vi.mocked(modalManager.showDialog).mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        confirmMerge = resolve;
+      }),
+    );
+    renderPage({ person });
+
+    await userEvent.click(screen.getByText('add_a_name'));
+    await userEvent.type(screen.getByPlaceholderText('add_a_name'), 'Ange');
+    await userEvent.click(await screen.findByRole('button', { name: 'Ange' }));
+    await fireEvent.mouseDown(document.body);
+    confirmMerge(true);
+
+    await waitFor(() => expect(toastManager.danger).toHaveBeenCalled());
+    expect(sdkMock.updateSpacePerson).not.toHaveBeenCalled();
+    expect(toastManager.success).not.toHaveBeenCalled();
+  });
+
+  it('never renames the person when the autosuggest merge prompt is dismissed outside the name editor (#859)', async () => {
+    const person = makePerson({ id: 'person-1', name: '' });
+    const existingPerson = makePerson({ id: 'person-2', name: 'Ange' });
+    sdkMock.getSpacePeople.mockResolvedValue([existingPerson]);
+    sdkMock.updateSpacePerson.mockResolvedValue({ ...person, name: 'Ange' });
+    let dismissMerge: (confirmed: boolean) => void = () => {};
+    vi.mocked(modalManager.showDialog).mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        dismissMerge = resolve;
+      }),
+    );
+    renderPage({ person });
+
+    await userEvent.click(screen.getByText('add_a_name'));
+    await userEvent.type(screen.getByPlaceholderText('add_a_name'), 'Ange');
+    await userEvent.click(await screen.findByRole('button', { name: 'Ange' }));
+    await fireEvent.mouseDown(document.body);
+    dismissMerge(false);
+
+    await waitFor(() => expect(sdkMock.mergeSpacePeople).not.toHaveBeenCalled());
+    expect(sdkMock.updateSpacePerson).not.toHaveBeenCalled();
+  });
+
   it('re-runs an autosuggest merge with the cross-owner acknowledgement once the user confirms', async () => {
     sdkMock.isHttpError.mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
     const person = makePerson({ id: 'person-1', name: '' });
