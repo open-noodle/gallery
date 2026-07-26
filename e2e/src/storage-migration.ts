@@ -1437,6 +1437,49 @@ async function phaseContentVerify(): Promise<void> {
     }
   }
 
+  // Range requests: this stack runs with IMMICH_S3_SERVE_MODE=proxy, so the server streams
+  // the object itself instead of redirecting. It used to drop the Range header and answer
+  // 200 with the whole body, which makes WebKit abort <video> playback and breaks seeking.
+  const [rangeAssetId] = Object.keys(contentHashes);
+  if (rangeAssetId) {
+    const rangeToken = adminIds.has(rangeAssetId) ? token : (user2Token ?? token);
+    const expected = await downloadAssetOriginal(rangeToken, rangeAssetId);
+
+    console.log('  Verifying proxied range requests...');
+    const partial = await fetch(`${BASE_URL}/assets/${rangeAssetId}/original`, {
+      headers: { Authorization: `Bearer ${rangeToken}`, Range: 'bytes=0-9' },
+      redirect: 'follow',
+    });
+    assert.equal(partial.status, 206, `Expected 206 for a ranged proxy read, got ${partial.status}`);
+    assert.equal(
+      partial.headers.get('content-range'),
+      `bytes 0-9/${expected.length}`,
+      'Expected the proxied response to relay S3 Content-Range',
+    );
+    assert.equal(partial.headers.get('accept-ranges'), 'bytes', 'Expected the proxied response to accept ranges');
+    assert.equal(partial.headers.get('content-length'), '10', 'Expected Content-Length to cover only the range');
+    const partialBody = Buffer.from(await partial.arrayBuffer());
+    assert.equal(partialBody.length, 10, `Expected 10 bytes, got ${partialBody.length}`);
+    assert.ok(partialBody.equals(expected.subarray(0, 10)), 'Ranged bytes do not match the start of the object');
+
+    // a suffix range: S3 resolves it, we relay it — nothing in the server parses ranges
+    const suffix = await fetch(`${BASE_URL}/assets/${rangeAssetId}/original`, {
+      headers: { Authorization: `Bearer ${rangeToken}`, Range: 'bytes=-5' },
+      redirect: 'follow',
+    });
+    assert.equal(suffix.status, 206, `Expected 206 for a suffix range, got ${suffix.status}`);
+    const suffixBody = Buffer.from(await suffix.arrayBuffer());
+    assert.ok(suffixBody.equals(expected.subarray(-5)), 'Suffix range bytes do not match the end of the object');
+
+    // unsatisfiable ranges must surface as 416, not as a masked 404
+    const unsatisfiable = await fetch(`${BASE_URL}/assets/${rangeAssetId}/original`, {
+      headers: { Authorization: `Bearer ${rangeToken}`, Range: `bytes=${expected.length + 1000}-` },
+      redirect: 'follow',
+    });
+    assert.equal(unsatisfiable.status, 416, `Expected 416 for an unsatisfiable range, got ${unsatisfiable.status}`);
+    console.log(`  Range requests verified (206 partial, suffix range, 416 unsatisfiable) for ${rangeAssetId}`);
+  }
+
   console.log('=== Phase: Content Verification complete ===');
 }
 
