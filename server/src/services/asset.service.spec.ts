@@ -2675,26 +2675,162 @@ describe(AssetService.name, () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('should reject trim on cloud-stored videos', async () => {
+    it('should accept trim on S3-backed videos and probe via a presigned url', async () => {
       const assetId = newUuid();
+      const getReadableUrl = vi.fn().mockResolvedValue('https://bucket.s3/key?X-Amz-Signature=abc');
+      const { StorageService } = await import('src/services/storage.service.js');
+      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ getReadableUrl } as any);
+
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
       mocks.asset.getForEdit.mockResolvedValue({
         type: AssetType.Video,
         livePhotoVideoId: null,
-        originalPath: 's3://bucket/video.mp4',
+        originalPath: 'upload/admin/ab/cd/video.mp4',
         originalFileName: 'video.mp4',
         duration: 30_000,
         exifImageWidth: 1920,
         exifImageHeight: 1080,
         orientation: null,
         projectionType: null,
+      } as any);
+      mocks.assetEdit.getAll.mockResolvedValue([]);
+      mocks.assetEdit.replaceAll.mockResolvedValue([] as any);
+      mocks.media.probe.mockResolvedValue({
+        videoStreams: [{}],
+        audioStreams: [{}],
+        format: {},
+      } as any);
+
+      await sut.editAsset(authStub.admin, assetId, {
+        edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } }],
       });
+
+      expect(getReadableUrl).toHaveBeenCalledWith('upload/admin/ab/cd/video.mp4');
+      expect(mocks.media.probe).toHaveBeenCalledWith('https://bucket.s3/key?X-Amz-Signature=abc');
+      expect(mocks.assetEdit.replaceAll).toHaveBeenCalled();
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.AssetEditThumbnailGeneration,
+        data: { id: assetId },
+      });
+
+      vi.restoreAllMocks();
+    });
+
+    it('surfaces a generic error, never the presigned url, when the probe fails', async () => {
+      const assetId = newUuid();
+      const getReadableUrl = vi.fn().mockResolvedValue('https://bucket.s3/key?X-Amz-Signature=SECRET');
+      const { StorageService } = await import('src/services/storage.service.js');
+      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ getReadableUrl } as any);
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
+      mocks.asset.getForEdit.mockResolvedValue({
+        type: AssetType.Video,
+        livePhotoVideoId: null,
+        originalPath: 'upload/admin/ab/cd/video.mp4',
+        originalFileName: 'video.mp4',
+        duration: 30_000,
+        exifImageWidth: 1920,
+        exifImageHeight: 1080,
+        orientation: null,
+        projectionType: null,
+      } as any);
+      mocks.assetEdit.getAll.mockResolvedValue([]);
+      // ffprobe echoes the input (the presigned url, with its signature) in its error message.
+      mocks.media.probe.mockRejectedValue(new Error('https://bucket.s3/key?X-Amz-Signature=SECRET: Invalid data'));
+
+      const error = await sut
+        .editAsset(authStub.admin, assetId, {
+          edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } }],
+        })
+        .catch((error_: unknown) => error_);
+
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as Error).message).not.toContain('X-Amz-Signature');
+
+      vi.restoreAllMocks();
+    });
+
+    it('should reject trim on external library videos', async () => {
+      const assetId = newUuid();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
+      mocks.asset.getForEdit.mockResolvedValue({
+        type: AssetType.Video,
+        livePhotoVideoId: null,
+        originalPath: '/mnt/external/video.mp4',
+        originalFileName: 'video.mp4',
+        duration: 30_000,
+        exifImageWidth: 1920,
+        exifImageHeight: 1080,
+        orientation: null,
+        projectionType: null,
+      } as any);
 
       await expect(
         sut.editAsset(authStub.admin, assetId, {
           edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } }],
         }),
-      ).rejects.toThrow('Video trimming is not available for cloud-stored videos');
+      ).rejects.toThrow('Video trimming is not available for external library videos');
+    });
+
+    it('should reject trim on audio-only S3 files', async () => {
+      const assetId = newUuid();
+      const getReadableUrl = vi.fn().mockResolvedValue('https://bucket.s3/key?X-Amz-Signature=abc');
+      const { StorageService } = await import('src/services/storage.service.js');
+      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ getReadableUrl } as any);
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
+      mocks.asset.getForEdit.mockResolvedValue({
+        type: AssetType.Video,
+        livePhotoVideoId: null,
+        originalPath: 'upload/admin/ab/cd/audio.m4a',
+        originalFileName: 'audio.m4a',
+        duration: 180_000,
+        exifImageWidth: null,
+        exifImageHeight: null,
+        orientation: null,
+        projectionType: null,
+      } as any);
+      mocks.assetEdit.getAll.mockResolvedValue([]);
+      mocks.media.probe.mockResolvedValue({ videoStreams: [], audioStreams: [{}], format: {} } as any);
+
+      await expect(
+        sut.editAsset(authStub.admin, assetId, {
+          edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 10, endTime: 60 } }],
+        }),
+      ).rejects.toThrow('Cannot trim audio-only files');
+
+      vi.restoreAllMocks();
+    });
+
+    it('should probe disk-backed videos by absolute path, without presigning', async () => {
+      const assetId = newUuid();
+      const { StorageService } = await import('src/services/storage.service.js');
+      const resolveSpy = vi.spyOn(StorageService, 'resolveBackendForKey');
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
+      mocks.asset.getForEdit.mockResolvedValue({
+        type: AssetType.Video,
+        livePhotoVideoId: null,
+        originalPath: '/data/library/video.mp4',
+        originalFileName: 'video.mp4',
+        duration: 30_000,
+        exifImageWidth: 1920,
+        exifImageHeight: 1080,
+        orientation: null,
+        projectionType: null,
+      } as any);
+      mocks.assetEdit.getAll.mockResolvedValue([]);
+      mocks.assetEdit.replaceAll.mockResolvedValue([] as any);
+      mocks.media.probe.mockResolvedValue({ videoStreams: [{}], audioStreams: [{}], format: {} } as any);
+
+      await sut.editAsset(authStub.admin, assetId, {
+        edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } }],
+      });
+
+      expect(mocks.media.probe).toHaveBeenCalledWith('/data/library/video.mp4');
+      expect(resolveSpy).not.toHaveBeenCalled();
+
+      vi.restoreAllMocks();
     });
 
     it('should reject trim on audio-only files', async () => {

@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import AsyncLock from 'async-lock';
 import { randomUUID } from 'node:crypto';
-import { createReadStream } from 'node:fs';
-import { unlink } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
 import { FACE_THUMBNAIL_SIZE } from 'src/constants';
@@ -88,15 +86,29 @@ export class MediaService extends BaseService {
       return localPath;
     }
     // S3 mode: upload the locally-generated file
-    const stream = createReadStream(localPath);
+    const stream = this.storageRepository.createPlainReadStream(localPath);
     await writeBackend.put(relativeKey, stream, { contentType });
     // Clean up local temp file
-    try {
-      await unlink(localPath);
-    } catch {
+    await this.storageRepository.unlink(localPath).catch(() => {
       /* ignore */
-    }
+    });
     return relativeKey;
+  }
+
+  /**
+   * Persists every generated image file and rewrites its path to the stored location.
+   * Every ffmpeg/sharp output path must go through this — forgetting it is how the
+   * trim thumbnails ended up unpersisted on S3 (gh#671).
+   */
+  private async persistImageFiles(asset: ThumbnailAsset, files: UpsertFileOptions[]): Promise<void> {
+    for (const file of files) {
+      const relativeKey = StorageCore.getRelativeImagePath(asset, {
+        fileType: file.type,
+        format: file.path.split('.').pop() as ImageFormat,
+        isEdited: file.isEdited,
+      });
+      file.path = await this.persistFile(file.path, relativeKey, mimeTypes.lookup(file.path));
+    }
   }
 
   @OnJob({ name: JobName.AssetGenerateThumbnailsQueueAll, queue: QueueName.ThumbnailGeneration })
@@ -223,6 +235,16 @@ export class MediaService extends BaseService {
           asset.files.filter((file) => file.isEdited),
           [],
         );
+
+        // asset.files never contains EncodedVideo rows (getForGenerateThumbnailJob only loads
+        // thumbnail/preview/fullsize), so syncFiles cannot see the trimmed video. Without this,
+        // getForVideo (isEdited DESC) would keep serving the trimmed video after an undo.
+        const editedVideo = await this.assetRepository.getEditedEncodedVideo(asset.id);
+        if (editedVideo) {
+          await this.assetRepository.deleteFiles([editedVideo]);
+          await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [editedVideo.path] } });
+        }
+
         await this.jobRepository.queue({ name: JobName.AssetGenerateThumbnails, data: { id } });
         return JobStatus.Success;
       }
@@ -231,14 +253,7 @@ export class MediaService extends BaseService {
 
       // Persist output files to S3 if needed
       if (generated?.files) {
-        for (const file of generated.files) {
-          const relativeKey = StorageCore.getRelativeImagePath(asset, {
-            fileType: file.type,
-            format: file.path.split('.').pop() as ImageFormat,
-            isEdited: file.isEdited,
-          });
-          file.path = await this.persistFile(file.path, relativeKey, mimeTypes.lookup(file.path));
-        }
+        await this.persistImageFiles(asset, generated.files);
       }
 
       await this.syncFiles(
@@ -281,12 +296,13 @@ export class MediaService extends BaseService {
     const params = trimEdit.parameters as TrimParameters & { originalDuration: number };
     const duration = params.endTime - params.startTime;
 
-    // Select input: prefer non-edited encoded video, fall back to original
-    const existingEncoded = asset.files.find((f) => f.type === AssetFileType.EncodedVideo && !f.isEdited);
-    const inputPath = existingEncoded?.path || localPath;
+    // ffmpeg always reads the original. The asset's encoded video is not a candidate:
+    // getForGenerateThumbnailJob never loads EncodedVideo rows (asset-job.repository.ts),
+    // and on S3 its path would be a relative key ffmpeg cannot open anyway.
+    const inputPath = localPath;
 
     // Output path for edited encoded video in EncodedVideo directory
-    const outputPath = StorageCore.getNestedPath(StorageFolder.EncodedVideo, asset.ownerId, `${asset.id}_edited.mp4`);
+    const outputPath = StorageCore.getEditedEncodedVideoPath(asset);
     this.storageCore.ensureFolders(outputPath);
 
     // Trim to a unique temp path and atomically rename into place — ffmpeg writing
@@ -298,67 +314,96 @@ export class MediaService extends BaseService {
       await this.storageRepository.rename(trimTempPath, outputPath);
     } catch (error) {
       this.logger.error(`FFmpeg trim failed for asset ${asset.id}: ${error}`);
-      await unlink(trimTempPath).catch(() => {});
+      await this.storageRepository.unlink(trimTempPath).catch(() => {});
       return JobStatus.Failed;
     }
 
-    // Re-probe for actual duration and update asset
-    const probeResult = await this.mediaRepository.probe(outputPath);
-    const probedDuration = probeResult.format.duration;
-    if (probedDuration && probedDuration > 0) {
-      const newDuration = Math.round(probedDuration * 1000);
-      this.logger.debug(`Trim: updating duration from probe: ${newDuration} (${probedDuration}s)`);
-      await this.assetRepository.update({ id: asset.id, duration: newDuration });
-    } else {
-      // Probe didn't return duration — use calculated duration from trim parameters
-      const calculatedDuration = Math.round((params.endTime - params.startTime) * 1000);
-      this.logger.debug(`Trim: probe duration unavailable, using calculated: ${calculatedDuration}`);
-      await this.assetRepository.update({ id: asset.id, duration: calculatedDuration });
-    }
-
-    // Extract a frame at ~10% into the trimmed video for thumbnail generation.
-    // The path is unique per invocation: the in-process trim lock does not cover
-    // other worker processes, and a fixed name would let one job's cleanup unlink
-    // the frame another job is still reading (issue #743 item 2).
-    const frameTime = duration * 0.1;
+    // outputPath is now a locally-written trimmed video. Every step below can throw; on failure
+    // the catch removes it (and the extracted frame) so an S3-mode error doesn't leak temps on
+    // the pod's local disk — persistFile is what hands ownership of outputPath to the write backend.
+    //
+    // The frame path is unique per invocation: the in-process trim lock does not cover other
+    // worker processes, and a fixed name would let one job's cleanup unlink the frame another
+    // job is still reading (issue #743 item 2).
     const framePath = `${outputPath}.frame-${randomUUID()}.jpg`;
-    await this.mediaRepository.extractFrame(outputPath, framePath, frameTime);
+    try {
+      // Re-probe for the actual trimmed duration. It is committed to the DB only after the
+      // trimmed video is durably persisted (below), so a mid-op failure can't leave the asset's
+      // duration pointing at a video that was never stored.
+      const probeResult = await this.mediaRepository.probe(outputPath);
+      const probedDuration = probeResult.format.duration;
+      let newDuration: number;
+      if (probedDuration && probedDuration > 0) {
+        newDuration = Math.round(probedDuration * 1000);
+        this.logger.debug(`Trim: updating duration from probe: ${newDuration} (${probedDuration}s)`);
+      } else {
+        // Probe didn't return duration — use calculated duration from trim parameters
+        newDuration = Math.round((params.endTime - params.startTime) * 1000);
+        this.logger.debug(`Trim: probe duration unavailable, using calculated: ${newDuration}`);
+      }
 
-    // Generate thumbnail/preview/fullsize from extracted frame
-    const thumbnailResult = await this.generateImageThumbnails(
-      { ...asset, originalPath: framePath },
-      config,
-      true,
-      framePath,
-    );
+      // Extract a frame at ~10% into the trimmed video for thumbnail generation
+      const frameTime = duration * 0.1;
+      await this.mediaRepository.extractFrame(outputPath, framePath, frameTime);
 
-    // Clean up temp frame
-    await unlink(framePath).catch(() => {});
+      // Generate thumbnail/preview/fullsize from extracted frame
+      const thumbnailResult = await this.generateImageThumbnails(
+        { ...asset, originalPath: framePath },
+        config,
+        true,
+        framePath,
+      );
 
-    // Sync both edited encoded video and edited thumbnail files
-    const editedVideoFile: UpsertFileOptions = {
-      assetId: asset.id,
-      type: AssetFileType.EncodedVideo,
-      path: outputPath,
-      isEdited: true,
-      isProgressive: false,
-      isTransparent: false,
-    };
-    const newFiles = [editedVideoFile, ...thumbnailResult.files];
+      // Clean up temp frame
+      await this.storageRepository.unlink(framePath).catch(() => {});
 
-    await this.syncFiles(
-      asset.files.filter((file) => file.isEdited),
-      newFiles,
-    );
+      // Persist output files to S3 if needed
+      await this.persistImageFiles(asset, thumbnailResult.files);
 
-    if (
-      thumbnailResult.thumbhash &&
-      (!asset.thumbhash || Buffer.compare(asset.thumbhash, thumbnailResult.thumbhash) !== 0)
-    ) {
-      await this.assetRepository.update({ id: asset.id, thumbhash: thumbnailResult.thumbhash });
+      // persistFile unlinks the local file after uploading, so this must come AFTER
+      // probe() and extractFrame() have read outputPath.
+      const editedVideoPath = await this.persistFile(
+        outputPath,
+        StorageCore.getRelativeEditedEncodedVideoPath(asset),
+        'video/mp4',
+      );
+
+      // Sync both edited encoded video and edited thumbnail files
+      const editedVideoFile: UpsertFileOptions = {
+        assetId: asset.id,
+        type: AssetFileType.EncodedVideo,
+        path: editedVideoPath,
+        isEdited: true,
+        isProgressive: false,
+        isTransparent: false,
+      };
+      const newFiles = [editedVideoFile, ...thumbnailResult.files];
+
+      await this.syncFiles(
+        asset.files.filter((file) => file.isEdited),
+        newFiles,
+      );
+
+      // Commit the new duration only now that the trimmed video + files are persisted.
+      await this.assetRepository.update({ id: asset.id, duration: newDuration });
+
+      if (
+        thumbnailResult.thumbhash &&
+        (!asset.thumbhash || Buffer.compare(asset.thumbhash, thumbnailResult.thumbhash) !== 0)
+      ) {
+        await this.assetRepository.update({ id: asset.id, thumbhash: thumbnailResult.thumbhash });
+      }
+
+      return JobStatus.Success;
+    } catch (error) {
+      // A post-trim step failed. Remove the local trimmed video + extracted frame so an S3-mode
+      // failure doesn't leak temps on local disk (persistFile may already have removed outputPath
+      // on the S3 happy path — unlink is best-effort). Rethrow so the job fails and BullMQ retries.
+      this.logger.error(`Trim post-processing failed for asset ${asset.id}: ${error}`);
+      await this.storageRepository.unlink(outputPath).catch(() => {});
+      await this.storageRepository.unlink(framePath).catch(() => {});
+      throw error;
     }
-
-    return JobStatus.Success;
   }
 
   @OnJob({ name: JobName.AssetGenerateThumbnails, queue: QueueName.ThumbnailGeneration })
@@ -393,25 +438,11 @@ export class MediaService extends BaseService {
       }
 
       // Persist output files to S3 if needed
-      for (const file of generated.files) {
-        const relativeKey = StorageCore.getRelativeImagePath(asset, {
-          fileType: file.type,
-          format: file.path.split('.').pop() as ImageFormat,
-          isEdited: file.isEdited,
-        });
-        file.path = await this.persistFile(file.path, relativeKey, mimeTypes.lookup(file.path));
-      }
+      await this.persistImageFiles(asset, generated.files);
 
       const editedGenerated = await this.generateEditedThumbnails(asset, config, localPath);
       if (editedGenerated) {
-        for (const file of editedGenerated.files) {
-          const relativeKey = StorageCore.getRelativeImagePath(asset, {
-            fileType: file.type,
-            format: file.path.split('.').pop() as ImageFormat,
-            isEdited: file.isEdited,
-          });
-          file.path = await this.persistFile(file.path, relativeKey, mimeTypes.lookup(file.path));
-        }
+        await this.persistImageFiles(asset, editedGenerated.files);
         generated.files.push(...editedGenerated.files);
       }
 

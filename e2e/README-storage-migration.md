@@ -27,6 +27,10 @@ cd e2e
 1. **setup** - Uploads test assets (image, live photo, person crop) to Immich running on local disk storage.
 2. **migrate-to-s3** - Triggers migration from disk to S3 (MinIO), then validates the results.
 3. **migrate-to-disk** - Triggers migration from S3 back to disk, then validates the results.
+4. **video-trim-s3** - Uploads a video, forces a transcode, and trims it on an S3-backed server. Validates that
+   the edited encoded video and its thumbnails are persisted to S3 under `_edited` keys, that the transcoded
+   original is not overwritten, that nothing is left behind on local disk, that playback serves the trimmed
+   video, and that undo removes the edited objects from the bucket. Covers gh#671.
 
 ## What it validates (per migration direction)
 
@@ -39,7 +43,6 @@ cd e2e
 
 ## Known gaps
 
-- No video asset upload (transcoding too slow/unreliable in e2e)
 - No fullsize image testing
 - No rollback endpoint testing
 - No concurrent upload during migration testing
