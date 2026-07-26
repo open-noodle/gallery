@@ -106,18 +106,54 @@ export const getAlbumAssetsActions = ($t: MessageFormatter, album: AlbumResponse
   return { AddAssets, Upload };
 };
 
-export const addAssetsToAlbums = async (albumIds: string[], assetIds: string[], { notify }: { notify: boolean }) => {
+/**
+ * Single-album add that reports WHICH assets the server accepted.
+ *
+ * `POST /albums/:id/assets` answers HTTP 200 with per-asset outcomes, so "the call did not throw"
+ * is not "every photo landed" — an asset can come back `success:false, error:no_permission`. A
+ * caller that paints the whole selection into the album on a non-throwing call shows photos that
+ * disappear on the next reload. Cross-owner adds make that routine, because an asset visible
+ * through a space is not necessarily one the #764 contribution path will accept.
+ */
+export const addAssetsToAlbumWithOutcome = async (
+  albumId: string,
+  assetIds: string[],
+  { notify }: { notify: boolean },
+): Promise<{ ok: boolean; addedIds: string[]; deniedIds: string[] }> => {
   const $t = await getFormatter();
 
   try {
-    if (albumIds.length === 1) {
-      const albumId = albumIds[0];
-      const results = await addToAlbum({ ...authManager.params, id: albumId, bulkIdsDto: { ids: assetIds } });
-      if (notify) {
-        notifyAddToAlbum($t, albumId, assetIds, results);
-      }
+    const results = await addToAlbum({ ...authManager.params, id: albumId, bulkIdsDto: { ids: assetIds } });
+    if (notify) {
+      notifyAddToAlbum($t, albumId, assetIds, results);
     }
+    eventManager.emit('AlbumAddAssets', { assetIds, albumIds: [albumId] });
+    return {
+      ok: true,
+      addedIds: results.filter(({ success }) => success).map(({ id }) => id),
+      // An asset already in the album comes back `success:false, error:duplicate`. That is not a
+      // refusal — the photo is already where the caller wanted it and there is nothing to retry —
+      // so it must not be lumped in with a genuine permission denial.
+      deniedIds: results
+        .filter(({ success, error }) => !success && error !== BulkIdErrorReason.Duplicate)
+        .map(({ id }) => id),
+    };
+  } catch (error) {
+    handleError(error, $t('errors.error_adding_assets_to_album'));
+    return { ok: false, addedIds: [], deniedIds: [] };
+  }
+};
 
+export const addAssetsToAlbums = async (albumIds: string[], assetIds: string[], { notify }: { notify: boolean }) => {
+  const $t = await getFormatter();
+
+  // Delegate the single-album case so both paths share one implementation (and one event emit).
+  if (albumIds.length === 1) {
+    const { ok } = await addAssetsToAlbumWithOutcome(albumIds[0], assetIds, { notify });
+    return ok;
+  }
+
+  try {
     if (albumIds.length > 1) {
       const results = await addToAlbums({ ...authManager.params, albumsAddAssetsDto: { albumIds, assetIds } });
       if (notify) {
