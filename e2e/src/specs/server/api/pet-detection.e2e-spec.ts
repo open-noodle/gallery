@@ -1,10 +1,11 @@
-import { LoginResponseDto, QueueCommand, mergePerson, updateConfig } from '@immich/sdk';
+import { LoginResponseDto, QueueCommand, QueueName, getQueuesLegacy, mergePerson, updateConfig } from '@immich/sdk';
 import { errorDto } from 'src/responses';
 import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const getSystemConfig = (accessToken: string) => utils.getSystemConfig(accessToken);
+const getQueues = (accessToken: string) => getQueuesLegacy({ headers: asBearerAuth(accessToken) });
 
 describe('/pet-detection', () => {
   let admin: LoginResponseDto;
@@ -649,7 +650,15 @@ describe('/pet-detection', () => {
 
     it('should include pet in asset people list', async () => {
       const asset = await utils.getAssetInfo(admin.accessToken, integrationAssetId);
-      expect(asset).toBeDefined();
+
+      const petEntry = asset.people?.find((person) => person.id === integrationPetId);
+      expect(petEntry).toBeDefined();
+      expect(petEntry?.type).toBe('pet');
+      expect(petEntry?.species).toBe('cat');
+
+      const humanEntry = asset.people?.find((person) => person.id === integrationPersonId);
+      expect(humanEntry).toBeDefined();
+      expect(humanEntry?.type).toBe('person');
     });
 
     it('should handle multiple pets in same asset', async () => {
@@ -750,6 +759,92 @@ describe('/pet-detection', () => {
       expect(pet2.species).toBe('dog');
       expect(pet1.name).toBe('Rover');
       expect(pet2.name).toBe('Spot');
+    });
+  });
+
+  // Slice 9 — the e2e stack has no ML service (no real detect->embed->cluster flow to exercise),
+  // so this covers what e2e *can* prove: the force-reset flow purges pet data and requeues
+  // detection through the real HTTP + queue + DB stack (R9.9), and that the recognition queue
+  // honours the config gate even under `force` (R9.10).
+  describe('Force Reset & Recognition Queue Gate', () => {
+    beforeAll(async () => {
+      await utils.resetDatabase();
+      admin = await utils.adminSetup();
+      await utils.connectDatabase();
+    });
+
+    it('force-resets pet recognition: purges pet people and requeues detection under a paused petDetection queue (R9.9)', async () => {
+      const asset = await utils.createAsset(admin.accessToken);
+      const { personId } = await utils.createPetWithEmbedding(admin.userId, 'dog', asset.id, 'Rex');
+
+      // the force purge only runs when handleQueuePetRecognition sees recognition enabled —
+      // otherwise it returns Skipped before ever reaching the purge (see R9.10 below).
+      const config = await getSystemConfig(admin.accessToken);
+      config.machineLearning.enabled = true;
+      config.machineLearning.petRecognition.enabled = true;
+      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+
+      // Pause petDetection *before* triggering the reset so the PetDetectionQueueAll{force:true}
+      // job the reset requeues is captured rather than immediately drained — a paused BullMQ
+      // queue holds newly-added jobs under `paused`, not `waiting`, so the assertion below sums
+      // both rather than asserting `waiting` alone.
+      await utils.queueCommand(admin.accessToken, QueueName.PetDetection, {
+        command: QueueCommand.Pause,
+        force: false,
+      });
+      await utils.waitForQueuePaused(admin.accessToken, 'petDetection');
+
+      const { status } = await request(app)
+        .put('/jobs/petRecognition')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ command: QueueCommand.Start, force: true });
+
+      expect(status).toBe(200);
+      await utils.waitForQueueFinish(admin.accessToken, 'petRecognition');
+
+      const { body } = await request(app)
+        .get('/people')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .query({ withHidden: true });
+      const petIds = body.people.map((p: any) => p.id);
+      expect(petIds).not.toContain(personId);
+
+      const queues = await getQueues(admin.accessToken);
+      expect(queues.petDetection.jobCounts.waiting + queues.petDetection.jobCounts.paused).toBeGreaterThan(0);
+
+      // Clean up shared queue state before the next test / spec file runs (the e2e stack's
+      // BullMQ queues are a machine-wide singleton across the whole vitest run).
+      await utils.queueCommand(admin.accessToken, QueueName.PetDetection, {
+        command: QueueCommand.Resume,
+        force: false,
+      });
+      await utils.resetAdminConfig(admin.accessToken);
+    });
+
+    it('starting petRecognition with recognition disabled is a no-op even with force (R9.10)', async () => {
+      const asset = await utils.createAsset(admin.accessToken);
+      const petId = await utils.createPet(admin.userId, 'cat', 'Whiskers');
+      await utils.createFace({ assetId: asset.id, personId: petId });
+
+      // Recognition (and detection) stay at their default-disabled state here.
+      const config = await getSystemConfig(admin.accessToken);
+      expect(config.machineLearning.petRecognition.enabled).toBe(false);
+
+      const { status } = await request(app)
+        .put('/jobs/petRecognition')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ command: QueueCommand.Start, force: true });
+
+      expect(status).toBe(200);
+      await utils.waitForQueueFinish(admin.accessToken, 'petRecognition');
+
+      const { status: getStatus, body } = await request(app)
+        .get(`/people/${petId}`)
+        .set('Authorization', `Bearer ${admin.accessToken}`);
+
+      expect(getStatus).toBe(200);
+      expect(body.type).toBe('pet');
+      expect(body.species).toBe('cat');
     });
   });
 });
