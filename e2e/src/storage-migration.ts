@@ -2021,6 +2021,172 @@ async function phaseUserDeleteS3Orphans(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Phase: video-trim-s3
+//
+// Covers gh#671. Trims a video on an S3-backed server and asserts every output
+// (edited encoded video + edited thumbnails) is persisted to MinIO as a relative
+// key, that the non-edited encoded object is not overwritten, and that nothing
+// is left behind on the pod's local disk.
+//
+// Runs with the server in s3 write mode. Leaves suite state as it found it, so
+// the later migrate-to-disk phase is unaffected.
+// ---------------------------------------------------------------------------
+async function phaseVideoTrimS3(): Promise<void> {
+  console.log('=== Phase: video-trim-s3 ===');
+  const token = await loginAdmin();
+
+  // Force transcoding so a NON-edited EncodedVideo exists in S3. That object is
+  // the trim job's preferred input, and it is what makes gh#671's defect 3
+  // (an S3 key handed straight to ffmpeg) reachable.
+  const originalConfig = await api('GET', '/system-config', { token });
+  const trimConfig = structuredClone(originalConfig);
+  trimConfig.ffmpeg.transcode = 'all';
+  await api('PUT', '/system-config', { body: trimConfig, token });
+  console.log('  ffmpeg.transcode = all');
+
+  // Cleanup runs even when an assertion fails: a half-finished run must not leave
+  // encoded-video rows behind for the later migrate-to-disk phase to trip over.
+  let assetId: string | undefined;
+
+  try {
+    // 4s test video, tiny frame size. Must be >= 2s or editAsset rejects the trim.
+    //
+    // -g 10 -keyint_min 10 -sc_threshold 0 puts a keyframe on every second (10fps).
+    // MediaRepository.trim runs ffmpeg with `-c copy`, so its seek is keyframe-snapped:
+    // with x264's default GOP a 4s clip has only the frame-0 keyframe, `-ss 1` would snap
+    // back to 0, and the "2s" trim would come out 3.2s long. Real videos carry regular
+    // keyframes; the fixture must too, or it tests a scenario that does not exist.
+    const base64 = dockerExec(
+      'immich-server',
+      'ffmpeg -y -loglevel error -f lavfi -i testsrc=duration=4:size=192x144:rate=10 ' +
+        '-c:v libx264 -pix_fmt yuv420p -g 10 -keyint_min 10 -sc_threshold 0 /tmp/trim-src.mp4 ' +
+        String.raw`&& base64 /tmp/trim-src.mp4 | tr -d "\n"`,
+    );
+    const video = Buffer.from(base64, 'base64');
+    assert.ok(video.length > 1000, `Generated video looks too small: ${video.length} bytes`);
+    console.log(`  Generated test video (${video.length} bytes)`);
+
+    const uploaded = await uploadAsset(token, 'trim-s3.mp4', video);
+    assetId = uploaded.id;
+    console.log(`  Uploaded asset ${assetId}`);
+    await waitForProcessing(token, 120_000);
+
+    // Precondition 1: duration was probed — editAsset rejects the trim without it.
+    const assetRows = await queryDb<{ ownerId: string; duration: string | null; originalPath: string }>(
+      'SELECT "ownerId", duration, "originalPath" FROM asset WHERE id = $1',
+      [assetId],
+    );
+    assert.ok(assetRows[0], `Asset ${assetId} not found`);
+    const { ownerId, originalPath } = assetRows[0];
+    assert.ok(assetRows[0].duration, 'Asset duration was not probed — editAsset would reject the trim');
+    assert.ok(!originalPath.startsWith('/'), `Expected S3 (relative) originalPath, got ${originalPath}`);
+
+    // Precondition 2: a NON-edited EncodedVideo exists in S3.
+    // NB: the asset_file.type enum value is 'encoded_video', not 'encodedVideo'.
+    const encodedRows = await queryDb<{ path: string }>(
+      `SELECT path FROM asset_file WHERE "assetId" = $1 AND type = 'encoded_video' AND "isEdited" = false`,
+      [assetId],
+    );
+    assert.equal(encodedRows.length, 1, `Expected 1 non-edited encoded_video row, got ${encodedRows.length}`);
+    const nonEditedKey = encodedRows[0].path;
+    assert.ok(!nonEditedKey.startsWith('/'), `Expected relative encoded_video path, got ${nonEditedKey}`);
+    assert.ok(minioFileExists(nonEditedKey), `Non-edited encoded video missing from MinIO: ${nonEditedKey}`);
+    const nonEditedStatBefore = dockerExec('minio', `mc stat local/immich-test/${nonEditedKey}`);
+    console.log(`  Precondition OK: transcoded video in S3 at ${nonEditedKey}`);
+
+    // Act: trim 1s..3s out of the 4s video.
+    await api('PUT', `/assets/${assetId}/edits`, {
+      token,
+      body: { edits: [{ action: 'trim', parameters: { startTime: 1, endTime: 3 } }] },
+    });
+    console.log('  Trim edit submitted');
+    await waitForProcessing(token, 120_000);
+
+    const editedRows = await queryDb<{ path: string; type: string }>(
+      `SELECT path, type FROM asset_file WHERE "assetId" = $1 AND "isEdited" = true ORDER BY type`,
+      [assetId],
+    );
+    assert.ok(
+      editedRows.length >= 3,
+      `Expected >= 3 edited asset_file rows (video + preview + thumbnail), got ${editedRows.length}`,
+    );
+
+    for (const row of editedRows) {
+      assert.ok(!row.path.startsWith('/'), `Edited ${row.type} path must be an S3 key, got ${row.path}`);
+      assert.ok(minioFileExists(row.path), `Edited ${row.type} missing from MinIO: ${row.path}`);
+    }
+
+    const editedVideo = editedRows.find((r) => r.type === 'encoded_video');
+    assert.ok(editedVideo, 'No edited encoded_video row');
+    const expectedKey = `encoded-video/${ownerId}/${assetId.slice(0, 2)}/${assetId.slice(2, 4)}/${assetId}_edited.mp4`;
+    assert.equal(editedVideo.path, expectedKey, 'Edited encoded video key mismatch');
+    assert.notEqual(editedVideo.path, nonEditedKey, 'Edited video must not reuse the non-edited key');
+
+    for (const row of editedRows.filter((r) => r.type !== 'encoded_video')) {
+      assert.ok(row.path.includes('_edited'), `Edited ${row.type} key must carry _edited: ${row.path}`);
+    }
+
+    // Collision guard: the transcoded original must be untouched.
+    assert.ok(minioFileExists(nonEditedKey), 'Non-edited encoded video disappeared');
+    const nonEditedStatAfter = dockerExec('minio', `mc stat local/immich-test/${nonEditedKey}`);
+    assert.equal(nonEditedStatAfter, nonEditedStatBefore, 'Non-edited encoded video was overwritten by the trim');
+
+    // No local leftovers: persistFile must upload AND unlink.
+    const localEditedPath = `${MEDIA_LOCATION}/encoded-video/${ownerId}/${assetId.slice(0, 2)}/${assetId.slice(2, 4)}/${assetId}_edited.mp4`;
+    assert.ok(!diskFileExists(localEditedPath), `Trimmed video left on local disk: ${localEditedPath}`);
+
+    // Duration reflects the trim (~2s), not the original (4s). The trim is a `-c copy`
+    // stream copy, so ffmpeg snaps to keyframes and the result is close to, not exactly,
+    // the requested 2s — which is why handleVideoTrim re-probes the output instead of
+    // trusting the requested duration. The window allows one keyframe interval of slack.
+    const trimmedRows = await queryDb<{ duration: string | null }>('SELECT duration FROM asset WHERE id = $1', [
+      assetId,
+    ]);
+    const durationMs = Number(trimmedRows[0].duration);
+    assert.ok(
+      durationMs >= 1500 && durationMs <= 2600,
+      `Expected trimmed duration ~2000ms (keyframe-snapped), got ${trimmedRows[0].duration}`,
+    );
+
+    // Playback serves the trimmed video from S3.
+    const playbackRes = await fetch(`${BASE_URL}/assets/${assetId}/video/playback`, {
+      headers: { Authorization: `Bearer ${token}` },
+      redirect: 'follow',
+    });
+    assert.equal(playbackRes.status, 200, `Expected 200 from playback, got ${playbackRes.status}`);
+    await playbackRes.arrayBuffer();
+    console.log('  Trim persisted to S3 and served');
+
+    // Undo: the edited objects must be removed from the bucket.
+    const editedKeys = editedRows.map((r) => r.path);
+    await api('DELETE', `/assets/${assetId}/edits`, { token });
+    await waitForProcessing(token, 120_000);
+
+    for (const key of editedKeys) {
+      assert.ok(!minioFileExists(key), `Undo left an edited object in MinIO: ${key}`);
+    }
+
+    const undoRes = await fetch(`${BASE_URL}/assets/${assetId}/video/playback`, {
+      headers: { Authorization: `Bearer ${token}` },
+      redirect: 'follow',
+    });
+    assert.equal(undoRes.status, 200, `Expected 200 from playback after undo, got ${undoRes.status}`);
+    await undoRes.arrayBuffer();
+    console.log('  Undo removed edited objects from S3');
+  } finally {
+    // Teardown: leave no trace for the later migrate-to-disk phase.
+    if (assetId) {
+      await api('DELETE', '/assets', { token, body: { ids: [assetId], force: true } });
+      console.log(`  Asset ${assetId} deleted`);
+    }
+    await api('PUT', '/system-config', { body: originalConfig, token });
+    console.log('  ffmpeg config restored');
+  }
+
+  console.log('=== Phase: video-trim-s3 complete ===');
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
@@ -2113,9 +2279,13 @@ async function main() {
         await phaseUserDeleteS3Orphans();
         break;
       }
+      case 'video-trim-s3': {
+        await phaseVideoTrimS3();
+        break;
+      }
       default: {
         throw new Error(
-          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped, template-s3-upload-skipped, template-s3-live-photo-skipped, template-s3-sidecar-skipped, template-s3-queue-migration-skipped, template-disk-baseline, copy-asset-sidecar-s3, user-delete-s3-orphans`,
+          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped, template-s3-upload-skipped, template-s3-live-photo-skipped, template-s3-sidecar-skipped, template-s3-queue-migration-skipped, template-disk-baseline, copy-asset-sidecar-s3, user-delete-s3-orphans, video-trim-s3`,
         );
       }
     }

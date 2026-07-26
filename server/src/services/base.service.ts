@@ -445,6 +445,20 @@ export class BaseService {
     return { localPath: tempPath, cleanup };
   }
 
+  /**
+   * Returns something ffmpeg/ffprobe can read directly: an absolute path as-is,
+   * or a presigned URL for a storage-backend key. Unlike ensureLocalFile this
+   * does NOT download the object, so it is safe to call inside a request handler.
+   */
+  protected async getProbeInput(filePath: string): Promise<string> {
+    if (isAbsolute(filePath)) {
+      return filePath;
+    }
+    // lazy import to avoid circular dependency (StorageService extends BaseService)
+    const { StorageService } = await import('./storage.service.js');
+    return StorageService.resolveBackendForKey(filePath).getReadableUrl(filePath);
+  }
+
   protected async getFaceThumbnailSource(assetId: string): Promise<string | null> {
     const preview = await this.assetRepository.getForThumbnail(assetId, AssetFileType.Preview, false);
     if (preview.path) {
