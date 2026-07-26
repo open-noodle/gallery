@@ -566,9 +566,10 @@ describe('sendFile stream responses over real HTTP', () => {
     // A <video> abandons a range response on every seek. `pipe` alone leaves the source
     // open, which strands the S3 socket and its proxy-read slot until the process dies —
     // 32 abandoned seeks are enough to wedge every proxied read.
-    const source = new Readable({
+    // self-reference instead of `this` (unicorn/no-this-outside-of-class)
+    const source: Readable = new Readable({
       read() {
-        this.push(Buffer.alloc(64 * 1024, 'x'));
+        source.push(Buffer.alloc(64 * 1024, 'x'));
       },
     });
 
