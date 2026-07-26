@@ -10,7 +10,7 @@ import { AssetFaceTable } from 'src/schema/tables/asset-face.table';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table';
 import { PersonTable } from 'src/schema/tables/person.table';
 import { PetSearchTable } from 'src/schema/tables/pet-search.table';
-import { dummy, removeUndefinedKeys, withFilePath } from 'src/utils/database';
+import { dummy, petFacePredicate, removeUndefinedKeys, withFilePath } from 'src/utils/database';
 import { retargetDeclinePersonId } from 'src/utils/face-decline-merge';
 import { reviewableAssetVisibility } from 'src/utils/face-review';
 import { retargetVerdictPersonId } from 'src/utils/face-verdict-merge';
@@ -100,6 +100,12 @@ const visibleFaceOnAsset = (eb: ExpressionBuilder<DB, 'person'>, { locked }: { l
 
 export interface DeleteFacesOptions {
   sourceType: SourceType;
+  /**
+   * Human-pipeline callers set this so pet faces survive their resets. Pet faces share
+   * `sourceType: 'machine-learning'` with human faces, so a plain sourceType filter reaches them
+   * (F1/F3) — {@link petFacePredicate} is the only thing that tells the two apart.
+   */
+  excludePetFaces?: boolean;
 }
 
 export interface GetAllPeopleOptions {
@@ -122,6 +128,8 @@ export interface GetAllFacesOptions {
    * `face_identity_face` row via `unassignFaces` before this runs) and every other caller are unchanged.
    */
   excludeManuallyPlaced?: boolean;
+  /** See {@link DeleteFacesOptions.excludePetFaces} — keeps pet faces out of human fan-outs (F2). */
+  excludePetFaces?: boolean;
 }
 
 export interface RepresentativeFaceListOptions {
@@ -297,21 +305,28 @@ export class PersonRepository {
     await db.updateTable('person').set({ identityId: input.identityId }).where('id', '=', input.personId).execute();
   }
 
-  async unassignFaces({ sourceType }: UnassignFacesOptions): Promise<void> {
+  async unassignFaces({ sourceType, excludePetFaces }: UnassignFacesOptions): Promise<void> {
     // "Reset all people" bulk-nulls personId across the whole library. It must also clear the human-placement
     // record (face_identity_face.source='manual'); otherwise every previously-confirmed face keeps a stale
     // manual link with no person behind it, and both face engines would treat those unassigned faces as
     // settled forever — permanently excluding them from recognition and suggestions after a reset.
+    // `excludePetFaces` scopes it the same way the personId reset below is scoped: a human reset must
+    // leave pet faces, and their manual links, alone (F2).
     await this.db
       .deleteFrom('face_identity_face')
       .where('assetFaceId', 'in', (eb) =>
-        eb.selectFrom('asset_face').select('id').where('asset_face.sourceType', '=', sourceType),
+        eb
+          .selectFrom('asset_face')
+          .select('id')
+          .where('asset_face.sourceType', '=', sourceType)
+          .$if(!!excludePetFaces, (qb) => qb.where((inner) => inner.not(petFacePredicate(inner)))),
       )
       .execute();
     await this.db
       .updateTable('asset_face')
       .set({ personId: null })
       .where('asset_face.sourceType', '=', sourceType)
+      .$if(!!excludePetFaces, (qb) => qb.where((eb) => eb.not(petFacePredicate(eb))))
       .execute();
   }
 
@@ -325,8 +340,12 @@ export class PersonRepository {
     await this.db.deleteFrom('person').where('person.id', 'in', ids).execute();
   }
 
-  async deleteFaces({ sourceType }: DeleteFacesOptions): Promise<void> {
-    await this.db.deleteFrom('asset_face').where('asset_face.sourceType', '=', sourceType).execute();
+  async deleteFaces({ sourceType, excludePetFaces }: DeleteFacesOptions): Promise<void> {
+    await this.db
+      .deleteFrom('asset_face')
+      .where('asset_face.sourceType', '=', sourceType)
+      .$if(!!excludePetFaces, (qb) => qb.where((eb) => eb.not(petFacePredicate(eb))))
+      .execute();
   }
 
   async deleteAllPets(): Promise<void> {
@@ -387,6 +406,7 @@ export class PersonRepository {
           ),
         ),
       )
+      .$if(!!options.excludePetFaces, (qb) => qb.where((eb) => eb.not(petFacePredicate(eb))))
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', 'is', true)
       .stream();

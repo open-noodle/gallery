@@ -2123,7 +2123,10 @@ describe(PersonService.name, () => {
       await expect(sut.handleQueueDetectFaces({ force: true })).resolves.toBe(JobStatus.Success);
 
       expect(mocks.person.deleteFaces).toHaveBeenCalledTimes(1);
-      expect(mocks.person.deleteFaces).toHaveBeenCalledWith({ sourceType: SourceType.MachineLearning });
+      expect(mocks.person.deleteFaces).toHaveBeenCalledWith({
+        sourceType: SourceType.MachineLearning,
+        excludePetFaces: true,
+      });
       expect(mocks.person.deleteFaces).not.toHaveBeenCalledWith({ sourceType: SourceType.Manual });
       expect(mocks.person.deleteFaces).not.toHaveBeenCalledWith({ sourceType: SourceType.Exif });
       expect(mocks.person.delete).toHaveBeenCalledWith([orphan.id]);
@@ -2266,6 +2269,7 @@ describe(PersonService.name, () => {
         personId: null,
         sourceType: SourceType.MachineLearning,
         excludeManuallyPlaced: true,
+        excludePetFaces: true,
       });
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
@@ -2300,6 +2304,7 @@ describe(PersonService.name, () => {
 
       expect(mocks.person.getAllFaces).toHaveBeenCalledWith({
         sourceType: SourceType.MachineLearning,
+        excludePetFaces: true,
       });
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
@@ -2432,8 +2437,13 @@ describe(PersonService.name, () => {
       await expect(sut.handleQueueRecognizeFaces({ force: true })).resolves.toBe(JobStatus.Success);
 
       expect(mocks.job.empty).toHaveBeenCalledWith(QueueName.FacialRecognition, true);
-      expect(mocks.person.unassignFaces).toHaveBeenCalledWith({ sourceType: SourceType.MachineLearning });
-      expect(mocks.faceIdentity.unlinkFacesBySourceType).toHaveBeenCalledWith(SourceType.MachineLearning);
+      expect(mocks.person.unassignFaces).toHaveBeenCalledWith({
+        sourceType: SourceType.MachineLearning,
+        excludePetFaces: true,
+      });
+      expect(mocks.faceIdentity.unlinkFacesBySourceType).toHaveBeenCalledWith(SourceType.MachineLearning, {
+        excludePetFaces: true,
+      });
       expect(mocks.person.delete).toHaveBeenCalledWith([orphan.id]);
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.FileDelete,
@@ -2472,7 +2482,10 @@ describe(PersonService.name, () => {
 
       await expect(sut.handleQueueRecognizeFaces({ force: true })).resolves.toBe(JobStatus.Success);
 
-      expect(mocks.person.getAllFaces).toHaveBeenCalledWith({ sourceType: SourceType.MachineLearning });
+      expect(mocks.person.getAllFaces).toHaveBeenCalledWith({
+        sourceType: SourceType.MachineLearning,
+        excludePetFaces: true,
+      });
       expect(mocks.person.getAllFaces).not.toHaveBeenCalledWith(undefined);
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
@@ -2528,6 +2541,47 @@ describe(PersonService.name, () => {
       ]);
     });
 
+    it('R2.7 force recognition passes the pet exclusions to every destructive human call site', async () => {
+      const face = AssetFaceFactory.create();
+      mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
+      mocks.person.getAllFaces.mockReturnValue(makeStream([face]));
+      mocks.person.getAllWithoutFaces.mockResolvedValue([]);
+      mocks.sharedSpace.deleteAllPersonFaces.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deleteAllPersons.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue([]);
+
+      await sut.handleQueueRecognizeFaces({ force: true });
+
+      expect(mocks.person.unassignFaces).toHaveBeenCalledWith({
+        sourceType: SourceType.MachineLearning,
+        excludePetFaces: true,
+      });
+      expect(mocks.faceIdentity.unlinkFacesBySourceType).toHaveBeenCalledWith(SourceType.MachineLearning, {
+        excludePetFaces: true,
+      });
+      expect(mocks.sharedSpace.deleteAllPersonFaces).toHaveBeenCalledWith({ excludePets: true });
+      expect(mocks.sharedSpace.deleteAllPersons).toHaveBeenCalledWith({ excludePets: true });
+      expect(mocks.person.getAllFaces).toHaveBeenCalledWith({
+        sourceType: SourceType.MachineLearning,
+        excludePetFaces: true,
+      });
+    });
+
+    it('R2.7 non-force recognition fan-out is pet-excluded too', async () => {
+      const face = AssetFaceFactory.create();
+      mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
+      mocks.person.getAllFaces.mockReturnValue(makeStream([face]));
+      mocks.person.getAllWithoutFaces.mockResolvedValue([]);
+
+      await sut.handleQueueRecognizeFaces({ force: false });
+
+      expect(mocks.person.getAllFaces).toHaveBeenCalledWith({
+        personId: null,
+        sourceType: SourceType.MachineLearning,
+        excludePetFaces: true,
+      });
+    });
+
     it('non-force recognition keeps incremental shared-space matching enabled', async () => {
       const face = AssetFaceFactory.create();
       mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
@@ -2564,7 +2618,9 @@ describe(PersonService.name, () => {
 
       await sut.handleQueueRecognizeFaces({ force: true });
 
-      expect(mocks.faceIdentity.unlinkFacesBySourceType).toHaveBeenCalledWith(SourceType.MachineLearning);
+      expect(mocks.faceIdentity.unlinkFacesBySourceType).toHaveBeenCalledWith(SourceType.MachineLearning, {
+        excludePetFaces: true,
+      });
     });
 
     it('should delete unreferenced identities after force reset removes people and shared-space people', async () => {
@@ -2616,6 +2672,7 @@ describe(PersonService.name, () => {
         personId: null,
         sourceType: SourceType.MachineLearning,
         excludeManuallyPlaced: true,
+        excludePetFaces: true,
       });
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
@@ -2675,7 +2732,10 @@ describe(PersonService.name, () => {
       await sut.handleQueueRecognizeFaces({ force: true });
 
       expect(mocks.person.deleteFaces).not.toHaveBeenCalled();
-      expect(mocks.person.unassignFaces).toHaveBeenCalledWith({ sourceType: SourceType.MachineLearning });
+      expect(mocks.person.unassignFaces).toHaveBeenCalledWith({
+        sourceType: SourceType.MachineLearning,
+        excludePetFaces: true,
+      });
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
           name: JobName.FacialRecognition,
@@ -6228,6 +6288,7 @@ describe(PersonService.name, () => {
         personId: null,
         sourceType: SourceType.MachineLearning,
         excludeManuallyPlaced: true,
+        excludePetFaces: true,
       });
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         { name: JobName.FacialRecognition, data: { id: face.id, deferred: false } },
