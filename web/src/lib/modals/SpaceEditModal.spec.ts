@@ -1,10 +1,10 @@
 import { UserAvatarColor, type SharedSpaceResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 // userEvent (not fireEvent) for the submit button: it dispatches the full pointer/click sequence
 // that actually triggers form submission in happy-dom. PersonEditBirthDateModal.spec does the same.
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SpaceEditModal from './SpaceEditModal.svelte';
 
 const updateSpaceDetailsMock = vi.hoisted(() => vi.fn());
@@ -32,6 +32,14 @@ const saveButton = () => screen.getByRole('button', { name: 'Save' });
 beforeEach(() => {
   vi.clearAllMocks();
   updateSpaceDetailsMock.mockResolvedValue(true);
+});
+
+afterEach(async () => {
+  cleanup();
+  // bits-ui's body-scroll-lock resets body styles on a 24ms timer after the last dialog
+  // unmounts (bits-ui#1639). Wait it out so it fires while `document` still exists —
+  // otherwise it lands after environment teardown as an unhandled ReferenceError.
+  await new Promise((resolve) => setTimeout(resolve, 30));
 });
 
 describe('SpaceEditModal', () => {
@@ -146,7 +154,7 @@ describe('SpaceEditModal', () => {
   it('disables save for a whitespace-only name, which native `required` would let through', async () => {
     render(SpaceEditModal, { space: space(), onClose: vi.fn() });
 
-    await fireEvent.input(nameInput(), { target: { value: '   ' } });
+    await fireEvent.input(nameInput(), { target: { value: ' '.repeat(3) } });
 
     expect(saveButton()).toBeDisabled();
   });
