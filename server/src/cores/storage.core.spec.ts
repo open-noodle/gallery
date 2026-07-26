@@ -187,6 +187,35 @@ describe('StorageCore', () => {
       });
     });
 
+    describe('getEditedEncodedVideoPath', () => {
+      it('nests the _edited video beside the non-edited one', () => {
+        StorageCore.setMediaLocation('/media');
+        const asset = { id: 'abcd1234-0000-0000-0000-000000000000', ownerId: 'owner-id' };
+
+        expect(StorageCore.getEditedEncodedVideoPath(asset as any)).toBe(
+          '/media/encoded-video/owner-id/ab/cd/abcd1234-0000-0000-0000-000000000000_edited.mp4',
+        );
+      });
+    });
+
+    describe('getRelativeEditedEncodedVideoPath', () => {
+      it('returns the _edited key', () => {
+        const asset = { id: 'abcd1234-0000-0000-0000-000000000000', ownerId: 'owner-id' };
+
+        expect(StorageCore.getRelativeEditedEncodedVideoPath(asset as any)).toBe(
+          'encoded-video/owner-id/ab/cd/abcd1234-0000-0000-0000-000000000000_edited.mp4',
+        );
+      });
+
+      it('never collides with the non-edited encoded video key', () => {
+        const asset = { id: 'abcd1234-0000-0000-0000-000000000000', ownerId: 'owner-id' };
+
+        expect(StorageCore.getRelativeEditedEncodedVideoPath(asset as any)).not.toBe(
+          StorageCore.getRelativeEncodedVideoPath(asset as any),
+        );
+      });
+    });
+
     describe('getRelativePersonThumbnailPath', () => {
       it('should return relative path for person thumbnail', () => {
         const result = StorageCore.getRelativePersonThumbnailPath({ id: 'person-1', ownerId: 'user-1' });
