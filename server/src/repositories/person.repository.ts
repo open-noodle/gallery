@@ -331,6 +331,16 @@ export class PersonRepository {
 
   async deleteAllPets(): Promise<void> {
     await this.db.transaction().execute(async (trx) => {
+      // Unassigned pet faces (recognition-written, not yet clustered) are invisible to the
+      // person-scoped delete below — the pet_search join is the only thing that identifies
+      // them. Delete them first, while their pet_search rows still exist: the force purge
+      // calls deleteAllPetSearch() afterwards, and truncating first would orphan these rows
+      // forever.
+      await trx
+        .deleteFrom('asset_face')
+        .where('asset_face.id', 'in', (eb) => eb.selectFrom('pet_search').select('pet_search.faceId'))
+        .execute();
+
       // Delete pet faces before the pet people they belong to: asset_face.personId is
       // ON DELETE SET NULL, so removing the people first would orphan (not delete) the faces.
       await trx

@@ -225,7 +225,155 @@ describe('PetRecognitionService.handlePetRecognition (medium)', () => {
   });
 });
 
+describe('PersonRepository.deleteAllPets (medium)', () => {
+  it('deletes an unassigned pet face identified only by its pet_search row (R1.1)', async () => {
+    const { ctx } = setup();
+    const personRepository = ctx.get(PersonRepository);
+    const { user } = await ctx.newUser();
+
+    // Recognition wrote this face + embedding, but it was never clustered into a person, so the
+    // person-scoped delete can't see it — the pet_search row is its only identity.
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    const { assetFace: unassignedFace } = await ctx.newAssetFace({ assetId: asset.id });
+    await ctx.database
+      .insertInto('pet_search')
+      .values({ faceId: unassignedFace.id, embedding: axisEmbedding('first') })
+      .execute();
+
+    await personRepository.deleteAllPets();
+
+    const faceRows = await ctx.database
+      .selectFrom('asset_face')
+      .select(['id'])
+      .where('id', '=', unassignedFace.id)
+      .execute();
+    expect(faceRows).toHaveLength(0);
+
+    const petSearchRows = await ctx.database
+      .selectFrom('pet_search')
+      .selectAll()
+      .where('faceId', '=', unassignedFace.id)
+      .execute();
+    expect(petSearchRows).toHaveLength(0);
+  });
+
+  it('pin: deletes an assigned pet face, its person and its pet_search row (R1.2)', async () => {
+    const { ctx } = setup();
+    const personRepository = ctx.get(PersonRepository);
+    const { user } = await ctx.newUser();
+
+    const { person: petPerson } = await ctx.newPerson({ ownerId: user.id, type: 'pet', species: 'dog' });
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    const { assetFace: petFace } = await ctx.newAssetFace({ assetId: asset.id, personId: petPerson.id });
+    await ctx.database
+      .insertInto('pet_search')
+      .values({ faceId: petFace.id, embedding: axisEmbedding('first') })
+      .execute();
+
+    await personRepository.deleteAllPets();
+
+    expect(
+      await ctx.database.selectFrom('person').select(['id']).where('id', '=', petPerson.id).execute(),
+    ).toHaveLength(0);
+    expect(
+      await ctx.database.selectFrom('asset_face').select(['id']).where('id', '=', petFace.id).execute(),
+    ).toHaveLength(0);
+    expect(
+      await ctx.database.selectFrom('pet_search').selectAll().where('faceId', '=', petFace.id).execute(),
+    ).toHaveLength(0);
+  });
+
+  it('pin: leaves a human person, face and face_search row untouched (R1.3)', async () => {
+    const { ctx } = setup();
+    const personRepository = ctx.get(PersonRepository);
+    const { user } = await ctx.newUser();
+
+    const { person: humanPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Human' });
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    const { assetFace: humanFace } = await ctx.newAssetFace({ assetId: asset.id, personId: humanPerson.id });
+    await ctx.database
+      .insertInto('face_search')
+      .values({ faceId: humanFace.id, embedding: axisEmbedding('second') })
+      .execute();
+
+    await personRepository.deleteAllPets();
+
+    const personRow = await ctx.database
+      .selectFrom('person')
+      .selectAll()
+      .where('id', '=', humanPerson.id)
+      .executeTakeFirstOrThrow();
+    expect(personRow.type).toBe('person');
+
+    const faceRow = await ctx.database
+      .selectFrom('asset_face')
+      .selectAll()
+      .where('id', '=', humanFace.id)
+      .executeTakeFirstOrThrow();
+    expect(faceRow.personId).toBe(humanPerson.id);
+
+    const faceSearchRows = await ctx.database
+      .selectFrom('face_search')
+      .selectAll()
+      .where('faceId', '=', humanFace.id)
+      .execute();
+    expect(faceSearchRows).toHaveLength(1);
+  });
+});
+
 describe('PetRecognitionService.handleQueuePetRecognition (medium)', () => {
+  it('force reset leaves only human faces behind, assigned and unassigned pet faces alike (R1.4)', async () => {
+    const { sut, ctx } = setup();
+    await enablePetRecognition(ctx);
+    const { user } = await ctx.newUser();
+
+    // An assigned pet face (reachable through its person) …
+    const { person: petPerson } = await ctx.newPerson({ ownerId: user.id, type: 'pet', species: 'dog' });
+    const { asset: assignedAsset } = await ctx.newAsset({ ownerId: user.id });
+    const { assetFace: assignedPetFace } = await ctx.newAssetFace({
+      assetId: assignedAsset.id,
+      personId: petPerson.id,
+    });
+    await ctx.database
+      .insertInto('pet_search')
+      .values({ faceId: assignedPetFace.id, embedding: axisEmbedding('first') })
+      .execute();
+
+    // … and an unassigned one, reachable only through pet_search.
+    const { asset: unassignedAsset } = await ctx.newAsset({ ownerId: user.id });
+    const { assetFace: unassignedPetFace } = await ctx.newAssetFace({ assetId: unassignedAsset.id });
+    await ctx.database
+      .insertInto('pet_search')
+      .values({ faceId: unassignedPetFace.id, embedding: nearAxisEmbedding('first', 2) })
+      .execute();
+
+    // Human faces: one assigned, one unassigned — both must survive.
+    const { person: humanPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Human' });
+    const { asset: humanAssetA } = await ctx.newAsset({ ownerId: user.id });
+    const { assetFace: assignedHumanFace } = await ctx.newAssetFace({
+      assetId: humanAssetA.id,
+      personId: humanPerson.id,
+    });
+    const { asset: humanAssetB } = await ctx.newAsset({ ownerId: user.id });
+    const { assetFace: unassignedHumanFace } = await ctx.newAssetFace({ assetId: humanAssetB.id });
+
+    expect(await sut.handleQueuePetRecognition({ force: true })).toBe(JobStatus.Success);
+
+    // Scoped to the faces this test seeded — the medium DB is shared across the whole file.
+    const seededIds = [assignedPetFace.id, unassignedPetFace.id, assignedHumanFace.id, unassignedHumanFace.id];
+    const remainingFaces = await ctx.database
+      .selectFrom('asset_face')
+      .select(['id'])
+      .where('id', 'in', seededIds)
+      .execute();
+    expect(new Set(remainingFaces.map((face) => face.id))).toEqual(
+      new Set([assignedHumanFace.id, unassignedHumanFace.id]),
+    );
+
+    // pet_search is truncated wholesale by the force purge, so this one is legitimately global.
+    expect(await ctx.database.selectFrom('pet_search').selectAll().execute()).toHaveLength(0);
+  });
+
   it(
     'force purge empties pet_search, deletes pet people/asset_face rows and their shared-space copies, ' +
       'and leaves a human person, asset_face, face_search row and shared-space copy untouched (6.7)',
@@ -306,7 +454,13 @@ describe('PetRecognitionService.handleQueuePetRecognition (medium)', () => {
         .executeTakeFirstOrThrow();
       expect(humanFaceRow.personId).toBe(humanPerson.id);
 
-      const faceSearchRows = await ctx.database.selectFrom('face_search').selectAll().execute();
+      // Scoped by faceId: the medium DB is shared across every test in this file, so a whole-table
+      // count here would break the moment another test seeds a human face (R9.6 hygiene fix).
+      const faceSearchRows = await ctx.database
+        .selectFrom('face_search')
+        .selectAll()
+        .where('faceId', '=', humanFace.id)
+        .execute();
       expect(faceSearchRows).toHaveLength(1);
       expect(faceSearchRows[0].faceId).toBe(humanFace.id);
 
