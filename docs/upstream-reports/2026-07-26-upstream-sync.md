@@ -96,6 +96,31 @@ Per the fork-sync rule the full 10-workflow set was not re-dispatched: this cycl
 **zero upstream commits**, and the fork commits were fully CI-validated on `main` — the
 re-validated surface is the toolchain-drift one (lint/tests/build), covered above.
 
+## Fork sync — later the same day (#772)
+
+While the report above was being written, `9230c433c87` — fix(editing): enable video trim on
+S3-backed storage (#671) (#772) — landed on `origin/main`. Synced cleanly with
+`make upstream-sync-fork-main` (no conflicts, 27 files, `integratedForkHead` → `9230c433c87`,
+branch commit `82cc4470ada`). Risk scan: no migrations, no Drift, no generated artifacts, no
+lockfile changes. It cherry-picked cleanly on top of this morning's
+`s3-storage.backend.spec.ts` lint fix.
+
+Toolchain drift, same v72 class, all in `e2e/src/storage-migration.ts` (fixed in
+`f1d7f5b6c6c`): one `unicorn/no-duplicate-loops` (`.filter()` in a `for…of` header → `continue`
+guard) and two more explicit-default `redirect: 'follow'` fetch options. Server-side lint was
+clean; `pnpm check` clean; all five changed server spec files pass locally (512 tests);
+the #772 plan/spec markdown passes the docs prettier gate.
+
+| Workflow                      | Commit        | Run         | Status |
+| ----------------------------- | ------------- | ----------- | ------ |
+| `test.yml`                    | `f1d7f5b6c6c` | 30197988235 | GREEN  |
+| `docker.yml`                  | `f1d7f5b6c6c` | 30197989075 | GREEN  |
+| `storage-migration-tests.yml` | `f1d7f5b6c6c` | 30197989778 | GREEN  |
+| `storage-migration-e2e.yml`   | `f1d7f5b6c6c` | 30197990549 | GREEN  |
+
+The storage-migration suites were added to the dispatch set because #772 modifies their
+workflow file, the e2e harness, and the disk/S3 backends they exercise.
+
 ## Not done — deliberately
 
 No cutover to `main`: ruleset 13531204 (`non_fast_forward`, zero bypass actors) still blocks
