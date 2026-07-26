@@ -167,6 +167,28 @@ describe(AssetMediaController.name, () => {
 
     // TODO figure out how to deal with `sendFile`
 
+    describe('GET /assets/:id/original (range)', () => {
+      it('should forward the client Range header to the service', async () => {
+        const id = factory.uuid();
+        await request(ctx.getHttpServer()).get(`/assets/${id}/original`).set('Range', 'bytes=1024-2047');
+        expect(service.downloadOriginal).toHaveBeenCalledWith(undefined, id, expect.anything(), 'bytes=1024-2047');
+      });
+    });
+
+    describe('GET /assets/:id/video/playback', () => {
+      it('should forward the client Range header to the service', async () => {
+        const id = factory.uuid();
+        await request(ctx.getHttpServer()).get(`/assets/${id}/video/playback`).set('Range', 'bytes=0-1023');
+        expect(service.playbackVideo).toHaveBeenCalledWith(undefined, id, 'bytes=0-1023');
+      });
+
+      it('should pass no range when the client sent no Range header', async () => {
+        const id = factory.uuid();
+        await request(ctx.getHttpServer()).get(`/assets/${id}/video/playback`);
+        expect(service.playbackVideo).toHaveBeenCalledWith(undefined, id, undefined);
+      });
+    });
+
     // TODO figure out how to deal with `sendFile`
     describe('GET /assets/:id/thumbnail', () => {
       it('should redirect if size=original is requested', async () => {
