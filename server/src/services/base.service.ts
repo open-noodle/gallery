@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { Insertable } from 'kysely';
 import { createReadStream } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -11,7 +11,7 @@ import { StorageCore } from 'src/cores/storage.core';
 import { AssetFace, UserAdmin } from 'src/database';
 import { AssetEditAction, type CropParameters } from 'src/dtos/editing.dto';
 import { AssetFileType, CacheControl, ImageFormat, StorageFolder } from 'src/enum';
-import { ServeStrategy } from 'src/interfaces/storage-backend.interface';
+import { RangeNotSatisfiableError, ServeStrategy } from 'src/interfaces/storage-backend.interface';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { ActivityRepository } from 'src/repositories/activity.repository';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository';
@@ -356,22 +356,40 @@ export class BaseService {
     }
   }
 
+  /**
+   * @param options.acceptsRanges set by callers whose route forwards the client's `Range`
+   *        header, so the response may advertise `Accept-Ranges: bytes`.
+   * @param options.range the client's raw `Range` header, when the route forwards one.
+   *        The backend decides whether to honor it: disk serves ranges through express,
+   *        and S3 in redirect mode leaves them to S3 — so it only changes the S3 proxy
+   *        stream path, which previously ignored ranges entirely.
+   */
   protected async serveFromBackend(
     filePath: string,
     contentType: string,
     cacheControl: CacheControl,
     fileName?: string,
     disposition: ContentDisposition = 'inline',
+    options: { range?: string; acceptsRanges?: boolean } = {},
   ): Promise<ImmichMediaResponse> {
     // lazy import to avoid circular dependency (StorageService extends BaseService)
     const { StorageService } = await import('./storage.service.js');
     const backend = StorageService.resolveBackendForKey(filePath);
-    const strategy: ServeStrategy = await backend.getServeStrategy(filePath, {
-      contentType,
-      cacheControl,
-      fileName,
-      disposition,
-    });
+    let strategy: ServeStrategy;
+    try {
+      strategy = await backend.getServeStrategy(filePath, {
+        contentType,
+        cacheControl,
+        fileName,
+        disposition,
+        range: options.range,
+      });
+    } catch (error) {
+      if (error instanceof RangeNotSatisfiableError) {
+        throw new HttpException('Requested range not satisfiable', HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE);
+      }
+      throw error;
+    }
     const responseDisposition = disposition === 'inline' ? undefined : disposition;
 
     switch (strategy.type) {
@@ -395,6 +413,8 @@ export class BaseService {
           stream: strategy.stream,
           contentType,
           length: strategy.length,
+          contentRange: strategy.contentRange,
+          acceptsRanges: options.acceptsRanges,
           cacheControl,
           fileName,
           disposition: responseDisposition,
