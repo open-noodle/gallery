@@ -2,17 +2,38 @@ import { Readable } from 'node:stream';
 import { CacheControl } from 'src/enum';
 import type { ContentDisposition } from 'src/utils/file';
 
+/**
+ * Thrown by a backend when the client's `Range` header cannot be satisfied, so
+ * the HTTP layer can answer 416 instead of masking it as a 404. Kept here (and
+ * not as a Nest `HttpException`) so backends stay free of HTTP framework types.
+ */
+export class RangeNotSatisfiableError extends Error {
+  constructor(key: string) {
+    super(`Requested range is not satisfiable for ${key}`);
+    this.name = 'RangeNotSatisfiableError';
+  }
+}
+
 export type ServeOptions = {
   contentType: string;
   cacheControl: CacheControl;
   fileName?: string;
   disposition?: ContentDisposition;
+  /**
+   * The client's raw `Range` header, forwarded verbatim: S3 resolves `bytes=a-b`,
+   * `bytes=a-` and `bytes=-n` for us, so nothing here parses it. Only the S3 proxy
+   * strategy reads this — the disk backend ignores it because express' `sendFile`
+   * already honors the request's own `Range`, and the S3 redirect strategy ignores
+   * it because the client replays the header to S3 on the presigned URL.
+   */
+  range?: string;
 };
 
 export type ServeStrategy =
   | { type: 'file'; path: string }
   | { type: 'redirect'; url: string }
-  | { type: 'stream'; stream: Readable; length?: number };
+  /** `contentRange` is set only when the backend honored a requested range, and drives the 206 response. */
+  | { type: 'stream'; stream: Readable; length?: number; contentRange?: string };
 
 export interface StorageBackend {
   /** Write content to the given key */
