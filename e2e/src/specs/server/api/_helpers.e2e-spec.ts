@@ -76,11 +76,9 @@ describe('test helpers smoke', () => {
   // downstream PR that depends on the role distinction.
   //
   // PATCH /shared-spaces/:id with {thumbnailCropY: 0} is an Editor-level update.
-  // shared-space.service.ts:197-203 — only `name`/`description`/`color`/
-  // `faceRecognitionEnabled`/`petsEnabled` count as "metadata" and require Owner.
-  // `thumbnailCropY` is Editor-or-above. Viewer must be rejected; Editor and Owner pass.
-  // Don't use {name: ...} here — that would require Owner and the smoke test would
-  // not distinguish Editor from Viewer (both would 403).
+  // shared-space.service.ts:197-203 — only `faceRecognitionEnabled`/`petsEnabled` require
+  // Owner; everything else (name, description, color, thumbnailCropY, ...) is Editor-or-above.
+  // Viewer must be rejected; Editor and Owner pass.
   it('buildSpaceContext assigns the right role to each member', async () => {
     await forEachActor(
       [ctx.spaceOwner, ctx.spaceEditor, ctx.spaceViewer],

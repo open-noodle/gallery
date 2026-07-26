@@ -5,6 +5,7 @@ import {
   SharedSpaceMemberParamDto,
   SharedSpacePersonFaceParamDto,
   SharedSpacePersonParamDto,
+  SharedSpaceUpdateDto,
 } from 'src/dtos/shared-space.dto';
 
 // Generates valid v4 UUIDs by varying the last 12 hex chars
@@ -78,5 +79,60 @@ describe('shared-space param DTOs (security-9)', () => {
   it('SharedSpaceLibraryParamDto rejects a non-UUID libraryId', () => {
     expect(SharedSpaceLibraryParamDto.schema.safeParse({ id: uuid, libraryId: 'nope' }).success).toBe(false);
     expect(SharedSpaceLibraryParamDto.schema.safeParse({ id: uuid, libraryId: uuid }).success).toBe(true);
+  });
+});
+
+describe('SharedSpaceUpdateDto', () => {
+  it('should accept a rename', () => {
+    const result = SharedSpaceUpdateDto.schema.safeParse({ name: 'Family & Friends' });
+    expect(result.success).toBe(true);
+  });
+
+  it('should trim surrounding whitespace from the name', () => {
+    const result = SharedSpaceUpdateDto.schema.safeParse({ name: '  Padded  ' });
+    expect(result.success).toBe(true);
+    expect(result.data?.name).toBe('Padded');
+  });
+
+  it('should reject a whitespace-only name', () => {
+    // .trim() runs before .min(1), so "   " collapses to "" and fails the minimum.
+    const result = SharedSpaceUpdateDto.schema.safeParse({ name: '   ' });
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject an empty name', () => {
+    const result = SharedSpaceUpdateDto.schema.safeParse({ name: '' });
+    expect(result.success).toBe(false);
+  });
+
+  it('should accept a name at exactly 100 characters', () => {
+    const result = SharedSpaceUpdateDto.schema.safeParse({ name: 'a'.repeat(100) });
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject a name over 100 characters', () => {
+    const result = SharedSpaceUpdateDto.schema.safeParse({ name: 'a'.repeat(101) });
+    expect(result.success).toBe(false);
+  });
+
+  it('should accept an empty description, which clears the field', () => {
+    const result = SharedSpaceUpdateDto.schema.safeParse({ description: '' });
+    expect(result.success).toBe(true);
+    expect(result.data?.description).toBe('');
+  });
+
+  it('should accept a description at exactly 500 characters', () => {
+    const result = SharedSpaceUpdateDto.schema.safeParse({ description: 'a'.repeat(500) });
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject a description over 500 characters', () => {
+    const result = SharedSpaceUpdateDto.schema.safeParse({ description: 'a'.repeat(501) });
+    expect(result.success).toBe(false);
+  });
+
+  it('should accept an empty object, since every field is optional', () => {
+    const result = SharedSpaceUpdateDto.schema.safeParse({});
+    expect(result.success).toBe(true);
   });
 });
