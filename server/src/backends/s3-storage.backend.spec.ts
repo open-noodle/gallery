@@ -440,10 +440,12 @@ describe('S3StorageBackend', () => {
         proxyReadConcurrency: 1,
       });
       const proxyClient = (S3Client as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
-      const invalidRange = Object.assign(new Error('The requested range is not satisfiable'), {
+      // plain object instead of an Error (unicorn/no-error-property-assignment)
+      const invalidRange = {
         name: 'InvalidRange',
+        message: 'The requested range is not satisfiable',
         $metadata: { httpStatusCode: 416 },
-      });
+      };
       proxyClient.send.mockRejectedValueOnce(invalidRange).mockResolvedValueOnce({
         Body: Readable.from([Buffer.from('second')]),
         ContentLength: 6,
