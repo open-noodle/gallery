@@ -1,9 +1,9 @@
 // album.service.spec.ts
-import type { AlbumResponseDto } from '@immich/sdk';
+import { BulkIdErrorReason, type AlbumResponseDto } from '@immich/sdk';
 import type { BulkIdResponseDto } from '@immich/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import SpacePickerModal from '$lib/modals/SpacePickerModal.svelte';
-import { handleLinkAlbumToSpace, notifyAddToAlbum } from './album.service';
+import { addAssetsToAlbumWithOutcome, handleLinkAlbumToSpace, notifyAddToAlbum } from './album.service';
 
 const linkAlbum = vi.fn();
 const showModal = vi.fn();
@@ -12,10 +12,19 @@ const info = vi.fn();
 const warning = vi.fn();
 const handleError = vi.fn();
 
+const addAssetToAlbum = vi.fn();
+const emit = vi.fn();
+
 vi.mock('@immich/sdk', async (orig) => ({
   ...(await orig<typeof import('@immich/sdk')>()),
   linkAlbum: (...a: unknown[]) => linkAlbum(...a),
+  addAssetsToAlbum: (...a: unknown[]) => addAssetToAlbum(...a),
 }));
+
+vi.mock('$lib/managers/event-manager.svelte', () => ({
+  eventManager: { emit: (...a: unknown[]) => emit(...a), on: () => () => {} },
+}));
+vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: { params: {} } }));
 
 vi.mock('@immich/ui', async (orig) => ({
   ...(await orig<typeof import('@immich/ui')>()),
@@ -83,8 +92,12 @@ describe('notifyAddToAlbum — truthful severity (#764)', () => {
     `${key}:${JSON.stringify(opts?.values ?? {})}`) as never;
 
   const ok = (id: string): BulkIdResponseDto => ({ id, success: true });
-  const dup = (id: string): BulkIdResponseDto => ({ id, success: false, error: 'duplicate' as never });
-  const denied = (id: string): BulkIdResponseDto => ({ id, success: false, error: 'no_permission' as never });
+  const dup = (id: string): BulkIdResponseDto => ({ id, success: false, error: BulkIdErrorReason.Duplicate as never });
+  const denied = (id: string): BulkIdResponseDto => ({
+    id,
+    success: false,
+    error: BulkIdErrorReason.NoPermission as never,
+  });
 
   it('all succeeded → green success toast (primary) with View album', () => {
     notifyAddToAlbum($t, 'album-1', ['a', 'b'], [ok('a'), ok('b')]);
@@ -124,5 +137,57 @@ describe('notifyAddToAlbum — truthful severity (#764)', () => {
     notifyAddToAlbum($t, 'album-1', ['a', 'b'], [dup('a'), denied('b')]);
     expect(primary).not.toHaveBeenCalled();
     expect(warning).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Commit 93ba61e: the endpoint answers 200 with PER-ASSET outcomes, so the caller needs to know
+// which ids landed — and must not confuse "already there" with "refused".
+describe('addAssetsToAlbumWithOutcome', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('reports only the ids the server accepted', async () => {
+    addAssetToAlbum.mockResolvedValue([
+      { id: 'a1', success: true },
+      { id: 'a2', success: false, error: BulkIdErrorReason.NoPermission },
+    ] satisfies BulkIdResponseDto[]);
+
+    const outcome = await addAssetsToAlbumWithOutcome('album-1', ['a1', 'a2'], { notify: false });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.addedIds).toEqual(['a1']);
+  });
+
+  it('counts a refusal as denied but a duplicate as neither added nor denied', async () => {
+    addAssetToAlbum.mockResolvedValue([
+      { id: 'a1', success: false, error: BulkIdErrorReason.Duplicate },
+      { id: 'a2', success: false, error: BulkIdErrorReason.NoPermission },
+    ] satisfies BulkIdResponseDto[]);
+
+    const outcome = await addAssetsToAlbumWithOutcome('album-1', ['a1', 'a2'], { notify: false });
+
+    expect(outcome.addedIds).toEqual([]);
+    // 'a1' is already in the album — nothing to retry, so it must not read as a refusal.
+    expect(outcome.deniedIds).toEqual(['a2']);
+  });
+
+  it('emits AlbumAddAssets exactly once with the single album id', async () => {
+    addAssetToAlbum.mockResolvedValue([{ id: 'a1', success: true }] satisfies BulkIdResponseDto[]);
+
+    await addAssetsToAlbumWithOutcome('album-1', ['a1'], { notify: false });
+
+    expect(emit).toHaveBeenCalledTimes(1);
+    expect(emit).toHaveBeenCalledWith('AlbumAddAssets', { assetIds: ['a1'], albumIds: ['album-1'] });
+  });
+
+  it('resolves ok:false and emits nothing when the request throws', async () => {
+    addAssetToAlbum.mockRejectedValue(new Error('boom'));
+
+    const outcome = await addAssetsToAlbumWithOutcome('album-1', ['a1'], { notify: false });
+
+    expect(outcome).toEqual({ ok: false, addedIds: [], deniedIds: [] });
+    expect(emit).not.toHaveBeenCalled();
+    expect(handleError).toHaveBeenCalled();
   });
 });
