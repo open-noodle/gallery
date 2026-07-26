@@ -29,7 +29,13 @@ describe('PersonTile', () => {
     expect(screen.getByRole('link', { name: 'Mochi' })).toHaveAttribute('href', '/people/person-1');
     expect(screen.getByTitle('Mochi')).toHaveAttribute('src', '/api/people/person-1/thumbnail');
     expect(screen.getByLabelText('favorite')).toBeInTheDocument();
-    expect(screen.getByTitle('cat')).toBeInTheDocument();
+    // R8.2 (review-fixes F13): the badge gets role="img" + aria-label, and the tooltip goes
+    // through pet-species.ts's i18n map. svelte-i18n's `dev` fallback locale (test setup) renders
+    // an unmatched key literally, so the resolved key ('species_cat') proves the species went
+    // through the map rather than being used raw.
+    const petBadge = screen.getByTitle('species_cat');
+    expect(petBadge).toHaveAttribute('role', 'img');
+    expect(petBadge).toHaveAttribute('aria-label', 'species_cat');
     expect(screen.getByText('Footer content')).toBeInTheDocument();
   });
 
@@ -103,6 +109,6 @@ describe('PersonTile', () => {
     });
 
     expect(screen.queryByLabelText('favorite')).not.toBeInTheDocument();
-    expect(screen.queryByTitle('cat')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('species_cat')).not.toBeInTheDocument();
   });
 });

@@ -8,7 +8,7 @@
   import FormatMessage from '$lib/elements/FormatMessage.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { systemConfigManager } from '$lib/managers/system-config-manager.svelte';
-  import { Button, IconButton } from '@immich/ui';
+  import { Button, IconButton, modalManager, Text } from '@immich/ui';
   import { mdiPlus, mdiTrashCanOutline } from '@mdi/js';
   import { isEqual } from 'lodash-es';
   import { untrack } from 'svelte';
@@ -42,6 +42,18 @@
       }
     });
   });
+
+  // Model-change confirm (pairs with the server's scoped-purge switch, Slice 5): switching the
+  // pet-recognition model invalidates embeddings and recognition-created individuals and
+  // reprocesses the whole library, so warn before saving a changed model. The model <select> is
+  // disabled while recognition is off (see below), so this only ever fires on a recognition-on
+  // switch — a recognition-off switch reaches the server only via API/config file.
+  const onBeforeSave = async () => {
+    if (configToEdit.machineLearning.petRecognition.modelName !== config.machineLearning.petRecognition.modelName) {
+      return modalManager.showDialog({ prompt: $t('admin.pet_recognition_model_change_warning') });
+    }
+    return true;
+  };
 </script>
 
 <div class="mt-2">
@@ -455,6 +467,10 @@
             disabled={disabled || !configToEdit.machineLearning.enabled}
           />
 
+          {#if config.machineLearning.petDetection.enabled === false}
+            <Text color="warning" size="small">{$t('admin.pet_recognition_requires_detection')}</Text>
+          {/if}
+
           <hr />
 
           <SettingSelect
@@ -504,7 +520,7 @@
           />
         </div>
       </SettingAccordion>
-      <SettingButtonsRow bind:configToEdit keys={['machineLearning']} {disabled} />
+      <SettingButtonsRow bind:configToEdit keys={['machineLearning']} {disabled} {onBeforeSave} />
     </form>
   </div>
 </div>

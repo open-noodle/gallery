@@ -26,6 +26,7 @@ import {
   mdiOcr,
   mdiPause,
   mdiPaw,
+  mdiPawOutline,
   mdiPencil,
   mdiPlay,
   mdiPlus,
@@ -274,7 +275,7 @@ export const asQueueItem = ($t: MessageFormatter, queue: { name: QueueName }): Q
       subtitle: $t('admin.pet_detection_job_description'),
     },
     [QueueName.PetRecognition]: {
-      icon: mdiPaw,
+      icon: mdiPawOutline,
       title: $t('admin.machine_learning_pet_recognition'),
       subtitle: $t('admin.pet_recognition_job_description'),
     },

@@ -569,7 +569,45 @@ describe('DetailPanelPeople', () => {
 
     renderPanel({ isOwner: true });
 
-    expect(screen.getByTestId('pet-badge')).toHaveAttribute('title', 'dog');
+    // svelte-i18n's `dev` fallback locale (global test setup) renders an unmatched key literally,
+    // so a resolved translation key ('species_dog') proves the species went through
+    // pet-species.ts's map rather than being used raw — see R8.2 below for the full a11y contract.
+    expect(screen.getByTestId('pet-badge')).toHaveAttribute('title', 'species_dog');
+  });
+
+  // R8.1 (review-fixes F13): the badge markup is shared by both people sources — closes the
+  // audited gap that only the owner/faceManager path had badge coverage, not the space-viewer
+  // asset.people path a non-owner space member actually renders through.
+  it('renders the accessible paw badge via the space-viewer asset.people data path', () => {
+    faceManagerMock.people = [person('Should Not Appear')];
+
+    renderPanel({ isOwner: false, spaceId: 'space-1', people: [person('Rex', { type: 'pet', species: 'dog' })] });
+
+    const badge = screen.getByTestId('pet-badge');
+    expect(badge).toHaveAttribute('role', 'img');
+    expect(badge).toHaveAttribute('aria-label', 'species_dog');
+  });
+
+  // R8.2 (review-fixes F13): badge a11y + i18n — role, aria-label, and a translated species
+  // tooltip, with a raw-value fallback for a species pet-species.ts doesn't map.
+  it('gives the badge an aria-label with the translated species tooltip', () => {
+    faceManagerMock.people = [person('Mochi', { type: 'pet', species: 'dog' })];
+
+    renderPanel({ isOwner: true });
+
+    const badge = screen.getByTestId('pet-badge');
+    expect(badge).toHaveAttribute('role', 'img');
+    expect(badge).toHaveAttribute('aria-label', 'species_dog');
+  });
+
+  it('falls back to the raw species value in the badge tooltip for an unrecognized species', () => {
+    faceManagerMock.people = [person('Bandit', { type: 'pet', species: 'axolotl' })];
+
+    renderPanel({ isOwner: true });
+
+    const badge = screen.getByTestId('pet-badge');
+    expect(badge).toHaveAttribute('aria-label', 'axolotl');
+    expect(badge).toHaveAttribute('title', 'axolotl');
   });
 
   it('renders no paw badge for a human person', () => {

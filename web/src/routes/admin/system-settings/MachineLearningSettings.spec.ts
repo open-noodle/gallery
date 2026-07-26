@@ -1,8 +1,9 @@
 import type { SystemConfigDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { handleSystemConfigSave } from '$lib/services/system-config.service';
 import MachineLearningSettings from './MachineLearningSettings.svelte';
 
 type FacialRecognitionOverrides = Partial<
@@ -11,7 +12,14 @@ type FacialRecognitionOverrides = Partial<
   }
 >;
 
-const makeMachineLearningConfig = (facialRecognitionOverrides: FacialRecognitionOverrides = {}): SystemConfigDto =>
+type MachineLearningOverrides = Partial<
+  Pick<SystemConfigDto['machineLearning'], 'petDetection' | 'petRecognition'>
+>;
+
+const makeMachineLearningConfig = (
+  facialRecognitionOverrides: FacialRecognitionOverrides = {},
+  machineLearningOverrides: MachineLearningOverrides = {},
+): SystemConfigDto =>
   ({
     machineLearning: {
       enabled: true,
@@ -39,7 +47,14 @@ const makeMachineLearningConfig = (facialRecognitionOverrides: FacialRecognition
         minRecognitionScore: 0.5,
         maxResolution: 736,
       },
-      petDetection: { enabled: false, modelName: 'yolo11s', minScore: 0.7 },
+      petDetection: { enabled: false, modelName: 'yolo11s', minScore: 0.7, ...machineLearningOverrides.petDetection },
+      petRecognition: {
+        enabled: true,
+        modelName: 'pet-recognition-base',
+        maxDistance: 0.5,
+        minFaces: 2,
+        ...machineLearningOverrides.petRecognition,
+      },
     },
   }) as unknown as SystemConfigDto;
 
@@ -49,6 +64,7 @@ const mocks = vi.hoisted(() => ({
   defaultSystemConfig: {} as SystemConfigDto,
   cloneValue: vi.fn(),
   cloneDefaultValue: vi.fn(),
+  showDialog: vi.fn(),
 }));
 
 vi.mock(import('$lib/managers/feature-flags-manager.svelte'), () => ({
@@ -76,7 +92,7 @@ vi.mock(import('$lib/managers/system-config-manager.svelte'), () => ({
 // stub it to keep the facial-recognition section open and avoid SvelteKit navigation in tests.
 vi.mock(import('$lib/managers/accordion-manager.svelte'), () => ({
   accordionManager: {
-    isOpen: (key: string) => key === 'facial-recognition',
+    isOpen: (key: string) => key === 'facial-recognition' || key === 'pet-recognition',
     open: vi.fn(),
     close: vi.fn(),
   } as never,
@@ -85,6 +101,14 @@ vi.mock(import('$lib/managers/accordion-manager.svelte'), () => ({
 vi.mock(import('$lib/services/system-config.service'), () => ({
   handleSystemConfigSave: vi.fn(),
 }));
+
+vi.mock('@immich/ui', async (original) => {
+  const mod = await original<typeof import('@immich/ui')>();
+  return {
+    ...mod,
+    modalManager: { showDialog: mocks.showDialog, show: vi.fn() },
+  };
+});
 
 // SettingInputField sets both `id` and the paired `<label for>` to the raw label string, but it also
 // unconditionally sets `aria-labelledby="{label}-label"` on the input — an id this component never
@@ -248,5 +272,87 @@ describe('MachineLearningSettings suggestions toggle availability', () => {
     render(MachineLearningSettings);
 
     expect(screen.getByRole('switch', { name: 'admin.machine_learning_face_suggestions_setting' })).toBeDisabled();
+  });
+});
+
+describe('MachineLearningSettings pet recognition', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.featureFlags.configFile = false;
+    mocks.systemConfig = makeMachineLearningConfig();
+    mocks.defaultSystemConfig = makeMachineLearningConfig();
+    mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
+    mocks.cloneDefaultValue.mockImplementation(() => structuredClone(mocks.defaultSystemConfig));
+    mocks.showDialog.mockResolvedValue(true);
+  });
+
+  // R8.3: soft-dependency hint under the pet-recognition enable switch.
+  describe('detection-dependency hint', () => {
+    it('shows a hint when pet detection is disabled', () => {
+      mocks.systemConfig = makeMachineLearningConfig(
+        {},
+        { petDetection: { enabled: false, modelName: 'yolo11s', minScore: 0.5 } },
+      );
+      mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
+
+      render(MachineLearningSettings);
+
+      expect(screen.getByText('admin.pet_recognition_requires_detection')).toBeInTheDocument();
+    });
+
+    it('hides the hint when pet detection is enabled', () => {
+      mocks.systemConfig = makeMachineLearningConfig(
+        {},
+        { petDetection: { enabled: true, modelName: 'yolo11s', minScore: 0.5 } },
+      );
+      mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
+
+      render(MachineLearningSettings);
+
+      expect(screen.queryByText('admin.pet_recognition_requires_detection')).not.toBeInTheDocument();
+    });
+  });
+
+  // R8.4: model-change confirm — pairs with the server-side scoped-purge switch (Slice 5).
+  describe('model-change confirm', () => {
+    it('opens a confirm dialog when the model changed, and blocks the save on cancel', async () => {
+      mocks.showDialog.mockResolvedValue(false);
+      render(MachineLearningSettings);
+
+      const select = screen.getByLabelText('admin.machine_learning_pet_recognition_model') as HTMLSelectElement;
+      await fireEvent.change(select, { target: { value: 'pet-recognition-large' } });
+
+      await fireEvent.click(screen.getByRole('button', { name: 'save' }));
+
+      await waitFor(() => {
+        expect(mocks.showDialog).toHaveBeenCalledWith({ prompt: 'admin.pet_recognition_model_change_warning' });
+      });
+      expect(handleSystemConfigSave).not.toHaveBeenCalled();
+    });
+
+    it('proceeds with the save once the model-change confirm is accepted', async () => {
+      mocks.showDialog.mockResolvedValue(true);
+      render(MachineLearningSettings);
+
+      const select = screen.getByLabelText('admin.machine_learning_pet_recognition_model') as HTMLSelectElement;
+      await fireEvent.change(select, { target: { value: 'pet-recognition-large' } });
+
+      await fireEvent.click(screen.getByRole('button', { name: 'save' }));
+
+      await waitFor(() => {
+        expect(handleSystemConfigSave).toHaveBeenCalled();
+      });
+    });
+
+    it('does not open the confirm dialog when the model is unchanged', async () => {
+      render(MachineLearningSettings);
+
+      await fireEvent.click(screen.getByRole('button', { name: 'save' }));
+
+      await waitFor(() => {
+        expect(handleSystemConfigSave).toHaveBeenCalled();
+      });
+      expect(mocks.showDialog).not.toHaveBeenCalled();
+    });
   });
 });
