@@ -1448,7 +1448,6 @@ async function phaseContentVerify(): Promise<void> {
     console.log('  Verifying proxied range requests...');
     const partial = await fetch(`${BASE_URL}/assets/${rangeAssetId}/original`, {
       headers: { Authorization: `Bearer ${rangeToken}`, Range: 'bytes=0-9' },
-      redirect: 'follow',
     });
     assert.equal(partial.status, 206, `Expected 206 for a ranged proxy read, got ${partial.status}`);
     assert.equal(
@@ -1465,7 +1464,6 @@ async function phaseContentVerify(): Promise<void> {
     // a suffix range: S3 resolves it, we relay it — nothing in the server parses ranges
     const suffix = await fetch(`${BASE_URL}/assets/${rangeAssetId}/original`, {
       headers: { Authorization: `Bearer ${rangeToken}`, Range: 'bytes=-5' },
-      redirect: 'follow',
     });
     assert.equal(suffix.status, 206, `Expected 206 for a suffix range, got ${suffix.status}`);
     const suffixBody = Buffer.from(await suffix.arrayBuffer());
@@ -1474,7 +1472,6 @@ async function phaseContentVerify(): Promise<void> {
     // unsatisfiable ranges must surface as 416, not as a masked 404
     const unsatisfiable = await fetch(`${BASE_URL}/assets/${rangeAssetId}/original`, {
       headers: { Authorization: `Bearer ${rangeToken}`, Range: `bytes=${expected.length + 1000}-` },
-      redirect: 'follow',
     });
     assert.equal(unsatisfiable.status, 416, `Expected 416 for an unsatisfiable range, got ${unsatisfiable.status}`);
     console.log(`  Range requests verified (206 partial, suffix range, 416 unsatisfiable) for ${rangeAssetId}`);
