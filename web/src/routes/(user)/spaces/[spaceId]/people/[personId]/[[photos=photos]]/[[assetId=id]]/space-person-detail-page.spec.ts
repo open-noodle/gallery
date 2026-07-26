@@ -54,6 +54,7 @@ const { gotoMock, invalidateAllMock, authenticateMock, featureFlagsMock, formatM
         // Mirrors the real manager's derived field; these fixtures only model the
         // all-owned and none-owned ends of the range.
         get ownedAssets() {
+          // eslint-disable-next-line unicorn/no-this-outside-of-class
           return this.isAllUserOwned ? this.assets : [];
         },
       },
