@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { S3StorageBackend } from 'src/backends/s3-storage.backend';
 import { CacheControl } from 'src/enum';
+import { RangeNotSatisfiableError } from 'src/interfaces/storage-backend.interface';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -172,5 +173,80 @@ describe.skipIf(!canRunDocker)('S3StorageBackend integration (MinIO)', () => {
       }
       expect(Buffer.concat(chunks).toString()).toBe('proxy content');
     }
+  });
+
+  describe('range requests in proxy mode', () => {
+    // 'proxy range content' is 19 bytes
+    const body = 'proxy range content';
+    let proxyBackend: S3StorageBackend;
+
+    beforeAll(async () => {
+      const endpoint = `http://${container.getHost()}:${container.getMappedPort(9000)}`;
+      proxyBackend = new S3StorageBackend({
+        bucket,
+        region: 'us-east-1',
+        endpoint,
+        accessKeyId: 'minioadmin',
+        secretAccessKey: 'minioadmin',
+        presignedUrlExpiry: 3600,
+        serveMode: 'proxy',
+      });
+      await backend.put('test/proxy-range.txt', Buffer.from(body));
+    });
+
+    const readRange = async (range: string) => {
+      const strategy = await proxyBackend.getServeStrategy('test/proxy-range.txt', {
+        contentType: 'text/plain',
+        cacheControl: CacheControl.PrivateWithCache,
+        range,
+      });
+      if (strategy.type !== 'stream') {
+        throw new Error(`expected a stream strategy, got ${strategy.type}`);
+      }
+      const chunks: Buffer[] = [];
+      for await (const chunk of strategy.stream) {
+        chunks.push(Buffer.from(chunk));
+      }
+      return { ...strategy, content: Buffer.concat(chunks).toString() };
+    };
+
+    // These prove the pass-through design: we never parse the Range header, and a real
+    // S3 server resolves every syntax for us and reports the byte window it served.
+    it('should serve a closed range', async () => {
+      const { content, length, contentRange } = await readRange('bytes=0-4');
+      expect(content).toBe('proxy');
+      expect(length).toBe(5);
+      expect(contentRange).toBe(`bytes 0-4/${body.length}`);
+    });
+
+    it('should serve an open-ended range', async () => {
+      const { content, length, contentRange } = await readRange('bytes=12-');
+      expect(content).toBe('content');
+      expect(length).toBe(7);
+      expect(contentRange).toBe(`bytes 12-18/${body.length}`);
+    });
+
+    it('should serve a suffix range', async () => {
+      const { content, length, contentRange } = await readRange('bytes=-7');
+      expect(content).toBe('content');
+      expect(length).toBe(7);
+      expect(contentRange).toBe(`bytes 12-18/${body.length}`);
+    });
+
+    it('should serve the whole object with no content range when no range is asked for', async () => {
+      const strategy = await proxyBackend.getServeStrategy('test/proxy-range.txt', {
+        contentType: 'text/plain',
+        cacheControl: CacheControl.PrivateWithCache,
+      });
+      expect(strategy).toMatchObject({ type: 'stream', length: body.length });
+      expect((strategy as { contentRange?: string }).contentRange).toBeUndefined();
+      if (strategy.type === 'stream') {
+        strategy.stream.destroy();
+      }
+    });
+
+    it('should reject an unsatisfiable range', async () => {
+      await expect(readRange('bytes=9999-10000')).rejects.toBeInstanceOf(RangeNotSatisfiableError);
+    });
   });
 });
