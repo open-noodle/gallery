@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import { JobName, SharedSpaceRole, SourceType, SystemMetadataKey } from 'src/enum';
+import { AssetFileType, AssetVisibility, JobName, SharedSpaceRole, SourceType, SystemMetadataKey } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
@@ -170,6 +170,46 @@ describe('human face reset isolation from pet data (medium)', () => {
     expect(await personRow(ctx, pet.person.id)).toMatchObject({ id: pet.person.id, type: 'pet' });
 
     expect(await faceRow(ctx, human.face.id)).toBeUndefined();
+  });
+
+  it('R3.4 per-asset re-detection with zero detections keeps the pet face and drops the stale human face', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+
+    // One asset carrying both an assigned pet face and a stale human ML face.
+    const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+    await ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: `/preview/${asset.id}.webp` });
+    await ctx.newExif({ assetId: asset.id, exifImageWidth: 400, exifImageHeight: 500 });
+
+    const { person: petPerson } = await ctx.newPerson({ ownerId: user.id, type: 'pet', species: 'dog', name: 'Rex' });
+    const { assetFace: petFace } = await ctx.newAssetFace({
+      assetId: asset.id,
+      personId: petPerson.id,
+      sourceType: SourceType.MachineLearning,
+    });
+    await ctx.database
+      .insertInto('pet_search')
+      .values({ faceId: petFace.id, embedding: embedding('first') })
+      .execute();
+
+    const { assetFace: staleHumanFace } = await ctx.newAssetFace({
+      assetId: asset.id,
+      sourceType: SourceType.MachineLearning,
+    });
+
+    ctx
+      .getMock<MachineLearningRepository, Mocked<MachineLearningRepository>>(MachineLearningRepository)
+      .detectFaces.mockResolvedValue({ imageHeight: 500, imageWidth: 400, faces: [] });
+
+    await sut.handleDetectFaces({ id: asset.id });
+
+    expect(await faceRow(ctx, petFace.id)).toMatchObject({ id: petFace.id, personId: petPerson.id });
+    expect(
+      await ctx.database.selectFrom('pet_search').selectAll().where('faceId', '=', petFace.id).execute(),
+    ).toHaveLength(1);
+    expect(await personRow(ctx, petPerson.id)).toMatchObject({ id: petPerson.id, type: 'pet' });
+
+    expect(await faceRow(ctx, staleHumanFace.id)).toBeUndefined();
   });
 
   it('R2.3 non-force recognize fan-out queues the unassigned human face but not the unassigned pet face', async () => {

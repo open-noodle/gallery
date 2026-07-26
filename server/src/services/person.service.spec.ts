@@ -3133,6 +3133,76 @@ describe(PersonService.name, () => {
       expect(facesRecognizedAt.getTime()).toBeGreaterThanOrEqual(start);
     });
 
+    // F4: pet faces live in asset_face with the same machine-learning sourceType as human faces.
+    // Per-asset detection must neither sweep them up as "stale ML faces" nor IoU-match a detected
+    // human box onto one (which would write a human face_search embedding over a pet face).
+    // getForDetectFacesJob resolves the computed `isPet` column; these tests supply it directly.
+    const withIsPet = (asset: ReturnType<AssetFactory['build']>, isPetById: Record<string, boolean>) => {
+      const base = getForDetectedFaces(asset);
+      return { ...base, faces: base.faces.map((face) => ({ ...face, isPet: isPetById[face.id] ?? false })) };
+    };
+
+    it('R3.1 does not remove a pet face when detection returns no faces', async () => {
+      const petFace = AssetFaceFactory.create({ sourceType: SourceType.MachineLearning });
+      const asset = AssetFactory.from().file({ type: AssetFileType.Preview }).exif().face(petFace).build();
+
+      mocks.machineLearning.detectFaces.mockResolvedValue({ imageHeight: 500, imageWidth: 400, faces: [] });
+      mocks.assetJob.getForDetectFacesJob.mockResolvedValue(withIsPet(asset, { [petFace.id]: true }) as any);
+      mocks.person.refreshFaces.mockResolvedValue();
+
+      await expect(sut.handleDetectFaces({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.person.refreshFaces).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.arrayContaining([petFace.id]),
+        expect.anything(),
+      );
+      expect(mocks.faceIdentity.unlinkFaces).not.toHaveBeenCalled();
+    });
+
+    it('R3.2 never writes a human embedding onto an IoU-overlapping pet face', async () => {
+      const petFace = AssetFaceFactory.create({ sourceType: SourceType.MachineLearning });
+      const asset = AssetFactory.from().file({ type: AssetFileType.Preview }).exif().face(petFace).build();
+      const firstNewFaceId = newUuid();
+      const secondNewFaceId = newUuid();
+
+      // Two detected human boxes, both exactly the pet face's box (IoU 1.0 — the strongest possible
+      // cross-match). Before the fix the first detection consumed the pet face out of mlFaceIds and
+      // the second one, finding it already consumed, wrote its human embedding straight onto the
+      // pet face. Neither box may touch it.
+      const detected = getAsDetectedFace(petFace);
+      mocks.machineLearning.detectFaces.mockResolvedValue({
+        ...detected,
+        faces: [...detected.faces, ...detected.faces],
+      });
+      mocks.assetJob.getForDetectFacesJob.mockResolvedValue(withIsPet(asset, { [petFace.id]: true }) as any);
+      mocks.crypto.randomUUID.mockReturnValueOnce(firstNewFaceId).mockReturnValueOnce(secondNewFaceId);
+      mocks.person.refreshFaces.mockResolvedValue();
+
+      await expect(sut.handleDetectFaces({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+      const call = mocks.person.refreshFaces.mock.calls[0];
+      expect(call).toBeDefined();
+      const [facesToAdd, faceIdsToRemove, embeddings] = call!;
+      expect(facesToAdd.map((face) => face.id)).toEqual([firstNewFaceId, secondNewFaceId]);
+      expect(faceIdsToRemove).not.toContain(petFace.id);
+      expect((embeddings ?? []).map((embedding) => embedding.faceId)).not.toContain(petFace.id);
+    });
+
+    it('R3.3 pin: a stale human machine-learning face is still removed', async () => {
+      const staleFace = AssetFaceFactory.create({ sourceType: SourceType.MachineLearning });
+      const asset = AssetFactory.from().file({ type: AssetFileType.Preview }).exif().face(staleFace).build();
+
+      mocks.machineLearning.detectFaces.mockResolvedValue({ imageHeight: 500, imageWidth: 400, faces: [] });
+      mocks.assetJob.getForDetectFacesJob.mockResolvedValue(withIsPet(asset, {}) as any);
+      mocks.person.refreshFaces.mockResolvedValue();
+
+      await expect(sut.handleDetectFaces({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.person.refreshFaces).toHaveBeenCalledWith([], [staleFace.id], []);
+      expect(mocks.faceIdentity.unlinkFaces).toHaveBeenCalledWith([staleFace.id]);
+    });
+
     it('should not write facesRecognizedAt or queue recognition when ML face detection throws', async () => {
       const asset = AssetFactory.from().file({ type: AssetFileType.Preview, path: '/preview.jpg' }).exif().build();
       mocks.assetJob.getForDetectFacesJob.mockResolvedValue(getForDetectedFaces(asset));

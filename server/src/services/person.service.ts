@@ -935,13 +935,21 @@ export class PersonService extends BaseService {
     const mlFaceIds = new Set<string>();
 
     for (const face of asset.faces) {
-      if (face.sourceType === SourceType.MachineLearning) {
+      // Pet faces carry the same machine-learning sourceType as human faces, so without the isPet
+      // guard they land in faceIdsToRemove and get hard-deleted on every re-detection (F4).
+      if (face.sourceType === SourceType.MachineLearning && !face.isPet) {
         mlFaceIds.add(face.id);
       }
     }
 
     for (const { boundingBox, embedding } of faces) {
       const match = asset.faces.find((face) => {
+        // A detected human box must never resolve to a pet face: the match either consumes it or,
+        // once consumed, receives a human face_search embedding written over the pet (F4).
+        if (face.isPet) {
+          return false;
+        }
+
         const heightScale = face.imageHeight / imageHeight;
         const widthScale = face.imageWidth / imageWidth;
         const scaledBox = {

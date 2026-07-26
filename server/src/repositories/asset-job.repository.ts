@@ -9,6 +9,7 @@ import { DB } from 'src/schema';
 import {
   anyUuid,
   asUuid,
+  petFacePredicate,
   withAudioStream,
   withDefaultVisibility,
   withEdits,
@@ -231,14 +232,27 @@ export class AssetJobRepository {
 
   @GenerateSql({ params: [DummyValue.UUID] })
   getForDetectFacesJob(id: string) {
-    return this.db
-      .selectFrom('asset')
-      .select(['asset.id', 'asset.visibility'])
-      .$call(withExifInner)
-      .select((eb) => withFaces(eb, true, true))
-      .select((eb) => withFiles(eb, AssetFileType.Preview))
-      .where('asset.id', '=', id)
-      .executeTakeFirst();
+    return (
+      this.db
+        .selectFrom('asset')
+        .select(['asset.id', 'asset.visibility'])
+        .$call(withExifInner)
+        // Local variant of withFaces(eb, true, true) that also computes `isPet`. handleDetectFaces
+        // needs it to keep pet faces out of the stale-face sweep and the IoU match (F4); withFaces
+        // itself stays untouched for its other, read-only callers.
+        .select((eb) =>
+          jsonArrayFrom(
+            eb
+              .selectFrom('asset_face')
+              .selectAll('asset_face')
+              .select((inner) => petFacePredicate(inner).as('isPet'))
+              .whereRef('asset_face.assetId', '=', 'asset.id'),
+          ).as('faces'),
+        )
+        .select((eb) => withFiles(eb, AssetFileType.Preview))
+        .where('asset.id', '=', id)
+        .executeTakeFirst()
+    );
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
