@@ -2122,7 +2122,10 @@ async function phaseVideoTrimS3(): Promise<void> {
     assert.equal(editedVideo.path, expectedKey, 'Edited encoded video key mismatch');
     assert.notEqual(editedVideo.path, nonEditedKey, 'Edited video must not reuse the non-edited key');
 
-    for (const row of editedRows.filter((r) => r.type !== 'encoded_video')) {
+    for (const row of editedRows) {
+      if (row.type === 'encoded_video') {
+        continue;
+      }
       assert.ok(row.path.includes('_edited'), `Edited ${row.type} key must carry _edited: ${row.path}`);
     }
 
@@ -2151,7 +2154,6 @@ async function phaseVideoTrimS3(): Promise<void> {
     // Playback serves the trimmed video from S3.
     const playbackRes = await fetch(`${BASE_URL}/assets/${assetId}/video/playback`, {
       headers: { Authorization: `Bearer ${token}` },
-      redirect: 'follow',
     });
     assert.equal(playbackRes.status, 200, `Expected 200 from playback, got ${playbackRes.status}`);
     await playbackRes.arrayBuffer();
@@ -2168,7 +2170,6 @@ async function phaseVideoTrimS3(): Promise<void> {
 
     const undoRes = await fetch(`${BASE_URL}/assets/${assetId}/video/playback`, {
       headers: { Authorization: `Bearer ${token}` },
-      redirect: 'follow',
     });
     assert.equal(undoRes.status, 200, `Expected 200 from playback after undo, got ${undoRes.status}`);
     await undoRes.arrayBuffer();
