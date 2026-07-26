@@ -275,13 +275,13 @@ export class SharedSpaceService extends BaseService {
   }
 
   async update(auth: AuthDto, id: string, dto: SharedSpaceUpdateDto): Promise<SharedSpaceResponseDto> {
-    const isMetadataUpdate =
-      dto.name !== undefined ||
-      dto.description !== undefined ||
-      dto.color !== undefined ||
-      dto.faceRecognitionEnabled !== undefined ||
-      dto.petsEnabled !== undefined;
-    const minimumRole = isMetadataUpdate ? SharedSpaceRole.Owner : SharedSpaceRole.Editor;
+    // Space-wide processing settings stay owner-only: faceRecognitionEnabled gates ML work and
+    // the People tab for every member (and queues a full re-match when switched on), petsEnabled
+    // changes the whole space's people list. Naming/appearance (name, description, color) and the
+    // cover are editor-level. The check runs against the WHOLE dto before any write, so a mixed
+    // payload from an editor is rejected outright rather than partially applied.
+    const isOwnerOnlySettingsUpdate = dto.faceRecognitionEnabled !== undefined || dto.petsEnabled !== undefined;
+    const minimumRole = isOwnerOnlySettingsUpdate ? SharedSpaceRole.Owner : SharedSpaceRole.Editor;
     await this.requireRole(auth, id, minimumRole);
 
     // Validate thumbnail asset belongs to the space

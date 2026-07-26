@@ -1138,26 +1138,38 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.sharedSpace.update).not.toHaveBeenCalled();
     });
 
-    it('should not allow editor to update name', async () => {
+    it('should allow editor to update name', async () => {
       const auth = factory.auth();
       const space = factory.sharedSpace();
       const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Editor });
+      const updatedSpace = { ...space, name: 'New Name' };
 
       mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.update.mockResolvedValue(updatedSpace);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
 
-      await expect(sut.update(auth, space.id, { name: 'New Name' })).rejects.toBeInstanceOf(ForbiddenException);
+      const result = await sut.update(auth, space.id, { name: 'New Name' });
+
+      expect(result.name).toBe('New Name');
+      expect(mocks.sharedSpace.update).toHaveBeenCalledWith(space.id, { name: 'New Name' });
     });
 
-    it('should not allow editor to update description', async () => {
+    it('should allow editor to update description', async () => {
       const auth = factory.auth();
       const space = factory.sharedSpace();
       const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Editor });
+      const updatedSpace = { ...space, description: 'New Description' };
 
       mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.update.mockResolvedValue(updatedSpace);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
 
-      await expect(sut.update(auth, space.id, { description: 'New Description' })).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
+      const result = await sut.update(auth, space.id, { description: 'New Description' });
+
+      expect(result.description).toBe('New Description');
+      expect(mocks.sharedSpace.update).toHaveBeenCalledWith(space.id, { description: 'New Description' });
     });
 
     it('should allow owner to update color', async () => {
@@ -1185,19 +1197,24 @@ describe(SharedSpaceService.name, () => {
       });
     });
 
-    it('should not allow editor to update color', async () => {
+    it('should allow editor to update color', async () => {
       const auth = factory.auth();
       const space = factory.sharedSpace();
       const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Editor });
+      const updatedSpace = { ...space, color: 'blue' };
 
       mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.update.mockResolvedValue(updatedSpace);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
 
-      await expect(sut.update(auth, space.id, { color: UserAvatarColor.Blue })).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
+      const result = await sut.update(auth, space.id, { color: UserAvatarColor.Blue });
+
+      expect(result.color).toBe('blue');
+      expect(mocks.sharedSpace.update).toHaveBeenCalledWith(space.id, { color: UserAvatarColor.Blue });
     });
 
-    it('should treat color update as metadata change (owner-only)', async () => {
+    it('should not allow viewer to update color', async () => {
       const auth = factory.auth();
       const space = factory.sharedSpace();
       const viewer = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Viewer });
@@ -1207,6 +1224,82 @@ describe(SharedSpaceService.name, () => {
       await expect(sut.update(auth, space.id, { color: UserAvatarColor.Red })).rejects.toBeInstanceOf(
         ForbiddenException,
       );
+    });
+
+    it('should not allow editor to update faceRecognitionEnabled', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace();
+      const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Editor });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+
+      await expect(sut.update(auth, space.id, { faceRecognitionEnabled: true })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(mocks.sharedSpace.update).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it('should not allow editor to update petsEnabled', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace();
+      const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Editor });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+
+      await expect(sut.update(auth, space.id, { petsEnabled: true })).rejects.toBeInstanceOf(ForbiddenException);
+      expect(mocks.sharedSpace.update).not.toHaveBeenCalled();
+    });
+
+    it('should reject an editor mixing naming and settings fields without writing anything', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace();
+      const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Editor });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+
+      // The role check runs against the WHOLE dto before any write, so the permitted
+      // `name` must NOT sneak through alongside the forbidden `petsEnabled`.
+      await expect(sut.update(auth, space.id, { name: 'Sneaky', petsEnabled: true })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(mocks.sharedSpace.update).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.logActivity).not.toHaveBeenCalled();
+    });
+
+    it('should not allow a viewer to update name', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace();
+      const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Viewer });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+
+      await expect(sut.update(auth, space.id, { name: 'Nope' })).rejects.toBeInstanceOf(ForbiddenException);
+      expect(mocks.sharedSpace.update).not.toHaveBeenCalled();
+    });
+
+    it('should attribute an editor rename to the editor in the activity feed', async () => {
+      // The feed renders "<user> renamed the space" from this userId. Every existing
+      // space_rename activity test uses an Owner, so editor attribution is a newly
+      // reachable path with no coverage — an editor's rename must not be logged as
+      // the owner's.
+      const auth = factory.auth();
+      const space = factory.sharedSpace({ name: 'Old Name' });
+      const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Editor });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.update.mockResolvedValue({ ...space, name: 'New Name' });
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.update(auth, space.id, { name: 'New Name' });
+
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith({
+        spaceId: space.id,
+        userId: auth.user.id,
+        type: SharedSpaceActivityType.SpaceRename,
+        data: { oldName: 'Old Name', newName: 'New Name' },
+      });
     });
 
     it('should not allow viewer to update thumbnailAssetId', async () => {
