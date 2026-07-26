@@ -69,6 +69,10 @@ export class DiskStorageBackend implements StorageBackend {
     });
   }
 
+  getReadableUrl(key: string): Promise<string> {
+    return Promise.resolve(this.resolvePath(key));
+  }
+
   private async getFolderSize(folder: string): Promise<number> {
     let total = 0;
     let dir;
