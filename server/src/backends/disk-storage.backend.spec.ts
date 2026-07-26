@@ -149,4 +149,16 @@ describe('DiskStorageBackend', () => {
       await expect(backend.getPrefixUsage('thumbs/ghost/')).resolves.toBe(0);
     });
   });
+
+  describe('getReadableUrl', () => {
+    it('returns the resolved local path for a relative key', async () => {
+      await expect(backend.getReadableUrl('upload/admin/ab/cd/video.mp4')).resolves.toBe(
+        join(testDir, 'upload/admin/ab/cd/video.mp4'),
+      );
+    });
+
+    it('returns absolute paths unchanged', async () => {
+      await expect(backend.getReadableUrl('/data/library/video.mp4')).resolves.toBe('/data/library/video.mp4');
+    });
+  });
 });

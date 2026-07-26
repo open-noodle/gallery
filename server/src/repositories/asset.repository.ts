@@ -1899,6 +1899,17 @@ export class AssetRepository {
       .executeTakeFirst();
   }
 
+  // No @GenerateSql: undecorated repository methods are not documented; several already are.
+  async getEditedEncodedVideo(assetId: string) {
+    return this.db
+      .selectFrom('asset_file')
+      .select(['asset_file.id', 'asset_file.path'])
+      .where('asset_file.assetId', '=', assetId)
+      .where('asset_file.type', '=', AssetFileType.EncodedVideo)
+      .where('asset_file.isEdited', '=', true)
+      .executeTakeFirst();
+  }
+
   @GenerateSql({ params: [DummyValue.UUID] })
   async getForOcr(id: string) {
     return this.db
