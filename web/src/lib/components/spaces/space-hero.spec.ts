@@ -1,5 +1,5 @@
 import type { SharedSpaceResponseDto } from '@immich/sdk';
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 // The hover edit control mounts a ButtonContextMenu → IconButton → Tooltip, which needs a
 // TooltipProvider in context. The wrapper supplies it and forwards SpaceHero's props verbatim.
@@ -106,31 +106,38 @@ describe('SpaceHero component', () => {
 
   // --- Edit control (✎) ---
 
-  it('shows the edit control without requiring hover (always visible for editors with a cover)', () => {
+  it('shows the edit control immediately for an editor with a cover, with no hover interaction', () => {
     render(SpaceHero, {
       space: makeSpace({ thumbnailAssetId: 'a1' }),
       canEdit: true,
       onChangeCover: () => {},
       onReposition: () => {},
     });
-    expect(screen.getByTestId('hero-edit-cover')).not.toHaveClass('opacity-0');
+    const menu = screen.getByTestId('hero-edit-menu');
+    expect(menu).toBeInTheDocument();
+    expect(within(menu).getByLabelText('edit')).toBeEnabled();
   });
 
   it('shows the edit control only when canEdit', async () => {
     const { rerender } = render(SpaceHero, { space: makeSpace({ thumbnailAssetId: 'a1' }), canEdit: false });
-    expect(screen.queryByTestId('hero-edit-cover')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('hero-edit-menu')).not.toBeInTheDocument();
     await rerender({
       space: makeSpace({ thumbnailAssetId: 'a1' }),
       canEdit: true,
       onChangeCover: () => {},
       onReposition: () => {},
     });
-    expect(screen.getByTestId('hero-edit-cover')).toBeInTheDocument();
+    expect(screen.getByTestId('hero-edit-menu')).toBeInTheDocument();
   });
 
-  it('does not show the hover edit control when there is no cover', () => {
-    render(SpaceHero, { space: makeSpace({ thumbnailAssetId: null }), canEdit: true, onChangeCover: () => {} });
-    expect(screen.queryByTestId('hero-edit-cover')).not.toBeInTheDocument();
+  it('shows the edit menu even when there is no cover, so renaming stays reachable', () => {
+    render(SpaceHero, {
+      space: makeSpace({ thumbnailAssetId: null }),
+      canEdit: true,
+      onChangeCover: () => {},
+      onEditSpace: () => {},
+    });
+    expect(screen.getByTestId('hero-edit-menu')).toBeInTheDocument();
   });
 
   it('does not show the hover edit control during reposition mode', () => {
@@ -143,7 +150,86 @@ describe('SpaceHero component', () => {
       onSavePosition: vi.fn(),
       onCancelReposition: vi.fn(),
     });
-    expect(screen.queryByTestId('hero-edit-cover')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('hero-edit-menu')).not.toBeInTheDocument();
+  });
+
+  it('offers Edit space in the hero menu for an editor', async () => {
+    render(SpaceHero, {
+      space: makeSpace({ thumbnailAssetId: 'a1' }),
+      canEdit: true,
+      onChangeCover: () => {},
+      onReposition: () => {},
+      onEditSpace: () => {},
+    });
+
+    await fireEvent.click(within(screen.getByTestId('hero-edit-menu')).getByLabelText('edit'));
+
+    expect(await screen.findByText('spaces_edit')).toBeInTheDocument();
+  });
+
+  it('calls onEditSpace when Edit space is chosen', async () => {
+    const onEditSpace = vi.fn();
+    render(SpaceHero, {
+      space: makeSpace({ thumbnailAssetId: 'a1' }),
+      canEdit: true,
+      onChangeCover: () => {},
+      onReposition: () => {},
+      onEditSpace,
+    });
+
+    await fireEvent.click(within(screen.getByTestId('hero-edit-menu')).getByLabelText('edit'));
+    await fireEvent.click(await screen.findByText('spaces_edit'));
+
+    expect(onEditSpace).toHaveBeenCalledOnce();
+  });
+
+  it('omits Reposition when there is no cover, since there is no image to drag', async () => {
+    render(SpaceHero, {
+      space: makeSpace({ thumbnailAssetId: null }),
+      canEdit: true,
+      onChangeCover: () => {},
+      onEditSpace: () => {},
+    });
+
+    await fireEvent.click(within(screen.getByTestId('hero-edit-menu')).getByLabelText('edit'));
+
+    expect(await screen.findByText('spaces_edit')).toBeInTheDocument();
+    expect(screen.getByText('change_cover_photo')).toBeInTheDocument();
+    expect(screen.queryByText('reposition')).not.toBeInTheDocument();
+  });
+
+  it('offers Reposition when there IS a cover', async () => {
+    render(SpaceHero, {
+      space: makeSpace({ thumbnailAssetId: 'a1' }),
+      canEdit: true,
+      onChangeCover: () => {},
+      onReposition: () => {},
+      onEditSpace: () => {},
+    });
+
+    await fireEvent.click(within(screen.getByTestId('hero-edit-menu')).getByLabelText('edit'));
+
+    expect(await screen.findByText('reposition')).toBeInTheDocument();
+  });
+
+  it('shows no edit menu for a viewer, with or without a cover', async () => {
+    const { rerender } = render(SpaceHero, { space: makeSpace({ thumbnailAssetId: 'a1' }), canEdit: false });
+    expect(screen.queryByTestId('hero-edit-menu')).not.toBeInTheDocument();
+
+    await rerender({ space: makeSpace({ thumbnailAssetId: null }), canEdit: false });
+    expect(screen.queryByTestId('hero-edit-menu')).not.toBeInTheDocument();
+  });
+
+  it('still shows the empty-state Set cover button alongside the menu', () => {
+    render(SpaceHero, {
+      space: makeSpace({ thumbnailAssetId: null }),
+      canEdit: true,
+      onChangeCover: () => {},
+      onEditSpace: () => {},
+    });
+
+    expect(screen.getByTestId('hero-edit-menu')).toBeInTheDocument();
+    expect(screen.getByTestId('hero-set-cover-button')).toBeInTheDocument();
   });
 
   // --- Set cover prompt (no cover) ---

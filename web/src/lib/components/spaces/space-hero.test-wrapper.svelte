@@ -9,6 +9,7 @@
     gradientClass?: string;
     canEdit?: boolean;
     onChangeCover?: () => void;
+    onEditSpace?: () => void;
     onReposition?: () => void;
     repositioning?: boolean;
     onSavePosition?: (cropY: number) => void;
