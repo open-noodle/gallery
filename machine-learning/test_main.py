@@ -21,6 +21,7 @@ from PIL import Image
 from pytest import MonkeyPatch
 from pytest_mock import MockerFixture
 
+import immich_ml.main as ml_main
 from immich_ml.config import MaxBatchSize, Settings, settings
 from immich_ml.main import load, preload_models
 from immich_ml.models import get_model_class
@@ -1215,6 +1216,32 @@ class TestPetDetection:
 
         assert detector.min_score == 0.8
 
+    def test_detector_clamps_boxes_to_image_bounds(self, mocker: MockerFixture) -> None:
+        mocker.patch.object(PetDetector, "load")
+        detector = PetDetector("yolo11n", min_score=0.5, cache_dir="test_cache")
+
+        session = mock.Mock()
+        # cv_image-sized inputs are (orig_h=800, orig_w=600); scale_x = 600/640, scale_y = 800/640.
+        # Bottom-right detection overflows past (600, 800); top-left detection overflows below (0, 0).
+        session.run.return_value = self._make_yolo_output(
+            [
+                (630, 630, 100, 100, 16, 0.9),  # dog, overflows bottom-right
+                (5, 5, 50, 50, 15, 0.85),  # cat, overflows top-left
+            ]
+        )
+        detector.session = session
+        detector._input_name = "images"
+
+        # width=600, height=800 (matches the cv_image fixture's PIL Image.new("RGB", (600, 800)))
+        image = np.zeros((800, 600, 3), dtype=np.uint8)
+        results = detector.predict(image)
+
+        assert len(results) == 2
+        for detection in results:
+            box = detection["boundingBox"]
+            assert 0 <= box["x1"] <= box["x2"] <= 600
+            assert 0 <= box["y1"] <= box["y2"] <= 800
+
 
 class TestPetRecognition:
     @staticmethod
@@ -1340,25 +1367,122 @@ class TestPetRecognition:
         embedding = orjson.loads(embedding_str)
         assert len(embedding) == 512
 
-    def test_recognizer_skips_degenerate_box(self, mocker: MockerFixture) -> None:
+    def test_recognizer_skips_degenerate_box_but_recognizes_valid_sibling(self, mocker: MockerFixture) -> None:
         mocker.patch.object(PetRecognizer, "load")
         recognizer = PetRecognizer("pet-recognition-base", cache_dir="test_cache")
         recognizer.session = mock.Mock()
         recognizer._input_name = "input"
+        # only the valid sibling box is ever sent to the model -> one embedding row
         recognizer.session.run.return_value = [np.random.rand(1, 512).astype(np.float32)]
 
         image = np.zeros((50, 50, 3), dtype=np.uint8)
         pets: PetDetectionOutput = [
             {"boundingBox": {"x1": 10, "y1": 10, "x2": 10, "y2": 10}, "score": 0.9, "label": "cat"},
+            {"boundingBox": {"x1": 0, "y1": 0, "x2": 50, "y2": 50}, "score": 0.8, "label": "dog"},
+        ]
+
+        results = recognizer.predict(image, pets)
+
+        assert len(results) == 2
+        degenerate_result, valid_result = results
+        assert degenerate_result["boundingBox"] == pets[0]["boundingBox"]
+        assert degenerate_result["label"] == "cat"
+        assert "embedding" not in degenerate_result
+
+        assert valid_result["label"] == "dog"
+        embedding_str = valid_result.get("embedding")
+        assert isinstance(embedding_str, str)
+        embedding = orjson.loads(embedding_str)
+        assert len(embedding) == 512
+
+    def test_recognizer_skips_fully_out_of_bounds_box(self, mocker: MockerFixture) -> None:
+        mocker.patch.object(PetRecognizer, "load")
+        recognizer = PetRecognizer("pet-recognition-base", cache_dir="test_cache")
+        recognizer.session = mock.Mock()
+        recognizer._input_name = "input"
+
+        image = np.zeros((50, 50, 3), dtype=np.uint8)
+        pets: PetDetectionOutput = [
+            {"boundingBox": {"x1": 1000, "y1": 1000, "x2": 1010, "y2": 1010}, "score": 0.9, "label": "dog"},
         ]
 
         results = recognizer.predict(image, pets)
 
         assert len(results) == 1
-        embedding_str = results[0].get("embedding")
-        assert isinstance(embedding_str, str)
-        embedding = orjson.loads(embedding_str)
-        assert len(embedding) == 512
+        assert "embedding" not in results[0]
+        recognizer.session.run.assert_not_called()
+
+    def test_recognizer_uses_area_interpolation_downscaling_and_linear_upscaling(self, mocker: MockerFixture) -> None:
+        mocker.patch.object(PetRecognizer, "load")
+        recognizer = PetRecognizer("pet-recognition-base", cache_dir="test_cache")
+        recognizer.session = mock.Mock()
+        recognizer._input_name = "input"
+        recognizer.session.run.return_value = [np.random.rand(2, 512).astype(np.float32)]
+
+        mock_resize = mocker.patch(
+            "immich_ml.models.pet_recognition.recognition.cv2.resize",
+            return_value=np.zeros((224, 224, 3), dtype=np.uint8),
+        )
+
+        image = np.zeros((500, 500, 3), dtype=np.uint8)
+        pets: PetDetectionOutput = [
+            # 400x400 crop: larger than 224x224 by area -> downscale -> INTER_AREA
+            {"boundingBox": {"x1": 0, "y1": 0, "x2": 400, "y2": 400}, "score": 0.9, "label": "dog"},
+            # 100x100 crop: smaller than 224x224 by area -> upscale -> INTER_LINEAR
+            {"boundingBox": {"x1": 400, "y1": 400, "x2": 500, "y2": 500}, "score": 0.8, "label": "cat"},
+        ]
+
+        recognizer.predict(image, pets)
+
+        assert mock_resize.call_count == 2
+        assert mock_resize.call_args_list[0].kwargs["interpolation"] == cv2.INTER_AREA
+        assert mock_resize.call_args_list[1].kwargs["interpolation"] == cv2.INTER_LINEAR
+
+    def test_recognizer_batches_predictions_by_configured_max_batch_size(self, mocker: MockerFixture) -> None:
+        mocker.patch.object(settings, "max_batch_size", MaxBatchSize(pet_recognition=1))
+        mocker.patch.object(PetRecognizer, "load")
+        recognizer = PetRecognizer("pet-recognition-base", cache_dir="test_cache")
+        assert recognizer.batch_size == 1
+
+        recognizer.session = mock.Mock()
+        recognizer._input_name = "input"
+
+        call_sizes: list[int] = []
+
+        def fake_run(_output_names: Any, feed: dict[str, NDArray[np.float32]]) -> list[NDArray[np.float32]]:
+            blob = feed[recognizer._input_name]
+            call_sizes.append(blob.shape[0])
+            embedding = np.full((blob.shape[0], 512), len(call_sizes) - 1, dtype=np.float32)
+            return [embedding]
+
+        recognizer.session.run.side_effect = fake_run
+
+        image = np.zeros((50, 50, 3), dtype=np.uint8)
+        pets: PetDetectionOutput = [
+            {"boundingBox": {"x1": 0, "y1": 0, "x2": 10, "y2": 10}, "score": 0.9, "label": "dog"},
+            {"boundingBox": {"x1": 10, "y1": 10, "x2": 20, "y2": 20}, "score": 0.8, "label": "cat"},
+            {"boundingBox": {"x1": 20, "y1": 20, "x2": 30, "y2": 30}, "score": 0.7, "label": "bird"},
+        ]
+
+        results = recognizer.predict(image, pets)
+
+        assert recognizer.session.run.call_count == 3
+        assert call_sizes == [1, 1, 1]
+        assert [orjson.loads(r["embedding"])[0] for r in results] == [0.0, 1.0, 2.0]
+
+    def test_recognizer_raises_on_embedding_count_mismatch(self, mocker: MockerFixture) -> None:
+        mocker.patch.object(PetRecognizer, "load")
+        recognizer = PetRecognizer("pet-recognition-base", cache_dir="test_cache")
+        recognizer.session = mock.Mock()
+        recognizer._input_name = "input"
+        # two pets are sent to the model, but the session only returns one embedding row
+        recognizer.session.run.return_value = [np.random.rand(1, 512).astype(np.float32)]
+
+        image = np.zeros((50, 50, 3), dtype=np.uint8)
+        pets = self._pets()
+
+        with pytest.raises(ValueError):
+            recognizer.predict(image, pets)
 
     def test_get_model_class_resolves_pet_recognition(self) -> None:
         assert get_model_class("pet-recognition-base", ModelType.RECOGNITION, ModelTask.PET_DETECTION) is PetRecognizer
@@ -1376,7 +1500,84 @@ class TestPetRecognition:
             "open-noodle/pet-recognition-base",
             cache_dir=recognizer.cache_dir,
             local_dir=recognizer.cache_dir,
+            ignore_patterns=["*.armnn", "*.rknn"],
         )
+
+
+class TestPetPipeline:
+    @pytest.mark.asyncio
+    async def test_recognition_overwrites_pet_detection_key_with_paired_embeddings(self, mocker: MockerFixture) -> None:
+        """Endpoint-level pairing contract (F12/R7.6): the recognition entry's output overwrites the
+        'pet-detection' response key produced by the detection entry, and each crop's deterministic
+        fake embedding (mean pixel value, computed independently of the production zip) survives
+        end-to-end through run_inference. A reversed zip inside PetRecognizer._predict would swap the
+        two embeddings between labels and fail this test."""
+        detector = PetDetector("yolo11n", cache_dir="test_cache")
+        detector.loaded = True
+        detected_pets: PetDetectionOutput = [
+            {"boundingBox": {"x1": 0, "y1": 0, "x2": 50, "y2": 50}, "score": 0.9, "label": "dog"},
+            {"boundingBox": {"x1": 50, "y1": 50, "x2": 100, "y2": 100}, "score": 0.8, "label": "cat"},
+        ]
+        mocker.patch.object(PetDetector, "_predict", return_value=detected_pets)
+
+        recognizer = PetRecognizer("pet-recognition-base", cache_dir="test_cache")
+        recognizer.loaded = True
+        recognizer._input_name = "input"
+        recognizer.session = mock.Mock()
+
+        def fake_run(_output_names: Any, feed: dict[str, NDArray[np.float32]]) -> list[NDArray[np.float32]]:
+            blob = feed[recognizer._input_name]
+            means = blob.reshape(blob.shape[0], -1).mean(axis=1).astype(np.float32)
+            return [np.stack([np.full(512, m, dtype=np.float32) for m in means])]
+
+        recognizer.session.run.side_effect = fake_run
+
+        async def fake_get(model_name: str, model_type: ModelType, model_task: ModelTask, **kwargs: Any) -> Any:
+            return detector if model_type == ModelType.DETECTION else recognizer
+
+        mocker.patch.object(ml_main.model_cache, "get", side_effect=fake_get)
+
+        # region A (dog crop): BGR pure blue; region B (cat crop): BGR pure red
+        image = np.zeros((100, 100, 3), dtype=np.uint8)
+        image[0:50, 0:50] = (255, 0, 0)
+        image[50:100, 50:100] = (0, 0, 255)
+        pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+
+        without_deps: list[dict[str, Any]] = [
+            {"name": "yolo11n", "task": ModelTask.PET_DETECTION, "type": ModelType.DETECTION, "options": {}}
+        ]
+        with_deps: list[dict[str, Any]] = [
+            {
+                "name": "pet-recognition-base",
+                "task": ModelTask.PET_DETECTION,
+                "type": ModelType.RECOGNITION,
+                "options": {},
+            }
+        ]
+
+        response = await ml_main.run_inference(pil_image, (without_deps, with_deps))  # type: ignore[arg-type]
+
+        pet_detection_result = response["pet-detection"]
+        assert len(pet_detection_result) == 2
+        dog_result, cat_result = pet_detection_result
+        assert dog_result["label"] == "dog"
+        assert cat_result["label"] == "cat"
+        assert "embedding" in dog_result
+        assert "embedding" in cat_result
+
+        from immich_ml.models.pet_recognition.recognition import _MEAN, _STD
+
+        def expected_mean(rgb: tuple[int, int, int]) -> float:
+            channel_values = [(c / 255.0 - _MEAN[i]) / _STD[i] for i, c in enumerate(rgb)]
+            return float(np.mean(channel_values))
+
+        dog_expected = expected_mean((0, 0, 255))  # region A after BGR->RGB
+        cat_expected = expected_mean((255, 0, 0))  # region B after BGR->RGB
+
+        dog_embedding = orjson.loads(dog_result["embedding"])
+        cat_embedding = orjson.loads(cat_result["embedding"])
+        assert np.allclose(dog_embedding, dog_expected, atol=1e-4)
+        assert np.allclose(cat_embedding, cat_expected, atol=1e-4)
 
 
 @pytest.mark.asyncio

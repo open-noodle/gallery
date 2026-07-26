@@ -5,7 +5,7 @@ import numpy as np
 import numpy.typing as npt
 import orjson
 from fastapi.responses import JSONResponse
-from typing_extensions import TypedDict
+from typing_extensions import NotRequired, TypedDict
 
 
 class ORJSONResponse(JSONResponse):
@@ -117,7 +117,9 @@ class RecognizedPet(TypedDict):
     boundingBox: BoundingBox
     score: float
     label: str
-    embedding: str
+    # Absent when the crop was too small (post-clamp) to embed — such pets are routed to the
+    # species bucket server-side instead of being written as unassigned embedding-less faces.
+    embedding: NotRequired[str]
 
 
 PetRecognitionOutput = list[RecognizedPet]
