@@ -4,7 +4,7 @@
   import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
   import type { ManagedPerson } from '$lib/components/people/people-types';
   import type { ThumbnailLoadQueue } from '$lib/components/people/thumbnail-load-queue.svelte';
-  import { getPetSpeciesI18nKey } from '$lib/utils/pet-species';
+  import { getPetSpeciesLabel } from '$lib/utils/pet-species';
   import { Icon } from '@immich/ui';
   import { mdiHeart, mdiPaw } from '@mdi/js';
   import type { Snippet } from 'svelte';
@@ -67,7 +67,7 @@
         </div>
       {/if}
       {#if person.type === 'pet'}
-        {@const petSpeciesLabel = person.species ? $t(getPetSpeciesI18nKey(person.species)) : undefined}
+        {@const petSpeciesLabel = getPetSpeciesLabel(person.species, $t)}
         <div
           class="absolute right-1 bottom-1 rounded-full bg-immich-primary p-1 text-white"
           role="img"

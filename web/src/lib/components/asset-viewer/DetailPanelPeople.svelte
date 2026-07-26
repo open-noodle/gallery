@@ -12,7 +12,7 @@
     buildPersonFilterPatch,
     rememberContextualPersonName,
   } from '$lib/utils/filter-target';
-  import { getPetSpeciesI18nKey } from '$lib/utils/pet-species';
+  import { getPetSpeciesLabel } from '$lib/utils/pet-species';
   import { zoomImageToBase64 } from '$lib/utils/people-utils';
   import { getRepresentativeThumbnailUrl, resolvePersonAvatar } from '$lib/utils/person-avatar';
   import { type AssetResponseDto } from '@immich/sdk';
@@ -243,7 +243,7 @@
               {@render avatar(avatarSource.url, person, isHighlighted)}
             {/if}
             {#if person.type === 'pet'}
-              {@const petSpeciesLabel = person.species ? $t(getPetSpeciesI18nKey(person.species)) : undefined}
+              {@const petSpeciesLabel = getPetSpeciesLabel(person.species, $t)}
               <div
                 class="absolute bottom-1 right-1 rounded-full bg-immich-primary p-1 text-white"
                 data-testid="pet-badge"
