@@ -96,7 +96,7 @@ describe('SharedSpaceUpdateDto', () => {
 
   it('should reject a whitespace-only name', () => {
     // .trim() runs before .min(1), so "   " collapses to "" and fails the minimum.
-    const result = SharedSpaceUpdateDto.schema.safeParse({ name: '   ' });
+    const result = SharedSpaceUpdateDto.schema.safeParse({ name: ' '.repeat(3) });
     expect(result.success).toBe(false);
   });
 
