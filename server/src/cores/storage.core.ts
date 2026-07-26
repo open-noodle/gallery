@@ -371,6 +371,26 @@ export class StorageCore {
     return StorageCore.getRelativeNestedPath(StorageFolder.EncodedVideo, asset.ownerId, `${asset.id}.mp4`);
   }
 
+  private static getEditedEncodedVideoFilename(asset: ThumbnailPathEntity): string {
+    return `${asset.id}_edited.mp4`;
+  }
+
+  static getEditedEncodedVideoPath(asset: ThumbnailPathEntity): string {
+    return StorageCore.getNestedPath(
+      StorageFolder.EncodedVideo,
+      asset.ownerId,
+      StorageCore.getEditedEncodedVideoFilename(asset),
+    );
+  }
+
+  static getRelativeEditedEncodedVideoPath(asset: ThumbnailPathEntity): string {
+    return StorageCore.getRelativeNestedPath(
+      StorageFolder.EncodedVideo,
+      asset.ownerId,
+      StorageCore.getEditedEncodedVideoFilename(asset),
+    );
+  }
+
   static getRelativePersonThumbnailPath(person: ThumbnailPathEntity): string {
     return StorageCore.getRelativeNestedPath(StorageFolder.Thumbnails, person.ownerId, `${person.id}.jpeg`);
   }

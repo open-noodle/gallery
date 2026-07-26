@@ -25,6 +25,11 @@ import {
 } from 'src/interfaces/storage-backend.interface';
 import { getContentDispositionHeader } from 'src/utils/file';
 
+// getReadableUrl backs server-side, download-free probing (ffprobe) that completes within the
+// request. Its URL is a bearer credential, so it gets a much shorter expiry than the client-facing
+// presignedUrlExpiry — a long TTL only widens exposure if the URL ever reaches a log.
+const READABLE_URL_EXPIRY_SECONDS = 60;
+
 class AsyncLimiter {
   private active = 0;
   private readonly queue: Array<() => void> = [];
@@ -226,6 +231,12 @@ export class S3StorageBackend implements StorageBackend {
     });
 
     return { type: 'redirect', url };
+  }
+
+  async getReadableUrl(key: string): Promise<string> {
+    return getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
+      expiresIn: READABLE_URL_EXPIRY_SECONDS,
+    });
   }
 
   async downloadToTemp(key: string): Promise<{ tempPath: string; cleanup: () => Promise<void> }> {
