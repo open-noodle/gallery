@@ -131,6 +131,20 @@ describe('pet_search', () => {
     expect(remaining).toHaveLength(0);
   });
 
+  it('R4.6 has a nullable species text column (migration 1785200000000)', async () => {
+    const { ctx } = setup();
+    const { rows } = await sql<{
+      column_name: string;
+      data_type: string;
+      is_nullable: string;
+    }>`SELECT column_name, data_type, is_nullable FROM information_schema.columns
+       WHERE table_name = 'pet_search' AND column_name = 'species'`.execute(ctx.database);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].data_type).toBe('text');
+    expect(rows[0].is_nullable).toBe('YES');
+  });
+
   it('has a pet_index vector index on the table', async () => {
     const { ctx } = setup();
     const { rows } = await sql<{
@@ -143,16 +157,18 @@ describe('pet_search', () => {
 
 describe('PersonRepository.refreshPetFaces', () => {
   // 4.4
-  it('inserts an asset_face and a pet_search row and returns the created face id', async () => {
+  it('inserts an asset_face and a pet_search row under the caller-supplied face id', async () => {
     const { ctx } = setup();
     const personRepository = ctx.get(PersonRepository);
     const { user } = await ctx.newUser();
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     const embedding = newEmbedding();
+    const faceId = newUuid();
 
-    const faceIds = await personRepository.refreshPetFaces(
+    await personRepository.refreshPetFaces(
       [
         {
+          id: faceId,
           assetId: asset.id,
           imageWidth: 200,
           imageHeight: 200,
@@ -162,12 +178,8 @@ describe('PersonRepository.refreshPetFaces', () => {
           boundingBoxY2: 60,
         },
       ],
-      [embedding],
+      [{ faceId, embedding, species: 'dog' }],
     );
-
-    expect(faceIds).toHaveLength(1);
-    const [faceId] = faceIds;
-    expect(typeof faceId).toBe('string');
 
     const faceRow = await ctx.database
       .selectFrom('asset_face')
@@ -183,39 +195,116 @@ describe('PersonRepository.refreshPetFaces', () => {
       .where('faceId', '=', faceId)
       .executeTakeFirstOrThrow();
     expect(petSearchRow.faceId).toBe(faceId);
+    // R4.5: species round-trips through the new column.
+    expect(petSearchRow.species).toBe('dog');
     const stored = JSON.parse(petSearchRow.embedding) as number[];
     const inserted = JSON.parse(embedding) as number[];
     expect(stored).toHaveLength(inserted.length);
   });
 
-  it('inserts multiple faces and pairs each with its positionally-matched embedding', async () => {
+  it('R4.7 lands each embedding on its own face by id, not by insert order', async () => {
     const { ctx } = setup();
     const personRepository = ctx.get(PersonRepository);
     const { user } = await ctx.newUser();
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     const firstEmbedding = axisEmbedding('first');
     const secondEmbedding = axisEmbedding('second');
+    const firstFaceId = newUuid();
+    const secondFaceId = newUuid();
 
-    const faceIds = await personRepository.refreshPetFaces(
+    await personRepository.refreshPetFaces(
       [
-        { assetId: asset.id, boundingBoxX1: 1, boundingBoxY1: 1, boundingBoxX2: 2, boundingBoxY2: 2 },
-        { assetId: asset.id, boundingBoxX1: 3, boundingBoxY1: 3, boundingBoxX2: 4, boundingBoxY2: 4 },
+        { id: firstFaceId, assetId: asset.id, boundingBoxX1: 1, boundingBoxY1: 1, boundingBoxX2: 2, boundingBoxY2: 2 },
+        { id: secondFaceId, assetId: asset.id, boundingBoxX1: 3, boundingBoxY1: 3, boundingBoxX2: 4, boundingBoxY2: 4 },
       ],
-      [firstEmbedding, secondEmbedding],
+      // Deliberately supplied in the reverse order of facesToAdd: pairing is by faceId, so the
+      // result must be unaffected. Under the old positional pairing this test cross-wires.
+      [
+        { faceId: secondFaceId, embedding: secondEmbedding, species: 'cat' },
+        { faceId: firstFaceId, embedding: firstEmbedding, species: 'dog' },
+      ],
     );
 
-    expect(faceIds).toHaveLength(2);
-    const rows = await ctx.database.selectFrom('pet_search').selectAll().where('faceId', 'in', faceIds).execute();
-    const byFaceId = new Map(rows.map((row) => [row.faceId, row.embedding]));
-    expect(JSON.parse(byFaceId.get(faceIds[0])!)).toEqual(JSON.parse(firstEmbedding));
-    expect(JSON.parse(byFaceId.get(faceIds[1])!)).toEqual(JSON.parse(secondEmbedding));
+    const rows = await ctx.database
+      .selectFrom('pet_search')
+      .selectAll()
+      .where('faceId', 'in', [firstFaceId, secondFaceId])
+      .execute();
+    const byFaceId = new Map(rows.map((row) => [row.faceId, row]));
+    expect(JSON.parse(byFaceId.get(firstFaceId)!.embedding)).toEqual(JSON.parse(firstEmbedding));
+    expect(byFaceId.get(firstFaceId)!.species).toBe('dog');
+    expect(JSON.parse(byFaceId.get(secondFaceId)!.embedding)).toEqual(JSON.parse(secondEmbedding));
+    expect(byFaceId.get(secondFaceId)!.species).toBe('cat');
+  });
+
+  it('R4.5 accepts a null species, so pre-migration rows stay writable and readable', async () => {
+    const { ctx } = setup();
+    const personRepository = ctx.get(PersonRepository);
+    const { user } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    const faceId = newUuid();
+
+    await personRepository.refreshPetFaces(
+      [{ id: faceId, assetId: asset.id, boundingBoxX1: 1, boundingBoxY1: 1, boundingBoxX2: 2, boundingBoxY2: 2 }],
+      [{ faceId, embedding: axisEmbedding('first'), species: null }],
+    );
+
+    const row = await ctx.database
+      .selectFrom('pet_search')
+      .selectAll()
+      .where('faceId', '=', faceId)
+      .executeTakeFirstOrThrow();
+    expect(row.species).toBeNull();
+  });
+
+  it('R4.8 throws when the embedding count does not match the face count', async () => {
+    const { ctx } = setup();
+    const personRepository = ctx.get(PersonRepository);
+    const { user } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    const faceId = newUuid();
+
+    await expect(
+      personRepository.refreshPetFaces(
+        [
+          { id: faceId, assetId: asset.id, boundingBoxX1: 1, boundingBoxY1: 1, boundingBoxX2: 2, boundingBoxY2: 2 },
+          { id: newUuid(), assetId: asset.id, boundingBoxX1: 3, boundingBoxY1: 3, boundingBoxX2: 4, boundingBoxY2: 4 },
+        ],
+        [{ faceId, embedding: axisEmbedding('first'), species: 'dog' }],
+      ),
+    ).rejects.toThrow('one embedding per face');
+
+    // The guard runs before the transaction, so nothing was written.
+    expect(await ctx.database.selectFrom('asset_face').select(['id']).where('id', '=', faceId).execute()).toHaveLength(
+      0,
+    );
+  });
+
+  it('R4.8 throws when an embedding names a face that is not being inserted', async () => {
+    const { ctx } = setup();
+    const personRepository = ctx.get(PersonRepository);
+    const { user } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    const faceId = newUuid();
+    const strayFaceId = newUuid();
+
+    await expect(
+      personRepository.refreshPetFaces(
+        [{ id: faceId, assetId: asset.id, boundingBoxX1: 1, boundingBoxY1: 1, boundingBoxX2: 2, boundingBoxY2: 2 }],
+        [{ faceId: strayFaceId, embedding: axisEmbedding('first'), species: 'dog' }],
+      ),
+    ).rejects.toThrow(`unknown face ${strayFaceId}`);
+
+    expect(await ctx.database.selectFrom('asset_face').select(['id']).where('id', '=', faceId).execute()).toHaveLength(
+      0,
+    );
   });
 
   it('is a no-op for empty input rather than issuing malformed SQL', async () => {
     const { ctx } = setup();
     const personRepository = ctx.get(PersonRepository);
 
-    await expect(personRepository.refreshPetFaces([], [])).resolves.toEqual([]);
+    await expect(personRepository.refreshPetFaces([], [])).resolves.toBeUndefined();
   });
 });
 

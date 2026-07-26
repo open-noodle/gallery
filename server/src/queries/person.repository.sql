@@ -710,11 +710,9 @@ from
 -- PersonRepository.refreshPetFaces
 begin
 insert into
-  "asset_face" ("assetId")
+  "asset_face" ("id", "assetId")
 values
-  ($1)
-returning
-  "id"
+  ($1, $2)
 rollback
 
 -- PersonRepository.getFacesByIds

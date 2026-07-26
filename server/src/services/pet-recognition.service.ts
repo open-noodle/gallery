@@ -130,7 +130,9 @@ export class PetRecognitionService extends BaseService {
       const person = await this.personRepository.create({
         ownerId,
         type: 'pet',
-        species: label ?? null,
+        // The job label is only present on the detection fan-out; the queue-all and nightly paths
+        // have none, so fall back to the species persisted on the embedding at detect time (F8).
+        species: label ?? face.petSearch.species ?? null,
         name: '',
       });
       personId = person.id;

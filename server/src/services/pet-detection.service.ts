@@ -79,12 +79,19 @@ export class PetDetectionService extends BaseService {
       // Both writers are additive (refreshPetFaces only inserts), so running both on one asset is
       // safe and order-independent.
       if (recognitionEnabled) {
-        const bucketed = pets.filter((pet) => !isRecognizablePetSpecies(pet.label));
+        // A pet goes to the individual pipeline only if it is BOTH a recognizable species AND
+        // carries an embedding. Everything else buckets: an unassigned face with no pet_search row
+        // would match neither arm of petFacePredicate, so the human pipeline could not see it as a
+        // pet and would destroy it — the bucket keeps it recorded and protected.
+        const embeddable = pets.filter(
+          (pet): pet is DetectedPet & { embedding: string } => isRecognizablePetSpecies(pet.label) && !!pet.embedding,
+        );
+        const bucketed = pets.filter((pet) => !isRecognizablePetSpecies(pet.label) || !pet.embedding);
         await this.writeDetectedPetsForRecognition({
           assetId: id,
           imageHeight,
           imageWidth,
-          pets: pets.filter((pet) => isRecognizablePetSpecies(pet.label)),
+          pets: embeddable,
         });
         if (bucketed.length > 0) {
           await this.writeDetectedPetsAsSpeciesBuckets({
@@ -187,10 +194,10 @@ export class PetDetectionService extends BaseService {
    * created here — clustering into individuals happens in
    * PetRecognitionService.handlePetRecognition (Slice 5 Part B).
    *
-   * Only receives species in RECOGNIZABLE_PET_SPECIES; the caller routes the rest to
-   * writeDetectedPetsAsSpeciesBuckets. The ML service still embeds every detected pet in the same
-   * request, so the discarded embeddings are wasted work — cheap next to detection, and not worth
-   * teaching the ML pipeline a species allow-list to avoid.
+   * Only receives recognizable species that actually carry an embedding; the caller routes
+   * everything else to writeDetectedPetsAsSpeciesBuckets. The ML service still embeds every
+   * detected pet in the same request, so the discarded embeddings are wasted work — cheap next to
+   * detection, and not worth teaching the ML pipeline a species allow-list to avoid.
    */
   private async writeDetectedPetsForRecognition({
     assetId,
@@ -201,38 +208,41 @@ export class PetDetectionService extends BaseService {
     assetId: string;
     imageHeight: number;
     imageWidth: number;
-    pets: DetectedPet[];
+    pets: (DetectedPet & { embedding: string })[];
   }): Promise<void> {
-    // Positional pairing: PersonRepository.refreshPetFaces pairs embeddingsToAdd[i] with
-    // facesToAdd[i], and a shorter embeddingsToAdd only drops TRAILING entries (see its
-    // docstring). Pets missing an embedding (defensive path — older ML service) are ordered last
-    // so the pairing stays correct for the pets that do have one.
-    const withEmbedding = pets.filter((pet): pet is DetectedPet & { embedding: string } => !!pet.embedding);
-    const withoutEmbedding = pets.filter((pet) => !pet.embedding);
-    const orderedPets = [...withEmbedding, ...withoutEmbedding];
+    // Ids are generated here, not by the database, so each embedding names the face it belongs to
+    // explicitly. The old code paired embeddingsToAdd[i] with the i-th INSERT … RETURNING row,
+    // which is only correct while postgres returns rows in insert order (F7).
+    const entries = pets.map((pet) => ({ pet, faceId: this.cryptoRepository.randomUUID() }));
 
-    const facesToAdd: (Insertable<AssetFaceTable> & { assetId: string })[] = orderedPets.map((pet) => ({
-      assetId,
-      imageHeight,
-      imageWidth,
-      boundingBoxX1: pet.boundingBox.x1,
-      boundingBoxY1: pet.boundingBox.y1,
-      boundingBoxX2: pet.boundingBox.x2,
-      boundingBoxY2: pet.boundingBox.y2,
-    }));
-    const embeddingsToAdd = withEmbedding.map((pet) => pet.embedding);
-
-    const faceIds =
-      orderedPets.length > 0 ? await this.personRepository.refreshPetFaces(facesToAdd, embeddingsToAdd) : [];
-
-    const jobs: JobItem[] = withEmbedding.map((pet, index) => ({
-      name: JobName.PetRecognition,
-      data: { id: faceIds[index], deferred: false, label: pet.label },
+    const facesToAdd: (Insertable<AssetFaceTable> & { id: string; assetId: string })[] = entries.map(
+      ({ pet, faceId }) => ({
+        id: faceId,
+        assetId,
+        imageHeight,
+        imageWidth,
+        boundingBoxX1: pet.boundingBox.x1,
+        boundingBoxY1: pet.boundingBox.y1,
+        boundingBoxX2: pet.boundingBox.x2,
+        boundingBoxY2: pet.boundingBox.y2,
+      }),
+    );
+    // species rides along with the embedding so the queue-all and nightly recognition paths, whose
+    // job data has no label, can still stamp the species on a newly created pet person (F8).
+    const embeddingsToAdd = entries.map(({ pet, faceId }) => ({
+      faceId,
+      embedding: pet.embedding,
+      species: pet.label,
     }));
 
-    for (let index = withEmbedding.length; index < orderedPets.length; index++) {
-      this.logger.warn(`Pet face ${faceIds[index]} for asset ${assetId} has no embedding; skipping recognition`);
+    if (entries.length > 0) {
+      await this.personRepository.refreshPetFaces(facesToAdd, embeddingsToAdd);
     }
+
+    const jobs: JobItem[] = entries.map(({ pet, faceId }) => ({
+      name: JobName.PetRecognition,
+      data: { id: faceId, deferred: false, label: pet.label },
+    }));
 
     await this.jobRepository.queueAll(jobs);
   }

@@ -461,7 +461,26 @@ select
     from
       (
         select
-          "asset_face".*
+          "asset_face".*,
+          (
+            exists (
+              select
+                1 as "one"
+              from
+                "pet_search"
+              where
+                "pet_search"."faceId" = "asset_face"."id"
+            )
+            or exists (
+              select
+                1 as "one"
+              from
+                "person"
+              where
+                "person"."id" = "asset_face"."personId"
+                and "person"."type" = $1
+            )
+          ) as "isPet"
         from
           "asset_face"
         where
@@ -482,14 +501,14 @@ select
           "asset_file"
         where
           "asset_file"."assetId" = "asset"."id"
-          and "asset_file"."type" = $1
+          and "asset_file"."type" = $2
       ) as agg
   ) as "files"
 from
   "asset"
   inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
 where
-  "asset"."id" = $2
+  "asset"."id" = $3
 
 -- AssetJobRepository.getForOcr
 select

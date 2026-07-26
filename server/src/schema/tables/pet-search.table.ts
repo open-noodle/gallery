@@ -14,4 +14,12 @@ export class PetSearchTable {
 
   @Column({ type: 'vector', length: 512, synchronize: false })
   embedding!: string;
+
+  /**
+   * Species label from the detector, captured at embed time. The queue-all and nightly recognition
+   * paths carry no label in their job data, so without this a person created from those paths got
+   * `species: null` (F8). Nullable — rows written before migration 1785200000000 have none.
+   */
+  @Column({ type: 'text', nullable: true })
+  species!: string | null;
 }

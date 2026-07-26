@@ -14,7 +14,7 @@ const makePetFace = (overrides: Record<string, unknown> = {}) => ({
   assetId: 'asset-id',
   personId: null,
   asset: { ownerId: 'owner-id' },
-  petSearch: { faceId: 'face-id', embedding: '[1,2,3]' },
+  petSearch: { faceId: 'face-id', embedding: '[1,2,3]', species: null },
   ...overrides,
 });
 
@@ -228,6 +228,42 @@ describe(PetRecognitionService.name, () => {
           name: '',
         });
         expect(mocks.person.reassignFaces).toHaveBeenCalledWith({ faceIds: ['face-id'], newPersonId: 'new-person' });
+      });
+
+      it('R4.3 falls back to the stored pet_search species when the job carries no label', async () => {
+        // The queue-all and nightly fan-outs have no label in their job data (F8) — the species
+        // persisted at embed time is the only thing that can stamp the new person.
+        mocks.person.getPetFaceForRecognition.mockResolvedValue(
+          makePetFace({ petSearch: { faceId: 'face-id', embedding: '[1,2,3]', species: 'cat' } }),
+        );
+        mocks.search.searchPets
+          .mockResolvedValueOnce([{ id: 'face-id', personId: null, distance: 0 }])
+          .mockResolvedValueOnce([]);
+        mocks.person.create.mockResolvedValue(makePerson({ id: 'new-person', species: 'cat' }));
+        mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'new-identity' } as any);
+        mocks.person.getById.mockResolvedValue(makePerson({ id: 'new-person', faceAssetId: null }));
+        mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([]);
+
+        expect(await sut.handlePetRecognition({ id: 'face-id' })).toEqual(JobStatus.Success);
+
+        expect(mocks.person.create).toHaveBeenCalledWith(expect.objectContaining({ species: 'cat' }));
+      });
+
+      it('R4.4 pin: an explicit job label still wins over the stored species', async () => {
+        mocks.person.getPetFaceForRecognition.mockResolvedValue(
+          makePetFace({ petSearch: { faceId: 'face-id', embedding: '[1,2,3]', species: 'cat' } }),
+        );
+        mocks.search.searchPets
+          .mockResolvedValueOnce([{ id: 'face-id', personId: null, distance: 0 }])
+          .mockResolvedValueOnce([]);
+        mocks.person.create.mockResolvedValue(makePerson({ id: 'new-person' }));
+        mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'new-identity' } as any);
+        mocks.person.getById.mockResolvedValue(makePerson({ id: 'new-person', faceAssetId: null }));
+        mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([]);
+
+        expect(await sut.handlePetRecognition({ id: 'face-id', label: 'dog' })).toEqual(JobStatus.Success);
+
+        expect(mocks.person.create).toHaveBeenCalledWith(expect.objectContaining({ species: 'dog' }));
       });
 
       it('assigns to a person already matched by search without creating a new person (5.6)', async () => {

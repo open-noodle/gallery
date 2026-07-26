@@ -1109,39 +1109,55 @@ export class PersonRepository {
 
   /**
    * Pet-recognition equivalent of {@link refreshFaces}, simplified: pets have no "remove stale
-   * faces" step here (that lives in the detection pipeline, not recognition). Unlike
-   * `refreshFaces` — where the caller pre-generates each face's id client-side so it can be
-   * reused as `face_search.faceId` in the same statement — `facesToAdd` here carries no `id`, so
-   * `asset_face.id` is DB-generated. The caller (Slice 5) needs those generated ids to queue one
-   * `PetRecognition` job per face, so this returns them. `embeddingsToAdd[i]` is paired
-   * positionally with `facesToAdd[i]` (not by an explicit `faceId`, which the caller cannot know
-   * ahead of the insert); pass a shorter `embeddingsToAdd` to skip embeddings for the trailing
-   * faces (e.g. a defensive path where the ML service returned a pet with no embedding).
+   * faces" step here (that lives in the detection pipeline, not recognition).
+   *
+   * Like `refreshFaces`, the caller pre-generates each face's id (`CryptoRepository.randomUUID`)
+   * and pairs embeddings to faces by explicit `faceId`. The previous version let the DB generate
+   * ids and paired `embeddingsToAdd[i]` with the i-th `INSERT … RETURNING` row, which is only
+   * correct while postgres happens to return insert order (F7) — nothing in the SQL standard or
+   * Kysely guarantees it, and a mispairing silently attaches one pet's embedding to another pet's
+   * face.
+   *
+   * Every face must have exactly one embedding: callers route embedding-less pets to the species
+   * bucket instead, so a mismatch here is a broken contract and throws rather than writing a
+   * partially-embedded batch.
    */
   @GenerateSql({
-    params: [[{ assetId: DummyValue.UUID }], [DummyValue.VECTOR]],
+    params: [
+      [{ id: DummyValue.UUID, assetId: DummyValue.UUID }],
+      [{ faceId: DummyValue.UUID, embedding: DummyValue.VECTOR, species: 'dog' }],
+    ],
   })
   async refreshPetFaces(
-    facesToAdd: (Insertable<AssetFaceTable> & { assetId: string })[],
-    embeddingsToAdd: string[],
-  ): Promise<string[]> {
-    if (facesToAdd.length === 0) {
-      return [];
+    facesToAdd: (Insertable<AssetFaceTable> & { id: string; assetId: string })[],
+    embeddingsToAdd: { faceId: string; embedding: string; species: string | null }[],
+  ): Promise<void> {
+    if (facesToAdd.length !== embeddingsToAdd.length) {
+      throw new Error(
+        `refreshPetFaces requires one embedding per face, got ${facesToAdd.length} faces and ${embeddingsToAdd.length} embeddings`,
+      );
     }
 
-    return this.db.transaction().execute(async (trx) => {
-      const inserted = await trx.insertInto('asset_face').values(facesToAdd).returning('id').execute();
-      const faceIds = inserted.map(({ id }) => id);
-
-      if (embeddingsToAdd.length > 0) {
-        const embeddingRows: Insertable<PetSearchTable>[] = embeddingsToAdd.map((embedding, index) => ({
-          faceId: faceIds[index],
-          embedding,
-        }));
-        await trx.insertInto('pet_search').values(embeddingRows).execute();
+    const faceIds = new Set(facesToAdd.map(({ id }) => id));
+    for (const { faceId } of embeddingsToAdd) {
+      if (!faceIds.has(faceId)) {
+        throw new Error(`refreshPetFaces got an embedding for unknown face ${faceId}`);
       }
+    }
 
-      return faceIds;
+    if (facesToAdd.length === 0) {
+      return;
+    }
+
+    await this.db.transaction().execute(async (trx) => {
+      await trx.insertInto('asset_face').values(facesToAdd).execute();
+
+      const embeddingRows: Insertable<PetSearchTable>[] = embeddingsToAdd.map(({ faceId, embedding, species }) => ({
+        faceId,
+        embedding,
+        species,
+      }));
+      await trx.insertInto('pet_search').values(embeddingRows).execute();
     });
   }
 

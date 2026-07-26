@@ -443,6 +443,7 @@ DELETE FROM "kysely_migrations"
    '1784800000000-RepairSharedSpaceAlbumGrantDrift',
    '1785000000000-AddFaceRepairLock',
    '1785000000000-CreatePetSearchTable',
+   '1785200000000-AddSpeciesToPetSearch',
    '1786000000000-FaceRepairLockPersonNullable',
    '1787000000000-AddFacePersonVerdict',
    '1788000000000-ReconcileFacePersonVerdictConstraints',

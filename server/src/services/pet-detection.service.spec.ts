@@ -510,7 +510,7 @@ describe(PetDetectionService.name, () => {
         },
       };
 
-      it('requests embeddings, writes faces via refreshPetFaces, and queues one PetRecognition job per pet without creating species buckets (5.2)', async () => {
+      it('R4.1 writes faces with caller-generated ids, pairs embeddings by faceId, and queues one job per pet (5.2)', async () => {
         const asset = AssetFactory.create();
         mocks.systemMetadata.get.mockResolvedValue(recognitionConfig);
         mocks.machineLearning.detectPets.mockResolvedValue({
@@ -521,7 +521,8 @@ describe(PetDetectionService.name, () => {
             { boundingBox: { x1: 50, y1: 60, x2: 70, y2: 80 }, score: 0.8, label: 'cat', embedding: '[4,5,6]' },
           ],
         });
-        mocks.person.refreshPetFaces.mockResolvedValue(['face-1', 'face-2']);
+        mocks.crypto.randomUUID.mockReturnValueOnce('face-1').mockReturnValueOnce('face-2');
+        mocks.person.refreshPetFaces.mockResolvedValue();
 
         expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Success);
 
@@ -529,6 +530,7 @@ describe(PetDetectionService.name, () => {
         expect(mocks.person.refreshPetFaces).toHaveBeenCalledWith(
           [
             expect.objectContaining({
+              id: 'face-1',
               assetId: asset.id,
               imageHeight: 100,
               imageWidth: 200,
@@ -538,6 +540,7 @@ describe(PetDetectionService.name, () => {
               boundingBoxY2: 40,
             }),
             expect.objectContaining({
+              id: 'face-2',
               assetId: asset.id,
               imageHeight: 100,
               imageWidth: 200,
@@ -547,7 +550,11 @@ describe(PetDetectionService.name, () => {
               boundingBoxY2: 80,
             }),
           ],
-          ['[1,2,3]', '[4,5,6]'],
+          // Paired by explicit faceId, not by position, and carrying the species for the F8 fallback.
+          [
+            { faceId: 'face-1', embedding: '[1,2,3]', species: 'dog' },
+            { faceId: 'face-2', embedding: '[4,5,6]', species: 'cat' },
+          ],
         );
         for (const face of mocks.person.refreshPetFaces.mock.calls[0][0]) {
           expect((face as Record<string, unknown>).personId).toBeUndefined();
@@ -599,7 +606,8 @@ describe(PetDetectionService.name, () => {
             { boundingBox: { x1: 50, y1: 60, x2: 70, y2: 80 }, score: 0.8, label: 'horse', embedding: '[4,5,6]' },
           ],
         });
-        mocks.person.refreshPetFaces.mockResolvedValue(['face-1']);
+        mocks.crypto.randomUUID.mockReturnValue('face-1');
+        mocks.person.refreshPetFaces.mockResolvedValue();
         mocks.person.getByOwnerAndSpecies.mockResolvedValue(void 0);
         mocks.person.create.mockResolvedValue(makePerson());
         mocks.person.createAssetFace.mockResolvedValue('face-id');
@@ -610,8 +618,8 @@ describe(PetDetectionService.name, () => {
 
         // Only the dog's face and embedding reach the recognition store.
         expect(mocks.person.refreshPetFaces).toHaveBeenCalledWith(
-          [expect.objectContaining({ boundingBoxX1: 10, boundingBoxY1: 20 })],
-          ['[1,2,3]'],
+          [expect.objectContaining({ id: 'face-1', boundingBoxX1: 10, boundingBoxY1: 20 })],
+          [{ faceId: 'face-1', embedding: '[1,2,3]', species: 'dog' }],
         );
         expect(mocks.job.queueAll).toHaveBeenCalledWith([
           { name: JobName.PetRecognition, data: { id: 'face-1', deferred: false, label: 'dog' } },
@@ -625,7 +633,7 @@ describe(PetDetectionService.name, () => {
         );
       });
 
-      it('writes the face but does not queue recognition for a pet returned without an embedding (5.3)', async () => {
+      it('R4.2 routes a recognizable pet that arrives without an embedding to the species bucket (5.3)', async () => {
         const asset = AssetFactory.create();
         mocks.systemMetadata.get.mockResolvedValue(recognitionConfig);
         mocks.machineLearning.detectPets.mockResolvedValue({
@@ -636,17 +644,33 @@ describe(PetDetectionService.name, () => {
             { boundingBox: { x1: 50, y1: 60, x2: 70, y2: 80 }, score: 0.8, label: 'cat' }, // no embedding
           ],
         });
-        mocks.person.refreshPetFaces.mockResolvedValue(['face-1', 'face-2']);
+        mocks.crypto.randomUUID.mockReturnValue('face-1');
+        mocks.person.refreshPetFaces.mockResolvedValue();
+        mocks.person.getByOwnerAndSpecies.mockResolvedValue(void 0);
+        mocks.person.create.mockResolvedValue(makePerson({ species: 'cat', name: 'cat' }));
+        mocks.person.createAssetFace.mockResolvedValue('bucket-face-id');
+        mocks.person.getById.mockResolvedValue(makePerson({ species: 'cat', name: 'cat' }));
+        mocks.person.update.mockResolvedValue({} as any);
 
         expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Success);
 
+        // Only the embedded dog reaches the individual pipeline...
         expect(mocks.person.refreshPetFaces).toHaveBeenCalledWith(
-          [expect.objectContaining({ boundingBoxX1: 10 }), expect.objectContaining({ boundingBoxX1: 50 })],
-          ['[1,2,3]'],
+          [expect.objectContaining({ id: 'face-1', boundingBoxX1: 10 })],
+          [{ faceId: 'face-1', embedding: '[1,2,3]', species: 'dog' }],
         );
         expect(mocks.job.queueAll).toHaveBeenCalledWith([
           { name: JobName.PetRecognition, data: { id: 'face-1', deferred: false, label: 'dog' } },
         ]);
+
+        // ...the embedding-less cat becomes a species bucket instead of an unassigned face with no
+        // pet_search row, which would match neither arm of petFacePredicate and be unprotected.
+        expect(mocks.person.create).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'cat', type: 'pet', species: 'cat' }),
+        );
+        expect(mocks.person.createAssetFace).toHaveBeenCalledWith(
+          expect.objectContaining({ boundingBoxX1: 50, personId: 'person-id' }),
+        );
       });
 
       it('stamps petsDetectedAt with no writes or jobs when zero pets are detected (5.4)', async () => {
