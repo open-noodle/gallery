@@ -42,7 +42,7 @@
       // server-side, whereas omitting the key (or `undefined`) would leave the old value.
       const success = await updateSpaceDetails(space.id, {
         name: name.trim(),
-        ...(description === originalDescription ? {} : { description }),
+        ...(description !== originalDescription && { description }),
         color,
       });
       if (success) {
