@@ -260,16 +260,23 @@ describe('/shared-spaces', () => {
       expect(status).toBe(403);
     });
 
-    it('should reject editor updating name (metadata requires owner)', async () => {
+    it('should allow editor to rename a space', async () => {
       const space = await utils.createSpace(user1.accessToken, { name: 'Editor Update Meta' });
       await utils.addSpaceMember(user1.accessToken, space.id, { userId: user2.userId, role: SharedSpaceRole.Editor });
 
-      const { status } = await request(app)
+      const { status, body } = await request(app)
         .patch(`/shared-spaces/${space.id}`)
         .set('Authorization', `Bearer ${user2.accessToken}`)
         .send({ name: 'Editor Updated' });
 
-      expect(status).toBe(403);
+      expect(status).toBe(200);
+      expect(body).toEqual(expect.objectContaining({ name: 'Editor Updated' }));
+
+      const { body: fetched } = await request(app)
+        .get(`/shared-spaces/${space.id}`)
+        .set('Authorization', `Bearer ${user1.accessToken}`);
+
+      expect(fetched.name).toBe('Editor Updated');
     });
 
     it('should allow editor to update cover photo (non-metadata)', async () => {
