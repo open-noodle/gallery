@@ -1,4 +1,6 @@
-import { JobName, JobStatus, SystemMetadataKey } from 'src/enum';
+import { SystemConfig } from 'src/config';
+import { PET_RECOGNITION_MODEL_NAMES } from 'src/constants';
+import { JobName, JobStatus, QueueName, SystemMetadataKey } from 'src/enum';
 import { PetRecognitionService } from 'src/services/pet-recognition.service';
 import { makeStream, newTestService, ServiceMocks } from 'test/utils';
 
@@ -8,6 +10,28 @@ const enabledConfig = {
     petRecognition: { enabled: true, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
   },
 };
+
+// Full config shape (petDetection + petRecognition) for the model-switch hook tests: onConfigInit /
+// onConfigUpdate receive the event payload directly (not via getConfig), so unlike enabledConfig
+// above these must not rely on the defaults merge to fill in petDetection.
+const makeConfig = ({
+  recognitionEnabled = true,
+  detectionEnabled = true,
+  modelName = 'pet-recognition-base',
+  minFaces = 1,
+}: {
+  recognitionEnabled?: boolean;
+  detectionEnabled?: boolean;
+  modelName?: string;
+  minFaces?: number;
+} = {}): SystemConfig =>
+  ({
+    machineLearning: {
+      enabled: true,
+      petDetection: { enabled: detectionEnabled, modelName: 'yolo11n', minScore: 0.6 },
+      petRecognition: { enabled: recognitionEnabled, modelName, maxDistance: 0.55, minFaces },
+    },
+  }) as SystemConfig;
 
 const makePetFace = (overrides: Record<string, unknown> = {}) => ({
   id: 'face-id',
@@ -49,6 +73,177 @@ describe(PetRecognitionService.name, () => {
     expect(sut).toBeDefined();
   });
 
+  describe('onConfigValidate', () => {
+    it('R5.1 throws for an unknown pet recognition model', () => {
+      expect(() =>
+        sut.onConfigValidate({
+          newConfig: { machineLearning: { petRecognition: { modelName: 'pet-recognition-huge' } } } as SystemConfig,
+          oldConfig: {} as SystemConfig,
+        }),
+      ).toThrow('Unknown pet recognition model: pet-recognition-huge');
+    });
+
+    it.each(PET_RECOGNITION_MODEL_NAMES)('R5.1 allows the whitelisted model %s', (modelName) => {
+      expect(() =>
+        sut.onConfigValidate({
+          newConfig: { machineLearning: { petRecognition: { modelName } } } as SystemConfig,
+          oldConfig: {} as SystemConfig,
+        }),
+      ).not.toThrow();
+    });
+  });
+
+  describe('model switch (onConfigInit / onConfigUpdate)', () => {
+    it('R5.2 live switch with recognition and detection both on: empties both pet queues, scoped purge, stamps state, requeues detection force', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ modelName: 'pet-recognition-base' });
+      mocks.person.purgePetRecognitionArtifacts.mockResolvedValue();
+
+      await sut.onConfigUpdate({
+        oldConfig: makeConfig({ modelName: 'pet-recognition-base' }),
+        newConfig: makeConfig({ modelName: 'pet-recognition-large' }),
+      });
+
+      expect(mocks.job.empty).toHaveBeenCalledWith(QueueName.PetRecognition, true);
+      expect(mocks.job.empty).toHaveBeenCalledWith(QueueName.PetDetection, true);
+      expect(mocks.person.purgePetRecognitionArtifacts).toHaveBeenCalled();
+      expect(mocks.person.deleteAllPets).not.toHaveBeenCalled();
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.PetRecognitionState, {
+        lastRun: expect.any(String),
+        modelName: 'pet-recognition-large',
+      });
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PetDetectionQueueAll, data: { force: true } });
+    });
+
+    it('R5.3 config change without a model change: no purge, no requeue', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(null);
+
+      await sut.onConfigUpdate({
+        oldConfig: makeConfig({ minFaces: 1 }),
+        newConfig: makeConfig({ minFaces: 2 }),
+      });
+
+      expect(mocks.person.purgePetRecognitionArtifacts).not.toHaveBeenCalled();
+      expect(mocks.job.empty).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.systemMetadata.set).not.toHaveBeenCalled();
+    });
+
+    it('R5.4 idempotency: a second onConfigUpdate delivery carrying the same stale oldConfig no-ops once state is stamped', async () => {
+      // Simulates two ConfigUpdate deliveries (e.g. multiple non-API workers) racing the same
+      // switch: both carry the same (stale) oldConfig, but state was already stamped by the first.
+      mocks.systemMetadata.get.mockResolvedValue({ modelName: 'pet-recognition-large' });
+
+      await sut.onConfigUpdate({
+        oldConfig: makeConfig({ modelName: 'pet-recognition-base' }),
+        newConfig: makeConfig({ modelName: 'pet-recognition-large' }),
+      });
+
+      expect(mocks.person.purgePetRecognitionArtifacts).not.toHaveBeenCalled();
+      expect(mocks.job.empty).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.systemMetadata.set).not.toHaveBeenCalled();
+    });
+
+    it('R5.5 switch with recognition on / detection off: scoped purge, pendingReprocess stamped, no requeue, warns about a force run', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(null);
+      mocks.person.purgePetRecognitionArtifacts.mockResolvedValue();
+
+      await sut.onConfigUpdate({
+        oldConfig: makeConfig({ modelName: 'pet-recognition-base', detectionEnabled: false }),
+        newConfig: makeConfig({ modelName: 'pet-recognition-large', detectionEnabled: false }),
+      });
+
+      expect(mocks.person.purgePetRecognitionArtifacts).toHaveBeenCalled();
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.PetRecognitionState, {
+        lastRun: expect.any(String),
+        modelName: 'pet-recognition-large',
+        pendingReprocess: true,
+      });
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.PetDetectionQueueAll }));
+      expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('force'));
+    });
+
+    it('R5.6 detection re-enabled while pendingReprocess is set: requeues detection force and clears the flag', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        modelName: 'pet-recognition-large',
+        lastRun: '2026-07-01T00:00:00.000Z',
+        pendingReprocess: true,
+      });
+
+      await sut.onConfigUpdate({
+        oldConfig: makeConfig({ modelName: 'pet-recognition-large', detectionEnabled: false }),
+        newConfig: makeConfig({ modelName: 'pet-recognition-large', detectionEnabled: true }),
+      });
+
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.PetRecognitionState, {
+        modelName: 'pet-recognition-large',
+        lastRun: '2026-07-01T00:00:00.000Z',
+        pendingReprocess: false,
+      });
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PetDetectionQueueAll, data: { force: true } });
+      expect(mocks.person.purgePetRecognitionArtifacts).not.toHaveBeenCalled();
+    });
+
+    it('R5.7 switch with recognition off: scoped purge runs (not the full deleteAllPets purge), no requeue, no pendingReprocess flag', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(null);
+      mocks.person.purgePetRecognitionArtifacts.mockResolvedValue();
+
+      await sut.onConfigUpdate({
+        oldConfig: makeConfig({ modelName: 'pet-recognition-base', recognitionEnabled: false }),
+        newConfig: makeConfig({ modelName: 'pet-recognition-large', recognitionEnabled: false }),
+      });
+
+      // The scoped purge runs (species buckets are protected by its SQL — proven at the medium
+      // layer, R5.13); the point at THIS layer is that it is the scoped purge, not the full one.
+      expect(mocks.person.purgePetRecognitionArtifacts).toHaveBeenCalled();
+      expect(mocks.person.deleteAllPets).not.toHaveBeenCalled();
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.PetRecognitionState, {
+        lastRun: expect.any(String),
+        modelName: 'pet-recognition-large',
+      });
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.PetDetectionQueueAll }));
+      expect(mocks.logger.warn).not.toHaveBeenCalledWith(expect.stringContaining('force'));
+    });
+
+    it('R5.8 ConfigInit with no prior state and recognition enabled: adopts the current model as reference, no purge, no requeue', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(null);
+
+      await sut.onConfigInit({ newConfig: makeConfig({ modelName: 'pet-recognition-base' }) });
+
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.PetRecognitionState, {
+        modelName: 'pet-recognition-base',
+      });
+      expect(mocks.person.purgePetRecognitionArtifacts).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it('R5.8 ConfigInit with no prior state and recognition disabled: full no-op', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(null);
+
+      await sut.onConfigInit({
+        newConfig: makeConfig({ modelName: 'pet-recognition-base', recognitionEnabled: false }),
+      });
+
+      expect(mocks.systemMetadata.set).not.toHaveBeenCalled();
+      expect(mocks.person.purgePetRecognitionArtifacts).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it('R5.9 ConfigInit detects an offline drift against stored state: scoped purge + gated requeue', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ modelName: 'pet-recognition-base' });
+      mocks.person.purgePetRecognitionArtifacts.mockResolvedValue();
+
+      await sut.onConfigInit({ newConfig: makeConfig({ modelName: 'pet-recognition-large' }) });
+
+      expect(mocks.person.purgePetRecognitionArtifacts).toHaveBeenCalled();
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.PetRecognitionState, {
+        lastRun: expect.any(String),
+        modelName: 'pet-recognition-large',
+      });
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PetDetectionQueueAll, data: { force: true } });
+    });
+  });
+
   describe('handleQueuePetRecognition', () => {
     it('should skip when pet recognition is disabled (default)', async () => {
       expect(await sut.handleQueuePetRecognition({ force: false })).toEqual(JobStatus.Skipped);
@@ -72,14 +267,23 @@ describe(PetRecognitionService.name, () => {
         mocks.sharedSpace.deleteAllPets.mockResolvedValue(void 0);
       });
 
-      it('force: true purges pet people, space copies and pet_search, then requeues detection with force (6.1)', async () => {
+      it('force: true purges pet people, space copies and pet_search, then requeues detection with force (6.1, R5.11)', async () => {
         expect(await sut.handleQueuePetRecognition({ force: true })).toEqual(JobStatus.Success);
 
+        // R5.11: the PetRecognition queue is drained before the (full, bucket-inclusive) purge —
+        // otherwise a job queued before the reset could still run against faces about to be deleted.
+        expect(mocks.job.empty).toHaveBeenCalledWith(QueueName.PetRecognition, true);
         expect(mocks.person.deleteAllPets).toHaveBeenCalled();
         expect(mocks.sharedSpace.deleteAllPets).toHaveBeenCalled();
         expect(mocks.person.deleteAllPetSearch).toHaveBeenCalled();
         expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PetDetectionQueueAll, data: { force: true } });
         expect(mocks.person.getUnassignedPetFaces).not.toHaveBeenCalled();
+
+        // The force purge is deliberately the FULL purge (buckets included, rebuilt by the
+        // requeue) — distinct from a model-switch's scoped purge, which never touches deleteAllPets.
+        expect(mocks.job.empty.mock.invocationCallOrder[0]).toBeLessThan(
+          mocks.person.deleteAllPets.mock.invocationCallOrder[0],
+        );
       });
 
       it('force: false queues PetRecognition only for embedded, unassigned pet faces (6.2)', async () => {
@@ -122,6 +326,35 @@ describe(PetRecognitionService.name, () => {
         expect(mocks.job.queueAll).toHaveBeenCalledWith([
           { name: JobName.PetRecognition, data: { id: 'face-1', deferred: false } },
         ]);
+      });
+
+      it('R5.10 nightly drift check runs before the date-skip: a drifted state still switches even with no new pets', async () => {
+        const lastRun = new Date('2026-07-20T00:00:00.000Z');
+        const driftedConfig = {
+          machineLearning: {
+            enabled: true,
+            petDetection: { enabled: true, modelName: 'yolo11n', minScore: 0.6 },
+            petRecognition: { enabled: true, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
+          },
+        };
+        mocks.systemMetadata.get.mockImplementation((key: SystemMetadataKey) => {
+          if (key === SystemMetadataKey.SystemConfig) {
+            return Promise.resolve(driftedConfig as any);
+          }
+          if (key === SystemMetadataKey.PetRecognitionState) {
+            return Promise.resolve({ modelName: 'pet-recognition-small', lastRun: lastRun.toISOString() } as any);
+          }
+          return Promise.resolve(null);
+        });
+        // If the date-skip ran first it would fire here (no new pet since lastRun) and mask the drift.
+        mocks.person.getLatestPetDate.mockResolvedValue(new Date(lastRun.getTime() - 1000).toISOString());
+        mocks.person.purgePetRecognitionArtifacts.mockResolvedValue();
+
+        expect(await sut.handleQueuePetRecognition({ force: false, nightly: true })).toEqual(JobStatus.Success);
+
+        expect(mocks.person.purgePetRecognitionArtifacts).toHaveBeenCalled();
+        expect(mocks.person.getLatestPetDate).not.toHaveBeenCalled();
+        expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PetDetectionQueueAll, data: { force: true } });
       });
 
       it('nightly: true with no prior lastRun queues work (first-ever nightly run)', async () => {

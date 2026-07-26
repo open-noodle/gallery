@@ -79,6 +79,18 @@ export class PetDetectionService extends BaseService {
       // Both writers are additive (refreshPetFaces only inserts), so running both on one asset is
       // safe and order-independent.
       if (recognitionEnabled) {
+        // Mid-flight model-switch guard (mirrors SmartInfoService.handleEncodeClip,
+        // smart-info.service.ts:132-136): the ML call above may have taken long enough for a
+        // ConfigUpdate to land and switch the model. That hook (PetRecognitionService.
+        // handleModelSwitch) already purges stale embeddings and requeues detection under the new
+        // model, so this in-flight request — still carrying embeddings computed under the OLD
+        // model — must be dropped rather than writing mixed-model data. The config cache is
+        // invalidated on every worker on ConfigUpdate, so this re-fetch observes the new value.
+        const newConfig = await this.getConfig({ withCache: true });
+        if (newConfig.machineLearning.petRecognition.modelName !== machineLearning.petRecognition.modelName) {
+          return JobStatus.Skipped;
+        }
+
         // A pet goes to the individual pipeline only if it is BOTH a recognizable species AND
         // carries an embedding. Everything else buckets: an unassigned face with no pet_search row
         // would match neither arm of petFacePredicate, so the human pipeline could not see it as a

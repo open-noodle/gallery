@@ -178,6 +178,20 @@ const withPetSearch = (eb: ExpressionBuilder<DB, 'asset_face'>) => {
   ).as('petSearch');
 };
 
+/**
+ * Every embedded pet face: unassigned (recognition-written, not yet clustered) faces are invisible
+ * to a person-scoped delete — the `pet_search` join is the only thing that identifies them. Shared
+ * by {@link PersonRepository.deleteAllPets} (full purge) and
+ * {@link PersonRepository.purgePetRecognitionArtifacts} (scoped purge) as their first statement:
+ * both need this same delete, and it must run before anything that would remove the `pet_search`
+ * rows it joins against (F5).
+ */
+const deleteEmbeddedPetFaces = (trx: Transaction<DB>) =>
+  trx
+    .deleteFrom('asset_face')
+    .where('asset_face.id', 'in', (eb) => eb.selectFrom('pet_search').select('pet_search.faceId'))
+    .execute();
+
 @Injectable()
 export class PersonRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
@@ -355,10 +369,7 @@ export class PersonRepository {
       // them. Delete them first, while their pet_search rows still exist: the force purge
       // calls deleteAllPetSearch() afterwards, and truncating first would orphan these rows
       // forever.
-      await trx
-        .deleteFrom('asset_face')
-        .where('asset_face.id', 'in', (eb) => eb.selectFrom('pet_search').select('pet_search.faceId'))
-        .execute();
+      await deleteEmbeddedPetFaces(trx);
 
       // Delete pet faces before the pet people they belong to: asset_face.personId is
       // ON DELETE SET NULL, so removing the people first would orphan (not delete) the faces.
@@ -383,6 +394,56 @@ export class PersonRepository {
    */
   async deleteAllPetSearch(): Promise<void> {
     await sql`truncate ${sql.table('pet_search')}`.execute(this.db);
+  }
+
+  /**
+   * The SCOPED purge used by {@link PetRecognitionService}'s model-switch handler. Unlike
+   * {@link deleteAllPets} (the FULL purge behind the admin Reset button, which also wipes species
+   * buckets — the requeue rebuilds them, and the confirmation dialog promises exactly that), a
+   * model switch invalidates only embeddings and the individuals recognition created from them.
+   * Species buckets are pure detector output, are not model-coupled, and must survive every switch.
+   */
+  async purgePetRecognitionArtifacts(): Promise<void> {
+    await this.db.transaction().execute(async (trx) => {
+      // 1. Every embedded pet face. Bucket faces have no pet_search row, so they are untouched.
+      await deleteEmbeddedPetFaces(trx);
+
+      // 2. Pet people left with zero faces are exactly the recognition-created individuals — a
+      //    species bucket still holds its (embedding-less) faces after step 1.
+      const orphaned = await trx
+        .selectFrom('person')
+        .select(['person.id', 'person.identityId'])
+        .where('person.type', '=', 'pet')
+        .where((eb) =>
+          eb.not(
+            eb.exists(
+              eb
+                .selectFrom('asset_face')
+                .select(sql`1`.as('one'))
+                .whereRef('asset_face.personId', '=', 'person.id'),
+            ),
+          ),
+        )
+        .execute();
+
+      if (orphaned.length > 0) {
+        const identityIds = orphaned.map((row) => row.identityId).filter((id): id is string => !!id);
+        if (identityIds.length > 0) {
+          await trx.deleteFrom('shared_space_person').where('identityId', 'in', identityIds).execute();
+        }
+        await trx
+          .deleteFrom('person')
+          .where(
+            'person.id',
+            'in',
+            orphaned.map((row) => row.id),
+          )
+          .execute();
+      }
+
+      // 3. Belt and braces: step 1 already cascaded these away.
+      await sql`truncate ${sql.table('pet_search')}`.execute(trx);
+    });
   }
 
   getAllFaces(options: GetAllFacesOptions = {}) {

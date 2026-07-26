@@ -1,5 +1,6 @@
 import { AssetVisibility, ImmichWorker, JobName, JobStatus } from 'src/enum';
 import { PetDetectionService } from 'src/services/pet-detection.service';
+import { clearConfigCache } from 'src/utils/config';
 import { AssetFactory } from 'test/factories/asset.factory';
 import { systemConfigStub } from 'test/fixtures/system-config.stub';
 import { makeStream, newTestService, ServiceMocks } from 'test/utils';
@@ -687,6 +688,37 @@ describe(PetDetectionService.name, () => {
         expect(mocks.asset.upsertJobStatus).toHaveBeenCalledWith(
           expect.objectContaining({ assetId: asset.id, petsDetectedAt: expect.any(Date) }),
         );
+      });
+
+      it('R5.12 mid-flight model-switch guard: skips the write when the config model changed while the ML call was in flight', async () => {
+        const asset = AssetFactory.create();
+        mocks.systemMetadata.get.mockResolvedValue(recognitionConfig);
+        mocks.machineLearning.detectPets.mockImplementation(() => {
+          // Simulates a ConfigUpdate (PetRecognitionService.handleModelSwitch) landing while this
+          // ML request was in flight: it clears the shared config cache and persists a new model
+          // name, so the re-fetch below observes the switch.
+          clearConfigCache();
+          mocks.systemMetadata.get.mockResolvedValue({
+            machineLearning: {
+              enabled: true,
+              petDetection: { enabled: true, modelName: 'yolo11n', minScore: 0.6 },
+              petRecognition: { enabled: true, modelName: 'pet-recognition-large', maxDistance: 0.55, minFaces: 1 },
+            },
+          });
+          return Promise.resolve({
+            imageHeight: 100,
+            imageWidth: 200,
+            pets: [{ boundingBox: { x1: 10, y1: 20, x2: 30, y2: 40 }, score: 0.9, label: 'dog', embedding: '[1,2,3]' }],
+          });
+        });
+
+        expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Skipped);
+
+        expect(mocks.person.refreshPetFaces).not.toHaveBeenCalled();
+        expect(mocks.person.createAssetFace).not.toHaveBeenCalled();
+        expect(mocks.person.create).not.toHaveBeenCalled();
+        expect(mocks.job.queueAll).not.toHaveBeenCalled();
+        expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
       });
     });
   });

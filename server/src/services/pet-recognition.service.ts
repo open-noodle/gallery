@@ -1,43 +1,83 @@
 import { Injectable } from '@nestjs/common';
-import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants';
-import { OnJob } from 'src/decorators';
-import { JobName, JobStatus, QueueName, SystemMetadataKey } from 'src/enum';
+import { SystemConfig } from 'src/config';
+import { JOBS_ASSET_PAGINATION_SIZE, PET_RECOGNITION_MODEL_NAMES } from 'src/constants';
+import { OnEvent, OnJob } from 'src/decorators';
+import { DatabaseLock, ImmichWorker, JobName, JobStatus, QueueName, SystemMetadataKey } from 'src/enum';
+import { ArgOf } from 'src/repositories/event.repository';
 import { BaseService } from 'src/services/base.service';
 import { JobItem, JobOf } from 'src/types';
-import { isPetRecognitionEnabled } from 'src/utils/misc';
+import { isPetDetectionEnabled, isPetRecognitionEnabled } from 'src/utils/misc';
 
 @Injectable()
 export class PetRecognitionService extends BaseService {
+  @OnEvent({ name: 'ConfigValidate' })
+  onConfigValidate({ newConfig }: ArgOf<'ConfigValidate'>) {
+    const modelName = newConfig.machineLearning.petRecognition.modelName;
+    if (!(PET_RECOGNITION_MODEL_NAMES as readonly string[]).includes(modelName)) {
+      throw new Error(
+        `Unknown pet recognition model: ${modelName}. Please check the model name for typos and confirm this is a supported model.`,
+      );
+    }
+  }
+
+  @OnEvent({ name: 'ConfigInit', workers: [ImmichWorker.Microservices] })
+  async onConfigInit({ newConfig }: ArgOf<'ConfigInit'>) {
+    await this.handleModelSwitch(newConfig);
+  }
+
+  @OnEvent({ name: 'ConfigUpdate', workers: [ImmichWorker.Microservices], server: true })
+  async onConfigUpdate({ oldConfig, newConfig }: ArgOf<'ConfigUpdate'>) {
+    await this.handleModelSwitch(newConfig, oldConfig);
+  }
+
   @OnJob({ name: JobName.PetRecognitionQueueAll, queue: QueueName.PetRecognition })
   async handleQueuePetRecognition({ force, nightly }: JobOf<JobName.PetRecognitionQueueAll>): Promise<JobStatus> {
-    const { machineLearning } = await this.getConfig({ withCache: false });
+    const config = await this.getConfig({ withCache: false });
+    const { machineLearning } = config;
     if (!isPetRecognitionEnabled(machineLearning)) {
       return JobStatus.Skipped;
     }
 
-    if (nightly) {
-      const [state, latestPetDate] = await Promise.all([
-        this.systemMetadataRepository.get(SystemMetadataKey.PetRecognitionState),
-        this.personRepository.getLatestPetDate(),
-      ]);
-
-      if (state?.lastRun && latestPetDate && state.lastRun > latestPetDate) {
-        this.logger.debug('Skipping pet recognition nightly since no pet has been added since the last run');
-        return JobStatus.Skipped;
-      }
-    }
-
     if (force) {
+      // F9's force half: drain any PetRecognition jobs queued before the reset — they'd otherwise
+      // run against faces the purge below is about to delete, and the requeued detection force run
+      // rebuilds everything from scratch anyway.
+      await this.jobRepository.empty(QueueName.PetRecognition, true);
       // Purge pet people (and their shared-space copies) plus every stored pet embedding, then
       // requeue detection so assets are re-detected and re-embedded with the *current* model. This
       // is the explicit, order-independent reset for enabling recognition or switching model:
       // deleteAllPets() removes the pet asset_face rows via CASCADE from their people, and the
       // pet_search truncate is a belt-and-braces guarantee independent of that delete order.
+      // Deliberately a FULL purge (buckets included, rebuilt by the requeue) — broader than a
+      // model switch's scoped purge, because the admin Reset button promises exactly that.
       await this.personRepository.deleteAllPets();
       await this.sharedSpaceRepository.deleteAllPets();
       await this.personRepository.deleteAllPetSearch();
       await this.jobRepository.queue({ name: JobName.PetDetectionQueueAll, data: { force: true } });
     } else {
+      const state = await this.systemMetadataRepository.get(SystemMetadataKey.PetRecognitionState);
+
+      // Drift check: the model recorded at the last run differs from the configured one, meaning
+      // the switch happened outside the ConfigInit/ConfigUpdate hook (an offline config-file edit,
+      // or an event this worker missed) and never got its scoped purge. Placed BEFORE the nightly
+      // date-skip below — an idle library (no new pets since state.lastRun) would otherwise mask
+      // the drift forever.
+      if (state?.modelName && state.modelName !== machineLearning.petRecognition.modelName) {
+        this.logger.warn(
+          `Pet recognition model changed from ${state.modelName} to ${machineLearning.petRecognition.modelName} outside the config-update hook — reprocessing`,
+        );
+        await this.handleModelSwitch(config);
+        return JobStatus.Success;
+      }
+
+      if (nightly) {
+        const latestPetDate = await this.personRepository.getLatestPetDate();
+        if (state?.lastRun && latestPetDate && state.lastRun > latestPetDate) {
+          this.logger.debug('Skipping pet recognition nightly since no pet has been added since the last run');
+          return JobStatus.Skipped;
+        }
+      }
+
       let jobs: JobItem[] = [];
       for await (const face of this.personRepository.getUnassignedPetFaces()) {
         jobs.push({ name: JobName.PetRecognition, data: { id: face.id, deferred: false } });
@@ -150,6 +190,85 @@ export class PetRecognitionService extends BaseService {
     await this.queueSharedSpaceFaceMatchesForAsset(face.assetId);
 
     return JobStatus.Success;
+  }
+
+  /**
+   * The model-switch hook shared by {@link onConfigInit} and {@link onConfigUpdate}. `oldConfig` is
+   * only available from ConfigUpdate — ConfigInit fires at bootstrap with no prior config.
+   *
+   * Runs entirely under `DatabaseLock.PetRecognitionModelSwitch`: `withLock` only serializes
+   * concurrent callers, it does not dedupe, so the FIRST thing done under the lock is a re-read of
+   * the stored state to check idempotency — two ConfigUpdate deliveries (e.g. multiple
+   * non-API workers reacting to the same save) both carry the same stale `oldConfig`, and without
+   * this re-read they would each purge + requeue, double-detecting every asset (both pet writers
+   * are additive).
+   */
+  private async handleModelSwitch(newConfig: SystemConfig, oldConfig?: SystemConfig): Promise<void> {
+    await this.databaseRepository.withLock(DatabaseLock.PetRecognitionModelSwitch, async () => {
+      const state = await this.systemMetadataRepository.get(SystemMetadataKey.PetRecognitionState);
+      const newModel = newConfig.machineLearning.petRecognition.modelName;
+      const recognitionEnabled = isPetRecognitionEnabled(newConfig.machineLearning);
+      const detectionEnabled = isPetDetectionEnabled(newConfig.machineLearning);
+      const detectionTurnedOn = !!oldConfig && !isPetDetectionEnabled(oldConfig.machineLearning) && detectionEnabled;
+
+      if (state?.modelName === newModel) {
+        // Deferred reprocess: the switch already happened while detection was off, and detection
+        // has just been turned back on.
+        if (detectionTurnedOn && state.pendingReprocess) {
+          await this.systemMetadataRepository.set(SystemMetadataKey.PetRecognitionState, {
+            ...state,
+            pendingReprocess: false,
+          });
+          await this.jobRepository.queue({ name: JobName.PetDetectionQueueAll, data: { force: true } });
+        }
+        return;
+      }
+
+      const referenceModel = oldConfig?.machineLearning.petRecognition.modelName ?? state?.modelName;
+      if (!referenceModel) {
+        // Fresh install / ConfigInit before any state exists. Adopt the current model as the
+        // reference so a later offline switch is detectable — otherwise the enable→first-nightly
+        // window is blind to a switch.
+        if (recognitionEnabled) {
+          await this.systemMetadataRepository.set(SystemMetadataKey.PetRecognitionState, {
+            ...state,
+            modelName: newModel,
+          });
+        }
+        return;
+      }
+      if (referenceModel === newModel) {
+        return;
+      }
+
+      // Scoped purge (species buckets survive — see PersonRepository.purgePetRecognitionArtifacts).
+      // Empty both pet queues first: pending old-model detection jobs would re-embed with mixed
+      // state and duplicate faces against the requeued force run below.
+      await this.jobRepository.empty(QueueName.PetRecognition, true);
+      await this.jobRepository.empty(QueueName.PetDetection, true);
+      // empty() drains waiting/delayed jobs; it does NOT kill an ACTIVE one. An in-flight
+      // recognition job can still create a person after this purge — it ends up face-less, and
+      // generic person cleanup collects it (see R2.6).
+      await this.personRepository.purgePetRecognitionArtifacts();
+
+      // Stamp state BEFORE any requeue — this is what makes the idempotency re-read above sound.
+      const pendingReprocess = recognitionEnabled && !detectionEnabled;
+      await this.systemMetadataRepository.set(SystemMetadataKey.PetRecognitionState, {
+        lastRun: new Date().toISOString(),
+        modelName: newModel,
+        ...(pendingReprocess ? { pendingReprocess: true } : {}),
+      });
+
+      if (recognitionEnabled && detectionEnabled) {
+        await this.jobRepository.queue({ name: JobName.PetDetectionQueueAll, data: { force: true } });
+      } else if (recognitionEnabled) {
+        this.logger.warn(
+          `Pet recognition model changed to ${newModel} but pet detection is disabled. Run a FORCE pet detection once detection is re-enabled — a non-force run skips assets already stamped with petsDetectedAt and would rebuild nothing.`,
+        );
+      }
+      // Recognition off: no requeue and no pendingReprocess flag — the buckets survived the scoped
+      // purge, and re-enabling recognition later follows the documented manual-reset flow.
+    });
   }
 
   /**

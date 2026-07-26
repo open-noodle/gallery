@@ -1,6 +1,8 @@
 import { Kysely } from 'kysely';
+import { SystemConfig } from 'src/config';
 import { JobName, JobStatus, SystemMetadataKey } from 'src/enum';
 import { ConfigRepository } from 'src/repositories/config.repository';
+import { DatabaseRepository } from 'src/repositories/database.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
@@ -53,6 +55,7 @@ const setup = (db?: Kysely<DB>) => {
     database: db || defaultDatabase,
     real: [
       ConfigRepository,
+      DatabaseRepository,
       FaceIdentityRepository,
       PersonRepository,
       SearchRepository,
@@ -63,6 +66,7 @@ const setup = (db?: Kysely<DB>) => {
   });
   ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository).queue.mockResolvedValue();
   ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository).queueAll.mockResolvedValue();
+  ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository).empty.mockResolvedValue();
   return { sut, ctx };
 };
 
@@ -484,5 +488,121 @@ describe('PetRecognitionService.handleQueuePetRecognition (medium)', () => {
 
     const petSearchRows = await ctx.database.selectFrom('pet_search').selectAll().execute();
     expect(petSearchRows).toHaveLength(0);
+  });
+});
+
+describe('PetRecognitionService model switch (medium)', () => {
+  it(
+    'R5.13 a live model switch scopes the purge to embeddings and recognition-created individuals — ' +
+      'a species bucket and its faces survive',
+    async () => {
+      const { sut, ctx } = setup();
+      await enablePetRecognition(ctx);
+      const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+      const { user } = await ctx.newUser();
+
+      // Two near-identical embeddings cluster into one individual under the base model.
+      const { asset: assetA } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: faceA } = await ctx.newAssetFace({ assetId: assetA.id });
+      await ctx.database
+        .insertInto('pet_search')
+        .values({ faceId: faceA.id, embedding: axisEmbedding('first') })
+        .execute();
+      const { asset: assetB } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: faceB } = await ctx.newAssetFace({ assetId: assetB.id });
+      await ctx.database
+        .insertInto('pet_search')
+        .values({ faceId: faceB.id, embedding: nearAxisEmbedding('first', 2) })
+        .execute();
+
+      expect(await sut.handlePetRecognition({ id: faceA.id, deferred: false, label: 'dog' })).toBe(JobStatus.Success);
+      expect(await sut.handlePetRecognition({ id: faceB.id, deferred: false, label: 'dog' })).toBe(JobStatus.Success);
+
+      const clusteredRows = await ctx.database
+        .selectFrom('asset_face')
+        .select(['id', 'personId'])
+        .where('id', 'in', [faceA.id, faceB.id])
+        .execute();
+      const individualPersonId = clusteredRows[0].personId;
+      expect(individualPersonId).not.toBeNull();
+
+      // A bird species bucket: pure detector output — no embedding, no pet_search row — built
+      // under the same (base) model, and expected to survive the switch untouched.
+      const { person: birdBucket } = await ctx.newPerson({ ownerId: user.id, type: 'pet', species: 'bird' });
+      const { asset: birdAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: birdFace } = await ctx.newAssetFace({ assetId: birdAsset.id, personId: birdBucket.id });
+
+      // Stamp state so the switch below has a reference model to diff the new one against.
+      await ctx
+        .get(SystemMetadataRepository)
+        .set(SystemMetadataKey.PetRecognitionState, { modelName: 'pet-recognition-base' });
+
+      await sut.onConfigUpdate({
+        oldConfig: {
+          machineLearning: {
+            enabled: true,
+            petDetection: { enabled: true, modelName: 'yolo11n', minScore: 0.6 },
+            petRecognition: { enabled: true, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
+          },
+        } as SystemConfig,
+        newConfig: {
+          machineLearning: {
+            enabled: true,
+            petDetection: { enabled: true, modelName: 'yolo11n', minScore: 0.6 },
+            petRecognition: { enabled: true, modelName: 'pet-recognition-large', maxDistance: 0.55, minFaces: 1 },
+          },
+        } as SystemConfig,
+      });
+
+      // pet_search is emptied entirely.
+      expect(await ctx.database.selectFrom('pet_search').selectAll().execute()).toHaveLength(0);
+
+      // The clustered individual and its faces are gone.
+      const individualPersonRows = await ctx.database
+        .selectFrom('person')
+        .select(['id'])
+        .where('id', '=', individualPersonId!)
+        .execute();
+      expect(individualPersonRows).toHaveLength(0);
+      const individualFaceRows = await ctx.database
+        .selectFrom('asset_face')
+        .select(['id'])
+        .where('id', 'in', [faceA.id, faceB.id])
+        .execute();
+      expect(individualFaceRows).toHaveLength(0);
+
+      // The bird bucket and its face survive, untouched.
+      const birdPersonRow = await ctx.database
+        .selectFrom('person')
+        .selectAll()
+        .where('id', '=', birdBucket.id)
+        .executeTakeFirstOrThrow();
+      expect(birdPersonRow.species).toBe('bird');
+      const birdFaceRow = await ctx.database
+        .selectFrom('asset_face')
+        .selectAll()
+        .where('id', '=', birdFace.id)
+        .executeTakeFirstOrThrow();
+      expect(birdFaceRow.personId).toBe(birdBucket.id);
+
+      // State records the new model.
+      const state = await ctx.get(SystemMetadataRepository).get(SystemMetadataKey.PetRecognitionState);
+      expect(state?.modelName).toBe('pet-recognition-large');
+
+      // Detection was requeued force so assets are re-detected/re-embedded under the new model.
+      expect(jobMock.queue).toHaveBeenCalledWith({ name: JobName.PetDetectionQueueAll, data: { force: true } });
+    },
+  );
+});
+
+describe('PetRecognitionService.handleQueuePetRecognition state (medium)', () => {
+  it('R5.14 pin: after a normal queue-all run, state.modelName equals the config model', async () => {
+    const { sut, ctx } = setup();
+    await enablePetRecognition(ctx);
+
+    expect(await sut.handleQueuePetRecognition({ force: false })).toBe(JobStatus.Success);
+
+    const state = await ctx.get(SystemMetadataRepository).get(SystemMetadataKey.PetRecognitionState);
+    expect(state?.modelName).toBe('pet-recognition-base');
   });
 });
