@@ -31,6 +31,7 @@ import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3StorageBackend } from 'src/backends/s3-storage.backend';
 import { CacheControl } from 'src/enum';
+import { RangeNotSatisfiableError } from 'src/interfaces/storage-backend.interface';
 
 describe('S3StorageBackend', () => {
   let backend: S3StorageBackend;
@@ -48,6 +49,9 @@ describe('S3StorageBackend', () => {
   });
 
   afterEach(() => {
+    // clearAllMocks resets call history but leaves queued `mockResolvedValueOnce` values on
+    // the shared `send` mock, so an unconsumed one would bleed into the next test
+    mockSend.mockReset();
     vi.clearAllMocks();
   });
 
@@ -330,6 +334,151 @@ describe('S3StorageBackend', () => {
 
       expect(second.type).toBe('stream');
       expect(proxyClient.send).toHaveBeenCalledTimes(2);
+    });
+
+    it('should pass the client Range header through to S3 and relay the partial response', async () => {
+      const proxyBackend = new S3StorageBackend({
+        bucket: 'test-bucket',
+        region: 'us-east-1',
+        presignedUrlExpiry: 3600,
+        serveMode: 'proxy' as const,
+      });
+      const proxyClient = (S3Client as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
+      proxyClient.send.mockResolvedValueOnce({
+        Body: Readable.from([Buffer.from('a'.repeat(1024))]),
+        ContentLength: 1024,
+        ContentRange: 'bytes 0-1023/1048576',
+      });
+
+      const strategy = await proxyBackend.getServeStrategy('upload/user1/video.mp4', {
+        contentType: 'video/mp4',
+        cacheControl: CacheControl.PrivateWithCache,
+        range: 'bytes=0-1023',
+      });
+
+      expect(GetObjectCommand).toHaveBeenCalledWith(
+        expect.objectContaining({
+          Bucket: 'test-bucket',
+          Key: 'upload/user1/video.mp4',
+          Range: 'bytes=0-1023',
+        }),
+      );
+      expect(strategy).toMatchObject({
+        type: 'stream',
+        length: 1024,
+        contentRange: 'bytes 0-1023/1048576',
+      });
+    });
+
+    it('should relay open-ended and suffix ranges verbatim without parsing them', async () => {
+      const proxyBackend = new S3StorageBackend({
+        bucket: 'test-bucket',
+        region: 'us-east-1',
+        presignedUrlExpiry: 3600,
+        serveMode: 'proxy' as const,
+      });
+      const proxyClient = (S3Client as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
+      proxyClient.send
+        .mockResolvedValueOnce({
+          Body: Readable.from([Buffer.from('tail')]),
+          ContentLength: 4,
+          ContentRange: 'bytes 1048572-1048575/1048576',
+        })
+        .mockResolvedValueOnce({
+          Body: Readable.from([Buffer.from('rest')]),
+          ContentLength: 4,
+          ContentRange: 'bytes 512-515/516',
+        });
+
+      await proxyBackend.getServeStrategy('upload/user1/video.mp4', {
+        contentType: 'video/mp4',
+        cacheControl: CacheControl.PrivateWithCache,
+        range: 'bytes=-4',
+      });
+      await proxyBackend.getServeStrategy('upload/user1/video.mp4', {
+        contentType: 'video/mp4',
+        cacheControl: CacheControl.PrivateWithCache,
+        range: 'bytes=512-',
+      });
+
+      expect(GetObjectCommand).toHaveBeenCalledWith(expect.objectContaining({ Range: 'bytes=-4' }));
+      expect(GetObjectCommand).toHaveBeenCalledWith(expect.objectContaining({ Range: 'bytes=512-' }));
+    });
+
+    it('should not set Range on the S3 request when the client sent no range', async () => {
+      const proxyBackend = new S3StorageBackend({
+        bucket: 'test-bucket',
+        region: 'us-east-1',
+        presignedUrlExpiry: 3600,
+        serveMode: 'proxy' as const,
+      });
+      const proxyClient = (S3Client as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
+      proxyClient.send.mockResolvedValueOnce({
+        Body: Readable.from([Buffer.from('whole object')]),
+        ContentLength: 12,
+      });
+
+      const strategy = await proxyBackend.getServeStrategy('upload/user1/video.mp4', {
+        contentType: 'video/mp4',
+        cacheControl: CacheControl.PrivateWithCache,
+      });
+
+      // assert the value, not just the absence of the key: the backend always passes
+      // `Range`, and the AWS SDK omits the header only because the value is undefined
+      const [[commandInput]] = (GetObjectCommand as unknown as ReturnType<typeof vi.fn>).mock.calls;
+      expect(commandInput.Range).toBeUndefined();
+      expect(strategy).toMatchObject({ type: 'stream', length: 12 });
+      expect((strategy as { contentRange?: string }).contentRange).toBeUndefined();
+    });
+
+    it('should surface an unsatisfiable range as RangeNotSatisfiableError and release the read slot', async () => {
+      const proxyBackend = new S3StorageBackend({
+        bucket: 'test-bucket',
+        region: 'us-east-1',
+        presignedUrlExpiry: 3600,
+        serveMode: 'proxy' as const,
+        proxyReadConcurrency: 1,
+      });
+      const proxyClient = (S3Client as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
+      const invalidRange = Object.assign(new Error('The requested range is not satisfiable'), {
+        name: 'InvalidRange',
+        $metadata: { httpStatusCode: 416 },
+      });
+      proxyClient.send.mockRejectedValueOnce(invalidRange).mockResolvedValueOnce({
+        Body: Readable.from([Buffer.from('second')]),
+        ContentLength: 6,
+      });
+
+      await expect(
+        proxyBackend.getServeStrategy('upload/user1/video.mp4', {
+          contentType: 'video/mp4',
+          cacheControl: CacheControl.PrivateWithCache,
+          range: 'bytes=999999999-',
+        }),
+      ).rejects.toBeInstanceOf(RangeNotSatisfiableError);
+
+      // the limiter slot must have been released, otherwise this second read would never start
+      const second = await proxyBackend.getServeStrategy('upload/user1/other.mp4', {
+        contentType: 'video/mp4',
+        cacheControl: CacheControl.PrivateWithCache,
+      });
+      expect(second.type).toBe('stream');
+      expect(proxyClient.send).toHaveBeenCalledTimes(2);
+    });
+
+    it('should ignore the range in redirect mode and leave it to S3', async () => {
+      const strategy = await backend.getServeStrategy('upload/user1/video.mp4', {
+        contentType: 'video/mp4',
+        cacheControl: CacheControl.PrivateWithCache,
+        range: 'bytes=0-1023',
+      });
+
+      expect(strategy.type).toBe('redirect');
+      // the presigned command must carry no Range at all: the client replays its own
+      // Range header against S3, which answers it natively
+      const [[commandInput]] = (GetObjectCommand as unknown as ReturnType<typeof vi.fn>).mock.calls;
+      expect('Range' in commandInput).toBe(false);
+      expect(mockSend).not.toHaveBeenCalled();
     });
 
     it('should not acquire proxy read slots in redirect mode', async () => {

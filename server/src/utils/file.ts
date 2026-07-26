@@ -55,7 +55,12 @@ export class ImmichRedirectResponse {
 export class ImmichStreamResponse {
   public readonly stream!: Readable;
   public readonly contentType!: string;
+  /** Byte count of `stream` — the partial length when `contentRange` is set, the full object otherwise. */
   public readonly length?: number;
+  /** Set only for a partial read (e.g. `bytes 0-1023/1048576`); turns the response into a 206. */
+  public readonly contentRange?: string;
+  /** Whether this endpoint forwards the client's `Range` header, i.e. whether `Accept-Ranges` is truthful. */
+  public readonly acceptsRanges?: boolean;
   public readonly cacheControl!: CacheControl;
   public readonly fileName?: string;
   public readonly disposition?: ContentDisposition;
@@ -116,12 +121,29 @@ export const sendFile = async (
         res.set('Cache-Control', cacheControlHeader);
       }
       res.header('Content-Type', file.contentType);
+      // only claim range support for endpoints that actually forward the Range header —
+      // advertising it while ignoring Range invites a client to resume a download and
+      // append a full 200 body to its partial file
+      if (file.acceptsRanges) {
+        res.header('Accept-Ranges', 'bytes');
+      }
+      if (file.contentRange) {
+        // the backend served a partial read; WebKit refuses to play <video> without a 206
+        res.status(206);
+        res.header('Content-Range', file.contentRange);
+      }
       if (file.length !== undefined) {
         res.header('Content-Length', String(file.length));
       }
       if (file.fileName) {
         res.header('Content-Disposition', getContentDispositionHeader(file.disposition ?? 'inline', file.fileName));
       }
+      // A client can walk away mid-stream — a <video> abandons a range response on every
+      // seek. `pipe` only unpipes on the destination's close and leaves the source open,
+      // so destroy it explicitly: for S3 that is what frees the socket and the proxy-read
+      // slot (see `releaseWhenStreamCloses`), and without it 32 aborted seeks wedge every
+      // proxied read. Destroying an already-finished stream is a no-op.
+      res.once('close', () => file.stream.destroy());
       file.stream.pipe(res);
       return;
     }
