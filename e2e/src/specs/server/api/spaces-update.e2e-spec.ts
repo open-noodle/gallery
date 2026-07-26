@@ -143,7 +143,7 @@ describe('PATCH /shared-spaces/:id — rename and edit RBAC', () => {
       const { status } = await request(app)
         .patch(`/shared-spaces/${ctx.spaceId}`)
         .set(authHeaders(ctx.spaceEditor))
-        .send({ name: '   ' });
+        .send({ name: ' '.repeat(3) });
 
       expect(status).toBe(400);
     });
