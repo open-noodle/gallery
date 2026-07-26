@@ -100,6 +100,7 @@ else
 
   restart_server s3
   run_phase migrate-to-s3
+  run_phase video-trim-s3
 
   restart_server disk
   run_phase migrate-to-disk
