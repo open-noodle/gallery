@@ -30,10 +30,11 @@ Gallery enforces strict role-based access on every endpoint. Three roles — Own
 | Add own assets to space     | Yes   | Yes    | No     |
 | Remove assets from space    | Yes   | Yes    | No     |
 | Set cover photo             | Yes   | Yes    | No     |
+| Rename / edit space details | Yes   | Yes    | No     |
 | Invite/remove members       | Yes   | No     | No     |
 | Change member roles         | Yes   | No     | No     |
 | Toggle face recognition     | Yes   | No     | No     |
-| Change space color          | Yes   | No     | No     |
+| Change space color          | Yes   | Yes    | No     |
 | Delete the space            | Yes   | No     | No     |
 | Leave the space             | No    | Yes    | Yes    |
 | Search within space         | Yes   | Yes    | Yes    |
@@ -177,6 +178,15 @@ Each member can choose whether a space's photos appear in their personal timelin
 When enabled, photos from that space are merged into your main Photos timeline alongside your own assets. This is per-member — each user controls their own setting independently.
 
 > Timeline integration cannot be combined with archive, favorites, or trash filters.
+
+## Renaming and Editing Space Details
+
+Owners and Editors can rename a space or update its description and color at any time. There are two entry points:
+
+- **Overflow menu** — Open the space and click the **three-dot menu** (⋮) in the header, then select **Edit Space**.
+- **Cover ✎ button** — Click the **✎** (edit) button on the space cover, then choose **Edit Space** from the menu.
+
+Both open the same modal, where you can update the name, description, and color, then click **Save**. Renames and other detail changes are recorded in the space's [activity log](#activity-log).
 
 ## Space Covers
 
@@ -365,7 +375,7 @@ In short: **personal clustering is cautious and keeps things separate; space clu
 
 ## Space Colors
 
-Each space can have an assigned color, chosen during creation or changed later by the Owner. Colors are used for:
+Each space can have an assigned color, chosen during creation or changed later by an Owner or Editor. Colors are used for:
 
 - Gradient backgrounds on space cards (when no cover photo or collage is available)
 - Hero banner gradients on the space detail page

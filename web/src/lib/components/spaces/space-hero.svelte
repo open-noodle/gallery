@@ -13,6 +13,7 @@
     gradientClass?: string;
     canEdit?: boolean;
     onChangeCover?: () => void;
+    onEditSpace?: () => void;
     onReposition?: () => void;
     repositioning?: boolean;
     onSavePosition?: (cropY: number) => void;
@@ -28,6 +29,7 @@
     gradientClass = 'from-gray-400 to-gray-600',
     canEdit = false,
     onChangeCover,
+    onEditSpace,
     onReposition,
     repositioning = false,
     onSavePosition,
@@ -168,8 +170,8 @@
 
     <!-- Mockup: hover ✎ (editors) + role badge grouped at the top-right of the cover. -->
     <div class="absolute top-3 right-3 flex items-center gap-2">
-      {#if canEdit && hasCover}
-        <div class="transition" data-testid="hero-edit-cover">
+      {#if canEdit}
+        <div class="transition" data-testid="hero-edit-menu">
           <ButtonContextMenu
             icon={mdiPencilOutline}
             title={$t('edit')}
@@ -177,8 +179,12 @@
             align="top-right"
             direction="left"
           >
+            <MenuOption text={$t('spaces_edit')} icon={mdiPencilOutline} onClick={() => onEditSpace?.()} />
             <MenuOption text={$t('change_cover_photo')} icon={mdiImageEditOutline} onClick={() => onChangeCover?.()} />
-            <MenuOption text={$t('reposition')} icon={mdiCursorMove} onClick={() => onReposition?.()} />
+            {#if hasCover}
+              <!-- Repositioning drags the cover image; with only a gradient there is nothing to drag. -->
+              <MenuOption text={$t('reposition')} icon={mdiCursorMove} onClick={() => onReposition?.()} />
+            {/if}
           </ButtonContextMenu>
         </div>
       {/if}
