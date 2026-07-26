@@ -1,16 +1,21 @@
 import { Kysely } from 'kysely';
 import { SystemConfig } from 'src/config';
-import { JobName, JobStatus, SystemMetadataKey } from 'src/enum';
+import { AssetFileType, AssetVisibility, JobName, JobStatus, SystemMetadataKey } from 'src/enum';
+import { AssetJobRepository } from 'src/repositories/asset-job.repository';
+import { AssetRepository } from 'src/repositories/asset.repository';
 import { ConfigRepository } from 'src/repositories/config.repository';
+import { CryptoRepository } from 'src/repositories/crypto.repository';
 import { DatabaseRepository } from 'src/repositories/database.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
+import { MachineLearningRepository } from 'src/repositories/machine-learning.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
 import { SearchRepository } from 'src/repositories/search.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
 import { DB } from 'src/schema';
+import { PetDetectionService } from 'src/services/pet-detection.service';
 import { PetRecognitionService } from 'src/services/pet-recognition.service';
 import { clearConfigCache } from 'src/utils/config';
 import { newMediumService } from 'test/medium.factory';
@@ -604,5 +609,167 @@ describe('PetRecognitionService.handleQueuePetRecognition state (medium)', () =>
 
     const state = await ctx.get(SystemMetadataRepository).get(SystemMetadataKey.PetRecognitionState);
     expect(state?.modelName).toBe('pet-recognition-base');
+  });
+});
+
+// Slice 9 (R9.7, R9.8): the recognition seam has only ever been exercised one handler at a time.
+describe('PetRecognitionService end-to-end clustering (medium)', () => {
+  it('R9.7 with minFaces: 2, the first face defers and rejoins the person the second one creates', async () => {
+    // minFaces > 1 was a dead parameter in the medium suite — every existing test runs at the
+    // shipped default of 1, where every face is immediately core. This walks the real deferral
+    // path: A is not core alone, B becomes core once A's embedding is a neighbour, and A's
+    // deferred re-run finds B's person through the hasPerson fallback search.
+    const { sut, ctx } = setup();
+    await enablePetRecognition(ctx, { minFaces: 2 });
+    const { user } = await ctx.newUser();
+
+    const { asset: assetA } = await ctx.newAsset({ ownerId: user.id });
+    const { assetFace: faceA } = await ctx.newAssetFace({ assetId: assetA.id });
+    await ctx.database
+      .insertInto('pet_search')
+      .values({ faceId: faceA.id, embedding: axisEmbedding('first'), species: 'dog' })
+      .execute();
+
+    // Face A alone: only one embedding in range, so it is below minFaces and defers.
+    expect(await sut.handlePetRecognition({ id: faceA.id, deferred: false, label: 'dog' })).toBe(JobStatus.Skipped);
+    const deferredRow = await ctx.database
+      .selectFrom('asset_face')
+      .select(['personId'])
+      .where('id', '=', faceA.id)
+      .executeTakeFirst();
+    expect(deferredRow?.personId).toBeNull();
+
+    const { asset: assetB } = await ctx.newAsset({ ownerId: user.id });
+    const { assetFace: faceB } = await ctx.newAssetFace({ assetId: assetB.id });
+    await ctx.database
+      .insertInto('pet_search')
+      .values({ faceId: faceB.id, embedding: nearAxisEmbedding('first', 2), species: 'dog' })
+      .execute();
+
+    // Face B now sees two neighbours (itself and A), reaches minFaces, and creates the person.
+    expect(await sut.handlePetRecognition({ id: faceB.id, deferred: false, label: 'dog' })).toBe(JobStatus.Success);
+
+    // A's deferred re-run joins that person rather than creating a second one.
+    expect(await sut.handlePetRecognition({ id: faceA.id, deferred: true, label: 'dog' })).toBe(JobStatus.Success);
+
+    const rows = await ctx.database
+      .selectFrom('asset_face')
+      .select(['id', 'personId'])
+      .where('id', 'in', [faceA.id, faceB.id])
+      .execute();
+    expect(rows).toHaveLength(2);
+    expect(rows[0].personId).not.toBeNull();
+    expect(rows[0].personId).toBe(rows[1].personId);
+  });
+});
+
+// R9.8: the detect -> embed -> cluster seam. e2e can't reach it (no ML service in that stack), and
+// the unit tests stub the repository, so this is the only place the real handlers meet a real
+// database across the handoff.
+const setupDetection = (db?: Kysely<DB>) => {
+  clearConfigCache();
+  const { sut, ctx } = newMediumService(PetDetectionService, {
+    database: db || defaultDatabase,
+    real: [
+      AssetJobRepository,
+      AssetRepository,
+      ConfigRepository,
+      CryptoRepository,
+      DatabaseRepository,
+      FaceIdentityRepository,
+      PersonRepository,
+      SearchRepository,
+      SharedSpaceRepository,
+      SystemMetadataRepository,
+    ],
+    mock: [JobRepository, LoggingRepository, MachineLearningRepository],
+  });
+  const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  jobMock.queue.mockResolvedValue();
+  jobMock.queueAll.mockResolvedValue();
+  jobMock.empty.mockResolvedValue();
+  return { sut, ctx, jobMock };
+};
+
+describe('pet detection -> recognition pipeline (medium)', () => {
+  it('R9.8 detects, embeds and clusters a dog into a pet person with species and a pet identity', async () => {
+    const { sut: detectionSut, ctx, jobMock } = setupDetection();
+    // Set the config directly rather than via enablePetRecognition: handlePetDetection also reads
+    // petDetection.enabled, which that helper doesn't set.
+    await ctx.get(SystemMetadataRepository).set(SystemMetadataKey.SystemConfig, {
+      machineLearning: {
+        enabled: true,
+        petDetection: { enabled: true, modelName: 'yolo11n', minScore: 0.6 },
+        petRecognition: { enabled: true, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
+      },
+    } as any);
+    clearConfigCache();
+
+    const { user } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+    await ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: `/preview/${asset.id}.webp` });
+
+    ctx
+      .getMock<MachineLearningRepository, Mocked<MachineLearningRepository>>(MachineLearningRepository)
+      .detectPets.mockResolvedValue({
+        imageHeight: 500,
+        imageWidth: 400,
+        pets: [
+          {
+            boundingBox: { x1: 10, y1: 20, x2: 110, y2: 120 },
+            score: 0.9,
+            label: 'dog',
+            embedding: axisEmbedding('first'),
+          },
+        ],
+      });
+
+    expect(await detectionSut.handlePetDetection({ id: asset.id })).toBe(JobStatus.Success);
+
+    // The face and its embedding landed, carrying the species (F8).
+    const petSearchRows = await ctx.database
+      .selectFrom('pet_search')
+      .innerJoin('asset_face', 'asset_face.id', 'pet_search.faceId')
+      .select(['pet_search.faceId', 'pet_search.species'])
+      .where('asset_face.assetId', '=', asset.id)
+      .execute();
+    expect(petSearchRows).toHaveLength(1);
+    expect(petSearchRows[0].species).toBe('dog');
+
+    // Replay the recognition jobs detection queued, through the real handler.
+    const recognitionJobs = jobMock.queueAll.mock.calls
+      .flatMap(([jobs]) => jobs as { name: JobName; data: { id: string; deferred: false; label?: string } }[])
+      .filter((job) => job.name === JobName.PetRecognition);
+    expect(recognitionJobs).toHaveLength(1);
+    expect(recognitionJobs[0].data.id).toBe(petSearchRows[0].faceId);
+
+    const { sut: recognitionSut } = setup();
+    for (const job of recognitionJobs) {
+      expect(await recognitionSut.handlePetRecognition(job.data)).toBe(JobStatus.Success);
+    }
+
+    const faceRow = await ctx.database
+      .selectFrom('asset_face')
+      .select(['id', 'personId'])
+      .where('id', '=', petSearchRows[0].faceId)
+      .executeTakeFirstOrThrow();
+    expect(faceRow.personId).not.toBeNull();
+
+    const person = await ctx.database
+      .selectFrom('person')
+      .selectAll()
+      .where('id', '=', faceRow.personId!)
+      .executeTakeFirstOrThrow();
+    expect(person.type).toBe('pet');
+    expect(person.species).toBe('dog');
+    expect(person.ownerId).toBe(user.id);
+    expect(person.identityId).not.toBeNull();
+
+    const identity = await ctx.database
+      .selectFrom('face_identity')
+      .selectAll()
+      .where('id', '=', person.identityId!)
+      .executeTakeFirstOrThrow();
+    expect(identity.type).toBe('pet');
   });
 });

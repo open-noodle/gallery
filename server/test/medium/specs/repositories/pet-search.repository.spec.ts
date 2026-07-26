@@ -421,3 +421,160 @@ describe('SearchRepository.searchPets', () => {
     ).toThrow();
   });
 });
+
+// Slice 9 (R9.1, R9.3-R9.5): the load-bearing recognition SQL had only ever run against mocks.
+// These exercise it against a real database.
+const collect = async (stream: AsyncIterableIterator<{ id: string }>) => {
+  const ids: string[] = [];
+  for await (const row of stream) {
+    ids.push(row.id);
+  }
+  return ids;
+};
+
+describe('PersonRepository.getUnassignedPetFaces (medium)', () => {
+  it('R9.1 returns embedded, unassigned faces and excludes all four disqualifying cases', async () => {
+    const { ctx } = setup();
+    const personRepository = ctx.get(PersonRepository);
+    const { user } = await ctx.newUser();
+
+    // Included: embedded and unassigned.
+    const { assetFace: wanted } = await newPetFace(ctx, { ownerId: user.id, embedding: axisEmbedding('first') });
+
+    // Excluded 1: assigned to a person.
+    const { person } = await ctx.newPerson({ ownerId: user.id, type: 'pet', species: 'dog' });
+    const { assetFace: assigned } = await newPetFace(ctx, {
+      ownerId: user.id,
+      embedding: axisEmbedding('first'),
+      personId: person.id,
+    });
+
+    // Excluded 2: soft-deleted.
+    const { assetFace: softDeleted } = await newPetFace(ctx, { ownerId: user.id, embedding: axisEmbedding('first') });
+    await ctx.database
+      .updateTable('asset_face')
+      .set({ deletedAt: new Date() })
+      .where('id', '=', softDeleted.id)
+      .execute();
+
+    // Excluded 3: not visible.
+    const { assetFace: invisible } = await newPetFace(ctx, { ownerId: user.id, embedding: axisEmbedding('first') });
+    await ctx.database.updateTable('asset_face').set({ isVisible: false }).where('id', '=', invisible.id).execute();
+
+    // Excluded 4: no embedding at all (detected before recognition was enabled).
+    const { asset: bareAsset } = await ctx.newAsset({ ownerId: user.id });
+    const { assetFace: embeddingLess } = await ctx.newAssetFace({ assetId: bareAsset.id });
+
+    const ids = await collect(personRepository.getUnassignedPetFaces());
+
+    expect(ids).toContain(wanted.id);
+    expect(ids).not.toContain(assigned.id);
+    expect(ids).not.toContain(softDeleted.id);
+    expect(ids).not.toContain(invisible.id);
+    expect(ids).not.toContain(embeddingLess.id);
+  });
+});
+
+describe('PersonRepository.getPetFaceForRecognition (medium)', () => {
+  it('R9.5 excludes a soft-deleted face', async () => {
+    const { ctx } = setup();
+    const personRepository = ctx.get(PersonRepository);
+    const { user } = await ctx.newUser();
+    const { assetFace } = await newPetFace(ctx, { ownerId: user.id, embedding: axisEmbedding('first') });
+
+    expect(await personRepository.getPetFaceForRecognition(assetFace.id)).toBeDefined();
+
+    await ctx.database
+      .updateTable('asset_face')
+      .set({ deletedAt: new Date() })
+      .where('id', '=', assetFace.id)
+      .execute();
+
+    expect(await personRepository.getPetFaceForRecognition(assetFace.id)).toBeUndefined();
+  });
+});
+
+describe('SearchRepository.searchPets maxDistance boundary (medium)', () => {
+  it('R9.3 keeps a row whose distance is exactly maxDistance (the comparison is inclusive)', async () => {
+    const { ctx } = setup();
+    const searchRepository = ctx.get(SearchRepository);
+    const { user } = await ctx.newUser();
+    const query = axisEmbedding('first');
+    const { assetFace } = await newPetFace(ctx, { ownerId: user.id, embedding: blendedEmbedding(140, 116) });
+
+    // Read the row's real distance with a deliberately loose search...
+    const loose = await searchRepository.searchPets({
+      userIds: [user.id],
+      embedding: query,
+      numResults: 10,
+      maxDistance: 1,
+    });
+    const match = loose.find((row) => row.id === assetFace.id);
+    expect(match).toBeDefined();
+
+    // ...then re-query with maxDistance set to exactly that distance.
+    const exact = await searchRepository.searchPets({
+      userIds: [user.id],
+      embedding: query,
+      numResults: 10,
+      maxDistance: match!.distance,
+    });
+
+    expect(exact.map((row) => row.id)).toContain(assetFace.id);
+  });
+});
+
+describe('PersonRepository.refreshPetFaces dimension guard (medium)', () => {
+  it('R9.4 rejects a wrong-dimension embedding and leaves no asset_face row behind', async () => {
+    const { ctx } = setup();
+    const personRepository = ctx.get(PersonRepository);
+    const { user } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    const faceId = newUuid();
+
+    await expect(
+      personRepository.refreshPetFaces(
+        [{ id: faceId, assetId: asset.id, boundingBoxX1: 1, boundingBoxY1: 1, boundingBoxX2: 2, boundingBoxY2: 2 }],
+        [{ faceId, embedding: '[1,2,3]', species: 'dog' }],
+      ),
+    ).rejects.toThrow();
+
+    // Faces and embeddings are inserted in one transaction, so the rejected embedding rolls the
+    // face insert back with it.
+    expect(await ctx.database.selectFrom('asset_face').select(['id']).where('id', '=', faceId).execute()).toHaveLength(
+      0,
+    );
+  });
+});
+
+describe('PersonRepository.getLatestPetDate (medium)', () => {
+  it('R9.2 returns a Date, and a same-day earlier lastRun does not skip the nightly run', async () => {
+    const { ctx } = setup();
+    const personRepository = ctx.get(PersonRepository);
+    const { user } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+
+    // A pet detected today at 18:00.
+    const petsDetectedAt = new Date();
+    petsDetectedAt.setHours(18, 0, 0, 0);
+    await ctx.database
+      .insertInto('asset_job_status')
+      .values({ assetId: asset.id, petsDetectedAt })
+      .onConflict((oc) => oc.column('assetId').doUpdateSet({ petsDetectedAt }))
+      .execute();
+
+    const latestPetDate = await personRepository.getLatestPetDate();
+    expect(latestPetDate).toBeInstanceOf(Date);
+
+    // The nightly guard compares `new Date(state.lastRun) > latestPetDate`. A lastRun earlier the
+    // SAME day must not skip: under the old `::text` cast this compared an ISO-`T` string against
+    // pg's space-separated text, where 'T' > ' ' made any same-day lastRun look newer (F11).
+    const lastRun = new Date(petsDetectedAt);
+    lastRun.setHours(9, 0, 0, 0);
+    expect(new Date(lastRun.toISOString()) > latestPetDate!).toBe(false);
+
+    // ...and a genuinely later lastRun still skips.
+    const laterRun = new Date(petsDetectedAt.getTime() + 60_000);
+    expect(new Date(laterRun.toISOString()) > latestPetDate!).toBe(true);
+  });
+});
