@@ -99,6 +99,7 @@ const { mockAssetMultiSelectManager, pickerMultiSelectClear, pickerSelectedAsset
     // Mirrors the real manager's derived field. These fixtures only model the all-owned and
     // none-owned ends of the range, so deriving it from isAllUserOwned keeps the two in step.
     get ownedAssets() {
+      // eslint-disable-next-line unicorn/no-this-outside-of-class
       return this.isAllUserOwned ? this.assets : [];
     },
   },
