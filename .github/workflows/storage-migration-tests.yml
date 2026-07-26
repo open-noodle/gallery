@@ -90,6 +90,9 @@ jobs:
       - name: 'Phase: user-delete-s3-orphans'
         run: pnpm tsx src/storage-migration.ts user-delete-s3-orphans
 
+      - name: 'Phase: video-trim-s3'
+        run: pnpm tsx src/storage-migration.ts video-trim-s3
+
       - name: 'Phase: no-files'
         run: pnpm tsx src/storage-migration.ts no-files
 
