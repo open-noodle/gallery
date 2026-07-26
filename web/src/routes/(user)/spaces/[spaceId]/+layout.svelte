@@ -8,6 +8,7 @@
   import SpaceTabs from '$lib/components/spaces/space-tabs.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { spaceUiManager } from '$lib/managers/space-ui-manager.svelte';
+  import SpaceEditModal from '$lib/modals/SpaceEditModal.svelte';
   import { Route } from '$lib/route';
   import { handleError } from '$lib/utils/handle-error';
   import {
@@ -32,6 +33,7 @@
     mdiImageMultipleOutline,
     mdiImagePlusOutline,
     mdiPaw,
+    mdiPencilOutline,
   } from '@mdi/js';
   import type { Snippet } from 'svelte';
   import { t } from 'svelte-i18n';
@@ -101,6 +103,13 @@
       toastManager.success($t('space_cover_updated'));
     } catch (error) {
       handleError(error, $t('errors.unable_to_update_space_cover'));
+    }
+  };
+
+  const handleEditSpace = async () => {
+    const updated = await modalManager.show(SpaceEditModal, { space });
+    if (updated) {
+      await invalidateAll();
     }
   };
 
@@ -248,6 +257,7 @@
             />
             {#if isEditor}
               <hr class="my-1 border-gray-300" />
+              <MenuOption text={$t('spaces_edit')} icon={mdiPencilOutline} onClick={handleEditSpace} />
               <MenuOption text={$t('add_all_photos')} icon={mdiImageMultipleOutline} onClick={handleBulkAddAssets} />
             {/if}
             {#if currentMember && !isOwner}
@@ -290,6 +300,7 @@
           currentRole={currentMember?.role}
           canEdit={isEditor}
           onChangeCover={handleChangeCover}
+          onEditSpace={handleEditSpace}
           onReposition={() => (repositioning = true)}
           {repositioning}
           onSavePosition={handleSavePosition}
