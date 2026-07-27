@@ -111,6 +111,17 @@ describe('/server', () => {
         trash: true,
         email: false,
         peopleStatistics: false,
+        // The full list mirrors the SyncRequestType enum; pin the fork's space-album types,
+        // which mobile's sync gate opens on (capability signalling).
+        syncRequestTypes: expect.arrayContaining([
+          'AssetsV1',
+          'SharedSpacesV1',
+          'SharedSpaceAlbumsV1',
+          'SharedSpaceAlbumLinksV1',
+          'SharedSpaceAlbumToAssetsV1',
+          'SharedSpaceAlbumAssetsV1',
+          'SharedSpaceAlbumAssetExifsV1',
+        ]),
       });
     });
   });
