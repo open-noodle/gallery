@@ -47,7 +47,8 @@ class _StubRemoteAlbumNotifier extends RemoteAlbumNotifier {
   RemoteAlbumState build() => const RemoteAlbumState(albums: []);
 
   @override
-  Future<int> addAssets(String albumId, List<String> assetIds) async => assetIds.length;
+  Future<({int added, int failed})> addAssets(String albumId, List<String> assetIds) async =>
+      (added: assetIds.length, failed: 0);
 }
 
 void main() {
