@@ -2840,6 +2840,7 @@
   "spaces_expand_header": "Rozwiń nagłówek Space",
   "spaces_face_recognition": "Rozpoznawanie twarzy",
   "spaces_faces": "twarze",
+  "spaces_hidden_non_owned_selection": "Twój wybór zawiera zdjęcia należące do innych członków, więc nie można go dodać do Space.",
   "spaces_hidden_too_many_assets": "Spaces są ukryte — zaznaczono zbyt wiele zdjęć (maks. {count})",
   "spaces_hide_from_timeline": "Ukryj na osi czasu",
   "spaces_hide_people": "Ukryj osoby",

@@ -6,7 +6,9 @@ import 'package:immich_mobile/presentation/widgets/action_buttons/favorite_actio
 import 'package:immich_mobile/presentation/widgets/action_buttons/remove_from_space_action_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/share_action_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/base_bottom_sheet.widget.dart';
+import 'package:immich_mobile/presentation/widgets/collection/collection_picker.widget.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
+import 'package:immich_mobile/utils/space_permissions.dart';
 import 'package:openapi/api.dart';
 
 class SpaceBottomSheet extends ConsumerStatefulWidget {
@@ -35,8 +37,7 @@ class _SpaceBottomSheetState extends ConsumerState<SpaceBottomSheet> {
     super.dispose();
   }
 
-  bool get _canEdit =>
-      widget.currentUserRole == SharedSpaceRole.owner || widget.currentUserRole == SharedSpaceRole.editor;
+  bool get _canEdit => roleIsWritable(widget.currentUserRole);
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +47,9 @@ class _SpaceBottomSheetState extends ConsumerState<SpaceBottomSheet> {
       controller: sheetController,
       initialChildSize: 0.22,
       minChildSize: 0.22,
-      maxChildSize: 0.55,
+      // Raised from 0.55: the sheet now hosts the collection picker, which is unreachable
+      // at the old ceiling.
+      maxChildSize: 0.85,
       shouldCloseOnMinExtent: false,
       actions: [
         const ShareActionButton(source: ActionSource.timeline),
@@ -60,6 +63,10 @@ class _SpaceBottomSheetState extends ConsumerState<SpaceBottomSheet> {
               onComplete: widget.onAssetsRemoved,
             ),
         ],
+      ],
+      slivers: [
+        // A space is not offered as a destination for its own assets.
+        CollectionPicker(excludeSpaceId: widget.spaceId),
       ],
     );
   }
