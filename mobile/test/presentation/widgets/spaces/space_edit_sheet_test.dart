@@ -265,12 +265,12 @@ void main() {
     await pumpSheet(tester);
 
     for (final color in UserAvatarColor.values) {
-      final swatch = find.byKey(Key('space-edit-color-${color.value}'));
-      expect(swatch, findsOneWidget, reason: '${color.value} swatch');
+      final swatch = find.byKey(Key('space-edit-color-${color.toJson()}'));
+      expect(swatch, findsOneWidget, reason: '${color.toJson()} swatch');
       expect(
-        find.descendant(of: swatch, matching: find.bySemanticsLabel(color.value)),
+        find.descendant(of: swatch, matching: find.bySemanticsLabel(color.toJson())),
         findsOneWidget,
-        reason: '${color.value} needs a semantics label -- colour alone is invisible to a screen reader',
+        reason: '${color.toJson()} needs a semantics label -- colour alone is invisible to a screen reader',
       );
       expectTapTargetMin(tester, swatch);
     }
