@@ -1,6 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { serverVersion } from 'src/constants.js';
-import { SystemMetadataKey } from 'src/enum.js';
+import { SyncRequestType, SystemMetadataKey } from 'src/enum.js';
 import { ServerService } from 'src/services/server.service.js';
 import { clearConfigCache } from 'src/utils/config.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
@@ -155,6 +155,7 @@ describe(ServerService.name, () => {
         email: false,
         realtimeTranscoding: false,
         peopleStatistics: false,
+        syncRequestTypes: Object.values(SyncRequestType),
       });
       expect(mocks.systemMetadata.get).toHaveBeenCalled();
     });

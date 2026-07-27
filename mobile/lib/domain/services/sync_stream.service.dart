@@ -66,6 +66,20 @@ class SyncStreamService {
 
     final serverSemVer = SemVer(major: serverVersion.major, minor: serverVersion.minor, patch: serverVersion.patch_);
 
+    // Capability signal for fork-only request types: the reported version cannot carry
+    // this (RC images stamp the bare base version, unbranded dev servers report the
+    // upstream version), so prefer the server's own declaration and leave the version
+    // gate as the fallback for servers that predate it. An absent field must stay null —
+    // collapsing it to an empty set would read as "declares nothing" and silently
+    // disable fork sync.
+    Set<String>? supportedSyncTypes;
+    try {
+      final features = await _api.serverInfoApi.getServerFeatures();
+      supportedSyncTypes = features?.syncRequestTypes.orElse(null)?.toSet();
+    } catch (error) {
+      _logger.warning("Failed to fetch server features for sync capability detection: $error");
+    }
+
     final value = Store.get(StoreKey.syncMigrationStatus, "[]");
     final migrations = (jsonDecode(value) as List).cast<String>();
     int previousLength = migrations.length;
@@ -81,6 +95,7 @@ class SyncStreamService {
     await _syncApiRepository.streamChanges(
       _handleEvents,
       serverVersion: serverSemVer,
+      supportedSyncTypes: supportedSyncTypes,
       onReset: () => shouldReset = true,
       abortSignal: _cancellation?.future,
     );
@@ -89,6 +104,7 @@ class SyncStreamService {
       await _syncApiRepository.streamChanges(
         _handleEvents,
         serverVersion: serverSemVer,
+        supportedSyncTypes: supportedSyncTypes,
         abortSignal: _cancellation?.future,
       );
     }

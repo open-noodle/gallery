@@ -15,7 +15,7 @@ import {
   ServerStorageResponseDto,
   UsageByUserDto,
 } from 'src/dtos/server.dto.js';
-import { StorageFolder, SystemMetadataKey } from 'src/enum.js';
+import { StorageFolder, SyncRequestType, SystemMetadataKey } from 'src/enum.js';
 import { UserStatsQueryResponse } from 'src/repositories/user.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { getAdminAvailableMemoryTypeKeys, MEMORY_TYPE_KEYS } from 'src/services/memory-rules/memory-type.metadata.js';
@@ -141,6 +141,10 @@ export class ServerService extends BaseService {
       email: notifications.smtp.enabled,
       realtimeTranscoding: ffmpeg.realtime.enabled,
       peopleStatistics,
+      // Capability signal for mobile sync gating: /sync/stream 400s the whole request on any
+      // type outside this enum, so clients must know the accepted set before asking. Version
+      // numbers can't carry this (RC builds report the bare base version).
+      syncRequestTypes: Object.values(SyncRequestType),
     };
   }
 
