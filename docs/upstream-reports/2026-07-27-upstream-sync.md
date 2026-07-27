@@ -324,7 +324,86 @@ files — not `test/`. Running the formatter over `lib test` reports ~30 changed
 
 ## Remote CI Verification
 
-See the follow-up section appended after dispatch.
+- **Test branch**: `rebase/upstream-rolling-2026-07-27`
+- **Commit validated**: `1a5b874ae82` (everything below ran against this SHA; only this report
+  section was appended afterwards)
+
+| Workflow | Status | Notes |
+| --- | --- | --- |
+| `test.yml` | GREEN | full 21-job suite |
+| `docker.yml` | GREEN | validates the Dockerfile + pnpm/lockfile and mise changes |
+| `static_analysis.yml` | GREEN | `dart analyze --fatal-infos`, `dart format`, generated-file freshness |
+| `gallery-build-mobile.yml` | GREEN | iOS + Android compile |
+| `gallery-mobile-smoke.yml` | GREEN | Android codegen/analyze smoke |
+| `gallery-ml-smoke.yml` | GREEN | |
+| `gallery-rebase-smoke.yml` | GREEN | |
+| `storage-migration-tests.yml` | GREEN | |
+| `storage-migration-e2e.yml` | GREEN | |
+| `gallery-revert-to-immich-validation.yml` | **RED** | upstream-blocked, not a code defect — see below |
+
+**9 / 10 green, first try, no flakes and no re-runs.**
+
+### The one failure is an upstream release-timing issue, not a code defect
+
+`gallery-revert-to-immich-validation` fails at:
+
+```
+pre: pull ghcr.io/immich-app/immich-server:v3.1.0
+Error response from daemon: manifest unknown
+```
+
+Upstream tagged `v3.1.0` in git (`8aa95c67470`) but has **not cut the release**: there is no
+GitHub Release for v3.1.0 (their latest published release is still v3.0.3 from 2026-07-15) and
+`ghcr.io/immich-app/immich-server:v3.1.0` returns **404** while `v3.0.3` returns 200. The
+workflow derives its pull tag from `branding/config.json` → `upstream.version`, which this
+cycle bumped to `3.1.0`.
+
+The **coverage half of the gate passes** — the local detector reports 0 missing entries against
+`v3.1.0`, and no upstream migrations exist in the v3.0.3→v3.1.0 delta, so `revert-to-immich.sql`
+genuinely needs no change.
+
+**Decision (maintainer)**: keep `upstream.version` at `3.1.0` and re-dispatch this workflow once
+Immich publishes the v3.1.0 image. The alternative — reverting the reference to `3.0.3` — would
+also be correct, since the zero-migration delta means the revert path is identical either way.
+
+## Staging RC Validation
+
+- **RC tag**: `rolling-v310-rc1` (`gallery-rc-build.yml` run 30304866204, server-only, both arches)
+- **ML**: left at `v5.1.1` — `machine-learning/` differs from the pin only by the version string
+  (`3.0.3` → `3.1.0` in `pyproject.toml` + `uv.lock`); no source, dependency or Dockerfile change
+- **gitops**: `infra-gitops` `1a75f1e` pinned `apps/staging/server.yaml`
+- **Served pod image verified directly** (not via `rollout status`, which has a known
+  false-positive): `gallery-server-656bd5cf87-29jvc` → `…/gallery-server:rolling-v310-rc1`
+
+### Migration + schema validation on a real populated DB
+
+Pre-flight parity check found no boot-blocking orphans (the only orphan,
+`1776735180298-ChangeDurationToInteger`, is the known-benign `compatibilityAliases` case). Two
+migrations were expected to apply, and both did:
+
+```
+Migration "1784647658615-AddOAuthBearerTokenToSession" succeeded
+Migration "1784836013770-MinFacePreferenceMigration" succeeded
+Finished running migrations
+No schema drift detected      <- Microservices worker
+No schema drift detected      <- Api worker
+```
+
+### Fork surface smoke (temp api_key, since removed)
+
+| Endpoint | Result |
+| --- | --- |
+| `GET /server/ml-health` | 200 `{"smartSearchHealthy":true}` |
+| `GET /shared-spaces` | 200 |
+| `GET /albums` | 200 |
+| `GET /people?withSharedSpaces=true` | 200 — 362 people |
+| `GET /gallery/map/markers` (fork-only) | 200 with markers |
+| `GET /timeline/buckets` | 200 |
+| `GET /search/suggestions?type=camera-make` | 200 |
+| `POST /search/smart "beach"` | 200 — 100 assets (CLIP + vector end-to-end) |
+| `GET /` (web) | 200, 9786 bytes |
+
+Server self-reports `v5.2.2` (git describe nearest tag) — expected for an RC, not a bad build.
 
 ## Post-Rebase Verification
 
