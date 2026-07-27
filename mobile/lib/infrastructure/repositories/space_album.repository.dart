@@ -7,6 +7,19 @@ class SpaceAlbumRepository extends DriftDatabaseRepository {
   final Drift _db;
   const SpaceAlbumRepository(this._db) : super(_db);
 
+  /// Whether [albumId] is linked to at least one space. Cheap point lookup used to
+  /// decide if an album mutation needs the space sync-nudge.
+  Future<bool> isAlbumLinked(String albumId) async {
+    final link = _db.sharedSpaceAlbumLinkEntity;
+    final row =
+        await (_db.selectOnly(link)
+              ..addColumns([link.albumId])
+              ..where(link.albumId.equals(albumId))
+              ..limit(1))
+            .getSingleOrNull();
+    return row != null;
+  }
+
   /// Watches albums linked to [spaceId], joining metadata + link fields.
   /// Emits ordered by album name (ascending) and reacts to Drift row changes.
   Stream<List<SpaceAlbum>> watchLinkedAlbums(String spaceId) {
