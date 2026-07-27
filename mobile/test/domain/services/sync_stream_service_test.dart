@@ -36,6 +36,30 @@ class _AbortCallbackWrapper {
 
 class _MockAbortCallbackWrapper extends Mock implements _AbortCallbackWrapper {}
 
+/// A /server/features response; [syncRequestTypes] defaults to ABSENT — the shape an
+/// older fork server (no capability signalling) produces.
+ServerFeaturesDto makeServerFeatures({Optional<List<String>?> syncRequestTypes = const Optional.absent()}) =>
+    ServerFeaturesDto(
+      configFile: false,
+      duplicateDetection: false,
+      email: false,
+      facialRecognition: false,
+      importFaces: false,
+      map: true,
+      oauth: false,
+      oauthAutoLaunch: false,
+      ocr: false,
+      passwordLogin: true,
+      peopleStatistics: false,
+      realtimeTranscoding: false,
+      reverseGeocoding: true,
+      search: true,
+      sidecar: true,
+      smartSearch: false,
+      trash: true,
+      syncRequestTypes: syncRequestTypes,
+    );
+
 void main() {
   late SyncStreamService sut;
   late SyncStreamRepository mockSyncStreamRepo;
@@ -101,6 +125,7 @@ void main() {
         any(),
         onReset: any(named: 'onReset'),
         serverVersion: any(named: 'serverVersion'),
+        supportedSyncTypes: any(named: 'supportedSyncTypes'),
         abortSignal: any(named: 'abortSignal'),
       ),
     ).thenAnswer((invocation) async {
@@ -114,6 +139,8 @@ void main() {
     when(
       () => mockServerApi.getServerVersion(),
     ).thenAnswer((_) async => ServerVersionResponseDto(major: 1, minor: 132, patch_: 0, prerelease: null));
+    // Default: a server that predates capability signalling (no syncRequestTypes field).
+    when(() => mockServerApi.getServerFeatures()).thenAnswer((_) async => makeServerFeatures());
 
     when(() => mockSyncStreamRepo.updateUsersV1(any())).thenAnswer(successHandler);
     when(() => mockSyncStreamRepo.deleteUsersV1(any())).thenAnswer(successHandler);
@@ -871,6 +898,87 @@ void main() {
       await sut.sync();
 
       verifyNever(() => mockSyncMigrationRepo.v20260128CopyExifWidthHeightToAsset());
+    });
+  });
+
+  group('SyncStreamService - sync capability detection', () {
+    Set<String>? capturedSupportedTypes() {
+      final captured = verify(
+        () => mockSyncApiRepo.streamChanges(
+          any(),
+          onReset: any(named: 'onReset'),
+          serverVersion: any(named: 'serverVersion'),
+          supportedSyncTypes: captureAny(named: 'supportedSyncTypes'),
+          abortSignal: any(named: 'abortSignal'),
+        ),
+      ).captured;
+      return captured.single as Set<String>?;
+    }
+
+    test('passes the server-declared sync request types through to streamChanges', () async {
+      when(() => mockServerApi.getServerFeatures()).thenAnswer(
+        (_) async => makeServerFeatures(syncRequestTypes: const Optional.present(['AssetsV1', 'SharedSpaceAlbumsV1'])),
+      );
+
+      await sut.sync();
+
+      expect(capturedSupportedTypes(), {'AssetsV1', 'SharedSpaceAlbumsV1'});
+    });
+
+    test('passes null when the server predates capability signalling (field absent)', () async {
+      // The generated DTO's DEFAULT is Optional.present([]) — an ABSENT field must not
+      // collapse into "declares nothing", which would silently disable fork sync types.
+      when(() => mockServerApi.getServerFeatures()).thenAnswer((_) async => makeServerFeatures());
+
+      await sut.sync();
+
+      expect(capturedSupportedTypes(), isNull);
+    });
+
+    test('passes null and still syncs when the features fetch fails', () async {
+      when(() => mockServerApi.getServerFeatures()).thenThrow(ApiException(500, 'boom'));
+
+      final result = await sut.sync();
+
+      expect(result, isTrue);
+      expect(capturedSupportedTypes(), isNull);
+    });
+
+    test('the post-reset re-stream carries the same declared types', () async {
+      // A server-requested reset triggers a full resync — the moment the fork tables get
+      // rebuilt — so dropping the declaration there would reintroduce the empty-tables bug.
+      when(
+        () => mockServerApi.getServerFeatures(),
+      ).thenAnswer((_) async => makeServerFeatures(syncRequestTypes: const Optional.present(['SharedSpaceAlbumsV1'])));
+      var calls = 0;
+      when(
+        () => mockSyncApiRepo.streamChanges(
+          any(),
+          onReset: any(named: 'onReset'),
+          serverVersion: any(named: 'serverVersion'),
+          supportedSyncTypes: any(named: 'supportedSyncTypes'),
+          abortSignal: any(named: 'abortSignal'),
+        ),
+      ).thenAnswer((invocation) async {
+        calls++;
+        if (calls == 1) {
+          (invocation.namedArguments[const Symbol('onReset')] as Function)();
+        }
+      });
+
+      await sut.sync();
+
+      final captured = verify(
+        () => mockSyncApiRepo.streamChanges(
+          any(),
+          onReset: any(named: 'onReset'),
+          serverVersion: any(named: 'serverVersion'),
+          supportedSyncTypes: captureAny(named: 'supportedSyncTypes'),
+          abortSignal: any(named: 'abortSignal'),
+        ),
+      ).captured;
+      expect(captured, hasLength(2));
+      expect(captured[1], {'SharedSpaceAlbumsV1'});
     });
   });
 }

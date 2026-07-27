@@ -24,9 +24,20 @@ class SyncApiRepository {
     return _api.syncApi.deleteSyncAck(SyncAckDeleteDto(types: Optional.present(types)));
   }
 
+  /// The five Phase-2B space-album request types. Kept in one place so the capability
+  /// filter and the version-gate fallback can never drift apart.
+  static const _spaceAlbumSyncTypes = [
+    SyncRequestType.sharedSpaceAlbumsV1,
+    SyncRequestType.sharedSpaceAlbumLinksV1,
+    SyncRequestType.sharedSpaceAlbumToAssetsV1,
+    SyncRequestType.sharedSpaceAlbumAssetsV1,
+    SyncRequestType.sharedSpaceAlbumAssetExifsV1,
+  ];
+
   Future<void> streamChanges(
     Future<void> Function(List<SyncEvent>, Function() abort, Function() reset) onData, {
     required SemVer serverVersion,
+    Set<String>? supportedSyncTypes,
     Function()? onReset,
     int batchSize = kSyncEventBatchSize,
     http.Client? httpClient,
@@ -105,16 +116,18 @@ class SyncApiRepository {
           // still 400s the WHOLE /sync/stream request on any unrecognized type. This
           // client-side version gate is therefore the ONLY protection — every future
           // gallery-fork-only request type MUST be gated the same way.
-          // TODO(M14): the gate value itself is an unenforced release-order
-          // assumption (mobile + server release independently); pin it to the real
-          // first-feature-release version + add a CI guard before relying on it.
-          if (serverVersion > const SemVer(major: 5, minor: 0, patch: 0)) ...[
-            SyncRequestType.sharedSpaceAlbumsV1,
-            SyncRequestType.sharedSpaceAlbumLinksV1,
-            SyncRequestType.sharedSpaceAlbumToAssetsV1,
-            SyncRequestType.sharedSpaceAlbumAssetsV1,
-            SyncRequestType.sharedSpaceAlbumAssetExifsV1,
-          ],
+          // M14 resolution: servers now DECLARE the request types they accept via
+          // GET /server/features (syncRequestTypes), which the sync service passes in as
+          // [supportedSyncTypes]. The declaration is authoritative in both directions — it
+          // opens the gate on servers whose version LIES about the feature (an RC image
+          // stamps the bare base version, an unbranded dev server reports the upstream
+          // version) and keeps it closed on future servers that drop a type. The version
+          // gate below survives only as the fallback for fork servers that predate
+          // capability signalling (their /server/features has no syncRequestTypes field).
+          if (supportedSyncTypes != null)
+            ...(_spaceAlbumSyncTypes.where((type) => supportedSyncTypes.contains(type.value)))
+          else if (serverVersion > const SemVer(major: 5, minor: 0, patch: 0))
+            ..._spaceAlbumSyncTypes,
         ],
       ).toJson(),
     );

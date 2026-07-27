@@ -6,14 +6,18 @@ import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/pages/library/spaces/collection_sort.dart';
+import 'package:immich_mobile/presentation/widgets/spaces/space_edit_sheet.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
+import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
+import 'package:immich_mobile/utils/space_permissions.dart';
 import 'package:immich_mobile/widgets/common/collection_sort_button.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
 import 'package:immich_mobile/widgets/common/search_field.dart';
 import 'package:immich_mobile/widgets/spaces/space_card.dart';
+import 'package:openapi/api.dart';
 
 @RoutePage()
 class SpacesPage extends HookConsumerWidget {
@@ -78,6 +82,75 @@ class SpacesPage extends HookConsumerWidget {
 
       nameController.dispose();
       descController.dispose();
+    }
+
+    Future<void> confirmAndDeleteSpace(SharedSpaceResponseDto space) async {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('spaces_delete'.t(context: ctx)),
+          content: Text('spaces_delete_confirmation'.t(context: ctx, args: {'name': space.name})),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text('cancel'.t(context: ctx)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.error),
+              child: Text('delete'.t(context: ctx)),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+
+      try {
+        await ref.read(sharedSpaceApiRepositoryProvider).delete(space.id);
+        ref.invalidate(sharedSpacesProvider);
+      } catch (e) {
+        if (context.mounted) {
+          ImmichToast.show(context: context, msg: 'Failed to delete space', toastType: ToastType.error);
+        }
+      }
+    }
+
+    Future<void> showSpaceActions(SharedSpaceResponseDto space) async {
+      final userId = ref.read(currentUserProvider)?.id;
+      // A viewer has no actions at all, so opening an empty sheet would be worse
+      // than not reacting.
+      if (!spaceIsWritable(space, userId)) return;
+
+      await showModalBottomSheet<void>(
+        context: context,
+        builder: (sheetContext) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                key: const Key('space-card-action-edit'),
+                leading: const Icon(Icons.edit_outlined),
+                title: Text('spaces_edit'.t(context: sheetContext)),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  final saved = await SpaceEditSheet.show(context, space);
+                  if (saved == true) ref.invalidate(sharedSpacesProvider);
+                },
+              ),
+              if (spaceIsOwned(space, userId))
+                ListTile(
+                  key: const Key('space-card-action-delete'),
+                  leading: const Icon(Icons.delete_outline),
+                  title: Text('spaces_delete'.t(context: sheetContext)),
+                  onTap: () async {
+                    Navigator.of(sheetContext).pop();
+                    await confirmAndDeleteSpace(space);
+                  },
+                ),
+            ],
+          ),
+        ),
+      );
     }
 
     return Scaffold(
@@ -156,6 +229,7 @@ class SpacesPage extends HookConsumerWidget {
                                   await context.pushRoute(SpaceDetailRoute(spaceId: space.id));
                                   ref.invalidate(sharedSpacesProvider);
                                 },
+                                onLongPress: () => showSpaceActions(space),
                               );
                             },
                           ),
