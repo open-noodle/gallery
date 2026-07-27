@@ -73,13 +73,15 @@ void main() {
 
   Future<void> streamChanges(
     Future<void> Function(List<SyncEvent>, Function() abort, Function() reset) onDataCallback,
-    SemVer serverVersion,
-  ) {
+    SemVer serverVersion, {
+    Set<String>? supportedSyncTypes,
+  }) {
     return sut.streamChanges(
       onDataCallback,
       batchSize: testBatchSize,
       httpClient: mockHttpClient,
       serverVersion: serverVersion,
+      supportedSyncTypes: supportedSyncTypes,
     );
   }
 
@@ -87,8 +89,8 @@ void main() {
   // reads back the request body the SUT sent so we can assert on `types`.
   // The request is populated (body set) before client.send, and the mock
   // captures the object by reference, so reading .body afterwards is valid.
-  Future<List<String>> capturedRequestTypes(SemVer serverVersion) async {
-    final future = streamChanges((_, _, _) async {}, serverVersion);
+  Future<List<String>> capturedRequestTypes(SemVer serverVersion, {Set<String>? supportedSyncTypes}) async {
+    final future = streamChanges((_, _, _) async {}, serverVersion, supportedSyncTypes: supportedSyncTypes);
     await Future.delayed(const Duration(milliseconds: 50));
     await responseStreamController.close();
     await future;
@@ -166,6 +168,44 @@ void main() {
         isEmpty,
         reason: 'every SharedSpaceAlbum* SyncRequestType must be sent once the version gate is satisfied',
       );
+    });
+  });
+
+  group('server-declared sync capabilities override the version gate', () {
+    const albumTypes = <String>[
+      'SharedSpaceAlbumsV1',
+      'SharedSpaceAlbumLinksV1',
+      'SharedSpaceAlbumToAssetsV1',
+      'SharedSpaceAlbumAssetsV1',
+      'SharedSpaceAlbumAssetExifsV1',
+    ];
+
+    test('a declaring server INCLUDES the album types even when its version reads at/below the gate', () async {
+      // An RC image stamps the bare base version (5.0.0-rc.N reports 5.0.0) and an
+      // unbranded dev server reports the upstream version — both lie below the
+      // version gate while fully supporting the feature. The declaration must win.
+      for (final version in [const SemVer(major: 5, minor: 0, patch: 0), const SemVer(major: 3, minor: 0, patch: 3)]) {
+        final types = await capturedRequestTypes(version, supportedSyncTypes: {...albumTypes, 'AssetsV1'});
+        expect(albumTypes.every(types.contains), isTrue, reason: 'declared capability must open the gate at $version');
+        clearInteractions(mockHttpClient);
+      }
+    });
+
+    test('a declaring server WITHOUT the album types EXCLUDES them even far above the version gate', () async {
+      final types = await capturedRequestTypes(
+        const SemVer(major: 6, minor: 0, patch: 0),
+        supportedSyncTypes: {'AssetsV1'},
+      );
+      expect(albumTypes.any(types.contains), isFalse, reason: 'the declaration is authoritative in both directions');
+    });
+
+    test('a partial declaration sends exactly the declared album types', () async {
+      final declared = {'SharedSpaceAlbumsV1', 'SharedSpaceAlbumLinksV1'};
+      final types = await capturedRequestTypes(
+        const SemVer(major: 5, minor: 0, patch: 0),
+        supportedSyncTypes: declared,
+      );
+      expect(types.where(albumTypes.contains).toSet(), declared);
     });
   });
 
