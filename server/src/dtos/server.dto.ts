@@ -149,6 +149,14 @@ const ServerFeaturesSchema = z
     ocr: z.boolean().describe('Whether OCR is enabled'),
     realtimeTranscoding: z.boolean().describe('Whether real-time transcoding is enabled'),
     peopleStatistics: z.boolean().describe('Whether the people face statistics UI is enabled'),
+    // Deliberately plain strings, not the SyncRequestType enum: a client must be able to
+    // parse a newer server's list without choking on values its own enum doesn't know yet.
+    syncRequestTypes: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Sync stream request types this server accepts. Absent on servers that predate capability signalling; clients fall back to version-based gating.',
+      ),
   })
   .meta({ id: 'ServerFeaturesDto' });
 
