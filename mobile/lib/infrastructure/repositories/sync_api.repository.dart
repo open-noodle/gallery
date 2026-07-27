@@ -125,7 +125,7 @@ class SyncApiRepository {
           // gate below survives only as the fallback for fork servers that predate
           // capability signalling (their /server/features has no syncRequestTypes field).
           if (supportedSyncTypes != null)
-            ...(_spaceAlbumSyncTypes.where((type) => supportedSyncTypes.contains(type.value)))
+            ...(_spaceAlbumSyncTypes.where((type) => supportedSyncTypes.contains(type.toJson())))
           else if (serverVersion > const SemVer(major: 5, minor: 0, patch: 0))
             ..._spaceAlbumSyncTypes,
         ],
