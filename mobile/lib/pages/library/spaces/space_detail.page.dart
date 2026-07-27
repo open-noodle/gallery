@@ -6,6 +6,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/space_bottom_sheet.widget.dart';
+import 'package:immich_mobile/presentation/widgets/spaces/space_detail_kebab.widget.dart';
+import 'package:immich_mobile/presentation/widgets/spaces/space_edit_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_top_sliver.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
@@ -18,6 +20,7 @@ import 'package:immich_mobile/providers/sync_status.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
+import 'package:immich_mobile/utils/space_permissions.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
 import 'package:immich_mobile/widgets/spaces/sync_status_banner.dart';
 import 'package:openapi/api.dart';
@@ -103,15 +106,15 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   }
 
   bool get _isOwner {
-    final member = _currentMember;
-    if (member == null) return false;
-    return member.role == SharedSpaceRole.owner;
+    final space = _space;
+    if (space == null) return false;
+    return spaceIsOwned(space, ref.read(currentUserProvider)?.id);
   }
 
   bool get _canEdit {
-    final member = _currentMember;
-    if (member == null) return false;
-    return member.role == SharedSpaceRole.owner || member.role == SharedSpaceRole.editor;
+    final space = _space;
+    if (space == null) return false;
+    return spaceIsWritable(space, ref.read(currentUserProvider)?.id);
   }
 
   SharedSpaceRole get _currentRole {
@@ -168,14 +171,17 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Space'),
-        content: Text('Are you sure you want to delete "${_space?.name}"? This cannot be undone.'),
+        title: Text('spaces_delete'.t(context: ctx)),
+        content: Text('spaces_delete_confirmation'.t(context: ctx, args: {'name': _space?.name ?? ''})),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('cancel'.t(context: ctx)),
+          ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.error),
-            child: const Text('Delete'),
+            child: Text('delete'.t(context: ctx)),
           ),
         ],
       ),
@@ -195,6 +201,21 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
         }
       }
     }
+  }
+
+  Future<void> _editSpace() async {
+    final space = _space;
+    if (space == null) return;
+
+    final saved = await SpaceEditSheet.show(context, space);
+    if (saved != true) return;
+
+    // The grid reads sharedSpacesProvider; the app bar reads this page's own
+    // `_space`, which is network-loaded rather than Drift-backed. A sync nudge would
+    // NOT refresh the title -- nothing reads the local shared_space name column for
+    // display -- so re-fetch the metadata explicitly.
+    ref.invalidate(sharedSpacesProvider);
+    await _refreshSpaceMetadata();
   }
 
   bool get _showInTimeline {
@@ -455,13 +476,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
                 tooltip: 'Add Photos',
               ),
             IconButton(icon: const Icon(Icons.people_outline), onPressed: _navigateToMembers, tooltip: 'Members'),
-            if (_isOwner)
-              PopupMenuButton<String>(
-                onSelected: (value) {
-                  if (value == 'delete') _deleteSpace();
-                },
-                itemBuilder: (context) => [const PopupMenuItem(value: 'delete', child: Text('Delete Space'))],
-              ),
+            SpaceDetailKebab(canEdit: _canEdit, canDelete: _isOwner, onEdit: _editSpace, onDelete: _deleteSpace),
           ],
         ),
         bottomSheet: SpaceBottomSheet(

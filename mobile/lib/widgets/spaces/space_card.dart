@@ -7,7 +7,12 @@ class SpaceCard extends StatelessWidget {
   final SharedSpaceResponseDto space;
   final VoidCallback onTap;
 
-  const SpaceCard({super.key, required this.space, required this.onTap});
+  /// Optional so existing call sites keep working. `GestureDetector` fires either
+  /// `onTap` or `onLongPress` for a given gesture, never both, which is what keeps a
+  /// long-press from also navigating into the space behind the sheet.
+  final VoidCallback? onLongPress;
+
+  const SpaceCard({super.key, required this.space, required this.onTap, this.onLongPress});
 
   @override
   Widget build(BuildContext context) {
@@ -15,6 +20,12 @@ class SpaceCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
+      // Always register a long-press recognizer, even when the caller has no
+      // long-press handler of its own. Without one, GestureDetector only
+      // arms a tap recognizer, so a held-then-released touch (no onLongPress
+      // competing in the gesture arena) resolves as a plain tap -- a "fat
+      // finger" long hold would then navigate just like a quick tap.
+      onLongPress: onLongPress ?? () {},
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
