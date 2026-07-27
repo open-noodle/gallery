@@ -183,19 +183,19 @@ class _SpaceEditSheetState extends ConsumerState<SpaceEditSheet> {
     // descendant -- callers that look up the swatch by key and then search its
     // descendants for the semantics label depend on that nesting order.
     return SizedBox(
-      key: Key('space-edit-color-${color.value}'),
+      key: Key('space-edit-color-${color.toJson()}'),
       width: 48,
       height: 48,
       // Colour alone conveys nothing to a screen reader, so each swatch is labelled.
       child: Semantics(
-        label: color.value,
+        label: color.toJson(),
         selected: selected,
         button: true,
         child: InkWell(
           onTap: () => setState(() => _color = color),
           child: Center(
             child: Container(
-              key: selected ? Key('space-edit-color-${color.value}-selected') : null,
+              key: selected ? Key('space-edit-color-${color.toJson()}-selected') : null,
               width: 32,
               height: 32,
               decoration: BoxDecoration(
