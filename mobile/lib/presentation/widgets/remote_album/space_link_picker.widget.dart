@@ -4,6 +4,7 @@ import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/utils/space_permissions.dart';
 import 'package:openapi/api.dart';
 
 /// L15 — minimal "Link to space" picker, the reverse of [SpaceLinkAlbumPage]
@@ -31,13 +32,6 @@ class SpaceLinkPickerSheet extends ConsumerWidget {
     );
   }
 
-  static bool _canWrite(SharedSpaceResponseDto space, String? currentUserId) {
-    if (currentUserId == null) return false;
-    if (space.createdById == currentUserId) return true;
-    final role = (space.members.value ?? const []).where((m) => m.userId == currentUserId).firstOrNull?.role;
-    return role == SharedSpaceRole.owner || role == SharedSpaceRole.editor;
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final spacesAsync = ref.watch(sharedSpacesProvider);
@@ -57,7 +51,7 @@ class SpaceLinkPickerSheet extends ConsumerWidget {
             Flexible(
               child: spacesAsync.when(
                 data: (spaces) {
-                  final writable = spaces.where((s) => _canWrite(s, currentUserId)).toList();
+                  final writable = spaces.where((s) => spaceIsWritable(s, currentUserId)).toList();
                   if (writable.isEmpty) {
                     return _CenteredMessage(text: 'spaces_no_writable_spaces'.t(context: context));
                   }
