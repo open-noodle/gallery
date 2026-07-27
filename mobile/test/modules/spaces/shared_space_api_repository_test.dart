@@ -27,6 +27,7 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(api.SharedSpaceCreateDto(name: ''));
+    registerFallbackValue(api.SharedSpaceUpdateDto());
     registerFallbackValue(api.SharedSpacePersonUpdateDto());
     registerFallbackValue(
       api.SharedSpaceMemberCreateDto(userId: '', role: const api.Optional.present(api.SharedSpaceRole.viewer)),
@@ -507,6 +508,178 @@ void main() {
           ),
         ),
       ).called(1);
+    });
+  });
+
+  group('update', () {
+    api.SharedSpaceResponseDto updatedSpace() => api.SharedSpaceResponseDto(
+      id: 'space-1',
+      name: 'Renamed',
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-02T00:00:00Z',
+      createdById: 'user-1',
+    );
+
+    /// Asserts on the DTO handed to the generated client.
+    Matcher dtoThat(bool Function(api.SharedSpaceUpdateDto dto) predicate, String description) =>
+        isA<api.SharedSpaceUpdateDto>().having(predicate, description, isTrue);
+
+    test('sends only the name when only the name changed', () async {
+      when(() => mockApi.updateSpace('space-1', any())).thenAnswer((_) async => updatedSpace());
+
+      await repository.update('space-1', name: 'Renamed');
+
+      verify(
+        () => mockApi.updateSpace(
+          'space-1',
+          any(
+            that: dtoThat(
+              (d) =>
+                  d.name.isPresent &&
+                  d.name.value == 'Renamed' &&
+                  d.description.isEmpty &&
+                  d.color.isEmpty,
+              'name present, description and color absent',
+            ),
+          ),
+        ),
+      ).called(1);
+    });
+
+    test('sends an empty description verbatim so it clears server-side', () async {
+      when(() => mockApi.updateSpace('space-1', any())).thenAnswer((_) async => updatedSpace());
+
+      await repository.update('space-1', name: 'Renamed', description: '');
+
+      verify(
+        () => mockApi.updateSpace(
+          'space-1',
+          any(
+            that: dtoThat(
+              (d) => d.description.isPresent && d.description.value == '',
+              'description present and empty',
+            ),
+          ),
+        ),
+      ).called(1);
+    });
+
+    test('sends a newly added description', () async {
+      when(() => mockApi.updateSpace('space-1', any())).thenAnswer((_) async => updatedSpace());
+
+      await repository.update('space-1', description: 'Holiday photos');
+
+      verify(
+        () => mockApi.updateSpace(
+          'space-1',
+          any(
+            that: dtoThat(
+              (d) => d.description.isPresent && d.description.value == 'Holiday photos',
+              'description present',
+            ),
+          ),
+        ),
+      ).called(1);
+    });
+
+    test('omits description entirely when it is not passed', () async {
+      when(() => mockApi.updateSpace('space-1', any())).thenAnswer((_) async => updatedSpace());
+
+      await repository.update('space-1', name: 'Renamed');
+
+      verify(
+        () => mockApi.updateSpace(
+          'space-1',
+          any(
+            that: dtoThat(
+              // Absent, NOT Optional.present(null) -- the latter is a 400, because the
+              // server schema is .optional() but not .nullable().
+              (d) => d.description.isEmpty,
+              'description absent',
+            ),
+          ),
+        ),
+      ).called(1);
+    });
+
+    test('sends the colour when it changed', () async {
+      when(() => mockApi.updateSpace('space-1', any())).thenAnswer((_) async => updatedSpace());
+
+      await repository.update('space-1', color: api.UserAvatarColor.amber);
+
+      verify(
+        () => mockApi.updateSpace(
+          'space-1',
+          any(
+            that: dtoThat(
+              (d) => d.color.isPresent && d.color.value == api.UserAvatarColor.amber,
+              'color present',
+            ),
+          ),
+        ),
+      ).called(1);
+    });
+
+    test('never populates the four fields this feature does not own', () async {
+      // A stray Optional.present(false) on faceRecognitionEnabled would silently
+      // disable face recognition for the whole space on every rename.
+      when(() => mockApi.updateSpace('space-1', any())).thenAnswer((_) async => updatedSpace());
+
+      await repository.update('space-1', name: 'Renamed', description: 'x', color: api.UserAvatarColor.red);
+
+      verify(
+        () => mockApi.updateSpace(
+          'space-1',
+          any(
+            that: dtoThat(
+              (d) =>
+                  d.faceRecognitionEnabled.isEmpty &&
+                  d.petsEnabled.isEmpty &&
+                  d.thumbnailAssetId.isEmpty &&
+                  d.thumbnailCropY.isEmpty,
+              'untouched fields all absent',
+            ),
+          ),
+        ),
+      ).called(1);
+    });
+
+    test('trims the name but not the description', () async {
+      when(() => mockApi.updateSpace('space-1', any())).thenAnswer((_) async => updatedSpace());
+
+      await repository.update('space-1', name: '  Renamed  ', description: '  keep me  ');
+
+      verify(
+        () => mockApi.updateSpace(
+          'space-1',
+          any(
+            that: dtoThat(
+              (d) => d.name.value == 'Renamed' && d.description.value == '  keep me  ',
+              'name trimmed, description verbatim',
+            ),
+          ),
+        ),
+      ).called(1);
+    });
+
+    test('returns the updated space', () async {
+      when(() => mockApi.updateSpace('space-1', any())).thenAnswer((_) async => updatedSpace());
+
+      final result = await repository.update('space-1', name: 'Renamed');
+
+      expect(result.name, 'Renamed');
+    });
+
+    test('throws when the API returns null', () async {
+      when(() => mockApi.updateSpace(any(), any())).thenAnswer((_) async => null);
+
+      expect(() => repository.update('space-1', name: 'Renamed'), throwsA(isA<Exception>()));
+    });
+
+    test('propagates an API failure unchanged', () async {
+      when(() => mockApi.updateSpace(any(), any())).thenThrow(Exception('boom'));
+
+      expect(() => repository.update('space-1', name: 'Renamed'), throwsA(isA<Exception>()));
     });
   });
 }

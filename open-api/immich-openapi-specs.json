@@ -27463,6 +27463,13 @@
             "description": "Whether smart search is enabled",
             "type": "boolean"
           },
+          "syncRequestTypes": {
+            "description": "Sync stream request types this server accepts. Absent on servers that predate capability signalling; clients fall back to version-based gating.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "trash": {
             "description": "Whether trash feature is enabled",
             "type": "boolean"
