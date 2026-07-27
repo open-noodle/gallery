@@ -15,6 +15,19 @@ void main() {
   });
   tearDown(() => ctx.dispose());
 
+  group('isAlbumLinked', () {
+    test('true when the album has a space link, false otherwise', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final linked = await ctx.newSharedSpaceAlbum(name: 'Linked');
+      final unlinked = await ctx.newSharedSpaceAlbum(name: 'Unlinked');
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: linked.id);
+
+      expect(await repo.isAlbumLinked(linked.id), isTrue);
+      expect(await repo.isAlbumLinked(unlinked.id), isFalse);
+    });
+  });
+
   group('watchLinkedAlbums', () {
     test('emits the linked albums (metadata + showInTimeline) for a space', () async {
       final user = await ctx.newUser();
