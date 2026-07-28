@@ -265,27 +265,24 @@ interface FilterSuggestionFilterOptions {
   isInAlbum?: boolean;
 }
 
-export interface GetStatesOptions extends ExifSuggestionScopeOptions {
-  country?: string;
+export interface GetStatesOptions extends SuggestionScopeOptions, FilterSuggestionFilterOptions {
+  state?: string;
 }
 
 export interface GetCitiesOptions extends SuggestionScopeOptions, FilterSuggestionFilterOptions {
   state?: string;
 }
 
-export interface GetCameraModelsOptions extends ExifSuggestionScopeOptions {
-  make?: string;
+export interface GetCameraModelsOptions extends SuggestionScopeOptions, FilterSuggestionFilterOptions {
   lensModel?: string;
 }
 
-export interface GetCameraMakesOptions extends ExifSuggestionScopeOptions {
-  model?: string;
+export interface GetCameraMakesOptions extends SuggestionScopeOptions, FilterSuggestionFilterOptions {
   lensModel?: string;
 }
 
-export interface GetCameraLensModelsOptions extends ExifSuggestionScopeOptions {
-  make?: string;
-  model?: string;
+export interface GetCameraLensModelsOptions extends SuggestionScopeOptions, FilterSuggestionFilterOptions {
+  lensModel?: string;
 }
 
 export interface FilterSuggestionsOptions extends SuggestionScopeOptions, FilterSuggestionFilterOptions {}
@@ -1066,15 +1063,36 @@ export class SearchRepository {
       .execute();
   }
 
-  async getCountries(userIds: string[], options?: ExifSuggestionScopeOptions): Promise<string[]> {
-    const res = await this.getExifField('country', userIds, options).execute();
+  async getCountries(userIds: string[], options: FilterSuggestionsOptions = {}): Promise<string[]> {
+    // #858: mirror getFilterSuggestions' own getFilteredCountries — `city` is excluded alongside
+    // `country`, because a selected city implies its country and would collapse this list to one row.
+    const filteredIds = this.buildFilteredAssetIds(userIds, without(options, 'country', 'city'));
+    const res = await this.db
+      .selectFrom('asset_exif')
+      .select('country')
+      .distinct()
+      .where('assetId', 'in', filteredIds)
+      .where('country', 'is not', null)
+      .where('country', '!=', '')
+      .orderBy('country')
+      .execute();
+
     return res.map((row) => row.country!);
   }
 
   @GenerateSql({ params: [[DummyValue.UUID], DummyValue.STRING] })
   async getStates(userIds: string[], options: GetStatesOptions): Promise<string[]> {
-    const res = await this.getExifField('state', userIds, options)
-      .$if(!!options.country, (qb) => qb.where('country', '=', options.country!))
+    // `country` stays applied (it is the drill-down parent); `city` is excluded for the same reason
+    // as in getCountries. `state` is not a FilterSuggestionFilterOptions key, so it never self-narrows.
+    const filteredIds = this.buildFilteredAssetIds(userIds, without(options, 'city'));
+    const res = await this.db
+      .selectFrom('asset_exif')
+      .select('state')
+      .distinct()
+      .where('assetId', 'in', filteredIds)
+      .where('state', 'is not', null)
+      .where('state', '!=', '')
+      .orderBy('state')
       .execute();
 
     return res.map((row) => row.state!);
@@ -1099,9 +1117,16 @@ export class SearchRepository {
 
   @GenerateSql({ params: [[DummyValue.UUID], DummyValue.STRING, DummyValue.STRING] })
   async getCameraMakes(userIds: string[], options: GetCameraMakesOptions): Promise<string[]> {
-    const res = await this.getExifField('make', userIds, options)
-      .$if(!!options.model, (qb) => qb.where('model', '=', options.model!))
+    const filteredIds = this.buildFilteredAssetIds(userIds, without(options, 'make'));
+    const res = await this.db
+      .selectFrom('asset_exif')
+      .select('make')
+      .distinct()
+      .where('assetId', 'in', filteredIds)
+      .where('make', 'is not', null)
+      .where('make', '!=', '')
       .$if(!!options.lensModel, (qb) => qb.where('lensModel', '=', options.lensModel!))
+      .orderBy('make')
       .execute();
 
     return res.map((row) => row.make!);
@@ -1109,9 +1134,18 @@ export class SearchRepository {
 
   @GenerateSql({ params: [[DummyValue.UUID], DummyValue.STRING, DummyValue.STRING] })
   async getCameraModels(userIds: string[], options: GetCameraModelsOptions): Promise<string[]> {
-    const res = await this.getExifField('model', userIds, options)
-      .$if(!!options.make, (qb) => qb.where('make', '=', options.make!))
+    // #858: every other active filter must narrow the model list, exactly like getCities. Only the
+    // model itself is excluded — a selected model must not collapse its own list to one row.
+    const filteredIds = this.buildFilteredAssetIds(userIds, without(options, 'model'));
+    const res = await this.db
+      .selectFrom('asset_exif')
+      .select('model')
+      .distinct()
+      .where('assetId', 'in', filteredIds)
+      .where('model', 'is not', null)
+      .where('model', '!=', '')
       .$if(!!options.lensModel, (qb) => qb.where('lensModel', '=', options.lensModel!))
+      .orderBy('model')
       .execute();
 
     return res.map((row) => row.model!);
@@ -1119,9 +1153,17 @@ export class SearchRepository {
 
   @GenerateSql({ params: [[DummyValue.UUID], DummyValue.STRING] })
   async getCameraLensModels(userIds: string[], options: GetCameraLensModelsOptions): Promise<string[]> {
-    const res = await this.getExifField('lensModel', userIds, options)
-      .$if(!!options.make, (qb) => qb.where('make', '=', options.make!))
-      .$if(!!options.model, (qb) => qb.where('model', '=', options.model!))
+    // `lensModel` is not a member of `FilterSuggestionFilterOptions`, so nothing to exclude — `make`
+    // and `model` are applied inside buildFilteredAssetIds, replacing the old outer $if clauses.
+    const filteredIds = this.buildFilteredAssetIds(userIds, options);
+    const res = await this.db
+      .selectFrom('asset_exif')
+      .select('lensModel')
+      .distinct()
+      .where('assetId', 'in', filteredIds)
+      .where('lensModel', 'is not', null)
+      .where('lensModel', '!=', '')
+      .orderBy('lensModel')
       .execute();
 
     return res.map((row) => row.lensModel!);
@@ -1392,43 +1434,6 @@ export class SearchRepository {
           ),
         )
     );
-  }
-
-  private getExifField<K extends 'city' | 'state' | 'country' | 'make' | 'model' | 'lensModel'>(
-    field: K,
-    userIds: string[],
-    options?: ExifSuggestionScopeOptions,
-  ) {
-    const visibility = options?.visibility;
-    return this.applySuggestionScope(
-      this.db
-        .selectFrom('asset_exif')
-        .select(field)
-        .distinctOn(field)
-        .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
-        .$if(!!visibility, (qb) =>
-          visibility === 'not-locked'
-            ? qb.where('asset.visibility', '!=', AssetVisibility.Locked)
-            : qb.where('asset.visibility', '=', visibility!),
-        )
-        .where('deletedAt', 'is', null)
-        .where(field, 'is not', null)
-        .where(field, '!=', '' as any),
-      userIds,
-      options,
-    )
-      .$if(!!options?.isNotInAlbum && !options?.albumId, (qb) =>
-        qb.where((eb) =>
-          eb.not(eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id'))),
-        ),
-      )
-      .$if(!!options?.isInAlbum && !options?.albumId, (qb) =>
-        qb.where((eb) =>
-          eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id')),
-        ),
-      )
-      .$if(!!options?.takenAfter, (qb) => qb.where('asset.fileCreatedAt', '>=', options!.takenAfter!))
-      .$if(!!options?.takenBefore, (qb) => qb.where('asset.fileCreatedAt', '<', options!.takenBefore!));
   }
 
   private buildFilteredAssetIds(userIds: string[], options: FilterSuggestionsOptions) {
