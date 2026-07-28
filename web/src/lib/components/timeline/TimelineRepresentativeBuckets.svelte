@@ -28,6 +28,7 @@
     visibleWindow: VisibleWindow;
     locale?: string;
     disabled?: boolean;
+    renderOffset?: number;
     onTimelineBucketActivate?: (bucket: ActivatableTimelineBucket) => void;
     onRequestCovers?: (timeBuckets: string[]) => void;
   }
@@ -38,6 +39,7 @@
     visibleWindow,
     locale = 'en-US',
     disabled = false,
+    renderOffset = 0,
     onTimelineBucketActivate,
     onRequestCovers,
   }: Props = $props();
@@ -67,7 +69,7 @@
   <div data-testid="timeline-representative-buckets" data-grouping={grouping}>
     {#each visibleBuckets as bucket (bucket.viewId)}
       <div
-        style={`position: absolute; height: ${bucket.height}px; width: 100%; transform: translateY(${bucket.top}px);`}
+        style={`position: absolute; height: ${bucket.height}px; width: 100%; transform: translateY(${bucket.top + renderOffset}px);`}
         data-testid={`timeline-bucket-shell-${bucket.timeBucket}`}
       >
         <div class="mx-auto h-full max-w-5xl px-4" data-testid="timeline-bucket-frame">
