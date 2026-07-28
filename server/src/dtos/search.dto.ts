@@ -134,6 +134,7 @@ const SearchSuggestionRequestBaseSchema = z.object({
   type: SearchSuggestionTypeSchema,
   albumId: z.uuidv4().optional().describe('Scope suggestions to a specific album'),
   country: z.string().optional().describe('Filter by country'),
+  city: z.string().optional().describe('Filter by city'),
   state: z.string().optional().describe('Filter by state/province'),
   personIds: z
     .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(ScopedPersonTokenSchema))
@@ -150,6 +151,7 @@ const SearchSuggestionRequestBaseSchema = z.object({
   make: z.string().optional().describe('Filter by camera make'),
   model: z.string().optional().describe('Filter by camera model'),
   lensModel: z.string().optional().describe('Filter by lens model'),
+  mediaType: AssetTypeSchema.optional().describe('Filter by asset type'),
   takenAfter: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (after)'),
   takenBefore: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (before)'),
   spaceId: z.uuidv4().optional().describe('Scope suggestions to a specific shared space'),
