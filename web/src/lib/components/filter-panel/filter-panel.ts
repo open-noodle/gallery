@@ -1,3 +1,4 @@
+import { AssetTypeEnum } from '@immich/sdk';
 import { browser } from '$app/environment';
 
 const COLLAPSED_KEY = 'gallery-filter-collapsed';
@@ -164,6 +165,11 @@ export type FilterContext = {
   isFavorite?: boolean;
   isNotInAlbum?: boolean;
   isInAlbum?: boolean;
+  country?: string;
+  city?: string;
+  make?: string;
+  model?: string;
+  mediaType?: AssetTypeEnum;
 };
 
 function hasDateValue(value: string | undefined): value is string {
@@ -262,6 +268,26 @@ export function buildFilterContext(
 
   if (includes('isInAlbum') && state.isInAlbum === true) {
     context.isInAlbum = true;
+  }
+
+  if (includes('country') && state.country) {
+    context.country = state.country;
+  }
+
+  if (includes('city') && state.city) {
+    context.city = state.city;
+  }
+
+  if (includes('make') && state.make) {
+    context.make = state.make;
+  }
+
+  if (includes('model') && state.model) {
+    context.model = state.model;
+  }
+
+  if (includes('mediaType') && state.mediaType && state.mediaType !== 'all') {
+    context.mediaType = state.mediaType === 'image' ? AssetTypeEnum.Image : AssetTypeEnum.Video;
   }
 
   const validDateAfter = includes('dateAfter') ? dateOnlyToUtcStart(state.dateAfter) : undefined;
