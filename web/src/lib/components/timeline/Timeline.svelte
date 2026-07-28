@@ -245,7 +245,7 @@
       return;
     }
 
-    const currentTop = scrollableElement?.scrollTop || 0;
+    const currentTop = timelineManager.scrollTop;
     const viewportHeight = visibleBottom - visibleTop;
 
     // Calculate the minimum scroll needed to bring the asset into view.
@@ -438,13 +438,13 @@
       // edge case - scroll limited due to size of content, must adjust -  use the overall percent instead
       const maxScroll = timelineManager.maxScroll;
 
-      timelineScrollPercent = Math.min(1, scrollableElement.scrollTop / maxScroll);
+      timelineScrollPercent = Math.min(1, timelineManager.scrollTop / maxScroll);
       viewportTopMonth = undefined;
       viewportTopMonthScrollPercent = 0;
     } else {
       timelineScrollPercent = 0;
 
-      let top = scrollableElement.scrollTop;
+      let top = timelineManager.scrollTop;
       let maxScrollPercent = timelineManager.maxScrollPercent;
 
       const monthsLength = timelineManager.months.length;
@@ -738,14 +738,16 @@
     bind:this={timelineElement}
     id="virtual-timeline"
     class:invisible
-    style:height={timelineManager.totalViewerHeight + 'px'}
+    style:height={timelineManager.domHeight + 'px'}
   >
     <section
       bind:clientHeight={timelineManager.topSectionHeight}
       class:invisible
+      data-testid="timeline-top-section"
       style:position="absolute"
       style:left="0"
       style:right="0"
+      style:transform={`translate3d(0,${timelineManager.renderOffset}px,0)`}
     >
       {@render children?.()}
       {#if isEmpty}
@@ -759,6 +761,7 @@
         grouping={activeGrouping}
         buckets={timelineManager.timelineBuckets}
         visibleWindow={timelineManager.visibleWindow}
+        renderOffset={timelineManager.renderOffset}
         locale={$lang}
         disabled={isSelectionMode || assetInteraction.selectionActive}
         {onTimelineBucketActivate}
@@ -773,10 +776,11 @@
       {#key timelineManager.reloadToken}
         {#each timelineManager.months as timelineMonth (timelineMonth.viewId)}
           {@const isInOrNearViewport = timelineMonth.isInOrNearViewport}
-          {@const absoluteHeight = timelineMonth.top}
+          {@const absoluteHeight = timelineMonth.top + timelineManager.renderOffset}
 
           {#if !timelineMonth.isLoaded}
             <div
+              data-testid="timeline-month-skeleton"
               style:height={timelineMonth.height + 'px'}
               style:position="absolute"
               style:transform={`translate3d(0,${absoluteHeight}px,0)`}
@@ -844,11 +848,12 @@
     {/if}
     <!-- spacer for leadout -->
     <div
+      data-testid="timeline-leadout"
       style:height={timelineManager.bottomSectionHeight + 'px'}
       style:position="absolute"
       style:left="0"
       style:right="0"
-      style:transform={`translate3d(0,${timelineManager.topSectionHeight + timelineManager.bodySectionHeight}px,0)`}
+      style:transform={`translate3d(0,${timelineManager.topSectionHeight + timelineManager.bodySectionHeight + timelineManager.renderOffset}px,0)`}
     ></div>
   </section>
 </section>
