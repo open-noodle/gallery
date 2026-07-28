@@ -10,6 +10,7 @@ import { tick } from 'svelte';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { eventManager } from '$lib/managers/event-manager.svelte';
 import { getTimelineMonthByDate } from '$lib/managers/timeline-manager/internal/search-support.svelte';
+import { scrollTimelineToTemporalAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
 import { AbortError } from '$lib/utils';
 import { fromISODateTimeUTCToObject } from '$lib/utils/timeline-util';
 import { assetFactory, timelineAssetFactory, toResponseDto } from '@test-data/factories/asset-factory';
@@ -1366,5 +1367,126 @@ describe('TimelineManager', () => {
         Settings.resetCaches();
       }
     });
+  });
+});
+
+describe('TimelineManager scroll scaling', () => {
+  let timelineManager: TimelineManager;
+  let fakeEl: { scrollTop: number; scrollTo: (o: { top: number }) => void };
+
+  function deriveLocalDateTime(arg: TimelineAsset): TimelineAsset {
+    return { ...arg, localDateTime: arg.fileCreatedAt };
+  }
+
+  const bucketAssets: Record<string, TimelineAsset[]> = {
+    '2024-03-01': timelineAssetFactory
+      .buildList(1)
+      .map((asset) =>
+        deriveLocalDateTime({ ...asset, fileCreatedAt: fromISODateTimeUTCToObject('2024-03-01T00:00:00.000Z') }),
+      ),
+    '2024-02-01': timelineAssetFactory
+      .buildList(100)
+      .map((asset) =>
+        deriveLocalDateTime({ ...asset, fileCreatedAt: fromISODateTimeUTCToObject('2024-02-01T00:00:00.000Z') }),
+      ),
+    '2024-01-01': timelineAssetFactory
+      .buildList(3)
+      .map((asset) =>
+        deriveLocalDateTime({ ...asset, fileCreatedAt: fromISODateTimeUTCToObject('2024-01-01T00:00:00.000Z') }),
+      ),
+  };
+  const bucketAssetsResponse: Record<string, TimeBucketAssetResponseDto> = Object.fromEntries(
+    Object.entries(bucketAssets).map(([key, assets]) => [key, toResponseDto(...assets)]),
+  );
+
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    timelineManager = new TimelineManager();
+    sdkMock.getTimeBuckets.mockResolvedValue([
+      { count: 1, timeBucket: '2024-03-01' },
+      { count: 100, timeBucket: '2024-02-01' },
+      { count: 3, timeBucket: '2024-01-01' },
+    ]);
+    sdkMock.getTimeBucket.mockImplementation(({ timeBucket }) => Promise.resolve(bucketAssetsResponse[timeBucket]));
+    await timelineManager.updateViewport({ width: 1588, height: 1000 });
+    await tick();
+
+    fakeEl = {
+      scrollTop: 0,
+      scrollTo({ top }: { top: number }) {
+        this.scrollTop = top; // manager already clamped; store verbatim
+      },
+    };
+    timelineManager.scrollableElement = fakeEl as unknown as HTMLElement;
+  });
+
+  it('9. is inert below the cap', () => {
+    // totalViewerHeight == 8337, viewport == 1000, default cap is huge
+    expect(timelineManager.domHeight).toBe(timelineManager.totalViewerHeight);
+    expect(timelineManager.scrollScale).toBe(1);
+    timelineManager.scrollTo(1000);
+    expect(fakeEl.scrollTop).toBe(1000);
+    expect(timelineManager.scrollTop).toBe(1000);
+    expect(timelineManager.renderOffset).toBe(0);
+  });
+
+  it('10. reaches the tail under forced scaling (symptom #1)', () => {
+    timelineManager.maxScrollHeight = 4000; // domHeight 4000, domScrollMax 3000, logicalScrollMax 7337
+    timelineManager.scrollTo(timelineManager.maxScroll); // 7337
+    expect(fakeEl.scrollTop).toBeCloseTo(timelineManager.domScrollMax, 6); // 3000
+    expect(timelineManager.scrollTop).toBeCloseTo(timelineManager.maxScroll, 6); // 7337
+  });
+
+  it('11. clamps scrollTo to [0, domScrollMax]', () => {
+    timelineManager.maxScrollHeight = 4000;
+    timelineManager.scrollTo(10 * timelineManager.totalViewerHeight);
+    expect(fakeEl.scrollTop).toBeCloseTo(timelineManager.domScrollMax, 6); // clamped to bottom
+    timelineManager.scrollTo(0); // top reachable (spec edge #11)
+    expect(fakeEl.scrollTop).toBe(0);
+    timelineManager.scrollTo(-5000); // negative clamped to 0
+    expect(fakeEl.scrollTop).toBe(0);
+  });
+
+  it('12. scrollBy moves the logical position by the given delta', () => {
+    timelineManager.maxScrollHeight = 4000;
+    timelineManager.scrollTo(2000);
+    timelineManager.scrollBy(1000);
+    expect(timelineManager.scrollTop).toBeCloseTo(3000, 6);
+  });
+
+  it('13. exposes a logical scrollTop end-to-end', () => {
+    timelineManager.maxScrollHeight = 4000;
+    fakeEl.scrollTop = timelineManager.domScrollMax; // 3000 (raw DOM)
+    timelineManager.updateSlidingWindow();
+    expect(timelineManager.scrollTop).toBeCloseTo(timelineManager.maxScroll, 6); // 7337
+    expect(timelineManager.visibleWindow.top).toBeCloseTo(timelineManager.maxScroll, 6);
+  });
+
+  it('14. scrollBy preserves the logical delta the height compensation relies on', () => {
+    timelineManager.maxScrollHeight = 4000;
+    timelineManager.scrollTo(1500);
+    const before = timelineManager.scrollTop;
+    timelineManager.scrollBy(500); // mirrors month.height setter compensation
+    expect(timelineManager.scrollTop - before).toBeCloseTo(500, 6);
+  });
+
+  it('15. preserves a deep anchor across Years/Months → All (symptom #2)', () => {
+    timelineManager.maxScrollHeight = 4000;
+    const reached = scrollTimelineToTemporalAnchor(timelineManager, { year: 2024, month: 1 });
+    expect(fakeEl.scrollTop).toBeCloseTo(timelineManager.domScrollMax, 6); // 3000, reachable — not clamped short
+    expect(reached).toBe(true);
+  });
+
+  it('16. re-derives the DOM↔logical mapping on a geometry change so renderOffset never goes stale', () => {
+    timelineManager.maxScrollHeight = 4000; // force scaling: domScrollMax 3000, logicalScrollMax 7337
+    timelineManager.scrollTo(2000); // logical; DOM scrollTop is now well below the logical position
+    // Invariant after any scroll: renderOffset === domScrollTop − logicalScrollTop.
+    expect(timelineManager.renderOffset).toBeCloseTo(fakeEl.scrollTop - timelineManager.scrollTop, 6);
+
+    // A viewport resize changes the scale WITHOUT a scroll event. The cached logical position must be
+    // re-derived under the new scale, otherwise the next scroll teleports the timeline by the drift.
+    timelineManager.viewportHeight = 500; // was 1000
+
+    expect(timelineManager.renderOffset).toBeCloseTo(fakeEl.scrollTop - timelineManager.scrollTop, 6);
   });
 });
