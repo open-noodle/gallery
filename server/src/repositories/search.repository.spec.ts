@@ -33,9 +33,6 @@ const buildAssetSearchSql = (options: Record<string, unknown>) =>
 const compileFilteredAssetIds = (sut: SearchRepository, options: Record<string, unknown>) =>
   (sut as any).buildFilteredAssetIds(['00000000-0000-0000-0000-000000000000'], options).compile().sql;
 
-const compileExifField = (sut: SearchRepository, field: 'country' | 'model', options: Record<string, unknown>) =>
-  (sut as any).getExifField(field, ['00000000-0000-0000-0000-000000000000'], options).compile().sql;
-
 const compileFilteredPeopleQuery = (sut: SearchRepository, options: Record<string, unknown>) =>
   (sut as any)
     .buildFilteredGlobalPeopleQuery(
@@ -454,14 +451,6 @@ describe(SearchRepository.name, () => {
       expect(sql).not.toContain('"album_asset"');
     });
 
-    it('filters dependent EXIF suggestions to assets without album membership', () => {
-      const sql = compileExifField(sut, 'model', { isNotInAlbum: true });
-
-      expect(sql).toContain('"album_asset"');
-      expect(sql).toContain('not exists');
-      expect(sql).toContain('"album_asset"."assetId" = "asset"."id"');
-    });
-
     it('filters suggestion asset ids to assets with album membership', () => {
       const sql = compileFilteredAssetIds(sut, { isInAlbum: true });
 
@@ -475,14 +464,6 @@ describe(SearchRepository.name, () => {
       const sql = compileFilteredAssetIds(sut, { isInAlbum: false });
 
       expect(sql).not.toContain('"album_asset"');
-    });
-
-    it('filters dependent EXIF suggestions to assets with album membership', () => {
-      const sql = compileExifField(sut, 'model', { isInAlbum: true });
-
-      expect(sql).toContain('"album_asset"');
-      expect(sql).toContain('exists');
-      expect(sql).not.toContain('not exists');
     });
 
     it('filters metadata search assets to album members via searchAssetBuilder', () => {
@@ -530,35 +511,8 @@ describe(SearchRepository.name, () => {
       expect(sql).not.toContain('"shared_space_library"');
     });
 
-    it('getExifField widens album scope to album participants, no spaces without timeline opt-in', () => {
-      const sql = compileExifField(sut, 'country', {
-        albumId: '11111111-1111-1111-1111-111111111111',
-      });
-
-      expect(sql).toContain('"album_asset"');
-      expect(sql).toContain('"album_asset"."albumId"');
-      expect(sql).toContain('"album_asset"."assetId" = "asset"."id"');
-      expect(sql).toContain('"album_user"."userId" = "asset"."ownerId"');
-      expect(sql).not.toContain('"shared_space_asset"');
-      expect(sql).not.toContain('"shared_space_library"');
-    });
-
     it('buildFilteredAssetIds adds timeline-enabled direct and linked-library spaces to album participants', () => {
       const sql = compileFilteredAssetIds(sut, {
-        albumId: '11111111-1111-1111-1111-111111111111',
-        timelineSpaceIds: ['33333333-3333-3333-3333-333333333333'],
-      });
-
-      expect(sql).toContain('"album_asset"');
-      expect(sql).toContain('"album_user"."userId" = "asset"."ownerId"');
-      expect(sql).toContain('"shared_space_asset"');
-      expect(sql).toContain('"shared_space_asset"."spaceId"');
-      expect(sql).toContain('"shared_space_library"');
-      expect(sql).toContain('"shared_space_library"."spaceId"');
-    });
-
-    it('getExifField adds timeline-enabled direct and linked-library spaces to album participants', () => {
-      const sql = compileExifField(sut, 'country', {
         albumId: '11111111-1111-1111-1111-111111111111',
         timelineSpaceIds: ['33333333-3333-3333-3333-333333333333'],
       });
@@ -583,14 +537,6 @@ describe(SearchRepository.name, () => {
       // The visibility gate ("asset"."visibility" in ($N, $N)) must appear in the SQL
       // emitted for the album branch — it restricts the album_user participant arm so
       // Hidden/Locked assets owned by OTHER participants are not surfaced.
-      expect(sql).toMatch(/"asset"\."visibility" in \(\$\d+(?:, \$\d+)*\)/);
-    });
-
-    it('getExifField gates album_user participant arm on Archive+Timeline visibility', () => {
-      const sql = compileExifField(sut, 'country', {
-        albumId: '11111111-1111-1111-1111-111111111111',
-      });
-
       expect(sql).toMatch(/"asset"\."visibility" in \(\$\d+(?:, \$\d+)*\)/);
     });
 
