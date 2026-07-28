@@ -133,7 +133,7 @@ export class TimelineManager extends VirtualScrollManager {
   #websocketSupport: WebsocketSupport | undefined;
   #options: TimelineManagerOptions = TimelineManager.#INIT_OPTIONS;
   #updatingViewportProximities = false;
-  #scrollableElement: HTMLElement | undefined = $state();
+  #scrollableElement: HTMLElement | undefined = $state.raw();
   #unsubscribes: Array<() => void> = [];
   #initSequence = 0;
   #destroyed = false;
@@ -170,7 +170,7 @@ export class TimelineManager extends VirtualScrollManager {
     );
   }
 
-  override get scrollTop(): number {
+  override get domScrollTop(): number {
     return this.#scrollableElement?.scrollTop ?? 0;
   }
 
@@ -179,13 +179,12 @@ export class TimelineManager extends VirtualScrollManager {
   }
 
   scrollTo(top: number) {
-    this.#scrollableElement?.scrollTo({ top });
+    this.#scrollableElement?.scrollTo({ top: clamp(this.logicalToDom(top), 0, this.domScrollMax) });
     this.updateSlidingWindow();
   }
 
   scrollBy(y: number) {
-    this.#scrollableElement?.scrollBy(0, y);
-    this.updateSlidingWindow();
+    this.scrollTo(this.scrollTop + y);
   }
 
   async *assetsIterator(options?: {
@@ -458,11 +457,15 @@ export class TimelineManager extends VirtualScrollManager {
     }
     if (this.grouping !== 'day') {
       layoutTimelineBuckets(this.timelineBuckets);
+      this.resyncScrollMapping();
       return;
     }
     for (const month of this.months) {
       updateGeometry(this, month, { invalidateHeight: changedWidth });
     }
+    // Geometry may have changed the scale (viewport resize / width reflow), so re-derive the
+    // DOM↔logical mapping before recomputing proximities off the logical scrollTop.
+    this.resyncScrollMapping();
     this.updateViewportProximities();
     if (changedWidth) {
       this.#createScrubberMonths();
