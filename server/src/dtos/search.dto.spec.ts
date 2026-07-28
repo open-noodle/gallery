@@ -5,6 +5,7 @@ import {
   SmartSearchDto,
   SmartSearchFacetsDto,
 } from 'src/dtos/search.dto';
+import { AssetType } from 'src/enum';
 
 describe('search DTO albumless filters', () => {
   it('should accept isNotInAlbum on smart search requests', () => {
@@ -83,5 +84,24 @@ describe('search DTO albumless filters', () => {
 
     expect(result.success).toBe(true);
     expect(result.data?.isInAlbum).toBe(true);
+  });
+});
+
+describe('SearchSuggestionRequestDto (#858)', () => {
+  it('accepts a city filter', () => {
+    const result = SearchSuggestionRequestDto.schema.safeParse({ type: 'camera-model', city: 'Berlin' });
+    expect(result.success).toBe(true);
+    expect(result.data?.city).toBe('Berlin');
+  });
+
+  it('accepts a mediaType filter', () => {
+    const result = SearchSuggestionRequestDto.schema.safeParse({ type: 'camera-model', mediaType: 'IMAGE' });
+    expect(result.success).toBe(true);
+    expect(result.data?.mediaType).toBe(AssetType.Image);
+  });
+
+  it('rejects an unknown mediaType', () => {
+    const result = SearchSuggestionRequestDto.schema.safeParse({ type: 'camera-model', mediaType: 'NOT_A_TYPE' });
+    expect(result.success).toBe(false);
   });
 });
