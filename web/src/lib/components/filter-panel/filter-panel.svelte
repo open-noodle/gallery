@@ -86,7 +86,10 @@
   let availableRatings = $state<number[] | undefined>();
   let availableMediaTypes = $state<string[] | undefined>();
 
-  let filterContext = $derived(buildFilterContext(filters));
+  // The count gate answers "has a *cross-section* filter narrowed the panel?". It drives the
+  // empty-section disable in filter-section.svelte, not a request, so the location/camera/media
+  // dimensions added for #858 stay out of it — see the #858 design doc §3.3.
+  let filterContext = $derived(buildFilterContext(filters, ['country', 'city', 'make', 'model', 'mediaType']));
   let locationFilterContext = $derived(buildFilterContext(filters, ['country', 'city']));
   let cameraFilterContext = $derived(buildFilterContext(filters, ['make', 'model']));
 
