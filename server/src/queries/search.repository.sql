@@ -1136,15 +1136,23 @@ order by
 
 -- SearchRepository.getStates
 select distinct
-  on ("state") "state"
+  "state"
 from
   "asset_exif"
-  inner join "asset" on "asset"."id" = "asset_exif"."assetId"
 where
-  "deletedAt" is null
+  "assetId" in (
+    select
+      "asset"."id"
+    from
+      "asset"
+    where
+      "asset"."deletedAt" is null
+      and "asset"."ownerId" = any ($1::uuid[])
+  )
   and "state" is not null
-  and "state" != $1
-  and "asset"."ownerId" = any ($2::uuid[])
+  and "state" != $2
+order by
+  "state"
 
 -- SearchRepository.getCities
 select distinct
@@ -1168,39 +1176,63 @@ order by
 
 -- SearchRepository.getCameraMakes
 select distinct
-  on ("make") "make"
+  "make"
 from
   "asset_exif"
-  inner join "asset" on "asset"."id" = "asset_exif"."assetId"
 where
-  "deletedAt" is null
+  "assetId" in (
+    select
+      "asset"."id"
+    from
+      "asset"
+    where
+      "asset"."deletedAt" is null
+      and "asset"."ownerId" = any ($1::uuid[])
+  )
   and "make" is not null
-  and "make" != $1
-  and "asset"."ownerId" = any ($2::uuid[])
+  and "make" != $2
+order by
+  "make"
 
 -- SearchRepository.getCameraModels
 select distinct
-  on ("model") "model"
+  "model"
 from
   "asset_exif"
-  inner join "asset" on "asset"."id" = "asset_exif"."assetId"
 where
-  "deletedAt" is null
+  "assetId" in (
+    select
+      "asset"."id"
+    from
+      "asset"
+    where
+      "asset"."deletedAt" is null
+      and "asset"."ownerId" = any ($1::uuid[])
+  )
   and "model" is not null
-  and "model" != $1
-  and "asset"."ownerId" = any ($2::uuid[])
+  and "model" != $2
+order by
+  "model"
 
 -- SearchRepository.getCameraLensModels
 select distinct
-  on ("lensModel") "lensModel"
+  "lensModel"
 from
   "asset_exif"
-  inner join "asset" on "asset"."id" = "asset_exif"."assetId"
 where
-  "deletedAt" is null
+  "assetId" in (
+    select
+      "asset"."id"
+    from
+      "asset"
+    where
+      "asset"."deletedAt" is null
+      and "asset"."ownerId" = any ($1::uuid[])
+  )
   and "lensModel" is not null
-  and "lensModel" != $1
-  and "asset"."ownerId" = any ($2::uuid[])
+  and "lensModel" != $2
+order by
+  "lensModel"
 
 -- SearchRepository.searchMetadataV3 (baseline)
 select

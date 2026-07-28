@@ -422,6 +422,38 @@ describe(SearchController.name, () => {
           ]),
         );
       });
+
+      it('accepts city and mediaType query params (#858)', async () => {
+        ctx.authenticate.mockResolvedValue({});
+        service.getSearchSuggestions.mockResolvedValue(['Canon EOS R5']);
+
+        const { status } = await request(ctx.getHttpServer()).get('/search/suggestions').query({
+          type: 'camera-model',
+          make: 'Canon',
+          city: 'Berlin',
+          mediaType: 'IMAGE',
+        });
+
+        expect(status).toBe(200);
+        expect(service.getSearchSuggestions).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ city: 'Berlin', mediaType: AssetType.Image }),
+        );
+      });
+
+      it('rejects an invalid mediaType (#858)', async () => {
+        const { status, body } = await request(ctx.getHttpServer()).get('/search/suggestions').query({
+          type: 'camera-model',
+          mediaType: 'bogus',
+        });
+
+        expect(status).toBe(400);
+        expect(body).toEqual(
+          errorDto.validationError([
+            { path: ['mediaType'], message: expect.stringContaining('Invalid option: expected one of') },
+          ]),
+        );
+      });
     });
 
     describe('GET /search/suggestions/filters', () => {
