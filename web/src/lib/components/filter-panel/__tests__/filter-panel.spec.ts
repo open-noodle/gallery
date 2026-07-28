@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
-import type { FilterSection } from '../filter-panel';
+import type { FilterPanelConfig, FilterSection } from '../filter-panel';
 import { ALL_FILTER_SECTIONS, createFilterState } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
 
@@ -398,6 +398,29 @@ describe('FilterPanel', () => {
         expect(screen.getByTestId('camera-empty')).toHaveTextContent('No cameras found');
       });
     });
+  });
+
+  it('keeps empty sections enabled when only a section-local filter is active (#858 §3.3)', async () => {
+    // Only a camera make is set — a section-local dimension. The People section is empty but must
+    // stay enabled, exactly as before #858 widened FilterContext.
+    const filters = { ...createFilterState(), make: 'Canon' };
+    const config: FilterPanelConfig = {
+      sections: ['people', 'camera'],
+      providers: {
+        people: vi.fn().mockResolvedValue([]),
+        cameras: vi.fn().mockResolvedValue([{ value: 'Canon', type: 'make' as const }]),
+      },
+    };
+
+    render(FilterPanel, { props: { config, timeBuckets: [], filters } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('camera-make-Canon')).toBeTruthy();
+    });
+
+    const peopleButton = within(screen.getByTestId('filter-section-people')).getByRole('button');
+    expect(peopleButton).not.toBeDisabled();
+    expect(peopleButton.textContent).not.toContain('(0)');
   });
 });
 
