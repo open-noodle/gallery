@@ -548,4 +548,41 @@ describe('/search/suggestions/filters', () => {
     const tagNames = body.tags.map((t: { value: string }) => t.value);
     expect(tagNames).toContain('nature');
   });
+
+  describe('drill-down suggestions (#858)', () => {
+    it('narrows camera models by an active tag filter', async () => {
+      const { body: unfiltered } = await request(app)
+        .get('/search/suggestions?type=camera-model&make=Canon&withSharedSpaces=true')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .expect(200);
+
+      expect(unfiltered).toEqual(expect.arrayContaining(['Canon EOS R5', 'Canon EOS 7D']));
+
+      const { body: narrowed } = await request(app)
+        .get(`/search/suggestions?type=camera-model&make=Canon&tagIds=${tagNatureId}&withSharedSpaces=true`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .expect(200);
+
+      expect(narrowed).toEqual(['Canon EOS R5']);
+    });
+
+    it('narrows camera models by an active rating filter', async () => {
+      // assets[0] (Canon EOS R5) is rated 5; assets[1] (Canon EOS 7D) is rated 4.
+      const { body } = await request(app)
+        .get('/search/suggestions?type=camera-model&make=Canon&rating=5&withSharedSpaces=true')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .expect(200);
+
+      expect(body).toEqual(['Canon EOS R5']);
+    });
+
+    it('keeps every camera model when only the make is selected', async () => {
+      const { body } = await request(app)
+        .get('/search/suggestions?type=camera-model&make=Canon&withSharedSpaces=true')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .expect(200);
+
+      expect(body).toEqual(expect.arrayContaining(['Canon EOS R5', 'Canon EOS 7D']));
+    });
+  });
 });

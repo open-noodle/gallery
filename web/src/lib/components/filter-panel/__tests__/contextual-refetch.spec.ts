@@ -1,5 +1,6 @@
+import { AssetTypeEnum } from '@immich/sdk';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import type { FilterContext, FilterPanelConfig, FilterSuggestionsResponse } from '../filter-panel';
+import type { FilterContext, FilterPanelConfig, FilterSection, FilterSuggestionsResponse } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
 
 function createConfig(overrides: Partial<NonNullable<FilterPanelConfig['providers']>> = {}): FilterPanelConfig {
@@ -414,7 +415,7 @@ describe('Contextual re-fetch on temporal change', () => {
     });
   });
 
-  it('should pass custom from date context to dependent city and camera model providers', async () => {
+  it('should pass the full cross-dimension context to dependent city and camera model providers', async () => {
     const cities = vi.fn().mockResolvedValue(['Berlin']);
     const cameraModels = vi.fn().mockResolvedValue(['EOS R5']);
     const config = createConfig({ cities, cameraModels });
@@ -432,9 +433,38 @@ describe('Contextual re-fetch on temporal change', () => {
     await waitFor(() => {
       expect(cities).toHaveBeenLastCalledWith('Germany', {
         takenAfter: '2024-01-01T00:00:00.000Z',
+        make: 'Canon',
       });
       expect(cameraModels).toHaveBeenLastCalledWith('Canon', {
         takenAfter: '2024-01-01T00:00:00.000Z',
+        country: 'Germany',
+      });
+    });
+  });
+
+  it('should pass the media type to dependent city and camera model providers', async () => {
+    const cities = vi.fn().mockResolvedValue(['Berlin']);
+    const cameraModels = vi.fn().mockResolvedValue(['EOS R5']);
+    const config = {
+      ...createConfig({ cities, cameraModels }),
+      sections: ['location', 'camera', 'media'] as FilterSection[],
+    };
+    render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    await fireEvent.click(screen.getByTestId('location-country-Germany'));
+    await fireEvent.click(screen.getByTestId('camera-make-Canon'));
+    await fireEvent.click(screen.getByTestId('media-type-video'));
+
+    await waitFor(() => {
+      expect(cities).toHaveBeenLastCalledWith('Germany', {
+        make: 'Canon',
+        mediaType: AssetTypeEnum.Video,
+      });
+      expect(cameraModels).toHaveBeenLastCalledWith('Canon', {
+        country: 'Germany',
+        mediaType: AssetTypeEnum.Video,
       });
     });
   });
