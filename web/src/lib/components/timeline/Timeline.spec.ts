@@ -43,6 +43,8 @@ const testState = vi.hoisted(() => ({
   scrollTop: 0,
   maxScroll: 1,
   scrollToUpdatesAfterCalls: 1,
+  domHeight: 296,
+  renderOffset: 0,
 }));
 
 vi.mock('$app/navigation', () => ({
@@ -119,6 +121,12 @@ vi.mock('$lib/managers/timeline-manager/timeline-manager.svelte', () => ({
     bodySectionHeight = 296;
     bottomSectionHeight = 0;
     totalViewerHeight = 296;
+    get domHeight() {
+      return testState.domHeight;
+    }
+    get renderOffset() {
+      return testState.renderOffset;
+    }
     get viewportHeight() {
       return testState.viewportHeight;
     }
@@ -227,6 +235,8 @@ describe('Timeline representative grouping integration', () => {
     testState.scrollTop = 0;
     testState.maxScroll = 1;
     testState.scrollToUpdatesAfterCalls = 1;
+    testState.domHeight = 296;
+    testState.renderOffset = 0;
     testState.representativeBucket = {
       grouping: 'year',
       timeBucket: '2015-01-01',
@@ -441,5 +451,63 @@ describe('Timeline representative grouping integration', () => {
     });
 
     expect(screen.getByText('No assets found')).toBeInTheDocument();
+  });
+});
+
+describe('Timeline scroll-space scaling', () => {
+  beforeEach(() => {
+    testState.grouping = 'day';
+    testState.assetCount = 1;
+    testState.viewportHeight = 600;
+    testState.viewportWidth = 390;
+    testState.domHeight = 296;
+    testState.renderOffset = 0;
+    testState.months = [];
+  });
+
+  it('sizes the virtual timeline to domHeight, not totalViewerHeight', () => {
+    testState.domHeight = 200; // < totalViewerHeight (296)
+    const { container } = renderTimeline();
+    const virtual = container.querySelector('#virtual-timeline') as HTMLElement;
+    expect(virtual).toHaveStyle({ height: '200px' });
+  });
+
+  it('offsets the month skeleton transform by renderOffset', () => {
+    testState.renderOffset = 50;
+    testState.months = [
+      {
+        viewId: 'month:2015-01',
+        isInOrNearViewport: false,
+        isLoaded: false,
+        top: 1200,
+        height: 240,
+        title: 'Jan 2015',
+      },
+    ];
+    renderTimeline();
+    // assert on the raw inline style so CSS normalization (e.g. `0`→`0px`) can't cause a false negative;
+    // the template emits exactly `translate3d(0,${top + renderOffset}px,0)`
+    const skeleton = screen.getByTestId('timeline-month-skeleton');
+    expect(skeleton.getAttribute('style')).toMatch(/translate3d\(\s*0(?:px)?\s*,\s*1250px\s*,\s*0(?:px)?\s*\)/);
+  });
+
+  it('offsets the lead-out spacer transform by renderOffset', () => {
+    // topSectionHeight 0 + bodySectionHeight 296 + renderOffset 50 = 346
+    testState.renderOffset = 50;
+    const { getByTestId } = renderTimeline();
+    expect(getByTestId('timeline-leadout').getAttribute('style')).toMatch(
+      /translate3d\(\s*0(?:px)?\s*,\s*346px\s*,\s*0(?:px)?\s*\)/,
+    );
+  });
+
+  it('offsets the lead-in/top section transform by renderOffset so it stays flush with the first month', () => {
+    // The top section renders at logical position 0, so its DOM position must be `0 + renderOffset`.
+    // Without this, an above-cap library (renderOffset != 0) draws the first month over the still-visible
+    // lead-in as it scrolls, because months use `top + renderOffset` and the top section did not.
+    testState.renderOffset = 50;
+    const { getByTestId } = renderTimeline();
+    expect(getByTestId('timeline-top-section').getAttribute('style')).toMatch(
+      /translate3d\(\s*0(?:px)?\s*,\s*50px\s*,\s*0(?:px)?\s*\)/,
+    );
   });
 });
