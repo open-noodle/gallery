@@ -1,3 +1,4 @@
+import { AssetTypeEnum } from '@immich/sdk';
 import { buildFilterContext, clearFilters, createFilterState, getActiveFilterCount } from '../filter-panel';
 
 describe('FilterState utilities', () => {
@@ -366,5 +367,76 @@ describe('buildFilterContext', () => {
     expect(buildFilterContext(state)).toEqual({
       takenAfter: '2024-01-01T00:00:00.000Z',
     });
+  });
+
+  it('should include country and city', () => {
+    const state = { ...createFilterState(), country: 'Germany', city: 'Berlin' };
+    expect(buildFilterContext(state)).toEqual({ country: 'Germany', city: 'Berlin' });
+  });
+
+  it('should include make and model', () => {
+    const state = { ...createFilterState(), make: 'Canon', model: 'Canon EOS R5' };
+    expect(buildFilterContext(state)).toEqual({ make: 'Canon', model: 'Canon EOS R5' });
+  });
+
+  it('should map mediaType image and video to the SDK enum', () => {
+    const imageState = { ...createFilterState(), mediaType: 'image' as const };
+    expect(buildFilterContext(imageState)).toEqual({ mediaType: AssetTypeEnum.Image });
+
+    const videoState = { ...createFilterState(), mediaType: 'video' as const };
+    expect(buildFilterContext(videoState)).toEqual({ mediaType: AssetTypeEnum.Video });
+  });
+
+  it('should omit mediaType when set to all', () => {
+    const state = { ...createFilterState(), mediaType: 'all' as const, rating: 4 };
+    expect(buildFilterContext(state)).toEqual({ rating: 4 });
+  });
+
+  it('should exclude country and city for the location context but keep the rest', () => {
+    const state = {
+      ...createFilterState(),
+      country: 'Germany',
+      city: 'Berlin',
+      make: 'Canon',
+      model: 'Canon EOS R5',
+      mediaType: 'image' as const,
+      tagIds: ['t1'],
+    };
+
+    expect(buildFilterContext(state, ['country', 'city'])).toEqual({
+      make: 'Canon',
+      model: 'Canon EOS R5',
+      mediaType: AssetTypeEnum.Image,
+      tagIds: ['t1'],
+    });
+  });
+
+  it('should exclude make and model for the camera context but keep the rest', () => {
+    const state = {
+      ...createFilterState(),
+      country: 'Germany',
+      city: 'Berlin',
+      make: 'Canon',
+      model: 'Canon EOS R5',
+      mediaType: 'image' as const,
+      tagIds: ['t1'],
+    };
+
+    expect(buildFilterContext(state, ['make', 'model'])).toEqual({
+      country: 'Germany',
+      city: 'Berlin',
+      mediaType: AssetTypeEnum.Image,
+      tagIds: ['t1'],
+    });
+  });
+
+  it('should return undefined when only mediaType is all and nothing else is set', () => {
+    const state = createFilterState();
+    expect(buildFilterContext(state)).toBeUndefined();
+  });
+
+  it('should return a defined context when only a country is set', () => {
+    const state = { ...createFilterState(), country: 'Germany' };
+    expect(buildFilterContext(state)).toEqual({ country: 'Germany' });
   });
 });

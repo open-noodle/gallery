@@ -283,6 +283,37 @@ describe(SearchService.name, () => {
       expect(mocks.search.getCameraModels).toHaveBeenCalledWith([authStub.user1.user.id], expect.anything());
     });
 
+    it('should pass active filters to camera model suggestions (#858)', async () => {
+      const personIds = [newUuid()];
+      const tagIds = [newUuid()];
+      mocks.search.getCameraModels.mockResolvedValue(['Canon EOS R5']);
+
+      await sut.getSearchSuggestions(authStub.user1, {
+        includeNull: false,
+        type: SearchSuggestionType.CAMERA_MODEL,
+        make: 'Canon',
+        personIds,
+        tagIds,
+        rating: 4,
+        isFavorite: true,
+        city: 'Berlin',
+        mediaType: AssetType.Image,
+      });
+
+      expect(mocks.search.getCameraModels).toHaveBeenCalledWith(
+        [authStub.user1.user.id],
+        expect.objectContaining({
+          make: 'Canon',
+          personIds,
+          tagIds,
+          rating: 4,
+          isFavorite: true,
+          city: 'Berlin',
+          mediaType: AssetType.Image,
+        }),
+      );
+    });
+
     it('should return search suggestions for camera lens model', async () => {
       mocks.search.getCameraLensModels.mockResolvedValue(['10-24mm']);
       mocks.partner.getAll.mockResolvedValue([]);
