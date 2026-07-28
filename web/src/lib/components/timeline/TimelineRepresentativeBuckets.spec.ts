@@ -228,4 +228,15 @@ describe('TimelineRepresentativeBuckets', () => {
 
     expect(onRequestCovers).not.toHaveBeenCalled();
   });
+
+  it('offsets bucket transforms by renderOffset', () => {
+    render(TimelineRepresentativeBuckets, {
+      grouping: 'year',
+      buckets: [bucket(2016, 120)],
+      visibleWindow: { top: 100, bottom: 600 },
+      renderOffset: 50,
+    });
+
+    expect(screen.getByTestId('timeline-bucket-shell-2016-01-01')).toHaveStyle('transform: translateY(170px)');
+  });
 });
