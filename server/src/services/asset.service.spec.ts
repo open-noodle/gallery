@@ -1549,6 +1549,69 @@ describe(AssetService.name, () => {
   });
 
   describe('handleAssetDeletion', () => {
+    // Deleting an asset makes Postgres lock shared_space_person itself to satisfy the
+    // representativeFaceId ON DELETE SET NULL foreign key, in face-deletion order. That cycles
+    // against concurrent space-people recounts and no application-level ordering can prevent it,
+    // so a deadlock victim must be re-driven or the asset silently survives the delete (#864).
+    it('retries the delete when postgres picks it as a deadlock victim', async () => {
+      const asset = AssetFactory.from().build();
+      mocks.assetJob.getForAssetDeletion.mockResolvedValue(getForAssetDeletion(asset));
+      mocks.asset.remove
+        .mockRejectedValueOnce(Object.assign(new Error('deadlock detected'), { code: '40P01' }))
+        .mockResolvedValue(void 0);
+
+      await expect(sut.handleAssetDeletion({ id: asset.id, deleteOnDisk: true })).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.asset.remove).toHaveBeenCalledTimes(2);
+    });
+
+    // A retry must re-drive only the delete. If it re-ran the surrounding work the asset would be
+    // announced as deleted twice and its files queued for deletion twice.
+    it('does not repeat the surrounding work when the delete is retried', async () => {
+      const asset = AssetFactory.from().build();
+      mocks.assetJob.getForAssetDeletion.mockResolvedValue(getForAssetDeletion(asset));
+      mocks.asset.remove
+        .mockRejectedValueOnce(Object.assign(new Error('deadlock detected'), { code: '40P01' }))
+        .mockResolvedValue(void 0);
+
+      await sut.handleAssetDeletion({ id: asset.id, deleteOnDisk: true });
+
+      expect(mocks.asset.remove).toHaveBeenCalledTimes(2);
+      expect(mocks.sharedSpace.getSpacePersonsForAsset).toHaveBeenCalledTimes(1);
+      expect(mocks.event.emit).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
+    });
+
+    // Losing a deletion is the one genuinely harmful outcome here: the asset is already
+    // soft-deleted, so without a re-queue it lingers until the trash sweep runs, days later.
+    // Measured on the unmap repro — even a 5-attempt budget was exhausted once under load.
+    it('re-queues the deletion instead of losing it when every retry deadlocks', async () => {
+      const asset = AssetFactory.from().build();
+      mocks.assetJob.getForAssetDeletion.mockResolvedValue(getForAssetDeletion(asset));
+      mocks.asset.remove.mockRejectedValue(Object.assign(new Error('deadlock detected'), { code: '40P01' }));
+
+      await expect(sut.handleAssetDeletion({ id: asset.id, deleteOnDisk: true })).resolves.toBe(JobStatus.Skipped);
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.AssetDelete,
+        data: { id: asset.id, deleteOnDisk: true },
+      });
+      // the deletion is never reported as done
+      expect(mocks.event.emit).not.toHaveBeenCalled();
+    });
+
+    it('does not retry a delete that failed for a non-deadlock reason', async () => {
+      const asset = AssetFactory.from().build();
+      mocks.assetJob.getForAssetDeletion.mockResolvedValue(getForAssetDeletion(asset));
+      mocks.asset.remove.mockRejectedValue(Object.assign(new Error('nope'), { code: '23503' }));
+
+      await expect(sut.handleAssetDeletion({ id: asset.id, deleteOnDisk: true })).rejects.toMatchObject({
+        code: '23503',
+      });
+
+      expect(mocks.asset.remove).toHaveBeenCalledTimes(1);
+    });
+
     it('should clean up files', async () => {
       const asset = AssetFactory.from()
         .file({ type: AssetFileType.Thumbnail })

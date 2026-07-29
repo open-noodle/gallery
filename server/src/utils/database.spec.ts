@@ -2,7 +2,9 @@ import { DatabaseExtension } from 'src/enum';
 import {
   ASSET_CHECKSUM_CONSTRAINT,
   isAssetChecksumConstraint,
+  isDeadlockError,
   removeUndefinedKeys,
+  retryOnDeadlock,
   tokenizeForSearch,
   updateLockedColumns,
   vectorIndexQuery,
@@ -340,5 +342,110 @@ describe('updateLockedColumns', () => {
     const exif = { description: 'test', lockedProperties: ['old'] } as any;
     const result = updateLockedColumns(exif);
     expect(result.lockedProperties).toEqual(['description']);
+  });
+});
+
+const deadlockError = () => Object.assign(new Error('deadlock detected'), { code: '40P01' });
+
+describe('isDeadlockError', () => {
+  it('recognises the postgres deadlock code', () => {
+    expect(isDeadlockError({ code: '40P01' })).toBe(true);
+  });
+
+  it('rejects other postgres error codes', () => {
+    expect(isDeadlockError({ code: '23503' })).toBe(false);
+  });
+
+  it('tolerates values that are not postgres errors', () => {
+    expect(isDeadlockError(null)).toBe(false);
+    expect(isDeadlockError(void 0)).toBe(false);
+    expect(isDeadlockError(new Error('boom'))).toBe(false);
+    expect(isDeadlockError('deadlock detected')).toBe(false);
+  });
+});
+
+describe('retryOnDeadlock', () => {
+  it('returns the result without retrying when the operation succeeds first time', async () => {
+    let attempts = 0;
+    const operation = () => {
+      attempts++;
+      return Promise.resolve('first');
+    };
+
+    await expect(retryOnDeadlock(operation)).resolves.toBe('first');
+    expect(attempts).toBe(1);
+  });
+
+  it('does not retry at all when only one attempt is budgeted', async () => {
+    let attempts = 0;
+    const operation = () => {
+      attempts++;
+      return Promise.reject(deadlockError());
+    };
+
+    await expect(retryOnDeadlock(operation, { attempts: 1, delayMs: 0 })).rejects.toMatchObject({ code: '40P01' });
+    expect(attempts).toBe(1);
+  });
+
+  it('rethrows the original error object once it gives up', async () => {
+    const error = deadlockError();
+
+    await expect(retryOnDeadlock(() => Promise.reject(error), { attempts: 2, delayMs: 0 })).rejects.toBe(error);
+  });
+
+  it('does not retry rejections that carry no error code', async () => {
+    let attempts = 0;
+    const operation = () => {
+      attempts++;
+      return Promise.reject(new Error('plain failure'));
+    };
+
+    await expect(retryOnDeadlock(operation, { delayMs: 0 })).rejects.toThrow('plain failure');
+    expect(attempts).toBe(1);
+  });
+
+  it('retries a deadlocked operation and returns the eventual result', async () => {
+    let attempts = 0;
+    const operation = () => {
+      attempts++;
+      return attempts < 3 ? Promise.reject(deadlockError()) : Promise.resolve('done');
+    };
+
+    await expect(retryOnDeadlock(operation, { delayMs: 0 })).resolves.toBe('done');
+    expect(attempts).toBe(3);
+  });
+
+  it('does not retry errors that are not deadlocks', async () => {
+    let attempts = 0;
+    const operation = () => {
+      attempts++;
+      return Promise.reject(Object.assign(new Error('violates foreign key constraint'), { code: '23503' }));
+    };
+
+    await expect(retryOnDeadlock(operation, { delayMs: 0 })).rejects.toMatchObject({ code: '23503' });
+    expect(attempts).toBe(1);
+  });
+
+  it('defaults to a budget deep enough to ride out a real delete storm', async () => {
+    let attempts = 0;
+    const operation = () => {
+      attempts++;
+      return Promise.reject(deadlockError());
+    };
+
+    await expect(retryOnDeadlock(operation, { delayMs: 0 })).rejects.toMatchObject({ code: '40P01' });
+    // measured: at ~8.7k concurrent asset deletes a budget of 3 still let one delete through
+    expect(attempts).toBe(5);
+  });
+
+  it('gives up and rethrows once the attempt budget is spent', async () => {
+    let attempts = 0;
+    const operation = () => {
+      attempts++;
+      return Promise.reject(deadlockError());
+    };
+
+    await expect(retryOnDeadlock(operation, { attempts: 4, delayMs: 0 })).rejects.toMatchObject({ code: '40P01' });
+    expect(attempts).toBe(4);
   });
 });
