@@ -9,7 +9,7 @@ import type { PeopleFaceStatistics, PersonStatistics } from 'src/repositories/pe
 import { DB } from 'src/schema';
 import { FaceIdentityFaceSource, FaceIdentityFaceTable } from 'src/schema/tables/face-identity-face.table';
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table';
-import { anyUuid } from 'src/utils/database';
+import { anyUuid, retryOnDeadlock } from 'src/utils/database';
 import { asDateString, asDateTimeString } from 'src/utils/date';
 import { spaceAlbumAssetExistsSql, spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope';
 
@@ -2762,33 +2762,58 @@ export class FaceIdentityRepository {
     toPersonId: string;
     identityId: string;
   }): Promise<void> {
-    const identityFaceIds = this.db
-      .selectFrom('shared_space_person_face')
-      .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
-      .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
-      .select('shared_space_person_face.assetFaceId')
-      .where('shared_space_person_face.personId', '=', input.fromPersonId)
-      .where('face_identity_face.identityId', '=', input.identityId)
-      .where('asset_face.deletedAt', 'is', null)
-      .where('asset_face.isVisible', '=', true);
+    // The UPDATE below sets personId, so its FK check takes FOR KEY SHARE on BOTH the source and
+    // target person rows. Claiming only the target left the source locked in an arbitrary order,
+    // so claim both in id order (#864).
+    const parentIds = [...new Set([input.fromPersonId, input.toPersonId])].toSorted();
 
-    await this.db
-      .deleteFrom('shared_space_person_face')
-      .where('personId', '=', input.fromPersonId)
-      .where('assetFaceId', 'in', identityFaceIds)
-      .where(
-        'assetFaceId',
-        'in',
-        this.db.selectFrom('shared_space_person_face').select('assetFaceId').where('personId', '=', input.toPersonId),
-      )
-      .execute();
+    await retryOnDeadlock(() =>
+      this.db.transaction().execute(async (trx) => {
+        // Orphan cleanup runs concurrently with the backfill during a library unmap and can delete
+        // the target person between the caller resolving it and this move. Claiming it here stops it
+        // disappearing mid-move; if it is already gone we skip, because reassigning faces onto a
+        // missing person violates shared_space_person_face_personId_fkey and kills the job.
+        const claimed = await trx
+          .selectFrom('shared_space_person')
+          .select('id')
+          .where('id', 'in', parentIds)
+          .orderBy('id')
+          .forUpdate()
+          .execute();
 
-    await this.db
-      .updateTable('shared_space_person_face')
-      .set({ personId: input.toPersonId })
-      .where('personId', '=', input.fromPersonId)
-      .where('assetFaceId', 'in', identityFaceIds)
-      .execute();
+        if (!claimed.some(({ id }) => id === input.toPersonId)) {
+          return;
+        }
+
+        const identityFaceIds = trx
+          .selectFrom('shared_space_person_face')
+          .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+          .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
+          .select('shared_space_person_face.assetFaceId')
+          .where('shared_space_person_face.personId', '=', input.fromPersonId)
+          .where('face_identity_face.identityId', '=', input.identityId)
+          .where('asset_face.deletedAt', 'is', null)
+          .where('asset_face.isVisible', '=', true);
+
+        await trx
+          .deleteFrom('shared_space_person_face')
+          .where('personId', '=', input.fromPersonId)
+          .where('assetFaceId', 'in', identityFaceIds)
+          .where(
+            'assetFaceId',
+            'in',
+            trx.selectFrom('shared_space_person_face').select('assetFaceId').where('personId', '=', input.toPersonId),
+          )
+          .execute();
+
+        await trx
+          .updateTable('shared_space_person_face')
+          .set({ personId: input.toPersonId })
+          .where('personId', '=', input.fromPersonId)
+          .where('assetFaceId', 'in', identityFaceIds)
+          .execute();
+      }),
+    );
   }
 
   private spacePersonFaceCount(eb: ExpressionBuilder<DB, 'shared_space_person'>) {
@@ -2827,23 +2852,40 @@ export class FaceIdentityRepository {
       return;
     }
 
-    await this.db
-      .updateTable('shared_space_person')
-      .set((eb) => ({
-        faceCount: this.spacePersonFaceCount(eb),
-        assetCount: this.spacePersonAssetCount(eb),
-      }))
-      .where('id', 'in', personIds)
-      // Recount runs for every person an identity backfill pass scans. Skip rows whose counts are
-      // already correct — an unconditional UPDATE fires the updatedAt trigger for the whole table
-      // once per pass, generating constant write load and updatedAt churn for sync watchers.
-      .where((eb) =>
-        eb.or([
-          eb('shared_space_person.faceCount', 'is distinct from', this.spacePersonFaceCount(eb)),
-          eb('shared_space_person.assetCount', 'is distinct from', this.spacePersonAssetCount(eb)),
-        ]),
-      )
-      .execute();
+    // This is the identity backfill's own copy of the space-person recount, and it runs while a
+    // library unmap is deleting assets. It needs the same protection as
+    // SharedSpaceRepository.recountPersons (#864): claim the rows in a canonical order so two
+    // recounts cannot cycle, and re-drive when the representativeFaceId ON DELETE SET NULL
+    // cascade — whose lock order we do not control — makes this transaction the victim.
+    await retryOnDeadlock(() =>
+      this.db.transaction().execute(async (trx) => {
+        await trx
+          .selectFrom('shared_space_person')
+          .select('id')
+          .where('id', 'in', [...new Set(personIds)].toSorted())
+          .orderBy('id')
+          .forUpdate()
+          .execute();
+
+        await trx
+          .updateTable('shared_space_person')
+          .set((eb) => ({
+            faceCount: this.spacePersonFaceCount(eb),
+            assetCount: this.spacePersonAssetCount(eb),
+          }))
+          .where('id', 'in', personIds)
+          // Recount runs for every person an identity backfill pass scans. Skip rows whose counts are
+          // already correct — an unconditional UPDATE fires the updatedAt trigger for the whole table
+          // once per pass, generating constant write load and updatedAt churn for sync watchers.
+          .where((eb) =>
+            eb.or([
+              eb('shared_space_person.faceCount', 'is distinct from', this.spacePersonFaceCount(eb)),
+              eb('shared_space_person.assetCount', 'is distinct from', this.spacePersonAssetCount(eb)),
+            ]),
+          )
+          .execute();
+      }),
+    );
   }
 
   private async deleteOrphanedSpacePersons(personIds: string[]): Promise<void> {
@@ -2851,19 +2893,34 @@ export class FaceIdentityRepository {
       return;
     }
 
-    await this.db
-      .deleteFrom('shared_space_person')
-      .where('id', 'in', personIds)
-      .where((eb) =>
-        eb.not(
-          eb.exists(
-            eb
-              .selectFrom('shared_space_person_face')
-              .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id'),
-          ),
-        ),
-      )
-      .execute();
+    // Same reasoning as recountSpacePersons: this DELETE takes locks on shared_space_person in
+    // scan order while concurrent recounts take them in id order, so claim first and re-drive if
+    // Postgres kills us (#864).
+    await retryOnDeadlock(() =>
+      this.db.transaction().execute(async (trx) => {
+        await trx
+          .selectFrom('shared_space_person')
+          .select('id')
+          .where('id', 'in', [...new Set(personIds)].toSorted())
+          .orderBy('id')
+          .forUpdate()
+          .execute();
+
+        await trx
+          .deleteFrom('shared_space_person')
+          .where('id', 'in', personIds)
+          .where((eb) =>
+            eb.not(
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_person_face')
+                  .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id'),
+              ),
+            ),
+          )
+          .execute();
+      }),
+    );
   }
 
   async mergeIdentities(input: {
