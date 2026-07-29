@@ -166,20 +166,80 @@ every file under `server/src/queries/`.
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-rolling-2026-07-29`
-- **Commit validated**: _(filled in after dispatch)_
+- **Commit validated**: `76245d2db30`
 
-| Workflow                                  | Status | Notes                                   |
-| ----------------------------------------- | ------ | --------------------------------------- |
-| `test.yml`                                |        |                                         |
-| `docker.yml`                              |        |                                         |
-| `static_analysis.yml`                     |        |                                         |
-| `gallery-build-mobile.yml`                |        |                                         |
-| `gallery-rebase-smoke.yml`                |        |                                         |
-| `storage-migration-tests.yml`             |        |                                         |
-| `storage-migration-e2e.yml`               |        |                                         |
-| `gallery-revert-to-immich-validation.yml` |        | upstream-blocked; see 2026-07-27 report |
-| `gallery-ml-smoke.yml`                    |        |                                         |
-| `gallery-mobile-smoke.yml`                |        |                                         |
+| Workflow                                  | Status | Notes                                                |
+| ----------------------------------------- | ------ | ---------------------------------------------------- |
+| `test.yml`                                | GREEN  | 21/21 jobs, none skipped (run 30471034202)           |
+| `docker.yml`                              | GREEN  | run 30471037201                                      |
+| `static_analysis.yml`                     | GREEN  | run 30471039722                                      |
+| `gallery-build-mobile.yml`                | GREEN  | run 30471060671                                      |
+| `gallery-rebase-smoke.yml`                | GREEN  | run 30471042044                                      |
+| `storage-migration-tests.yml`             | GREEN  | run 30471044582                                      |
+| `storage-migration-e2e.yml`               | GREEN  | run 30471058313                                      |
+| `gallery-revert-to-immich-validation.yml` | RED    | structural main-lag, not a branch defect — see below |
+| `gallery-ml-smoke.yml`                    | GREEN  | run 30471049197                                      |
+| `gallery-mobile-smoke.yml`                | GREEN  | run 30471051606                                      |
+
+### `gallery-revert-to-immich-validation` — diagnosis (run 30471046799)
+
+**Not a `revert-to-immich.sql` coverage gap, and not fixable on this branch.** The coverage
+detector from step 7i reports **0 missing** entries against the `v3.1.0` upstream tree (88
+upstream migrations), and `1784647658615-AddOAuthBearerTokenToSession` is already present in
+the SQL.
+
+The failure is a consequence of the rolling branch being ahead of `main`:
+
+1. The workflow's pre-phase boots **upstream Immich at the tag from the branch's
+   `branding/config.json`** — now `v3.1.0`. That image runs
+   `1784647658615-AddOAuthBearerTokenToSession` and records it in `kysely_migrations`.
+   Pre-phase baseline drift: 0 items.
+2. The gallery phase then boots `GALLERY_IMAGE`, which defaults to **`:main`** — built from
+   `origin/main`, where `branding/config.json` still says **3.0.3** and
+   `1784647658615-AddOAuthBearerTokenToSession.ts` **does not exist**.
+3. Kysely aborts: `corrupted migrations: previously executed migration
+1784647658615-AddOAuthBearerTokenToSession is missing`, so the server never answers
+   `/api/server/ping` and the job times out at 180s.
+
+The revert SQL is never reached. This clears itself once the rolling branch lands on `main`
+and `:main` is rebuilt at v3.1.0. It is the same upstream/main-lag family as the 2026-07-27
+red, with a different symptom now that the `v3.1.0` image is published.
+
+## Staging RC Validation
+
+- **RC tag**: `rolling-v310-rc2` (server-only; `build_ml` omitted)
+- **Built from**: `rebase/upstream-rolling-2026-07-29` @ `76245d2db30` (run 30471070327)
+- **ML**: left at `v5.1.1` — `git diff v5.1.1..HEAD -- machine-learning/` is the version
+  string `3.0.3` → `3.1.0` in `pyproject.toml` + `uv.lock` and nothing else; this cycle
+  changed zero ML files.
+- **infra-gitops**: `dee96ef` (`apps/staging/server.yaml` only)
+- **Served pod**: `gallery-server-fdbff59bd-rwlch` running
+  `ghcr.io/open-noodle/gallery-server:rolling-v310-rc2` (verified by pod image, not by
+  `rollout status`)
+
+**Migration parity pre-check** (before pinning): the only DB-recorded migration with no file
+on disk was `1776735180298-ChangeDurationToInteger` — the known-benign `compatibilityAliases`
+case — and **0 migrations were pending**, consistent with this cycle adding none.
+
+**Boot result**: `Running migrations` → `Finished running migrations` →
+**`No schema drift detected` on BOTH Api and Microservices workers.**
+
+**Fork surface smoke** (temp api_key, deleted afterwards) — all HTTP 200:
+
+| Endpoint                                                  | Result                        |
+| --------------------------------------------------------- | ----------------------------- |
+| `/server/ml-health`                                       | `{"smartSearchHealthy":true}` |
+| `/shared-spaces`                                          | 200                           |
+| `/albums`                                                 | 200                           |
+| `/people?withSharedSpaces=true`                           | 200                           |
+| `/gallery/map/markers` (fork-only)                        | 200, 556 KB                   |
+| `/timeline/buckets` (#715 surface)                        | 200                           |
+| `/search/suggestions?type=camera-model&make=Apple` (#861) | narrowed to 4 iPhone models   |
+| `POST /search/smart` (#870 palette path)                  | 200, 10 hits (CLIP + vector)  |
+
+The `#861` probe is the meaningful one: unfiltered `camera-make` returns 12 makes, and
+`camera-model` narrowed by `make=Apple` returns only iPhone models — i.e. second-level
+narrowing works end-to-end against a real library.
 
 ## Post-Rebase Verification
 
