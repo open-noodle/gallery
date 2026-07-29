@@ -178,3 +178,56 @@ describe(FaceIdentityRepository.name, () => {
     });
   });
 });
+
+// The identity backfill keeps its OWN copy of the space-person recount and orphan cleanup, and
+// runs them while a library unmap is deleting assets. They touch the same shared_space_person
+// rows as SharedSpaceRepository.recountPersons, so they need the same deadlock handling (#864).
+const spaceMaintenanceDeadlock = () => Object.assign(new Error('deadlock detected'), { code: '40P01' });
+
+const spaceMaintenanceDb = (execute: () => Promise<unknown>) => {
+  const transaction = vi.fn(() => ({ execute }));
+  return { db: { transaction } as any, transaction };
+};
+
+describe('FaceIdentityRepository space-person maintenance deadlock safety (#864)', () => {
+  const ids = ['11111111-1111-4111-8111-111111111111'];
+
+  const invoke = (db: any, method: string) => (new FaceIdentityRepository(db) as any)[method](ids) as Promise<void>;
+
+  for (const method of ['recountSpacePersons', 'deleteOrphanedSpacePersons']) {
+    it(`${method} re-drives in a fresh transaction when it is the deadlock victim`, async () => {
+      let attempts = 0;
+      const { db, transaction } = spaceMaintenanceDb(() => {
+        attempts++;
+        return attempts < 3 ? Promise.reject(spaceMaintenanceDeadlock()) : Promise.resolve(void 0);
+      });
+
+      await expect(invoke(db, method)).resolves.toBeUndefined();
+      expect(transaction).toHaveBeenCalledTimes(3);
+    });
+
+    it(`${method} gives up once the attempt budget is spent`, async () => {
+      const { db, transaction } = spaceMaintenanceDb(() => Promise.reject(spaceMaintenanceDeadlock()));
+
+      await expect(invoke(db, method)).rejects.toMatchObject({ code: '40P01' });
+      expect(transaction).toHaveBeenCalledTimes(5);
+    });
+
+    it(`${method} does not retry non-deadlock failures`, async () => {
+      const { db, transaction } = spaceMaintenanceDb(() =>
+        Promise.reject(Object.assign(new Error('nope'), { code: '23503' })),
+      );
+
+      await expect(invoke(db, method)).rejects.toMatchObject({ code: '23503' });
+      expect(transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it(`${method} opens no transaction for an empty id list`, async () => {
+      const transaction = vi.fn();
+      const sut = new FaceIdentityRepository({ transaction } as any) as any;
+
+      await expect(sut[method]([])).resolves.toBeUndefined();
+      expect(transaction).not.toHaveBeenCalled();
+    });
+  }
+});
