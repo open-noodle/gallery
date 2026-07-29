@@ -16,9 +16,11 @@ import {
   expressionBuilder,
   sql,
 } from 'kysely';
-import { PostgresJSDialect } from 'kysely-postgres-js';
 import { jsonArrayFrom, jsonObjectFrom } from 'kysely/helpers/postgres';
+import { PostgresJSDialect } from 'kysely-postgres-js';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { Notice, PostgresError } from 'postgres';
+import type { AudioStreamInfo, VectorExtension, VideoFormat, VideoPacketInfo, VideoStreamInfo } from 'src/types.js';
 import { LockableProperty, Person, columns, lockableProperties } from 'src/database.js';
 import { DummyValue, GenerateSqlQueries } from 'src/decorators.js';
 import { AssetEditActionItem } from 'src/dtos/editing.dto.js';
@@ -48,7 +50,6 @@ import {
 } from 'src/repositories/search.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
-import type { AudioStreamInfo, VectorExtension, VideoFormat, VideoPacketInfo, VideoStreamInfo } from 'src/types.js';
 import { fromChecksum } from 'src/utils/request.js';
 import { spaceAssetPathBranches, spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
 import { dateTruncUnitForTimeBucketSize } from 'src/utils/timeline-bucket.js';
@@ -122,6 +123,41 @@ export const isStaleAssetForeignKeyConstraint = (error: unknown) => {
     postgresError.constraint_name !== undefined &&
     STALE_ASSET_FOREIGN_KEY_CONSTRAINTS.has(postgresError.constraint_name)
   );
+};
+
+const DEADLOCK_ERROR_CODE = '40P01';
+
+export const isDeadlockError = (error: unknown) => (error as PostgresError)?.code === DEADLOCK_ERROR_CODE;
+
+/**
+ * Retry an operation that Postgres aborted as a deadlock victim (#864).
+ *
+ * Lock ordering alone cannot prevent every cycle here: deleting an asset makes Postgres lock
+ * `shared_space_person` rows itself, to satisfy the `representativeFaceId` ON DELETE SET NULL
+ * foreign key, and it takes those locks in face-deletion order. No application-level ordering can
+ * join that sequence, so the losing transaction has to be re-driven instead.
+ */
+export const retryOnDeadlock = async <T>(
+  operation: () => Promise<T>,
+  options?: { attempts?: number; delayMs?: number },
+): Promise<T> => {
+  // 5, not 3: measured on the library-unmap repro at ~8.7k concurrent asset deletes, a budget of 3
+  // still let one delete exhaust its attempts and lose the deletion.
+  const attempts = options?.attempts ?? 5;
+  const delayMs = options?.delayMs ?? 50;
+
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (attempt >= attempts || !isDeadlockError(error)) {
+        throw error;
+      }
+
+      // Jittered backoff — concurrent victims that retry in lockstep just collide again.
+      await sleep(delayMs * attempt + Math.random() * delayMs);
+    }
+  }
 };
 
 export function withDefaultVisibility<O>(qb: SelectQueryBuilder<DB, 'asset', O>) {
