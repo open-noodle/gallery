@@ -1335,7 +1335,7 @@ describe('TimelineManager scroll scaling', () => {
     fakeEl = {
       scrollTop: 0,
       scrollTo({ top }: { top: number }) {
-        this.scrollTop = top; // manager already clamped; store verbatim
+        fakeEl.scrollTop = top; // manager already clamped; store verbatim
       },
     };
     timelineManager.scrollableElement = fakeEl as unknown as HTMLElement;
