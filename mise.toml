@@ -159,6 +159,12 @@ dir = "packages/sdk"
 run = "pnpm --filter @immich/sdk install --frozen-lockfile"
 
 [tasks."sdk:build"]
+# Serialised behind sdk:install on purpose. Callers list both as parallel `depends`
+# (e2e's ci-unit/ci-setup, for instance), and `pnpm build` runs pnpm's own
+# deps-status check, which shells out to `pnpm install`. Two concurrent installs
+# then race on node_modules/.pnpm/lock.yaml and one dies with
+# "ENOENT: rename lock.yaml.<pid> -> lock.yaml" while the other takes a SIGTERM.
+depends = ["//:sdk:install"]
 dir = "packages/sdk"
 run = "pnpm build"
 
