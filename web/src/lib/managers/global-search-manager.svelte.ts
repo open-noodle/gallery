@@ -1,9 +1,11 @@
 import {
+  AssetVisibility,
   getAlbumInfo,
   getAlbumNames,
   getAllPeople,
   getAllSpaces,
   getAllTags,
+  getAssetInfo,
   getMlHealth,
   getSpace,
   searchAssets,
@@ -699,6 +701,61 @@ export class GlobalSearchManager {
       this.mlProbed = true;
       void this.probeMlHealth();
     }
+    void this.validatePhotoRecents();
+  }
+
+  /**
+   * Re-check the photo rows in RECENT against the server and drop the ones it no longer
+   * hands back. Recents live in localStorage and carry the filename, so without this a
+   * photo that has since moved into the locked folder (or been deleted) keeps its
+   * filename on the palette's cold surface until the user removes the row by hand
+   * (#869). The thumbnail already 400s, so the row rendered as a blank tile with a
+   * readable name.
+   *
+   * Two things drop a row:
+   *
+   *  - The server refuses it. 400/403/404 mirror `activateAlbum`'s stale-entry branch —
+   *    Gallery's `requireAccess` answers 400 (BadRequestException) for both "row missing"
+   *    and "no access", so it sits alongside the canonical 404/403. This is the deleted-
+   *    asset and lapsed-PIN case.
+   *  - It resolves but sits in the locked folder. Moving a photo there requires an
+   *    elevated session (`asset.service.ts` `requireElevatedPermission`), so the caller
+   *    can still resolve it for the rest of the PIN window — a refusal-only check would
+   *    leave the row up for 15+ minutes right after the user locked it. Gating on the
+   *    visibility instead also matches the palette's searches, which pin Timeline, so a
+   *    locked photo is not reachable from the palette by any route.
+   *
+   * A network failure leaves history intact rather than erasing it on a dropped
+   * connection, and an abort (palette closed mid-flight) is a no-op because the next open
+   * re-runs the check.
+   */
+  async validatePhotoRecents() {
+    const photos = getEntries().filter(
+      (entry): entry is Extract<RecentEntry, { kind: 'photo' }> => entry.kind === 'photo',
+    );
+    if (photos.length === 0) {
+      return;
+    }
+    await Promise.all(
+      photos.map(async (entry) => {
+        try {
+          const asset = await getAssetInfo({ id: entry.assetId }, { signal: this.closeSignal });
+          if (asset.visibility === AssetVisibility.Locked) {
+            removeEntry(entry.id);
+            this.recentsRevision++;
+          }
+        } catch (error: unknown) {
+          if (error instanceof Error && error.name === 'AbortError') {
+            return;
+          }
+          const status = (error as { status?: number } | null)?.status;
+          if (status === 400 || status === 403 || status === 404) {
+            removeEntry(entry.id);
+            this.recentsRevision++;
+          }
+        }
+      }),
+    );
   }
 
   private async probeMlHealth() {
@@ -2624,8 +2681,13 @@ export class GlobalSearchManager {
           if (mode === 'smart') {
             // withSharedSpaces:true mirrors Gallery's main search page so palette
             // results include shared-space content the user can access.
+            // visibility:Timeline also mirrors that page (search/+page.svelte). Omitting it
+            // hands the decision to the server default, which is "no visibility filter" while
+            // the session is elevated — that pulled locked-folder assets into palette results
+            // for the whole PIN window (#869). Pin it so palette results never vary with the
+            // PIN state; the locked folder has its own dedicated view.
             const response = await searchSmart(
-              { smartSearchDto: { query, size: 5, withSharedSpaces: true } },
+              { smartSearchDto: { query, size: 5, withSharedSpaces: true, visibility: AssetVisibility.Timeline } },
               { signal },
             );
             const items = response.assets.items;
@@ -2636,6 +2698,7 @@ export class GlobalSearchManager {
           // have in the palette. Only smart search includes shared-space content in v1.
           const metadataSearchDto: MetadataSearchDto = {
             size: 5,
+            visibility: AssetVisibility.Timeline,
             ...(mode === 'metadata' && { originalFileName: query }),
             ...(mode === 'description' && { description: query }),
             ...(mode === 'ocr' && { ocr: query }),
