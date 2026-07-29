@@ -5,6 +5,7 @@ import {
   getAllPeople,
   getAllSpaces,
   getAllTags,
+  getAssetInfo,
   getMlHealth,
   getSpace,
   searchAssets,
@@ -131,6 +132,7 @@ vi.mock('@immich/sdk', async () => ({
   getAlbumNames: vi.fn(),
   getAllSpaces: vi.fn(),
   getAlbumInfo: vi.fn(),
+  getAssetInfo: vi.fn(),
   getSpace: vi.fn(),
   // Default bare-@ tests in prior suites rely on an empty-people baseline so the
   // people section lands at `empty` (not `ok`) when a test doesn't set its own mock.
@@ -626,6 +628,35 @@ describe('real providers', () => {
     expect(searchAssets).toHaveBeenCalledWith(
       expect.objectContaining({
         metadataSearchDto: expect.objectContaining({ ocr: 'ACME' }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  // #869: the palette omitted `visibility`, so the server default applied — and for an
+  // elevated session that default is "no filter", which pulled locked-folder assets into
+  // ordinary palette results. Pin Timeline the way the main search page already does
+  // (search/+page.svelte), so palette results never depend on the PIN state.
+  it('photos pins visibility to timeline in smart mode', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(searchSmart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        smartSearchDto: expect.objectContaining({ visibility: AssetVisibility.Timeline }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('photos pins visibility to timeline in metadata mode', async () => {
+    localStorage.setItem('searchQueryType', 'metadata');
+    const m = new GlobalSearchManager();
+    m.setQuery('IMG_0042');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(searchAssets).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadataSearchDto: expect.objectContaining({ visibility: AssetVisibility.Timeline }),
       }),
       expect.anything(),
     );
@@ -2876,6 +2907,107 @@ describe('topSearchMatch', () => {
 
     m.query = '@alice';
     expect(m.topSearchMatch).toBeNull();
+  });
+});
+
+// #869: a photo recent is written to localStorage with its filename and nothing ever
+// re-checked it. Moving that photo into the locked folder left the filename sitting in
+// RECENT — visible without the PIN — until the user removed the row by hand. Re-check
+// photo entries when the palette opens and drop the ones the server no longer returns.
+describe('photo recents revalidation', () => {
+  const photoEntry = { kind: 'photo' as const, id: 'photo:a1', assetId: 'a1', label: 'private.jpg', lastUsed: 1 };
+  const httpError = (status: number) => Object.assign(new Error(`HTTP ${status}`), { status });
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+  });
+
+  // 400 sits alongside 403/404 because Gallery's requireAccess middleware answers
+  // BadRequestException for both "row missing" and "no access" — same reasoning as
+  // activateAlbum's stale-entry branch.
+  it.each([400, 403, 404])('drops a photo recent the server refuses with %i', async (status) => {
+    addEntry(photoEntry);
+    vi.mocked(getAssetInfo).mockRejectedValue(httpError(status));
+
+    const m = new GlobalSearchManager();
+    await m.validatePhotoRecents();
+
+    expect(getEntries()).toEqual([]);
+  });
+
+  it('keeps a photo recent the user can still open', async () => {
+    addEntry(photoEntry);
+    vi.mocked(getAssetInfo).mockResolvedValue({
+      id: 'a1',
+      visibility: AssetVisibility.Timeline,
+    } as unknown as Awaited<ReturnType<typeof getAssetInfo>>);
+
+    const m = new GlobalSearchManager();
+    await m.validatePhotoRecents();
+
+    expect(getEntries().map((entry) => entry.id)).toEqual(['photo:a1']);
+  });
+
+  // Moving a photo into the locked folder requires an elevated session
+  // (asset.service.ts requireElevatedPermission), so right after the move the caller can
+  // still resolve it — a refusal-only check would keep the row until the PIN window
+  // lapsed. Drop it on the visibility itself, which also matches the palette's searches:
+  // they pin Timeline, so a locked photo is not reachable from the palette either way.
+  it('drops a photo recent that has moved into the locked folder even while unlocked', async () => {
+    addEntry(photoEntry);
+    vi.mocked(getAssetInfo).mockResolvedValue({
+      id: 'a1',
+      visibility: AssetVisibility.Locked,
+    } as unknown as Awaited<ReturnType<typeof getAssetInfo>>);
+
+    const m = new GlobalSearchManager();
+    await m.validatePhotoRecents();
+
+    expect(getEntries()).toEqual([]);
+  });
+
+  // A dropped connection must not erase history — only an explicit refusal does.
+  it('keeps a photo recent when the request fails without a status', async () => {
+    addEntry(photoEntry);
+    vi.mocked(getAssetInfo).mockRejectedValue(new Error('network down'));
+
+    const m = new GlobalSearchManager();
+    await m.validatePhotoRecents();
+
+    expect(getEntries().map((entry) => entry.id)).toEqual(['photo:a1']);
+  });
+
+  it('leaves non-photo recents alone', async () => {
+    addEntry({ kind: 'query', id: 'query:beach', text: 'beach', lastUsed: 1 });
+
+    const m = new GlobalSearchManager();
+    await m.validatePhotoRecents();
+
+    expect(getAssetInfo).not.toHaveBeenCalled();
+    expect(getEntries().map((entry) => entry.id)).toEqual(['query:beach']);
+  });
+
+  it('bumps recentsRevision so an open palette re-renders without the dropped row', async () => {
+    addEntry(photoEntry);
+    vi.mocked(getAssetInfo).mockRejectedValue(httpError(400));
+
+    const m = new GlobalSearchManager();
+    const before = m.recentsRevision;
+    await m.validatePhotoRecents();
+
+    expect(m.recentsRevision).toBeGreaterThan(before);
+  });
+
+  it('revalidates when the palette opens', async () => {
+    addEntry(photoEntry);
+    vi.mocked(getAssetInfo).mockRejectedValue(httpError(400));
+
+    const m = new GlobalSearchManager();
+    m.open();
+
+    await vi.waitFor(() => expect(getEntries()).toEqual([]));
   });
 });
 
