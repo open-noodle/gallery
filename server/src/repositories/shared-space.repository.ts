@@ -22,7 +22,7 @@ import { SharedSpacePersonAliasTable } from 'src/schema/tables/shared-space-pers
 import { SharedSpacePersonFaceTable } from 'src/schema/tables/shared-space-person-face.table';
 import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table';
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
-import { anyUuid, searchAssetBuilderLegacy } from 'src/utils/database';
+import { anyUuid, retryOnDeadlock, searchAssetBuilderLegacy } from 'src/utils/database';
 import {
   spaceAlbumAssetExists,
   spaceContributedAssetExists,
@@ -2616,12 +2616,30 @@ export class SharedSpaceRepository {
       return [];
     }
 
-    const result = await this.db
-      .insertInto('shared_space_person_face')
-      .values(values)
-      .onConflict((oc) => oc.doNothing())
-      .returningAll()
-      .execute();
+    // This INSERT names only shared_space_person_face, but the FK check takes FOR KEY SHARE on each
+    // shared_space_person parent, in row order — an invisible deadlock participant against the
+    // representativeFaceId SET NULL cascade that a concurrent asset delete drives (#864). Claim the
+    // parents in id order first so this agrees with every other writer, and re-drive if it still loses.
+    const parentIds = [...new Set(values.map(({ personId }) => personId))].toSorted();
+
+    const result = await retryOnDeadlock(() =>
+      this.db.transaction().execute(async (trx) => {
+        await trx
+          .selectFrom('shared_space_person')
+          .select('id')
+          .where('id', 'in', parentIds)
+          .orderBy('id')
+          .forUpdate()
+          .execute();
+
+        return trx
+          .insertInto('shared_space_person_face')
+          .values(values)
+          .onConflict((oc) => oc.doNothing())
+          .returningAll()
+          .execute();
+      }),
+    );
 
     if (!options?.skipRecount && result.length > 0) {
       const personIds = [...new Set(result.map((r) => r.personId))];
@@ -2934,11 +2952,16 @@ export class SharedSpaceRepository {
       .where('personId', 'in', spacePersonSubquery)
       .execute();
 
-    await this.db
-      .deleteFrom('shared_space_person_face')
-      .where('assetFaceId', 'in', assetFaceSubquery)
-      .where('personId', 'in', spacePersonSubquery)
-      .execute();
+    // Reached from unlinkLibrary / AlbumDelete / AlbumAssetsRemove — during the unmap itself. The
+    // asset_face cascade deletes these same junction rows, so the two can cycle (#864). A single
+    // statement is its own transaction, so re-running it is all the recovery needed.
+    await retryOnDeadlock(() =>
+      this.db
+        .deleteFrom('shared_space_person_face')
+        .where('assetFaceId', 'in', assetFaceSubquery)
+        .where('personId', 'in', spacePersonSubquery)
+        .execute(),
+    );
 
     if (affectedPersonIds.length > 0) {
       await this.recountPersons(affectedPersonIds.map((r) => r.personId));
@@ -2966,11 +2989,16 @@ export class SharedSpaceRepository {
       .where('personId', 'in', spacePersonSubquery)
       .execute();
 
-    await this.db
-      .deleteFrom('shared_space_person_face')
-      .where('assetFaceId', 'in', assetFaceSubquery)
-      .where('personId', 'in', spacePersonSubquery)
-      .execute();
+    // Reached from unlinkLibrary / AlbumDelete / AlbumAssetsRemove — during the unmap itself. The
+    // asset_face cascade deletes these same junction rows, so the two can cycle (#864). A single
+    // statement is its own transaction, so re-running it is all the recovery needed.
+    await retryOnDeadlock(() =>
+      this.db
+        .deleteFrom('shared_space_person_face')
+        .where('assetFaceId', 'in', assetFaceSubquery)
+        .where('personId', 'in', spacePersonSubquery)
+        .execute(),
+    );
 
     if (affectedPersonIds.length > 0) {
       await this.recountPersons(affectedPersonIds.map((r) => r.personId));
@@ -3182,11 +3210,37 @@ export class SharedSpaceRepository {
 
   @GenerateSql({ params: [DummyValue.UUID] })
   async deleteOrphanedPersons(spaceId: string) {
-    await this.db
-      .deleteFrom('shared_space_person')
-      .where('spaceId', '=', spaceId)
-      .where('id', 'not in', this.db.selectFrom('shared_space_person_face').select('personId'))
-      .execute();
+    // onAssetDelete runs this immediately after recountPersons, so protecting only the recount
+    // just moves the deadlock victim onto this DELETE (#864). Same treatment: resolve the orphans
+    // and claim them in id order first, so this agrees on a lock order with every other writer,
+    // then re-drive if the representativeFaceId cascade still picks us as the victim.
+    await retryOnDeadlock(() =>
+      this.db.transaction().execute(async (trx) => {
+        const orphans = await trx
+          .selectFrom('shared_space_person')
+          .select('id')
+          .where('spaceId', '=', spaceId)
+          .where('id', 'not in', trx.selectFrom('shared_space_person_face').select('personId'))
+          .orderBy('id')
+          .forUpdate()
+          .execute();
+
+        if (orphans.length === 0) {
+          return;
+        }
+
+        await trx
+          .deleteFrom('shared_space_person')
+          .where(
+            'id',
+            'in',
+            orphans.map(({ id }) => id),
+          )
+          // re-checked under the claim: a person that gained a face must not be deleted
+          .where('id', 'not in', trx.selectFrom('shared_space_person_face').select('personId'))
+          .execute();
+      }),
+    );
   }
 
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
@@ -3195,12 +3249,34 @@ export class SharedSpaceRepository {
       return;
     }
 
-    await this.db
-      .deleteFrom('shared_space_person')
-      .where('spaceId', '=', spaceId)
-      .where('id', 'in', personIds)
-      .where('id', 'not in', this.db.selectFrom('shared_space_person_face').select('personId'))
-      .execute();
+    // Same claim-then-delete ordering as deleteOrphanedPersons (#864).
+    await retryOnDeadlock(() =>
+      this.db.transaction().execute(async (trx) => {
+        const orphans = await trx
+          .selectFrom('shared_space_person')
+          .select('id')
+          .where('spaceId', '=', spaceId)
+          .where('id', 'in', [...new Set(personIds)].toSorted())
+          .where('id', 'not in', trx.selectFrom('shared_space_person_face').select('personId'))
+          .orderBy('id')
+          .forUpdate()
+          .execute();
+
+        if (orphans.length === 0) {
+          return;
+        }
+
+        await trx
+          .deleteFrom('shared_space_person')
+          .where(
+            'id',
+            'in',
+            orphans.map(({ id }) => id),
+          )
+          .where('id', 'not in', trx.selectFrom('shared_space_person_face').select('personId'))
+          .execute();
+      }),
+    );
   }
 
   @GenerateSql({ params: [] })
@@ -3235,6 +3311,35 @@ export class SharedSpaceRepository {
     if (personIds.length === 0) {
       return;
     }
+
+    // A multi-row UPDATE takes its row locks in scan order, and the planner may pick a different
+    // scan (so a different order) per connection.  Concurrent AssetDelete/face-match workers
+    // recounting overlapping people therefore deadlocked against each other (#864).  Claim the
+    // rows sorted by id first so every caller agrees on one global lock order.  The claim only
+    // holds for the enclosing transaction, so open one when the caller did not supply it.
+    if (db.isTransaction) {
+      // A deadlock aborts the caller's entire transaction, so retrying inside it would only raise
+      // "current transaction is aborted". Surfacing it lets the caller re-drive its own transaction.
+      return this.recountPersonsLocked(personIds, db);
+    }
+
+    // Ordering the claim removes recount-vs-recount cycles but cannot remove every cycle: deleting
+    // an asset makes Postgres lock these same rows to satisfy the representativeFaceId ON DELETE
+    // SET NULL cascade, in face-deletion order, so a recount can still be picked as the victim.
+    // Measured on the library-unmap repro at ~8.7k assets: 418 recount failures without this.
+    return retryOnDeadlock(() => db.transaction().execute((trx) => this.recountPersonsLocked(personIds, trx)));
+  }
+
+  private async recountPersonsLocked(personIds: string[], db: Kysely<DB> | Transaction<DB>) {
+    // Mirrors lockSpacePeopleForMerge, except a missing person is not an error here: a
+    // concurrent worker may legitimately have deleted an orphaned person before we recount it.
+    await db
+      .selectFrom('shared_space_person')
+      .select('id')
+      .where('id', 'in', [...new Set(personIds)].toSorted())
+      .orderBy('id')
+      .forUpdate()
+      .execute();
 
     await db
       .updateTable('shared_space_person')
