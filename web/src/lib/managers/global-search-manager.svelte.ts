@@ -749,7 +749,7 @@ export class GlobalSearchManager {
             return;
           }
           const status = (error as { status?: number } | null)?.status;
-          if (status === 400 || status === 403 || status === 404) {
+          if (status !== undefined && [400, 403, 404].includes(status)) {
             removeEntry(entry.id);
             this.recentsRevision++;
           }

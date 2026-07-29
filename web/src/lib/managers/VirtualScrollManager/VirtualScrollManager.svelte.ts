@@ -61,7 +61,7 @@ export abstract class VirtualScrollManager {
   #viewportHeight = $state(0);
   #viewportWidth = $state(0);
   #scrollTop = $state(0);
-  maxScrollHeight = $state(maxScrollHeightForDevicePixelRatio(globalThis.devicePixelRatio));
+  maxScrollHeight = $state(maxScrollHeightForDevicePixelRatio(devicePixelRatio));
   #cachedDomScrollTop = $state(0);
   #rowHeight = $state(235);
   #headerHeight = $state(48);
@@ -194,7 +194,7 @@ export abstract class VirtualScrollManager {
   // so re-derive the budget then — otherwise the cap stays at the old display's value and the
   // browser clamps the element behind our back again.
   #refreshScrollCap() {
-    const next = maxScrollHeightForDevicePixelRatio(globalThis.devicePixelRatio);
+    const next = maxScrollHeightForDevicePixelRatio(devicePixelRatio);
     if (this.maxScrollHeight !== next) {
       this.maxScrollHeight = next;
     }
