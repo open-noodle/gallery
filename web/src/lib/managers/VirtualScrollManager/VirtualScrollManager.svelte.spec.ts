@@ -124,7 +124,7 @@ describe('VirtualScrollManager HiDPI scroll cap', () => {
 
   it('10. falls back to a 1x budget for absent or nonsensical devicePixelRatio values', () => {
     const oneX = maxScrollHeightForDevicePixelRatio(1);
-    for (const bogus of [0, -2, Number.NaN, Number.POSITIVE_INFINITY]) {
+    for (const bogus of [0, -2, NaN, Infinity]) {
       expect(maxScrollHeightForDevicePixelRatio(bogus)).toBe(oneX);
     }
   });
