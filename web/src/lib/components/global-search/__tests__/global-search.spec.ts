@@ -98,6 +98,9 @@ vi.mock('@immich/sdk', async () => {
       hasUnnamedPeople: false,
     }),
     getMlHealth: vi.fn().mockResolvedValue({ smartSearchHealthy: true }),
+    // open() revalidates photo recents (#869). Stub it so specs that seed a photo row
+    // resolve it locally instead of firing an unmocked request at the dev server.
+    getAssetInfo: vi.fn().mockResolvedValue({ id: 'stub' }),
   };
 });
 
