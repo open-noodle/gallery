@@ -226,7 +226,11 @@ export class MachineLearningRepository {
           `Machine learning request to "${url}" failed with status ${response.status}: ${response.statusText}`,
         );
       } catch (error: Error | unknown) {
-        if (error instanceof Error && error.name === 'AbortError') {
+        // `signal` is one budget shared by every URL below, and AbortSignal.timeout() rejects
+        // with TimeoutError rather than AbortError. Either name means the budget is spent, so
+        // the remaining URLs cannot actually be contacted — continuing would only mark servers
+        // unhealthy that were never tried (#864).
+        if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
           throw error;
         }
         this.logger.warn(`Machine learning request to "${url}" failed`, error);
