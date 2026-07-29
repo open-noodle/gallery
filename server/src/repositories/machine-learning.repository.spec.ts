@@ -424,6 +424,21 @@ describe(MachineLearningRepository.name, () => {
       }
     });
 
+    // The 15s signal is one budget for the whole predict, shared across every URL. Once it
+    // expires the remaining URLs cannot possibly be tried — their fetch aborts instantly — so
+    // marking them unhealthy blames servers that were never contacted (#864).
+    it('does not try or blame the remaining URLs once the shared timeout budget expires', async () => {
+      const fallbackUrl = 'http://ml-fallback:3003';
+      sut.setup({ ...baseConfig, urls: [mlUrl, fallbackUrl] });
+      // undici rejects an AbortSignal.timeout() fetch with TimeoutError, NOT AbortError.
+      mockFetch.mockRejectedValue(new DOMException('The operation was aborted due to timeout', 'TimeoutError'));
+
+      await expect(sut.encodeText('hello', { language: 'en', modelName: 'clip' })).rejects.toMatchObject({
+        name: 'TimeoutError',
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
     it('non-abort errors still surface as the multi-URL failure', async () => {
       mockFetch.mockRejectedValue(new Error('ECONNREFUSED'));
       await expect(sut.encodeText('hello', { language: 'en', modelName: 'clip' })).rejects.toThrow(
