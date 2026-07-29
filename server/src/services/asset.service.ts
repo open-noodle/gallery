@@ -55,7 +55,7 @@ import {
   onBeforeLink,
   onBeforeUnlink,
 } from 'src/utils/asset.util';
-import { updateLockedColumns } from 'src/utils/database';
+import { isDeadlockError, retryOnDeadlock, updateLockedColumns } from 'src/utils/database';
 import { asDateTimeString, extractTimeZone } from 'src/utils/date';
 import { batched, findOrFail } from 'src/utils/misc';
 import { applyResolvedIdentityMetadata } from 'src/utils/person-identity';
@@ -605,7 +605,23 @@ export class AssetService extends BaseService {
     // handler in SharedSpaceService receives this data and recounts/cleans up after the delete.
     const affectedSpacePersons = await this.sharedSpaceRepository.getSpacePersonsForAsset(id);
 
-    await this.assetRepository.remove(asset);
+    // The delete cascades into asset_face, which makes Postgres lock shared_space_person rows to
+    // null out representativeFaceId. Those locks are taken in face order, so they can cycle against
+    // a concurrent space-people recount. Re-drive the victim rather than lose the deletion (#864).
+    try {
+      await retryOnDeadlock(() => this.assetRepository.remove(asset));
+    } catch (error) {
+      if (!isDeadlockError(error)) {
+        throw error;
+      }
+
+      // Still contended after the whole budget. The asset is already soft-deleted, so dropping it
+      // here would leave it behind until the trash sweep runs days later. Re-queue instead: the
+      // job goes to the back of the queue, by which point the delete storm has usually drained.
+      this.logger.warn(`Re-queueing deletion of asset ${id}: still deadlocking after repeated retries`);
+      await this.jobRepository.queue({ name: JobName.AssetDelete, data: { id, deleteOnDisk } });
+      return JobStatus.Skipped;
+    }
     if (!asset.libraryId) {
       await this.userRepository.updateUsage(asset.ownerId, -(asset.exifInfo?.fileSizeInByte || 0));
     }
