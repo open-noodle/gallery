@@ -1,5 +1,11 @@
 [tasks.install]
-run = "pnpm install --filter immich-e2e --frozen-lockfile"
+# The `...` suffix pulls in immich-e2e's workspace dependencies, not just immich-e2e:
+# packages/sdk, packages/e2e-auth-server and packages/cli. `check` type-checks
+# src/specs/server/api/oauth.e2e-spec.ts, which imports @immich/e2e-auth-server, so tsc
+# follows it into packages/e2e-auth-server and needs that package's own deps (jose,
+# oidc-provider) present. Without the suffix it resolved only by accident, off the
+# full-workspace install that an unserialised `sdk:build` used to trigger.
+run = "pnpm install --filter 'immich-e2e...' --frozen-lockfile"
 
 [tasks.build]
 dir = "{{ config_root }}"
