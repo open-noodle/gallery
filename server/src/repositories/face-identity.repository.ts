@@ -2781,7 +2781,8 @@ export class FaceIdentityRepository {
           .forUpdate()
           .execute();
 
-        if (!claimed.some(({ id }) => id === input.toPersonId)) {
+        const targetStillExists = claimed.some(({ id }) => id === input.toPersonId);
+        if (!targetStillExists) {
           return;
         }
 
