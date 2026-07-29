@@ -2343,7 +2343,11 @@ where
   "shared_space_person"."spaceId" = $1
 
 -- SharedSpaceRepository.deleteOrphanedPersons
-delete from "shared_space_person"
+begin
+select
+  "id"
+from
+  "shared_space_person"
 where
   "spaceId" = $1
   and "id" not in (
@@ -2352,9 +2356,17 @@ where
     from
       "shared_space_person_face"
   )
+order by
+  "id"
+for update
+commit
 
 -- SharedSpaceRepository.deleteOrphanedPersonsByIds
-delete from "shared_space_person"
+begin
+select
+  "id"
+from
+  "shared_space_person"
 where
   "spaceId" = $1
   and "id" in ($2)
@@ -2364,6 +2376,10 @@ where
     from
       "shared_space_person_face"
   )
+order by
+  "id"
+for update
+commit
 
 -- SharedSpaceRepository.deleteAllOrphanedPersons
 delete from "shared_space_person"
@@ -2387,6 +2403,16 @@ where
   "type" = $1
 
 -- SharedSpaceRepository.recountPersons
+begin
+select
+  "id"
+from
+  "shared_space_person"
+where
+  "id" in ($1)
+order by
+  "id"
+for update
 update "shared_space_person"
 set
   "faceCount" = (
@@ -2419,6 +2445,7 @@ set
   )
 where
   "id" in ($1)
+commit
 
 -- SharedSpaceRepository.getAlias
 select
