@@ -25,6 +25,16 @@ List<BucketLite> _seed({Map<String, int> counts = const {'2024-06-01': 12, '2024
   for (final e in counts.entries) (timeBucket: e.key, count: e.value),
 ];
 
+/// One bucket per year, descending from [newest] for [count] consecutive years.
+List<BucketLite> _seedYears(int count, {int newest = 2026}) => [
+  for (var i = 0; i < count; i++) (timeBucket: '${newest - i}-06-01', count: 10 + i),
+];
+
+/// Long year lists exceed the 800×600 test viewport. In the app the section is
+/// a child of `DeepContent`'s ListView, so scroll it here too — otherwise the
+/// harness reports a RenderFlex overflow that the real layout never hits.
+Widget _scrolled(Widget child) => Material(child: SingleChildScrollView(child: child));
+
 void main() {
   group('WhenAccordionSection', () {
     testWidgets('renders year rows in descending order', (tester) async {
@@ -201,6 +211,98 @@ void main() {
       // Basic assertion: month pill exists. Detailed color check is brittle
       // in widget tests; presence + basic selection semantics is enough.
       expect(find.byKey(const Key('when-month-2024-6')), findsOneWidget);
+    });
+
+    // #820: When was the only Deep section rendering its list uncapped — a
+    // library spanning 73 years produced 73 rows every time the section was
+    // expanded. Cap the preview like People (6) / Tags / Camera / Places (10).
+    testWidgets('caps the preview to the 10 most recent years', (tester) async {
+      await tester.pumpConsumerWidget(
+        _scrolled(const WhenAccordionSection(onOpenPicker: null)),
+        overrides: [_noCollapsed(), timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seedYears(15)))],
+      );
+      await tester.pumpAndSettle();
+
+      // 2026..2017 — the 10 most recent.
+      for (var y = 2026; y > 2016; y--) {
+        expect(find.byKey(Key('when-year-$y')), findsOneWidget, reason: '$y is within the cap');
+      }
+      // 2016..2012 — beyond the cap, reachable via "N years →".
+      for (var y = 2016; y >= 2012; y--) {
+        expect(find.byKey(Key('when-year-$y')), findsNothing, reason: '$y is beyond the cap');
+      }
+    });
+
+    // Mirrors the "selected suggestions beyond the cap are pinned" rule the
+    // People / Tags / Camera / Places sections follow: a year the user already
+    // filtered on must stay visible even when it sits past the cap.
+    testWidgets('pins a beyond-cap year covered by the active date range', (tester) async {
+      await tester.pumpConsumerWidget(
+        _scrolled(const WhenAccordionSection(onOpenPicker: null)),
+        overrides: [
+          _noCollapsed(),
+          timeBucketsProvider.overrideWith(
+            (ref, filter) => Future.value([..._seedYears(15), (timeBucket: '1953-04-01', count: 42)]),
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(tester.element(find.byType(WhenAccordionSection)));
+      container
+          .read(photosFilterProvider.notifier)
+          .setDateRange(start: DateTime(1953, 4, 1), end: DateTime(1953, 5, 0, 23, 59, 59));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('when-year-1953')), findsOneWidget, reason: 'selected year is pinned past the cap');
+      // Unselected overflow stays hidden.
+      expect(find.byKey(const Key('when-year-2016')), findsNothing);
+    });
+
+    // Guard: the pin must not become a backdoor that re-expands the whole list.
+    // An open-ended "before 2015" range overlaps 19 of the seeded years.
+    testWidgets('an open-ended date range cannot re-expand the section past the cap', (tester) async {
+      await tester.pumpConsumerWidget(
+        _scrolled(const WhenAccordionSection(onOpenPicker: null)),
+        overrides: [_noCollapsed(), timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seedYears(30)))],
+      );
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(tester.element(find.byType(WhenAccordionSection)));
+      container.read(photosFilterProvider.notifier).setDateRange(start: null, end: DateTime(2015, 12, 31));
+      await tester.pumpAndSettle();
+
+      // Newest overlapping years pin; the long tail stays behind "N years →".
+      expect(find.byKey(const Key('when-year-2015')), findsOneWidget);
+      expect(find.byKey(const Key('when-year-2005')), findsNothing, reason: 'pinned overflow is itself bounded');
+      expect(find.byKey(const Key('when-year-1997')), findsNothing, reason: 'pinned overflow is itself bounded');
+    });
+
+    testWidgets('≤10 years renders all, no over-cap', (tester) async {
+      await tester.pumpConsumerWidget(
+        _scrolled(const WhenAccordionSection(onOpenPicker: null)),
+        overrides: [_noCollapsed(), timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seedYears(4)))],
+      );
+      await tester.pumpAndSettle();
+
+      for (var y = 2026; y > 2022; y--) {
+        expect(find.byKey(Key('when-year-$y')), findsOneWidget);
+      }
+    });
+
+    // The capped preview must not shrink the picker affordance's count — it
+    // advertises how many years the picker reaches, not how many are shown.
+    testWidgets('"N years →" reports the total year count, not the capped preview length', (tester) async {
+      await tester.pumpConsumerWidget(
+        _scrolled(const WhenAccordionSection(onOpenPicker: null)),
+        overrides: [_noCollapsed(), timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seedYears(15)))],
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(of: find.byKey(const Key('when-section-search-more')), matching: find.text('15 years →')),
+        findsOneWidget,
+      );
     });
   });
 }
