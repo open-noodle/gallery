@@ -245,7 +245,7 @@
             {#if person.type === 'pet'}
               {@const petSpeciesLabel = getPetSpeciesLabel(person.species, $t)}
               <div
-                class="absolute bottom-1 right-1 rounded-full bg-immich-primary p-1 text-white"
+                class="absolute right-1 bottom-1 rounded-full bg-immich-primary p-1 text-white"
                 data-testid="pet-badge"
                 role="img"
                 aria-label={petSpeciesLabel}

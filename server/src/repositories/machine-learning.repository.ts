@@ -320,7 +320,7 @@ export class MachineLearningRepository {
     const request: PetDetectionRequest = {
       [ModelTask.PET_DETECTION]: {
         [ModelType.DETECTION]: { modelName, options: { minScore } },
-        ...(recognition ? { [ModelType.RECOGNITION]: { modelName: recognition.modelName } } : {}),
+        ...(recognition && { [ModelType.RECOGNITION]: { modelName: recognition.modelName } }),
       },
     };
     const response = await this.predict<PetDetectionResponse>({ imagePath }, request);

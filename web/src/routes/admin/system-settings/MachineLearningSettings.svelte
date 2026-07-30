@@ -467,7 +467,7 @@
             disabled={disabled || !configToEdit.machineLearning.enabled}
           />
 
-          {#if config.machineLearning.petDetection.enabled === false}
+          {#if !config.machineLearning.petDetection.enabled}
             <Text color="warning" size="small">{$t('admin.pet_recognition_requires_detection')}</Text>
           {/if}
 

@@ -170,7 +170,7 @@ export class PetRecognitionService extends BaseService {
       this.logger.debug(`Deferring non-core pet face ${id} for later processing`);
       await this.jobRepository.queue({
         name: JobName.PetRecognition,
-        data: { id, deferred: true, ...(label === undefined ? {} : { label }) },
+        data: { id, deferred: true, ...(label !== undefined && { label }) },
       });
       return JobStatus.Skipped;
     }
@@ -282,7 +282,7 @@ export class PetRecognitionService extends BaseService {
       await this.systemMetadataRepository.set(SystemMetadataKey.PetRecognitionState, {
         lastRun: new Date().toISOString(),
         modelName: newModel,
-        ...(pendingReprocess ? { pendingReprocess: true } : {}),
+        ...(pendingReprocess && { pendingReprocess: true }),
       });
 
       if (recognitionEnabled && detectionEnabled) {
