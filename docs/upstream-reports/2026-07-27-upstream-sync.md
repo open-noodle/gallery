@@ -15,14 +15,14 @@ mobile + toolchain + i18n + a version bump. The fork base moves from Immich **v3
 
 ## Incoming Upstream Changes
 
-| SHA | Summary | Area | Risk to Fork | Notes |
-| --- | --- | --- | --- | --- |
-| `e3385ce1837` | chore(mobile): harden mobile OpenAPI codegen and dependency install (#30202) | CI/toolchain | **HIGH** | Rewrites `generate-dart-sdk.sh`, trims `mobile/mise.lock`, edits 4 fork-modified workflows |
-| `04a38ba91c2` | refactor: asset update method (#30201) | mobile | **MEDIUM** | 32 files; relocates mocks, widens `addAssets` return type |
-| `e5310e2d2cd` | chore(web): update translations (#29781) | i18n | **MEDIUM** | 61 locale files; ~50 carry fork branding |
-| `8aa95c67470` | chore: version v3.1.0 | release | LOW | Triggers version-reference updates |
-| `e6f8256b259` | fix(mobile): prevent timeline scroll to top on unrelated pages (#30281) | mobile | LOW-MED | `timeline.widget.dart` — fork extends timeline grouping |
-| `bc6bf388c01` | fix(web): single grid row spacing (#30277) | web | LOW | 3 lines of CSS |
+| SHA           | Summary                                                                      | Area         | Risk to Fork | Notes                                                                                      |
+| ------------- | ---------------------------------------------------------------------------- | ------------ | ------------ | ------------------------------------------------------------------------------------------ |
+| `e3385ce1837` | chore(mobile): harden mobile OpenAPI codegen and dependency install (#30202) | CI/toolchain | **HIGH**     | Rewrites `generate-dart-sdk.sh`, trims `mobile/mise.lock`, edits 4 fork-modified workflows |
+| `04a38ba91c2` | refactor: asset update method (#30201)                                       | mobile       | **MEDIUM**   | 32 files; relocates mocks, widens `addAssets` return type                                  |
+| `e5310e2d2cd` | chore(web): update translations (#29781)                                     | i18n         | **MEDIUM**   | 61 locale files; ~50 carry fork branding                                                   |
+| `8aa95c67470` | chore: version v3.1.0                                                        | release      | LOW          | Triggers version-reference updates                                                         |
+| `e6f8256b259` | fix(mobile): prevent timeline scroll to top on unrelated pages (#30281)      | mobile       | LOW-MED      | `timeline.widget.dart` — fork extends timeline grouping                                    |
+| `bc6bf388c01` | fix(web): single grid row spacing (#30277)                                   | web          | LOW          | 3 lines of CSS                                                                             |
 
 ### High-Risk Changes (detailed analysis)
 
@@ -80,11 +80,11 @@ as a proper 3-way JSON merge per file — take upstream's translations, then re-
 the keys the fork had changed relative to the merge base. Verified against a pre-rebase
 baseline snapshot:
 
-| Metric | Before | After |
-| --- | ---: | ---: |
-| "Noodle Gallery" strings | 201 | 201 |
-| Fork-only key instances | 7011 | 7011 |
-| Locale files with any delta | — | 0 |
+| Metric                      | Before | After |
+| --------------------------- | -----: | ----: |
+| "Noodle Gallery" strings    |    201 |   201 |
+| Fork-only key instances     |   7011 |  7011 |
+| Locale files with any delta |      — |     0 |
 
 One genuine regression surfaced that a loss-only check would have missed — see
 "Inconsistencies Found".
@@ -208,17 +208,17 @@ CI-safe, and this is the **sixth** occurrence of "green on `main`, red on the ro
 #863 was authored against `origin/main`, whose generated Dart client and `RemoteAlbumNotifier`
 predate this branch's upstream batches. `dart analyze --fatal-infos` reported **9 errors**:
 
-| Symptom | Cause | Fix |
-| --- | --- | --- |
-| `UserAvatarColor.value` / `SyncRequestType.value` undefined (8 errors) | Generated OpenAPI enums are now real Dart `enum`s with a **private** `_value`; the old shape exposed a public `value` | Use the established `toJson()` accessor for the wire value |
-| `_StubRemoteAlbumNotifier.addAssets` invalid override (1 error) | Upstream #30201 widened `RemoteAlbumNotifier.addAssets` to `Future<({int added, int failed})>` | Return `(added: …, failed: 0)`; the stub's return value is not asserted |
+| Symptom                                                                | Cause                                                                                                                 | Fix                                                                     |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `UserAvatarColor.value` / `SyncRequestType.value` undefined (8 errors) | Generated OpenAPI enums are now real Dart `enum`s with a **private** `_value`; the old shape exposed a public `value` | Use the established `toJson()` accessor for the wire value              |
+| `_StubRemoteAlbumNotifier.addAssets` invalid override (1 error)        | Upstream #30201 widened `RemoteAlbumNotifier.addAssets` to `Future<({int added, int failed})>`                        | Return `(added: …, failed: 0)`; the stub's return value is not asserted |
 
 Fixed in `e0d9c1526df`.
 
 ## Inconsistencies Found
 
 **Weblate newly added the four location-disclosure keys to `i18n/bn.json`** (Bengali gained
-+1728 lines this sync) carrying a translation of *upstream's short* disclosure. This is the
++1728 lines this sync) carrying a translation of _upstream's short_ disclosure. This is the
 inverse of the usual flake: nothing was lost, so a loss-only comparison reported no
 regression — but the fork's app-store policy gate
 (`mobile/test/policy/location_disclosure_copy_test.dart`) requires every locale that carries
@@ -230,15 +230,15 @@ that already omit these keys. That shows a complete, accurate disclosure rather 
 Bengali one missing the legally-required privacy statements. A native Bengali translation can
 be added later alongside the other 54 localised disclosures.
 
-**Lesson for the next sync**: check both directions — fork keys *lost*, and unbranded upstream
-keys *gained*.
+**Lesson for the next sync**: check both directions — fork keys _lost_, and unbranded upstream
+keys _gained_.
 
 ## Pattern Propagation
 
-| Refactor | Old → New Pattern | Fork Files Affected | Decision | Commit / Follow-up |
-| --- | --- | --- | --- | --- |
-| Mobile test mock consolidation (#30201) | `test/domain/service.mock.dart` → `test/service.mocks.dart` | 2 | Bundled | batch 53 resolution |
-| Upstream "action migration" (#30201) | direct repository calls → unified `updateAll` with `Option<T>` params | fork space/album actions (#863) | Deferred | Not yet required; upstream's own migration is incomplete (`TODO(shenlong)` markers). Revisit when upstream removes the transitional methods |
+| Refactor                                | Old → New Pattern                                                     | Fork Files Affected             | Decision | Commit / Follow-up                                                                                                                          |
+| --------------------------------------- | --------------------------------------------------------------------- | ------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mobile test mock consolidation (#30201) | `test/domain/service.mock.dart` → `test/service.mocks.dart`           | 2                               | Bundled  | batch 53 resolution                                                                                                                         |
+| Upstream "action migration" (#30201)    | direct repository calls → unified `updateAll` with `Option<T>` params | fork space/album actions (#863) | Deferred | Not yet required; upstream's own migration is incomplete (`TODO(shenlong)` markers). Revisit when upstream removes the transitional methods |
 
 ## Database Migration Analysis
 
@@ -260,10 +260,10 @@ range. `make mobile-drift-rebase-check` OK on batches 52, 53 and 54.
 
 ## Version References Updated
 
-| File | Change |
-| --- | --- |
-| `branding/config.json` | `upstream.version` `3.0.3` → `3.1.0` (one-line; key order preserved) |
-| `README.md` | "Currently based on **Immich v3.1.0**" |
+| File                                                    | Change                                                                           |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `branding/config.json`                                  | `upstream.version` `3.0.3` → `3.1.0` (one-line; key order preserved)             |
+| `README.md`                                             | "Currently based on **Immich v3.1.0**"                                           |
 | `tools/upstream-preflight/src/branding-targets.spec.ts` | M8 gate re-pinned to `3.1.0`, comment updated to record the zero-migration delta |
 
 Marketing site (`apps/marketing/src/pages/index.astro` in the `platform` repo) is **not** yet
@@ -271,47 +271,47 @@ updated — it is a separate repo and a separate deploy.
 
 ## Fork Feature Verification
 
-| Feature | Status | Notes |
-| --- | --- | --- |
-| Shared Spaces | OK | #863 space-edit sheet reconciled and passing |
-| Storage Migration | OK | untouched |
-| Pet Detection | OK | untouched |
-| Image Editing | OK | untouched |
-| Branding | OK | i18n branding invariant verified 201/201 |
-| Google Photos Import | OK | untouched |
-| Mobile Drift sync | OK | drift check OK |
-| Dart client patches | OK | regeneration byte-identical |
+| Feature              | Status | Notes                                        |
+| -------------------- | ------ | -------------------------------------------- |
+| Shared Spaces        | OK     | #863 space-edit sheet reconciled and passing |
+| Storage Migration    | OK     | untouched                                    |
+| Pet Detection        | OK     | untouched                                    |
+| Image Editing        | OK     | untouched                                    |
+| Branding             | OK     | i18n branding invariant verified 201/201     |
+| Google Photos Import | OK     | untouched                                    |
+| Mobile Drift sync    | OK     | drift check OK                               |
+| Dart client patches  | OK     | regeneration byte-identical                  |
 
 ## CI and Infrastructure Verification
 
-| Check | Status | Notes |
-| --- | --- | --- |
-| Workflow files (no upstream collisions) | OK | `ci-invariants-check` passed on 52 and 54 |
-| Docker image references | OK | `gallery-release-image-names` passed |
-| Branding (no Immich leaks in CI) | OK | `no-push-o-matic` passed |
-| Fork CI modifications intact | OK | `apply-branding` step preserved in both mobile build jobs |
-| `mise.lock` / `mobile/mise.lock` integrity | OK | fork platform blocks retained (union merge) |
-| `@immich/ui` patch | OK | `fork-patches-check` passed |
+| Check                                      | Status | Notes                                                     |
+| ------------------------------------------ | ------ | --------------------------------------------------------- |
+| Workflow files (no upstream collisions)    | OK     | `ci-invariants-check` passed on 52 and 54                 |
+| Docker image references                    | OK     | `gallery-release-image-names` passed                      |
+| Branding (no Immich leaks in CI)           | OK     | `no-push-o-matic` passed                                  |
+| Fork CI modifications intact               | OK     | `apply-branding` step preserved in both mobile build jobs |
+| `mise.lock` / `mobile/mise.lock` integrity | OK     | fork platform blocks retained (union merge)               |
+| `@immich/ui` patch                         | OK     | `fork-patches-check` passed                               |
 
 ## Local CI Verification
 
-| Check | Status | Notes |
-| --- | --- | --- |
-| `server pnpm build` (+ postbuild migration sync) | PASS | |
-| `server pnpm check` (tsc) | PASS | |
-| `server pnpm lint` | PASS | `--max-warnings 0` |
-| Server unit tests | PASS | 5206 passed, 1 file skipped |
-| `web check:typescript` | PASS | |
-| `web check:svelte` | PASS | 571 files, 0 errors, 0 warnings |
-| web eslint (`tscompat` off) | PASS | 0 errors |
-| Web unit tests | PASS | 3952 passed |
-| e2e eslint + tsc | PASS | |
-| mobile `dart analyze --fatal-infos` | PASS | after the #863 reconcile |
-| mobile `dart format` (CI scope: `lib`, excl. generated) | PASS | 806 files, 0 changed |
-| mobile `flutter test` | PASS | 2974 passed |
-| Dart client regeneration | PASS | byte-identical; generator 7.24.0 |
-| `upstream-preflight` tooling tests | PASS | 235 passed |
-| `revert-to-immich` coverage detector | PASS | 0 missing vs `v3.1.0` |
+| Check                                                   | Status | Notes                            |
+| ------------------------------------------------------- | ------ | -------------------------------- |
+| `server pnpm build` (+ postbuild migration sync)        | PASS   |                                  |
+| `server pnpm check` (tsc)                               | PASS   |                                  |
+| `server pnpm lint`                                      | PASS   | `--max-warnings 0`               |
+| Server unit tests                                       | PASS   | 5206 passed, 1 file skipped      |
+| `web check:typescript`                                  | PASS   |                                  |
+| `web check:svelte`                                      | PASS   | 571 files, 0 errors, 0 warnings  |
+| web eslint (`tscompat` off)                             | PASS   | 0 errors                         |
+| Web unit tests                                          | PASS   | 3952 passed                      |
+| e2e eslint + tsc                                        | PASS   |                                  |
+| mobile `dart analyze --fatal-infos`                     | PASS   | after the #863 reconcile         |
+| mobile `dart format` (CI scope: `lib`, excl. generated) | PASS   | 806 files, 0 changed             |
+| mobile `flutter test`                                   | PASS   | 2974 passed                      |
+| Dart client regeneration                                | PASS   | byte-identical; generator 7.24.0 |
+| `upstream-preflight` tooling tests                      | PASS   | 235 passed                       |
+| `revert-to-immich` coverage detector                    | PASS   | 0 missing vs `v3.1.0`            |
 
 `make sql` was not run: no repository method changed, and the audit's Generated Artifact
 Review is clean. `make open-api` (TypeScript) was not needed: no controller/DTO changed.
@@ -328,18 +328,18 @@ files — not `test/`. Running the formatter over `lib test` reports ~30 changed
 - **Commit validated**: `1a5b874ae82` (everything below ran against this SHA; only this report
   section was appended afterwards)
 
-| Workflow | Status | Notes |
-| --- | --- | --- |
-| `test.yml` | GREEN | full 21-job suite |
-| `docker.yml` | GREEN | validates the Dockerfile + pnpm/lockfile and mise changes |
-| `static_analysis.yml` | GREEN | `dart analyze --fatal-infos`, `dart format`, generated-file freshness |
-| `gallery-build-mobile.yml` | GREEN | iOS + Android compile |
-| `gallery-mobile-smoke.yml` | GREEN | Android codegen/analyze smoke |
-| `gallery-ml-smoke.yml` | GREEN | |
-| `gallery-rebase-smoke.yml` | GREEN | |
-| `storage-migration-tests.yml` | GREEN | |
-| `storage-migration-e2e.yml` | GREEN | |
-| `gallery-revert-to-immich-validation.yml` | **RED** | upstream-blocked, not a code defect — see below |
+| Workflow                                  | Status  | Notes                                                                 |
+| ----------------------------------------- | ------- | --------------------------------------------------------------------- |
+| `test.yml`                                | GREEN   | full 21-job suite                                                     |
+| `docker.yml`                              | GREEN   | validates the Dockerfile + pnpm/lockfile and mise changes             |
+| `static_analysis.yml`                     | GREEN   | `dart analyze --fatal-infos`, `dart format`, generated-file freshness |
+| `gallery-build-mobile.yml`                | GREEN   | iOS + Android compile                                                 |
+| `gallery-mobile-smoke.yml`                | GREEN   | Android codegen/analyze smoke                                         |
+| `gallery-ml-smoke.yml`                    | GREEN   |                                                                       |
+| `gallery-rebase-smoke.yml`                | GREEN   |                                                                       |
+| `storage-migration-tests.yml`             | GREEN   |                                                                       |
+| `storage-migration-e2e.yml`               | GREEN   |                                                                       |
+| `gallery-revert-to-immich-validation.yml` | **RED** | upstream-blocked, not a code defect — see below                       |
 
 **9 / 10 green, first try, no flakes and no re-runs.**
 
@@ -391,17 +391,17 @@ No schema drift detected      <- Api worker
 
 ### Fork surface smoke (temp api_key, since removed)
 
-| Endpoint | Result |
-| --- | --- |
-| `GET /server/ml-health` | 200 `{"smartSearchHealthy":true}` |
-| `GET /shared-spaces` | 200 |
-| `GET /albums` | 200 |
-| `GET /people?withSharedSpaces=true` | 200 — 362 people |
-| `GET /gallery/map/markers` (fork-only) | 200 with markers |
-| `GET /timeline/buckets` | 200 |
-| `GET /search/suggestions?type=camera-make` | 200 |
-| `POST /search/smart "beach"` | 200 — 100 assets (CLIP + vector end-to-end) |
-| `GET /` (web) | 200, 9786 bytes |
+| Endpoint                                   | Result                                      |
+| ------------------------------------------ | ------------------------------------------- |
+| `GET /server/ml-health`                    | 200 `{"smartSearchHealthy":true}`           |
+| `GET /shared-spaces`                       | 200                                         |
+| `GET /albums`                              | 200                                         |
+| `GET /people?withSharedSpaces=true`        | 200 — 362 people                            |
+| `GET /gallery/map/markers` (fork-only)     | 200 with markers                            |
+| `GET /timeline/buckets`                    | 200                                         |
+| `GET /search/suggestions?type=camera-make` | 200                                         |
+| `POST /search/smart "beach"`               | 200 — 100 assets (CLIP + vector end-to-end) |
+| `GET /` (web)                              | 200, 9786 bytes                             |
 
 Server self-reports `v5.2.2` (git describe nearest tag) — expected for an RC, not a bad build.
 
