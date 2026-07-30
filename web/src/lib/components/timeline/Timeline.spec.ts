@@ -511,3 +511,57 @@ describe('Timeline scroll-space scaling', () => {
     );
   });
 });
+
+describe('Timeline top section stacking', () => {
+  beforeEach(() => {
+    testState.grouping = 'day';
+    testState.assetCount = 1;
+    testState.viewportHeight = 600;
+    testState.viewportWidth = 390;
+    testState.domHeight = 296;
+    testState.renderOffset = 0;
+    testState.months = [];
+  });
+
+  // The top section and every month layer are transform-positioned siblings, so each one is its own
+  // stacking context with `z-index: auto` — painting order then falls back to DOM order and the month
+  // layers cover whatever the top section overflows downwards. Header overlays that hang below the
+  // section (the person page's name-suggestion dropdown, #878) were painted under the day-title row
+  // and swallowed its clicks. A `z-index` on the top section is the only lift that works: an overlay's
+  // own z-index is trapped inside this section's stacking context.
+  it('paints the top section above the month layers so overflowing header overlays stay clickable', () => {
+    testState.months = [
+      {
+        viewId: 'month:2015-01',
+        isInOrNearViewport: false,
+        isLoaded: false,
+        top: 0,
+        height: 240,
+        title: 'Jan 2015',
+      },
+    ];
+
+    const { getByTestId } = renderTimeline();
+
+    expect(Number(getByTestId('timeline-top-section').style.zIndex)).toBeGreaterThan(0);
+  });
+
+  it('leaves the month layers at the default stacking level', () => {
+    // The lift above only holds while months stay at `z-index: auto`. If a month layer ever gains its
+    // own z-index, the top section's has to be re-derived against it rather than silently losing.
+    testState.months = [
+      {
+        viewId: 'month:2015-01',
+        isInOrNearViewport: false,
+        isLoaded: false,
+        top: 0,
+        height: 240,
+        title: 'Jan 2015',
+      },
+    ];
+
+    const { getByTestId } = renderTimeline();
+
+    expect(getByTestId('timeline-month-skeleton').style.zIndex).toBe('');
+  });
+});
