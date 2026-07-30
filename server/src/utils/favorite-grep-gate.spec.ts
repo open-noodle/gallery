@@ -89,7 +89,7 @@ describe('favorite grep gate (#763)', () => {
     const offenders: string[] = [];
 
     for (const absPath of collectTsFiles(SRC_DIR)) {
-      const relPath = relative(SERVER_ROOT, absPath).split('\\').join('/');
+      const relPath = relative(SERVER_ROOT, absPath).replaceAll('\\', '/');
       if (isExcluded(relPath)) {
         continue;
       }
