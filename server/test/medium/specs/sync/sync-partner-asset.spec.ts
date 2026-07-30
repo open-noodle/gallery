@@ -411,8 +411,7 @@ describe(SyncRequestType.PartnerAssetsV2, () => {
     const response = await ctx.syncStream(auth, [SyncRequestType.PartnerAssetsV2]);
     const backfillEvents = response.filter((r: { type: string }) => r.type === SyncEntityType.PartnerAssetBackfillV2);
     const backfillRow = backfillEvents.find((r: { data: { id: string } }) => r.data.id === backfillAsset.id) as
-      | { data: { id: string; isFavorite: boolean } }
-      | undefined;
+      { data: { id: string; isFavorite: boolean } } | undefined;
     expect(backfillRow?.data.isFavorite).toBe(true);
   });
 });

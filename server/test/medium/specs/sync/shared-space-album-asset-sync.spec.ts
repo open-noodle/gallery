@@ -105,10 +105,7 @@ describe('SharedSpaceAlbumAssetSync.getBackfill', () => {
     await ctx.get(AssetFavoriteRepository).addAll(member.id, [asset.id]);
 
     const stream = sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id, member.id);
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     expect(result.find((r: any) => r.id === asset.id)?.isFavorite).toBe(true);
   });
 });
@@ -202,10 +199,7 @@ describe('SharedSpaceAlbumAssetSync.getCreates', () => {
     await ctx.get(AssetFavoriteRepository).addAll(member.id, [asset.id]);
 
     const stream = sut.getCreates({ nowId: NOW_ID, userId: member.id });
-    const result: any[] = [];
-    for await (const row of stream) {
-      result.push(row);
-    }
+    const result: any[] = await Array.fromAsync(stream);
     const row = result.find((r: any) => r.id === asset.id);
     expect(row?.isFavorite).toBe(true);
   });
