@@ -2059,6 +2059,53 @@ describe(FaceIdentityRepository.name, () => {
     }
   });
 
+  // The requested-profile preference is a ranking tiebreak layered on top of the membership gate, and
+  // must not become a way to address a profile the caller has no membership for. Deep-linking the Zoe
+  // profile as a member of the Amy space only must resolve to nothing at all — not to the Amy profile
+  // wearing the requested id, and not to Zoe.
+  it('does not resolve a requested space profile the caller is not a member of', async () => {
+    const { ctx, sut } = setup();
+    const { owner, viewer, amySpace, zoeSpace } = await seedIdentityInTwoSpaces(ctx, sut);
+    const { user: amyOnlyMember } = await ctx.newUser();
+    const { user: outsider } = await ctx.newUser();
+
+    try {
+      await ctx.newSharedSpaceMember({
+        spaceId: amySpace.space.id,
+        userId: amyOnlyMember.id,
+        role: SharedSpaceRole.Editor,
+      });
+
+      const requestedForeignProfile = await sut.getAccessiblePersonByProfileId(
+        amyOnlyMember.id,
+        zoeSpace.spacePerson.id,
+      );
+      expect(requestedForeignProfile).toBeUndefined();
+
+      // Not vacuous: the same caller resolves the profile they DO have a membership for, and that
+      // answer carries nothing from the space they are not in.
+      const requestedOwnProfile = await sut.getAccessiblePersonByProfileId(amyOnlyMember.id, amySpace.spacePerson.id);
+      expect(requestedOwnProfile).toEqual(
+        expect.objectContaining({
+          id: amySpace.spacePerson.id,
+          primaryProfile: { type: 'space-person', id: amySpace.spacePerson.id, spaceId: amySpace.space.id },
+        }),
+      );
+      const serialized = JSON.stringify(requestedOwnProfile);
+      expect(serialized).not.toContain(zoeSpace.spacePerson.id);
+      expect(serialized).not.toContain(zoeSpace.space.id);
+
+      // A user with no membership at all resolves neither profile.
+      await expect(sut.getAccessiblePersonByProfileId(outsider.id, amySpace.spacePerson.id)).resolves.toBeUndefined();
+      await expect(sut.getAccessiblePersonByProfileId(outsider.id, zoeSpace.spacePerson.id)).resolves.toBeUndefined();
+    } finally {
+      await ctx.database
+        .deleteFrom('user')
+        .where('id', 'in', [owner.id, viewer.id, amyOnlyMember.id, outsider.id])
+        .execute();
+    }
+  });
+
   it('prefers the owner birthday over a more-recent space birthday', async () => {
     const { ctx, sut } = setup();
     const { user } = await ctx.newUser();

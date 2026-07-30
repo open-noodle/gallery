@@ -512,20 +512,31 @@ const drainReassignFaceMatchJobs = async (sharedSpaceService: SharedSpaceService
 
 // Both faces live on assets owned by the space owner, so the actor never owns the asset or the
 // face: reassign has to resolve through the space's Editor grant to succeed.
-const setupSpaceReassignFixture = async (actorRole: SharedSpaceRole) => {
+//
+// `actorRole: 'non-member'` leaves the actor out of shared_space_member entirely, and
+// `misassignedInSpace: false` keeps the misassigned face's asset out of the space (so the target
+// person is editable but the face's asset is not reachable) — the two denial shapes the #765
+// authorization matrix needs beyond the role axis. `actorIsAdmin` proves admin is not a bypass.
+const setupSpaceReassignFixture = async (
+  actorRole: SharedSpaceRole | 'non-member',
+  options: { misassignedInSpace?: boolean; actorIsAdmin?: boolean } = {},
+) => {
+  const misassignedInSpace = options.misassignedInSpace ?? true;
   const { ctx, sut, faceIdentityRepository } = setup();
   const { sut: sharedSpaceService } = setupSharedSpace();
   const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
   const { user: owner } = await ctx.newUser();
-  const { user: actor } = await ctx.newUser();
+  const { user: actor } = await ctx.newUser({ isAdmin: options.actorIsAdmin ?? false });
   const { space } = await ctx.newSharedSpace({ createdById: owner.id });
   await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
-  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: actor.id, role: actorRole });
+  if (actorRole !== 'non-member') {
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: actor.id, role: actorRole });
+  }
 
   const wrong = await createIdentityBackedFace(ctx, faceIdentityRepository, {
     ownerId: owner.id,
     personName: 'Wrong Match',
-    spaceId: space.id,
+    spaceId: misassignedInSpace ? space.id : undefined,
   });
   const correct = await createIdentityBackedFace(ctx, faceIdentityRepository, {
     ownerId: owner.id,
@@ -533,12 +544,68 @@ const setupSpaceReassignFixture = async (actorRole: SharedSpaceRole) => {
     spaceId: space.id,
   });
 
-  await sharedSpaceService.handleSharedSpaceFaceMatch({ spaceId: space.id, assetId: wrong.asset.id });
+  if (misassignedInSpace) {
+    await sharedSpaceService.handleSharedSpaceFaceMatch({ spaceId: space.id, assetId: wrong.asset.id });
+  }
   await sharedSpaceService.handleSharedSpaceFaceMatch({ spaceId: space.id, assetId: correct.asset.id });
   jobs.queue.mockClear();
 
   return { ctx, sut, sharedSpaceService, jobs, owner, actor, space, wrong, correct };
 };
+
+// The two gates (#765) are evaluated independently, so they can resolve through DIFFERENT spaces.
+// This fixture separates them: the target person is only reachable through `targetSpace`, the
+// misassigned face's asset only through `faceSpace`, and each is owned by a different user. The actor
+// is always an Editor of `targetSpace`; `actorEditsFaceSpace` decides whether they are also an Editor
+// of `faceSpace`.
+const setupCrossSpaceReassignFixture = async (options: { actorEditsFaceSpace: boolean }) => {
+  const { ctx, sut, faceIdentityRepository } = setup();
+  const { sut: sharedSpaceService } = setupSharedSpace();
+  const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const { user: targetOwner } = await ctx.newUser();
+  const { user: faceOwner } = await ctx.newUser();
+  const { user: actor } = await ctx.newUser();
+
+  const { space: targetSpace } = await ctx.newSharedSpace({ createdById: targetOwner.id, name: 'Target Space' });
+  await ctx.newSharedSpaceMember({ spaceId: targetSpace.id, userId: targetOwner.id, role: SharedSpaceRole.Owner });
+  await ctx.newSharedSpaceMember({ spaceId: targetSpace.id, userId: actor.id, role: SharedSpaceRole.Editor });
+
+  const { space: faceSpace } = await ctx.newSharedSpace({ createdById: faceOwner.id, name: 'Face Space' });
+  await ctx.newSharedSpaceMember({ spaceId: faceSpace.id, userId: faceOwner.id, role: SharedSpaceRole.Owner });
+  if (options.actorEditsFaceSpace) {
+    await ctx.newSharedSpaceMember({ spaceId: faceSpace.id, userId: actor.id, role: SharedSpaceRole.Editor });
+  }
+
+  const correct = await createIdentityBackedFace(ctx, faceIdentityRepository, {
+    ownerId: targetOwner.id,
+    personName: 'Cross Space Correct Match',
+    spaceId: targetSpace.id,
+  });
+  const wrong = await createIdentityBackedFace(ctx, faceIdentityRepository, {
+    ownerId: faceOwner.id,
+    personName: 'Cross Space Wrong Match',
+    spaceId: faceSpace.id,
+  });
+
+  await sharedSpaceService.handleSharedSpaceFaceMatch({ spaceId: targetSpace.id, assetId: correct.asset.id });
+  await sharedSpaceService.handleSharedSpaceFaceMatch({ spaceId: faceSpace.id, assetId: wrong.asset.id });
+  jobs.queue.mockClear();
+
+  return { ctx, sut, sharedSpaceService, jobs, actor, targetOwner, faceOwner, targetSpace, faceSpace, wrong, correct };
+};
+
+/** The bulk reassign body for one misassigned face, addressed the way the client does: (source person, asset). */
+const bulkFor = (assetId: string, sourcePersonId: string) => ({
+  data: [{ personId: sourcePersonId, assetId }],
+});
+
+const facePersonIdFor = (ctx: ReturnType<typeof setup>['ctx'], assetFaceId: string) =>
+  ctx.database
+    .selectFrom('asset_face')
+    .select('personId')
+    .where('id', '=', assetFaceId)
+    .executeTakeFirstOrThrow()
+    .then((row) => row.personId);
 
 describe('People identity RBAC projection', () => {
   it('returns one row per accessible identity for a member of multiple spaces', async () => {
@@ -4092,6 +4159,208 @@ describe('People identity RBAC projection', () => {
         .execute();
       expect(projected).toEqual([]);
       expect(jobs.queue.mock.calls.map(([job]) => job.name)).not.toContain(JobName.SharedSpaceFaceMatch);
+    });
+
+    // #765 replaced two owner-only upstream gates with fork helpers, against the REAL access
+    // repository here (so the role predicates in checkSharedSpaceEditAccess / checkSpaceEditAccess are
+    // actually exercised, not mocked):
+    //   Permission.PersonUpdate -> requireReassignTargetAccess (owner, else space Owner/Editor)
+    //   Permission.PersonCreate -> requireReassignFaceAccess   (face owner, else Permission.AssetUpdate)
+    // Both gates are supersets of what they replaced; the claim under test is that the ONLY principals
+    // they add are Owners/Editors of a space the person/asset is reachable through. Every allow row
+    // uses an actor who owns neither the target person nor the misassigned face's asset, so nothing
+    // can pass through the owner fast path.
+    describe('authorization matrix', () => {
+      it.each([SharedSpaceRole.Owner, SharedSpaceRole.Editor])(
+        'reassignFacesById: a space %s may reassign a face on another member’s asset',
+        async (actorRole) => {
+          const fx = await setupSpaceReassignFixture(actorRole);
+
+          await expect(
+            fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.id, { id: fx.wrong.faceId }),
+          ).resolves.toEqual(expect.objectContaining({ id: fx.correct.person.id }));
+
+          await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.correct.person.id);
+        },
+      );
+
+      it.each([SharedSpaceRole.Owner, SharedSpaceRole.Editor])(
+        'reassignFaces: a space %s may reassign a face on another member’s asset',
+        async (actorRole) => {
+          const fx = await setupSpaceReassignFixture(actorRole);
+
+          await expect(
+            fx.sut.reassignFaces(
+              authFor(fx.actor),
+              fx.correct.person.id,
+              bulkFor(fx.wrong.asset.id, fx.wrong.person.id),
+            ),
+          ).resolves.toEqual([expect.objectContaining({ id: fx.correct.person.id })]);
+
+          await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.correct.person.id);
+        },
+      );
+
+      // Viewer holds PersonRead on the target and AssetView on the asset, so both gates have to reject
+      // on the role predicate alone. A non-member holds neither. Asserting the message pins WHICH gate
+      // refused — a Viewer must be stopped at the target gate, before the face is even resolved.
+      it.each([SharedSpaceRole.Viewer, 'non-member' as const])(
+        'reassignFacesById: a space %s may not reassign, and nothing moves',
+        async (actorRole) => {
+          const fx = await setupSpaceReassignFixture(actorRole);
+
+          await expect(
+            fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.id, { id: fx.wrong.faceId }),
+          ).rejects.toThrow('Not found or no person.update access');
+
+          await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.id);
+          const projected = await spacePersonFacesFor(fx.ctx, { spaceId: fx.space.id, assetFaceId: fx.wrong.faceId });
+          expect(projected).toEqual([expect.objectContaining({ identityId: fx.wrong.identity.id })]);
+        },
+      );
+
+      it.each([SharedSpaceRole.Viewer, 'non-member' as const])(
+        'reassignFaces: a space %s may not reassign, and nothing moves',
+        async (actorRole) => {
+          const fx = await setupSpaceReassignFixture(actorRole);
+
+          await expect(
+            fx.sut.reassignFaces(
+              authFor(fx.actor),
+              fx.correct.person.id,
+              bulkFor(fx.wrong.asset.id, fx.wrong.person.id),
+            ),
+          ).rejects.toThrow('Not found or no person.update access');
+
+          await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.id);
+          const projected = await spacePersonFacesFor(fx.ctx, { spaceId: fx.space.id, assetFaceId: fx.wrong.faceId });
+          expect(projected).toEqual([expect.objectContaining({ identityId: fx.wrong.identity.id })]);
+        },
+      );
+
+      // Mirrors 'does not use admin status to bypass shared-space timeline membership' above: neither
+      // new gate consults auth.user.isAdmin, and no access-repository predicate special-cases admins.
+      it('does not let an admin non-member reassign', async () => {
+        const fx = await setupSpaceReassignFixture('non-member', { actorIsAdmin: true });
+
+        expect(fx.actor.isAdmin).toBe(true);
+        await expect(
+          fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.id, { id: fx.wrong.faceId }),
+        ).rejects.toThrow('Not found or no person.update access');
+        await expect(
+          fx.sut.reassignFaces(authFor(fx.actor), fx.correct.person.id, bulkFor(fx.wrong.asset.id, fx.wrong.person.id)),
+        ).rejects.toThrow('Not found or no person.update access');
+
+        await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.id);
+      });
+
+      // The Editor grant on the target person must not carry over to the face: the misassigned asset is
+      // in no space at all here, so only its owner may touch its faces. The 'asset.update' message
+      // proves the target gate passed and the FACE gate did the refusing.
+      it('refuses a space Editor a face whose asset they cannot access', async () => {
+        const fx = await setupSpaceReassignFixture(SharedSpaceRole.Editor, { misassignedInSpace: false });
+
+        await expect(
+          fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.id, { id: fx.wrong.faceId }),
+        ).rejects.toThrow('Not found or no asset.update access');
+        await expect(
+          fx.sut.reassignFaces(authFor(fx.actor), fx.correct.person.id, bulkFor(fx.wrong.asset.id, fx.wrong.person.id)),
+        ).rejects.toThrow('Not found or no asset.update access');
+
+        await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.id);
+      });
+
+      it('refuses a face in a different space the actor is not a member of', async () => {
+        const fx = await setupCrossSpaceReassignFixture({ actorEditsFaceSpace: false });
+
+        await expect(
+          fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.id, { id: fx.wrong.faceId }),
+        ).rejects.toThrow('Not found or no asset.update access');
+        await expect(
+          fx.sut.reassignFaces(authFor(fx.actor), fx.correct.person.id, bulkFor(fx.wrong.asset.id, fx.wrong.person.id)),
+        ).rejects.toThrow('Not found or no asset.update access');
+
+        await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.id);
+        const projected = await spacePersonFacesFor(fx.ctx, {
+          spaceId: fx.faceSpace.id,
+          assetFaceId: fx.wrong.faceId,
+        });
+        expect(projected).toEqual([expect.objectContaining({ identityId: fx.wrong.identity.id })]);
+      });
+
+      // Characterisation of a documented consequence of evaluating the two gates independently, NOT an
+      // endorsement: nothing requires them to resolve through the SAME space. An Editor of two spaces
+      // can therefore move a face from space B onto a person they only reach through space A. Both
+      // halves stay inside a grant the actor already holds (Editor of B for the asset, Editor of A for
+      // the person), so it is not a role escalation — but the web picker's same-space scoping is a
+      // client-side convention, not a server invariant. This test exists so that becoming a server
+      // invariant is a deliberate, visible change rather than a silent one.
+      it('composes the two gates across two different spaces the actor edits', async () => {
+        const fx = await setupCrossSpaceReassignFixture({ actorEditsFaceSpace: true });
+
+        await expect(
+          fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.id, { id: fx.wrong.faceId }),
+        ).resolves.toEqual(expect.objectContaining({ id: fx.correct.person.id }));
+
+        await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.correct.person.id);
+      });
+
+      // The owner fast path, on the bulk entry point (the by-id one is covered by 'reassigns a face on
+      // an asset in no space...' above): no space involvement at all, so this is the exact principal
+      // the removed owner-only gates admitted, and it must keep working.
+      it('reassignFaces: an owner may reassign their own face onto their own person', async () => {
+        const { ctx, sut, faceIdentityRepository } = setup();
+        const { user: owner } = await ctx.newUser();
+        const wrong = await createIdentityBackedFace(ctx, faceIdentityRepository, {
+          ownerId: owner.id,
+          personName: 'Owner Bulk Wrong Match',
+        });
+        const correct = await createIdentityBackedFace(ctx, faceIdentityRepository, {
+          ownerId: owner.id,
+          personName: 'Owner Bulk Correct Match',
+        });
+
+        await expect(
+          sut.reassignFaces(authFor(owner), correct.person.id, {
+            data: [{ personId: wrong.person.id, assetId: wrong.asset.id }],
+          }),
+        ).resolves.toEqual([expect.objectContaining({ id: correct.person.id })]);
+
+        await expect(facePersonIdFor(ctx, wrong.faceId)).resolves.toBe(correct.person.id);
+      });
+
+      // The deep-link resolution the branch added (hydrateAccessiblePeople's preferProfileId) is what
+      // decides which space a person page's writes — including this reassign — target, so it has to be
+      // membership-gated too. Profile-ranking specifics live in
+      // test/medium/specs/repositories/face-identity.repository.spec.ts; this pins the service edge.
+      it('resolves a deep-linked space profile for a member and refuses a non-member', async () => {
+        const fx = await createLinkedLibraryIdentityFixture({ personName: 'Deep Link Source' });
+
+        await expect(fx.personService.getById(authFor(fx.member), fx.spacePerson.id)).resolves.toEqual(
+          expect.objectContaining({
+            id: fx.spacePerson.id,
+            primaryProfile: { type: 'space-person', id: fx.spacePerson.id, spaceId: fx.space.id },
+          }),
+        );
+
+        await expect(fx.personService.getById(authFor(fx.nonMember), fx.spacePerson.id)).rejects.toThrow(
+          'Not found or no person.read access',
+        );
+      });
+
+      // A stranger with no relationship to either the person or the asset — the baseline the owner-only
+      // gates enforced for everyone. Kept separate from the Viewer/non-member rows because a space with
+      // an Editor already exists here, so the denial cannot come from there being no grant to find.
+      it('refuses an unrelated user with no space in common', async () => {
+        const fx = await setupSpaceReassignFixture(SharedSpaceRole.Editor);
+        const { user: stranger } = await fx.ctx.newUser();
+
+        await expect(
+          fx.sut.reassignFacesById(authFor(stranger), fx.correct.person.id, { id: fx.wrong.faceId }),
+        ).rejects.toThrow('Not found or no person.update access');
+
+        await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.id);
+      });
     });
   });
 });
