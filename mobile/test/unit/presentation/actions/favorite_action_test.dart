@@ -64,7 +64,7 @@ void main() {
     });
 
     // #763 (E32): the direction must derive from the SAME candidate set the action mutates.
-    // Before the fix, `shouldFavorite` was computed over the raw (unfiltered) selection while the
+    // Before the fix, the direction flag was computed over the raw (unfiltered) selection while the
     // mutation set was owner-filtered — a non-owned asset could flip the direction while being
     // excluded from the mutation, leaving an empty mutation set sent to the service.
     testWidgets('E32: mixed ownership keeps direction and mutation set coherent', (tester) async {
@@ -72,8 +72,8 @@ void main() {
       final theirsUnfavorited = notOwned();
 
       final action = FavoriteAction(assets: [mineFavorited, theirsUnfavorited]);
-      // Direction: theirsUnfavorited is not favorited yet -> shouldFavorite.
-      expect(action.shouldFavorite, isTrue);
+      // Direction: theirsUnfavorited is not favorited yet -> favorite.
+      expect(action.favorite, isTrue);
 
       await tester.pumpTestAction(context, action);
 
