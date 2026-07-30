@@ -699,6 +699,16 @@ jobs:
         run: mise //:open-api
         working-directory: open-api
 
+      # The generated Dart client only exists in this job (a plain ubuntu-latest
+      # runner with no mise/Java/Flutter runs `dart-nullable-array-items.spec.ts`
+      # everywhere else, so its `skipIf(!DART_MODEL_DIR)` guard would silently skip
+      # forever there). Run it here, right after generation, so issue #743's
+      # nullable-array-items invariant is actually exercised in CI.
+      - name: Install upstream-preflight dependencies
+        run: pnpm --filter @gallery/upstream-preflight install --frozen-lockfile
+      - name: Run dart nullable array items regression test
+        run: pnpm --filter @gallery/upstream-preflight test dart-nullable-array-items.spec.ts
+
       - name: Find file changes
         uses: tj-actions/verify-changed-files@a1c6acee9df209257a246f2cc6ae8cb6581c1edf # v20.0.4
         id: verify-changed-files
