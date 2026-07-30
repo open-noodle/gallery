@@ -430,6 +430,10 @@ export const columns = {
     'asset.height',
     'asset.isEdited',
   ],
+  // #763: isFavorite is intentionally NOT listed here — the search/city repository methods that
+  // use this list project it separately via favoriteExistsFor(eb, options.authUserId), the
+  // per-user asset_favorite overlay resolved for the CALLER, instead of the raw asset column
+  // (which was dropped in slice 3). Same pattern as syncAsset / workflowAssetV1 below.
   searchAsset: [
     'asset.id',
     'asset.updateId',
@@ -444,7 +448,6 @@ export const columns = {
     'asset.fileCreatedAt',
     'asset.fileModifiedAt',
     'asset.isExternal',
-    'asset.isFavorite',
     'asset.isOffline',
     'asset.isEdited',
     'asset.visibility',

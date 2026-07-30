@@ -213,6 +213,12 @@ export interface AssetSearchBuilderV3Options {
   filter?: SearchFilter;
   /** Server-derived ownership scope. Never client-controlled. */
   userIds?: string[];
+  /**
+   * #763: the CALLER's id, used to resolve `filter.isFavorite` against the per-user
+   * `asset_favorite` overlay (the raw `asset.isFavorite` column is gone). Mirrors
+   * `AssetSearchBuilderOptions.authUserId` on the legacy path. Never client-controlled.
+   */
+  authUserId?: string;
   withExif?: boolean;
   withFaces?: boolean;
   withPeople?: boolean;
