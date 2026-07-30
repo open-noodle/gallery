@@ -42,17 +42,17 @@ jobs:
           flutter-version-file: ./mobile/pubspec.yaml
           cache: true
 
+      - name: Setup Mise
+        uses: immich-app/devtools/actions/use-mise@3bca63ca3c15020293b36b51737a3ee2c773340b # use-mise-action-v3.1.0
+        with:
+          github_token: ${{ github.token }}
+          working_directory: ./mobile
+
       - name: Get Packages
-        working-directory: ./mobile
-        run: flutter pub get
+        run: mise //mobile:install:ci
 
-      - name: Generate translation file
-        working-directory: ./mobile
-        run: dart run easy_localization:generate -S ../i18n && dart run bin/generate_keys.dart
-
-      - name: Generate platform APIs
-        working-directory: ./mobile
-        run: make pigeon
+      - name: Perform codegen
+        run: mise //mobile:codegen
 
       - name: Run 100k scale test
         working-directory: ./mobile
