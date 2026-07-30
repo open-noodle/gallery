@@ -94,6 +94,12 @@ class AssetApiRepository extends ApiRepository {
     await _api.removeAssetEdits(assetId);
   }
 
+  // #763: DO NOT pass `isFavorite` here. This posts an AssetBulkUpdateDto to the OWNER-ONLY
+  // `PUT /assets`, but favorites are now a per-user overlay (`asset_favorite`) that a read-only
+  // space Viewer may set on another member's asset — use `updateFavorite` below, which routes to
+  // `PUT /assets/favorites` (and handles the pre-5.2.0 server fallback). The parameter survives
+  // only because it is the upstream Immich shape; nothing passes it, and
+  // test/policy/favorite_overlay_policy_test.dart fails if anything starts to.
   Future<void> update(
     List<String> remoteIds, {
     Option<bool> isFavorite = const .none(),
