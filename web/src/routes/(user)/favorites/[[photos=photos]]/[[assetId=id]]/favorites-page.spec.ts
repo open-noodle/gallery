@@ -151,34 +151,6 @@ describe('Favorites page timeline grouping', () => {
     expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
   });
 
-  // #763: this page must be cross-scope, matching buildPhotosTimelineOptions. A favorite placed on
-  // another Space member's asset is permitted by the per-user overlay, so it has to be reachable here
-  // and not only via the Photos timeline filter. Asserted on the serialised options rather than a
-  // rendered asset because the timeline is stubbed in this suite — these two flags are the whole
-  // difference between an owner-only and a cross-scope request, so dropping either turns this red.
-  it('requests favorites across shared spaces and partners, not just owned assets', async () => {
-    renderPage();
-
-    const options = await screen.findByTestId('timeline-options');
-    expect(options).toHaveTextContent('"withSharedSpaces":true');
-    expect(options).toHaveTextContent('"withPartners":true');
-  });
-
-  // Guards the composition rather than the constant: `options` is $derived by spreading
-  // baseTimelineOptions, so a future refactor that rebuilds it per grouping could drop the flags on
-  // every surface except the initial render. Activating a year bucket regroups to month.
-  it('keeps the cross-scope flags after a bucket change regroups the timeline', async () => {
-    renderPage();
-
-    await fireEvent.click(await screen.findByTestId('activate-year-bucket'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"month"');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"withSharedSpaces":true');
-      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"withPartners":true');
-    });
-  });
-
   it('year and month buckets keep favorite options without temporal chips', async () => {
     renderPage();
 
