@@ -25,6 +25,7 @@ enum SyncRequestType {
   assetEditsV1._(r'AssetEditsV1'),
   assetMetadataV1._(r'AssetMetadataV1'),
   assetOcrV1._(r'AssetOcrV1'),
+  assetFavoritesV1._(r'AssetFavoritesV1'),
   authUsersV1._(r'AuthUsersV1'),
   memoriesV1._(r'MemoriesV1'),
   memoryToAssetsV1._(r'MemoryToAssetsV1'),
@@ -127,6 +128,7 @@ class SyncRequestTypeTypeTransformer {
         case r'AssetEditsV1': return SyncRequestType.assetEditsV1;
         case r'AssetMetadataV1': return SyncRequestType.assetMetadataV1;
         case r'AssetOcrV1': return SyncRequestType.assetOcrV1;
+        case r'AssetFavoritesV1': return SyncRequestType.assetFavoritesV1;
         case r'AuthUsersV1': return SyncRequestType.authUsersV1;
         case r'MemoriesV1': return SyncRequestType.memoriesV1;
         case r'MemoryToAssetsV1': return SyncRequestType.memoryToAssetsV1;
