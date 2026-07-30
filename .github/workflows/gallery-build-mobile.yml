@@ -116,6 +116,12 @@ jobs:
         with:
           version: ${{ inputs.version }}
 
+      - name: Setup Mise
+        uses: immich-app/devtools/actions/use-mise@3bca63ca3c15020293b36b51737a3ee2c773340b # use-mise-action-v3.1.0
+        with:
+          github_token: ${{ github.token }}
+          working_directory: ./mobile
+
       - name: Create the Keystore
         env:
           KEY_JKS: ${{ secrets.KEY_JKS }}
@@ -168,26 +174,10 @@ jobs:
         run: flutter clean
 
       - name: Get Packages
-        working-directory: ./mobile
-        run: flutter pub get
+        run: mise //mobile:install:ci
 
-      - name: Generate translation file
-        run: dart run easy_localization:generate -S ../i18n && dart run bin/generate_keys.dart
-        working-directory: ./mobile
-
-      - name: Generate platform APIs
-        working-directory: ./mobile
-        run: |
-          dart run pigeon --input pigeon/native_sync_api.dart
-          dart run pigeon --input pigeon/local_image_api.dart
-          dart run pigeon --input pigeon/remote_image_api.dart
-          dart run pigeon --input pigeon/background_worker_api.dart
-          dart run pigeon --input pigeon/background_worker_lock_api.dart
-          dart run pigeon --input pigeon/connectivity_api.dart
-          dart run pigeon --input pigeon/network_api.dart
-          dart run pigeon --input pigeon/permission_api.dart
-          dart run pigeon --input pigeon/view_intent_api.dart
-          dart format lib/platform/native_sync_api.g.dart lib/platform/local_image_api.g.dart lib/platform/remote_image_api.g.dart lib/platform/background_worker_api.g.dart lib/platform/background_worker_lock_api.g.dart lib/platform/connectivity_api.g.dart lib/platform/network_api.g.dart lib/platform/permission_api.g.dart lib/platform/view_intent_api.g.dart
+      - name: Perform codegen
+        run: mise //mobile:codegen
 
       - name: Compute build metadata
         id: build-meta
@@ -367,6 +357,12 @@ jobs:
         with:
           version: ${{ inputs.version }}
 
+      - name: Setup Mise
+        uses: immich-app/devtools/actions/use-mise@3bca63ca3c15020293b36b51737a3ee2c773340b # use-mise-action-v3.1.0
+        with:
+          github_token: ${{ github.token }}
+          working_directory: ./mobile
+
       - name: Setup Flutter SDK
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -384,26 +380,10 @@ jobs:
         run: flutter config --no-enable-swift-package-manager
 
       - name: Install Flutter dependencies
-        working-directory: ./mobile
-        run: flutter pub get
+        run: mise //mobile:install:ci
 
-      - name: Generate translation files
-        run: dart run easy_localization:generate -S ../i18n && dart run bin/generate_keys.dart
-        working-directory: ./mobile
-
-      - name: Generate platform APIs
-        working-directory: ./mobile
-        run: |
-          dart run pigeon --input pigeon/native_sync_api.dart
-          dart run pigeon --input pigeon/local_image_api.dart
-          dart run pigeon --input pigeon/remote_image_api.dart
-          dart run pigeon --input pigeon/background_worker_api.dart
-          dart run pigeon --input pigeon/background_worker_lock_api.dart
-          dart run pigeon --input pigeon/connectivity_api.dart
-          dart run pigeon --input pigeon/network_api.dart
-          dart run pigeon --input pigeon/permission_api.dart
-          dart run pigeon --input pigeon/view_intent_api.dart
-          dart format lib/platform/native_sync_api.g.dart lib/platform/local_image_api.g.dart lib/platform/remote_image_api.g.dart lib/platform/background_worker_api.g.dart lib/platform/background_worker_lock_api.g.dart lib/platform/connectivity_api.g.dart lib/platform/network_api.g.dart lib/platform/permission_api.g.dart lib/platform/view_intent_api.g.dart
+      - name: Perform codegen
+        run: mise //mobile:codegen
 
       - name: Setup Ruby
         uses: ruby/setup-ruby@c515ec17f69368147deb311832da000dd229d338 # v1.297.0
