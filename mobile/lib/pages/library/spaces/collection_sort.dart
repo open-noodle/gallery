@@ -67,7 +67,7 @@ List<SpaceAlbum> filterAndSortSpaceAlbums(
 }
 
 // Optional-safe readers for SharedSpaceResponseDto. Verified against the
-// generated `openapi` client (mobile/openapi/lib/model/shared_space_response_dto.dart
+// generated `openapi` client (mobile/generated/openapi/lib/model/shared_space_response_dto.dart
 // + optional.dart): `memberCount`/`assetCount`/`lastActivityAt` are
 // `Optional<T?>` with `isPresent`/`value` accessors; `.value` throws
 // (`StateError`) when absent, so every read below guards with `isPresent`
