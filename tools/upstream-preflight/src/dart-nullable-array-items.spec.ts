@@ -22,7 +22,10 @@ const GENERATE_SCRIPT = path.join(
   'open-api/bin/generate-dart-sdk.sh',
 );
 const SPEC_PATH = path.join(REPO_ROOT, 'open-api/immich-openapi-specs.json');
-const DART_MODEL_DIR = path.join(REPO_ROOT, 'mobile/openapi/lib/model');
+const DART_MODEL_DIR = path.join(
+  REPO_ROOT,
+  'mobile/generated/openapi/lib/model',
+);
 
 interface SpecProperty {
   type?: string;
@@ -93,35 +96,42 @@ describe('dart nullable array items (issue #743 item 3)', () => {
     expect(script).toContain('native_class_nullable_items_in_arrays.patch');
   });
 
-  it('every nullable-item array in the spec is a List<T?> in the generated Dart model', () => {
-    const spec = JSON.parse(fs.readFileSync(SPEC_PATH, 'utf8')) as Spec;
-    const targets = nullableItemArrays(spec);
-    // The spec currently has nullable-item arrays (TimeBucketAssetResponseDto);
-    // an empty target list would mean this guard is checking nothing.
-    expect(targets.length).toBeGreaterThan(0);
+  // The generated Dart client is no longer committed (build-time codegen now
+  // writes it to mobile/generated/openapi) — this invariant can only be
+  // checked once the SDK has actually been generated (`mise run
+  // open-api-dart`). Skip rather than fail when that hasn't happened.
+  it.skipIf(!fs.existsSync(DART_MODEL_DIR))(
+    'every nullable-item array in the spec is a List<T?> in the generated Dart model',
+    () => {
+      const spec = JSON.parse(fs.readFileSync(SPEC_PATH, 'utf8')) as Spec;
+      const targets = nullableItemArrays(spec);
+      // The spec currently has nullable-item arrays (TimeBucketAssetResponseDto);
+      // an empty target list would mean this guard is checking nothing.
+      expect(targets.length).toBeGreaterThan(0);
 
-    const offenders: string[] = [];
-    for (const { model, property, itemType } of targets) {
-      const modelPath = path.join(DART_MODEL_DIR, `${snakeCase(model)}.dart`);
-      const dart = fs.readFileSync(modelPath, 'utf8');
-      const declaration = dart
-        .split('\n')
-        .find(
-          (line) =>
-            /^ {2}\S.*[ >]\w+;$/.test(line) && line.endsWith(` ${property};`),
-        );
-      if (!declaration) {
-        offenders.push(
-          `${model}.${property}: declaration not found in ${path.basename(modelPath)}`,
-        );
-        continue;
+      const offenders: string[] = [];
+      for (const { model, property, itemType } of targets) {
+        const modelPath = path.join(DART_MODEL_DIR, `${snakeCase(model)}.dart`);
+        const dart = fs.readFileSync(modelPath, 'utf8');
+        const declaration = dart
+          .split('\n')
+          .find(
+            (line) =>
+              /^ {2}\S.*[ >]\w+;$/.test(line) && line.endsWith(` ${property};`),
+          );
+        if (!declaration) {
+          offenders.push(
+            `${model}.${property}: declaration not found in ${path.basename(modelPath)}`,
+          );
+          continue;
+        }
+        if (!declaration.includes(`<${itemType}?>`)) {
+          offenders.push(
+            `${model}.${property}: expected item type '${itemType}?' in declaration '${declaration.trim()}'`,
+          );
+        }
       }
-      if (!declaration.includes(`<${itemType}?>`)) {
-        offenders.push(
-          `${model}.${property}: expected item type '${itemType}?' in declaration '${declaration.trim()}'`,
-        );
-      }
-    }
-    expect(offenders).toEqual([]);
-  });
+      expect(offenders).toEqual([]);
+    },
+  );
 });
