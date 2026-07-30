@@ -204,9 +204,7 @@ run = "dcm fix lib"
 
 [tasks.checklist]
 run = [
-  { task = "codegen:pigeon" },
-  { task = "codegen:dart" },
-  { task = "codegen:translation" },
+  { task = "codegen" },
   { task = "analyze" },
   { task = "format" },
   { task = "test" },
