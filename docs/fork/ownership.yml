@@ -477,5 +477,5 @@ risk_patterns:
     risk: medium
     path_globs:
       - open-api/**
-      - mobile/openapi/**
+      - mobile/generated/openapi/**
     notes: OpenAPI shape or generated client change
