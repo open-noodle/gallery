@@ -158,7 +158,11 @@ export function auditGeneratedArtifactSignals(
 ): AuditResult {
   const generatedFiles = micromatch(
     upstreamTouchedFiles,
-    ['open-api/**', 'mobile/openapi/**', 'server/src/queries/**/*.sql'],
+    [
+      'open-api/**',
+      'mobile/generated/openapi/**',
+      'server/src/queries/**/*.sql',
+    ],
     { dot: true },
   );
   return {
