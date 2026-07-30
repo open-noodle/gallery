@@ -98,27 +98,28 @@ class SharedSpacePersonReassignDtoTargetOneOf {
 }
 
 
-class SharedSpacePersonReassignDtoTargetOneOfTypeEnum {
-  /// Instantiate a new enum with the provided [value].
-  const SharedSpacePersonReassignDtoTargetOneOfTypeEnum._(this.value);
+enum SharedSpacePersonReassignDtoTargetOneOfTypeEnum {
+  new_._(r'new'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const SharedSpacePersonReassignDtoTargetOneOfTypeEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const new_ = SharedSpacePersonReassignDtoTargetOneOfTypeEnum._(r'new');
-
-  /// List of all possible values in this [enum][SharedSpacePersonReassignDtoTargetOneOfTypeEnum].
-  static const values = <SharedSpacePersonReassignDtoTargetOneOfTypeEnum>[
-    new_,
-  ];
-
+  /// Returns the instance of [SharedSpacePersonReassignDtoTargetOneOfTypeEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static SharedSpacePersonReassignDtoTargetOneOfTypeEnum? fromJson(dynamic value) => SharedSpacePersonReassignDtoTargetOneOfTypeEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [SharedSpacePersonReassignDtoTargetOneOfTypeEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<SharedSpacePersonReassignDtoTargetOneOfTypeEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <SharedSpacePersonReassignDtoTargetOneOfTypeEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -140,9 +141,10 @@ class SharedSpacePersonReassignDtoTargetOneOfTypeEnumTypeTransformer {
 
   const SharedSpacePersonReassignDtoTargetOneOfTypeEnumTypeTransformer._();
 
-  String encode(SharedSpacePersonReassignDtoTargetOneOfTypeEnum data) => data.value;
+  String encode(SharedSpacePersonReassignDtoTargetOneOfTypeEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a SharedSpacePersonReassignDtoTargetOneOfTypeEnum.
+  /// Returns the instance of [SharedSpacePersonReassignDtoTargetOneOfTypeEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -151,6 +153,9 @@ class SharedSpacePersonReassignDtoTargetOneOfTypeEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   SharedSpacePersonReassignDtoTargetOneOfTypeEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is SharedSpacePersonReassignDtoTargetOneOfTypeEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'new': return SharedSpacePersonReassignDtoTargetOneOfTypeEnum.new_;
@@ -163,7 +168,7 @@ class SharedSpacePersonReassignDtoTargetOneOfTypeEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [SharedSpacePersonReassignDtoTargetOneOfTypeEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static SharedSpacePersonReassignDtoTargetOneOfTypeEnumTypeTransformer? _instance;
 }
 
