@@ -102,7 +102,7 @@ const ALL_FALSE: SelectionCapabilities = {
 // ---------------------------------------------------------------------------
 
 describe('getSelectionCapabilities — space timeline (direct space)', () => {
-  it("E1: Given a space viewer selecting another member's asset, When capabilities resolve, Then only select-all and download are allowed", () => {
+  it("E1: Given a space viewer selecting another member's asset, When capabilities resolve, Then only select-all, download and favorite are allowed", () => {
     const ctx = makeCtx({
       space: makeSpace({ canWrite: false }),
       selection: makeSelection({ isAllUserOwned: false, selectedAssetIds: ['asset-1'] }),
@@ -112,6 +112,8 @@ describe('getSelectionCapabilities — space timeline (direct space)', () => {
       ...ALL_FALSE,
       canSelectAll: true,
       canDownload: true,
+      // Favorites are a per-user overlay row (#763), so they are never owner-gated.
+      canFavorite: true,
     });
   });
 

@@ -1130,11 +1130,15 @@ describe(SearchRepository.name, () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
 
-      const { asset: r5 } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
+      const { asset: r5 } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: r5.id, make: 'Canon', model: 'Canon EOS R5' });
 
       const { asset: sevenD } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: sevenD.id, make: 'Canon', model: 'Canon EOS 7D' });
+
+      // #763: the dropped asset."isFavorite" column is replaced by the per-user overlay. The
+      // narrowing predicate resolves it for userIds[0], so favorite it as `user`.
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: r5.id }).execute();
 
       const models = await sut.getCameraModels([user.id], { make: 'Canon', isFavorite: true });
 
@@ -1361,11 +1365,15 @@ describe(SearchRepository.name, () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
 
-      const { asset: canonAsset } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
+      const { asset: canonAsset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: canonAsset.id, make: 'Canon', rating: 5 });
 
       const { asset: nikonAsset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: nikonAsset.id, make: 'Nikon', rating: 2 });
+
+      // #763: the dropped asset."isFavorite" column is replaced by the per-user overlay. The
+      // narrowing predicate resolves it for userIds[0], so favorite it as `user`.
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: canonAsset.id }).execute();
 
       const makes = await sut.getCameraMakes([user.id], { rating: 4, isFavorite: true });
 
