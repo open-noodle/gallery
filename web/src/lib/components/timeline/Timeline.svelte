@@ -740,6 +740,11 @@
     class:invisible
     style:height={timelineManager.domHeight + 'px'}
   >
+    <!-- `z-index` is load-bearing: this section and every month layer below are transform-positioned,
+         so each is its own stacking context at `z-index: auto` and painting order falls back to DOM
+         order — the months would cover anything this section overflows downwards. Header overlays that
+         hang below it (the person page's name-suggestion dropdown, #878) were painted under the
+         day-title row and lost its clicks; their own z-index can't help, being trapped in here. -->
     <section
       bind:clientHeight={timelineManager.topSectionHeight}
       class:invisible
@@ -748,6 +753,7 @@
       style:left="0"
       style:right="0"
       style:transform={`translate3d(0,${timelineManager.renderOffset}px,0)`}
+      style:z-index="1"
     >
       {@render children?.()}
       {#if isEmpty}
