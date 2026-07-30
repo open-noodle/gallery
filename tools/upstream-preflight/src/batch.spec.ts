@@ -588,7 +588,7 @@ describe('selectBatchAuditScope', () => {
             'high',
             [],
             [
-              'mobile/openapi/lib/api.dart',
+              'mobile/generated/openapi/lib/api.dart',
               'open-api/immich-openapi-specs.json',
             ],
           ),
