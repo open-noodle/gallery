@@ -49,12 +49,7 @@
   };
   let timelineGrouping = $state<TimelineGrouping>('day');
   let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
-  // #763: favorites are a per-user overlay, so this page is cross-scope like the Photos timeline
-  // favorites filter (see buildPhotosTimelineOptions). Without these, a favorite a member placed on
-  // another member's Space asset — which the overlay explicitly permits — would be unreachable here.
-  // Access is still enforced per request: the server recomputes timelineSpaceIds from current
-  // membership, so losing Space access drops the asset even though the overlay row survives.
-  const baseTimelineOptions = { isFavorite: true, withStacked: true, withPartners: true, withSharedSpaces: true };
+  const baseTimelineOptions = { isFavorite: true, withStacked: true };
   const options = $derived({
     ...baseTimelineOptions,
     grouping: timelineGrouping,
