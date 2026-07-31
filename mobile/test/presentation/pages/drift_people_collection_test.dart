@@ -184,7 +184,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(avatarUrl(tester, 'sp'), endsWith('/shared-spaces/space-1/people/sp/thumbnail'));
+      // `?c=<ms>` is upstream #29350's cache-buster, threaded through the fork's space-scoped
+      // helper too; assert it is present so it cannot silently regress.
+      expect(avatarUrl(tester, 'sp'), contains('/shared-spaces/space-1/people/sp/thumbnail?c='));
     });
 
     testWidgets('builds a personal person\'s avatar from the owner thumbnail endpoint', (tester) async {
@@ -198,7 +200,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(avatarUrl(tester, 'me'), endsWith('/people/me/thumbnail'));
+      expect(avatarUrl(tester, 'me'), contains('/people/me/thumbnail?c='));
     });
   });
 }
