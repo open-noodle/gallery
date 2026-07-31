@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -42,31 +43,37 @@ class SortIconButton extends ConsumerWidget {
 
   void _open(BuildContext context, WidgetRef ref, bool smart, SearchSortOrder current) {
     final options = [if (smart) SearchSortOrder.relevance, SearchSortOrder.newest, SearchSortOrder.oldest];
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text('search_sort_title'.tr(), style: Theme.of(ctx).textTheme.titleMedium),
-            ),
-            RadioGroup<SearchSortOrder>(
-              groupValue: current,
-              onChanged: (v) {
-                if (v != null) ref.read(photosFilterProvider.notifier).setSort(v);
-                Navigator.of(ctx).pop();
-              },
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (final o in options)
-                    RadioListTile<SearchSortOrder>(key: Key('sort-option-${o.name}'), value: o, title: Text(_label(o))),
-                ],
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text('search_sort_title'.tr(), style: Theme.of(ctx).textTheme.titleMedium),
               ),
-            ),
-          ],
+              RadioGroup<SearchSortOrder>(
+                groupValue: current,
+                onChanged: (v) {
+                  if (v != null) ref.read(photosFilterProvider.notifier).setSort(v);
+                  Navigator.of(ctx).pop();
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final o in options)
+                      RadioListTile<SearchSortOrder>(
+                        key: Key('sort-option-${o.name}'),
+                        value: o,
+                        title: Text(_label(o)),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
