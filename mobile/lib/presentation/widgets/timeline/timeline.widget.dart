@@ -569,7 +569,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                     slivers: [
                       if (widget.appBar != null) widget.appBar!,
                       if (widget.topSliverWidget != null) widget.topSliverWidget!,
-                      SliverFillRemaining(hasScrollBody: false, child: widget.emptyWidget!),
+                      SliverFillRemaining(hasScrollBody: false, child: widget.emptyWidget),
                     ],
                   );
                 }

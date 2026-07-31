@@ -1,6 +1,6 @@
-import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
