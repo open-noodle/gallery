@@ -118,14 +118,15 @@ void main() {
       expect(provider.url, 'http://localhost:0/shared-spaces/space-1/people/profile-1/thumbnail');
     });
 
-    testWidgets('empty list → empty state string and no "Search N" affordance', (tester) async {
+    testWidgets('empty list → section auto-collapses with "(0)", no "Search N" affordance', (tester) async {
       await tester.pumpConsumerWidget(
         const Material(child: PeopleSectionDeep(onOpenPicker: null)),
         overrides: [photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(people: [])))],
       );
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('deep-section-empty')), findsOneWidget);
+      expect(find.textContaining('(0)'), findsOneWidget);
+      expect(find.byKey(const Key('deep-section-empty')), findsNothing);
       expect(find.byKey(const Key('people-section-search-more')), findsNothing);
     });
 
@@ -192,6 +193,82 @@ void main() {
       final ring = tester.widget<AnimatedContainer>(find.byKey(const Key('people-tile-ring-p1')));
       final decoration = ring.decoration as BoxDecoration;
       expect(decoration.border, isNotNull);
+    });
+
+    // Slice 3: cap the preview to 6 avatars + move "Search N →" from the header to a body row.
+    testWidgets('caps preview to 6 avatars + renders "Search N →" in the body (not the header)', (tester) async {
+      final people = [for (var i = 0; i < 10; i++) FilterSuggestionsPersonDto(id: 'p$i', name: 'P$i')];
+      await tester.pumpConsumerWidget(
+        const Material(child: PeopleSectionDeep(onOpenPicker: null)),
+        overrides: [
+          photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(people: people))),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      for (var i = 0; i < 6; i++) {
+        expect(find.byKey(Key('people-tile-p$i')), findsOneWidget);
+      }
+      for (var i = 6; i < 10; i++) {
+        expect(find.byKey(Key('people-tile-p$i')), findsNothing);
+      }
+
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('collapsible-body-people')),
+          matching: find.byKey(const Key('people-section-search-more')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('collapsible-header-people')),
+          matching: find.byKey(const Key('people-section-search-more')),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('pins a selected person beyond the first 6', (tester) async {
+      final people = [for (var i = 0; i < 10; i++) FilterSuggestionsPersonDto(id: 'p$i', name: 'P$i')];
+      await tester.pumpConsumerWidget(
+        const Material(child: PeopleSectionDeep(onOpenPicker: null)),
+        overrides: [
+          photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(people: people))),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(tester.element(find.byType(PeopleSectionDeep)));
+      container.read(photosFilterProvider.notifier).togglePerson(
+        const PersonDto(id: 'p7', name: 'P7', isHidden: false, thumbnailPath: ''),
+      );
+      await tester.pumpAndSettle();
+
+      // Pinned beyond the cap because it's selected.
+      expect(find.byKey(const Key('people-tile-p7')), findsOneWidget);
+      // The remaining, unselected overflow stays hidden.
+      expect(find.byKey(const Key('people-tile-p8')), findsNothing);
+      expect(find.byKey(const Key('people-tile-p9')), findsNothing);
+
+      final ring = tester.widget<AnimatedContainer>(find.byKey(const Key('people-tile-ring-p7')));
+      final decoration = ring.decoration as BoxDecoration;
+      expect(decoration.border, isNotNull, reason: 'pinned tile should render selected state');
+    });
+
+    testWidgets('≤6 people renders all, no over-cap', (tester) async {
+      final people = [for (var i = 0; i < 4; i++) FilterSuggestionsPersonDto(id: 'p$i', name: 'P$i')];
+      await tester.pumpConsumerWidget(
+        const Material(child: PeopleSectionDeep(onOpenPicker: null)),
+        overrides: [
+          photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(people: people))),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      for (var i = 0; i < 4; i++) {
+        expect(find.byKey(Key('people-tile-p$i')), findsOneWidget);
+      }
     });
 
     testWidgets('avatar tile hit area ≥ 44×44 pt', (tester) async {
