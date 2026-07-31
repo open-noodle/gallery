@@ -16,6 +16,11 @@ abstract class Person with _$Person {
     /// Space person must route through the editor-gated shared-space endpoint, never the
     /// owner-only person endpoint.
     String? spaceId,
+
+    /// Photo count sourced from the shared-spaces server list (`PersonResponseDto.numberOfAssets`).
+    /// Null when unavailable — the owner-scoped local Drift query and the offline fallback path
+    /// never populate it, so the picker row hides the count gracefully rather than erroring.
+    int? numberOfAssets,
   }) = _Person;
 }
 
