@@ -25,11 +25,7 @@ void main() {
       logSevere: (message, error, stackTrace) => calls.add('severe:$message'),
     );
 
-    await loop.run(
-      hashTimeout: const Duration(minutes: 3),
-      backupTimeout: null,
-      debugLabel: 'test background upload',
-    );
+    await loop.run(hashTimeout: const Duration(minutes: 3), backupTimeout: null, debugLabel: 'test background upload');
 
     expect(calls, containsAllInOrder(['sync:3', 'backup', 'cleanup']));
     expect(cancellationToken.isCompleted, isFalse);
@@ -54,13 +50,12 @@ void main() {
       logSevere: (message, error, stackTrace) => calls.add('severe:$message'),
     );
 
-    await loop.run(
-      hashTimeout: const Duration(minutes: 3),
-      backupTimeout: null,
-      debugLabel: 'test background upload',
-    );
+    await loop.run(hashTimeout: const Duration(minutes: 3), backupTimeout: null, debugLabel: 'test background upload');
 
-    expect(calls, containsAllInOrder(['sync', 'warning:Remote sync did not complete successfully, skipping backup', 'cleanup']));
+    expect(
+      calls,
+      containsAllInOrder(['sync', 'warning:Remote sync did not complete successfully, skipping backup', 'cleanup']),
+    );
     expect(calls, isNot(contains('backup')));
   });
 
@@ -129,11 +124,7 @@ void main() {
       logSevere: (message, error, stackTrace) => calls.add('severe:$message:$error'),
     );
 
-    await loop.run(
-      hashTimeout: const Duration(minutes: 3),
-      backupTimeout: null,
-      debugLabel: 'iOS background upload',
-    );
+    await loop.run(hashTimeout: const Duration(minutes: 3), backupTimeout: null, debugLabel: 'iOS background upload');
 
     expect(calls.where((call) => call.startsWith('severe:Failed to complete iOS background upload')), hasLength(1));
     expect(calls, contains('cleanup'));

@@ -191,7 +191,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final ring = tester.widget<AnimatedContainer>(find.byKey(const Key('people-tile-ring-p1')));
-      final decoration = ring.decoration as BoxDecoration;
+      final decoration = ring.decoration! as BoxDecoration;
       expect(decoration.border, isNotNull);
     });
 
@@ -200,9 +200,7 @@ void main() {
       final people = [for (var i = 0; i < 10; i++) FilterSuggestionsPersonDto(id: 'p$i', name: 'P$i')];
       await tester.pumpConsumerWidget(
         const Material(child: PeopleSectionDeep(onOpenPicker: null)),
-        overrides: [
-          photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(people: people))),
-        ],
+        overrides: [photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(people: people)))],
       );
       await tester.pumpAndSettle();
 
@@ -233,16 +231,14 @@ void main() {
       final people = [for (var i = 0; i < 10; i++) FilterSuggestionsPersonDto(id: 'p$i', name: 'P$i')];
       await tester.pumpConsumerWidget(
         const Material(child: PeopleSectionDeep(onOpenPicker: null)),
-        overrides: [
-          photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(people: people))),
-        ],
+        overrides: [photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(people: people)))],
       );
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(PeopleSectionDeep)));
-      container.read(photosFilterProvider.notifier).togglePerson(
-        const PersonDto(id: 'p7', name: 'P7', isHidden: false, thumbnailPath: ''),
-      );
+      container
+          .read(photosFilterProvider.notifier)
+          .togglePerson(const PersonDto(id: 'p7', name: 'P7', isHidden: false, thumbnailPath: ''));
       await tester.pumpAndSettle();
 
       // Pinned beyond the cap because it's selected.
@@ -252,7 +248,7 @@ void main() {
       expect(find.byKey(const Key('people-tile-p9')), findsNothing);
 
       final ring = tester.widget<AnimatedContainer>(find.byKey(const Key('people-tile-ring-p7')));
-      final decoration = ring.decoration as BoxDecoration;
+      final decoration = ring.decoration! as BoxDecoration;
       expect(decoration.border, isNotNull, reason: 'pinned tile should render selected state');
     });
 
@@ -260,9 +256,7 @@ void main() {
       final people = [for (var i = 0; i < 4; i++) FilterSuggestionsPersonDto(id: 'p$i', name: 'P$i')];
       await tester.pumpConsumerWidget(
         const Material(child: PeopleSectionDeep(onOpenPicker: null)),
-        overrides: [
-          photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(people: people))),
-        ],
+        overrides: [photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(people: people)))],
       );
       await tester.pumpAndSettle();
 

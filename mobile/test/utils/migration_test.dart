@@ -63,8 +63,7 @@ void main() {
   }
 
   Future<PeopleSortBy?> readMigratedPeopleSortBy() async {
-    final row = await (db.settingsEntity.select()
-          ..where((t) => t.key.equals(SettingsKey.peopleSortBy.name)))
+    final row = await (db.settingsEntity.select()..where((t) => t.key.equals(SettingsKey.peopleSortBy.name)))
         .getSingleOrNull();
     if (row?.value == null) {
       return null;

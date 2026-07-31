@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -60,7 +61,7 @@ class PlacesPickerCountryAccordion extends ConsumerWidget {
                 selectedCity: selectedCountry == country ? selectedCity : null,
                 expanded: expanded == country,
                 onToggle: () {
-                  HapticFeedback.selectionClick();
+                  unawaited(HapticFeedback.selectionClick());
                   ref.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(country: country));
                   onExpandCountry(expanded == country ? null : country);
                 },
@@ -187,7 +188,7 @@ class _CityRow extends ConsumerWidget {
     return InkWell(
       key: Key('places-picker-city-$city'),
       onTap: () {
-        HapticFeedback.selectionClick();
+        unawaited(HapticFeedback.selectionClick());
         ref.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(country: country, city: city));
       },
       child: Padding(

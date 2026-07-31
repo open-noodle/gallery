@@ -139,10 +139,7 @@ void main() {
       test('should handle UTC-05:30 format (negative offset with minutes)', () {
         final utcTime = DateTime.utc(2024, 6, 15, 12, 0, 0);
 
-        final (adjustedTime, offset) = applyTimezoneOffset(
-          dateTime: utcTime,
-          timeZone: 'UTC-05:30',
-        );
+        final (adjustedTime, offset) = applyTimezoneOffset(dateTime: utcTime, timeZone: 'UTC-05:30');
 
         expect(adjustedTime.hour, 6);
         expect(adjustedTime.minute, 30); // 12:00 UTC - 5:30 = 06:30
@@ -152,10 +149,7 @@ void main() {
       test('should handle UTC-3:30 format (single digit hour with minutes)', () {
         final utcTime = DateTime.utc(2024, 6, 15, 12, 0, 0);
 
-        final (adjustedTime, offset) = applyTimezoneOffset(
-          dateTime: utcTime,
-          timeZone: 'UTC-3:30',
-        );
+        final (adjustedTime, offset) = applyTimezoneOffset(dateTime: utcTime, timeZone: 'UTC-3:30');
 
         expect(adjustedTime.hour, 8);
         expect(adjustedTime.minute, 30); // 12:00 UTC - 3:30 = 08:30
