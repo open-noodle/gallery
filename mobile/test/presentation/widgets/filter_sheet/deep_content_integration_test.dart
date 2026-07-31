@@ -2,12 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep_content.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
+import 'package:immich_mobile/providers/photos_filter/collapsed_sections.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/hidden_sections.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/temporal_utils.dart';
 import 'package:immich_mobile/providers/photos_filter/time_buckets.provider.dart';
 
+class _FakePrefs implements FilterSectionPrefs {
+  final Set<FilterSectionId> collapsed;
+  _FakePrefs(this.collapsed);
+  @override
+  Set<FilterSectionId> loadCollapsed() => collapsed;
+  @override
+  Future<void> saveCollapsed(Set<FilterSectionId> ids) async {}
+}
+
+class _FakeVis implements FilterSectionVisibilityPrefs {
+  Set<FilterSectionId> stored;
+  _FakeVis(this.stored);
+  @override
+  Set<FilterSectionId> loadHidden() => stored;
+  @override
+  Future<void> saveHidden(Set<FilterSectionId> ids) async => stored = ids;
+}
+
 Widget _buildHarness({required ScrollController controller}) {
   final overrides = <Override>[
+    filterSectionPrefsProvider.overrideWithValue(_FakePrefs({})),
+    filterSectionVisibilityPrefsProvider.overrideWithValue(_FakeVis({})),
     photosFilterSheetProvider.overrideWith((ref) => FilterSheetSnap.deep),
     timeBucketsProvider.overrideWith(
       (ref, filter) =>
