@@ -45,6 +45,24 @@ void main() {
       expect(find.byType(ImmichIconButton), findsNothing);
     });
 
+    testWidgets('stays visible when every selected asset belongs to another member', (tester) async {
+      await tester.pumpTestWidget(
+        context,
+        const ActionIconButton(
+          action: RemoveFromSpaceAction(source: .timeline, spaceId: spaceId),
+        ),
+        overrides: context.selected({theirs()}),
+      );
+
+      expect(
+        find.byType(ImmichIconButton),
+        findsOneWidget,
+        reason:
+            'an editor must be able to remove a photo they do not own — the action must not gate visibility on '
+            'ownership (ownedAssetsActionProvider would hide it here)',
+      );
+    });
+
     testWidgets('removes assets owned by other members, not just my own', (tester) async {
       final a = mine();
       final b = theirs();
@@ -71,13 +89,19 @@ void main() {
       expect(find.byType(SnackBar), findsOneWidget);
     });
 
-    testWidgets('surfaces a failure without throwing', (tester) async {
+    testWidgets('surfaces a translated error toast on failure, without throwing', (tester) async {
       when(() => actionService.removeFromSpace(any(), any())).thenThrow(Exception('boom'));
 
       await pump(tester, {mine()});
-      await tester.pumpAndSettle();
+      await tester.pumpUntilFound(find.byType(SnackBar));
 
       expect(tester.takeException(), isNull);
+      expect(find.byType(SnackBar), findsOneWidget);
+      // The resolved translation, not the raw i18n key — a raw
+      // 'scaffold_body_error_occurred' key leaking to the UI is the
+      // regression this guards against.
+      expect(find.text('Error occurred'), findsOneWidget);
+      expect(find.text('scaffold_body_error_occurred'), findsNothing);
     });
 
     testWidgets('fires onComplete once', (tester) async {
