@@ -1,12 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/utils/option.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/timeline_temporal_filter.provider.dart';
 import 'package:immich_mobile/providers/timeline/temporal_scope.provider.dart';
+import 'package:immich_mobile/utils/option.dart';
 
 void main() {
   group('applyTimelineTemporalScope', () {

@@ -152,7 +152,7 @@ class AlbumOptionsPage extends HookConsumerWidget {
       }
     }
 
-    buildLinkedSpacesList() {
+    RenderObjectWidget buildLinkedSpacesList() {
       final linksAsync = ref.watch(albumSharedSpaceLinksProvider(album.id));
       return linksAsync.maybeWhen(
         data: (links) {

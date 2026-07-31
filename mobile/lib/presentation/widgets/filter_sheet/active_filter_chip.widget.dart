@@ -2,9 +2,9 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/photos_filter/active_chips.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
-import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/utils/image_url_builder.dart';
 
 /// Renders a single active-filter chip for the timeline subheader.
@@ -100,7 +100,7 @@ class ActiveFilterChip extends ConsumerWidget {
               for (int i = 0; i < ids.length; i++)
                 Positioned(
                   left: i * 14.0,
-                  child: Container(
+                  child: DecoratedBox(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(color: Theme.of(context).colorScheme.surface, width: 1.5),

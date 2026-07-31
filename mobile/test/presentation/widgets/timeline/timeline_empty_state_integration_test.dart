@@ -70,7 +70,7 @@ TimelineService _service({required List<Bucket> buckets, required List<BaseAsset
   return TimelineService((
     bucketSource: () => Stream.value(buckets),
     assetSource: (offset, count) async {
-      final end = (offset + count).clamp(0, assets.length).toInt();
+      final end = (offset + count).clamp(0, assets.length);
       if (offset >= end) return const <BaseAsset>[];
       return assets.sublist(offset, end);
     },
