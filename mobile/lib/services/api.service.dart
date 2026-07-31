@@ -55,14 +55,6 @@ class ApiService {
     _apiClient.client = NetworkRepository.client;
   }
 
-  /// Re-establishes the native HTTP client after a background-worker teardown
-  /// orphaned the shared iOS URLSession, then re-points the API client at it.
-  /// Call on foreground resume (see [AppLifeCycleNotifier]).
-  Future<void> refreshConnection() async {
-    await NetworkRepository.refresh();
-    _apiClient.client = NetworkRepository.client;
-  }
-
   void setEndpoint(String endpoint) {
     _apiClient.basePath = endpoint;
     _apiClient.client = NetworkRepository.client;
