@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -27,7 +28,7 @@ class RatingStarsSection extends ConsumerWidget {
                 icon: Icon(i <= (current ?? 0) ? Icons.star_rounded : Icons.star_outline_rounded),
                 color: theme.colorScheme.primary,
                 onPressed: () {
-                  HapticFeedback.selectionClick();
+                  unawaited(HapticFeedback.selectionClick());
                   ref.read(photosFilterProvider.notifier).setRating(current == i ? null : i);
                 },
               ),

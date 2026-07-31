@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -45,7 +46,7 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
   @override
   void initState() {
     super.initState();
-    _loadSpaceName();
+    unawaited(_loadSpaceName());
   }
 
   Future<void> _loadSpaceName() async {
