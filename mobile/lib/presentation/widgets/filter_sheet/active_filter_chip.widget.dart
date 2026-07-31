@@ -123,6 +123,7 @@ class ActiveFilterChip extends ConsumerWidget {
       case ChipVisual.when:
         return const SizedBox.shrink();
       case ChipVisual.location:
+      case ChipVisual.camera:
       case ChipVisual.rating:
       case ChipVisual.media:
       case ChipVisual.toggle:
