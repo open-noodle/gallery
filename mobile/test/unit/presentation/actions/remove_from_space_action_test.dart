@@ -7,6 +7,7 @@ import 'package:immich_ui/immich_ui.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../../../service.mocks.dart';
+import '../../factories/local_asset_factory.dart';
 import '../../factories/remote_asset_factory.dart';
 import '../presentation_context.dart';
 
@@ -45,6 +46,22 @@ void main() {
       expect(find.byType(ImmichIconButton), findsNothing);
     });
 
+    testWidgets('is hidden when the selection has no remote assets', (tester) async {
+      await tester.pumpTestWidget(
+        context,
+        const ActionIconButton(
+          action: RemoveFromSpaceAction(source: .timeline, spaceId: spaceId),
+        ),
+        overrides: context.selected({LocalAssetFactory.create()}),
+      );
+
+      expect(
+        find.byType(ImmichIconButton),
+        findsNothing,
+        reason: 'a local-only asset was never added to the space, so there is nothing to remove',
+      );
+    });
+
     testWidgets('stays visible when every selected asset belongs to another member', (tester) async {
       await tester.pumpTestWidget(
         context,
@@ -75,18 +92,27 @@ void main() {
       expect(captured, containsAll([a.id, b.id]), reason: 'a space editor may remove another member\'s photo');
     });
 
-    testWidgets('threads the action spaceId through to the service', (tester) async {
-      await pump(tester, {mine()});
+    testWidgets("threads the action's own spaceId through to the service, not a different one", (tester) async {
+      const otherSpaceId = 'space-2';
+
+      await tester.pumpTestAction(
+        context,
+        const RemoveFromSpaceAction(source: .timeline, spaceId: otherSpaceId),
+        overrides: context.selected({mine()}),
+      );
       await tester.pumpAndSettle();
 
-      verify(() => actionService.removeFromSpace(any(), spaceId)).called(1);
+      verify(() => actionService.removeFromSpace(any(), otherSpaceId)).called(1);
+      verifyNever(() => actionService.removeFromSpace(any(), spaceId));
     });
 
-    testWidgets('shows a snackbar on success', (tester) async {
+    testWidgets('shows a snackbar with the removed count on success', (tester) async {
+      when(() => actionService.removeFromSpace(any(), any())).thenAnswer((_) async => 2);
+
       await pump(tester, {mine()});
       await tester.pumpUntilFound(find.byType(SnackBar));
 
-      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.text('2 photos removed from space'), findsOneWidget);
     });
 
     testWidgets('surfaces a translated error toast on failure, without throwing', (tester) async {
@@ -113,11 +139,19 @@ void main() {
       expect(calls, 1);
     });
 
-    testWidgets('does not crash when onComplete is null', (tester) async {
+    testWidgets('completes the success path when onComplete is null', (tester) async {
+      when(() => actionService.removeFromSpace(any(), any())).thenAnswer((_) async => 5);
+
       await pump(tester, {mine()});
-      await tester.pumpAndSettle();
+      await tester.pumpUntilFound(find.byType(SnackBar));
 
       expect(tester.takeException(), isNull);
+      // A null onComplete must be a no-op, not a crash that gets routed to
+      // the generic error toast — pin the actual success toast, since
+      // `takeException()` alone stays null either way (the action's own
+      // try/catch swallows a bad null-check on onComplete and would surface
+      // it as the same "no exception thrown" outcome).
+      expect(find.text('5 photos removed from space'), findsOneWidget);
     });
   });
 }

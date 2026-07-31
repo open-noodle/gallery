@@ -114,15 +114,6 @@ void main() {
       expect(find.byKey(_timelinePageKey), findsOneWidget, reason: 'navigated to the (fake) main timeline');
     });
 
-    testWidgets('does not throw when tapped', (tester) async {
-      await pumpWithRouter(tester);
-
-      await tester.tap(find.byType(ImmichIconButton));
-      await tester.pumpAndSettle();
-
-      expect(tester.takeException(), isNull);
-    });
-
     testWidgets('invalidates the asset viewer', (tester) async {
       when(() => context.service.asset.service.watchAsset(any())).thenAnswer((_) => const Stream.empty());
       await pumpWithRouter(tester);
