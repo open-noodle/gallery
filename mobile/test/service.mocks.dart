@@ -8,6 +8,7 @@ import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/domain/utils/background_sync.dart';
 import 'package:immich_mobile/platform/native_sync_api.g.dart';
+import 'package:immich_mobile/services/action.service.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:immich_mobile/services/app_settings.service.dart';
 import 'package:immich_mobile/services/auth.service.dart';
@@ -43,6 +44,8 @@ class MockAppSettingsService extends Mock implements AppSettingsService {}
 class MockPartnerService extends Mock implements PartnerService {}
 
 class MockAssetService extends Mock implements AssetService {}
+
+class MockActionService extends Mock implements ActionService {}
 
 class MockUserService extends Mock implements UserService {}
 
