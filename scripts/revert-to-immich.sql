@@ -333,7 +333,9 @@ ALTER ROLE CURRENT_USER RESET jit;
 -- key is inert for the tagged release's schema-check and boot — only its
 -- kysely_migrations row must go (step 8).
 
--- 1784664555996-AlbumDescriptionNullable (upstream #30123) made album.description
+-- 1784986754474-AlbumDescriptionNullable (upstream #30123, re-timestamped by #30424
+-- from 1784664555996 so it sorts after ConvertUserPasswordEmptyStringToNull) made
+-- album.description
 -- nullable and rewrote '' to NULL. The tagged release still declares the column
 -- NOT NULL DEFAULT '', so both the data and the constraint have to go back or its
 -- schema-check fails. The UPDATE must run BEFORE the SET NOT NULL or rows written
@@ -429,9 +431,9 @@ DELETE FROM "kysely_migrations"
    -- Post-tag upstream migrations pulled in by rebase, paired with the schema
    -- rollbacks in step 7. Keep timestamp-sorted.
    '1784647658615-AddOAuthBearerTokenToSession',
-   '1784664555996-AlbumDescriptionNullable',
    '1784836013770-MinFacePreferenceMigration',
-   '1784986754473-ConvertUserPasswordEmptyStringToNull'
+   '1784986754473-ConvertUserPasswordEmptyStringToNull',
+   '1784986754474-AlbumDescriptionNullable'
  );
 
 -- -----------------------------------------------------------------------------
