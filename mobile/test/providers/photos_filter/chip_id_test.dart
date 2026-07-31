@@ -22,6 +22,8 @@ void main() {
       expect(const NotInAlbumChipId(), const NotInAlbumChipId());
       expect(const UntaggedChipId(), const UntaggedChipId());
       expect(const TextChipId(), const TextChipId());
+      expect(const CameraChipId(), const CameraChipId());
+      expect(const CameraChipId().hashCode, const CameraChipId().hashCode);
     });
     test('Different value-less chip ids are NOT equal', () {
       expect(const LocationChipId(), isNot(const DateChipId()));
