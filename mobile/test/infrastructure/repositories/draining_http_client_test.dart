@@ -27,11 +27,13 @@ class _FakeInnerClient extends http.BaseClient {
     // request when its abort trigger fires.
     if (honorAbort) {
       if (request case http.Abortable(:final abortTrigger?)) {
-        abortTrigger.whenComplete(() {
-          if (!completer.isCompleted) {
-            completer.completeError(http.RequestAbortedException(request.url));
-          }
-        });
+        unawaited(
+          abortTrigger.whenComplete(() {
+            if (!completer.isCompleted) {
+              completer.completeError(http.RequestAbortedException(request.url));
+            }
+          }),
+        );
       }
     }
     return completer.future;

@@ -81,7 +81,11 @@ abstract final class SharedSpaceStub {
     color: const Optional.present(UserAvatarColor.purple),
     assetCount: const Optional.present(300),
     memberCount: const Optional.present(3),
-    members: Optional.present([SharedSpaceMemberStub.owner, SharedSpaceMemberStub.editor, SharedSpaceMemberStub.viewer]),
+    members: Optional.present([
+      SharedSpaceMemberStub.owner,
+      SharedSpaceMemberStub.editor,
+      SharedSpaceMemberStub.viewer,
+    ]),
     faceRecognitionEnabled: const Optional.present(true),
     thumbnailAssetId: const Optional.present('asset-thumbnail-1'),
     thumbnailCropY: const Optional.present(50),

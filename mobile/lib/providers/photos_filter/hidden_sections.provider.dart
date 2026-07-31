@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -61,6 +62,6 @@ class HiddenSectionsNotifier extends Notifier<Set<FilterSectionId>> {
       next.add(id);
     }
     state = next;
-    ref.read(filterSectionVisibilityPrefsProvider).saveHidden(next);
+    unawaited(ref.read(filterSectionVisibilityPrefsProvider).saveHidden(next));
   }
 }

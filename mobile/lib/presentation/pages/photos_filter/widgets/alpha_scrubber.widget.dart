@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -54,7 +55,7 @@ class _AlphaScrubberState extends State<AlphaScrubber> {
     if (letter == _currentLetter) return;
     setState(() => _currentLetter = letter);
     if (widget.letterToIndex.containsKey(letter)) {
-      HapticFeedback.selectionClick();
+      unawaited(HapticFeedback.selectionClick());
       widget.onLetter(letter);
     }
   }

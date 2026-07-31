@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -56,6 +57,6 @@ class CollapsedSectionsNotifier extends Notifier<Set<FilterSectionId>> {
     if (!next.remove(id)) next.add(id);
     state = next;
     // Fire-and-forget persist; state is source of truth in-memory.
-    ref.read(filterSectionPrefsProvider).saveCollapsed(next);
+    unawaited(ref.read(filterSectionPrefsProvider).saveCollapsed(next));
   }
 }
