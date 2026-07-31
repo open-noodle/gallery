@@ -1,3 +1,5 @@
+import 'package:auto_route/auto_route.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -6,6 +8,12 @@ import 'package:immich_mobile/presentation/widgets/filter_sheet/strips/strip_sca
 import 'package:immich_mobile/providers/photos_filter/filter_debounce.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
+import 'package:immich_mobile/routing/router.dart';
+
+/// Strip cap: at most this many country tiles render before a trailing "+N"
+/// tile takes over, opening the full-screen picker instead of an unbounded
+/// ListView.
+const int _kStripCap = 10;
 
 class PlacesStrip extends ConsumerWidget {
   const PlacesStrip({super.key});
@@ -21,12 +29,65 @@ class PlacesStrip extends ConsumerWidget {
       items: items,
       height: 84,
       onRetry: () => ref.invalidate(photosFilterSuggestionsProvider(filter)),
-      childBuilder: (data) => ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: data.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 10),
-        itemBuilder: (ctx, i) => _PlaceTile(country: data[i] as String),
+      childBuilder: (data) {
+        final countries = data.cast<String>();
+        final shown = countries.take(_kStripCap).toList();
+        final overflow = countries.length - shown.length;
+        return ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: shown.length + (overflow > 0 ? 1 : 0),
+          separatorBuilder: (_, _) => const SizedBox(width: 10),
+          itemBuilder: (ctx, i) => i < shown.length ? _PlaceTile(country: shown[i]) : _MorePlaceTile(count: overflow),
+        );
+      },
+    );
+  }
+}
+
+class _MorePlaceTile extends StatelessWidget {
+  final int count;
+  const _MorePlaceTile({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      key: const Key('places-strip-more'),
+      width: 104,
+      height: 72,
+      child: Material(
+        color: theme.colorScheme.surfaceContainerHigh,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            context.pushRoute(const PlacesPickerRoute());
+          },
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '+$count',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'all'.tr(),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -140,13 +141,26 @@ class _PersonRow extends ConsumerWidget {
             CircleAvatar(radius: 20, backgroundImage: RemoteImageProvider(url: getFaceThumbnailUrl(person.id))),
             const SizedBox(width: 14),
             Expanded(
-              child: Text(
-                person.name,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    person.name,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                  if (person.numberOfAssets != null)
+                    Text(
+                      _photoCountLabel(person.numberOfAssets!),
+                      key: Key('person-row-count-${person.id}'),
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                    ),
+                ],
               ),
             ),
             if (isSelected)
@@ -156,4 +170,13 @@ class _PersonRow extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Plural helper — nested-leaf lookup avoids `.plural()`, which reads a
+/// late-initialized locale field and throws in widget tests without an
+/// `EasyLocalization` ancestor. Matches the pattern in `people_section.widget.dart`.
+String _photoCountLabel(int count) {
+  final formatted = NumberFormat.decimalPattern(Intl.getCurrentLocale()).format(count);
+  final variant = count == 1 ? 'one' : 'other';
+  return 'person_picker_photo_count.$variant'.tr(namedArgs: {'count': formatted});
 }

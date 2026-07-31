@@ -3,25 +3,31 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 
-/// DriftPerson -> PersonDto. thumbnailPath is intentionally empty — thumbnails
+/// Person -> PersonDto. thumbnailPath is intentionally empty — thumbnails
 /// are fetched lazily via getFaceThumbnailUrl(id) at the widget layer, matching
-/// PeopleStrip._PersonTile.
-PersonDto _toPersonDto(DriftPerson p) => PersonDto(
+/// PeopleStrip._PersonTile. numberOfAssets carries straight through (no extra
+/// network call) so the picker row can render a photo count.
+PersonDto _toPersonDto(Person p) => PersonDto(
   id: p.id,
   name: p.name,
-  isHidden: p.isHidden,
+  // Both sources (local Drift query and the server's withHidden:false list) already exclude
+  // hidden people, and the unified Person model carries no isHidden field to check anyway.
+  isHidden: false,
   thumbnailPath: '',
   birthDate: p.birthDate,
   updatedAt: p.updatedAt,
+  numberOfAssets: p.numberOfAssets,
 );
 
-/// All non-hidden, non-blank people sourced from local Drift (see plan
-/// §"Design deviation: local Drift, not server pagination").
+/// All non-hidden, non-blank people, including shared-space people (matches the web
+/// People picker; see driftGetAllPeopleWithSharedSpacesProvider). Offline / server
+/// failure falls back to the owner-scoped local Drift list, which leaves
+/// numberOfAssets null — the picker row hides the count gracefully in that case.
 /// Pinned to photoCount ordering: peopleAlphaIndex preserves input order within
 /// letter buckets, so the People-view sort preference must not leak in here.
 final peoplePickerAllProvider = FutureProvider.autoDispose<List<PersonDto>>((ref) async {
-  final all = await ref.watch(getAllPeopleProvider(PeopleSortBy.photoCount).future);
-  return all.where((p) => !p.isHidden && p.name.isNotEmpty).map(_toPersonDto).toList();
+  final all = await ref.watch(driftGetAllPeopleWithSharedSpacesProvider(PeopleSortBy.photoCount).future);
+  return all.where((p) => p.name.isNotEmpty).map(_toPersonDto).toList();
 });
 
 /// Live search text.
