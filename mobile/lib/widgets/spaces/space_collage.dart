@@ -58,7 +58,7 @@ class SpaceCollage extends StatelessWidget {
   /// 0 assets: gradient background with a centered icon
   Widget _buildEmpty() {
     final colors = spaceGradientColors(color);
-    return Container(
+    return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colors),
       ),

@@ -31,9 +31,9 @@ Future<ValueNotifier<AsyncValue<List<dynamic>>>> _pumpHarness(
   return notifier;
 }
 
-final _scaffoldKey = const Key('strip-scaffold');
-final _skeletonKey = const Key('strip-skeleton');
-final _retryKey = const Key('strip-retry');
+const _scaffoldKey = Key('strip-scaffold');
+const _skeletonKey = Key('strip-skeleton');
+const _retryKey = Key('strip-retry');
 
 void main() {
   testWidgets('first load (AsyncLoading, no cache) → skeleton visible, no content', (tester) async {
