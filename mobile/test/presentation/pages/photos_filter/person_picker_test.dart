@@ -91,7 +91,9 @@ void main() {
       await tester.pumpConsumerWidget(
         const PersonPickerPage(),
         overrides: [
-          driftGetAllPeopleProvider.overrideWith((ref, sortBy) async => [_d('a', 'Alice'), _d('b', 'Bob')]),
+          driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
+            (ref, sortBy) async => [_d('a', 'Alice'), _d('b', 'Bob')],
+          ),
         ],
       );
       await tester.pumpAndSettle();
@@ -132,7 +134,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const PersonPickerPage(),
         overrides: [
-          driftGetAllPeopleProvider.overrideWith((ref, sortBy) async => [_d('a', 'Alice')]),
+          driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, sortBy) async => [_d('a', 'Alice')]),
         ],
       );
       await tester.pumpAndSettle();
@@ -151,7 +153,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const PersonPickerPage(),
         overrides: [
-          driftGetAllPeopleProvider.overrideWith((ref, sortBy) async => [_d('a', 'Alice')]),
+          driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, sortBy) async => [_d('a', 'Alice')]),
         ],
       );
       await tester.pumpAndSettle();
@@ -167,6 +169,31 @@ void main() {
 
       expect(container.read(peoplePickerQueryProvider), '');
       expect(find.byKey(const Key('person-picker-clear-search')), findsNothing);
+    });
+  });
+
+  group('PersonPickerPage error state', () {
+    testWidgets('renders a tappable retry; tapping invalidates the provider and refetches', (tester) async {
+      var calls = 0;
+      await tester.pumpConsumerWidget(
+        const PersonPickerPage(),
+        overrides: [
+          driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, sortBy) async {
+            calls++;
+            if (calls == 1) throw Exception('network down');
+            return [_d('a', 'Alice')];
+          }),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('person-picker-retry')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('person-picker-retry')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('person-picker-retry')), findsNothing);
+      expect(find.text('Alice'), findsOneWidget);
     });
   });
 }

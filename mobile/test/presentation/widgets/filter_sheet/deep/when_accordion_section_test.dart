@@ -2,11 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/when_accordion_section.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
+import 'package:immich_mobile/providers/photos_filter/collapsed_sections.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/temporal_utils.dart';
 import 'package:immich_mobile/providers/photos_filter/time_buckets.provider.dart';
 
 import '../../../../widget_tester_extensions.dart';
+
+class _FakePrefs implements FilterSectionPrefs {
+  final Set<FilterSectionId> collapsed;
+  _FakePrefs(this.collapsed);
+  @override
+  Set<FilterSectionId> loadCollapsed() => collapsed;
+  @override
+  Future<void> saveCollapsed(Set<FilterSectionId> ids) async {}
+}
+
+Override _noCollapsed() => filterSectionPrefsProvider.overrideWithValue(_FakePrefs({}));
 
 List<BucketLite> _seed({Map<String, int> counts = const {'2024-06-01': 12, '2024-01-01': 3, '2023-12-01': 7}}) => [
   for (final e in counts.entries) (timeBucket: e.key, count: e.value),
@@ -17,7 +30,7 @@ void main() {
     testWidgets('renders year rows in descending order', (tester) async {
       await tester.pumpConsumerWidget(
         const Material(child: WhenAccordionSection(onOpenPicker: null)),
-        overrides: [timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seed()))],
+        overrides: [_noCollapsed(), timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seed()))],
       );
       await tester.pumpAndSettle();
 
@@ -29,7 +42,7 @@ void main() {
     testWidgets('tapping a year expands the inline month grid', (tester) async {
       await tester.pumpConsumerWidget(
         const Material(child: WhenAccordionSection(onOpenPicker: null)),
-        overrides: [timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seed()))],
+        overrides: [_noCollapsed(), timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seed()))],
       );
       await tester.pumpAndSettle();
 
@@ -43,7 +56,7 @@ void main() {
     testWidgets('tapping another year collapses the first (single-expand)', (tester) async {
       await tester.pumpConsumerWidget(
         const Material(child: WhenAccordionSection(onOpenPicker: null)),
-        overrides: [timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seed()))],
+        overrides: [_noCollapsed(), timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seed()))],
       );
       await tester.pumpAndSettle();
 
@@ -60,7 +73,7 @@ void main() {
     testWidgets('tapping a month sets setDateRange(first, last)', (tester) async {
       await tester.pumpConsumerWidget(
         const Material(child: WhenAccordionSection(onOpenPicker: null)),
-        overrides: [timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seed()))],
+        overrides: [_noCollapsed(), timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seed()))],
       );
       await tester.pumpAndSettle();
 
@@ -78,7 +91,7 @@ void main() {
     testWidgets('tapping the same month twice clears the date range', (tester) async {
       await tester.pumpConsumerWidget(
         const Material(child: WhenAccordionSection(onOpenPicker: null)),
-        overrides: [timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seed()))],
+        overrides: [_noCollapsed(), timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seed()))],
       );
       await tester.pumpAndSettle();
 
@@ -95,20 +108,49 @@ void main() {
       expect(date.takenBefore, isNull);
     });
 
-    testWidgets('empty buckets → empty caption via DeepSectionScaffold', (tester) async {
+    testWidgets('empty buckets → section auto-collapses, "(0)" shown, empty caption hidden', (tester) async {
       await tester.pumpConsumerWidget(
         const Material(child: WhenAccordionSection(onOpenPicker: null)),
-        overrides: [timeBucketsProvider.overrideWith((ref, filter) => Future.value(const <BucketLite>[]))],
+        overrides: [
+          _noCollapsed(),
+          timeBucketsProvider.overrideWith((ref, filter) => Future.value(const <BucketLite>[])),
+        ],
       );
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('deep-section-empty')), findsOneWidget);
+      expect(find.textContaining('(0)'), findsOneWidget);
+      expect(find.byKey(const Key('deep-section-empty')), findsNothing);
+    });
+
+    // Final review: the "N years →" row lives in the section BODY, not the header
+    // (matches the People/Places/Tags/Camera body-row pattern).
+    testWidgets('renders "N years →" in the body (not the header)', (tester) async {
+      await tester.pumpConsumerWidget(
+        const Material(child: WhenAccordionSection(onOpenPicker: null)),
+        overrides: [_noCollapsed(), timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seed()))],
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('collapsible-body-when')),
+          matching: find.byKey(const Key('when-section-search-more')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('collapsible-header-when')),
+          matching: find.byKey(const Key('when-section-search-more')),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets('onOpenPicker fires on "N years →" tap', (tester) async {
       var opened = false;
       await tester.pumpConsumerWidget(
         Material(child: WhenAccordionSection(onOpenPicker: () => opened = true)),
-        overrides: [timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seed()))],
+        overrides: [_noCollapsed(), timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seed()))],
       );
       await tester.pumpAndSettle();
 
@@ -119,7 +161,7 @@ void main() {
     testWidgets('null onOpenPicker does NOT show a SnackBar when "N years →" tapped', (tester) async {
       await tester.pumpConsumerWidget(
         const Material(child: WhenAccordionSection()),
-        overrides: [timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seed()))],
+        overrides: [_noCollapsed(), timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seed()))],
       );
       await tester.pumpAndSettle();
 
@@ -133,6 +175,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const Material(child: WhenAccordionSection(onOpenPicker: null)),
         overrides: [
+          _noCollapsed(),
           timeBucketsProvider.overrideWith(
             (ref, filter) => Future<List<BucketLite>>.error('network down', StackTrace.empty),
           ),
@@ -146,7 +189,7 @@ void main() {
     testWidgets('selected month pill uses primary color in dark theme', (tester) async {
       await tester.pumpConsumerWidgetDark(
         const Material(child: WhenAccordionSection(onOpenPicker: null)),
-        overrides: [timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seed()))],
+        overrides: [_noCollapsed(), timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seed()))],
       );
       await tester.pumpAndSettle();
 

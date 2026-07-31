@@ -4,7 +4,7 @@ import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/people_picker.provider.dart';
 
-DriftPerson _d(String id, String name, {bool isHidden = false}) => DriftPerson(
+DriftPerson _d(String id, String name, {bool isHidden = false, int? numberOfAssets}) => DriftPerson(
   id: id,
   createdAt: DateTime(2024, 1, 1),
   updatedAt: DateTime(2024, 1, 1),
@@ -13,12 +13,18 @@ DriftPerson _d(String id, String name, {bool isHidden = false}) => DriftPerson(
   isFavorite: false,
   isHidden: isHidden,
   color: null,
+  numberOfAssets: numberOfAssets,
 );
 
 PersonDto _p(String id, String name) => PersonDto(id: id, name: name, isHidden: false, thumbnailPath: '');
 
+// peoplePickerAllProvider sources driftGetAllPeopleWithSharedSpacesProvider (not the
+// owner-scoped-only driftGetAllPeopleProvider) so the picker includes shared-space people,
+// mirroring the web People picker. See slice 3 plan.
 ProviderContainer _containerWith(List<DriftPerson> people) {
-  return ProviderContainer(overrides: [driftGetAllPeopleProvider.overrideWith((ref, sortBy) async => people)]);
+  return ProviderContainer(
+    overrides: [driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, sortBy) async => people)],
+  );
 }
 
 void main() {
@@ -50,7 +56,7 @@ void main() {
     test('pins photoCount ordering regardless of the people sort preference', () async {
       final c = ProviderContainer(
         overrides: [
-          driftGetAllPeopleProvider.overrideWith(
+          driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
             (ref, sortBy) async => sortBy == PeopleSortBy.photoCount ? [_d('pinned', 'Alice')] : [_d('leaked', 'Bob')],
           ),
         ],
@@ -58,6 +64,21 @@ void main() {
       addTearDown(c.dispose);
       final result = await c.read(peoplePickerAllProvider.future);
       expect(result.map((p) => p.id), ['pinned']);
+    });
+
+    // Slice 3: the picker row's photo count reads straight off the already-fetched
+    // DriftPerson — no extra network call.
+    test('carries numberOfAssets from the source DriftPerson', () async {
+      final c = _containerWith([
+        _d('a', 'Alice', numberOfAssets: 1204),
+        _d('b', 'Bob', numberOfAssets: 0),
+        _d('c', 'Carol'),
+      ]);
+      addTearDown(c.dispose);
+      final result = await c.read(peoplePickerAllProvider.future);
+      expect(result.firstWhere((p) => p.id == 'a').numberOfAssets, 1204);
+      expect(result.firstWhere((p) => p.id == 'b').numberOfAssets, 0);
+      expect(result.firstWhere((p) => p.id == 'c').numberOfAssets, isNull);
     });
   });
 

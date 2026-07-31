@@ -2,8 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/deep_section_scaffold.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
+import 'package:immich_mobile/providers/photos_filter/collapsed_sections.provider.dart';
 
 import '../../../../widget_tester_extensions.dart';
+
+class _FakePrefs implements FilterSectionPrefs {
+  final Set<FilterSectionId> collapsed;
+  _FakePrefs(this.collapsed);
+  @override
+  Set<FilterSectionId> loadCollapsed() => collapsed;
+  @override
+  Future<void> saveCollapsed(Set<FilterSectionId> ids) async {}
+}
 
 Future<ValueNotifier<AsyncValue<List<int>>>> _pump(
   WidgetTester tester, {
@@ -17,6 +28,7 @@ Future<ValueNotifier<AsyncValue<List<int>>>> _pump(
     ValueListenableBuilder<AsyncValue<List<int>>>(
       valueListenable: notifier,
       builder: (_, value, __) => DeepSectionScaffold<int>(
+        sectionId: FilterSectionId.people,
         titleKey: 'filter_sheet_deep_people_section',
         emptyCaptionKey: emptyKey,
         items: value,
@@ -24,6 +36,7 @@ Future<ValueNotifier<AsyncValue<List<int>>>> _pump(
         childBuilder: (data) => Wrap(children: [for (final d in data) Text('item:$d')]),
       ),
     ),
+    overrides: [filterSectionPrefsProvider.overrideWithValue(_FakePrefs({}))],
   );
   return notifier;
 }
@@ -43,10 +56,11 @@ void main() {
     expect(find.byKey(const Key('deep-section-skeleton')), findsNothing);
   });
 
-  testWidgets('AsyncData([]) → empty caption text', (tester) async {
+  testWidgets('AsyncData([]) → section auto-collapses, "(0)" shown, empty caption hidden', (tester) async {
     await _pump(tester, initial: const AsyncData<List<int>>([]));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('deep-section-empty')), findsOneWidget);
+    expect(find.textContaining('(0)'), findsOneWidget);
+    expect(find.byKey(const Key('deep-section-empty')), findsNothing);
   });
 
   testWidgets('AsyncError → retry button visible, tapping fires onRetry', (tester) async {
