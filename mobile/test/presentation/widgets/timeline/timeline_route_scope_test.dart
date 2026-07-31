@@ -174,7 +174,7 @@ void main() {
                       key: const Key('left-drilldown'),
                       onPressed: () {
                         final handler = ref.read(timelineOverviewDrilldownProvider);
-                        handler?.call(TimeBucket(date: DateTime(2025), assetCount: 4), GroupAssetsBy.year);
+                        unawaited(handler?.call(TimeBucket(date: DateTime(2025), assetCount: 4), GroupAssetsBy.year));
                       },
                       child: Text(
                         'left:${ref.watch(timelineTemporalScopeProvider).kind.name}:${_anchorLabel(ref.watch(timelineZoomAnchorProvider))}:${ref.watch(timelineGroupingProvider).name}',
