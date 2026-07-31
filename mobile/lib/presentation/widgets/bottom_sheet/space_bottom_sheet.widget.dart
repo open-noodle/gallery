@@ -3,8 +3,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/enums.dart';
 import 'package:immich_mobile/presentation/actions/action.widget.dart';
 import 'package:immich_mobile/presentation/actions/favorite.action.dart';
+import 'package:immich_mobile/presentation/actions/remove_from_space.action.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/download_action_button.widget.dart';
-import 'package:immich_mobile/presentation/widgets/action_buttons/remove_from_space_action_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/share_action_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/base_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/collection/collection_picker.widget.dart';
@@ -58,10 +58,12 @@ class _SpaceBottomSheetState extends ConsumerState<SpaceBottomSheet> {
           const DownloadActionButton(source: ActionSource.timeline),
           const ActionColumnButton(action: FavoriteAction(source: ActionSource.timeline)),
           if (_canEdit)
-            RemoveFromSpaceActionButton(
-              source: ActionSource.timeline,
-              spaceId: widget.spaceId,
-              onComplete: widget.onAssetsRemoved,
+            ActionColumnButton(
+              action: RemoveFromSpaceAction(
+                source: ActionSource.timeline,
+                spaceId: widget.spaceId,
+                onComplete: widget.onAssetsRemoved,
+              ),
             ),
         ],
       ],
