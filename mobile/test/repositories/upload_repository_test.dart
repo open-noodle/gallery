@@ -186,7 +186,7 @@ void main() {
       expect(calls, hasLength(1));
       expect(calls.single.method, 'updateNotification');
 
-      final args = calls.single.arguments as List<Object?>;
+      final args = calls.single.arguments! as List<Object?>;
       expect(jsonDecode(args[0]! as String)['taskId'], 'asset-1');
       final notificationConfigJson = jsonDecode(args[1]! as String) as Map<String, dynamic>;
       expect(notificationConfigJson['groupNotificationId'], kBackupGroup);

@@ -134,7 +134,7 @@ void main() {
     // No album cards
     expect(
       find.byWidgetPredicate(
-        (w) => w.key is ValueKey<String> && (w.key as ValueKey<String>).value.startsWith('space-album-card-'),
+        (w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('space-album-card-'),
       ),
       findsNothing,
     );

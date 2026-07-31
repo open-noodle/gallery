@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -71,7 +72,7 @@ class _SearchMoreRow extends StatelessWidget {
         key: const Key('places-section-search-more'),
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          HapticFeedback.selectionClick();
+          unawaited(HapticFeedback.selectionClick());
           onOpenPicker?.call();
         },
         child: Padding(
@@ -120,7 +121,7 @@ class _CountryWrap extends ConsumerWidget {
             label: Text(country),
             selected: false,
             onSelected: (_) {
-              HapticFeedback.selectionClick();
+              unawaited(HapticFeedback.selectionClick());
               ref.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(country: country));
             },
           ),
@@ -149,7 +150,7 @@ class _CityCascade extends ConsumerWidget {
           selected: true,
           selectedColor: theme.colorScheme.primaryContainer,
           onDeleted: () {
-            HapticFeedback.selectionClick();
+            unawaited(HapticFeedback.selectionClick());
             ref.read(photosFilterProvider.notifier).setLocation(null);
           },
           deleteIcon: const Icon(Icons.close_rounded, key: Key('places-country-selected-clear')),
@@ -168,7 +169,7 @@ class _CityCascade extends ConsumerWidget {
                     label: Text(city),
                     selected: selectedCity == city,
                     onSelected: (_) {
-                      HapticFeedback.selectionClick();
+                      unawaited(HapticFeedback.selectionClick());
                       ref
                           .read(photosFilterProvider.notifier)
                           .setLocation(
