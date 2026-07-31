@@ -134,15 +134,12 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
     switch (tab) {
       case GalleryTabEnum.photos:
         ref.invalidate(driftMemoryFutureProvider);
-        break;
       case GalleryTabEnum.albums:
         unawaited(ref.read(remoteAlbumProvider.notifier).refresh());
-        break;
       case GalleryTabEnum.library:
         ref.invalidate(localAlbumProvider);
         ref.invalidate(driftGetAllPeopleProvider);
         ref.invalidate(driftGetAllPeopleWithSharedSpacesProvider);
-        break;
     }
 
     ref.read(hapticFeedbackProvider.notifier).selectionClick();
