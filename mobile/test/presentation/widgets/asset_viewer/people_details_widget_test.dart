@@ -97,12 +97,14 @@ void main() {
   testWidgets('a Space person\'s strip avatar resolves via the space thumbnail endpoint', (tester) async {
     await pumpStrip(tester, _person('space-person-1', 'Alice', spaceId: 'space-1'));
 
-    expect(avatarUrl(tester), endsWith('/shared-spaces/space-1/people/space-person-1/thumbnail'));
+    // `?c=<ms>` is upstream #29350's cache-buster, threaded through the fork's space-scoped
+    // helper too; assert it is present so it cannot silently regress.
+    expect(avatarUrl(tester), contains('/shared-spaces/space-1/people/space-person-1/thumbnail?c='));
   });
 
   testWidgets('a personal person\'s strip avatar resolves via the owner thumbnail endpoint', (tester) async {
     await pumpStrip(tester, _person('global-1', 'Bob'));
 
-    expect(avatarUrl(tester), endsWith('/people/global-1/thumbnail'));
+    expect(avatarUrl(tester), contains('/people/global-1/thumbnail?c='));
   });
 }
