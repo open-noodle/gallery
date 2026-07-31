@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/deep_section_scaffold.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_debounce.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provider.dart';
@@ -11,11 +12,16 @@ import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dar
 import 'package:immich_mobile/utils/image_url_builder.dart';
 import 'package:openapi/api.dart';
 
+/// Preview cap: the deep section shows at most this many avatars by default,
+/// plus any selected suggestion beyond the cap (pinned so it stays visible).
+const int _kPreviewCap = 6;
+
 /// PeopleSectionDeep — Deep-snap section for the People filter dimension.
 ///
-/// Layout: circular-avatar wrap grid (52pt avatars, 62pt tile), 14pt gap.
-/// Trailing header shows a "Search N people →" affordance that delegates to
-/// [onOpenPicker] — tapping the header opens a full picker (wired later).
+/// Layout: circular-avatar wrap grid (52pt avatars, 62pt tile), 14pt gap,
+/// capped to [_kPreviewCap] avatars (selected suggestions beyond the cap are
+/// pinned). A body "Search N people →" row below the grid delegates to
+/// [onOpenPicker] — tapping it opens the full picker.
 class PeopleSectionDeep extends ConsumerWidget {
   final VoidCallback? onOpenPicker;
   const PeopleSectionDeep({super.key, this.onOpenPicker});
@@ -25,27 +31,68 @@ class PeopleSectionDeep extends ConsumerWidget {
     final filter = ref.watch(photosFilterDebouncedProvider);
     final async = ref.watch(photosFilterSuggestionsProvider(filter));
     final peopleAsync = async.whenData((s) => s.people);
+    final selectedIds = ref.watch(photosFilterProvider.select((f) => f.people.map((p) => p.id).toSet()));
 
     final count = peopleAsync.valueOrNull?.length ?? 0;
-    final showTrailing = count > 0;
 
     return DeepSectionScaffold<FilterSuggestionsPersonDto>(
+      sectionId: FilterSectionId.people,
       titleKey: 'filter_sheet_deep_people_section',
       emptyCaptionKey: 'filter_sheet_deep_empty_people',
       items: peopleAsync,
       onRetry: () => ref.invalidate(photosFilterSuggestionsProvider(filter)),
-      trailingHeader: showTrailing
-          ? TextButton(
-              key: const Key('people-section-search-more'),
-              onPressed: () {
-                HapticFeedback.selectionClick();
-                onOpenPicker?.call();
-              },
-              child: Text(_searchMoreLabel(count)),
-            )
-          : null,
-      childBuilder: (people) =>
-          Wrap(spacing: 14, runSpacing: 14, children: [for (final p in people) _PeopleGridTile(person: p)]),
+      childBuilder: (people) {
+        final firstSix = people.take(_kPreviewCap).toList();
+        final overflowSelected = people.skip(_kPreviewCap).where((p) => selectedIds.contains(p.id)).toList();
+        final display = [...firstSix, ...overflowSelected];
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Wrap(spacing: 14, runSpacing: 14, children: [for (final p in display) _PeopleGridTile(person: p)]),
+            if (count > 0) _SearchMoreRow(count: count, onOpenPicker: onOpenPicker),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _SearchMoreRow extends StatelessWidget {
+  final int count;
+  final VoidCallback? onOpenPicker;
+  const _SearchMoreRow({required this.count, this.onOpenPicker});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: InkWell(
+        key: const Key('people-section-search-more'),
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onOpenPicker?.call();
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Icon(Icons.search_rounded, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 10),
+              // The translated label already ends in "→" (see filter_sheet_deep_search_n_people).
+              Expanded(
+                child: Text(
+                  _searchMoreLabel(count),
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.primary),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -14,7 +14,7 @@ class GallerySearchBlob extends StatefulWidget {
 }
 
 class _GallerySearchBlobState extends State<GallerySearchBlob> {
-  static const _diameter = 54.0;
+  static const _diameter = 50.0;
   bool _pressed = false;
 
   @override

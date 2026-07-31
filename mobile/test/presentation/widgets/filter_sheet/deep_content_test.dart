@@ -10,6 +10,7 @@ import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/people_section.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/places_cascade_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/when_accordion_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep_content.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
@@ -65,6 +66,7 @@ void main() {
         const Key('deep-section-people'),
         const Key('deep-section-places'),
         const Key('deep-section-tags'),
+        const Key('deep-section-camera'),
         const Key('deep-section-when'),
         const Key('deep-section-rating'),
         const Key('deep-section-media'),
@@ -203,6 +205,29 @@ void main() {
 
       final whenWidget = tester.widget<WhenAccordionSection>(find.byKey(const Key('deep-section-when')));
       expect(whenWidget.onOpenPicker, isNotNull);
+    });
+  });
+
+  group('DeepContent PlacesSection wire-up', () {
+    testWidgets('DeepContent wires non-null onOpenPicker into PlacesCascadeSection', (tester) async {
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      await tester.binding.setSurfaceSize(const Size(400, 2400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpConsumerWidget(
+        DeepContent(scrollController: controller),
+        overrides: [
+          photosFilterSuggestionsProvider.overrideWith(
+            (ref, filter) => Future.value(FilterSuggestionsResponseDto(hasUnnamedPeople: false, countries: ['France'])),
+          ),
+          timeBucketsProvider.overrideWith((ref, filter) => Future.value(const <BucketLite>[])),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      final placesWidget = tester.widget<PlacesCascadeSection>(find.byKey(const Key('deep-section-places')));
+      expect(placesWidget.onOpenPicker, isNotNull);
     });
   });
 }

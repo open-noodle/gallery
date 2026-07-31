@@ -282,5 +282,17 @@ void main() {
 
       expect(result.single.spaceId, isNull);
     });
+
+    // Slice 3: the picker's per-row photo count reads DriftPerson.numberOfAssets, sourced
+    // straight from the already-fetched PersonResponseDto — no extra network call.
+    test('carries numberOfAssets from the DTO onto DriftPerson', () async {
+      stubGetAllPeople(
+        () async => peopleResponse([personDto('counted', name: 'Alice', numberOfAssets: 1204)]),
+      );
+
+      final result = await repository.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.name);
+
+      expect(result.single.numberOfAssets, 1204);
+    });
   });
 }

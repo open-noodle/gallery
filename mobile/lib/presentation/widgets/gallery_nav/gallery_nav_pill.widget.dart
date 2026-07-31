@@ -19,9 +19,10 @@ class GalleryNavPill extends StatefulWidget {
 }
 
 class _GalleryNavPillState extends State<GalleryNavPill> {
-  static const _pillHeight = 58.0;
-  static const _underlayHeight = 46.0;
+  static const _pillHeight = 52.0;
+  static const _underlayHeight = 38.0;
   static const _pillRadius = 28.0;
+  static const _borderWidth = 1.0;
   static const _motionCurve = Cubic(0.3, 0.6, 0.2, 1);
   static const _motionDuration = Duration(milliseconds: 280);
 
@@ -81,7 +82,11 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
     final activeRect = _segmentRects[widget.activeTab];
     final underlayLeft = activeRect?.left ?? 0;
     final underlayWidth = activeRect?.width ?? 0;
-    const underlayTop = (_pillHeight - _underlayHeight) / 2;
+    // The Container's 1px border is folded into the child's padding, so the Stack
+    // that hosts this underlay is `_pillHeight - 2*_borderWidth` tall — not the full
+    // `_pillHeight`. Centre against that inner box so the top/bottom gaps match (and
+    // match the `_edgeInset` horizontal gap), instead of sitting 1px low.
+    const underlayTop = (_pillHeight - 2 * _borderWidth - _underlayHeight) / 2;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(_pillRadius),
@@ -98,7 +103,7 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
                 ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.68)
                 : theme.colorScheme.surface.withValues(alpha: 0.9),
             borderRadius: BorderRadius.circular(_pillRadius),
-            border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.55), width: 1),
+            border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.55), width: _borderWidth),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.7),
@@ -147,7 +152,9 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: _edgeInset),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  // Google-Photos-style: cluster the tabs (content width) instead of
+                  // spreading them edge-to-edge; the pill sizes to this Row.
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     for (final tab in GalleryTabEnum.values)
                       KeyedSubtree(
