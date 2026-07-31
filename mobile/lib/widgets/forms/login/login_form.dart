@@ -264,6 +264,10 @@ class LoginForm extends HookConsumerWidget {
       unawaited(handleSyncFlow());
       ref.read(websocketProvider.notifier).connect();
       unawaited(ref.read(featureMessageServiceProvider).markSeen());
+      if (!context.mounted) {
+        return;
+      }
+
       unawaited(context.replaceRoute(const GalleryTabShellRoute()));
     }
 
@@ -315,6 +319,10 @@ class LoginForm extends HookConsumerWidget {
         await completeLogin(result);
       } catch (error, stack) {
         log.severe('Error logging into demo mode: $error', error, stack);
+
+        if (!context.mounted) {
+          return;
+        }
 
         ImmichToast.show(
           context: context,
