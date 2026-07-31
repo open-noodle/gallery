@@ -9,7 +9,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/domain/models/asset/asset_metadata.model.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
-import 'package:immich_mobile/domain/models/background_backup_status.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/platform_extensions.dart';
@@ -22,7 +21,6 @@ import 'package:immich_mobile/providers/infrastructure/storage.provider.dart';
 import 'package:immich_mobile/repositories/asset_media.repository.dart';
 import 'package:immich_mobile/repositories/upload.repository.dart';
 import 'package:immich_mobile/services/api.service.dart';
-import 'package:immich_mobile/services/background_backup_status.service.dart';
 import 'package:immich_mobile/utils/debug_print.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart' as api;
@@ -38,7 +36,6 @@ final backgroundUploadServiceProvider = Provider((ref) {
     db.localAssetRepository,
     db.backupRepository,
     ref.watch(assetMediaRepositoryProvider),
-    ref.watch(backgroundBackupStatusServiceProvider),
   );
 
   ref.onDispose(service.dispose);
@@ -89,7 +86,6 @@ class BackgroundUploadService {
     this._localAssetRepository,
     this._backupRepository,
     this._assetMediaRepository,
-    this._backgroundBackupStatusService,
   ) {
     _uploadRepository.onUploadStatus = _onUploadCallback;
     _uploadRepository.onTaskProgress = _onTaskProgressCallback;
@@ -100,7 +96,6 @@ class BackgroundUploadService {
   final LocalAssetRepository _localAssetRepository;
   final BackupRepository _backupRepository;
   final AssetMediaRepository _assetMediaRepository;
-  final BackgroundBackupStatusService _backgroundBackupStatusService;
   final Logger _logger = Logger('BackgroundUploadService');
 
   final StreamController<TaskStatusUpdate> _taskStatusController = StreamController<TaskStatusUpdate>.broadcast();
@@ -110,28 +105,6 @@ class BackgroundUploadService {
   Stream<TaskProgressUpdate> get taskProgressStream => _taskProgressController.stream;
 
   bool shouldAbortQueuingTasks = false;
-
-  /// Maximum number of upload tasks enqueued per batch. iOS limits how many
-  /// tasks a background URLSession handles at once, so candidates are enqueued
-  /// in batches and the next batch is queued as the current one drains.
-  @visibleForTesting
-  int backupBatchSize = 100;
-
-  /// Asset IDs already enqueued during the current backup session.
-  ///
-  /// [DriftBackupRepository.getCandidates] only drops an asset once it appears
-  /// locally as a remote asset (populated by sync), so without this we would
-  /// re-enqueue the in-flight / just-finished batch before sync catches up.
-  final Set<String> _enqueuedAssetIds = {};
-
-  /// The user whose backup is currently draining; used to enqueue the next batch.
-  String? _activeBackupUserId;
-
-  /// Guards against overlapping next-batch enqueues from concurrent completions.
-  bool _isQueuingNextBatch = false;
-
-  /// Last final status update received while a drain check was already running.
-  TaskStatusUpdate? _pendingBackupDrainUpdate;
 
   void _onTaskProgressCallback(TaskProgressUpdate update) {
     if (!_taskProgressController.isClosed) {
@@ -152,43 +125,13 @@ class BackgroundUploadService {
   }
 
   /// Enqueue tasks to the background upload queue
-  Future<List<bool>> enqueueTasks(List<UploadTask> tasks) async {
-    if (CurrentPlatform.isIOS) {
-      await _uploadRepository.disableHoldingQueue();
-      late final List<bool> results;
-      try {
-        results = await _uploadRepository.enqueueBackgroundAll(tasks);
-      } finally {
-        await _uploadRepository.restoreDefaultHoldingQueue();
-      }
-
-      for (var i = 0; i < tasks.length && i < results.length; i++) {
-        if (results[i]) {
-          await _uploadRepository.updateNotification(tasks[i], TaskStatus.enqueued);
-        }
-      }
-
-      return results;
-    }
-
+  Future<List<bool>> enqueueTasks(List<UploadTask> tasks) {
     return _uploadRepository.enqueueBackgroundAll(tasks);
   }
 
   /// Get a list of tasks that are ENQUEUED or RUNNING
   Future<List<Task>> getActiveTasks(String group) {
     return _uploadRepository.getActiveTasks(group);
-  }
-
-  bool _isBackupUploadGroup(String group) {
-    return group == kBackupGroup || group == kBackupLivePhotoGroup;
-  }
-
-  Future<List<Task>> _getActiveBackupTasks() async {
-    final activeGroups = await Future.wait([
-      _uploadRepository.getActiveTasks(kBackupGroup),
-      _uploadRepository.getActiveTasks(kBackupLivePhotoGroup),
-    ]);
-    return activeGroups.expand((group) => group).toList(growable: false);
   }
 
   /// Start background upload using iOS URLSession
@@ -198,36 +141,20 @@ class BackgroundUploadService {
   Future<void> uploadBackupCandidates(String userId) async {
     await _storageRepository.clearCache();
     shouldAbortQueuingTasks = false;
-    _activeBackupUserId = userId;
 
     final candidates = await _backupRepository.getCandidates(userId);
-
-    // Report the total once per session; subsequent batches are continuations.
-    final isFirstBatch = _enqueuedAssetIds.isEmpty;
-    if (isFirstBatch) {
-      await _backgroundBackupStatusService.recordCandidateCount(candidates.length);
-    }
-
     if (candidates.isEmpty) {
       _logger.info("No new backup candidates found, finishing background upload");
-      _resetBackupSession();
       return;
     }
 
-    // Skip assets already enqueued this session (see [_enqueuedAssetIds]).
-    final pending = candidates.where((asset) => !_enqueuedAssetIds.contains(asset.id)).toList(growable: false);
-    if (pending.isEmpty) {
-      _logger.info("All ${candidates.length} candidates already enqueued this session, finishing");
-      _resetBackupSession();
-      return;
-    }
+    _logger.info("Found ${candidates.length} backup candidates for background tasks");
 
-    _logger.info("Found ${candidates.length} backup candidates (${pending.length} not yet enqueued this session)");
+    const batchSize = 100;
+    final batch = candidates.take(batchSize).toList();
+    List<UploadTask> tasks = [];
 
-    final batch = pending.take(backupBatchSize).toList();
-    final List<UploadTask> tasks = [];
     for (final asset in batch) {
-      _enqueuedAssetIds.add(asset.id);
       final task = await getUploadTask(asset);
       if (task != null) {
         tasks.add(task);
@@ -237,7 +164,6 @@ class BackgroundUploadService {
     if (tasks.isNotEmpty && !shouldAbortQueuingTasks) {
       _logger.info("Enqueuing ${tasks.length} background upload tasks");
       await enqueueTasks(tasks);
-      await _backgroundBackupStatusService.recordUploadEnqueue(candidateCount: tasks.length);
     }
   }
 
@@ -246,7 +172,6 @@ class BackgroundUploadService {
   /// Returns the number of tasks left in the queue
   Future<int> cancel() async {
     shouldAbortQueuingTasks = true;
-    _resetBackupSession();
 
     await _storageRepository.clearCache();
     await _uploadRepository.reset(kBackupGroup);
@@ -256,38 +181,14 @@ class BackgroundUploadService {
     return activeTasks.length;
   }
 
-  /// Resume background backup processing and arm batch continuation so the rest
-  /// of the backlog is queued as the resumed tasks drain.
-  ///
-  /// Seeds the session with the assets already in flight (taskId == asset id) so
-  /// the next batch does not re-enqueue them.
-  Future<void> resume(String userId) async {
-    _activeBackupUserId = userId;
-    final active = await _getActiveBackupTasks();
-    for (final task in active) {
-      _enqueuedAssetIds.add(task.taskId);
-    }
-    await _uploadRepository.start();
-  }
-
-  bool _isLivePhotoMotionTask(Task task) {
-    if (task.group != kBackupGroup || task.metaData.isEmpty) {
-      return false;
-    }
-
-    try {
-      return UploadTaskMetadata.fromJson(task.metaData).isLivePhotos;
-    } catch (_) {
-      return false;
-    }
+  /// Resume background backup processing
+  Future<void> resume() {
+    return _uploadRepository.start();
   }
 
   Future<void> _handleTaskStatusUpdate(TaskStatusUpdate update) async {
     switch (update.status) {
       case TaskStatus.complete:
-        if (!_isLivePhotoMotionTask(update.task)) {
-          unawaited(_backgroundBackupStatusService.recordUploadSuccess());
-        }
         unawaited(_handleLivePhoto(update));
 
         if (CurrentPlatform.isIOS) {
@@ -299,59 +200,9 @@ class BackgroundUploadService {
           }
         }
 
-      case TaskStatus.failed:
-      case TaskStatus.notFound:
-      case TaskStatus.canceled:
-        unawaited(_backgroundBackupStatusService.recordFailure(BackgroundBackupFailureReason.uploadFailed));
-
       default:
         break;
     }
-
-    await _maybeQueueNextBackupBatch(update);
-  }
-
-  /// When a backup task reaches a terminal state and the queue has drained,
-  /// enqueue the next batch so a single trigger works through the whole backlog
-  /// instead of stalling after [backupBatchSize] items.
-  Future<void> _maybeQueueNextBackupBatch(TaskStatusUpdate update) async {
-    if (!_isBackupUploadGroup(update.task.group) || !update.status.isFinalState) {
-      return;
-    }
-    final userId = _activeBackupUserId;
-    if (userId == null || shouldAbortQueuingTasks) {
-      return;
-    }
-    if (_isQueuingNextBatch) {
-      _pendingBackupDrainUpdate = update;
-      return;
-    }
-
-    _isQueuingNextBatch = true;
-    try {
-      final active = await _getActiveBackupTasks();
-      if (active.any((task) => task.group != update.task.group || task.taskId != update.task.taskId)) {
-        // Other tasks of this batch are still uploading; the next batch is
-        // queued when the last one completes. (The just-completed task may still
-        // be reported active depending on update ordering, so ignore it.)
-        return;
-      }
-      await uploadBackupCandidates(userId);
-    } catch (error, stackTrace) {
-      _logger.severe("Failed to enqueue next backup batch", error, stackTrace);
-    } finally {
-      final pendingUpdate = _pendingBackupDrainUpdate;
-      _pendingBackupDrainUpdate = null;
-      _isQueuingNextBatch = false;
-      if (pendingUpdate != null) {
-        await _maybeQueueNextBackupBatch(pendingUpdate);
-      }
-    }
-  }
-
-  void _resetBackupSession() {
-    _enqueuedAssetIds.clear();
-    _activeBackupUserId = null;
   }
 
   Future<void> _handleLivePhoto(TaskStatusUpdate update) async {
