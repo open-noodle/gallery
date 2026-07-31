@@ -55,7 +55,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    unawaited(_loadData());
   }
 
   Future<void> _loadData() async {
@@ -375,17 +375,19 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   }
 
   void _navigateToMembers() {
-    context.pushRoute<String>(SpaceMembersRoute(spaceId: widget.spaceId)).then((result) async {
-      if (!mounted) return;
-      if (result == 'left') {
-        // The user just left this space from the members page. Re-fetching
-        // the space metadata would 403, so just pop ourselves back to the
-        // spaces list.
-        await context.maybePop();
-        return;
-      }
-      await _loadData();
-    });
+    unawaited(
+      context.pushRoute<String>(SpaceMembersRoute(spaceId: widget.spaceId)).then((result) async {
+        if (!mounted) return;
+        if (result == 'left') {
+          // The user just left this space from the members page. Re-fetching
+          // the space metadata would 403, so just pop ourselves back to the
+          // spaces list.
+          await context.maybePop();
+          return;
+        }
+        await _loadData();
+      }),
+    );
   }
 
   @override
@@ -414,7 +416,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
                     _loading = true;
                     _error = null;
                   });
-                  _loadData();
+                  unawaited(_loadData());
                 },
                 child: const Text('Retry'),
               ),

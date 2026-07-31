@@ -48,7 +48,7 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
 
   @override
   void dispose() {
-    _multiSelectSub?.cancel();
+    unawaited(_multiSelectSub?.cancel());
     super.dispose();
   }
 

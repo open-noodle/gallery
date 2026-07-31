@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -62,8 +63,8 @@ class _MorePlaceTile extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: () {
-            HapticFeedback.selectionClick();
-            context.pushRoute(const PlacesPickerRoute());
+            unawaited(HapticFeedback.selectionClick());
+            unawaited(context.pushRoute(const PlacesPickerRoute()));
           },
           child: Center(
             child: Column(
@@ -114,7 +115,7 @@ class _PlaceTile extends ConsumerWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: () {
-            HapticFeedback.selectionClick();
+            unawaited(HapticFeedback.selectionClick());
             if (isSelected) {
               ref.read(photosFilterProvider.notifier).setLocation(null);
             } else {
