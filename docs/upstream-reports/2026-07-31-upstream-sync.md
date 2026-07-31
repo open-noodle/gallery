@@ -12,7 +12,7 @@ batch-12 quarantine and rolling batches **12–14**.
 - **Fork commits synced from `origin/main`**: 1 (#879)
 - **Conflicts resolved**: 92 commits (88 mechanical, 4 requiring judgement)
 - **Risk level**: MEDIUM
-- **Recommendation**: PROCEED (pending the dispatched CI set)
+- **Recommendation**: PROCEED — full CI set (10 workflows) GREEN
 
 ## Why the quarantine lifted
 
@@ -176,6 +176,47 @@ Full dispatch set: `test.yml`, `docker.yml`, `static_analysis.yml`, `gallery-bui
 `static_analysis.yml`, `gallery-mobile-smoke.yml` and `gallery-build-mobile.yml` are the load-bearing
 gates for this delta — they are what actually exercise `mise //mobile:codegen` now that nothing
 generated is committed.
+
+### Results — all 10 GREEN
+
+| Workflow                                  | Status | Validated on                  |
+| ----------------------------------------- | ------ | ----------------------------- |
+| `test.yml`                                | GREEN  | `3079f8d3e28`                 |
+| `docker.yml`                              | GREEN  | `3079f8d3e28`                 |
+| `static_analysis.yml`                     | GREEN  | `3079f8d3e28`                 |
+| `gallery-build-mobile.yml`                | GREEN  | `7041ec9f100` (Android + iOS) |
+| `gallery-mobile-smoke.yml`                | GREEN  | `3079f8d3e28`                 |
+| `gallery-ml-smoke.yml`                    | GREEN  | `7041ec9f100`                 |
+| `gallery-rebase-smoke.yml`                | GREEN  | `7041ec9f100`                 |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | `7041ec9f100`                 |
+| `storage-migration-tests.yml`             | GREEN  | `7041ec9f100`                 |
+| `storage-migration-e2e.yml`               | GREEN  | `7041ec9f100`                 |
+
+The runs on `7041ec9f100` predate the two follow-up commits (this report, and the mobile test fix
+below). Neither touches server, web, ML, storage or app-build inputs, so those runs remain valid;
+`static_analysis.yml` was re-dispatched on the newer SHA specifically because it is the gate that
+inspects the edited Dart test files.
+
+### Failures fixed
+
+**`Test` + `Gallery Mobile Smoke` — 4 mobile tests (2978 passed, 4 failed, identical in both).**
+Person-thumbnail URLs now carry upstream #29350's `?c=<ms>` cache-buster, but four assertions still
+used `endsWith('/thumbnail')`.
+
+This is **pre-existing debt from batches 01–11 of this cycle, not from batches 12–14**. Proven
+before changing anything: batches 12–14 do not touch these files, and both test files are
+byte-identical to `origin/main`; what differs from `main` is `mobile/lib/utils/image_url_builder.dart`
+(+10/−6), the cache-buster threading applied during an earlier batch. It surfaced only now because
+`rolling-state.json`'s `checkHistory` is empty — **batches 01–11 were never CI'd**.
+
+Fixed by asserting `contains('<path>?c=')` rather than relaxing to the bare path, so the assertion
+still fails if either the space/owner routing or the cache-buster regresses.
+
+### Confirmed flakes
+
+**`Docker` — `mise install` hit a GitHub API 403.** The server image build failed at
+`github:extism/js-pdk@1.6.0` → `sh: 1: extism-js: not found`. Unrelated to this delta; confirmed
+transient by re-run (green on `3079f8d3e28`), not assumed.
 
 ## Post-Rebase Verification
 
