@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -25,7 +26,7 @@ class ActiveFilterChip extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     void removeChip() {
-      HapticFeedback.selectionClick();
+      unawaited(HapticFeedback.selectionClick());
       final callback = onRemove;
       if (callback != null) {
         callback();

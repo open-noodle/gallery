@@ -443,9 +443,7 @@ void main() {
 
   group('linkAlbum', () {
     test('calls SDK linkAlbum(albumId, spaceId) — note arg order', () async {
-      when(
-        () => mockApi.linkAlbum('album-1', 'space-1'),
-      ).thenAnswer((_) async {});
+      when(() => mockApi.linkAlbum('album-1', 'space-1')).thenAnswer((_) async {});
 
       await repository.linkAlbum('space-1', 'album-1');
 
@@ -455,9 +453,7 @@ void main() {
 
   group('unlinkAlbum', () {
     test('calls SDK unlinkAlbum(albumId, spaceId) — note arg order', () async {
-      when(
-        () => mockApi.unlinkAlbum('album-1', 'space-1'),
-      ).thenAnswer((_) async {});
+      when(() => mockApi.unlinkAlbum('album-1', 'space-1')).thenAnswer((_) async {});
 
       await repository.unlinkAlbum('space-1', 'album-1');
 
@@ -467,9 +463,7 @@ void main() {
 
   group('updateAlbumLink', () {
     test('calls updateSharedSpaceAlbum with showInTimeline:false', () async {
-      when(
-        () => mockApi.updateSharedSpaceAlbum('album-1', 'space-1', any()),
-      ).thenAnswer((_) async {});
+      when(() => mockApi.updateSharedSpaceAlbum('album-1', 'space-1', any())).thenAnswer((_) async {});
 
       await repository.updateAlbumLink('space-1', 'album-1', showInTimeline: false);
 
@@ -477,21 +471,13 @@ void main() {
         () => mockApi.updateSharedSpaceAlbum(
           'album-1',
           'space-1',
-          any(
-            that: isA<api.SharedSpaceAlbumLinkUpdateDto>().having(
-              (d) => d.showInTimeline,
-              'showInTimeline',
-              false,
-            ),
-          ),
+          any(that: isA<api.SharedSpaceAlbumLinkUpdateDto>().having((d) => d.showInTimeline, 'showInTimeline', false)),
         ),
       ).called(1);
     });
 
     test('calls updateSharedSpaceAlbum with showInTimeline:true', () async {
-      when(
-        () => mockApi.updateSharedSpaceAlbum('album-1', 'space-1', any()),
-      ).thenAnswer((_) async {});
+      when(() => mockApi.updateSharedSpaceAlbum('album-1', 'space-1', any())).thenAnswer((_) async {});
 
       await repository.updateAlbumLink('space-1', 'album-1', showInTimeline: true);
 
@@ -499,13 +485,7 @@ void main() {
         () => mockApi.updateSharedSpaceAlbum(
           'album-1',
           'space-1',
-          any(
-            that: isA<api.SharedSpaceAlbumLinkUpdateDto>().having(
-              (d) => d.showInTimeline,
-              'showInTimeline',
-              true,
-            ),
-          ),
+          any(that: isA<api.SharedSpaceAlbumLinkUpdateDto>().having((d) => d.showInTimeline, 'showInTimeline', true)),
         ),
       ).called(1);
     });
@@ -534,11 +514,7 @@ void main() {
           'space-1',
           any(
             that: dtoThat(
-              (d) =>
-                  d.name.isPresent &&
-                  d.name.value == 'Renamed' &&
-                  d.description.isEmpty &&
-                  d.color.isEmpty,
+              (d) => d.name.isPresent && d.name.value == 'Renamed' && d.description.isEmpty && d.color.isEmpty,
               'name present, description and color absent',
             ),
           ),
@@ -555,10 +531,7 @@ void main() {
         () => mockApi.updateSpace(
           'space-1',
           any(
-            that: dtoThat(
-              (d) => d.description.isPresent && d.description.value == '',
-              'description present and empty',
-            ),
+            that: dtoThat((d) => d.description.isPresent && d.description.value == '', 'description present and empty'),
           ),
         ),
       ).called(1);
@@ -610,12 +583,7 @@ void main() {
       verify(
         () => mockApi.updateSpace(
           'space-1',
-          any(
-            that: dtoThat(
-              (d) => d.color.isPresent && d.color.value == api.UserAvatarColor.amber,
-              'color present',
-            ),
-          ),
+          any(that: dtoThat((d) => d.color.isPresent && d.color.value == api.UserAvatarColor.amber, 'color present')),
         ),
       ).called(1);
     });

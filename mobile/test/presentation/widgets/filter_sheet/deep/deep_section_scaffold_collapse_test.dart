@@ -15,22 +15,26 @@ class _FakePrefs implements FilterSectionPrefs {
 }
 
 Widget _host(AsyncValue<List<String>> items, {Set<FilterSectionId> collapsed = const {}}) => ProviderScope(
-      overrides: [filterSectionPrefsProvider.overrideWithValue(_FakePrefs({...collapsed}))],
-      child: MaterialApp(
-        localizationsDelegates: const [DefaultMaterialLocalizations.delegate, DefaultWidgetsLocalizations.delegate],
-        home: Scaffold(
-          body: ListView(children: [
-            DeepSectionScaffold<String>(
-              sectionId: FilterSectionId.tags,
-              titleKey: FilterSectionId.tags.titleKey,
-              emptyCaptionKey: 'filter_sheet_deep_empty_tags',
-              items: items,
-              childBuilder: (data) => Column(children: [for (final d in data) Text(d, key: Key('item-$d'))]),
-            ),
-          ]),
-        ),
+  overrides: [
+    filterSectionPrefsProvider.overrideWithValue(_FakePrefs({...collapsed})),
+  ],
+  child: MaterialApp(
+    localizationsDelegates: const [DefaultMaterialLocalizations.delegate, DefaultWidgetsLocalizations.delegate],
+    home: Scaffold(
+      body: ListView(
+        children: [
+          DeepSectionScaffold<String>(
+            sectionId: FilterSectionId.tags,
+            titleKey: FilterSectionId.tags.titleKey,
+            emptyCaptionKey: 'filter_sheet_deep_empty_tags',
+            items: items,
+            childBuilder: (data) => Column(children: [for (final d in data) Text(d, key: Key('item-$d'))]),
+          ),
+        ],
       ),
-    );
+    ),
+  ),
+);
 
 /// Mutable-data harness: drives a SINGLE `DeepSectionScaffold` instance
 /// through a data transition (e.g. empty → non-empty) via a `ValueNotifier`,
@@ -44,22 +48,26 @@ Future<ValueNotifier<AsyncValue<List<String>>>> _pumpMutable(
   addTearDown(notifier.dispose);
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [filterSectionPrefsProvider.overrideWithValue(_FakePrefs({...collapsed}))],
+      overrides: [
+        filterSectionPrefsProvider.overrideWithValue(_FakePrefs({...collapsed})),
+      ],
       child: MaterialApp(
         localizationsDelegates: const [DefaultMaterialLocalizations.delegate, DefaultWidgetsLocalizations.delegate],
         home: Scaffold(
-          body: ListView(children: [
-            ValueListenableBuilder<AsyncValue<List<String>>>(
-              valueListenable: notifier,
-              builder: (_, value, __) => DeepSectionScaffold<String>(
-                sectionId: FilterSectionId.tags,
-                titleKey: FilterSectionId.tags.titleKey,
-                emptyCaptionKey: 'filter_sheet_deep_empty_tags',
-                items: value,
-                childBuilder: (data) => Column(children: [for (final d in data) Text(d, key: Key('item-$d'))]),
+          body: ListView(
+            children: [
+              ValueListenableBuilder<AsyncValue<List<String>>>(
+                valueListenable: notifier,
+                builder: (_, value, __) => DeepSectionScaffold<String>(
+                  sectionId: FilterSectionId.tags,
+                  titleKey: FilterSectionId.tags.titleKey,
+                  emptyCaptionKey: 'filter_sheet_deep_empty_tags',
+                  items: value,
+                  childBuilder: (data) => Column(children: [for (final d in data) Text(d, key: Key('item-$d'))]),
+                ),
               ),
-            ),
-          ]),
+            ],
+          ),
         ),
       ),
     ),

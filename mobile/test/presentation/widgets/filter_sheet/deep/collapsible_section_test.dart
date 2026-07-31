@@ -16,16 +16,17 @@ class _FakePrefs implements FilterSectionPrefs {
   Future<void> saveCollapsed(Set<FilterSectionId> ids) async {}
 }
 
-List<Override> _prefs([Set<FilterSectionId> collapsed = const {}]) =>
-    [filterSectionPrefsProvider.overrideWithValue(_FakePrefs({...collapsed}))];
+List<Override> _prefs([Set<FilterSectionId> collapsed = const {}]) => [
+  filterSectionPrefsProvider.overrideWithValue(_FakePrefs({...collapsed})),
+];
 
 CollapsibleSection _section(FilterSectionId id, {bool isEmpty = false, Widget? trailing}) => CollapsibleSection(
-      sectionId: id,
-      titleKey: id.titleKey,
-      isEmpty: isEmpty,
-      trailingHeader: trailing,
-      child: const Text('BODY', key: Key('body-marker')),
-    );
+  sectionId: id,
+  titleKey: id.titleKey,
+  isEmpty: isEmpty,
+  trailingHeader: trailing,
+  child: const Text('BODY', key: Key('body-marker')),
+);
 
 void main() {
   testWidgets('expanded by default: header + body visible', (t) async {

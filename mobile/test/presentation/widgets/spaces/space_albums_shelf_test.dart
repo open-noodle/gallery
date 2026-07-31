@@ -28,7 +28,7 @@ RemoteAsset _remoteAsset({required String id}) => RemoteAsset(
 
 /// Finds widgets whose [ValueKey<String>] starts with [prefix].
 Finder findByKeyPrefix(String prefix) => find.byWidgetPredicate(
-  (widget) => widget.key is ValueKey<String> && (widget.key as ValueKey<String>).value.startsWith(prefix),
+  (widget) => widget.key is ValueKey<String> && (widget.key! as ValueKey<String>).value.startsWith(prefix),
 );
 
 // ---------------------------------------------------------------------------

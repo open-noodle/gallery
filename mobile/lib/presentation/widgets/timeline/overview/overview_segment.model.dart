@@ -65,9 +65,11 @@ class _TimelineOverviewSegmentCard extends ConsumerWidget {
     if (bucket.assetCount > 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) {
-          ref
-              .read(timelineOverviewRepresentativeCacheProvider.notifier)
-              .ensure(key, segment.firstAssetIndex, bucket.assetCount);
+          unawaited(
+            ref
+                .read(timelineOverviewRepresentativeCacheProvider.notifier)
+                .ensure(key, segment.firstAssetIndex, bucket.assetCount),
+          );
         }
       });
     }

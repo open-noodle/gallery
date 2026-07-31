@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -41,7 +42,7 @@ class MediaTypeSection extends ConsumerWidget {
           ],
           selected: {current},
           onSelectionChanged: (selected) {
-            HapticFeedback.selectionClick();
+            unawaited(HapticFeedback.selectionClick());
             final next = selected.first;
             ref.read(photosFilterProvider.notifier).setMediaType(next == AssetType.other ? null : next);
           },

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -60,8 +61,8 @@ class _MorePersonTile extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(32),
         onTap: () {
-          HapticFeedback.selectionClick();
-          context.pushRoute(const PersonPickerRoute());
+          unawaited(HapticFeedback.selectionClick());
+          unawaited(context.pushRoute(const PersonPickerRoute()));
         },
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -110,7 +111,7 @@ class _PersonTile extends ConsumerWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(32),
         onTap: () {
-          HapticFeedback.selectionClick();
+          unawaited(HapticFeedback.selectionClick());
           final existing = ref.read(photosFilterProvider).people.firstWhereOrNull((p) => p.id == person.id);
           if (existing != null) {
             ref.read(photosFilterProvider.notifier).togglePerson(existing);
