@@ -76,11 +76,7 @@ class SpaceMembersPage extends HookConsumerWidget {
         await ref.read(sharedSpaceApiRepositoryProvider).updateMember(spaceId, member.userId, newRole);
         ref.invalidate(sharedSpaceMembersProvider(spaceId));
         if (context.mounted) {
-          ImmichToast.show(
-            context: context,
-            msg: '${member.name} is now ${newRole.toString()}',
-            toastType: ToastType.success,
-          );
+          ImmichToast.show(context: context, msg: '${member.name} is now $newRole', toastType: ToastType.success);
         }
       } catch (e) {
         if (context.mounted) {
