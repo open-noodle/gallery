@@ -658,10 +658,10 @@ Then rebase onto each in turn — `8e0ad9b2c4b`, `36cb86c886d`, `7aa20683610`, `
 - [ ] **Step 2: Run the audits after the final rebase**
 
 ```bash
-make upstream-postrebase-audit BATCH=29
+make upstream-postrebase-audit BATCH=26
 make ci-invariants-check
 make fork-patches-check
-make mobile-drift-rebase-check BATCH=29
+make mobile-drift-rebase-check BATCH=26
 ```
 
 Expected: all `OK:`.
