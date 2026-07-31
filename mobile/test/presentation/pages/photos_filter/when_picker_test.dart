@@ -206,4 +206,29 @@ void main() {
       expect(rect.bottom, greaterThan(0));
     });
   });
+
+  group('WhenPickerPage error state', () {
+    testWidgets('renders a tappable retry; tapping invalidates timeBucketsProvider and refetches', (tester) async {
+      var calls = 0;
+      await tester.pumpConsumerWidget(
+        const WhenPickerPage(),
+        overrides: [
+          timeBucketsProvider.overrideWith((ref, filter) async {
+            calls++;
+            if (calls == 1) throw Exception('network down');
+            return const <BucketLite>[(timeBucket: '2024-06-01', count: 10)];
+          }),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('when-picker-retry')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('when-picker-retry')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('when-picker-retry')), findsNothing);
+      expect(find.byKey(const Key('when-year-2024')), findsOneWidget);
+    });
+  });
 }

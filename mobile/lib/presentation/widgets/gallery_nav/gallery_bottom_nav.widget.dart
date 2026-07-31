@@ -31,7 +31,7 @@ class GalleryBottomNav extends ConsumerStatefulWidget {
 class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
   static const double _keyboardThreshold = 80;
   static const Duration _hideAnimation = Duration(milliseconds: 200);
-  static const double _pillHeight = 58;
+  static const double _pillHeight = 52;
   static const double _bottomFloat = 26;
 
   bool _hiddenForMultiSelect = false;
@@ -99,16 +99,18 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
           ignoring: hiding,
           child: Padding(
             padding: EdgeInsets.only(left: 14, right: 14, bottom: bottomInset),
+            // Google-Photos-style: the content-sized pill and the search blob form
+            // a single cluster centered horizontally (small fixed gap between them),
+            // rather than the pill hugging the left with a Spacer pushing search right.
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Expanded(
-                  child: GalleryNavPill(
-                    activeTab: GalleryTabEnum.values[widget.tabsRouter.activeIndex],
-                    disabledTabs: isReadonly ? const {GalleryTabEnum.albums, GalleryTabEnum.library} : const {},
-                    onTabTap: _onTabTap,
-                  ),
+                GalleryNavPill(
+                  activeTab: GalleryTabEnum.values[widget.tabsRouter.activeIndex],
+                  disabledTabs: isReadonly ? const {GalleryTabEnum.albums, GalleryTabEnum.library} : const {},
+                  onTabTap: _onTabTap,
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 GallerySearchBlob(enabled: !isReadonly, onTap: () => openGallerySearch(widget.tabsRouter, ref.read)),
               ],
             ),

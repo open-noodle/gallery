@@ -36,6 +36,20 @@ void main() {
       expect(find.byKey(const Key('tag-dot')), findsOneWidget);
     });
 
+    testWidgets('camera spec renders Icons.photo_camera_rounded leading', (tester) async {
+      const spec = ActiveChipSpec(
+        id: CameraChipId(),
+        label: 'Canon · R5',
+        visual: ChipVisual.camera,
+        icon: Icons.photo_camera_rounded,
+      );
+
+      await tester.pumpConsumerWidget(const ActiveFilterChip(spec: spec));
+      await tester.pumpAndSettle();
+      expect(find.text('Canon · R5'), findsOneWidget);
+      expect(find.byIcon(Icons.photo_camera_rounded), findsOneWidget);
+    });
+
     testWidgets('location spec renders Icons.place_rounded leading', (tester) async {
       const spec = ActiveChipSpec(
         id: LocationChipId(),
