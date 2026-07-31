@@ -29,10 +29,8 @@ import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/asset_media.repository.dart';
 import 'package:immich_mobile/repositories/permission.repository.dart';
 import 'package:immich_mobile/services/auth.service.dart';
-import 'package:immich_mobile/services/background_backup_status.service.dart';
 import 'package:immich_mobile/services/foreground_upload.service.dart';
 import 'package:immich_mobile/services/localization.service.dart';
-import 'package:immich_mobile/utils/background_downloader_recovery.dart';
 import 'package:immich_mobile/utils/bootstrap.dart';
 import 'package:immich_mobile/utils/debug_print.dart';
 import 'package:immich_mobile/wm_executor.dart';
@@ -112,11 +110,6 @@ class BackgroundWorkerBgService extends BackgroundWorkerFlutterApi {
 
   bool get _isBackupEnabled => SettingsRepository.instance.appConfig.backup.enabled;
 
-  BackgroundBackupEventRecorder? get _backupEventRecorder {
-    final statusService = _ref?.read(backgroundBackupStatusServiceProvider);
-    return statusService == null ? null : BackgroundBackupEventRecorder(statusService);
-  }
-
   Future<void> init() async {
     try {
       await Future.wait(
@@ -139,7 +132,6 @@ class BackgroundWorkerBgService extends BackgroundWorkerFlutterApi {
       );
 
       configureFileDownloaderNotifications();
-      scheduleBackgroundDownloaderRecovery();
 
       // Notify the host that the background worker service has been initialized and is ready to use
       unawaited(_backgroundHostApi.onInitialized());
@@ -153,7 +145,6 @@ class BackgroundWorkerBgService extends BackgroundWorkerFlutterApi {
   Future<void> onAndroidUpload(int? maxMinutes) async {
     final hashTimeout = Duration(minutes: _isBackupEnabled ? 3 : 6);
     final backupTimeout = maxMinutes != null ? Duration(minutes: maxMinutes - 1) : null;
-    await _backupEventRecorder?.recordAndroidWake();
     await _optimizeDB();
     return _backgroundLoop(
       hashTimeout: hashTimeout,
@@ -167,7 +158,6 @@ class BackgroundWorkerBgService extends BackgroundWorkerFlutterApi {
     _logger.info('iOS background upload started with maxSeconds: ${maxSeconds}s');
     final sw = Stopwatch()..start();
     try {
-      await _backupEventRecorder?.recordIosWake(isRefresh: isRefresh);
       final budget = maxSeconds != null ? Duration(seconds: maxSeconds - 1) : null;
 
       // Only for Background Processing tasks
@@ -214,16 +204,39 @@ class BackgroundWorkerBgService extends BackgroundWorkerFlutterApi {
     required Duration hashTimeout,
     required Duration? backupTimeout,
     required String debugLabel,
-  }) {
-    return BackgroundBackupLoop(
-      syncAssets: _syncAssets,
-      handleBackup: _handleBackup,
-      cleanup: _cleanup,
-      cancellationToken: _cancellationToken,
-      logInfo: _logger.info,
-      logWarning: _logger.warning,
-      logSevere: _logger.severe,
-    ).run(hashTimeout: hashTimeout, backupTimeout: backupTimeout, debugLabel: debugLabel);
+  }) async {
+    _logger.info(
+      '$debugLabel started hashTimeout: ${hashTimeout.inSeconds}s, backupTimeout: ${backupTimeout?.inMinutes ?? '~'}m',
+    );
+    final sw = Stopwatch()..start();
+    try {
+      if (!await _syncAssets(hashTimeout: hashTimeout)) {
+        _logger.warning("Remote sync did not complete successfully, skipping backup");
+        return;
+      }
+
+      final backupFuture = _handleBackup();
+      Timer? cancelTimer;
+      if (backupTimeout != null) {
+        cancelTimer = Timer(backupTimeout, () {
+          if (!_cancellationToken.isCompleted) {
+            _logger.warning("$debugLabel timed out after ${backupTimeout.inMinutes}m, cancelling backup");
+            _cancellationToken.complete();
+          }
+        });
+      }
+      try {
+        await backupFuture;
+      } finally {
+        cancelTimer?.cancel();
+      }
+    } catch (error, stack) {
+      _logger.severe("Failed to complete $debugLabel", error, stack);
+    } finally {
+      sw.stop();
+      _logger.info("$debugLabel completed in ${sw.elapsed.inSeconds}s");
+      await _cleanup();
+    }
   }
 
   @override
@@ -260,14 +273,6 @@ class BackgroundWorkerBgService extends BackgroundWorkerFlutterApi {
       _isCleanedUp = true;
       final nativeSyncApi = _ref?.read(nativeSyncApiProvider);
 
-      // Abort and drain in-flight HTTP requests first. On iOS the background
-      // isolate shares a native URLSession; if it is destroyed while a request
-      // is in flight, the cupertino_http delegate later calls back into the
-      // dead isolate and crashes (SIGABRT). Draining here makes their callbacks
-      // fire while the isolate is still alive, before the native side calls
-      // engine.destroyContext().
-      await NetworkRepository.shutdown();
-
       _logger.info("Cleaning up background worker");
       if (!_cancellationToken.isCompleted) {
         _cancellationToken.complete();
@@ -294,18 +299,12 @@ class BackgroundWorkerBgService extends BackgroundWorkerFlutterApi {
           return;
         }
 
-        final backupEnabled = _isBackupEnabled;
-        final currentUser = _ref?.read(currentUserProvider);
-        await _backupEventRecorder?.recordBackupPreflight(
-          backupEnabled: backupEnabled,
-          hasCurrentUser: currentUser != null,
-        );
-
-        if (!backupEnabled) {
+        if (!_isBackupEnabled) {
           _logger.info("Backup is disabled. Skipping backup routine");
           return;
         }
 
+        final currentUser = _ref?.read(currentUserProvider);
         if (currentUser == null) {
           _logger.warning("No current user found. Skipping backup from background");
           return;
@@ -332,9 +331,6 @@ class BackgroundWorkerBgService extends BackgroundWorkerFlutterApi {
     }
 
     final isSuccess = await _remoteSyncService.sync();
-    if (!isSuccess) {
-      await _backupEventRecorder?.recordRemoteSyncResult(false);
-    }
     if (_isCleanedUp) {
       return isSuccess;
     }
@@ -377,11 +373,6 @@ class BackgroundWorkerLockService {
 Future<void> backgroundSyncNativeEntrypoint() async {
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
-
-  // Track in-flight HTTP requests so they can be drained before this isolate is
-  // torn down. Must run before Bootstrap.initDomain (which calls
-  // NetworkRepository.init).
-  NetworkRepository.enableShutdownTracking();
 
   final (drift, logDB) = await Bootstrap.initDomain(shouldBufferLogs: false, listenStoreUpdates: false);
   await BackgroundWorkerBgService(drift: drift, driftLogger: logDB).init();
