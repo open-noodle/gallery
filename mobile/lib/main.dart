@@ -35,7 +35,6 @@ import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/services/deep_link.service.dart';
 import 'package:immich_mobile/theme/dynamic_theme.dart';
 import 'package:immich_mobile/theme/theme_data.dart';
-import 'package:immich_mobile/utils/background_downloader_recovery.dart';
 import 'package:immich_mobile/utils/bootstrap.dart';
 import 'package:immich_mobile/utils/cache/widgets_binding.dart';
 import 'package:immich_mobile/utils/debug_print.dart';
@@ -107,8 +106,6 @@ Future<void> initApp() async {
   await FileDownloader().trackTasksInGroup(kDownloadGroupLivePhoto, markDownloadedComplete: false);
 
   unawaited(FileDownloader().trackTasks());
-
-  scheduleBackgroundDownloaderRecovery();
 
   LicenseRegistry.addLicense(() async* {
     for (final license in nonPubLicenses.entries) {
