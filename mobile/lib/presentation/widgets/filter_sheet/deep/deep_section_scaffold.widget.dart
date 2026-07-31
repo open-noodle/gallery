@@ -1,6 +1,8 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/collapsible_section.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
 
 /// Shared shell for Deep filter-sheet sections — title + optional trailing header
 /// + loading skeleton / error retry / empty caption / childBuilder output.
@@ -11,6 +13,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// On AsyncError with cached data present, we also keep rendering the cache
 /// (no retry button) — per-section failure recovery stays silent.
 class DeepSectionScaffold<T> extends StatefulWidget {
+  final FilterSectionId sectionId;
   final String titleKey;
   final String emptyCaptionKey;
   final AsyncValue<List<T>> items;
@@ -23,6 +26,7 @@ class DeepSectionScaffold<T> extends StatefulWidget {
 
   const DeepSectionScaffold({
     super.key,
+    required this.sectionId,
     required this.titleKey,
     required this.emptyCaptionKey,
     required this.items,
@@ -44,49 +48,30 @@ class _DeepSectionScaffoldState<T> extends State<DeepSectionScaffold<T>> {
     final data = items.valueOrNull;
     if (data != null) _lastData = data;
 
-    final theme = Theme.of(context);
-    final title = Text(
-      widget.titleKey.tr().toUpperCase(),
-      overflow: TextOverflow.ellipsis,
-      style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 2, color: theme.colorScheme.outline),
-    );
-
-    final header = Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-      child: Row(
-        children: [
-          Expanded(child: title),
-          if (widget.trailingHeader != null) Flexible(child: widget.trailingHeader!),
-        ],
-      ),
-    );
+    final cache = _lastData;
+    final isEmpty = cache != null && cache.isEmpty;
 
     Widget body;
-    final cache = _lastData;
     if (cache != null) {
-      if (cache.isEmpty) {
-        body = Padding(
-          key: const Key('deep-section-empty'),
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            widget.emptyCaptionKey.tr(),
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
-          ),
-        );
-      } else {
-        body = Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: widget.childBuilder(cache));
-      }
+      // Body is hidden by CollapsibleSection when empty; isEmpty drives the "(0)" + disabled header.
+      // widget.emptyCaptionKey is kept on the constructor for callers, but its caption is
+      // unreachable while isEmpty is true, so we skip building it here.
+      body = cache.isEmpty
+          ? const SizedBox.shrink()
+          : Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: widget.childBuilder(cache));
     } else if (items is AsyncError) {
       body = _DeepRetry(onRetry: widget.onRetry);
     } else {
       body = const _DeepSkeleton();
     }
 
-    return Column(
+    return CollapsibleSection(
       key: const Key('deep-section-scaffold'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [header, body],
+      sectionId: widget.sectionId,
+      titleKey: widget.titleKey,
+      isEmpty: isEmpty,
+      trailingHeader: isEmpty ? null : widget.trailingHeader,
+      child: body,
     );
   }
 }

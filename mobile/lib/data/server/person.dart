@@ -99,6 +99,7 @@ class PersonApiRepository extends ApiRepository {
       updatedAt: dto.updatedAt.orElse(null),
       birthDate: dto.birthDate,
       spaceId: spaceId,
+      numberOfAssets: dto.numberOfAssets.orElse(null),
     );
   }
 
@@ -150,7 +151,4 @@ class PersonApiRepository extends ApiRepository {
     final response = await checkNull(_api.updatePerson(id, dto));
     return _toPerson(response);
   }
-
-  static Person _toPerson(PersonResponseDto dto) =>
-      .new(birthDate: dto.birthDate, id: dto.id, name: dto.name, updatedAt: dto.updatedAt.orElse(null));
 }

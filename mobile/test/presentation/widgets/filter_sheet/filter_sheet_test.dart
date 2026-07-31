@@ -3,14 +3,39 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep_content.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_sheet.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
+import 'package:immich_mobile/providers/photos_filter/collapsed_sections.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/hidden_sections.provider.dart';
 
 import '../../../widget_tester_extensions.dart';
+
+class _FakePrefs implements FilterSectionPrefs {
+  final Set<FilterSectionId> collapsed;
+  _FakePrefs(this.collapsed);
+  @override
+  Set<FilterSectionId> loadCollapsed() => collapsed;
+  @override
+  Future<void> saveCollapsed(Set<FilterSectionId> ids) async {}
+}
+
+class _FakeVis implements FilterSectionVisibilityPrefs {
+  Set<FilterSectionId> stored;
+  _FakeVis(this.stored);
+  @override
+  Set<FilterSectionId> loadHidden() => stored;
+  @override
+  Future<void> saveHidden(Set<FilterSectionId> ids) async => stored = ids;
+}
 
 Future<void> _pump(WidgetTester tester, {FilterSheetSnap? snap}) async {
   await tester.pumpConsumerWidget(
     const FilterSheet(),
-    overrides: snap == null ? const [] : [photosFilterSheetProvider.overrideWith((ref) => snap)],
+    overrides: [
+      filterSectionPrefsProvider.overrideWithValue(_FakePrefs({})),
+      filterSectionVisibilityPrefsProvider.overrideWithValue(_FakeVis({})),
+      if (snap != null) photosFilterSheetProvider.overrideWith((ref) => snap),
+    ],
   );
   await tester.pumpAndSettle();
 }

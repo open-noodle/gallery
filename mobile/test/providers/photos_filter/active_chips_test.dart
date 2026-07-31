@@ -107,6 +107,28 @@ void main() {
       expect(activeChipsFromFilter(f).where((c) => c.visual == ChipVisual.location), isEmpty);
     });
 
+    test('camera with make + model → 1 chip "Canon · R5"', () {
+      final f = _base()..camera = SearchCameraFilter(make: 'Canon', model: 'R5');
+      final chips = activeChipsFromFilter(f);
+      expect(chips, hasLength(1));
+      expect(chips.single.label, 'Canon · R5');
+      expect(chips.single.id, isA<CameraChipId>());
+      expect(chips.single.visual, ChipVisual.camera);
+    });
+
+    test('camera with make only → 1 chip "Canon"', () {
+      final f = _base()..camera = SearchCameraFilter(make: 'Canon');
+      final chips = activeChipsFromFilter(f);
+      expect(chips, hasLength(1));
+      expect(chips.single.label, 'Canon');
+      expect(chips.single.id, isA<CameraChipId>());
+    });
+
+    test('camera with all fields null → no chip (defensive)', () {
+      final f = _base();
+      expect(activeChipsFromFilter(f).where((c) => c.visual == ChipVisual.camera), isEmpty);
+    });
+
     test('date with only takenAfter → "After MMM yyyy"', () {
       final f = _base()..date = SearchDateFilter(takenAfter: DateTime(2024, 4, 1));
       final chips = activeChipsFromFilter(f);
@@ -179,6 +201,7 @@ void main() {
         ..people.add(_person('p1', 'Alice'))
         ..tagIds = ['t1']
         ..location = SearchLocationFilter(country: 'France')
+        ..camera = SearchCameraFilter(make: 'Canon', model: 'R5')
         ..date = SearchDateFilter(takenAfter: DateTime(2024, 4, 1))
         ..rating = SearchRatingFilter(rating: const Option.some(4))
         ..mediaType = AssetType.image
@@ -190,6 +213,7 @@ void main() {
         ChipVisual.person,
         ChipVisual.tag,
         ChipVisual.location,
+        ChipVisual.camera,
         ChipVisual.when,
         ChipVisual.rating,
         ChipVisual.media,

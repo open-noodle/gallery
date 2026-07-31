@@ -2,6 +2,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/collapsible_section.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
 /// Adaptive toggles: Favourites, Archived, Not-in-album, Untagged.
@@ -11,63 +13,59 @@ class TogglesSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final display = ref.watch(photosFilterProvider.select((f) => f.display));
     final notifier = ref.read(photosFilterProvider.notifier);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text(
-              'filter_sheet_deep_toggles_section'.tr().toUpperCase(),
-              style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 2, color: theme.colorScheme.outline),
+    return CollapsibleSection(
+      sectionId: FilterSectionId.toggles,
+      titleKey: 'filter_sheet_deep_toggles_section',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SwitchListTile.adaptive(
+              key: const Key('toggle-favourites'),
+              contentPadding: EdgeInsets.zero,
+              title: Text('filter_sheet_favourites'.tr()),
+              value: display.isFavorite,
+              onChanged: (v) {
+                HapticFeedback.selectionClick();
+                notifier.setFavouritesOnly(v);
+              },
             ),
-          ),
-          SwitchListTile.adaptive(
-            key: const Key('toggle-favourites'),
-            contentPadding: EdgeInsets.zero,
-            title: Text('filter_sheet_favourites'.tr()),
-            value: display.isFavorite,
-            onChanged: (v) {
-              HapticFeedback.selectionClick();
-              notifier.setFavouritesOnly(v);
-            },
-          ),
-          SwitchListTile.adaptive(
-            key: const Key('toggle-archived'),
-            contentPadding: EdgeInsets.zero,
-            title: Text('filter_sheet_archived'.tr()),
-            value: display.isArchive,
-            onChanged: (v) {
-              HapticFeedback.selectionClick();
-              notifier.setArchivedIncluded(v);
-            },
-          ),
-          SwitchListTile.adaptive(
-            key: const Key('toggle-not-in-album'),
-            contentPadding: EdgeInsets.zero,
-            title: Text('filter_sheet_not_in_album'.tr()),
-            value: display.isNotInAlbum,
-            onChanged: (v) {
-              HapticFeedback.selectionClick();
-              notifier.setNotInAlbum(v);
-            },
-          ),
-          SwitchListTile.adaptive(
-            key: const Key('toggle-untagged'),
-            contentPadding: EdgeInsets.zero,
-            title: Text('untagged'.tr()),
-            value: display.isUntagged,
-            onChanged: (v) {
-              HapticFeedback.selectionClick();
-              notifier.setUntagged(v);
-            },
-          ),
-        ],
+            SwitchListTile.adaptive(
+              key: const Key('toggle-archived'),
+              contentPadding: EdgeInsets.zero,
+              title: Text('filter_sheet_archived'.tr()),
+              value: display.isArchive,
+              onChanged: (v) {
+                HapticFeedback.selectionClick();
+                notifier.setArchivedIncluded(v);
+              },
+            ),
+            SwitchListTile.adaptive(
+              key: const Key('toggle-not-in-album'),
+              contentPadding: EdgeInsets.zero,
+              title: Text('filter_sheet_not_in_album'.tr()),
+              value: display.isNotInAlbum,
+              onChanged: (v) {
+                HapticFeedback.selectionClick();
+                notifier.setNotInAlbum(v);
+              },
+            ),
+            SwitchListTile.adaptive(
+              key: const Key('toggle-untagged'),
+              contentPadding: EdgeInsets.zero,
+              title: Text('untagged'.tr()),
+              value: display.isUntagged,
+              onChanged: (v) {
+                HapticFeedback.selectionClick();
+                notifier.setUntagged(v);
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
