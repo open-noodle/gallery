@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,7 +31,7 @@ class TogglesSection extends ConsumerWidget {
               title: Text('filter_sheet_favourites'.tr()),
               value: display.isFavorite,
               onChanged: (v) {
-                HapticFeedback.selectionClick();
+                unawaited(HapticFeedback.selectionClick());
                 notifier.setFavouritesOnly(v);
               },
             ),
@@ -40,7 +41,7 @@ class TogglesSection extends ConsumerWidget {
               title: Text('filter_sheet_archived'.tr()),
               value: display.isArchive,
               onChanged: (v) {
-                HapticFeedback.selectionClick();
+                unawaited(HapticFeedback.selectionClick());
                 notifier.setArchivedIncluded(v);
               },
             ),
@@ -50,7 +51,7 @@ class TogglesSection extends ConsumerWidget {
               title: Text('filter_sheet_not_in_album'.tr()),
               value: display.isNotInAlbum,
               onChanged: (v) {
-                HapticFeedback.selectionClick();
+                unawaited(HapticFeedback.selectionClick());
                 notifier.setNotInAlbum(v);
               },
             ),
@@ -60,7 +61,7 @@ class TogglesSection extends ConsumerWidget {
               title: Text('untagged'.tr()),
               value: display.isUntagged,
               onChanged: (v) {
-                HapticFeedback.selectionClick();
+                unawaited(HapticFeedback.selectionClick());
                 notifier.setUntagged(v);
               },
             ),

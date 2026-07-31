@@ -113,7 +113,7 @@ class _WhenPill extends ConsumerWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: () {
-          HapticFeedback.selectionClick();
+          unawaited(HapticFeedback.selectionClick());
           ref.read(photosFilterProvider.notifier).setDateRange(start: preset.start, end: preset.end);
         },
         child: Padding(

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -82,9 +83,11 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
       if (next == FilterSheetSnap.hidden || !_controller.isAttached) return;
       final target = _targetExtent(next);
       if ((_controller.size - target).abs() < 0.01) return;
-      _controller.animateTo(target, duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic);
+      unawaited(_controller.animateTo(target, duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic));
       if (MediaQuery.of(context).accessibleNavigation) {
-        SemanticsService.sendAnnouncement(View.of(context), 'filter panel ${next.name}', Directionality.of(context));
+        unawaited(
+          SemanticsService.sendAnnouncement(View.of(context), 'filter panel ${next.name}', Directionality.of(context)),
+        );
       }
     });
 
