@@ -1058,7 +1058,11 @@ export class SyncService extends BaseService {
     const upsertType = SyncEntityType.SharedSpaceAlbumV1;
     const upserts = this.syncRepository.sharedSpaceAlbum.getUpserts({ ...options, ack: checkpointMap[upsertType] });
     for await (const { updateId, ...data } of upserts) {
-      send(response, { type: upsertType, ids: [updateId], data });
+      // Same coercion upstream applies to its own album streams (#30123): album.description
+      // is nullable in the database now, but the sync wire contract is still non-nullable and
+      // mobile decodes it as such, so a null would break the client.
+      // TODO: return null instead of '' in v4
+      send(response, { type: upsertType, ids: [updateId], data: { ...data, description: data.description ?? '' } });
     }
   }
 
