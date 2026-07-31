@@ -1,10 +1,11 @@
-import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:immich_mobile/domain/models/store.model.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
+import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
@@ -17,7 +18,6 @@ import 'package:immich_mobile/repositories/permission.repository.dart';
 import 'package:immich_mobile/services/network.service.dart';
 import 'package:immich_mobile/widgets/settings/networking_settings/networking_settings.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../test_utils.dart';
 import '../../widget_tester_extensions.dart';
