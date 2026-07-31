@@ -3,14 +3,27 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/media_type_section.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
+import 'package:immich_mobile/providers/photos_filter/collapsed_sections.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
 import '../../../../widget_tester_extensions.dart';
 
+class _FakePrefs implements FilterSectionPrefs {
+  final Set<FilterSectionId> collapsed;
+  _FakePrefs(this.collapsed);
+  @override
+  Set<FilterSectionId> loadCollapsed() => collapsed;
+  @override
+  Future<void> saveCollapsed(Set<FilterSectionId> ids) async {}
+}
+
+List<Override> _prefs() => [filterSectionPrefsProvider.overrideWithValue(_FakePrefs({}))];
+
 void main() {
   group('MediaTypeSection', () {
     testWidgets('renders 4 segments with i18n-key fallback labels', (tester) async {
-      await tester.pumpConsumerWidget(const Material(child: MediaTypeSection()));
+      await tester.pumpConsumerWidget(const Material(child: MediaTypeSection()), overrides: _prefs());
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('media-segment-all')), findsOneWidget);
@@ -20,7 +33,7 @@ void main() {
     });
 
     testWidgets('tapping Photos calls setMediaType(AssetType.image)', (tester) async {
-      await tester.pumpConsumerWidget(const Material(child: MediaTypeSection()));
+      await tester.pumpConsumerWidget(const Material(child: MediaTypeSection()), overrides: _prefs());
       final container = ProviderScope.containerOf(tester.element(find.byType(MediaTypeSection)));
 
       await tester.tap(find.byKey(const Key('media-segment-image')));
@@ -30,7 +43,7 @@ void main() {
     });
 
     testWidgets('tapping All clears to AssetType.other (the "no constraint" sentinel)', (tester) async {
-      await tester.pumpConsumerWidget(const Material(child: MediaTypeSection()));
+      await tester.pumpConsumerWidget(const Material(child: MediaTypeSection()), overrides: _prefs());
       final container = ProviderScope.containerOf(tester.element(find.byType(MediaTypeSection)));
       container.read(photosFilterProvider.notifier).setMediaType(AssetType.image);
       await tester.pumpAndSettle();
@@ -42,7 +55,7 @@ void main() {
     });
 
     testWidgets('selected segment reflects current mediaType', (tester) async {
-      await tester.pumpConsumerWidget(const Material(child: MediaTypeSection()));
+      await tester.pumpConsumerWidget(const Material(child: MediaTypeSection()), overrides: _prefs());
       final container = ProviderScope.containerOf(tester.element(find.byType(MediaTypeSection)));
       container.read(photosFilterProvider.notifier).setMediaType(AssetType.video);
       await tester.pumpAndSettle();
@@ -52,13 +65,16 @@ void main() {
     });
 
     testWidgets('segmented button meets kMinInteractiveDimension (48pt)', (tester) async {
-      await tester.pumpConsumerWidget(const SizedBox(width: 400, child: Material(child: MediaTypeSection())));
+      await tester.pumpConsumerWidget(
+        const SizedBox(width: 400, child: Material(child: MediaTypeSection())),
+        overrides: _prefs(),
+      );
       await tester.pumpAndSettle();
       expectTapTargetMin(tester, find.byType(SegmentedButton<AssetType>));
     });
 
     testWidgets('renders correctly in dark theme', (tester) async {
-      await tester.pumpConsumerWidgetDark(const Material(child: MediaTypeSection()));
+      await tester.pumpConsumerWidgetDark(const Material(child: MediaTypeSection()), overrides: _prefs());
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('media-segment-all')), findsOneWidget);
       expect(find.byKey(const Key('media-segment-image')), findsOneWidget);

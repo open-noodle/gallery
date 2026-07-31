@@ -29,6 +29,14 @@ class LocationChipId extends ChipId {
   int get hashCode => (LocationChipId).hashCode;
 }
 
+class CameraChipId extends ChipId {
+  const CameraChipId();
+  @override
+  bool operator ==(Object other) => other is CameraChipId;
+  @override
+  int get hashCode => (CameraChipId).hashCode;
+}
+
 class DateChipId extends ChipId {
   const DateChipId();
   @override
