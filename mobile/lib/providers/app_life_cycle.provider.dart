@@ -175,7 +175,7 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
               if (syncSuccess) {
                 await Future.wait([
                   _safeRun(backgroundManager.hashAssets, "hashAssets").then((_) {
-                    _resumeBackup();
+                    unawaited(_resumeBackup());
                   }),
                   _resumeBackup(),
                   _safeRun(backgroundManager.syncCloudIds, "syncCloudIds"),
