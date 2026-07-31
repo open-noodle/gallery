@@ -333,6 +333,25 @@ ALTER ROLE CURRENT_USER RESET jit;
 -- key is inert for the tagged release's schema-check and boot — only its
 -- kysely_migrations row must go (step 8).
 
+-- 1784664555996-AlbumDescriptionNullable (upstream #30123) made album.description
+-- nullable and rewrote '' to NULL. The tagged release still declares the column
+-- NOT NULL DEFAULT '', so both the data and the constraint have to go back or its
+-- schema-check fails. The UPDATE must run BEFORE the SET NOT NULL or rows written
+-- since the migration would violate it. All three statements are idempotent, and
+-- the column exists in both schemas (only its nullability differs), so no guard is
+-- needed — unlike the DROP COLUMN cases above.
+UPDATE "album" SET "description" = '' WHERE "description" IS NULL;
+ALTER TABLE "album" ALTER COLUMN "description" SET DEFAULT ''::text;
+ALTER TABLE "album" ALTER COLUMN "description" SET NOT NULL;
+
+-- 1784986754473-ConvertUserPasswordEmptyStringToNull (upstream #30223) did the
+-- same for user.password. Same reasoning and same ordering constraint: OAuth-only
+-- users created after the migration carry NULL and must be rewritten to '' before
+-- the NOT NULL goes back.
+UPDATE "user" SET "password" = '' WHERE "password" IS NULL;
+ALTER TABLE "user" ALTER COLUMN "password" SET DEFAULT '';
+ALTER TABLE "user" ALTER COLUMN "password" SET NOT NULL;
+
 -- -----------------------------------------------------------------------------
 -- 8. Delete Gallery + post-v<branding upstream.version> upstream migration rows
 --    from kysely_migrations.
@@ -410,7 +429,9 @@ DELETE FROM "kysely_migrations"
    -- Post-tag upstream migrations pulled in by rebase, paired with the schema
    -- rollbacks in step 7. Keep timestamp-sorted.
    '1784647658615-AddOAuthBearerTokenToSession',
-   '1784836013770-MinFacePreferenceMigration'
+   '1784664555996-AlbumDescriptionNullable',
+   '1784836013770-MinFacePreferenceMigration',
+   '1784986754473-ConvertUserPasswordEmptyStringToNull'
  );
 
 -- -----------------------------------------------------------------------------
