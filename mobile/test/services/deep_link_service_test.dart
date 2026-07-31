@@ -138,7 +138,7 @@ void main() {
       final result = await sut.handleScheme(_deepLinkFor('immich://space?id=$spaceId'), ref);
 
       expect(result?.routeName, SpaceDetailRoute.name);
-      final args = result!.args as SpaceDetailRouteArgs;
+      final args = result!.args! as SpaceDetailRouteArgs;
       expect(args.spaceId, spaceId);
       verify(() => sharedSpaceApiRepository.get(spaceId)).called(1);
     });
@@ -179,7 +179,7 @@ void main() {
       );
 
       expect(route, isA<AssetViewerRoute>());
-      expect((route!.args as AssetViewerRouteArgs).currentAlbum, _album);
+      expect((route!.args! as AssetViewerRouteArgs).currentAlbum, _album);
     });
 
     test('still opens the viewer when the album cannot be resolved', () async {
@@ -192,7 +192,7 @@ void main() {
       );
 
       expect(route, isA<AssetViewerRoute>());
-      expect((route!.args as AssetViewerRouteArgs).currentAlbum, isNull);
+      expect((route!.args! as AssetViewerRouteArgs).currentAlbum, isNull);
     });
 
     test('plain photo link has no album', () async {
@@ -201,7 +201,7 @@ void main() {
       final route = await sut.handleMyImmichApp(_deepLinkFor('https://my.immich.app/photos/$_assetId'), ref);
 
       expect(route, isA<AssetViewerRoute>());
-      expect((route!.args as AssetViewerRouteArgs).currentAlbum, isNull);
+      expect((route!.args! as AssetViewerRouteArgs).currentAlbum, isNull);
       verifyNever(() => remoteAlbumService.get(any()));
     });
   });

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -72,7 +73,7 @@ class _SearchMoreRow extends StatelessWidget {
         key: const Key('tags-section-search-more'),
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          HapticFeedback.selectionClick();
+          unawaited(HapticFeedback.selectionClick());
           onOpenPicker?.call();
         },
         child: Padding(
@@ -128,7 +129,7 @@ class _TagChip extends ConsumerWidget {
         fontWeight: FontWeight.w500,
       ),
       onSelected: (_) {
-        HapticFeedback.selectionClick();
+        unawaited(HapticFeedback.selectionClick());
         ref.read(photosFilterProvider.notifier).toggleTag(tag.id);
       },
     );

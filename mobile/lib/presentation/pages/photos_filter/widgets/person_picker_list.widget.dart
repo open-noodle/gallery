@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -125,7 +126,7 @@ class _PersonRow extends ConsumerWidget {
     return InkWell(
       key: Key('person-row-${person.id}'),
       onTap: () {
-        HapticFeedback.selectionClick();
+        unawaited(HapticFeedback.selectionClick());
         final notifier = ref.read(photosFilterProvider.notifier);
         final existing = ref.read(photosFilterProvider).people.where((p) => p.id == person.id).firstOrNull;
         if (existing != null) {

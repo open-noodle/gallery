@@ -36,11 +36,7 @@ void main() {
     _setTallLogicalSize(tester);
     final events = <String>[];
     await tester.pumpConsumerWidget(
-      SpaceCard(
-        space: fullSpace(),
-        onTap: () => events.add('tap'),
-        onLongPress: () => events.add('longPress'),
-      ),
+      SpaceCard(space: fullSpace(), onTap: () => events.add('tap'), onLongPress: () => events.add('longPress')),
     );
 
     await tester.longPress(find.byType(SpaceCard));
@@ -53,11 +49,7 @@ void main() {
     _setTallLogicalSize(tester);
     final events = <String>[];
     await tester.pumpConsumerWidget(
-      SpaceCard(
-        space: fullSpace(),
-        onTap: () => events.add('tap'),
-        onLongPress: () => events.add('longPress'),
-      ),
+      SpaceCard(space: fullSpace(), onTap: () => events.add('tap'), onLongPress: () => events.add('longPress')),
     );
 
     await tester.tap(find.byType(SpaceCard));
@@ -69,9 +61,7 @@ void main() {
   testWidgets('omitting onLongPress leaves tap behaviour unchanged', (tester) async {
     _setTallLogicalSize(tester);
     final events = <String>[];
-    await tester.pumpConsumerWidget(
-      SpaceCard(space: fullSpace(), onTap: () => events.add('tap')),
-    );
+    await tester.pumpConsumerWidget(SpaceCard(space: fullSpace(), onTap: () => events.add('tap')));
 
     await tester.longPress(find.byType(SpaceCard));
     await tester.pumpAndSettle();

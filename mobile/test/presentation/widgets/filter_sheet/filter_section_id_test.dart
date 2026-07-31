@@ -5,7 +5,14 @@ void main() {
   group('FilterSectionId', () {
     test('render order is people, places, tags, camera, when, rating, media, toggles', () {
       expect(FilterSectionId.values.map((e) => e.name).toList(), [
-        'people', 'places', 'tags', 'camera', 'when', 'rating', 'media', 'toggles',
+        'people',
+        'places',
+        'tags',
+        'camera',
+        'when',
+        'rating',
+        'media',
+        'toggles',
       ]);
     });
 

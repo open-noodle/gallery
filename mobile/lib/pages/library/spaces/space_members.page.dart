@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -86,55 +87,57 @@ class SpaceMembersPage extends HookConsumerWidget {
     }
 
     void showMemberActions(SharedSpaceMemberResponseDto member, bool isOwner) {
-      showModalBottomSheet(
-        context: context,
-        builder: (ctx) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(member.name, style: context.textTheme.titleMedium),
-              ),
-              if (isOwner && member.role != SharedSpaceRole.owner) ...[
-                ListTile(
-                  leading: const Icon(Icons.edit_outlined),
-                  title: const Text('Set as Editor'),
-                  trailing: member.role == SharedSpaceRole.editor ? const Icon(Icons.check) : null,
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    updateRole(member, SharedSpaceRole.editor);
-                  },
+      unawaited(
+        showModalBottomSheet(
+          context: context,
+          builder: (ctx) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(member.name, style: context.textTheme.titleMedium),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.visibility_outlined),
-                  title: const Text('Set as Viewer'),
-                  trailing: member.role == SharedSpaceRole.viewer ? const Icon(Icons.check) : null,
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    updateRole(member, SharedSpaceRole.viewer);
-                  },
-                ),
-                const Divider(),
-                ListTile(
-                  leading: Icon(Icons.person_remove_outlined, color: Theme.of(ctx).colorScheme.error),
-                  title: Text('Remove from Space', style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    removeMember(member);
-                  },
-                ),
+                if (isOwner && member.role != SharedSpaceRole.owner) ...[
+                  ListTile(
+                    leading: const Icon(Icons.edit_outlined),
+                    title: const Text('Set as Editor'),
+                    trailing: member.role == SharedSpaceRole.editor ? const Icon(Icons.check) : null,
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      unawaited(updateRole(member, SharedSpaceRole.editor));
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.visibility_outlined),
+                    title: const Text('Set as Viewer'),
+                    trailing: member.role == SharedSpaceRole.viewer ? const Icon(Icons.check) : null,
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      unawaited(updateRole(member, SharedSpaceRole.viewer));
+                    },
+                  ),
+                  const Divider(),
+                  ListTile(
+                    leading: Icon(Icons.person_remove_outlined, color: Theme.of(ctx).colorScheme.error),
+                    title: Text('Remove from Space', style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      unawaited(removeMember(member));
+                    },
+                  ),
+                ],
+                if (!isOwner && member.userId == currentUser?.id)
+                  ListTile(
+                    leading: Icon(Icons.exit_to_app, color: Theme.of(ctx).colorScheme.error),
+                    title: Text('Leave Space', style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      unawaited(removeMember(member));
+                    },
+                  ),
               ],
-              if (!isOwner && member.userId == currentUser?.id)
-                ListTile(
-                  leading: Icon(Icons.exit_to_app, color: Theme.of(ctx).colorScheme.error),
-                  title: Text('Leave Space', style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    removeMember(member);
-                  },
-                ),
-            ],
+            ),
           ),
         ),
       );

@@ -52,9 +52,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(PlacesPickerCountryAccordion)),
-      );
+      final container = ProviderScope.containerOf(tester.element(find.byType(PlacesPickerCountryAccordion)));
       await tester.tap(find.byKey(const Key('places-picker-country-France')));
       await tester.pumpAndSettle();
 
@@ -66,8 +64,13 @@ void main() {
     testWidgets('tapping an already-expanded country calls onExpandCountry(null)', (tester) async {
       String? expanded = 'France';
       await tester.pumpConsumerWidget(
-        SingleChildScrollView(child: _harness(expandedCountry: 'France', onExpand: (c) => expanded = c)),
-        overrides: [..._overrideCountries(['France']), citySuggestionsProvider.overrideWith((ref, c) async => [])],
+        SingleChildScrollView(
+          child: _harness(expandedCountry: 'France', onExpand: (c) => expanded = c),
+        ),
+        overrides: [
+          ..._overrideCountries(['France']),
+          citySuggestionsProvider.overrideWith((ref, c) async => []),
+        ],
       );
       await tester.pumpAndSettle();
 
@@ -79,7 +82,9 @@ void main() {
     testWidgets('expanding a country fetches its cities only — other countries are not fetched', (tester) async {
       final fetchedFor = <String?>[];
       await tester.pumpConsumerWidget(
-        SingleChildScrollView(child: _harness(expandedCountry: 'France', onExpand: (_) {})),
+        SingleChildScrollView(
+          child: _harness(expandedCountry: 'France', onExpand: (_) {}),
+        ),
         overrides: [
           ..._overrideCountries(['France', 'Spain']),
           citySuggestionsProvider.overrideWith((ref, country) async {
@@ -98,7 +103,9 @@ void main() {
 
     testWidgets('tapping a city selects country + city via setLocation', (tester) async {
       await tester.pumpConsumerWidget(
-        SingleChildScrollView(child: _harness(expandedCountry: 'France', onExpand: (_) {})),
+        SingleChildScrollView(
+          child: _harness(expandedCountry: 'France', onExpand: (_) {}),
+        ),
         overrides: [
           ..._overrideCountries(['France']),
           citySuggestionsProvider.overrideWith((ref, country) async => ['Paris', 'Lyon']),
@@ -106,9 +113,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(PlacesPickerCountryAccordion)),
-      );
+      final container = ProviderScope.containerOf(tester.element(find.byType(PlacesPickerCountryAccordion)));
       await tester.tap(find.byKey(const Key('places-picker-city-Paris')));
       await tester.pumpAndSettle();
 
@@ -120,7 +125,9 @@ void main() {
     testWidgets('selecting a different country replaces the prior country/city selection', (tester) async {
       String? expanded = 'France';
       await tester.pumpConsumerWidget(
-        SingleChildScrollView(child: _harness(expandedCountry: expanded, onExpand: (c) => expanded = c)),
+        SingleChildScrollView(
+          child: _harness(expandedCountry: expanded, onExpand: (c) => expanded = c),
+        ),
         overrides: [
           ..._overrideCountries(['France', 'Spain']),
           citySuggestionsProvider.overrideWith((ref, country) async => country == 'France' ? ['Paris'] : []),
@@ -128,9 +135,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(PlacesPickerCountryAccordion)),
-      );
+      final container = ProviderScope.containerOf(tester.element(find.byType(PlacesPickerCountryAccordion)));
       container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(country: 'France', city: 'Paris'));
       await tester.pumpAndSettle();
 
@@ -144,7 +149,9 @@ void main() {
 
     testWidgets('search query filters the already-loaded city list for the expanded country', (tester) async {
       await tester.pumpConsumerWidget(
-        SingleChildScrollView(child: _harness(expandedCountry: 'France', onExpand: (_) {})),
+        SingleChildScrollView(
+          child: _harness(expandedCountry: 'France', onExpand: (_) {}),
+        ),
         overrides: [
           ..._overrideCountries(['France']),
           citySuggestionsProvider.overrideWith((ref, country) async => ['Paris', 'Lyon']),
@@ -154,9 +161,7 @@ void main() {
       expect(find.byKey(const Key('places-picker-city-Paris')), findsOneWidget);
       expect(find.byKey(const Key('places-picker-city-Lyon')), findsOneWidget);
 
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(PlacesPickerCountryAccordion)),
-      );
+      final container = ProviderScope.containerOf(tester.element(find.byType(PlacesPickerCountryAccordion)));
       container.read(placesPickerQueryProvider.notifier).state = 'par';
       await tester.pumpAndSettle();
 
@@ -166,7 +171,9 @@ void main() {
 
     testWidgets('per-country fetch error shows an inline retry for that country only', (tester) async {
       await tester.pumpConsumerWidget(
-        SingleChildScrollView(child: _harness(expandedCountry: 'Italy', onExpand: (_) {})),
+        SingleChildScrollView(
+          child: _harness(expandedCountry: 'Italy', onExpand: (_) {}),
+        ),
         overrides: [
           ..._overrideCountries(['Italy']),
           citySuggestionsProvider.overrideWith((ref, country) async => throw Exception('boom')),

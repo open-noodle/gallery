@@ -20,10 +20,7 @@ void main() {
     testWidgets('nested tag row shows leaf title + full-path subtitle', (tester) async {
       await tester.pumpConsumerWidget(TagsPickerList(tags: [_t('t1', 'Travel/Italy/Rome')]));
       expect(find.byKey(const Key('tag-row-t1')), findsOneWidget);
-      expect(
-        find.descendant(of: find.byKey(const Key('tag-row-t1')), matching: find.text('Rome')),
-        findsOneWidget,
-      );
+      expect(find.descendant(of: find.byKey(const Key('tag-row-t1')), matching: find.text('Rome')), findsOneWidget);
       expect(
         find.descendant(of: find.byKey(const Key('tag-row-t1')), matching: find.textContaining('Travel / Italy')),
         findsOneWidget,
@@ -33,10 +30,7 @@ void main() {
     testWidgets('flat (no-slash) tag row shows the value and no subtitle', (tester) async {
       await tester.pumpConsumerWidget(TagsPickerList(tags: [_t('t1', 'Food')]));
       expect(find.byKey(const Key('tag-row-t1')), findsOneWidget);
-      expect(
-        find.descendant(of: find.byKey(const Key('tag-row-t1')), matching: find.text('Food')),
-        findsOneWidget,
-      );
+      expect(find.descendant(of: find.byKey(const Key('tag-row-t1')), matching: find.text('Food')), findsOneWidget);
       expect(find.byKey(const Key('tag-row-subtitle-t1')), findsNothing);
     });
 

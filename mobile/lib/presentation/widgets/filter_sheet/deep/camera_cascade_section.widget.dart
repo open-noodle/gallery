@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -70,7 +71,7 @@ class _SearchMoreRow extends StatelessWidget {
         key: const Key('camera-section-search-more'),
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          HapticFeedback.selectionClick();
+          unawaited(HapticFeedback.selectionClick());
           onOpenPicker?.call();
         },
         child: Padding(
@@ -119,7 +120,7 @@ class _MakeWrap extends ConsumerWidget {
             label: Text(make),
             selected: false,
             onSelected: (_) {
-              HapticFeedback.selectionClick();
+              unawaited(HapticFeedback.selectionClick());
               ref.read(photosFilterProvider.notifier).setCamera(SearchCameraFilter(make: make));
             },
           ),
@@ -148,7 +149,7 @@ class _ModelCascade extends ConsumerWidget {
           selected: true,
           selectedColor: theme.colorScheme.primaryContainer,
           onDeleted: () {
-            HapticFeedback.selectionClick();
+            unawaited(HapticFeedback.selectionClick());
             ref.read(photosFilterProvider.notifier).setCamera(null);
           },
           deleteIcon: const Icon(Icons.close_rounded, key: Key('camera-make-selected-clear')),
@@ -167,7 +168,7 @@ class _ModelCascade extends ConsumerWidget {
                     label: Text(model),
                     selected: selectedModel == model,
                     onSelected: (_) {
-                      HapticFeedback.selectionClick();
+                      unawaited(HapticFeedback.selectionClick());
                       ref
                           .read(photosFilterProvider.notifier)
                           .setCamera(SearchCameraFilter(make: make, model: selectedModel == model ? null : model));
