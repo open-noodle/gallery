@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -61,7 +62,7 @@ class CameraPickerMakeAccordion extends ConsumerWidget {
                 selectedModel: selectedMake == make ? selectedModel : null,
                 expanded: expanded == make,
                 onToggle: () {
-                  HapticFeedback.selectionClick();
+                  unawaited(HapticFeedback.selectionClick());
                   ref.read(photosFilterProvider.notifier).setCamera(SearchCameraFilter(make: make));
                   onExpandMake(expanded == make ? null : make);
                 },
@@ -188,7 +189,7 @@ class _ModelRow extends ConsumerWidget {
     return InkWell(
       key: Key('camera-picker-model-$model'),
       onTap: () {
-        HapticFeedback.selectionClick();
+        unawaited(HapticFeedback.selectionClick());
         ref.read(photosFilterProvider.notifier).setCamera(SearchCameraFilter(make: make, model: model));
       },
       child: Padding(

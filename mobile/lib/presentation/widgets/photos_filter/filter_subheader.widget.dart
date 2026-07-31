@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -42,7 +43,7 @@ class PhotosFilterSubheader extends ConsumerWidget {
             const SizedBox(width: 16),
             _ClearAllChip(
               onTap: () {
-                HapticFeedback.selectionClick();
+                unawaited(HapticFeedback.selectionClick());
                 ref.read(photosFilterProvider.notifier).reset();
               },
             ),
