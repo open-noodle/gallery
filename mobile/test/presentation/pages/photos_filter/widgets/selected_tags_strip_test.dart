@@ -25,10 +25,7 @@ void main() {
     testWidgets('hidden when no selections', (tester) async {
       // Wrap in a Column so SizedBox.shrink() gets loose constraints and
       // actually renders at Size.zero, matching SelectedPeopleStrip's test.
-      await tester.pumpConsumerWidget(
-        const Column(children: [SelectedTagsStrip()]),
-        overrides: _overrides({}),
-      );
+      await tester.pumpConsumerWidget(const Column(children: [SelectedTagsStrip()]), overrides: _overrides({}));
       expect(find.byType(InputChip), findsNothing);
       expect(tester.getSize(find.byType(SelectedTagsStrip)), Size.zero);
     });

@@ -89,7 +89,10 @@ void main() {
     test('returns the server shared-space-inclusive people list', () async {
       // The local sync DB is owner-scoped: a viewer who owns no people gets nothing from it.
       when(
-        () => mockRepository.getAllPeople(minFaces: any(named: 'minFaces'), sortBy: any(named: 'sortBy')),
+        () => mockRepository.getAllPeople(
+          minFaces: any(named: 'minFaces'),
+          sortBy: any(named: 'sortBy'),
+        ),
       ).thenAnswer((_) async => <DriftPerson>[]);
       when(
         () => mockApiRepository.getAllPeopleWithSharedSpaces(sortBy: any(named: 'sortBy')),
@@ -101,7 +104,12 @@ void main() {
       verify(() => mockApiRepository.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.photoCount)).called(1);
       // The online path must never fall through to the local repository, so minFaces threading
       // (which only applies to the offline fallback) cannot leak into the server-backed path.
-      verifyNever(() => mockRepository.getAllPeople(minFaces: any(named: 'minFaces'), sortBy: any(named: 'sortBy')));
+      verifyNever(
+        () => mockRepository.getAllPeople(
+          minFaces: any(named: 'minFaces'),
+          sortBy: any(named: 'sortBy'),
+        ),
+      );
     });
 
     // Offline / server failure must not blank the page: the viewer's own people still render
@@ -111,7 +119,10 @@ void main() {
         () => mockApiRepository.getAllPeopleWithSharedSpaces(sortBy: any(named: 'sortBy')),
       ).thenThrow(Exception('offline'));
       when(
-        () => mockRepository.getAllPeople(minFaces: any(named: 'minFaces'), sortBy: any(named: 'sortBy')),
+        () => mockRepository.getAllPeople(
+          minFaces: any(named: 'minFaces'),
+          sortBy: any(named: 'sortBy'),
+        ),
       ).thenAnswer((_) async => [person('local-person')]);
 
       final result = await sut.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.name);
@@ -129,7 +140,10 @@ void main() {
         () => mockApiRepository.getAllPeopleWithSharedSpaces(sortBy: any(named: 'sortBy')),
       ).thenThrow(Exception('offline'));
       when(
-        () => mockRepository.getAllPeople(minFaces: any(named: 'minFaces'), sortBy: any(named: 'sortBy')),
+        () => mockRepository.getAllPeople(
+          minFaces: any(named: 'minFaces'),
+          sortBy: any(named: 'sortBy'),
+        ),
       ).thenAnswer((_) async => [person('local-person')]);
 
       final result = await sut.getAllPeopleWithSharedSpaces(minFaces: 5, sortBy: PeopleSortBy.photoCount);
@@ -143,7 +157,10 @@ void main() {
         () => mockApiRepository.getAllPeopleWithSharedSpaces(sortBy: any(named: 'sortBy')),
       ).thenThrow(Exception('offline'));
       when(
-        () => mockRepository.getAllPeople(minFaces: any(named: 'minFaces'), sortBy: any(named: 'sortBy')),
+        () => mockRepository.getAllPeople(
+          minFaces: any(named: 'minFaces'),
+          sortBy: any(named: 'sortBy'),
+        ),
       ).thenAnswer((_) async => [person('local-person')]);
 
       final result = await sut.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.photoCount);
