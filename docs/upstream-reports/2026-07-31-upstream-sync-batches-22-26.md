@@ -204,3 +204,50 @@ re-run round) on future full-suite runs.
    catch it and only `test.yml`'s `verify-changed-files` does.
 3. The fork's **own** workflows remain on older action majors (checkout v4/v6, setup-node v6, cache
    v5). Pre-existing, deliberate — they push images, sign mobile builds and deploy docs.
+
+## Addendum — 12 more upstream commits arrived during this session
+
+`upstream/main` moved from `aa565f5ca07` to `483b375c26c` while arcs 1–2 were running. Three were
+taken (tip **`56ce7176b1d`**, CI 10/10 green on `rebase/upstream-arc3-b29` @ `adede01aeea`); the rest
+are quarantined.
+
+### `fix: migration order (#30424)` invalidated work committed hours earlier
+
+It re-timestamps `1784664555996-AlbumDescriptionNullable` → **`1784986754474-AlbumDescriptionNullable`**
+so it sorts after `…473-ConvertUserPasswordEmptyStringToNull`. The revert-script coverage gate matches
+on **filename**, so the entry added earlier in this session went stale the moment the rename landed.
+Updated in both places and the DELETE list re-sorted.
+
+**No compatibility alias was needed** — batches 22–26 were never deployed, so no database recorded the
+pre-rename name. Had an RC been staged first, this would have become a permanent build-time alias like
+`ChangeDurationToInteger` (see `CLAUDE.md`). Worth remembering as an argument for _not_ deploying a
+rolling branch mid-cycle.
+
+### Quarantined at `405020eeeed` — and the ordering is the problem
+
+The two gate-firing commits sit at **positions 4 and 5 of 12**, so almost everything is behind them,
+including the **js-yaml v5 security bumps** (#30440/#30441) and the fourth codegen-removal commit
+(#30426). Only 3 commits were reachable.
+
+| Commit        | Why it is held                                                                                                                                                                                                                                                                                      |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `405020eeeed` | Enables `use_build_context_synchronously` — a **fourth** Dart lint sweep. The fork currently sets this rule to `false` (upstream set it false in batch 20 and now flips it to true across 59 files). Unlike `discarded_futures` this flags **real async-gap bugs**, so it is not a mechanical wrap. |
+| `fe5c8ed0fb8` | `refactor: base action (#29617)` — restructures the mobile presentation-action layer (31 files, −528 net) that the fork extends with `remove_from_space_action_button` and `similar_photos_action_button`. Architecture gate: brainstorm before rebasing.                                           |
+
+### Three distinct CI rate limits, hit in one session
+
+Worth separating, because the mitigations differ:
+
+| Symptom                                                         | Limit                                               | Trigger                                            |
+| --------------------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------- |
+| `toomanyrequests: … allowed: 44000/minute`                      | container registry (GHCR)                           | concurrent `docker pull` / `docker compose up`     |
+| `403 … github rate limit: 0/60 (core)` → `extism-js: not found` | GitHub **REST API**, unauthenticated, per runner IP | mise resolving `github:extism/js-pdk` release list |
+
+Staggering dispatches by 25s did **not** avoid the registry limit — the pull phases still overlap over
+minutes. What worked was reducing concurrency (re-run when few jobs are in flight) and, for the API
+limit, **waiting past the reset timestamp the 403 body reports** before re-running.
+
+The API-limit one is self-inflicted: the fork used to pass a `github_token` BuildKit secret in
+`server/Dockerfile`'s plugins stage so mise authenticated, and fork commit #508 ("remove plugin build
+secret requirement") deleted it. Restoring some form of authentication there would remove a recurring
+CI cost.
