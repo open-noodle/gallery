@@ -3,11 +3,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/tags_section.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
+import 'package:immich_mobile/providers/photos_filter/collapsed_sections.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:openapi/api.dart';
 
 import '../../../../widget_tester_extensions.dart';
+
+class _FakePrefs implements FilterSectionPrefs {
+  final Set<FilterSectionId> collapsed;
+  _FakePrefs(this.collapsed);
+  @override
+  Set<FilterSectionId> loadCollapsed() => collapsed;
+  @override
+  Future<void> saveCollapsed(Set<FilterSectionId> ids) async {}
+}
+
+Override _noCollapsed() => filterSectionPrefsProvider.overrideWithValue(_FakePrefs({}));
 
 FilterSuggestionsResponseDto _sugg({List<FilterSuggestionsTagDto>? tags}) =>
     FilterSuggestionsResponseDto(hasUnnamedPeople: false, tags: tags ?? const []);
@@ -18,6 +31,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const Material(child: TagsSectionDeep()),
         overrides: [
+          _noCollapsed(),
           photosFilterSuggestionsProvider.overrideWith(
             (ref, filter) => Future.value(
               _sugg(
@@ -42,6 +56,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const Material(child: TagsSectionDeep()),
         overrides: [
+          _noCollapsed(),
           photosFilterSuggestionsProvider.overrideWith(
             (ref, filter) => Future.value(
               _sugg(
@@ -70,6 +85,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const Material(child: TagsSectionDeep()),
         overrides: [
+          _noCollapsed(),
           photosFilterSuggestionsProvider.overrideWith(
             (ref, filter) => Future.value(
               _sugg(
@@ -89,20 +105,25 @@ void main() {
       expect(chip.selected, isTrue);
     });
 
-    testWidgets('empty tags → empty caption rendered by DeepSectionScaffold', (tester) async {
+    testWidgets('empty tags → section auto-collapses, "(0)" shown, empty caption hidden', (tester) async {
       await tester.pumpConsumerWidget(
         const Material(child: TagsSectionDeep()),
-        overrides: [photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(tags: [])))],
+        overrides: [
+          _noCollapsed(),
+          photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(tags: []))),
+        ],
       );
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('deep-section-empty')), findsOneWidget);
+      expect(find.textContaining('(0)'), findsOneWidget);
+      expect(find.byKey(const Key('deep-section-empty')), findsNothing);
     });
 
     testWidgets('section title renders via filter_sheet_deep_tags_section key', (tester) async {
       await tester.pumpConsumerWidget(
         const Material(child: TagsSectionDeep()),
         overrides: [
+          _noCollapsed(),
           photosFilterSuggestionsProvider.overrideWith(
             (ref, filter) => Future.value(
               _sugg(
@@ -119,10 +140,101 @@ void main() {
       expect(find.text('filter_sheet_deep_tags_section'.tr().toUpperCase()), findsOneWidget);
     });
 
+    // Slice 5 / final review: cap the preview Wrap to 10 chips + a body "Search N tags →" row.
+    testWidgets('caps preview to 10 chips + renders "Search N tags →" in the body (not the header)', (tester) async {
+      final tags = [for (var i = 0; i < 15; i++) FilterSuggestionsTagDto(id: 't$i', value: 'Tag$i')];
+      await tester.pumpConsumerWidget(
+        const Material(child: TagsSectionDeep()),
+        overrides: [
+          _noCollapsed(),
+          photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(tags: tags))),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      for (var i = 0; i < 10; i++) {
+        expect(find.byKey(Key('tag-chip-t$i')), findsOneWidget);
+      }
+      for (var i = 10; i < 15; i++) {
+        expect(find.byKey(Key('tag-chip-t$i')), findsNothing);
+      }
+
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('collapsible-body-tags')),
+          matching: find.byKey(const Key('tags-section-search-more')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('collapsible-header-tags')),
+          matching: find.byKey(const Key('tags-section-search-more')),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('tapping "Search N tags →" fires onOpenPicker', (tester) async {
+      var opened = false;
+      final tags = [for (var i = 0; i < 15; i++) FilterSuggestionsTagDto(id: 't$i', value: 'Tag$i')];
+      await tester.pumpConsumerWidget(
+        Material(child: TagsSectionDeep(onOpenPicker: () => opened = true)),
+        overrides: [
+          _noCollapsed(),
+          photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(tags: tags))),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('tags-section-search-more')));
+      expect(opened, isTrue);
+    });
+
+    testWidgets('pins a selected tag beyond the first 10', (tester) async {
+      final tags = [for (var i = 0; i < 15; i++) FilterSuggestionsTagDto(id: 't$i', value: 'Tag$i')];
+      await tester.pumpConsumerWidget(
+        const Material(child: TagsSectionDeep()),
+        overrides: [
+          _noCollapsed(),
+          photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(tags: tags))),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(tester.element(find.byType(TagsSectionDeep)));
+      container.read(photosFilterProvider.notifier).toggleTag('t11');
+      await tester.pumpAndSettle();
+
+      // Pinned beyond the cap because it's selected.
+      expect(find.byKey(const Key('tag-chip-t11')), findsOneWidget);
+      // The remaining, unselected overflow stays hidden.
+      expect(find.byKey(const Key('tag-chip-t12')), findsNothing);
+      expect(find.byKey(const Key('tag-chip-t13')), findsNothing);
+      expect(find.byKey(const Key('tag-chip-t14')), findsNothing);
+    });
+
+    testWidgets('≤10 tags renders all, no over-cap', (tester) async {
+      final tags = [for (var i = 0; i < 7; i++) FilterSuggestionsTagDto(id: 't$i', value: 'Tag$i')];
+      await tester.pumpConsumerWidget(
+        const Material(child: TagsSectionDeep()),
+        overrides: [
+          _noCollapsed(),
+          photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(tags: tags))),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      for (var i = 0; i < 7; i++) {
+        expect(find.byKey(Key('tag-chip-t$i')), findsOneWidget);
+      }
+    });
+
     testWidgets('selected chip renders primary color in dark theme', (tester) async {
       await tester.pumpConsumerWidgetDark(
         const Material(child: TagsSectionDeep()),
         overrides: [
+          _noCollapsed(),
           photosFilterSuggestionsProvider.overrideWith(
             (ref, filter) => Future.value(
               _sugg(
