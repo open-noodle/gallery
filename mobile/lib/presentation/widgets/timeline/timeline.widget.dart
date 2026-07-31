@@ -387,7 +387,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
       return;
     }
 
-    _scrollController.animateTo(0, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+    unawaited(_scrollController.animateTo(0, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut));
   }
 
   bool _scrollDrainScheduled = false;
@@ -504,25 +504,27 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
     final targetOffset = targetSegment.startOffset - 50;
     _resolvingZoomAnchor = anchor;
     ref.read(timelineStateProvider.notifier).setScrubbing(true);
-    _scrollController
-        .animateTo(
-          targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeInOut,
-        )
-        .whenComplete(() {
-          if (!mounted) {
-            return;
-          }
+    unawaited(
+      _scrollController
+          .animateTo(
+            targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+          )
+          .whenComplete(() {
+            if (!mounted) {
+              return;
+            }
 
-          if (ref.read(timelineZoomAnchorProvider) == anchor) {
-            ref.read(timelineZoomAnchorProvider.notifier).clear();
-          }
-          if (_resolvingZoomAnchor == anchor) {
-            _resolvingZoomAnchor = null;
-          }
-          ref.read(timelineStateProvider.notifier).setScrubbing(false);
-        });
+            if (ref.read(timelineZoomAnchorProvider) == anchor) {
+              ref.read(timelineZoomAnchorProvider.notifier).clear();
+            }
+            if (_resolvingZoomAnchor == anchor) {
+              _resolvingZoomAnchor = null;
+            }
+            ref.read(timelineStateProvider.notifier).setScrubbing(false);
+          }),
+    );
   }
 
   // Drag selection methods

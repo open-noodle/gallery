@@ -24,10 +24,7 @@ void main() {
       updatedAt: DateTime(2026, 4, 23),
       ownerId: 'user-1',
       type: MemoryTypeEnum.rule,
-      data: const MemoryData({
-        'ruleId': 'birthday',
-        'title': 'Happy birthday, Alice',
-      }),
+      data: const MemoryData({'ruleId': 'birthday', 'title': 'Happy birthday, Alice'}),
       isSaved: false,
       memoryAt: DateTime(2026, 4, 23),
       showAt: DateTime(2026, 4, 23),

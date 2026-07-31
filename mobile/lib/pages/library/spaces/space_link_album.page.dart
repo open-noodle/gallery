@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -82,9 +83,9 @@ class SpaceLinkAlbumPage extends HookConsumerWidget {
       // Use AutoRouter's maybePop when available (normal app), fall back to
       // Navigator for test environments that wrap with plain MaterialApp.
       try {
-        context.maybePop(ids);
+        unawaited(context.maybePop(ids));
       } catch (_) {
-        Navigator.of(context).maybePop(ids);
+        unawaited(Navigator.of(context).maybePop(ids));
       }
     }
 
