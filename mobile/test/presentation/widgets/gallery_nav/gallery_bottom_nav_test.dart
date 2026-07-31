@@ -254,7 +254,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(container.read(bottomNavHeightProvider), 92);
+    expect(container.read(bottomNavHeightProvider), 86);
     expect(tester.getRect(find.byType(GalleryNavPill)).bottom, 932 - 34);
   });
 
