@@ -19,7 +19,6 @@ import 'package:immich_mobile/providers/permission.provider.dart';
 import 'package:immich_mobile/providers/sync_status.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
-import 'package:immich_mobile/widgets/backup/background_backup_health_banner.dart';
 import 'package:immich_mobile/widgets/backup/backup_info_card.dart';
 import 'package:immich_ui/immich_ui.dart';
 import 'package:logging/logging.dart';
@@ -42,7 +41,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
   void initState() {
     super.initState();
 
-    unawaited(WakelockPlus.enable());
+    WakelockPlus.enable();
 
     final currentUser = ref.read(currentUserProvider);
     if (currentUser == null) {
@@ -66,9 +65,9 @@ class _BackupPageState extends ConsumerState<BackupPage> {
   }
 
   @override
-  void dispose() {
+  dispose() {
     super.dispose();
-    unawaited(WakelockPlus.disable());
+    WakelockPlus.disable();
   }
 
   @override
@@ -101,7 +100,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         Logger("BackupPage").warning("Remote sync did not complete successfully, skipping backup");
         return;
       }
-      await backupNotifier.startBackup(currentUser.id);
+      await backupNotifier.startForegroundBackup(currentUser.id);
     }
 
     return Scaffold(
@@ -110,7 +109,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         title: Text(context.t.backup_controller_page_backup),
         leading: IconButton(
           onPressed: () {
-            unawaited(context.maybePop(true));
+            context.maybePop(true);
           },
           splashRadius: 24,
           icon: const Icon(Icons.arrow_back_ios_rounded),
@@ -118,7 +117,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         actions: [
           IconButton(
             onPressed: () {
-              unawaited(context.pushRoute(const BackupOptionsRoute()));
+              context.pushRoute(const BackupOptionsRoute());
             },
             icon: const Icon(Icons.settings_outlined),
             tooltip: context.t.backup_options,
@@ -142,10 +141,9 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                     onStart: () async => await startBackup(),
                     onStop: () {
                       syncSuccess = null;
-                      unawaited(backupNotifier.stopBackup(reason: "backup button toggled off"));
+                      backupNotifier.stopForegroundBackup(reason: "backup button toggled off");
                     },
                   ),
-                  const BackgroundBackupHealthBanner(),
                   switch (error) {
                     BackupError.none => const SizedBox.shrink(),
                     BackupError.syncFailed => Padding(
@@ -207,8 +205,8 @@ class _BackupFooterState extends ConsumerState<_BackupFooter> with WidgetsBindin
     }
   }
 
-  Future<void> showPermissionsDialog() {
-    return showDialog(
+  void showPermissionsDialog() {
+    showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         content: Text(context.t.notification_permission_dialog_content),
@@ -225,7 +223,7 @@ class _BackupFooterState extends ConsumerState<_BackupFooter> with WidgetsBindin
             expanded: false,
             onPressed: () {
               ContextHelper(context).pop();
-              unawaited(openAppSettings());
+              openAppSettings();
             },
           ),
         ],
@@ -233,8 +231,8 @@ class _BackupFooterState extends ConsumerState<_BackupFooter> with WidgetsBindin
     );
   }
 
-  Future<void> showBatteryOptimizationInfo() {
-    return showDialog<void>(
+  void showBatteryOptimizationInfo() {
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext ctx) {
@@ -246,8 +244,7 @@ class _BackupFooterState extends ConsumerState<_BackupFooter> with WidgetsBindin
               labelText: context.t.backup_controller_page_background_battery_info_link,
               variant: .ghost,
               expanded: false,
-              onPressed: () =>
-                  unawaited(launchUrl(Uri.parse('https://dontkillmyapp.com'), mode: LaunchMode.externalApplication)),
+              onPressed: () => launchUrl(Uri.parse('https://dontkillmyapp.com'), mode: LaunchMode.externalApplication),
             ),
             ImmichTextButton(
               labelText: context.t.backup_controller_page_background_battery_info_ok,
@@ -280,13 +277,11 @@ class _BackupFooterState extends ConsumerState<_BackupFooter> with WidgetsBindin
                 style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurfaceSecondary),
               ),
               onPressed: () {
-                unawaited(
-                  ref.read(notificationPermissionProvider.notifier).requestNotificationPermission().then((p) {
-                    if (p == PermissionStatus.permanentlyDenied) {
-                      unawaited(showPermissionsDialog());
-                    }
-                  }),
-                );
+                ref.read(notificationPermissionProvider.notifier).requestNotificationPermission().then((p) {
+                  if (p == PermissionStatus.permanentlyDenied) {
+                    showPermissionsDialog();
+                  }
+                });
               },
             ),
           if (notificationStatus != PermissionStatus.granted && batteryOptimizationStatus != PermissionStatus.granted)
@@ -300,7 +295,7 @@ class _BackupFooterState extends ConsumerState<_BackupFooter> with WidgetsBindin
                 textAlign: TextAlign.left,
                 style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurfaceSecondary),
               ),
-              onPressed: () => unawaited(showBatteryOptimizationInfo()),
+              onPressed: showBatteryOptimizationInfo,
             ),
         ],
         TextButton.icon(
