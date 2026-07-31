@@ -42,7 +42,9 @@ class SearchApiRepository extends ApiRepository {
         make: filter.camera.make == null ? const Optional.absent() : Optional.present(filter.camera.make),
         model: filter.camera.model == null ? const Optional.absent() : Optional.present(filter.camera.model),
         takenAfter: filter.date.takenAfter == null ? const Optional.absent() : Optional.present(filter.date.takenAfter),
-        takenBefore: filter.date.takenBefore == null ? const Optional.absent() : Optional.present(filter.date.takenBefore),
+        takenBefore: filter.date.takenBefore == null
+            ? const Optional.absent()
+            : Optional.present(filter.date.takenBefore),
         visibility: Optional.present(filter.display.isArchive ? AssetVisibility.archive : AssetVisibility.timeline),
         rating: filter.rating.rating.toOptional(),
         isFavorite: filter.display.isFavorite ? const Optional.present(true) : const Optional.absent(),
@@ -50,7 +52,7 @@ class SearchApiRepository extends ApiRepository {
         personIds: Optional.present(filter.people.map((e) => e.id).toList()),
         tagIds: Optional.present(_tagIdsForSearch(filter)),
         type: type == null ? const Optional.absent() : Optional.present(type),
-        order: _order(filter) == null ? const Optional.absent() : Optional.present(_order(filter)!),
+        order: _order(filter) == null ? const Optional.absent() : Optional.present(_order(filter)),
         page: Optional.present(page),
         size: const Optional.present(100),
         // Include shared-space assets so a viewer's selected facet returns results (and a
@@ -75,7 +77,9 @@ class SearchApiRepository extends ApiRepository {
       make: filter.camera.make == null ? const Optional.absent() : Optional.present(filter.camera.make),
       model: filter.camera.model == null ? const Optional.absent() : Optional.present(filter.camera.model),
       takenAfter: filter.date.takenAfter == null ? const Optional.absent() : Optional.present(filter.date.takenAfter),
-      takenBefore: filter.date.takenBefore == null ? const Optional.absent() : Optional.present(filter.date.takenBefore),
+      takenBefore: filter.date.takenBefore == null
+          ? const Optional.absent()
+          : Optional.present(filter.date.takenBefore),
       visibility: Optional.present(filter.display.isArchive ? AssetVisibility.archive : AssetVisibility.timeline),
       rating: filter.rating.rating.toOptional(),
       isFavorite: filter.display.isFavorite ? const Optional.present(true) : const Optional.absent(),
@@ -83,7 +87,7 @@ class SearchApiRepository extends ApiRepository {
       personIds: Optional.present(filter.people.map((e) => e.id).toList()),
       tagIds: Optional.present(_tagIdsForSearch(filter)),
       type: type == null ? const Optional.absent() : Optional.present(type),
-      order: _order(filter) == null ? const Optional.absent() : Optional.present(_order(filter)!),
+      order: _order(filter) == null ? const Optional.absent() : Optional.present(_order(filter)),
       page: Optional.present(page),
       size: const Optional.present(1000),
       // Include shared-space assets so a viewer's selected facet returns results (and a
