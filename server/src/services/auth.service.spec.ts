@@ -1662,15 +1662,9 @@ describe(AuthService.name, () => {
     });
   });
 
-  describe('adminSignUp', () => {
-    it('should throw if admin setup is disabled', async () => {
-      mocks.config.getEnv.mockReturnValue({ setup: { allow: false } } as any);
-
-      await expect(sut.adminSignUp({ email: 'test@immich.com', password: 'password', name: 'admin' })).rejects.toThrow(
-        'Admin setup is disabled',
-      );
-    });
-  });
+  // NOTE: the "admin setup is disabled" guard moved out of AuthService in upstream #30311.
+  // It is now enforced by AuthGuard via `@Authenticated({ public: true, setup: true })` on
+  // POST /auth/admin-sign-up, and covered by auth.guard.spec.ts + a medium test upstream.
 
   describe('getAuthStatus', () => {
     it('should return the auth status for a user with a PIN code', async () => {
