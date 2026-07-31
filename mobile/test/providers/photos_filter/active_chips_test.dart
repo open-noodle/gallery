@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
-import 'package:immich_mobile/utils/option.dart';
 import 'package:immich_mobile/providers/photos_filter/active_chips.dart';
 import 'package:immich_mobile/providers/photos_filter/chip_id.dart';
+import 'package:immich_mobile/utils/option.dart';
 import 'package:openapi/api.dart';
 
 PersonDto _person(String id, String name) => PersonDto(id: id, name: name, isHidden: false, thumbnailPath: '');

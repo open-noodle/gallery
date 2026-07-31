@@ -283,7 +283,7 @@ class _AlbumCard extends ConsumerWidget {
   final void Function(String albumId) onTap;
 
   Widget _buildFallback(ColorScheme cs) {
-    return Container(
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
         borderRadius: const BorderRadius.all(Radius.circular(16)),
