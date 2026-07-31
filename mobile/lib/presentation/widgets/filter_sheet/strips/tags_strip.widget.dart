@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -60,8 +61,8 @@ class _MoreTagChip extends StatelessWidget {
         fontWeight: FontWeight.w600,
       ),
       onPressed: () {
-        HapticFeedback.selectionClick();
-        context.pushRoute(const TagsPickerRoute());
+        unawaited(HapticFeedback.selectionClick());
+        unawaited(context.pushRoute(const TagsPickerRoute()));
       },
     );
   }
@@ -90,7 +91,7 @@ class _TagChip extends ConsumerWidget {
         fontWeight: FontWeight.w500,
       ),
       onSelected: (_) {
-        HapticFeedback.selectionClick();
+        unawaited(HapticFeedback.selectionClick());
         ref.read(photosFilterProvider.notifier).toggleTag(tag.id);
       },
     );
