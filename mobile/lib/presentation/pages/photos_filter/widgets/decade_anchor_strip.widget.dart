@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -44,7 +45,7 @@ class DecadeAnchorStrip extends ConsumerWidget {
             child: InkWell(
               borderRadius: BorderRadius.circular(14),
               onTap: () {
-                HapticFeedback.selectionClick();
+                unawaited(HapticFeedback.selectionClick());
                 onDecade(d.decadeStart);
               },
               child: Padding(

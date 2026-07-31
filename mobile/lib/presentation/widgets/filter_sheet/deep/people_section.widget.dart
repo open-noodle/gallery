@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -73,7 +74,7 @@ class _SearchMoreRow extends StatelessWidget {
         key: const Key('people-section-search-more'),
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          HapticFeedback.selectionClick();
+          unawaited(HapticFeedback.selectionClick());
           onOpenPicker?.call();
         },
         child: Padding(
@@ -120,7 +121,7 @@ class _PeopleGridTile extends ConsumerWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(32),
         onTap: () {
-          HapticFeedback.selectionClick();
+          unawaited(HapticFeedback.selectionClick());
           final notifier = ref.read(photosFilterProvider.notifier);
           final existing = ref.read(photosFilterProvider).people.firstWhereOrNull((p) => p.id == person.id);
           if (existing != null) {
