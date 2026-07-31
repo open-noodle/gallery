@@ -208,7 +208,8 @@ be checked **per site** rather than bulk-replaced:
 | Risk                                                                       | Handling                                                                                                                                                                  |
 | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A bulk regex corrupts the 34 lint sites, as the batch-24 scanner did twice | Analyzer-driven loop: apply, re-analyze, repeat to zero. Verify each enclosing class is a `State` before rewriting — a plain `ConsumerWidget` must keep `context.mounted` |
-| The port silently changes behaviour                                        | Tests written first for the current behaviour, then the port made to satisfy them                                                                                         |
+| The port silently changes behaviour                                        | TDD: tests written first against current behaviour and failing, then the port made to satisfy them                                                                        |
+| Following upstream's template makes removal owner-only                     | Hard constraint above + case 3 in the RemoveFromSpaceAction table: derive from `assetsActionProvider`, never `ownedAssetsActionProvider`                                  |
 | `onComplete` has no equivalent in the new model                            | Kept as a fork-local builder field; not pushed into upstream's shared `ActionItem`                                                                                        |
 | Nine commits land at once after the gate opens                             | Rebase batch-by-batch with the existing audits between each, as in arcs 1–3                                                                                               |
 
@@ -223,7 +224,8 @@ be checked **per site** rather than bulk-replaced:
 ## Success criteria
 
 1. `dart analyze --fatal-infos lib test` clean with `use_build_context_synchronously: true`.
-2. `dart format` idempotent; `flutter test` green including the new action tests.
+2. `dart format` idempotent; `flutter test` green with **every** case in the two tables above covered
+   — 11 for `RemoveFromSpaceAction`, 6 for `SimilarPhotosAction`.
 3. The two old fork button widgets are gone and their behaviour is reachable through the new model.
 4. All nine previously-held upstream commits are integrated.
 5. Full CI set green.
