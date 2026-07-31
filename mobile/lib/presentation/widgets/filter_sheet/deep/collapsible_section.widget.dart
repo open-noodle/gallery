@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -38,7 +39,7 @@ class CollapsibleSection extends ConsumerWidget {
       onTap: isEmpty
           ? null
           : () {
-              HapticFeedback.selectionClick();
+              unawaited(HapticFeedback.selectionClick());
               ref.read(collapsedSectionsProvider.notifier).toggle(sectionId);
             },
       child: Padding(
