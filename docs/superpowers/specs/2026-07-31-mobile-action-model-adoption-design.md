@@ -111,8 +111,19 @@ What changes is the plumbing — `toastServiceProvider` instead of `ImmichToast.
 `clearSelectionProvider(source)` instead of `multiSelectProvider.notifier.reset()`, `handleError` on
 failure. That removes the button's `BuildContext`-across-async-gap handling entirely.
 
-`create()` returns `null` when there are no owned assets for the source, matching how upstream hides
-inapplicable actions.
+#### Hard constraint: removal is **not** owner-scoped
+
+`ActionNotifier.removeFromSpace` uses `_getRemoteIdsForSource(source)`, **not**
+`_getOwnedRemoteIdsForSource`. Removing an asset from a Shared Space is not deleting it, so a space
+editor may remove another member's photo. This is deliberate fork behaviour.
+
+Upstream's `AssetActionBuilder` template (`favorite.action.dart`) derives its state from
+`ownedAssetsActionProvider(source)`. **Following that template naively would silently make
+remove-from-space owner-only and break editors managing a multi-owner space.**
+
+`RemoveFromSpaceAction` must therefore derive from `assetsActionProvider(source)` — all remote assets
+for the source — and `create()` returns `null` only when the selection contains no remote assets.
+A test pins this explicitly (see Testing).
 
 ### Port 2 — `SimilarPhotosAction`
 
@@ -128,17 +139,69 @@ which is exactly what upstream did when it rewrote `action_button.utils.dart` to
 `mobile/lib/utils/action_button.utils.dart` moves from `ActionMenuItemWidget(action: X(assets: [...]))`
 to `ActionMenuItem(action: X(source: context.source))`, and the two old fork widget files are deleted.
 
-### Testing
+### Testing — TDD
 
-The fork's two buttons have **no test coverage today**. Since this is a behaviour-preserving rewrite,
-tests are the safety net that makes the port verifiable rather than hopeful. Add one file per action,
-modelled on upstream's `mobile/test/unit/presentation/actions/favorite_action_test.dart`:
+The fork's two buttons have **no test coverage today**, and this is a behaviour-preserving rewrite of
+working code. Tests are therefore written **first**, against the _current_ behaviour, and must fail
+before the port exists.
 
-- `create()` returns `null` when the action should not appear
-- `create()` returns a correctly-labelled `ActionItem` when it should
-- success path — service called with the right arguments, toast shown, selection cleared, and (for
-  remove-from-space) `onComplete` fired
-- failure path — `handleError` invoked, selection **not** cleared
+**Cycle, per action:**
+
+1. **RED** — write the test file against the new API (`RemoveFromSpaceAction` / `SimilarPhotosAction`).
+   It fails to compile, because the action does not exist yet. That is the red state.
+2. **GREEN** — write the minimum action code to make every test pass.
+3. **REFACTOR** — delete the old widget file and migrate call sites; tests stay green throughout.
+
+Do not write the action first and add tests after. The whole value here is catching a silent
+behavioural drift — like the ownership constraint above — and a test written after the code tends to
+encode whatever the code already does.
+
+**Harness** (all arrives with `fe5c8ed0fb8`):
+`mobile/test/unit/presentation/presentation_context.dart` — `PresentationContext.create()`,
+`context.selected(assets)`, `context.currentUser`, and `tester.pumpTestAction(...)` /
+`tester.pumpTestWidget(...)`. Asset fixtures come from `RemoteAssetFactory.create(ownerId: …)`.
+`service.mocks.dart` needs a mock registered for the fork's shared-space path.
+
+#### `RemoveFromSpaceAction` — required cases
+
+| #   | Case                                          | Assertion                                                                                                                                                                                                |
+| --- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Empty selection                               | `create()` returns `null` — action hidden                                                                                                                                                                |
+| 2   | Selection has no **remote** assets            | hidden (local-only assets cannot be in a space)                                                                                                                                                          |
+| 3   | **Selection includes assets owned by others** | `removeFromSpace` called with **all** remote ids, not just owned — the constraint above                                                                                                                  |
+| 4   | Correct `spaceId` threaded                    | service called with the action's `spaceId`, not the current space                                                                                                                                        |
+| 5   | Success                                       | success toast carrying the removed **count** from `ActionResult.count`                                                                                                                                   |
+| 6   | Result `success == false`                     | error toast                                                                                                                                                                                              |
+| 7   | Service **throws**                            | `handleError` invoked; no unhandled exception escapes                                                                                                                                                    |
+| 8   | Selection clearing                            | matches current behaviour — cleared after the call **regardless** of success (current code calls `reset()` unconditionally). If this is judged wrong, change it deliberately and record it, not silently |
+| 9   | `onComplete` fired                            | fired exactly once, with the same unconditional timing as today                                                                                                                                          |
+| 10  | `onComplete` is `null`                        | no crash — it is optional                                                                                                                                                                                |
+| 11  | `source == viewer`                            | `clearSelectionProvider` is a no-op there; must not throw                                                                                                                                                |
+
+#### `SimilarPhotosAction` — required cases
+
+| #   | Case                           | Assertion                                                                               |
+| --- | ------------------------------ | --------------------------------------------------------------------------------------- |
+| 1   | Visible with a valid `assetId` | `create()` returns an `ActionItem` with the `view_similar_photos` label                 |
+| 2   | Invalidates the asset viewer   | `assetViewerProvider` invalidated before navigation                                     |
+| 3   | Sets the filter                | `photosFilterProvider.notifier.setSimilarTo(assetId)` called with the right id          |
+| 4   | Navigates                      | routes to `MainTimelineRoute`                                                           |
+| 5   | Ordering                       | filter is set **before** navigation, or the timeline opens unfiltered                   |
+| 6   | Rendered as a menu item        | call site wrapping in `ActionMenuItem` renders, replacing the old `menuItem: true` flag |
+
+#### Lint sweep — verification, not unit tests
+
+The 34 sites are behaviour-preserving, so the analyzer is the oracle: `dart analyze --fatal-infos lib
+test` must reach zero with the rule enabled, and `flutter test` must stay green. Three edge cases must
+be checked **per site** rather than bulk-replaced:
+
+- **Enclosing class is a `State`** → `mounted` is correct.
+- **Enclosing class is a plain `ConsumerWidget`/`StatelessWidget`** → it has no `mounted`; keep
+  `context.mounted`.
+- **The guarded use is a _different_ `BuildContext`** — e.g. the `ctx` of a
+  `showModalBottomSheet(builder: (ctx) => …)` or a dialog builder. Guarding that with the State's
+  `mounted` is the same "unrelated mounted check" defect in reverse, and the analyzer will keep
+  complaining. These need `ctx.mounted`.
 
 ## Risks
 
