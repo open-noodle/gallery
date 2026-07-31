@@ -1,12 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/log.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/platform_extensions.dart';
-import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/auth.provider.dart';
 import 'package:immich_mobile/providers/background_sync.provider.dart';
 import 'package:immich_mobile/providers/backup/backup.provider.dart';
@@ -17,7 +15,6 @@ import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/permission.provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
 import 'package:immich_mobile/providers/websocket.provider.dart';
-import 'package:immich_mobile/services/background_backup_reminder.service.dart';
 import 'package:logging/logging.dart';
 
 enum AppLifeCycleEnum { active, inactive, paused, resumed, detached, hidden }
@@ -55,7 +52,6 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
     _resumeOperation = Completer<void>();
 
     try {
-      await refreshConnectionAfterResume(_wasPaused);
       await _performResume();
     } catch (e, stackTrace) {
       _log.severe("Error during app resume", e, stackTrace);
@@ -95,24 +91,6 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
     await _ref.read(notificationPermissionProvider.notifier).getNotificationPermission();
 
     await _ref.read(galleryPermissionNotifier.notifier).getGalleryPermissionStatus();
-  }
-
-  /// On iOS, re-establishes the native HTTP client when returning to the
-  /// foreground after a pause. The background-worker isolate shares (and on
-  /// teardown orphans) the native URLSession, leaving the foreground unable to
-  /// reach the server until a cold restart. Re-establishing the client here —
-  /// before [_performResume] issues any request — recovers connectivity.
-  @visibleForTesting
-  Future<void> refreshConnectionAfterResume(bool wasPaused) async {
-    if (!CurrentPlatform.isIOS || !wasPaused) {
-      return;
-    }
-    try {
-      await _ref.read(apiServiceProvider).refreshConnection();
-      _log.info("Re-established server connection after resume");
-    } catch (e, stackTrace) {
-      _log.warning("Failed to refresh connection on resume", e, stackTrace);
-    }
   }
 
   Future<void> _safeRun(Future<void> Function() action, String debugName) async {
@@ -192,10 +170,10 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
       final currentUser = Store.tryGet(StoreKey.currentUser);
       if (currentUser != null) {
         await _safeRun(
-          () => _ref.read(backgroundBackupReminderServiceProvider).maybeShowReminder(),
-          "backgroundBackupReminder",
+          () => _ref.read(driftBackupProvider.notifier).startForegroundBackup(currentUser.id),
+          "handleBackupResume",
         );
-        await _safeRun(() => _ref.read(backupProvider.notifier).startBackup(currentUser.id), "handleBackupResume");
+
       }
     }
   }
@@ -243,10 +221,7 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
 
   Future<void> _performPause() {
     if (_ref.read(authProvider).isAuthenticated) {
-      if (!CurrentPlatform.isIOS) {
-        _ref.read(backupProvider.notifier).stopForegroundBackup(reason: "the app being sent to the background");
-      }
-
+      _ref.read(backupProvider.notifier).stopForegroundBackup(reason: "the app being sent to the background");
       _ref.read(websocketProvider.notifier).disconnect();
     }
 
