@@ -7,7 +7,9 @@ import 'package:immich_mobile/presentation/pages/photos_filter/widgets/quick_ran
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/when_picker_footer.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/when_picker_search_header.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/when_picker_year_accordion.widget.dart';
+import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/temporal_utils.dart';
+import 'package:immich_mobile/providers/photos_filter/time_buckets.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/when_picker.provider.dart';
 
 @RoutePage()
@@ -125,8 +127,19 @@ class _WhenPickerPageState extends ConsumerState<WhenPickerPage> {
 
   List<Widget> _bodySlivers(AsyncValue<List<YearCount>> async, String query) {
     return async.when(
-      loading: () => const [SliverFillRemaining(child: Center(child: CircularProgressIndicator(value: 0)))],
-      error: (e, st) => [SliverFillRemaining(child: Center(child: Text('filter_sheet_load_error_retry'.tr())))],
+      loading: () => const [SliverFillRemaining(child: Center(child: CircularProgressIndicator()))],
+      error: (e, st) => [
+        SliverFillRemaining(
+          child: Center(
+            child: TextButton.icon(
+              key: const Key('when-picker-retry'),
+              onPressed: () => ref.invalidate(timeBucketsProvider(ref.read(photosFilterProvider))),
+              icon: const Icon(Icons.refresh_rounded),
+              label: Text('filter_sheet_load_error_retry'.tr()),
+            ),
+          ),
+        ),
+      ],
       data: (filtered) {
         if (filtered.isEmpty && query.trim().isNotEmpty) {
           return [

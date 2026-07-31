@@ -1,3 +1,5 @@
+import 'package:auto_route/auto_route.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -7,8 +9,13 @@ import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.
 import 'package:immich_mobile/providers/photos_filter/filter_debounce.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
+import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/utils/image_url_builder.dart';
 import 'package:openapi/api.dart';
+
+/// Strip cap: at most this many person tiles render before a trailing "+N" tile
+/// takes over, opening the full-screen picker instead of an unbounded ListView.
+const int _kStripCap = 6;
 
 class PeopleStrip extends ConsumerWidget {
   const PeopleStrip({super.key});
@@ -24,12 +31,67 @@ class PeopleStrip extends ConsumerWidget {
       items: items,
       height: 80,
       onRetry: () => ref.invalidate(photosFilterSuggestionsProvider(filter)),
-      childBuilder: (data) => ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: data.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 10),
-        itemBuilder: (ctx, i) => _PersonTile(person: data[i] as FilterSuggestionsPersonDto),
+      childBuilder: (data) {
+        final people = data.cast<FilterSuggestionsPersonDto>();
+        final shown = people.take(_kStripCap).toList();
+        final overflow = people.length - shown.length;
+        return ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: shown.length + (overflow > 0 ? 1 : 0),
+          separatorBuilder: (_, _) => const SizedBox(width: 10),
+          itemBuilder: (ctx, i) => i < shown.length ? _PersonTile(person: shown[i]) : _MorePersonTile(count: overflow),
+        );
+      },
+    );
+  }
+}
+
+class _MorePersonTile extends StatelessWidget {
+  final int count;
+  const _MorePersonTile({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      key: const Key('people-strip-more'),
+      width: 58,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(32),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          context.pushRoute(const PersonPickerRoute());
+        },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: theme.colorScheme.surfaceContainerHighest),
+              child: Text(
+                '+$count',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            SizedBox(
+              width: 58,
+              child: Text(
+                'all'.tr(),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelSmall?.copyWith(fontSize: 10.5, color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

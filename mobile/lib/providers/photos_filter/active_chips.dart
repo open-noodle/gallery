@@ -2,8 +2,8 @@
 // of chip specs for the active-filters subheader and the sheet header.
 //
 // Order (design §5.5):
-//   people → tags → location → date → rating → media → favourite → archive
-//   → not-in-album → untagged → text.
+//   people → tags → location → camera → date → rating → media → favourite
+//   → archive → not-in-album → untagged → text.
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -12,7 +12,7 @@ import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/photos_filter/chip_id.dart';
 import 'package:openapi/api.dart';
 
-enum ChipVisual { person, tag, location, when, rating, media, toggle, text }
+enum ChipVisual { person, tag, location, camera, when, rating, media, toggle, text }
 
 class ActiveChipSpec {
   final ChipId id;
@@ -110,6 +110,22 @@ List<ActiveChipSpec> activeChipsFromFilter(SearchFilter filter, {FilterSuggestio
         label: locParts.join(' · '),
         visual: ChipVisual.location,
         icon: Icons.place_rounded,
+      ),
+    );
+  }
+
+  // ── camera ───────────────────────────────────────────────────────────
+  final cameraParts = [
+    filter.camera.make,
+    filter.camera.model,
+  ].where((s) => s != null && s.isNotEmpty).cast<String>().toList();
+  if (cameraParts.isNotEmpty) {
+    out.add(
+      ActiveChipSpec(
+        id: const CameraChipId(),
+        label: cameraParts.join(' · '),
+        visual: ChipVisual.camera,
+        icon: Icons.photo_camera_rounded,
       ),
     );
   }

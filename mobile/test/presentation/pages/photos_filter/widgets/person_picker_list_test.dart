@@ -38,9 +38,28 @@ void main() {
     await db.close();
   });
 
-  PersonDto person(String id, String name) => PersonDto(id: id, name: name, isHidden: false, thumbnailPath: '');
+  PersonDto person(String id, String name, {int? numberOfAssets}) =>
+      PersonDto(id: id, name: name, isHidden: false, thumbnailPath: '', numberOfAssets: numberOfAssets);
 
   group('PersonPickerList', () {
+    testWidgets('shows a photo-count subtitle when numberOfAssets is present', (tester) async {
+      _setLogicalSize(tester, const Size(400, 800));
+      await tester.pumpConsumerWidget(
+        PersonPickerList(people: [person('a', 'Alice', numberOfAssets: 1204)]),
+      );
+      await tester.pumpAndSettle();
+      final finder = find.byKey(const Key('person-row-count-a'));
+      expect(finder, findsOneWidget);
+      expect((tester.widget(finder) as Text).data, contains('1,204'));
+    });
+
+    testWidgets('hides the photo-count subtitle when numberOfAssets is null', (tester) async {
+      _setLogicalSize(tester, const Size(400, 800));
+      await tester.pumpConsumerWidget(PersonPickerList(people: [person('a', 'Alice')]));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('person-row-count-a')), findsNothing);
+    });
+
     testWidgets('renders rows and bucket headers alpha-sorted', (tester) async {
       _setLogicalSize(tester, const Size(400, 800));
       await tester.pumpConsumerWidget(

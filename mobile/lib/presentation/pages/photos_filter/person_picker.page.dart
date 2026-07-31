@@ -7,6 +7,7 @@ import 'package:immich_mobile/presentation/pages/photos_filter/widgets/person_pi
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/person_picker_search_header.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/recent_people_strip.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/selected_people_strip.widget.dart';
+import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/people_picker.provider.dart';
 
 @RoutePage()
@@ -81,8 +82,19 @@ class _PersonPickerPageState extends ConsumerState<PersonPickerPage> {
 
   List<Widget> _bodySlivers(AsyncValue<List<PersonDto>> async, String query) {
     return async.when(
-      loading: () => const [SliverFillRemaining(child: Center(child: CircularProgressIndicator(value: 0)))],
-      error: (e, st) => [SliverFillRemaining(child: Center(child: Text('filter_sheet_load_error_retry'.tr())))],
+      loading: () => const [SliverFillRemaining(child: Center(child: CircularProgressIndicator()))],
+      error: (e, st) => [
+        SliverFillRemaining(
+          child: Center(
+            child: TextButton.icon(
+              key: const Key('person-picker-retry'),
+              onPressed: () => ref.invalidate(driftGetAllPeopleWithSharedSpacesProvider),
+              icon: const Icon(Icons.refresh_rounded),
+              label: Text('filter_sheet_load_error_retry'.tr()),
+            ),
+          ),
+        ),
+      ],
       data: (filtered) {
         if (filtered.isEmpty && query.trim().isNotEmpty) {
           return [
