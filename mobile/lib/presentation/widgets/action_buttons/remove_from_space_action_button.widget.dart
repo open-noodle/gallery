@@ -15,7 +15,7 @@ class RemoveFromSpaceActionButton extends ConsumerWidget {
 
   const RemoveFromSpaceActionButton({super.key, required this.spaceId, required this.source, this.onComplete});
 
-  void _onTap(BuildContext context, WidgetRef ref) async {
+  Future<void> _onTap(BuildContext context, WidgetRef ref) async {
     if (!context.mounted) return;
 
     final result = await ref.read(actionProvider.notifier).removeFromSpace(source, spaceId);
