@@ -1484,11 +1484,15 @@
   "filter_search_people": "Search people...",
   "filter_sheet_archived": "Archived",
   "filter_sheet_browse_see_all": "More filters",
+  "filter_sheet_camera": "Camera",
   "filter_sheet_clear_filters": "Clear filters",
+  "filter_sheet_deep_camera_section": "Camera",
+  "filter_sheet_deep_empty_camera": "Cameras will appear when photos have them",
   "filter_sheet_deep_empty_people": "Filters appear as you upload photos",
   "filter_sheet_deep_empty_places": "Locations will appear when photos have them",
   "filter_sheet_deep_empty_tags": "No tags yet — tap a photo to add one",
   "filter_sheet_deep_empty_when": "When will appear once photos exist",
+  "filter_sheet_deep_manage_sections": "Manage sections",
   "filter_sheet_deep_media_any": "All",
   "filter_sheet_deep_media_section": "Media",
   "filter_sheet_deep_people_section": "People",
@@ -1497,9 +1501,21 @@
   "filter_sheet_deep_places_section": "Places",
   "filter_sheet_deep_rating_any": "Any rating",
   "filter_sheet_deep_rating_section": "Rating",
+  "filter_sheet_deep_search_n_cameras": {
+    "one": "Search {count} camera →",
+    "other": "Search {count} cameras →"
+  },
   "filter_sheet_deep_search_n_people": {
     "one": "Search {count} person →",
     "other": "Search {count} people →"
+  },
+  "filter_sheet_deep_search_n_places": {
+    "one": "Search {count} place →",
+    "other": "Search {count} places →"
+  },
+  "filter_sheet_deep_search_n_tags": {
+    "one": "Search {count} tag →",
+    "other": "Search {count} tags →"
   },
   "filter_sheet_deep_search_n_years": {
     "one": "{count} year →",
@@ -1538,6 +1554,7 @@
   "filter_sheet_offline": "Offline",
   "filter_sheet_people": "People",
   "filter_sheet_picker_all_time": "All time",
+  "filter_sheet_picker_camera_title": "Camera",
   "filter_sheet_picker_clear_search": "Clear search",
   "filter_sheet_picker_done": "Done",
   "filter_sheet_picker_no_results": "No results for '{query}'",
@@ -1546,13 +1563,19 @@
     "other": "{count} people"
   },
   "filter_sheet_picker_people_title": "Choose people",
+  "filter_sheet_picker_places_title": "Places",
   "filter_sheet_picker_recent": "Recent",
+  "filter_sheet_picker_search_camera_hint": "Search make or model…",
   "filter_sheet_picker_search_people_hint": "Search people",
+  "filter_sheet_picker_search_places_hint": "Search country or city…",
+  "filter_sheet_picker_search_tags_hint": "Search tags…",
   "filter_sheet_picker_search_when_hint": "Year or decade — e.g. 2024 or 20s",
   "filter_sheet_picker_selection_count": {
     "one": "{count} selected",
     "other": "{count} selected"
   },
+  "filter_sheet_picker_tags_matches": "Matches",
+  "filter_sheet_picker_tags_title": "Tags",
   "filter_sheet_picker_when_title": "Choose when",
   "filter_sheet_places": "Places",
   "filter_sheet_reset": "Reset",
@@ -2180,6 +2203,10 @@
   "person_age_years": "{years, plural, one {# year} other {# years}} old",
   "person_birthdate": "Born on {date}",
   "person_hidden": "{name}{hidden, select, true { (hidden)} other {}}",
+  "person_picker_photo_count": {
+    "one": "{count} photo",
+    "other": "{count} photos"
+  },
   "person_recognized": "Person recognized",
   "photo_shared_all_users": "Looks like you shared your photos with all users or you don't have any user to share with.",
   "photos": "Photos",

@@ -18,6 +18,8 @@ enum StoreKey<T> {
   manageLocalMediaAndroid<bool>._(137),
   // Read-only Mode settings
   readonlyModeEnabled<bool>._(138),
+  filterSheetCollapsedSections<String>._(143),
+  filterSheetHiddenSections<String>._(144),
 
   syncMigrationStatus<String>._(1013),
 
