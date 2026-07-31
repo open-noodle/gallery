@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -95,7 +96,7 @@ class _WhenPickerPill extends ConsumerWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: () {
-          HapticFeedback.selectionClick();
+          unawaited(HapticFeedback.selectionClick());
           ref.read(photosFilterProvider.notifier).setDateRange(start: preset.start, end: preset.end);
         },
         child: Padding(
