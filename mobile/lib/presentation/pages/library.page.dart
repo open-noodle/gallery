@@ -203,7 +203,7 @@ class _SpacesCollectionCard extends ConsumerWidget {
                         children: spaces.take(4).map((space) {
                           final thumbnailId = space.thumbnailAssetId.value;
                           if (thumbnailId == null) {
-                            return Container(
+                            return DecoratedBox(
                               decoration: BoxDecoration(
                                 color: context.colorScheme.surfaceContainerHigh,
                                 borderRadius: const BorderRadius.all(Radius.circular(10)),
@@ -552,7 +552,7 @@ class _AlbumsCollectionCard extends ConsumerWidget {
                     children: albums.take(4).map((album) {
                       final thumbnailId = album.thumbnailAssetId;
                       if (thumbnailId == null) {
-                        return Container(
+                        return DecoratedBox(
                           decoration: BoxDecoration(
                             color: context.colorScheme.surfaceContainerHigh,
                             borderRadius: const BorderRadius.all(Radius.circular(10)),
