@@ -224,8 +224,10 @@ be checked **per site** rather than bulk-replaced:
 ## Success criteria
 
 1. `dart analyze --fatal-infos lib test` clean with `use_build_context_synchronously: true`.
-2. `dart format` idempotent; `flutter test` green with **every** case in the two tables above covered
-   — 11 for `RemoveFromSpaceAction`, 6 for `SimilarPhotosAction`.
+2. `dart format` idempotent; `flutter test` green with every **distinct behaviour** in the two tables
+   above covered. Cases that reduce to an already-tested branch may be folded together, provided the
+   reduction is recorded in the implementation plan. Writing two tests that exercise one branch is
+   not coverage — the review rubric treats duplicated assertions as a defect in their own right.
 3. The two old fork button widgets are gone and their behaviour is reachable through the new model.
 4. All nine previously-held upstream commits are integrated.
 5. Full CI set green.
