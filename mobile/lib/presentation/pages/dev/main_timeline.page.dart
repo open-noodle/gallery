@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -71,7 +72,7 @@ class _MainTimelinePageState extends ConsumerState<MainTimelinePage> {
                 if (m.axis != Axis.vertical) return false;
                 final isSheet = n.context?.findAncestorWidgetOfExactType<DraggableScrollableSheet>() != null;
                 if (!isSheet && m.maxScrollExtent - m.pixels < m.viewportDimension) {
-                  scopedRef.read(photosFilterSearchProvider.notifier).loadMore();
+                  unawaited(scopedRef.read(photosFilterSearchProvider.notifier).loadMore());
                 }
                 return false;
               },

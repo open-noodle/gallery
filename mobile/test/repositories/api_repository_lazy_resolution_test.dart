@@ -49,7 +49,9 @@ void main() {
   late _MockApiService apiService;
 
   setUpAll(() {
-    registerFallbackValue(SessionCreateDto(deviceType: const Optional.present(''), deviceOS: const Optional.present('')));
+    registerFallbackValue(
+      SessionCreateDto(deviceType: const Optional.present(''), deviceOS: const Optional.present('')),
+    );
     registerFallbackValue(UpdateAssetDto());
     registerFallbackValue(BulkIdsDto(ids: []));
     registerFallbackValue(PartnerDirection.sharedBy);
@@ -97,9 +99,7 @@ void main() {
 
     when(() => apiService.sessionsApi).thenReturn(newApi);
     // Throw via thenAnswer so expectLater sees the rejection as a Future.
-    when(
-      () => newApi.createSession(any()),
-    ).thenAnswer((_) => Future.error(Exception('stop')));
+    when(() => newApi.createSession(any())).thenAnswer((_) => Future.error(Exception('stop')));
 
     await expectLater(repo.createSession('phone', 'ios'), throwsException);
 
@@ -115,12 +115,7 @@ void main() {
 
     when(() => apiService.peopleApi).thenReturn(newApi);
     when(() => newApi.getAllPeople()).thenAnswer(
-      (_) async => PeopleResponseDto(
-        people: [],
-        hidden: 0,
-        total: 0,
-        hasNextPage: const Optional.present(false),
-      ),
+      (_) async => PeopleResponseDto(people: [], hidden: 0, total: 0, hasNextPage: const Optional.present(false)),
     );
 
     await repo.getAll();
@@ -136,9 +131,7 @@ void main() {
     final repo = PartnerApiRepository(apiService);
 
     when(() => apiService.partnersApi).thenReturn(newApi);
-    when(
-      () => newApi.getPartners(PartnerDirection.sharedBy),
-    ).thenAnswer((_) async => []);
+    when(() => newApi.getPartners(PartnerDirection.sharedBy)).thenAnswer((_) async => []);
 
     await repo.getAll(Direction.sharedByMe);
 
@@ -153,9 +146,7 @@ void main() {
     final repo = FolderApiRepository(apiService);
 
     when(() => apiService.viewApi).thenReturn(newApi);
-    when(
-      () => newApi.getUniqueOriginalPathsWithHttpInfo(),
-    ).thenAnswer((_) async => http.Response('[]', 200));
+    when(() => newApi.getUniqueOriginalPathsWithHttpInfo()).thenAnswer((_) async => http.Response('[]', 200));
 
     await repo.getAllUniquePaths();
 
@@ -171,9 +162,7 @@ void main() {
 
     when(() => apiService.albumsApi).thenReturn(newApi);
     registerFallbackValue(BulkIdsDto(ids: []));
-    when(
-      () => newApi.removeAssetFromAlbum(any(), any()),
-    ).thenAnswer((_) async => []);
+    when(() => newApi.removeAssetFromAlbum(any(), any())).thenAnswer((_) async => []);
 
     await repo.removeAssets('album-1', ['asset-1']);
 
@@ -188,9 +177,7 @@ void main() {
     final repo = AssetApiRepository(apiService);
 
     when(() => apiService.assetsApi).thenReturn(newApi);
-    when(
-      () => newApi.updateAsset(any(), any()),
-    ).thenAnswer((_) => Future.error(Exception('stop')));
+    when(() => newApi.updateAsset(any(), any())).thenAnswer((_) => Future.error(Exception('stop')));
 
     await expectLater(repo.updateDescription('a1', 'desc'), throwsException);
 

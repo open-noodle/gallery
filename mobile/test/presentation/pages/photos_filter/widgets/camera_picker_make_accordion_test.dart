@@ -36,10 +36,7 @@ void main() {
     });
 
     testWidgets('empty makes -> hidden (SizedBox.shrink)', (tester) async {
-      await tester.pumpConsumerWidget(
-        _harness(expandedMake: null, onExpand: (_) {}),
-        overrides: _overrideMakes([]),
-      );
+      await tester.pumpConsumerWidget(_harness(expandedMake: null, onExpand: (_) {}), overrides: _overrideMakes([]));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('camera-picker-make-Canon')), findsNothing);
     });
@@ -64,8 +61,13 @@ void main() {
     testWidgets('tapping an already-expanded make calls onExpandMake(null)', (tester) async {
       String? expanded = 'Canon';
       await tester.pumpConsumerWidget(
-        SingleChildScrollView(child: _harness(expandedMake: 'Canon', onExpand: (m) => expanded = m)),
-        overrides: [..._overrideMakes(['Canon']), cameraModelSuggestionsProvider.overrideWith((ref, m) async => [])],
+        SingleChildScrollView(
+          child: _harness(expandedMake: 'Canon', onExpand: (m) => expanded = m),
+        ),
+        overrides: [
+          ..._overrideMakes(['Canon']),
+          cameraModelSuggestionsProvider.overrideWith((ref, m) async => []),
+        ],
       );
       await tester.pumpAndSettle();
 
@@ -77,7 +79,9 @@ void main() {
     testWidgets('expanding a make fetches its models only — other makes are not fetched', (tester) async {
       final fetchedFor = <String?>[];
       await tester.pumpConsumerWidget(
-        SingleChildScrollView(child: _harness(expandedMake: 'Canon', onExpand: (_) {})),
+        SingleChildScrollView(
+          child: _harness(expandedMake: 'Canon', onExpand: (_) {}),
+        ),
         overrides: [
           ..._overrideMakes(['Canon', 'Sony']),
           cameraModelSuggestionsProvider.overrideWith((ref, make) async {
@@ -96,7 +100,9 @@ void main() {
 
     testWidgets('tapping a model selects make + model via setCamera', (tester) async {
       await tester.pumpConsumerWidget(
-        SingleChildScrollView(child: _harness(expandedMake: 'Canon', onExpand: (_) {})),
+        SingleChildScrollView(
+          child: _harness(expandedMake: 'Canon', onExpand: (_) {}),
+        ),
         overrides: [
           ..._overrideMakes(['Canon']),
           cameraModelSuggestionsProvider.overrideWith((ref, make) async => ['EOS R5', 'EOS R6']),
@@ -116,7 +122,9 @@ void main() {
     testWidgets('selecting a different make replaces the prior make/model selection', (tester) async {
       String? expanded = 'Canon';
       await tester.pumpConsumerWidget(
-        SingleChildScrollView(child: _harness(expandedMake: expanded, onExpand: (m) => expanded = m)),
+        SingleChildScrollView(
+          child: _harness(expandedMake: expanded, onExpand: (m) => expanded = m),
+        ),
         overrides: [
           ..._overrideMakes(['Canon', 'Sony']),
           cameraModelSuggestionsProvider.overrideWith((ref, make) async => make == 'Canon' ? ['EOS R5'] : []),
@@ -138,7 +146,9 @@ void main() {
 
     testWidgets('search query filters the already-loaded model list for the expanded make', (tester) async {
       await tester.pumpConsumerWidget(
-        SingleChildScrollView(child: _harness(expandedMake: 'Canon', onExpand: (_) {})),
+        SingleChildScrollView(
+          child: _harness(expandedMake: 'Canon', onExpand: (_) {}),
+        ),
         overrides: [
           ..._overrideMakes(['Canon']),
           cameraModelSuggestionsProvider.overrideWith((ref, make) async => ['EOS R5', 'EOS R6']),
@@ -158,7 +168,9 @@ void main() {
 
     testWidgets('per-make fetch error shows an inline retry for that make only', (tester) async {
       await tester.pumpConsumerWidget(
-        SingleChildScrollView(child: _harness(expandedMake: 'Leica', onExpand: (_) {})),
+        SingleChildScrollView(
+          child: _harness(expandedMake: 'Leica', onExpand: (_) {}),
+        ),
         overrides: [
           ..._overrideMakes(['Leica']),
           cameraModelSuggestionsProvider.overrideWith((ref, make) async => throw Exception('boom')),

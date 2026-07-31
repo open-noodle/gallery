@@ -399,10 +399,10 @@ void main() {
 
       // members desc by default: present-but-null memberCount treated as 0,
       // sorting after the space with 3 members.
-      expect(
-        filterAndSortSpaces(items, '', SpaceSortMode.members, false).map((s) => s.id).toList(),
-        ['has-members', 'present-null'],
-      );
+      expect(filterAndSortSpaces(items, '', SpaceSortMode.members, false).map((s) => s.id).toList(), [
+        'has-members',
+        'present-null',
+      ]);
 
       // recentActivity: present-but-null lastActivityAt falls back to
       // updatedAt (not a crash on a null `.value`); hasMembers' real
