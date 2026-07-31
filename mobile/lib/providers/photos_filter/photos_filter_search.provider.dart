@@ -85,7 +85,7 @@ class PhotosFilterSearchNotifier extends StateNotifier<PhotosFilterSearchState> 
   @override
   void dispose() {
     _disposed = true;
-    _countController.close();
+    unawaited(_countController.close());
     super.dispose();
   }
 }

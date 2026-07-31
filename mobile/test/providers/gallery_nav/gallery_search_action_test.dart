@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -53,7 +54,7 @@ void main() {
       final c = _container(sheet: FilterSheetSnap.hidden);
       addTearDown(c.dispose);
 
-      openGallerySearch(router, c.read);
+      unawaited(openGallerySearch(router, c.read));
       async.flushMicrotasks();
 
       expect(router.setCalls, [GalleryTabEnum.photos.index]);
@@ -95,7 +96,7 @@ void main() {
       final c = _container(sheet: FilterSheetSnap.hidden);
       addTearDown(c.dispose);
 
-      openGallerySearch(router, c.read);
+      unawaited(openGallerySearch(router, c.read));
       async.elapse(const Duration(milliseconds: 620));
       async.flushMicrotasks();
 
@@ -123,9 +124,9 @@ void main() {
       final c = _container(sheet: FilterSheetSnap.hidden);
       addTearDown(c.dispose);
 
-      openGallerySearch(router, c.read);
+      unawaited(openGallerySearch(router, c.read));
       async.elapse(const Duration(milliseconds: 300));
-      openGallerySearch(router, c.read);
+      unawaited(openGallerySearch(router, c.read));
       async.elapse(const Duration(milliseconds: 700));
 
       expect(c.read(photosFilterSheetProvider), FilterSheetSnap.deep);
@@ -139,7 +140,7 @@ void main() {
       final c = _container(sheet: FilterSheetSnap.hidden);
       addTearDown(c.dispose);
 
-      openGallerySearch(router, c.read);
+      unawaited(openGallerySearch(router, c.read));
       async.elapse(const Duration(milliseconds: 100));
       router.setActiveIndex(GalleryTabEnum.library.index);
       async.elapse(const Duration(milliseconds: 700));
