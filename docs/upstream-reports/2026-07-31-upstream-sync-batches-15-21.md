@@ -160,8 +160,42 @@ so it is not a gate.
 
 - **Test branch**: `rebase/upstream-arc1-b21`
 - **Commit validated**: `505268602e1`
+- **Result**: **10 / 10 GREEN**
 
-(Recorded in a follow-up commit once the dispatched runs settle.)
+| Workflow                                  | Status | Notes                                                |
+| ----------------------------------------- | ------ | ---------------------------------------------------- |
+| `test.yml`                                | GREEN  | Green on re-run — one confirmed flake, see below     |
+| `docker.yml`                              | GREEN  | Validates the `server/Dockerfile` resolutions        |
+| `static_analysis.yml`                     | GREEN  | Confirms the Dart lint sweep + `dart format` in CI   |
+| `gallery-build-mobile.yml`                | GREEN  | iOS **and** Android compile after the Pigeon removal |
+| `gallery-mobile-smoke.yml`                | GREEN  |                                                      |
+| `gallery-ml-smoke.yml`                    | GREEN  |                                                      |
+| `gallery-rebase-smoke.yml`                | GREEN  |                                                      |
+| `storage-migration-tests.yml`             | GREEN  |                                                      |
+| `storage-migration-e2e.yml`               | GREEN  |                                                      |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | Coverage grep + Docker boot                          |
+
+PR-gated workflows (codeql / zizmor / docs-build / cli) were not run; this arc is not HIGH-risk
+overall and no PR was opened for the test branch.
+
+### Confirmed flake — and the latent bug behind it
+
+First `test.yml` run: `End-to-End Tests (Server & CLI)` failed with 1 of 1474 tests red —
+`asset.e2e-spec.ts:995`, `expected 'duplicate' to be 'created'`. Green on re-run.
+
+The mechanism is worth recording because "flaky" understates it:
+
+1. Attempt 1 failed with `Timed out waiting for assetUpload event` on a 31 MB RICOH GR III raw
+   file — the test itself carries a comment that raw thumbnail generation "can take a while".
+2. `e2e/vitest.config.ts` sets `retry: process.env.CI ? 4 : 0`.
+3. `utils.createAsset` re-uploads the **same bytes**, so every retry correctly returns `duplicate`.
+
+One slow upload therefore becomes a guaranteed 5-attempt failure (`[2/5]` in the log): the retry is
+**not idempotent for uploads**. Arc 1 did not touch this path — its only `e2e/` changes are
+`mise.toml` (batch 18), `responses.ts` (batch 17 removing the now-dead `alreadyHasAdmin` DTO), and a
+maintenance spec. This is upstream's test and upstream's retry config; fixing it properly (make the
+retry tolerate `duplicate`, or exclude upload specs from blanket retry) is logged as follow-up
+rather than accepted as background noise.
 
 ## Post-Rebase Verification
 
@@ -180,3 +214,6 @@ so it is not a gate.
 3. **Batch 25** — `AlbumDescriptionNullable` migration → also needs a `revert-to-immich.sql` entry.
 4. **Batch 26** — GitHub Actions major bump; note the fork's own workflows are deliberately behind
    (pre-existing drift).
+5. **Non-idempotent e2e upload retry** (not arc-2 blocking) — `retry: 4` re-uploads identical bytes,
+   so any slow upload turns one timeout into a hard failure. Worth fixing at the root rather than
+   re-running: either tolerate `duplicate` on retry, or drop blanket retry for upload specs.
