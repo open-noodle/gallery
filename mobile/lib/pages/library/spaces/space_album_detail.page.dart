@@ -79,7 +79,7 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
 
     try {
       final count = await ref.read(spaceAlbumActionsProvider).addAssets(widget.albumId, remoteAssetIds);
-      if (context.mounted && count > 0) {
+      if (mounted && count > 0) {
         ImmichToast.show(
           context: context,
           msg: 'space_album_add_photos_success'.t(context: context, args: {'count': count.toString()}),
@@ -87,7 +87,7 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
         );
       }
     } catch (_) {
-      if (context.mounted) {
+      if (mounted) {
         ImmichToast.show(
           context: context,
           msg: 'space_album_add_photos_failed'.t(context: context),
@@ -106,7 +106,7 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
       await ref
           .read(spaceAlbumActionsProvider)
           .toggleTimeline(widget.spaceId, widget.albumId, current: album.showInTimeline);
-      if (context.mounted) {
+      if (mounted) {
         ImmichToast.show(
           context: context,
           msg: album.showInTimeline
@@ -116,7 +116,7 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
         );
       }
     } catch (_) {
-      if (context.mounted) {
+      if (mounted) {
         ImmichToast.show(
           context: context,
           msg: 'space_album_timeline_update_failed'.t(context: context),
@@ -150,7 +150,7 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
 
     try {
       await ref.read(spaceAlbumActionsProvider).unlink(widget.spaceId, widget.albumId);
-      if (context.mounted) {
+      if (mounted) {
         ImmichToast.show(
           context: context,
           msg: 'space_album_unlinked_success'.t(context: context),
@@ -159,7 +159,7 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
         await context.maybePop();
       }
     } catch (_) {
-      if (context.mounted) {
+      if (mounted) {
         ImmichToast.show(
           context: context,
           msg: 'spaces_linked_albums_error_unlink'.t(context: context),
