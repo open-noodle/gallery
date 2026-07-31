@@ -65,10 +65,6 @@ class NetworkApiImpl: NetworkApi {
     return Bundle.main.object(forInfoDictionaryKey: "AppGroupId") as! String
   }
 
-  func recreateSession() throws {
-    URLSessionManager.shared.recreateSession()
-  }
-
   func setRequestHeaders(headers: [String : String], serverUrls: [String], token: String?) throws {
     URLSessionManager.setServerUrls(serverUrls)
 
