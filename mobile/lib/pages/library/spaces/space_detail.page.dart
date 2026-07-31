@@ -132,7 +132,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       final assetIds = newAssets.whereType<RemoteAsset>().map((a) => a.id).toList();
       await ref.read(sharedSpaceApiRepositoryProvider).addAssets(widget.spaceId, assetIds);
       ref.invalidate(sharedSpacesProvider);
-      if (context.mounted) {
+      if (mounted) {
         ImmichToast.show(
           context: context,
           msg: 'Added ${assetIds.length} photos to space',
@@ -148,7 +148,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       await _triggerSpaceSync();
       await _refreshSpaceMetadata();
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ImmichToast.show(context: context, msg: 'Failed to add photos', toastType: ToastType.error);
       }
     }
@@ -191,12 +191,12 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       try {
         await ref.read(sharedSpaceApiRepositoryProvider).delete(widget.spaceId);
         ref.invalidate(sharedSpacesProvider);
-        if (context.mounted) {
+        if (mounted) {
           ImmichToast.show(context: context, msg: 'Space deleted', toastType: ToastType.success);
           await context.maybePop();
         }
       } catch (e) {
-        if (context.mounted) {
+        if (mounted) {
           ImmichToast.show(context: context, msg: 'Failed to delete space', toastType: ToastType.error);
         }
       }
@@ -285,7 +285,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     if (ids.isEmpty) return;
     try {
       await ref.read(spaceAlbumActionsProvider).link(widget.spaceId, ids);
-      if (context.mounted) {
+      if (mounted) {
         ImmichToast.show(
           context: context,
           msg: 'space_album_linked_success'.t(context: context, args: {'count': ids.length.toString()}),
@@ -293,7 +293,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
         );
       }
     } catch (_) {
-      if (context.mounted) {
+      if (mounted) {
         ImmichToast.show(
           context: context,
           msg: 'spaces_linked_albums_error_link'.t(context: context),
@@ -311,7 +311,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
 
     try {
       await ref.read(spaceAlbumActionsProvider).toggleTimeline(widget.spaceId, albumId, current: album.showInTimeline);
-      if (context.mounted) {
+      if (mounted) {
         ImmichToast.show(
           context: context,
           msg: album.showInTimeline
@@ -321,7 +321,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
         );
       }
     } catch (_) {
-      if (context.mounted) {
+      if (mounted) {
         ImmichToast.show(
           context: context,
           msg: 'space_album_timeline_update_failed'.t(context: context),
@@ -356,7 +356,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
 
     try {
       await ref.read(spaceAlbumActionsProvider).unlink(widget.spaceId, albumId);
-      if (context.mounted) {
+      if (mounted) {
         ImmichToast.show(
           context: context,
           msg: 'space_album_unlinked_success'.t(context: context),
@@ -364,7 +364,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
         );
       }
     } catch (_) {
-      if (context.mounted) {
+      if (mounted) {
         ImmichToast.show(
           context: context,
           msg: 'spaces_linked_albums_error_unlink'.t(context: context),
