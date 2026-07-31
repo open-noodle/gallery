@@ -52,6 +52,8 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
   void setLocation(SearchLocationFilter? location) =>
       state = state.copyWith(location: location ?? SearchLocationFilter());
 
+  void setCamera(SearchCameraFilter? camera) => state = state.copyWith(camera: camera ?? SearchCameraFilter());
+
   void setDateRange({DateTime? start, DateTime? end}) => state = state.copyWith(
     date: SearchDateFilter(takenAfter: start, takenBefore: end),
   );
@@ -108,6 +110,8 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
         state = state.copyWith()..tagIds = next.isEmpty ? null : next;
       case LocationChipId():
         setLocation(null);
+      case CameraChipId():
+        setCamera(null);
       case DateChipId():
         setDateRange(start: null, end: null);
       case RatingChipId():
