@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -37,15 +38,15 @@ class DeepHeader extends ConsumerWidget {
                 icon: const Icon(Icons.settings_rounded),
                 tooltip: 'filter_sheet_deep_manage_sections'.tr(),
                 onPressed: () {
-                  HapticFeedback.selectionClick();
-                  showManageSectionsSheet(context);
+                  unawaited(HapticFeedback.selectionClick());
+                  unawaited(showManageSectionsSheet(context));
                 },
               ),
               if (!isEmpty)
                 TextButton(
                   key: const Key('deep-header-reset'),
                   onPressed: () {
-                    HapticFeedback.mediumImpact();
+                    unawaited(HapticFeedback.mediumImpact());
                     ref.read(photosFilterProvider.notifier).reset();
                   },
                   child: Text('filter_sheet_reset'.tr()),

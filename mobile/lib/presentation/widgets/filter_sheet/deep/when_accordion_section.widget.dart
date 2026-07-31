@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -128,7 +129,7 @@ class _SearchMoreRow extends StatelessWidget {
         key: const Key('when-section-search-more'),
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          HapticFeedback.selectionClick();
+          unawaited(HapticFeedback.selectionClick());
           onOpenPicker?.call();
         },
         child: Padding(
@@ -170,7 +171,7 @@ class _YearRow extends StatelessWidget {
         InkWell(
           key: Key('when-year-${year.year}'),
           onTap: () {
-            HapticFeedback.selectionClick();
+            unawaited(HapticFeedback.selectionClick());
             onToggle();
           },
           child: Padding(
@@ -263,7 +264,7 @@ class _MonthCell extends ConsumerWidget {
       key: Key('when-month-$year-${month.month}'),
       borderRadius: BorderRadius.circular(10),
       onTap: () {
-        HapticFeedback.selectionClick();
+        unawaited(HapticFeedback.selectionClick());
         final notifier = ref.read(photosFilterProvider.notifier);
         if (isSelected) {
           notifier.setDateRange(start: null, end: null);

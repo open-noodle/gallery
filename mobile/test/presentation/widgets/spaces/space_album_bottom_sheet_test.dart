@@ -43,9 +43,7 @@ void main() {
   });
 
   testWidgets('canEdit:true — has Download, Share, and RemoveFromAlbum buttons', (tester) async {
-    await tester.pumpWidget(
-      _wrap(const SpaceAlbumBottomSheet(canEdit: true, albumId: 'a1')),
-    );
+    await tester.pumpWidget(_wrap(const SpaceAlbumBottomSheet(canEdit: true, albumId: 'a1')));
     await tester.pump();
 
     expect(find.byType(DownloadActionButton), findsOneWidget);
@@ -54,9 +52,7 @@ void main() {
   });
 
   testWidgets('canEdit:false — has Download and Share but NO RemoveFromAlbum button', (tester) async {
-    await tester.pumpWidget(
-      _wrap(const SpaceAlbumBottomSheet(canEdit: false, albumId: 'a1')),
-    );
+    await tester.pumpWidget(_wrap(const SpaceAlbumBottomSheet(canEdit: false, albumId: 'a1')));
     await tester.pump();
 
     expect(find.byType(DownloadActionButton), findsOneWidget);
@@ -65,9 +61,7 @@ void main() {
   });
 
   testWidgets('canEdit:true — does NOT have Favorite, Archive, Trash, or MoveToLockFolder buttons', (tester) async {
-    await tester.pumpWidget(
-      _wrap(const SpaceAlbumBottomSheet(canEdit: true, albumId: 'a1')),
-    );
+    await tester.pumpWidget(_wrap(const SpaceAlbumBottomSheet(canEdit: true, albumId: 'a1')));
     await tester.pump();
 
     // Verify forbidden action buttons are absent by checking for their label text
