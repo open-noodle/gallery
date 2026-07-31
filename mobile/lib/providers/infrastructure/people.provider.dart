@@ -44,9 +44,11 @@ final getAllPeopleProvider = StreamProvider.family<List<Person>, PeopleSortBy>((
   yield* service.watch(minFaces: prefs?.minimumFaces ?? 3, sortBy: sortBy);
 });
 
-/// People for the global People page — the viewer's own people plus people on Space-shared
-/// assets, matching the web People page. Kept distinct from [driftGetAllPeopleProvider] so
-/// the owner-scoped, local-first people picker and library card stay local. See issue #727.
+/// People for the global People page AND the photos-filter People picker (see
+/// `peoplePickerAllProvider`) — the viewer's own people plus people on Space-shared assets,
+/// matching the web People page / picker. Kept distinct from [driftGetAllPeopleProvider] so
+/// the remaining owner-scoped, local-first surface (the library people card) stays local.
+/// See issue #727.
 final driftGetAllPeopleWithSharedSpacesProvider = FutureProvider.family<List<DriftPerson>, PeopleSortBy>((
   ref,
   sortBy,
