@@ -651,7 +651,7 @@ class SyncStreamRepository extends DatabaseAccessor<Drift> with $SyncStreamRepos
             color: Value(space.color),
             createdById: Value(space.createdById),
             thumbnailAssetId: Value(space.thumbnailAssetId),
-            thumbnailCropY: Value(space.thumbnailCropY?.toInt()),
+            thumbnailCropY: Value(space.thumbnailCropY),
             faceRecognitionEnabled: Value(space.faceRecognitionEnabled),
             petsEnabled: Value(space.petsEnabled),
             lastActivityAt: Value(space.lastActivityAt),

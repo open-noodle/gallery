@@ -22,10 +22,10 @@ import 'package:immich_mobile/presentation/widgets/timeline/constants.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/scroll_drain.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/scrubber.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
-import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_anchor.dart';
-import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_bottom_pill.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_drag_region.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_anchor.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_bottom_pill.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_scroll_target.dart';
 import 'package:immich_mobile/providers/asset_viewer/scroll_to_date_notifier.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
@@ -654,7 +654,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                     slivers: [
                       if (widget.appBar != null) widget.appBar!,
                       if (widget.topSliverWidget != null) widget.topSliverWidget!,
-                      SliverFillRemaining(hasScrollBody: false, child: widget.emptyWidget!),
+                      SliverFillRemaining(hasScrollBody: false, child: widget.emptyWidget),
                     ],
                   );
                 }
