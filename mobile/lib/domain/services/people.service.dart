@@ -64,14 +64,14 @@ class PeopleService {
     }
   }
 
-  /// People for the global People page: the viewer's own people AND people on assets shared
-  /// with them through a Space, matching the web People page (which calls the server with
-  /// withSharedSpaces:true). The local sync DB is owner-scoped and never receives
-  /// shared-space people, so this reads the server's unified, RBAC-projected list. This is
-  /// the People-page sibling of issue #727.
+  /// People for the global People page AND the photos-filter People picker: the viewer's own
+  /// people AND people on assets shared with them through a Space, matching the web People
+  /// page (which calls the server with withSharedSpaces:true). The local sync DB is
+  /// owner-scoped and never receives shared-space people, so this reads the server's unified,
+  /// RBAC-projected list. This is the People-page sibling of issue #727.
   ///
-  /// Kept separate from [getAllPeople] so the owner-scoped, local-first surfaces (the photos
-  /// filter people picker, the library people card) are unaffected.
+  /// Kept separate from [getAllPeople] so the remaining owner-scoped, local-first surface (the
+  /// library people card) is unaffected.
   Future<List<DriftPerson>> getAllPeopleWithSharedSpaces({
     int minFaces = 3,
     PeopleSortBy sortBy = PeopleSortBy.photoCount,
