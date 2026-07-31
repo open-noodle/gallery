@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/deep_section_scaffold.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_debounce.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/temporal_utils.dart';
@@ -15,8 +16,8 @@ import 'package:immich_mobile/providers/photos_filter/time_buckets.provider.dart
 /// tapping another year collapses the first. Tapping a month sets the date
 /// range filter to the whole month; tapping the same month twice clears it.
 ///
-/// The trailing header exposes a "N years →" affordance that delegates to
-/// [onOpenPicker] (a full when-picker will be wired in a later task).
+/// A body "N years →" row below the year list delegates to [onOpenPicker]
+/// — tapping it opens the full when-picker.
 class WhenAccordionSection extends ConsumerStatefulWidget {
   final VoidCallback? onOpenPicker;
   const WhenAccordionSection({super.key, this.onOpenPicker});
@@ -54,20 +55,11 @@ class _WhenAccordionSectionState extends ConsumerState<WhenAccordionSection> {
     final count = yearsAsync.valueOrNull?.length ?? 0;
 
     return DeepSectionScaffold<YearCount>(
+      sectionId: FilterSectionId.when,
       titleKey: 'filter_sheet_deep_when_section',
       emptyCaptionKey: 'filter_sheet_deep_empty_when',
       items: yearsAsync,
       onRetry: () => ref.invalidate(timeBucketsProvider(filter)),
-      trailingHeader: count > 0
-          ? TextButton(
-              key: const Key('when-section-search-more'),
-              onPressed: () {
-                HapticFeedback.selectionClick();
-                widget.onOpenPicker?.call();
-              },
-              child: Text(_yearsLabel(count)),
-            )
-          : null,
       childBuilder: (years) => Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -79,6 +71,7 @@ class _WhenAccordionSectionState extends ConsumerState<WhenAccordionSection> {
               expanded: _expandedYear == year.year,
               onToggle: () => _setExpandedYear(_expandedYear == year.year ? null : year.year),
             ),
+          if (count > 0) _SearchMoreRow(count: count, onOpenPicker: widget.onOpenPicker),
         ],
       ),
     );
@@ -88,6 +81,44 @@ class _WhenAccordionSectionState extends ConsumerState<WhenAccordionSection> {
 String _yearsLabel(int count) {
   final variant = count == 1 ? 'one' : 'other';
   return 'filter_sheet_deep_search_n_years.$variant'.tr(namedArgs: {'count': '$count'});
+}
+
+class _SearchMoreRow extends StatelessWidget {
+  final int count;
+  final VoidCallback? onOpenPicker;
+  const _SearchMoreRow({required this.count, this.onOpenPicker});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: InkWell(
+        key: const Key('when-section-search-more'),
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onOpenPicker?.call();
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Icon(Icons.search_rounded, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 10),
+              // The translated label already ends in "→" (see filter_sheet_deep_search_n_years).
+              Expanded(
+                child: Text(
+                  _yearsLabel(count),
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.primary),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _YearRow extends StatelessWidget {

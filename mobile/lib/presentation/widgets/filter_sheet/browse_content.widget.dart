@@ -5,6 +5,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/drag_handle.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/match_count_footer.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/search_bar.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/strips/camera_strip.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/strips/people_strip.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/strips/places_strip.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/strips/tags_strip.widget.dart';
@@ -54,6 +55,7 @@ class BrowseContent extends ConsumerWidget {
               const PeopleStrip(),
               const PlacesStrip(),
               const TagsStrip(),
+              const CameraStrip(),
               const WhenStrip(),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),

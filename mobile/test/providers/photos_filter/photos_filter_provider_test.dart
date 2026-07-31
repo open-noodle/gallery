@@ -107,6 +107,24 @@ void main() {
     });
   });
 
+  group('setCamera', () {
+    test('assigns a camera filter (make + model)', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setCamera(SearchCameraFilter(make: 'Canon', model: 'R5'));
+      final c = container.read(photosFilterProvider).camera;
+      expect(c.make, 'Canon');
+      expect(c.model, 'R5');
+    });
+    test('passing null resets to the empty SearchCameraFilter', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setCamera(SearchCameraFilter(make: 'Canon', model: 'R5'));
+      notifier.setCamera(null);
+      final c = container.read(photosFilterProvider).camera;
+      expect(c.make, null);
+      expect(c.model, null);
+    });
+  });
+
   group('setDateRange', () {
     final a = DateTime(2024, 1, 1);
     final b = DateTime(2024, 12, 31);
@@ -358,6 +376,14 @@ void main() {
       final d = container.read(photosFilterProvider).date;
       expect(d.takenAfter, null);
       expect(d.takenBefore, null);
+    });
+    test('CameraChipId clears camera', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setCamera(SearchCameraFilter(make: 'Canon', model: 'R5'));
+      notifier.removeChip(const CameraChipId());
+      final c = container.read(photosFilterProvider).camera;
+      expect(c.make, null);
+      expect(c.model, null);
     });
     test('RatingChipId clears rating', () {
       final notifier = container.read(photosFilterProvider.notifier);
