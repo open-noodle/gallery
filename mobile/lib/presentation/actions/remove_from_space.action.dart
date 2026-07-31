@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/enums.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/actions/action.dart';
 import 'package:immich_mobile/providers/infrastructure/action.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/toast.provider.dart';
@@ -25,13 +26,23 @@ class RemoveFromSpaceAction extends AssetActionBuilder {
       return null;
     }
 
-    return .new(icon: Icons.remove_circle_outline, label: 'Remove from space', onAction: () => _removeFromSpace(ref));
+    return .new(
+      icon: Icons.remove_circle_outline,
+      label: 'Remove from space',
+      onAction: () => _removeFromSpace(context, ref),
+    );
   }
 
-  Future<void> _removeFromSpace(WidgetRef ref) async {
+  Future<void> _removeFromSpace(BuildContext context, WidgetRef ref) async {
     final toastService = ref.read(toastServiceProvider);
     final clearSelection = ref.read(clearSelectionProvider(source));
     final notifier = ref.read(actionProvider.notifier);
+    // Resolved up front, before the `await` below: this key takes no
+    // arguments, and reading `context` after an async gap would need a
+    // mounted check (the old widget did exactly that). The old widget
+    // resolved this same key via `.t(context: context)`; `context.t.x` is
+    // the equivalent idiom used by the other action.dart files.
+    final errorMessage = context.t.scaffold_body_error_occurred;
 
     try {
       final result = await notifier.removeFromSpace(source, spaceId);
@@ -44,7 +55,7 @@ class RemoveFromSpaceAction extends AssetActionBuilder {
       if (result.success) {
         await toastService.success('${result.count} photos removed from space');
       } else {
-        await toastService.error('scaffold_body_error_occurred');
+        await toastService.error(errorMessage);
       }
     } catch (error, stack) {
       handleError(error, stack: stack, description: 'Failed to remove assets from space');
