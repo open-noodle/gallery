@@ -25,6 +25,11 @@ export interface PersonSearchOptions {
 
 export interface PersonNameSearchOptions {
   withHidden?: boolean;
+  /**
+   * Fork (#869 follow-up): mirrors `AccessRepository.asset.checkOwnerAccess` — without an elevated
+   * session the caller must not see anything that only exists inside their Locked Folder.
+   */
+  hasElevatedPermission?: boolean;
 }
 
 export interface PersonNameResponse {
@@ -71,6 +76,21 @@ const peopleAssetVisibilities = spaceVisibleAssetVisibilities;
 
 const isBlank = (value: string | null | undefined) => !value || value.trim().length === 0;
 
+/**
+ * Correlated "does this `person` row have a live, visible face on a locked (or non-locked) asset?"
+ * subquery. Only counts faces that are themselves live and visible, so a person left behind by a
+ * deleted or hidden face is not treated as backed by that face's asset.
+ */
+const visibleFaceOnAsset = (eb: ExpressionBuilder<DB, 'person'>, { locked }: { locked: boolean }) =>
+  eb
+    .selectFrom('asset_face')
+    .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+    .select('asset_face.id')
+    .whereRef('asset_face.personId', '=', 'person.id')
+    .where('asset_face.deletedAt', 'is', null)
+    .where('asset_face.isVisible', 'is', true)
+    .where('asset.visibility', locked ? '=' : '!=', AssetVisibility.Locked);
+
 export interface DeleteFacesOptions {
   sourceType: SourceType;
 }
@@ -99,6 +119,13 @@ export interface RepresentativeFaceListOptions {
    * owner's own unscoped picker view.
    */
   scope?: { memberUserId: string };
+  /**
+   * Fork (#869 follow-up): the owner's unscoped view above has no visibility gate of its own, so
+   * without this the picker enumerates the owner's Locked Folder faces to a session that never
+   * entered the PIN. Scoped (non-owner) callers are already Timeline+Archive-only via
+   * `spaceVisibilityGate`, so their own elevation can never reach the owner's locked assets.
+   */
+  hasElevatedPermission?: boolean;
 }
 
 export interface RepresentativeFaceUpdateOptions {
@@ -557,6 +584,7 @@ export class PersonRepository {
           ),
         ),
       )
+      .$if(!options.hasElevatedPermission, (qb) => qb.where('asset.visibility', '!=', AssetVisibility.Locked))
       .$if(!!options.scope, (qb) =>
         qb.where((eb) =>
           eb.and([
@@ -711,22 +739,38 @@ export class PersonRepository {
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING, { withHidden: true }] })
-  getByName(userId: string, personName: string, { withHidden }: PersonNameSearchOptions) {
-    return this.db
-      .with('similarity_threshold', (db) =>
-        db.selectNoFrom(sql`set_config('pg_trgm.word_similarity_threshold', '0.5', true)`.as('thresh')),
-      )
-      .selectFrom(['similarity_threshold', 'person'])
-      .selectAll('person')
-      .where('person.ownerId', '=', userId)
-      .where(
-        () =>
-          sql`(f_unaccent("person"."name") ILIKE '%' || f_unaccent(${personName}) || '%' OR f_unaccent("person"."name") %> f_unaccent(${personName}))`,
-      )
-      .orderBy(sql`f_unaccent("person"."name") <->>> f_unaccent(${personName})`)
-      .limit(100)
-      .$if(!withHidden, (qb) => qb.where('person.isHidden', '=', false))
-      .execute();
+  getByName(userId: string, personName: string, { withHidden, hasElevatedPermission }: PersonNameSearchOptions) {
+    return (
+      this.db
+        .with('similarity_threshold', (db) =>
+          db.selectNoFrom(sql`set_config('pg_trgm.word_similarity_threshold', '0.5', true)`.as('thresh')),
+        )
+        .selectFrom(['similarity_threshold', 'person'])
+        .selectAll('person')
+        .where('person.ownerId', '=', userId)
+        .where(
+          () =>
+            sql`(f_unaccent("person"."name") ILIKE '%' || f_unaccent(${personName}) || '%' OR f_unaccent("person"."name") %> f_unaccent(${personName}))`,
+        )
+        .orderBy(sql`f_unaccent("person"."name") <->>> f_unaccent(${personName})`)
+        .limit(100)
+        .$if(!withHidden, (qb) => qb.where('person.isHidden', '=', false))
+        // Fork (#869 follow-up): this owner-scoped lookup had no asset-visibility gate at all, so a person
+        // whose faces only ever appear inside the Locked Folder was named back to a session that had never
+        // entered the PIN — the withSharedSpaces path (searchAccessiblePeople) already gates on visibility.
+        // Drop a person only when the Locked Folder is the ONLY thing backing them: a person with a face on
+        // any non-locked asset is still legitimately discoverable, and a person with no faces at all (freshly
+        // created, or every face unassigned) reveals nothing about locked content.
+        .$if(!hasElevatedPermission, (qb) =>
+          qb.where((eb) =>
+            eb.or([
+              eb.not(eb.exists(visibleFaceOnAsset(eb, { locked: true }))),
+              eb.exists(visibleFaceOnAsset(eb, { locked: false })),
+            ]),
+          ),
+        )
+        .execute()
+    );
   }
 
   @GenerateSql({ params: [DummyValue.UUID, { withHidden: true }] })
