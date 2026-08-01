@@ -375,6 +375,7 @@ export class PersonService extends BaseService {
       take,
       skip: (dto.page - 1) * dto.size,
       scope,
+      hasElevatedPermission: auth.session?.hasElevatedPermission,
     });
     const faces = rows.slice(0, take);
 
@@ -499,13 +500,25 @@ export class PersonService extends BaseService {
 
   private async requireThumbnailAccess(auth: AuthDto, id: string) {
     const ids = new Set([id]);
-    const isOwner = await this.accessRepository.person.checkOwnerAccess(auth.user.id, ids);
-    if (isOwner.has(id)) {
+    const ownerAccess = await this.accessRepository.person.checkOwnerAccess(auth.user.id, ids);
+    const isOwner = ownerAccess.has(id);
+    if (!isOwner) {
+      const isShared = await this.accessRepository.person.checkSharedSpaceAccess(auth.user.id, ids);
+      if (!isShared.has(id)) {
+        throw new BadRequestException('Not found or no person.read access');
+      }
+    }
+
+    // Fork (#869 follow-up): both arms above grant person.read off ANY reachable face, while the thumbnail
+    // is a crop of the representative face's photo specifically. The owner needs an elevated session to be
+    // handed back a crop of their own Locked Folder photo; a shared-space viewer must never receive one at
+    // all — the folder belongs to the owner, so the viewer's own elevation says nothing about it.
+    if (isOwner && auth.session?.hasElevatedPermission) {
       return;
     }
 
-    const isShared = await this.accessRepository.person.checkSharedSpaceAccess(auth.user.id, ids);
-    if (!isShared.has(id)) {
+    const isUnlocked = await this.accessRepository.person.checkUnlockedThumbnailAccess(ids);
+    if (!isUnlocked.has(id)) {
       throw new BadRequestException('Not found or no person.read access');
     }
   }

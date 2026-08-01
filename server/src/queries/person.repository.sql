@@ -261,13 +261,14 @@ where
       "face_identity_face"."assetFaceId" = "asset_face"."id"
       and face_identity_face."identityId" IS DISTINCT FROM person."identityId"
   )
+  and "asset"."visibility" != $4
 order by
   "asset"."fileCreatedAt" desc,
   "asset_face"."id"
 limit
-  $4
-offset
   $5
+offset
+  $6
 
 -- PersonRepository.getRepresentativeFaceForUpdate
 select
@@ -410,10 +411,36 @@ where
     f_unaccent ("person"."name") ILIKE '%' || f_unaccent ($2) || '%'
     OR f_unaccent ("person"."name") %> f_unaccent ($3)
   )
+  and (
+    not exists (
+      select
+        "asset_face"."id"
+      from
+        "asset_face"
+        inner join "asset" on "asset"."id" = "asset_face"."assetId"
+      where
+        "asset_face"."personId" = "person"."id"
+        and "asset_face"."deletedAt" is null
+        and "asset_face"."isVisible" is true
+        and "asset"."visibility" = $4
+    )
+    or exists (
+      select
+        "asset_face"."id"
+      from
+        "asset_face"
+        inner join "asset" on "asset"."id" = "asset_face"."assetId"
+      where
+        "asset_face"."personId" = "person"."id"
+        and "asset_face"."deletedAt" is null
+        and "asset_face"."isVisible" is true
+        and "asset"."visibility" != $5
+    )
+  )
 order by
-  f_unaccent ("person"."name") <->>> f_unaccent ($4)
+  f_unaccent ("person"."name") <->>> f_unaccent ($6)
 limit
-  $5
+  $7
 
 -- PersonRepository.getDistinctNames
 select distinct

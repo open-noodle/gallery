@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
 import { AssetEditAction, MirrorAxis } from 'src/dtos/editing.dto';
@@ -95,6 +95,35 @@ const setupFaceDetection = (db?: Kysely<DB>) => {
     });
 
   return { sut, ctx };
+};
+
+/** #869 follow-up: one person carrying a face on a timeline asset and a face on a locked asset. */
+const seedPersonAcrossVisibilities = async (ctx: ReturnType<typeof setup>['ctx']) => {
+  const { user } = await ctx.newUser();
+  const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Vaulted Vera' });
+  const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+  const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
+  await ctx.newAssetFace({ assetId: timelineAsset.id, personId: person.id });
+  await ctx.newAssetFace({ assetId: lockedAsset.id, personId: person.id });
+  return { user, person, timelineAsset, lockedAsset };
+};
+
+/**
+ * #869 follow-up: seed a person whose representative face (`person.faceAssetId`, which points at an
+ * ASSET_FACE row) sits on an asset of the given visibility, so the thumbnail source is reachable as
+ * person -> asset_face -> asset.
+ */
+const seedPersonWithRepresentativeFace = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  ownerId: string,
+  visibility: AssetVisibility,
+  thumbnailPath: string,
+) => {
+  const { asset } = await ctx.newAsset({ ownerId, visibility });
+  const { person } = await ctx.newPerson({ ownerId, name: 'Vaulted Vera', thumbnailPath });
+  const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  await ctx.get(PersonRepository).update({ id: person.id, faceAssetId: faceId });
+  return { asset, person };
 };
 
 /**
@@ -1979,6 +2008,142 @@ describe(PersonService.name, () => {
       await expect(sut.getFacesById(factory.auth({ user: outsider }), { id: asset.id })).rejects.toBeInstanceOf(
         BadRequestException,
       );
+    });
+  });
+
+  // #869 follow-up: the representative-face picker (GET /people/:id/faces) runs UNSCOPED for the owner —
+  // the space scope that carries the visibility gate is only applied to non-owner callers. So the picker
+  // enumerated the owner's Locked Folder faces (asset id, bounding box, capture date) to a session that
+  // had never entered the PIN. The crop bytes were already refused by the AssetRead check on the
+  // per-face thumbnail route, so this is a metadata leak, but it is the same rule.
+  describe('getFacesForPicker locked-folder visibility', () => {
+    it('omits faces on locked assets from a non-elevated owner', async () => {
+      const { sut, ctx } = setup();
+      const { user, person, timelineAsset } = await seedPersonAcrossVisibilities(ctx);
+
+      const result = await sut.getFacesForPicker(factory.auth({ user: { id: user.id } }), person.id, {
+        page: 1,
+        size: 50,
+      });
+
+      expect(result.faces.map((face) => face.assetId)).toEqual([timelineAsset.id]);
+    });
+
+    it('includes faces on locked assets for an elevated owner', async () => {
+      const { sut, ctx } = setup();
+      const { user, person, timelineAsset, lockedAsset } = await seedPersonAcrossVisibilities(ctx);
+
+      const auth = factory.auth({ user: { id: user.id }, session: { hasElevatedPermission: true } });
+      const result = await sut.getFacesForPicker(auth, person.id, { page: 1, size: 50 });
+
+      expect(result.faces.map((face) => face.assetId).toSorted()).toEqual(
+        [timelineAsset.id, lockedAsset.id].toSorted(),
+      );
+    });
+  });
+
+  // #869 follow-up: the person thumbnail is a crop of `person.faceAssetId`. The owner arm of
+  // requireThumbnailAccess only proved `person.ownerId = caller`, so a person whose representative face
+  // sits in the Locked Folder served that crop over HTTP 200 to a session that had never entered a PIN.
+  // (The shared-space arm below it already restricts to Timeline+Archive, so only the owner arm leaked.)
+  describe('getThumbnail locked-folder visibility', () => {
+    // Serving the bytes needs a bootstrapped StorageService backend, which the medium harness does not
+    // have, so the ALLOWED cases seed an empty `thumbnailPath` and assert NotFoundException: the 404 is
+    // raised after requireThumbnailAccess returns, so reaching it proves the visibility gate let the
+    // request through. A blocked request throws BadRequestException before that point. The byte-serving
+    // path itself is covered in src/services/person.service.spec.ts.
+    it('refuses the owner a thumbnail cropped from a locked asset while the session is not elevated', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await seedPersonWithRepresentativeFace(
+        ctx,
+        user.id,
+        AssetVisibility.Locked,
+        'upload/thumbs/vera.jpeg',
+      );
+
+      await expect(sut.getThumbnail(factory.auth({ user: { id: user.id } }), person.id)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it('lets an elevated owner past the gate for a locked-asset thumbnail', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await seedPersonWithRepresentativeFace(ctx, user.id, AssetVisibility.Locked, '');
+
+      const auth = factory.auth({ user: { id: user.id }, session: { hasElevatedPermission: true } });
+
+      await expect(sut.getThumbnail(auth, person.id)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('lets a non-elevated owner past the gate for a timeline-asset thumbnail', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await seedPersonWithRepresentativeFace(ctx, user.id, AssetVisibility.Timeline, '');
+
+      await expect(sut.getThumbnail(factory.auth({ user: { id: user.id } }), person.id)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    // `person.faceAssetId` is `ON DELETE SET NULL`, so a person can keep a thumbnail after losing its
+    // representative face row. There is no locked source to leak in that case, and the gate must not
+    // start refusing those people.
+    it('lets a person with no representative face past the gate', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Faceless Fay', thumbnailPath: '' });
+
+      await expect(sut.getThumbnail(factory.auth({ user: { id: user.id } }), person.id)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    // Regression guard: the locked check runs on the shared-space arm too, so prove the ordinary viewer
+    // case still passes it. Without this, tightening the gate could silently break every space thumbnail.
+    it('still lets a shared-space viewer past the gate for a timeline-sourced thumbnail', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+
+      const { asset, person } = await seedPersonWithRepresentativeFace(ctx, owner.id, AssetVisibility.Timeline, '');
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id, role: SharedSpaceRole.Viewer });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+
+      await expect(sut.getThumbnail(factory.auth({ user: { id: viewer.id } }), person.id)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    // The shared-space arm grants person.read off ANY space-visible face, but the thumbnail is a crop of
+    // the representative face specifically. A viewer must never receive a crop of the owner's Locked
+    // Folder photo — and unlike the owner, no amount of elevation on the viewer's own session changes that.
+    it("refuses a shared-space viewer a thumbnail cropped from the owner's locked asset", async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+
+      const { person } = await seedPersonWithRepresentativeFace(
+        ctx,
+        owner.id,
+        AssetVisibility.Locked,
+        'upload/thumbs/vera.jpeg',
+      );
+
+      // A second, space-shared face is what grants the viewer person.read in the first place.
+      const { asset: sharedAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.newAssetFace({ assetId: sharedAsset.id, personId: person.id });
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id, role: SharedSpaceRole.Viewer });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: sharedAsset.id, addedById: owner.id });
+
+      const auth = factory.auth({ user: { id: viewer.id }, session: { hasElevatedPermission: true } });
+
+      await expect(sut.getThumbnail(auth, person.id)).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 });
