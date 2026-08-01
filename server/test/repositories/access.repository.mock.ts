@@ -69,6 +69,7 @@ export const newAccessRepositoryMock = (): IAccessRepositoryMock => {
       checkOwnerAccess: vitest.fn().mockResolvedValue(new Set()),
       checkSharedSpaceAccess: vitest.fn().mockResolvedValue(new Set()),
       checkSharedSpaceEditAccess: vitest.fn().mockResolvedValue(new Set()),
+      checkUnlockedThumbnailAccess: vitest.fn().mockResolvedValue(new Set()),
     },
 
     partner: {
