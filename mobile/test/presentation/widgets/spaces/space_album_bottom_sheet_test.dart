@@ -2,15 +2,22 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/presentation/widgets/action_buttons/download_action_button.widget.dart';
+import 'package:immich_mobile/presentation/actions/action.dart';
+import 'package:immich_mobile/presentation/actions/action.widget.dart';
+import 'package:immich_mobile/presentation/actions/download.action.dart';
+import 'package:immich_mobile/presentation/actions/share.action.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/remove_from_album_action_button.widget.dart';
-import 'package:immich_mobile/presentation/widgets/action_buttons/share_action_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_album_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
 // easy_localization initializes shared_preferences internally; tests need the mock initializer.
 // ignore: depend_on_referenced_packages
 import 'package:shared_preferences/shared_preferences.dart';
+
+// Download and Share both render as ActionMenuItem after upstream's action-model
+// migration, so match on the wrapped action type — byType(ActionMenuItem) alone
+// could not tell them apart.
+Finder _actionOfType<T extends ActionBuilder>() => find.byWidgetPredicate((w) => w is ActionWidget && w.action is T);
 
 // ---------------------------------------------------------------------------
 // Helper
@@ -46,8 +53,8 @@ void main() {
     await tester.pumpWidget(_wrap(const SpaceAlbumBottomSheet(canEdit: true, albumId: 'a1')));
     await tester.pump();
 
-    expect(find.byType(DownloadActionButton), findsOneWidget);
-    expect(find.byType(ShareActionButton), findsOneWidget);
+    expect(_actionOfType<DownloadAction>(), findsOneWidget);
+    expect(_actionOfType<ShareAction>(), findsOneWidget);
     expect(find.byType(RemoveFromAlbumActionButton), findsOneWidget);
   });
 
@@ -55,8 +62,8 @@ void main() {
     await tester.pumpWidget(_wrap(const SpaceAlbumBottomSheet(canEdit: false, albumId: 'a1')));
     await tester.pump();
 
-    expect(find.byType(DownloadActionButton), findsOneWidget);
-    expect(find.byType(ShareActionButton), findsOneWidget);
+    expect(_actionOfType<DownloadAction>(), findsOneWidget);
+    expect(_actionOfType<ShareAction>(), findsOneWidget);
     expect(find.byType(RemoveFromAlbumActionButton), findsNothing);
   });
 
