@@ -875,8 +875,8 @@ describe(PersonService.name, () => {
       const auth = AuthFactory.create();
       const ids = [{ personGroupId: 'unknown', ownerId: auth.user.id }];
 
-      mocks.access.person.checkAccess.mockResolvedValue(new Set(ids));
-      mocks.person.getForThumbnail.mockResolvedValue(undefined);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['unknown']));
+      mocks.access.person.checkUnlockedThumbnailAccess.mockResolvedValue(new Set(['unknown']));
       await expect(sut.getThumbnail(auth, 'unknown')).rejects.toBeInstanceOf(NotFoundException);
       expect(mocks.storage.createReadStream).not.toHaveBeenCalled();
       expect(mocks.access.person.checkAccess).toHaveBeenCalledWith(auth.user.id, new Set(ids), PERSON_READ_ROLES);
@@ -887,8 +887,9 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create({ thumbnailPath: '' });
       const ids = [{ personGroupId: person.personGroupId, ownerId: auth.user.id }];
 
-      mocks.person.getForThumbnail.mockResolvedValue({ thumbnailPath: '', sharedThumbnailPath: null });
-      mocks.access.person.checkAccess.mockResolvedValue(new Set(ids));
+      mocks.person.getByGroupId.mockResolvedValue(person);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.person.checkUnlockedThumbnailAccess.mockResolvedValue(new Set([person.id]));
       await expect(sut.getThumbnail(auth, person.personGroupId)).rejects.toBeInstanceOf(NotFoundException);
       expect(mocks.storage.createReadStream).not.toHaveBeenCalled();
       expect(mocks.access.person.checkAccess).toHaveBeenCalledWith(auth.user.id, new Set(ids), PERSON_READ_ROLES);
@@ -899,31 +900,9 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create();
       const ids = [{ personGroupId: person.personGroupId, ownerId: auth.user.id }];
 
-      mocks.person.getForThumbnail.mockResolvedValue({
-        thumbnailPath: person.thumbnailPath,
-        sharedThumbnailPath: null,
-      });
-      mocks.access.person.checkAccess.mockResolvedValue(new Set(ids));
-      await expect(sut.getThumbnail(auth, person.personGroupId)).resolves.toEqual(
-        new ImmichFileResponse({
-          path: person.thumbnailPath,
-          contentType: 'image/jpeg',
-          cacheControl: CacheControl.PrivateWithoutCache,
-        }),
-      );
-      expect(mocks.access.person.checkAccess).toHaveBeenCalledWith(auth.user.id, new Set(ids), PERSON_READ_ROLES);
-    });
-
-    it('should fall back to a shared thumbnail', async () => {
-      const auth = AuthFactory.create();
-      const person = PersonFactory.create();
-      const ids = [{ personGroupId: person.personGroupId, ownerId: auth.user.id }];
-
-      mocks.person.getForThumbnail.mockResolvedValue({
-        thumbnailPath: '',
-        sharedThumbnailPath: person.thumbnailPath,
-      });
-      mocks.access.person.checkAccess.mockResolvedValue(new Set(ids));
+      mocks.person.getByGroupId.mockResolvedValue(person);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.person.checkUnlockedThumbnailAccess.mockResolvedValue(new Set([person.id]));
       await expect(sut.getThumbnail(auth, person.personGroupId)).resolves.toEqual(
         new ImmichFileResponse({
           path: person.thumbnailPath,
@@ -940,6 +919,7 @@ describe(PersonService.name, () => {
       mocks.person.getById.mockResolvedValue(person);
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.person.checkSharedSpaceAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.person.checkUnlockedThumbnailAccess.mockResolvedValue(new Set([person.id]));
 
       await expect(sut.getThumbnail(auth, person.id)).resolves.toEqual(
         new ImmichFileResponse({
@@ -950,6 +930,38 @@ describe(PersonService.name, () => {
       );
       expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.id]));
       expect(mocks.access.person.checkSharedSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.id]));
+    });
+
+    // #869 follow-up. The medium spec proves the locked/unlocked decision against a real database; these
+    // two pin what the decision does on either side of the serve boundary, which the medium harness (no
+    // bootstrapped storage backend) cannot reach.
+    it('should not serve the thumbnail of a locked-folder face to a non-elevated owner', async () => {
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create();
+
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.person.checkUnlockedThumbnailAccess.mockResolvedValue(new Set());
+
+      await expect(sut.getThumbnail(auth, person.id)).rejects.toBeInstanceOf(BadRequestException);
+      expect(mocks.storage.createReadStream).not.toHaveBeenCalled();
+    });
+
+    it('should serve the thumbnail of a locked-folder face to an elevated owner', async () => {
+      const auth = AuthFactory.from().session({ hasElevatedPermission: true }).build();
+      const person = PersonFactory.create();
+
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.person.checkUnlockedThumbnailAccess.mockResolvedValue(new Set());
+
+      await expect(sut.getThumbnail(auth, person.id)).resolves.toEqual(
+        new ImmichFileResponse({
+          path: person.thumbnailPath,
+          contentType: 'image/jpeg',
+          cacheControl: CacheControl.PrivateWithoutCache,
+        }),
+      );
     });
   });
 
