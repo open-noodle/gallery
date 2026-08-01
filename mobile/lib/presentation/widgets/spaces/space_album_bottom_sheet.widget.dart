@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/enums.dart';
-import 'package:immich_mobile/presentation/widgets/action_buttons/download_action_button.widget.dart';
+import 'package:immich_mobile/presentation/actions/action.widget.dart';
+import 'package:immich_mobile/presentation/actions/download.action.dart';
+import 'package:immich_mobile/presentation/actions/share.action.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/remove_from_album_action_button.widget.dart';
-import 'package:immich_mobile/presentation/widgets/action_buttons/share_action_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/base_bottom_sheet.widget.dart';
 
 /// Reduced multiselect bottom sheet for the Space Album detail page.
@@ -59,8 +60,8 @@ class _SpaceAlbumBottomSheetState extends ConsumerState<SpaceAlbumBottomSheet> {
       maxChildSize: 0.85,
       shouldCloseOnMinExtent: false,
       actions: [
-        const ShareActionButton(source: ActionSource.timeline),
-        const DownloadActionButton(source: ActionSource.timeline),
+        const ActionMenuItem(action: ShareAction(source: ActionSource.timeline)),
+        const ActionMenuItem(action: DownloadAction(source: ActionSource.timeline)),
         if (widget.canEdit)
           RemoveFromAlbumActionButton(
             source: ActionSource.timeline,
