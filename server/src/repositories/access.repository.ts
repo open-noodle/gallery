@@ -853,6 +853,30 @@ class PersonAccess {
       .then((persons) => new Set(persons.map((person) => person.personGroupId)));
   }
 
+  /**
+   * Fork (#869 follow-up): read access to a PERSON is granted off any one reachable face, but the person
+   * thumbnail is a crop of one specific photo — the representative face `person.faceAssetId` points at.
+   * Returns the subset whose representative face does NOT sit in the Locked Folder; a person with no
+   * representative face at all has no locked source to leak and stays in the set.
+   */
+  @GenerateSql({ params: [DummyValue.UUID_SET] })
+  @ChunkedSet({ paramIndex: 0 })
+  async checkUnlockedThumbnailAccess(personIds: Set<string>) {
+    if (personIds.size === 0) {
+      return new Set<string>();
+    }
+
+    return this.db
+      .selectFrom('person')
+      .select('person.id')
+      .leftJoin('asset_face', 'asset_face.id', 'person.faceAssetId')
+      .leftJoin('asset', 'asset.id', 'asset_face.assetId')
+      .where('person.id', 'in', [...personIds])
+      .where((eb) => eb.or([eb('asset.visibility', 'is', null), eb('asset.visibility', '!=', AssetVisibility.Locked)]))
+      .execute()
+      .then((persons) => new Set(persons.map((person) => person.id)));
+  }
+
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })
   @ChunkedSet({ paramIndex: 1 })
   async checkSharedSpaceAccess(userId: string, personIds: Set<string>) {
