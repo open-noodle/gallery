@@ -9,7 +9,8 @@
 - **Recommendation**: PROCEED
 
 Branch `rebase/upstream-rolling-v3.1.1` is **level with `upstream/main`** at `cafd6c7c0f1`
-(`git rev-list --count HEAD..cafd6c7c0f1` = 0). Branch HEAD `8e9106a3b67`.
+(`git rev-list --count HEAD..cafd6c7c0f1` = 0). Last code commit `8e9106a3b67`; CI validated the
+tree at `e53fa45a45f` (this report is the only change after that point).
 
 All 13 upstream commits are a single workstream: the continuation of the mobile action-model
 migration (`refactor: base action (#29617)`) that arc 4 integrated on 2026-07-31. Upstream migrated
@@ -207,6 +208,31 @@ Server/web/e2e suites were **not** run: the arc changed zero files outside `mobi
 
 `mise.lock` and `mobile/mise.lock` were confirmed untouched after the local `mise`-backed `make`
 runs (the known strip trap did not fire).
+
+## Remote CI Verification
+
+- **Test branch**: `rebase/upstream-b45`
+- **Commit validated**: `e53fa45a45f` — **every run reports the same `headSha`, so there is no SHA skew**
+
+| Workflow                                  | Status | Notes                                                                                    |
+| ----------------------------------------- | ------ | ---------------------------------------------------------------------------------------- |
+| `test.yml`                                | GREEN  | full 20-job suite                                                                        |
+| `static_analysis.yml`                     | GREEN  | `dart analyze --fatal-infos`, format, codegen freshness                                  |
+| `gallery-build-mobile.yml`                | GREEN  | Android + iOS compile (`environment=development`)                                        |
+| `gallery-mobile-smoke.yml`                | GREEN  |                                                                                          |
+| `docker.yml`                              | GREEN  | server/web/cli/ml images                                                                 |
+| `gallery-rebase-smoke.yml`                | GREEN  |                                                                                          |
+| `storage-migration-tests.yml`             | GREEN  |                                                                                          |
+| `storage-migration-e2e.yml`               | GREEN  |                                                                                          |
+| `gallery-ml-smoke.yml`                    | GREEN  |                                                                                          |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | reached `Post-phase drift (0 item(s))` → `validation PASSED`, not just the coverage grep |
+
+**10/10 green, first pass — no re-runs needed.** Dispatch was staggered in three waves (4 / 2 / 4)
+rather than all at once; the GHCR `toomanyrequests` limit that has bitten previous arcs did not fire.
+
+Not dispatched: `check-openapi.yml` (disabled at the Actions level), and the push/PR-only workflows
+(`cli.yml`, `codeql-analysis.yml`, `docs-build.yml`, `org-zizmor.yml`). The arc changed no CLI, no
+docs and no workflow files, so none of them gate this change.
 
 ## Follow-up work
 
