@@ -509,6 +509,20 @@ where
     )
   )
 
+-- AccessRepository.person.checkUnlockedThumbnailAccess
+select
+  "person"."id"
+from
+  "person"
+  left join "asset_face" on "asset_face"."id" = "person"."faceAssetId"
+  left join "asset" on "asset"."id" = "asset_face"."assetId"
+where
+  "person"."id" in ($1)
+  and (
+    "asset"."visibility" is null
+    or "asset"."visibility" != $2
+  )
+
 -- AccessRepository.person.checkSharedSpaceAccess
 select
   "person"."id"
