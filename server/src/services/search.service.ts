@@ -88,7 +88,10 @@ export class SearchService extends BaseService {
       });
     }
 
-    const people = await this.personRepository.getByName(auth.user.id, dto.name, { withHidden: dto.withHidden });
+    const people = await this.personRepository.getByName(auth.user.id, dto.name, {
+      withHidden: dto.withHidden,
+      hasElevatedPermission: auth.session?.hasElevatedPermission,
+    });
     return people.map((person) => mapPerson(person));
   }
 

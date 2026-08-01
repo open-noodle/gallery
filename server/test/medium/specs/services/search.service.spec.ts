@@ -119,6 +119,21 @@ const shareAsset = async (ctx: SearchCtx, spaceId: string, ownerId: string, visi
 
 const elevated = (userId: string) => factory.auth({ user: { id: userId }, session: { hasElevatedPermission: true } });
 
+// #869 follow-up: seed one person carrying a visible face on an asset of each given visibility.
+const seedPersonWithFaceOn = async (
+  ctx: SearchCtx,
+  ownerId: string,
+  name: string,
+  ...visibilities: AssetVisibility[]
+) => {
+  const { person } = await ctx.newPerson({ ownerId, name });
+  for (const visibility of visibilities) {
+    const { asset } = await ctx.newAsset({ ownerId, visibility });
+    await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  }
+  return person;
+};
+
 // Slice 5: seed a directly-shared space asset with distinct facet values for each type.
 // `visibility` controls whether this asset is Hidden/Locked/etc. Returns the asset.
 const seedSpaceAssetWithFacets = async (
@@ -265,6 +280,109 @@ describe(SearchService.name, () => {
       const result = await sut.searchStatistics(auth, { visibility: AssetVisibility.Locked });
 
       expect(result).toEqual({ total: 0 });
+    });
+  });
+
+  // #869 follow-up: the legacy (withSharedSpaces=false) person lookup read `person` rows straight off
+  // `ownerId` with no asset-visibility gate, so a named person whose faces only ever appear inside the
+  // Locked Folder was returned — and named — to a session that had never entered a PIN. The
+  // withSharedSpaces path already gates on asset visibility; these pin the same rule on the legacy path.
+  describe('searchPerson locked-folder visibility', () => {
+    it('omits a person whose faces exist only in locked assets from a non-elevated session', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      await seedPersonWithFaceOn(ctx, user.id, 'Vaulted Vera', AssetVisibility.Locked);
+
+      const result = await sut.searchPerson(factory.auth({ user: { id: user.id } }), { name: 'Vera' });
+
+      expect(result.map((person) => person.name)).toEqual([]);
+    });
+
+    it('returns a locked-only person once the session is elevated', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      await seedPersonWithFaceOn(ctx, user.id, 'Vaulted Vera', AssetVisibility.Locked);
+
+      const result = await sut.searchPerson(elevated(user.id), { name: 'Vera' });
+
+      expect(result.map((person) => person.name)).toEqual(['Vaulted Vera']);
+    });
+
+    it('keeps a person who also has a face on a timeline asset', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      await seedPersonWithFaceOn(ctx, user.id, 'Mixed Mira', AssetVisibility.Locked, AssetVisibility.Timeline);
+
+      const result = await sut.searchPerson(factory.auth({ user: { id: user.id } }), { name: 'Mira' });
+
+      expect(result.map((person) => person.name)).toEqual(['Mixed Mira']);
+    });
+
+    it('keeps a person who has no faces at all', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      await ctx.newPerson({ ownerId: user.id, name: 'Faceless Fay' });
+
+      const result = await sut.searchPerson(factory.auth({ user: { id: user.id } }), { name: 'Fay' });
+
+      expect(result.map((person) => person.name)).toEqual(['Faceless Fay']);
+    });
+
+    it('keeps a person backed only by an archived asset', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      await seedPersonWithFaceOn(ctx, user.id, 'Archived Ada', AssetVisibility.Archive);
+
+      const result = await sut.searchPerson(factory.auth({ user: { id: user.id } }), { name: 'Ada' });
+
+      expect(result.map((person) => person.name)).toEqual(['Archived Ada']);
+    });
+
+    // A face row that is soft-deleted or marked not-visible is not something the person is "backed by",
+    // so it must not rescue an otherwise locked-only person from the gate.
+    it('does not let a soft-deleted timeline face rescue a locked-only person', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Deleted Dana' });
+      const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
+      const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      await ctx.newAssetFace({ assetId: lockedAsset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: timelineAsset.id, personId: person.id, deletedAt: new Date() });
+
+      const result = await sut.searchPerson(factory.auth({ user: { id: user.id } }), { name: 'Dana' });
+
+      expect(result.map((person) => person.name)).toEqual([]);
+    });
+
+    it('does not let a hidden timeline face rescue a locked-only person', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Invisible Iris' });
+      const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
+      const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      await ctx.newAssetFace({ assetId: lockedAsset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: timelineAsset.id, personId: person.id, isVisible: false });
+
+      const result = await sut.searchPerson(factory.auth({ user: { id: user.id } }), { name: 'Iris' });
+
+      expect(result.map((person) => person.name)).toEqual([]);
+    });
+
+    // The locked gate and the isHidden gate are separate `$if` clauses; asking for hidden people must not
+    // hand back the locked-only ones.
+    it('still omits a locked-only person when hidden people are requested', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Hidden Hana', isHidden: true });
+      const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
+      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+
+      const result = await sut.searchPerson(factory.auth({ user: { id: user.id } }), {
+        name: 'Hana',
+        withHidden: true,
+      });
+
+      expect(result.map((person) => person.name)).toEqual([]);
     });
   });
 
