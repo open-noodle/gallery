@@ -5,7 +5,7 @@ metadata:
   upstream_branch: main
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: 38c99a9c0a569114a2a9d2253db828f317853a2e
+  last_verified_fork_head: 88e715507c6a69911bf80f7225faf9c01004ff2a
 
 coverage_ignore:
   - docs/superpowers/**
