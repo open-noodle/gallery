@@ -152,7 +152,7 @@ class BackgroundUploadService {
 
     const batchSize = 100;
     final batch = candidates.take(batchSize).toList();
-    List<UploadTask> tasks = [];
+    final List<UploadTask> tasks = [];
 
     for (final asset in batch) {
       final task = await getUploadTask(asset);
