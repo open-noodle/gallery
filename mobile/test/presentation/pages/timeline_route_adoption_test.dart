@@ -6,6 +6,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
 import 'package:immich_mobile/domain/models/timeline_zoom_anchor.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
@@ -126,7 +127,7 @@ void main() {
     await tester.runAsync(
       () async => ref
           .read(timelineOverviewDrilldownProvider)
-          ?.call(TimeBucket(date: DateTime(2025), assetCount: 3), GroupAssetsBy.year),
+          ?.call(TimeBucket(date: DateTime(2025), assetCount: 3), TimelineOverviewMode.years),
     );
     ref.invalidate(timelineServiceProvider);
     ref.read(timelineServiceProvider);
@@ -200,7 +201,7 @@ void main() {
 
         // Drive the route to Years through the selector (route-local, never persisted).
         calls.clear();
-        await tester.tap(find.byKey(const Key('timeline-grouping-year')));
+        await tester.tap(find.byKey(const Key('timeline-grouping-years')));
         await tester.pump();
         ref.read(timelineServiceProvider);
 
@@ -212,7 +213,7 @@ void main() {
         await tester.runAsync(
           () async => ref
               .read(timelineOverviewDrilldownProvider)
-              ?.call(TimeBucket(date: DateTime(2025), assetCount: 3), GroupAssetsBy.year),
+              ?.call(TimeBucket(date: DateTime(2025), assetCount: 3), TimelineOverviewMode.years),
         );
         // The drilldown persists the new grouping to SettingsRepository synchronously, but the
         // reactive rebuild now flows through appConfigProvider's drift watch stream, which does
@@ -232,7 +233,7 @@ void main() {
         await tester.runAsync(
           () async => ref
               .read(timelineOverviewDrilldownProvider)
-              ?.call(TimeBucket(date: DateTime(2025, 3), assetCount: 3), GroupAssetsBy.month),
+              ?.call(TimeBucket(date: DateTime(2025, 3), assetCount: 3), TimelineOverviewMode.months),
         );
         ref.invalidate(timelineServiceProvider);
         ref.read(timelineServiceProvider);

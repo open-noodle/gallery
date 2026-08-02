@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/overview/overview_card.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
 import 'package:immich_mobile/providers/timeline/overview_drilldown.provider.dart';
@@ -16,13 +17,13 @@ class TimelineOverviewSegment extends Segment {
     required super.endOffset,
     required super.firstAssetIndex,
     required super.bucket,
-    required this.groupBy,
+    required this.mode,
     super.headerExtent = 0,
     super.spacing = 0,
     required super.header,
   });
 
-  final GroupAssetsBy groupBy;
+  final TimelineOverviewMode mode;
 
   @override
   int getMinChildIndexForScrollOffset(double scrollOffset) => firstIndex;
@@ -52,11 +53,9 @@ class _TimelineOverviewSegmentCard extends ConsumerWidget {
     }
 
     final drilldown = ref.read(timelineOverviewDrilldownProvider);
-    final onTap = drilldown != null && bucket.assetCount > 0
-        ? () => unawaited(drilldown(bucket, segment.groupBy))
-        : null;
+    final onTap = drilldown != null && bucket.assetCount > 0 ? () => unawaited(drilldown(bucket, segment.mode)) : null;
 
-    final key = TimelineOverviewRepresentativeCacheNotifier.keyFor(segment.groupBy, bucket.date);
+    final key = TimelineOverviewRepresentativeCacheNotifier.keyFor(segment.mode, bucket.date);
 
     // Read the cached representative (null if not resolved yet).
     final cachedAsset = ref.watch(timelineOverviewRepresentativeCacheProvider.select((m) => m[key]?.asset));
@@ -74,11 +73,6 @@ class _TimelineOverviewSegmentCard extends ConsumerWidget {
       });
     }
 
-    return TimelineOverviewCard(
-      bucket: bucket,
-      groupBy: segment.groupBy,
-      representativeAsset: cachedAsset,
-      onTap: onTap,
-    );
+    return TimelineOverviewCard(bucket: bucket, mode: segment.mode, representativeAsset: cachedAsset, onTap: onTap);
   }
 }
