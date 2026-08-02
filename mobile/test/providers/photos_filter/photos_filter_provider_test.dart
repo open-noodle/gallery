@@ -436,14 +436,74 @@ void main() {
     expect(c.read(photosFilterProvider).sort, SearchSortOrder.oldest);
   });
 
-  test('clearing text while Relevance coerces sort to Newest', () {
-    final c = ProviderContainer();
-    addTearDown(c.dispose);
-    final n = c.read(photosFilterProvider.notifier);
-    n.setText('beach');
-    n.setSort(SearchSortOrder.relevance);
-    n.setText('');
-    expect(c.read(photosFilterProvider).sort, SearchSortOrder.newest);
+  // #902 — web parity. Web starts every search at relevance (global-search-manager
+  // `open()` / `activateSearch('')`) and never rewrites the stored order into a date
+  // order; relevance degrades to newest-first at query-build time for metadata-only
+  // filters. Mobile used to coerce relevance→newest as soon as the query emptied,
+  // which pinned the app to "Newest first" for every later search.
+  group('sort resets with the query', () {
+    test('clearing the query returns the sort to Relevance', () {
+      final c = ProviderContainer();
+      addTearDown(c.dispose);
+      final n = c.read(photosFilterProvider.notifier);
+      n.setText('beach');
+      n.setSort(SearchSortOrder.newest);
+      n.setText('');
+      expect(c.read(photosFilterProvider).sort, SearchSortOrder.relevance);
+    });
+
+    test('the next search after a cleared query is sorted by Relevance', () {
+      final c = ProviderContainer();
+      addTearDown(c.dispose);
+      final n = c.read(photosFilterProvider.notifier);
+      n.setText('beach');
+      n.setSort(SearchSortOrder.newest);
+      n.setText('');
+      n.setText('sunset');
+      expect(c.read(photosFilterProvider).sort, SearchSortOrder.relevance);
+    });
+
+    test('editing the query into a new one resets a manually chosen sort', () {
+      final c = ProviderContainer();
+      addTearDown(c.dispose);
+      final n = c.read(photosFilterProvider.notifier);
+      n.setText('beach');
+      n.setSort(SearchSortOrder.oldest);
+      n.setText('beaches');
+      expect(c.read(photosFilterProvider).sort, SearchSortOrder.relevance);
+    });
+
+    test('re-applying the same query keeps the chosen sort', () {
+      // The search bar re-sends the current text on submit; that is not a new
+      // search and must not throw away the order the user just picked.
+      final c = ProviderContainer();
+      addTearDown(c.dispose);
+      final n = c.read(photosFilterProvider.notifier);
+      n.setText('beach');
+      n.setSort(SearchSortOrder.newest);
+      n.setText('beach');
+      expect(c.read(photosFilterProvider).sort, SearchSortOrder.newest);
+    });
+
+    test('the chosen sort survives edits to other filter dimensions', () {
+      final c = ProviderContainer();
+      addTearDown(c.dispose);
+      final n = c.read(photosFilterProvider.notifier);
+      n.setText('beach');
+      n.setSort(SearchSortOrder.oldest);
+      n.setFavouritesOnly(true);
+      expect(c.read(photosFilterProvider).sort, SearchSortOrder.oldest);
+    });
+
+    test('clearing the query via its chip also returns the sort to Relevance', () {
+      final c = ProviderContainer();
+      addTearDown(c.dispose);
+      final n = c.read(photosFilterProvider.notifier);
+      n.setText('beach');
+      n.setSort(SearchSortOrder.oldest);
+      n.removeChip(const TextChipId());
+      expect(c.read(photosFilterProvider).sort, SearchSortOrder.relevance);
+    });
   });
 
   test('setSimilarTo builds an assetId-only image filter', () {
