@@ -12,7 +12,6 @@
   import AssetDeleteConfirmModal from '#lib/modals/AssetDeleteConfirmModal.svelte';
   import NavigateToDateModal from '#lib/modals/NavigateToDateModal.svelte';
   import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
-  import { Route } from '#lib/route.ts';
   import { toggleFavoriteAssets } from '#lib/services/asset.service.ts';
   import { handleStack } from '#lib/services/stack.service.ts';
   import { keyboardManager } from '#lib/stores/keyboard-manager.svelte.ts';
@@ -113,7 +112,6 @@
 
     const shortcuts: ShortcutOptions[] = [
       { shortcut: { key: '?', shift: true }, onShortcut: handleOpenShortcutModal },
-      { shortcut: { key: '/' }, onShortcut: () => goto(Route.explore()) },
       { shortcut: { key: 'A', ctrl: true }, onShortcut: () => selectAllAssets(timelineManager, assetInteraction) },
       { shortcut: { key: 'ArrowRight' }, onShortcut: () => setFocusTo('earlier', 'asset') },
       { shortcut: { key: 'ArrowLeft' }, onShortcut: () => setFocusTo('later', 'asset') },
