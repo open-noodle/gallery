@@ -1,6 +1,6 @@
-import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 
-/// The date to anchor on when the grouping changes away from [previousGroupBy].
+/// The date to anchor on when the zoom level changes away from [previousMode].
 /// [topBucketDate] is the (granularity-truncated) date of the top-visible bucket.
 /// [remembered] is the last position-derived anchor date, if any.
 ///
@@ -8,16 +8,16 @@ import 'package:immich_mobile/domain/models/timeline.model.dart';
 /// period (the user didn't scroll); otherwise uses the bucket date.
 DateTime resolveGroupingChangeAnchorDate({
   required DateTime topBucketDate,
-  required GroupAssetsBy previousGroupBy,
+  required TimelineOverviewMode previousMode,
   DateTime? remembered,
 }) {
   if (remembered == null) {
     return topBucketDate;
   }
-  final within = switch (previousGroupBy) {
-    GroupAssetsBy.year => remembered.year == topBucketDate.year,
-    GroupAssetsBy.month => remembered.year == topBucketDate.year && remembered.month == topBucketDate.month,
-    GroupAssetsBy.day || GroupAssetsBy.auto || GroupAssetsBy.none => false,
+  final within = switch (previousMode) {
+    TimelineOverviewMode.years => remembered.year == topBucketDate.year,
+    TimelineOverviewMode.months => remembered.year == topBucketDate.year && remembered.month == topBucketDate.month,
+    TimelineOverviewMode.all => false,
   };
   return within ? remembered : topBucketDate;
 }
