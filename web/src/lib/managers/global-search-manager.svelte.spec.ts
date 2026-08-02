@@ -1102,13 +1102,11 @@ describe('activate()', () => {
     expect(entries[0]).toMatchObject({ kind: 'place', id: 'place:48.8566:2.3522', label: 'Paris' });
   });
 
-  it('activate("tag", item) navigates to /search with tagIds and records recent entry', () => {
+  it('activate("tag", item) filters the current timeline by the tag and records recent entry', () => {
     const m = new GlobalSearchManager();
     m.open();
     m.activate('tag', { id: 't1', name: 'beach' });
-    const firstCall = vi.mocked(goto).mock.calls[0]?.[0] as string;
-    expect(firstCall).toContain('/search');
-    expect(decodeURIComponent(firstCall)).toContain('"tagIds":["t1"]');
+    expect(goto).toHaveBeenCalledWith('/photos?tags=t1');
     const entries = getEntries();
     expect(entries[0]).toMatchObject({ kind: 'tag', id: 'tag:t1', tagId: 't1', label: 'beach' });
   });
@@ -2652,8 +2650,7 @@ describe('activateRecent()', () => {
     const m = new GlobalSearchManager();
     m.open();
     m.activateRecent({ kind: 'tag', id: 'tag:t1', tagId: 't1', label: 'beach', lastUsed: 1 });
-    const firstCall = vi.mocked(goto).mock.calls[0]?.[0] as string;
-    expect(firstCall).toContain('/search');
+    expect(goto).toHaveBeenCalledWith('/photos?tags=t1');
     expect(m.isOpen).toBe(false);
   });
 
@@ -6668,5 +6665,116 @@ describe('field-search mode navigation (filename / description / ocr)', () => {
 
     const fieldNav = vi.mocked(goto).mock.calls.find((c) => String(c[0]).includes('description='));
     expect(fieldNav).toBeUndefined();
+  });
+});
+
+describe('tag activation navigation', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+    mockPage.url = new URL('https://gallery.test/photos');
+  });
+
+  const lastGoto = () => vi.mocked(goto).mock.calls.at(-1)?.[0] as string | undefined;
+
+  it('lands on the filterable timeline, not the deprecated /search page', () => {
+    const m = new GlobalSearchManager();
+
+    m.activate('tag', { id: 't1', name: 'beach' });
+
+    expect(lastGoto()).toBe('/photos?tags=t1');
+  });
+
+  it('preserves the current searchable-page filters (AND)', () => {
+    const m = new GlobalSearchManager();
+    m.registerSearchablePageFilters(() => ({ ...createFilterState(), personIds: ['p1'], rating: 3 }));
+
+    m.activate('tag', { id: 't1', name: 'beach' });
+
+    const dest = lastGoto();
+    expect(dest).toContain('people=p1');
+    expect(dest).toContain('rating=3');
+    expect(dest).toContain('tags=t1');
+  });
+
+  it('keeps tags already active on the page and appends the new one', () => {
+    const m = new GlobalSearchManager();
+    m.registerSearchablePageFilters(() => ({ ...createFilterState(), tagIds: ['t0'] }));
+
+    m.activate('tag', { id: 't1', name: 'beach' });
+
+    expect(lastGoto()).toBe('/photos?tags=t0%2Ct1');
+  });
+
+  it('does not duplicate a tag that is already filtering the page', () => {
+    const m = new GlobalSearchManager();
+    m.registerSearchablePageFilters(() => ({ ...createFilterState(), tagIds: ['t1'] }));
+
+    m.activate('tag', { id: 't1', name: 'beach' });
+
+    expect(lastGoto()).toBe('/photos?tags=t1');
+  });
+
+  it('drops a stale smart query so the tag filter is the only constraint', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/photos?q=sunset');
+
+    m.activate('tag', { id: 't1', name: 'beach' });
+
+    expect(lastGoto()).toBe('/photos?tags=t1');
+  });
+
+  it('targets /photos when the current page is not filterable', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/map');
+
+    m.activate('tag', { id: 't1', name: 'beach' });
+
+    expect(lastGoto()).toBe('/photos?tags=t1');
+  });
+
+  it('stays on a space timeline so the tag filters the space', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/spaces/space-1');
+
+    m.activate('tag', { id: 't1', name: 'beach' });
+
+    expect(lastGoto()).toBe('/spaces/space-1?tags=t1');
+  });
+
+  it('caches the tag name for the destination so the filter chip is not a raw id', () => {
+    const m = new GlobalSearchManager();
+
+    m.activate('tag', { id: 't1', name: 'beach' });
+
+    expect(storeTypedSearchNames).toHaveBeenCalledWith('/photos?tags=t1', {
+      personNames: new Map(),
+      tagNames: new Map([['t1', 'beach']]),
+    });
+  });
+
+  it('caches no name for a nameless tag so the chip falls back to the id, not a blank label', () => {
+    const m = new GlobalSearchManager();
+
+    m.activate('tag', { id: 't1' });
+
+    expect(storeTypedSearchNames).toHaveBeenCalledWith('/photos?tags=t1', {
+      personNames: new Map(),
+      tagNames: new Map(),
+    });
+  });
+
+  it('routes a recent tag entry to the filterable timeline too', () => {
+    const m = new GlobalSearchManager();
+    addEntry({ kind: 'tag', id: 'tag:t1', tagId: 't1', label: 'beach', lastUsed: 1 });
+
+    m.activateRecent({ kind: 'tag', id: 'tag:t1', tagId: 't1', label: 'beach', lastUsed: 1 });
+
+    expect(lastGoto()).toBe('/photos?tags=t1');
+    expect(storeTypedSearchNames).toHaveBeenCalledWith('/photos?tags=t1', {
+      personNames: new Map(),
+      tagNames: new Map([['t1', 'beach']]),
+    });
   });
 });
