@@ -13,6 +13,7 @@ import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/remote_album.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
 
 import '../../../test_helpers/fake_tabs_router.dart';
 
@@ -256,6 +257,96 @@ void main() {
 
     expect(container.read(bottomNavHeightProvider), 86);
     expect(tester.getRect(find.byType(GalleryNavPill)).bottom, 932 - 34);
+  });
+
+  testWidgets('narrow phone: the whole cluster stays inside the screen (#909)', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    addTearDown(() {
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetPhysicalSize();
+    });
+
+    final router = FakeTabsRouter();
+    await tester.pumpWidget(
+      _wrap(
+        GalleryBottomNav(tabsRouter: router),
+        mq: const MediaQueryData(size: Size(360, 800)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final pill = tester.getRect(find.byType(GalleryNavPill));
+    final blob = tester.getRect(find.byType(GallerySearchBlob));
+
+    expect(pill.left, greaterThanOrEqualTo(0), reason: 'pill must not run off the left edge');
+    expect(blob.right, lessThanOrEqualTo(360), reason: 'search blob must not run off the right edge');
+    expect(pill.right, lessThanOrEqualTo(blob.left), reason: 'pill must not overlap the search blob');
+  });
+
+  testWidgets('roomy screen: pill stays content-sized and the cluster stays centred', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1024, 800);
+    addTearDown(() {
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetPhysicalSize();
+    });
+
+    final router = FakeTabsRouter();
+    await tester.pumpWidget(
+      _wrap(
+        GalleryBottomNav(tabsRouter: router),
+        // Portrait MediaQuery so the pill branch is exercised, not the rail.
+        mq: const MediaQueryData(size: Size(1024, 1400)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final pill = tester.getRect(find.byType(GalleryNavPill));
+    final blob = tester.getRect(find.byType(GallerySearchBlob));
+
+    expect(pill.width, lessThan(1024 - 28 - 12 - 50), reason: 'pill must hug its tabs, not stretch to the free width');
+    expect(
+      (pill.left - (1024 - blob.right)).abs(),
+      lessThan(0.5),
+      reason: 'the pill+blob cluster stays centred: equal gaps either side',
+    );
+  });
+
+  testWidgets('narrow phone: the search blob is still tappable (#909)', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    addTearDown(() {
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetPhysicalSize();
+    });
+
+    final router = FakeTabsRouter(initialIndex: GalleryTabEnum.photos.index);
+    final container = ProviderContainer(
+      overrides: [
+        readonlyModeProvider.overrideWith(() => _FakeReadonly(false)),
+        hapticFeedbackProvider.overrideWith((ref) => _NoOpHaptic(ref)),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(360, 800)),
+            child: Material(child: GalleryBottomNav(tabsRouter: router)),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(GallerySearchBlob));
+    await tester.pumpAndSettle();
+
+    expect(container.read(photosFilterSheetProvider), FilterSheetSnap.deep);
   });
 
   testWidgets('re-tap Photos (already active): emits ScrollToTopEvent', (tester) async {
