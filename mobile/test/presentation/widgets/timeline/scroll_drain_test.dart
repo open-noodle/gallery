@@ -1,4 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment.model.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/overview/overview_segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/scroll_drain.dart';
 
 void main() {
@@ -10,6 +13,7 @@ void main() {
       bool segmentsLoaded = true,
       bool laidOut = true,
       bool segmentMatched = true,
+      bool isOverviewTimeline = false,
       int attempts = 0,
     }) {
       return decideScrollDrain(
@@ -17,6 +21,7 @@ void main() {
         segmentsLoaded: segmentsLoaded,
         laidOut: laidOut,
         segmentMatched: segmentMatched,
+        isOverviewTimeline: isOverviewTimeline,
         attempts: attempts,
         maxAttempts: maxAttempts,
       );
@@ -57,6 +62,37 @@ void main() {
 
     test('a ready request still scrolls even past the budget (never needed to give up)', () {
       expect(decide(attempts: maxAttempts + 5), ScrollDrainAction.scroll);
+    });
+
+    test('is idle with no pending request regardless of grouping or attempts', () {
+      expect(decide(hasPending: false, isOverviewTimeline: true), ScrollDrainAction.idle);
+      expect(
+        decide(hasPending: false, isOverviewTimeline: true, laidOut: false, attempts: maxAttempts + 1),
+        ScrollDrainAction.idle,
+      );
+    });
+
+    test('never scrolls while the timeline renders overview cards', () {
+      // #822: in Year/Month grouping findTimelineScrollTargetSegment happily matches
+      // the year/month CARD, so "ready" is true — scrolling here is exactly the bug.
+      expect(decide(isOverviewTimeline: true), ScrollDrainAction.switchToDayGrouping);
+    });
+
+    test('switches to day grouping while an overview timeline is still loading', () {
+      expect(decide(isOverviewTimeline: true, segmentsLoaded: false), ScrollDrainAction.switchToDayGrouping);
+      expect(decide(isOverviewTimeline: true, laidOut: false), ScrollDrainAction.switchToDayGrouping);
+    });
+
+    test('keeps switching right up to the attempt budget', () {
+      expect(decide(isOverviewTimeline: true, attempts: maxAttempts - 1), ScrollDrainAction.switchToDayGrouping);
+    });
+
+    test('gives up rather than switching forever when the grouping write never lands', () {
+      // If the grouping is pinned by timelineArgs or a dateless bucket source, set(day)
+      // is a no-op. The budget is the only thing stopping an infinite loop, so the
+      // widget must increment attempts on this branch too.
+      expect(decide(isOverviewTimeline: true, attempts: maxAttempts), ScrollDrainAction.giveUp);
+      expect(decide(isOverviewTimeline: true, attempts: maxAttempts + 5), ScrollDrainAction.giveUp);
     });
   });
 
@@ -99,4 +135,83 @@ void main() {
       expect(findMatchingSegmentIndex(dates, DateTime(2026, 5, 9)), 1);
     });
   });
+
+  group('segmentsAreOverview', () {
+    test('null segments are not an overview', () {
+      expect(segmentsAreOverview(null), isFalse);
+    });
+
+    test('an empty segment list is not an overview', () {
+      expect(segmentsAreOverview(const []), isFalse);
+    });
+
+    test('fixed segments only are not an overview', () {
+      expect(segmentsAreOverview([_fixedSegment(), _fixedSegment()]), isFalse);
+    });
+
+    test('a list of overview segments is an overview', () {
+      expect(segmentsAreOverview([_overviewSegment(), _overviewSegment()]), isTrue);
+    });
+
+    test('a mixed list containing one overview segment is an overview', () {
+      // Defensive: the builder never mixes them today, but treating "any overview
+      // card present" as overview keeps the scroll from targeting a card.
+      expect(segmentsAreOverview([_fixedSegment(), _overviewSegment()]), isTrue);
+    });
+  });
+
+  group('decideScrollResolve', () {
+    ScrollResolveOutcome decide({bool stillMounted = true, bool stillHasClients = true, bool targetUnchanged = true}) =>
+        decideScrollResolve(
+          stillMounted: stillMounted,
+          stillHasClients: stillHasClients,
+          targetUnchanged: targetUnchanged,
+        );
+
+    test('proceeds when nothing changed during the await', () {
+      expect(decide(), ScrollResolveOutcome.proceed);
+    });
+
+    test('abandons when the widget unmounted during the await', () {
+      expect(decide(stillMounted: false), ScrollResolveOutcome.abandonUnmounted);
+    });
+
+    test('abandons when the scroll controller lost its clients during the await', () {
+      expect(decide(stillHasClients: false), ScrollResolveOutcome.abandonUnmounted);
+    });
+
+    test('abandons a stale resolution when a newer request replaced the target', () {
+      expect(decide(targetUnchanged: false), ScrollResolveOutcome.abandonStale);
+    });
+
+    test('unmounting dominates staleness so nothing touches a dead controller', () {
+      expect(decide(stillMounted: false, targetUnchanged: false), ScrollResolveOutcome.abandonUnmounted);
+      expect(decide(stillHasClients: false, targetUnchanged: false), ScrollResolveOutcome.abandonUnmounted);
+    });
+  });
 }
+
+FixedSegment _fixedSegment() => FixedSegment(
+  firstIndex: 0,
+  lastIndex: 1,
+  startOffset: 0,
+  endOffset: 100,
+  firstAssetIndex: 0,
+  bucket: TimeBucket(date: DateTime(2026, 4, 3), assetCount: 1),
+  tileHeight: 100,
+  columnCount: 4,
+  headerExtent: 40,
+  spacing: 2,
+  header: HeaderType.day,
+);
+
+TimelineOverviewSegment _overviewSegment() => TimelineOverviewSegment(
+  firstIndex: 0,
+  lastIndex: 0,
+  startOffset: 0,
+  endOffset: 100,
+  firstAssetIndex: 0,
+  bucket: TimeBucket(date: DateTime(2026, 1), assetCount: 12),
+  groupBy: GroupAssetsBy.year,
+  header: HeaderType.none,
+);
