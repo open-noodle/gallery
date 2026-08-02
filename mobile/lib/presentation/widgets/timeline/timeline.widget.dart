@@ -12,6 +12,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/events.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/models/timeline_zoom_anchor.model.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/extensions/asyncvalue_extensions.dart';
@@ -221,7 +222,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
       if (mounted) _requestScrollDrain();
     });
 
-    ref.listenManual(timelineGroupingProvider, _onGroupingChanged);
+    ref.listenManual(timelineOverviewModeProvider, _onGroupingChanged);
   }
 
   @override
@@ -294,15 +295,15 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
     EventStream.shared.emit(MultiSelectToggleEvent(isEnabled));
   }
 
-  // When the grouping granularity changes (e.g. via the grouping selector),
-  // anchor the rebuilt timeline to the date currently at the top of the viewport
-  // so the user keeps their place instead of jumping to the most recent content.
-  void _onGroupingChanged(GroupAssetsBy? previous, GroupAssetsBy next) {
+  // When the zoom level changes (e.g. via the grouping selector), anchor the
+  // rebuilt timeline to the date currently at the top of the viewport so the
+  // user keeps their place instead of jumping to the most recent content.
+  void _onGroupingChanged(TimelineOverviewMode? previous, TimelineOverviewMode next) {
     if (previous == null || previous == next) {
       return;
     }
     // A card-tap drilldown sets an explicit year/month anchor right before it
-    // changes the grouping; don't overwrite it with a position-derived anchor.
+    // changes the mode; don't overwrite it with a position-derived anchor.
     if (!ref.read(timelineZoomAnchorProvider).isEmpty) {
       return;
     }
@@ -317,7 +318,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
     final anchorNotifier = ref.read(timelineZoomAnchorProvider.notifier);
     final resolved = resolveGroupingChangeAnchorDate(
       topBucketDate: topBucketDate,
-      previousGroupBy: previous,
+      previousMode: previous,
       remembered: anchorNotifier.lastPositionDate,
     );
     anchorNotifier.setDate(resolved);
@@ -454,7 +455,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
 
   void _scheduleZoomAnchorResolution({
     required TimelineZoomAnchor anchor,
-    required GroupAssetsBy groupBy,
+    required TimelineOverviewMode mode,
     required List<Segment> segments,
   }) {
     if (anchor.isEmpty || _scheduledZoomAnchor == anchor || _resolvingZoomAnchor == anchor) {
@@ -468,25 +469,27 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
       }
 
       _scheduledZoomAnchor = null;
-      _resolveZoomAnchor(anchor: anchor, groupBy: groupBy, segments: segments);
+      _resolveZoomAnchor(anchor: anchor, mode: mode, segments: segments);
     });
   }
 
   void _resolveZoomAnchor({
     required TimelineZoomAnchor anchor,
-    required GroupAssetsBy groupBy,
+    required TimelineOverviewMode mode,
     required List<Segment> segments,
   }) {
     if (ref.read(timelineZoomAnchorProvider) != anchor || !_scrollController.hasClients) {
       return;
     }
 
-    final GroupAssetsBy activeGroupBy = ref.read(timelineArgsProvider).groupBy ?? ref.read(timelineGroupingProvider);
-    if (activeGroupBy != groupBy) {
+    final TimelineOverviewMode activeMode = ref.read(timelineArgsProvider).groupBy != null
+        ? TimelineOverviewMode.all
+        : ref.read(timelineOverviewModeProvider);
+    if (activeMode != mode) {
       return;
     }
 
-    final targetSegment = findTimelineZoomAnchorSegment(segments, anchor, groupBy);
+    final targetSegment = findTimelineZoomAnchorSegment(segments, anchor, mode);
     if (targetSegment == null) {
       return;
     }
@@ -632,10 +635,12 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                   ),
               onData: (segments) {
                 _lastRenderedSegments = segments;
-                final GroupAssetsBy activeGroupBy =
-                    ref.watch(timelineArgsProvider).groupBy ?? ref.watch(timelineGroupingProvider);
+                final spec = ref.watch(timelineGroupingSpecProvider);
+                final pinnedGroupBy = ref.watch(timelineArgsProvider).groupBy;
+                final TimelineOverviewMode activeMode = pinnedGroupBy != null ? TimelineOverviewMode.all : spec.mode;
+                final GroupAssetsBy activeGroupBy = pinnedGroupBy ?? spec.groupBy;
                 final zoomAnchor = ref.watch(timelineZoomAnchorProvider);
-                _scheduleZoomAnchorResolution(anchor: zoomAnchor, groupBy: activeGroupBy, segments: segments);
+                _scheduleZoomAnchorResolution(anchor: zoomAnchor, mode: activeMode, segments: segments);
                 final childCount = (segments.lastOrNull?.lastIndex ?? -1) + 1;
 
                 // Zero assets: render the caller's empty state (first-run / no-results)
