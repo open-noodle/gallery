@@ -487,7 +487,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
         _scrollDrainAttempts++;
         if (!_daySwitchRequested) {
           _daySwitchRequested = true;
-          unawaited(ref.read(timelineGroupingProvider.notifier).set(GroupAssetsBy.day));
+          unawaited(ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.all));
         }
         WidgetsBinding.instance.addPostFrameCallback((_) => _attemptScrollDrain());
       case ScrollDrainAction.retry:
