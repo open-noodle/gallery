@@ -1,5 +1,6 @@
 import { fireEvent, render } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
+import { getResizeObserverMock } from '$lib/__mocks__/resize-observer.mock';
 import type { TagOption } from '../filter-panel';
 import TagsFilter from '../tags-filter.svelte';
 
@@ -7,6 +8,14 @@ beforeAll(async () => {
   register('en-US', () => import('$i18n/en.json'));
   await init({ fallbackLocale: 'en-US' });
   await waitLocale('en-US');
+});
+
+beforeEach(() => {
+  vi.stubGlobal('ResizeObserver', getResizeObserverMock());
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 function makeTags(count: number): TagOption[] {
@@ -239,5 +248,72 @@ describe('TagsFilter', () => {
 
     await fireEvent.click(getByTestId('tags-item-t1'));
     expect(selected).toEqual([]);
+  });
+
+  it('T1: clamps normal rows instead of truncating them', () => {
+    const tags = [{ id: 't1', name: 'Events/2024/Italy Summer Trip Rome' }];
+    const { getByTestId } = render(TagsFilter, {
+      props: { tags, selectedIds: [], onSelectionChange: () => {} },
+    });
+
+    const label = getByTestId('tags-item-t1').querySelector('span');
+    expect(label?.className).toContain('line-clamp-2');
+    expect(label?.className).not.toContain('truncate');
+  });
+
+  it('T2: clamps orphaned rows too', () => {
+    const { getByTestId } = render(TagsFilter, {
+      props: {
+        tags: [{ id: 't1', name: 'Kept' }],
+        selectedIds: ['gone'],
+        selectedNames: new Map([['gone', 'Events/2024/Removed But Still Selected']]),
+        onSelectionChange: () => {},
+      },
+    });
+
+    const label = getByTestId('tags-item-gone').querySelector('span');
+    expect(label?.className).toContain('line-clamp-2');
+  });
+
+  it('T3: keeps orphaned-row styling on the row element', () => {
+    const { getByTestId } = render(TagsFilter, {
+      props: {
+        tags: [{ id: 't1', name: 'Kept' }],
+        selectedIds: ['gone'],
+        selectedNames: new Map([['gone', 'Removed']]),
+        onSelectionChange: () => {},
+      },
+    });
+
+    const row = getByTestId('tags-item-gone');
+    expect(row.className).toContain('opacity-50');
+    expect(row.className).toContain('font-medium');
+    expect(row.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('T4: still reports selection through the row component', async () => {
+    const onSelectionChange = vi.fn();
+    const { getByTestId } = render(TagsFilter, {
+      props: { tags: [{ id: 't1', name: 'Vacation' }], selectedIds: [], onSelectionChange },
+    });
+
+    await fireEvent.click(getByTestId('tags-item-t1'));
+
+    expect(onSelectionChange).toHaveBeenCalledWith(['t1']);
+  });
+
+  it('T5: still filters by search, with clamped rows', async () => {
+    const tags = [
+      { id: 't1', name: 'Vacation' },
+      { id: 't2', name: 'Family' },
+    ];
+    const { getByTestId, queryByTestId } = render(TagsFilter, {
+      props: { tags, selectedIds: [], onSelectionChange: () => {} },
+    });
+
+    await fireEvent.input(getByTestId('tags-search-input'), { target: { value: 'vac' } });
+
+    expect(queryByTestId('tags-item-t2')).toBeNull();
+    expect(getByTestId('tags-item-t1').querySelector('span')?.className).toContain('line-clamp-2');
   });
 });

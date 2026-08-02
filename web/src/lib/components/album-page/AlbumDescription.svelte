@@ -44,7 +44,7 @@
     }))}
   />
 {:else if description}
-  <p class="wrap-break-words w-full text-base whitespace-pre-line text-black dark:text-white">
+  <p class="w-full text-base wrap-break-word whitespace-pre-line text-black dark:text-white">
     {description}
   </p>
 {/if}
