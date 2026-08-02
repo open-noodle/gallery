@@ -21,10 +21,18 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
   // SearchFilter.copyWith null-coalesces, so use cascade to set nullable fields.
   void setText(String text) {
     final next = state.copyWith()..context = text.isEmpty ? null : text;
-    // Relevance is only valid for smart (text) search; coerce to Newest for metadata.
-    state = (next.context == null && next.sort == SearchSortOrder.relevance)
-        ? next.copyWith(sort: SearchSortOrder.newest)
-        : next;
+    // Every new query starts over at Relevance, matching web: the search palette
+    // resets `searchSortOrder` to relevance when a session opens on an empty query
+    // and when the query is cleared (global-search-manager `open()` /
+    // `activateSearch('')`). A sort the user picks therefore applies to the results
+    // in front of them and is dropped once they search for something else.
+    //
+    // The sort is deliberately *not* rewritten to a date order for metadata-only
+    // filters — relevance degrades to newest-first where it has to (no `order` on
+    // the search request, date grouping in the timeline, "Newest first" in the sort
+    // sheet). Coercing the stored value instead used to pin the app to Newest first
+    // for the rest of the session once a query had been cleared (#902).
+    state = next.context == state.context ? next : next.copyWith(sort: SearchSortOrder.relevance);
   }
 
   void setSort(SearchSortOrder sort) => state = state.copyWith(sort: sort);
