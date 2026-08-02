@@ -7,12 +7,15 @@
   import { t } from 'svelte-i18n';
 
   type Props = {
-    timelineManager: TimelineManager;
+    /** Absent on surfaces with no timeline behind them (e.g. smart search results). */
+    timelineManager?: TimelineManager;
     assetInteraction: AssetMultiSelectManager;
     withText?: boolean;
+    /** Overrides the timeline-wide select-all — pass on non-timeline surfaces. */
+    onSelectAll?: () => void;
   };
 
-  let { timelineManager, assetInteraction, withText = false }: Props = $props();
+  let { timelineManager, assetInteraction, withText = false, onSelectAll }: Props = $props();
   const allAssetsSelected = $derived(assetInteraction.selectAll);
 
   const icon = $derived(allAssetsSelected ? mdiSelectRemove : mdiSelectAll);
@@ -20,7 +23,13 @@
   const onclick = async () => {
     if (allAssetsSelected) {
       assetInteraction.clear();
-    } else {
+      return;
+    }
+    if (onSelectAll) {
+      onSelectAll();
+      return;
+    }
+    if (timelineManager) {
       await selectAllAssets(timelineManager, assetInteraction);
     }
   };

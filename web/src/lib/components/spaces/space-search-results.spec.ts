@@ -10,6 +10,14 @@ vi.mock('@immich/sdk', async (importOriginal) => {
   return { ...actual, getAssetInfo: (...args: unknown[]) => getAssetInfoMock(...args) };
 });
 
+// The real GalleryViewer measures a justified layout against its scroll container, which
+// happy-dom reports as 0x0 — it would render zero thumbnails here. The stub records the props
+// under test and renders one clickable element per asset.
+vi.mock('$lib/components/shared-components/gallery-viewer/GalleryViewer.svelte', async () => {
+  const { default: MockComponent } = await import('./mock-gallery-viewer.test-wrapper.svelte');
+  return { default: MockComponent };
+});
+
 // Spy on the props forwarded to AssetViewer. The component dynamic-imports asset-viewer.svelte,
 // so we mock the module and record each invocation's props on this array. Tests assert against it.
 const assetViewerPropsCalls: Array<Record<string, unknown>> = [];
@@ -28,12 +36,6 @@ const mockAssets = [
   { id: 'asset-3', originalFileName: 'photo3.jpg' },
 ] as AssetResponseDto[];
 
-const mockAssetsWithDates = [
-  { id: 'a1', originalFileName: 'p1.jpg', fileCreatedAt: '2024-06-15T10:00:00.000Z' },
-  { id: 'a2', originalFileName: 'p2.jpg', fileCreatedAt: '2024-06-10T10:00:00.000Z' },
-  { id: 'a3', originalFileName: 'p3.jpg', fileCreatedAt: '2024-03-01T10:00:00.000Z' },
-] as AssetResponseDto[];
-
 describe('SpaceSearchResults', () => {
   beforeAll(async () => {
     register('en-US', () => import('$i18n/en.json'));
@@ -48,7 +50,7 @@ describe('SpaceSearchResults', () => {
     assetViewerPropsCalls.length = 0;
   });
 
-  it('should render thumbnail grid from search results', () => {
+  it('should render search results through the gallery viewer', () => {
     render(SpaceSearchResults, {
       props: {
         results: mockAssets,
@@ -59,8 +61,69 @@ describe('SpaceSearchResults', () => {
         sortMode: 'relevance',
       },
     });
-    const images = screen.getAllByRole('img');
-    expect(images).toHaveLength(3);
+    expect(screen.getByTestId('gallery-viewer')).toBeInTheDocument();
+    for (const asset of mockAssets) {
+      expect(screen.getByTestId(`gallery-asset-${asset.id}`)).toBeInTheDocument();
+    }
+  });
+
+  // The whole point of #908: results must use the justified, selectable gallery rather than the
+  // old fixed-aspect-ratio grid of bare <img> elements.
+  it('should hand the gallery viewer a selection manager so photos are selectable on hover', () => {
+    render(SpaceSearchResults, {
+      props: {
+        results: mockAssets,
+        isLoading: false,
+        hasMore: false,
+        totalLoaded: 3,
+        onLoadMore: vi.fn(),
+        sortMode: 'relevance',
+      },
+    });
+    expect(screen.getByTestId('gallery-viewer')).toHaveAttribute('data-has-asset-interaction', 'true');
+  });
+
+  it('should virtualize against its own scroll container rather than the document', () => {
+    render(SpaceSearchResults, {
+      props: {
+        results: mockAssets,
+        isLoading: false,
+        hasMore: false,
+        totalLoaded: 3,
+        onLoadMore: vi.fn(),
+        sortMode: 'relevance',
+      },
+    });
+    expect(screen.getByTestId('gallery-viewer')).toHaveAttribute('data-has-scroll-element', 'true');
+  });
+
+  it('should keep ownership of the asset viewer so space context is preserved', () => {
+    render(SpaceSearchResults, {
+      props: {
+        results: mockAssets,
+        isLoading: false,
+        hasMore: false,
+        totalLoaded: 3,
+        onLoadMore: vi.fn(),
+        sortMode: 'relevance',
+      },
+    });
+    expect(screen.getByTestId('gallery-viewer')).toHaveAttribute('data-with-asset-viewer', 'false');
+  });
+
+  it('should render the same justified gallery in date-sorted mode (no month headers)', () => {
+    render(SpaceSearchResults, {
+      props: {
+        results: mockAssets,
+        isLoading: false,
+        hasMore: false,
+        totalLoaded: 3,
+        onLoadMore: vi.fn(),
+        sortMode: 'desc',
+      },
+    });
+    expect(screen.getByTestId('gallery-viewer')).toBeInTheDocument();
+    expect(screen.queryByTestId('date-group-header-0')).not.toBeInTheDocument();
   });
 
   it('should show result count with + for relevance mode when more pages exist', () => {
@@ -165,39 +228,10 @@ describe('SpaceSearchResults', () => {
     expect(screen.getByTestId('search-empty')).toBeInTheDocument();
   });
 
-  it('should show date headers when sortMode is desc', () => {
-    render(SpaceSearchResults, {
-      props: {
-        results: mockAssetsWithDates,
-        isLoading: false,
-        hasMore: false,
-        totalLoaded: 3,
-        onLoadMore: vi.fn(),
-        sortMode: 'desc',
-      },
-    });
-    expect(screen.getByTestId('date-group-header-0')).toHaveTextContent('June 2024');
-    expect(screen.getByTestId('date-group-header-1')).toHaveTextContent('March 2024');
-  });
-
-  it('should not show date headers when sortMode is relevance', () => {
-    render(SpaceSearchResults, {
-      props: {
-        results: mockAssetsWithDates,
-        isLoading: false,
-        hasMore: false,
-        totalLoaded: 3,
-        onLoadMore: vi.fn(),
-        sortMode: 'relevance',
-      },
-    });
-    expect(screen.queryByTestId('date-group-header-0')).not.toBeInTheDocument();
-  });
-
   it('should show contextual result count for date-sorted mode', () => {
     render(SpaceSearchResults, {
       props: {
-        results: mockAssetsWithDates,
+        results: mockAssets,
         isLoading: false,
         hasMore: true,
         totalLoaded: 100,
@@ -208,48 +242,10 @@ describe('SpaceSearchResults', () => {
     expect(screen.getByTestId('result-count')).toHaveTextContent('100 of up to 500');
   });
 
-  it('should show date headers when sortMode is asc', () => {
-    render(SpaceSearchResults, {
-      props: {
-        results: mockAssetsWithDates,
-        isLoading: false,
-        hasMore: false,
-        totalLoaded: 3,
-        onLoadMore: vi.fn(),
-        sortMode: 'asc',
-      },
-    });
-    expect(screen.getByTestId('date-group-header-0')).toBeInTheDocument();
-    expect(screen.getByTestId('date-group-header-1')).toBeInTheDocument();
-  });
-
-  it('should merge assets with same month into one group', () => {
-    const assetsWithSameMonth = [
-      { id: 'b1', originalFileName: 'q1.jpg', fileCreatedAt: '2024-06-20T10:00:00.000Z' },
-      { id: 'b2', originalFileName: 'q2.jpg', fileCreatedAt: '2024-03-15T10:00:00.000Z' },
-      { id: 'b3', originalFileName: 'q3.jpg', fileCreatedAt: '2024-06-05T10:00:00.000Z' },
-    ] as AssetResponseDto[];
-
-    render(SpaceSearchResults, {
-      props: {
-        results: assetsWithSameMonth,
-        isLoading: false,
-        hasMore: false,
-        totalLoaded: 3,
-        onLoadMore: vi.fn(),
-        sortMode: 'desc',
-      },
-    });
-    // June 2024 appears twice in the data but should merge into one group
-    expect(screen.getByTestId('date-group-header-0')).toHaveTextContent('June 2024');
-    expect(screen.getByTestId('date-group-header-1')).toHaveTextContent('March 2024');
-    expect(screen.queryByTestId('date-group-header-2')).not.toBeInTheDocument();
-  });
-
   it('should show contextual result count for asc mode', () => {
     render(SpaceSearchResults, {
       props: {
-        results: mockAssetsWithDates,
+        results: mockAssets,
         isLoading: false,
         hasMore: true,
         totalLoaded: 50,
@@ -263,7 +259,7 @@ describe('SpaceSearchResults', () => {
   it('should show exact count in date mode when all loaded', () => {
     render(SpaceSearchResults, {
       props: {
-        results: mockAssetsWithDates,
+        results: mockAssets,
         isLoading: false,
         hasMore: false,
         totalLoaded: 35,
@@ -291,8 +287,7 @@ describe('SpaceSearchResults', () => {
         },
       });
 
-      const firstThumb = screen.getAllByRole('img')[0];
-      await fireEvent.click(firstThumb);
+      await fireEvent.click(screen.getByTestId('gallery-asset-asset-1'));
 
       // Wait for the dynamic-imported AssetViewer mock to be invoked with props.
       await vi.waitFor(() => expect(assetViewerPropsCalls.length).toBeGreaterThan(0));
@@ -314,10 +309,8 @@ describe('SpaceSearchResults', () => {
         },
       });
 
-      const firstThumb = screen.getAllByRole('img')[0];
-      await fireEvent.click(firstThumb);
+      await fireEvent.click(screen.getByTestId('gallery-asset-asset-1'));
 
-      // This test FAILS today because the component hardcodes isShared={true} in the AssetViewer render.
       await vi.waitFor(() => expect(assetViewerPropsCalls.length).toBeGreaterThan(0));
 
       const props = assetViewerPropsCalls.at(-1)!;
@@ -338,8 +331,7 @@ describe('SpaceSearchResults', () => {
         },
       });
 
-      const firstThumb = screen.getAllByRole('img')[0];
-      await fireEvent.click(firstThumb);
+      await fireEvent.click(screen.getByTestId('gallery-asset-asset-1'));
 
       await vi.waitFor(() => expect(getAssetInfoMock).toHaveBeenCalled());
 
@@ -359,14 +351,11 @@ describe('SpaceSearchResults', () => {
         },
       });
 
-      const firstThumb = screen.getAllByRole('img')[0];
-      await fireEvent.click(firstThumb);
+      await fireEvent.click(screen.getByTestId('gallery-asset-asset-1'));
 
       await vi.waitFor(() => expect(getAssetInfoMock).toHaveBeenCalled());
 
-      // Assert the spaceId key is ABSENT (not just undefined) from every call. The current
-      // implementation passes `{ ...authManager.params, id, spaceId }` which results in the
-      // key being present with an undefined value, so this test FAILS today.
+      // Assert the spaceId key is ABSENT (not just undefined) from every call.
       for (const call of getAssetInfoMock.mock.calls) {
         const arg = call[0] as Record<string, unknown>;
         expect(Object.prototype.hasOwnProperty.call(arg, 'spaceId')).toBe(false);

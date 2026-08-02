@@ -24,6 +24,7 @@
   import Timeline from '$lib/components/timeline/Timeline.svelte';
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
   import type { TimelineAsset, TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
+  import { removeSearchResults, selectAllSearchResults, updateSearchResults } from '$lib/utils/search-result-selection';
   import { registerSelectionContext, registerSpaceContext } from '$lib/managers/command-context-manager.svelte';
   import { eventManager } from '$lib/managers/event-manager.svelte';
   import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
@@ -60,6 +61,7 @@
   import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
   import {
     addAssets,
+    type AssetResponseDto,
     AssetTypeEnum,
     AssetVisibility,
     getFilterSuggestions,
@@ -511,20 +513,18 @@
     getAssets: () => assetMultiSelectManager.assets,
     clearSelection: () => assetMultiSelectManager.clear(),
     canAddToAlbum: () => true,
-    getOnFavorite: () =>
-      viewMode === 'view' && timelineManager
-        ? (ids, isFavorite) => timelineManager.update(ids, (asset) => (asset.isFavorite = isFavorite))
-        : undefined,
-    getOnArchive: () =>
-      viewMode === 'view' && timelineManager
-        ? (ids, visibility) => timelineManager.update(ids, (asset) => (asset.visibility = visibility))
-        : undefined,
+    getOnFavorite: () => (viewMode === 'view' && (showSearchResults || timelineManager) ? handleFavorite : undefined),
+    getOnArchive: () => (viewMode === 'view' && (showSearchResults || timelineManager) ? handleArchive : undefined),
     getAddSelectedToCurrentSpace: () =>
       viewMode === 'select-assets' && isEditor ? addSelectedAssetsToCurrentSpace : undefined,
   });
 
   const handleRemoveAssets = async (assetIds: string[]) => {
-    timelineManager.removeAssets(assetIds);
+    if (showSearchResults) {
+      removeSearchResults(searchResults, assetIds);
+    } else {
+      timelineManager.removeAssets(assetIds);
+    }
     await refreshSpace();
     // Also revalidate layout data so the shell's Photos tab count badge updates.
     await invalidateAll();
@@ -534,8 +534,30 @@
   // takes them out of this (non-locked) timeline view. Unlike remove-from-space, this isn't a
   // space-membership change, so it doesn't touch the space's asset count.
   const handleSetVisibility = (assetIds: string[]) => {
-    timelineManager.removeAssets(assetIds);
+    if (showSearchResults) {
+      removeSearchResults(searchResults, assetIds);
+    } else {
+      timelineManager.removeAssets(assetIds);
+    }
     assetMultiSelectManager.clear();
+  };
+
+  // While search results are showing, the timeline is unmounted — bulk actions have to mutate
+  // the result list instead of the TimelineManager (#908).
+  const handleFavorite = (ids: string[], isFavorite: boolean) => {
+    if (showSearchResults) {
+      updateSearchResults(searchResults, ids, (asset) => (asset.isFavorite = isFavorite));
+      return;
+    }
+    timelineManager.update(ids, (asset) => (asset.isFavorite = isFavorite));
+  };
+
+  const handleArchive = (ids: string[], visibility: AssetVisibility) => {
+    if (showSearchResults) {
+      updateSearchResults(searchResults, ids, (asset) => (asset.visibility = visibility));
+      return;
+    }
+    timelineManager.update(ids, (asset) => (asset.visibility = visibility));
   };
 
   // DeleteAssets already performed the server-side trash before calling this — it's a
@@ -546,6 +568,10 @@
   // via the page's `<OnEvents onAssetsDelete={refreshSpace} />` (see below), so refreshing
   // again here would be redundant.
   const handleAssetDelete = (assetIds: string[]) => {
+    if (showSearchResults) {
+      removeSearchResults(searchResults, assetIds);
+      return;
+    }
     timelineManager.removeAssets(assetIds);
   };
 
@@ -553,6 +579,12 @@
   // so re-add the assets to the local view directly; no space-count refresh is needed since
   // undoing a delete doesn't change space membership either.
   const handleUndoAssetDelete = (assets: TimelineAsset[]) => {
+    if (showSearchResults) {
+      // Undo hands back TimelineAssets; the results list holds full AssetResponseDtos, so
+      // re-running the search is how they come back.
+      searchReloadToken++;
+      return;
+    }
     timelineManager.upsertAssets(assets);
   };
 
@@ -582,7 +614,11 @@
   };
 
   const onSpaceRemoveAssets = async ({ assetIds }: { assetIds: string[]; spaceId: string }) => {
-    timelineManager.removeAssets(assetIds);
+    if (showSearchResults) {
+      removeSearchResults(searchResults, assetIds);
+    } else {
+      timelineManager.removeAssets(assetIds);
+    }
     await refreshSpace();
     // Also revalidate layout data so the shell's Photos tab count badge updates.
     await invalidateAll();
@@ -595,6 +631,11 @@
   >();
   let isLoading = $state(false);
   const showSearchResults = $derived(committedSearchQuery.trim().length > 0);
+  // Loaded smart search results. The timeline (and its TimelineManager) is unmounted while
+  // these are showing, so the multi-select toolbar acts on this array instead (#908).
+  let searchResults = $state<AssetResponseDto[]>([]);
+  // Bumped to force a re-run of the search (undo-delete restores the removed assets).
+  let searchReloadToken = $state(0);
   // `isEmptyForOptions` (not a bare `totalAssetCount === 0`) so clearing a filter that had 0
   // results can't flip this true for a tick while the timeline reloads — that transient would
   // unmount the filter panel and drop focus from a text input mid-typing.
@@ -827,6 +868,8 @@
       <SmartSearchResults
         searchQuery={committedSearchQuery}
         bind:isLoading
+        bind:results={searchResults}
+        reloadToken={searchReloadToken}
         {filters}
         language={$lang}
         spaceId={space.id}
@@ -896,13 +939,14 @@
 {#if assetMultiSelectManager.selectionActive && viewMode === 'view'}
   <div class="fixed inset-s-0 top-0 z-2 w-full">
     <SelectionToolbar
-      {timelineManager}
+      timelineManager={showSearchResults ? undefined : timelineManager}
       assetInteraction={assetMultiSelectManager}
+      onSelectAll={showSearchResults ? () => selectAllSearchResults(searchResults, assetMultiSelectManager) : undefined}
       space={{ id: space.id, canWrite: isEditor }}
       onRemove={handleRemoveAssets}
       onSetCover={handleSetAsCover}
-      onFavorite={(ids, isFavorite) => timelineManager.update(ids, (asset) => (asset.isFavorite = isFavorite))}
-      onArchive={(ids, visibility) => timelineManager.update(ids, (asset) => (asset.visibility = visibility))}
+      onFavorite={handleFavorite}
+      onArchive={handleArchive}
       onVisibilitySet={handleSetVisibility}
       onAssetDelete={handleAssetDelete}
       onUndoDelete={handleUndoAssetDelete}
