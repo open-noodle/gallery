@@ -3,16 +3,19 @@
 ## Summary
 
 - **Upstream commits pulled**: 0 — `upstream/main` unchanged at `cafd6c7c0f1`
-- **Fork commits synced**: 5 (`78d1223a289..546022c4de6`, PRs #920 #911 #905 #904 #886)
+- **Fork commits synced**: 6 (`78d1223a289..53f414ab79f`, PRs #920 #911 #905 #904 #886 #906)
 - **Conflicts resolved**: 2 commits (#911, #886), 5 hunks total
-- **Risk level**: MEDIUM — the sync imports a compile break that already exists on `origin/main`
-- **Recommendation**: PROCEED on the rolling branch; **`origin/main` needs the same fix separately**
+- **Risk level**: LOW as landed — the branch is green; the break it briefly carried is fixed both here and on `main`
+- **Recommendation**: PROCEED
 
 This is the second fork-sync-only cycle in a row. `make upstream-rolling-status` reported
 `Completed upstream batches: 45 / 45` and `Fork commits pending: 5`, so there was no batch plan, no
 rebase, and the per-batch product-direction gate had nothing to weigh.
 
-## ★★ Headline finding — `origin/main` does not compile (pre-existing, not caused by this sync)
+**#906 landed on `origin/main` mid-cycle** (after the first five were already applied here) and was
+cherry-picked on top, so the branch ends level with `origin/main` @ `53f414ab79f`.
+
+## ★★ Headline finding — `origin/main` briefly did not compile (pre-existing, not caused by this sync)
 
 Two fork PRs merged to `main` in sequence collide semantically without overlapping textually, so git
 merged both cleanly and the result does not build:
@@ -42,21 +45,42 @@ error - test/.../scroll_drain_test.dart:215:3 - The named parameter 'groupBy' is
 ```
 
 The same three reproduced here after the cherry-picks (at line 482 rather than 480 — a two-line
-offset from this branch's extra content). They are fixed on this branch in `7f93dc18808`; that commit
-should be ported to `main`.
+offset from this branch's extra content), and were reconciled here in `7f93dc18808`.
+
+### ★ Resolved on `main` by #906 — and the two fixes converged independently
+
+While this cycle was running, **#906** landed on `origin/main` carrying the fork's own fix for the
+same collision. It is **character-identical** to the reconciliation already applied here:
+
+| Site                     | #906                                                                                        | `7f93dc18808` (this branch) |
+| ------------------------ | ------------------------------------------------------------------------------------------- | --------------------------- |
+| `timeline.widget.dart`   | `unawaited(ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.all));` | identical                   |
+| `scroll_drain_test.dart` | `mode: TimelineOverviewMode.years,`                                                         | identical                   |
+| `scroll_drain_test.dart` | `import '.../timeline_grouping.model.dart';`                                                | identical                   |
+
+Because both sides made the same edit, cherry-picking #906 onto this branch produced **no conflict**.
+That convergence is also the strongest available evidence that the resolution matched the
+maintainer's intent rather than merely compiling: it was derived here from
+`overview_drilldown.provider.dart`'s canonical drill-to-grid step, and #906 chose the same form
+independently.
+
+`main` is therefore no longer red for this reason, and **no port from this branch is needed**. #906
+does not include the `cast_nullable_to_non_nullable` fix, which remains rolling-only because the rule
+is not enabled on `main`.
 
 ## Incoming Fork Changes
 
-| SHA (origin)  | Summary                                                              | Area   | Conflicts   | Notes                           |
-| ------------- | -------------------------------------------------------------------- | ------ | ----------- | ------------------------------- |
-| `1bf400817cf` | keep the bottom nav inside the screen on narrow phones (#909) (#920) | mobile | none        | clean                           |
-| `49c647f15af` | restore the Photo Grid "Group by" setting (#903) (#911)              | mobile | **3 hunks** | import ordering + `unawaited()` |
-| `c7662d5ae33` | show a loader while a filtered search is in flight (#901) (#905)     | mobile | none        | clean                           |
-| `cea1ddb6910` | restore iOS swipe-back on the Spaces page (#899) (#904)              | mobile | none        | clean                           |
-| `546022c4de6` | land memory "view in timeline" on the actual photo (#822) (#886)     | mobile | **2 hunks** | action-model + scroll rewrite   |
+| SHA (origin)  | Summary                                                                        | Area   | Conflicts   | Notes                                                |
+| ------------- | ------------------------------------------------------------------------------ | ------ | ----------- | ---------------------------------------------------- |
+| `1bf400817cf` | keep the bottom nav inside the screen on narrow phones (#909) (#920)           | mobile | none        | clean                                                |
+| `49c647f15af` | restore the Photo Grid "Group by" setting (#903) (#911)                        | mobile | **3 hunks** | import ordering + `unawaited()`                      |
+| `c7662d5ae33` | show a loader while a filtered search is in flight (#901) (#905)               | mobile | none        | clean                                                |
+| `cea1ddb6910` | restore iOS swipe-back on the Spaces page (#899) (#904)                        | mobile | none        | clean                                                |
+| `546022c4de6` | land memory "view in timeline" on the actual photo (#822) (#886)               | mobile | **2 hunks** | action-model + scroll rewrite                        |
+| `53f414ab79f` | start each search at Relevance and hide memories while filtering (#902) (#906) | mobile | none        | landed mid-cycle; carries `main`'s own collision fix |
 
-Whole-cycle scope: **65 files under `mobile/`, 4 under `docs/`**. No server, web, e2e, ML, CI, or
-migration surface — so those suites carry no risk from this delta.
+Whole-cycle scope: **mobile + docs only**. No server, web, e2e, ML, CI, or migration surface — so
+those suites carry no risk from this delta.
 
 ## The sync script rolled back; commits were hand-applied
 
@@ -122,11 +146,11 @@ Resolved as the **union**, sorted. Risk: LOW.
 
 ## Fixes applied on top (`7f93dc18808`)
 
-| Fix                                                                                                              | Origin                          | Present on `main`?              |
-| ---------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------- |
-| `timelineGroupingProvider.set(GroupAssetsBy.day)` → `timelineOverviewModeProvider.set(TimelineOverviewMode.all)` | #886×#911 collision             | **YES — main is red**           |
-| `TimelineOverviewSegment(groupBy:)` → `(mode:)` in `scroll_drain_test.dart`                                      | #886×#911 collision             | **YES — main is red**           |
-| `notifier.value?.asset as RemoteAsset` → `value!`                                                                | `cast_nullable_to_non_nullable` | No — rule not enabled on `main` |
+| Fix                                                                                                              | Origin                          | Present on `main`?                     |
+| ---------------------------------------------------------------------------------------------------------------- | ------------------------------- | -------------------------------------- |
+| `timelineGroupingProvider.set(GroupAssetsBy.day)` → `timelineOverviewModeProvider.set(TimelineOverviewMode.all)` | #886×#911 collision             | was red; **fixed by #906 identically** |
+| `TimelineOverviewSegment(groupBy:)` → `(mode:)` in `scroll_drain_test.dart`                                      | #886×#911 collision             | was red; **fixed by #906 identically** |
+| `notifier.value?.asset as RemoteAsset` → `value!`                                                                | `cast_nullable_to_non_nullable` | No — rule not enabled on `main`        |
 
 The first fix follows #911's own design vocabulary rather than a guess: `overview_drilldown.provider.dart`
 performs the equivalent drill-to-grid step as
@@ -147,10 +171,10 @@ This is the fourth occurrence (after #826/unicorn-v72, #810/`prefer-string-repea
 
 | Check                                     | Status   | Notes                                               |
 | ----------------------------------------- | -------- | --------------------------------------------------- |
-| `dart analyze --fatal-infos lib test`     | **PASS** | `No issues found!` after the fixes                  |
-| `dart format` gate (lib, excl. generated) | **PASS** | `Formatted 791 files (0 changed)`                   |
-| `flutter test` (full mobile suite)        | **PASS** | **3111 passed, 1 skipped**                          |
-| `make fork-ownership-coverage-check`      | **PASS** | covers 3220 fork files                              |
+| `dart analyze --fatal-infos lib test`     | **PASS** | `No issues found!` (re-run after #906)              |
+| `dart format` gate (lib, excl. generated) | **PASS** | `Formatted 792 files (0 changed)`                   |
+| `flutter test` (full mobile suite)        | **PASS** | **3122 passed, 1 skipped** (after #906)             |
+| `make fork-ownership-coverage-check`      | **PASS** | covers 3223 fork files                              |
 | `make ci-invariants-check`                | **PASS** | no-push-o-matic, image names, docs-deploy           |
 | `make fork-patches-check`                 | **PASS** | `@immich/ui` patch consistent                       |
 | `pubspec.yaml` churn (arc-1 trap)         | CLEAN    | no stray `shared_preferences: any`                  |
@@ -168,7 +192,15 @@ No migration files changed. `migrations-gallery/` count unchanged at **49**; the
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-forksync-20260802b`
-- **Commit validated**: `7f93dc18808`
+- **Commit validated**: final tip (post-#906)
+
+A first wave was dispatched on `7f93dc18808` before #906 landed. It returned
+**Static Code Analysis: success** — the gate that had been red on `main`, confirming the
+reconciliation — plus **Gallery Rebase Smoke: success**, and one **Docker: failure** that was the
+documented unauthenticated-GitHub-API transient (`mise install github:extism/js-pdk@1.6.0` →
+`403 API rate limit exceeded for <runner IP>` in the server plugins stage; unrelated to a
+mobile-only delta — see the three-rate-limits table in the rolling memory). Since #906 moved the
+branch, the full suite was re-dispatched on the new tip and that run is the gate of record.
 
 | Workflow                                  | Status    |
 | ----------------------------------------- | --------- |
@@ -188,16 +220,19 @@ No migration files changed. `migrations-gallery/` count unchanged at **49**; the
 ## Branch state
 
 - Level with `upstream/main` at `cafd6c7c0f1` (batches 45/45); **0 commits behind**
-- Fork-synced through `546022c4de6` (#886); **0 fork commits pending**
+- Fork-synced through `53f414ab79f` (#906); **0 fork commits pending**
 - **Still off `main`** — upstream has not tagged v3.1.1, so the standing rule applies
 - Backup: `backup/rolling-pre-forksync-20260802b` @ `09ff7b845c9`
+- `branding/config.json` `upstream.version` stays at **3.1.0** (v3.1.1 is not tagged)
 
 ## Follow-ups
 
-1. **Port `7f93dc18808` to `main`** (first two fixes at minimum) — `main` is currently red on Static
-   Code Analysis and Gallery Build Mobile, so the mobile app does not build from `main`.
-2. Consider why the #886/#911 collision reached `main`: both PRs were green individually, and
-   neither rebased onto the other before merge. A required up-to-date-branch check, or making
-   `Gallery Build Mobile` a PR gate (its jobs are currently `if:`-gated false on `pull_request`),
-   would have caught it.
+1. **No port to `main` needed** — #906 already fixed the collision there, identically. Worth
+   confirming `main`'s CI went green at `53f414ab79f`.
+2. Consider why the #886/#911 collision reached `main` at all: both PRs were green individually, and
+   neither was rebased onto the other before merge, so no gate ever compiled the combination. A
+   required up-to-date-branch check, or making `Gallery Build Mobile` run on `pull_request` (its
+   jobs are currently `if:`-gated false there), would have caught it. This is a **repeatable** hole,
+   not a one-off: any two mobile PRs that rename/retype in one and consume in the other will do it
+   again.
 3. Carried over: the non-idempotent e2e upload retry (`e2e/vitest.config.ts` `retry: 4`).
