@@ -4,6 +4,7 @@
   import { SvelteMap } from 'svelte/reactivity';
   import { t } from 'svelte-i18n';
   import type { TagOption } from './filter-panel';
+  import TagFilterRow from './tag-filter-row.svelte';
 
   interface Props {
     tags: TagOption[];
@@ -87,25 +88,7 @@
 
     <!-- Orphaned tags (selected but no longer in suggestions) -->
     {#each orphanedTags as tag (tag.id)}
-      <button
-        type="button"
-        class="-mx-2 flex w-[calc(100%+1rem)] items-center gap-2 rounded-lg px-2 py-1.5 text-sm opacity-50 hover:bg-subtle"
-        onclick={() => toggleTag(tag.id)}
-        aria-pressed="true"
-        data-testid="tags-item-{tag.id}"
-      >
-        <!-- Checkbox (always checked for orphaned) -->
-        <div
-          class="flex size-4 shrink-0 items-center justify-center rounded-sm bg-immich-primary dark:bg-immich-dark-primary"
-        >
-          <svg viewBox="0 0 24 24" class="size-3 text-white dark:text-black">
-            <path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" />
-          </svg>
-        </div>
-
-        <!-- Label -->
-        <span class="flex-1 truncate text-left font-medium">{tag.name}</span>
-      </button>
+      <TagFilterRow id={tag.id} name={tag.name} checked dimmed onToggle={toggleTag} />
     {/each}
 
     <!-- Empty search results -->
@@ -117,32 +100,7 @@
 
     <!-- Tags list -->
     {#each visibleTags as tag (tag.id)}
-      {@const isActive = selectedIds.includes(tag.id)}
-      <button
-        type="button"
-        class="-mx-2 flex w-[calc(100%+1rem)] items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-subtle {isActive
-          ? 'font-medium'
-          : 'text-gray-500 dark:text-gray-300'}"
-        onclick={() => toggleTag(tag.id)}
-        aria-pressed={isActive}
-        data-testid="tags-item-{tag.id}"
-      >
-        <!-- Checkbox -->
-        <div
-          class="flex size-4 shrink-0 items-center justify-center rounded-sm {isActive
-            ? 'bg-immich-primary dark:bg-immich-dark-primary'
-            : 'border border-gray-300 dark:border-gray-600'}"
-        >
-          {#if isActive}
-            <svg viewBox="0 0 24 24" class="size-3 text-white dark:text-black">
-              <path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" />
-            </svg>
-          {/if}
-        </div>
-
-        <!-- Label -->
-        <span class="flex-1 truncate text-left">{tag.name}</span>
-      </button>
+      <TagFilterRow id={tag.id} name={tag.name} checked={selectedIds.includes(tag.id)} onToggle={toggleTag} />
     {/each}
 
     <!-- Show more link -->
