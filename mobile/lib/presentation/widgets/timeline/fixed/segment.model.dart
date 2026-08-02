@@ -21,6 +21,7 @@ import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/current_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
+import 'package:immich_mobile/providers/timeline/highlighted_asset.provider.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 
@@ -273,18 +274,36 @@ class _AssetTileWidget extends ConsumerWidget {
     final showStorageIndicator = ref.watch(timelineArgsProvider.select((args) => args.showStorageIndicator));
     final isReadonlyModeEnabled = ref.watch(readonlyModeProvider);
     final showStackIndicator = ref.watch(timelineServiceProvider).origin != TimelineOrigin.trash;
+    // `select` so only the matching tile's selector flips when the highlight moves.
+    final isHighlighted = ref.watch(timelineHighlightedAssetProvider.select((a) => isHighlightedAsset(a, asset)));
 
     return RepaintBoundary(
       child: GestureDetector(
         onTap: () => lockSelection ? null : _handleOnTap(context, ref, assetIndex, asset, heroOffset, remoteSize),
         onLongPress: () => lockSelection || isReadonlyModeEnabled ? null : _handleOnLongPress(ref, asset),
-        child: ThumbnailTile(
-          asset,
-          remoteSize: remoteSize,
-          lockSelection: lockSelection,
-          showStorageIndicator: showStorageIndicator,
-          showStackIndicator: showStackIndicator,
-          heroOffset: heroOffset,
+        child: Stack(
+          fit: StackFit.passthrough,
+          children: [
+            ThumbnailTile(
+              asset,
+              remoteSize: remoteSize,
+              lockSelection: lockSelection,
+              showStorageIndicator: showStorageIndicator,
+              showStackIndicator: showStackIndicator,
+              heroOffset: heroOffset,
+            ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  opacity: isHighlighted ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(border: Border.all(color: context.colorScheme.primary, width: 3)),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

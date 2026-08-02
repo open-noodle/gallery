@@ -1,3 +1,5 @@
+import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
+
 /// What the timeline should do this frame with a pending "view in timeline"
 /// scroll request.
 enum ScrollDrainAction {
@@ -15,6 +17,10 @@ enum ScrollDrainAction {
   /// The attempt budget is exhausted — consume the request and stop, so a stale
   /// request cannot leak into a later timeline.
   giveUp,
+
+  /// The timeline is rendering overview cards, so the target photo has no tile.
+  /// Switch the grouping to day and keep retrying until the rebuilt segments arrive.
+  switchToDayGrouping,
 }
 
 /// Decides what to do with a latched scroll-to-date request on a single frame.
@@ -30,12 +36,19 @@ ScrollDrainAction decideScrollDrain({
   required bool segmentsLoaded,
   required bool laidOut,
   required bool segmentMatched,
+  required bool isOverviewTimeline,
   required int attempts,
   required int maxAttempts,
 }) {
   if (!hasPending) return ScrollDrainAction.idle;
-  if (segmentsLoaded && laidOut && segmentMatched) return ScrollDrainAction.scroll;
+  // `scroll` stays ahead of the budget check so a request that becomes ready on the
+  // very last frame still scrolls. `!isOverviewTimeline` gates it so an overview
+  // timeline can never scroll to a year/month card — the #822 symptom.
+  if (segmentsLoaded && laidOut && segmentMatched && !isOverviewTimeline) return ScrollDrainAction.scroll;
+  // The budget sits AHEAD of the switch so a grouping write that never lands
+  // (pinned by timelineArgs, or a dateless bucket source) cannot spin forever.
   if (attempts >= maxAttempts) return ScrollDrainAction.giveUp;
+  if (isOverviewTimeline) return ScrollDrainAction.switchToDayGrouping;
   return ScrollDrainAction.retry;
 }
 
@@ -60,4 +73,45 @@ int? findMatchingSegmentIndex(List<DateTime?> segmentDates, DateTime target) {
     }
   }
   return null;
+}
+
+/// True when the timeline is rendering year/month overview cards rather than
+/// asset tiles — in which case the target photo has no tile to scroll to.
+///
+/// Deliberately derived from the segments that were actually built, NOT from
+/// `timelineGroupingProvider`. `timeline.state.dart` picks the builder from
+/// `timelineArgsProvider.groupBy ?? timelineGroupingProvider`, then overrides it
+/// to `day` when the bucket source is dateless, and a `TimelineRouteScope` can
+/// substitute a route-local grouping notifier. Reading the provider would
+/// disagree with the screen in all three cases, and a "switch to day" that
+/// changes nothing would spin until the attempt budget expired.
+bool segmentsAreOverview(List<Segment>? segments) => segments != null && segments.any((segment) => segment.isOverview);
+
+/// What to do with an in-flight scroll resolution once its async index lookup
+/// has completed.
+enum ScrollResolveOutcome {
+  /// Everything is still valid — scroll.
+  proceed,
+
+  /// A newer "view in timeline" request replaced the target mid-flight. Drop this
+  /// resolution and let the drain loop pick up the newer one.
+  abandonStale,
+
+  /// The timeline went away mid-flight. Touching the scroll controller now would
+  /// throw, so do nothing.
+  abandonUnmounted,
+}
+
+/// Decides whether a resolved scroll target is still safe to act on.
+///
+/// Unmounting dominates staleness: a dead controller must not be touched even
+/// when the target also changed.
+ScrollResolveOutcome decideScrollResolve({
+  required bool stillMounted,
+  required bool stillHasClients,
+  required bool targetUnchanged,
+}) {
+  if (!stillMounted || !stillHasClients) return ScrollResolveOutcome.abandonUnmounted;
+  if (!targetUnchanged) return ScrollResolveOutcome.abandonStale;
+  return ScrollResolveOutcome.proceed;
 }
