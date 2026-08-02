@@ -483,9 +483,28 @@
   }
 
   function openDropdown() {
+    // Focus must never downgrade an open modal to the inline dropdown.
+    // `showDropdownPanel` is false while the modal is open, so without this the
+    // next focus event would call open('dropdown') and clobber the presentation.
+    if (manager.isOpen && manager.presentation === 'modal') {
+      return;
+    }
     if (!showDropdownPanel) {
       manager.open('dropdown');
     }
+  }
+
+  function openModalOnTouch(event: PointerEvent) {
+    if (event.pointerType !== 'touch') {
+      return;
+    }
+    // preventDefault is load-bearing: it suppresses the focus this tap would
+    // otherwise produce on pointer release, so iOS never raises the soft
+    // keyboard against this inline input, which the modal is about to cover.
+    // The modal's own Command.Input autofocuses once it opens, so the keyboard
+    // still appears — just against the modal's input rather than this one.
+    event.preventDefault();
+    manager.open('modal');
   }
 
   function onKeyDown(e: KeyboardEvent) {
@@ -634,6 +653,7 @@
           placeholder={$t('cmdk_placeholder')}
           maxlength={256}
           onfocus={openDropdown}
+          onpointerdown={openModalOnTouch}
           oninput={(event) => {
             inputEditRevision++;
             syncInputCaret(event);
@@ -649,11 +669,13 @@
           }}
           class="min-w-0 flex-1 bg-transparent text-sm text-gray-800 placeholder:text-gray-500 focus:outline-none dark:text-gray-100 dark:placeholder:text-gray-300"
         />
-        <kbd
-          class="hidden shrink-0 rounded-lg border border-gray-300 bg-white px-2 py-1 font-mono text-[11px] font-semibold tracking-wide text-gray-500 sm:inline-block dark:border-immich-dark-gray dark:bg-immich-dark-bg dark:text-gray-300"
-        >
-          {hotkeyLabel}
-        </kbd>
+        {#if !mediaQueryManager.pointerCoarse}
+          <kbd
+            class="hidden shrink-0 rounded-lg border border-gray-300 bg-white px-2 py-1 font-mono text-[11px] font-semibold tracking-wide text-gray-500 sm:inline-block dark:border-immich-dark-gray dark:bg-immich-dark-bg dark:text-gray-300"
+          >
+            {hotkeyLabel}
+          </kbd>
+        {/if}
       </div>
 
       {#if showDropdownPanel}
