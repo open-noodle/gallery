@@ -56,8 +56,8 @@ run = [
 [tasks.open-api-typescript]
 run = [
   "oazapfts --optimistic --argumentStyle=object --useEnumType --allSchemas open-api/immich-openapi-specs.json packages/sdk/src/fetch-client.ts",
-  { task = "//:sdk:install" },
-  { task = "//:sdk:build" },
+  { task = ":sdk:install" },
+  { task = ":sdk:build" },
 ]
 
 [tasks.open-api-dart]
@@ -74,7 +74,7 @@ run = "bash ./bin/generate-dart-sdk.sh"
 
 [tasks.open-api]
 run = [
-  { task = "//:plugins" },
+  { task = ":plugins" },
   { task = "//server:install" },
   { task = "//server:build" },
   { task = "//server:sync-open-api" },
@@ -88,33 +88,33 @@ run = "node ./dist/bin/sync-sql.js"
 
 # TODO dev, prod, and e2e should be de-duplicated by using env but for some reason I ran into issues
 [tasks.dev]
-depends = "//:plugins"
+depends = ":plugins"
 dir = "docker"
 interactive = true
 env = { COMPOSE_BAKE = true }
 run = "docker compose -f ./docker-compose.dev.yml up --remove-orphans"
-depends_post = "//:dev-down"
+depends_post = ":dev-down"
 
 [tasks.dev-update]
-run = { task = "//:dev", args = ["--build", "-V"] }
+run = { task = ":dev", args = ["--build", "-V"] }
 
 [tasks.dev-scale]
-run = { task = "//:dev", args = ["--build", "-V", "--scale immich-server=3"] }
+run = { task = ":dev", args = ["--build", "-V", "--scale immich-server=3"] }
 
 [tasks.dev-down]
 dir = "docker"
 run = "docker compose -f ./docker-compose.dev.yml down --remove-orphans"
 
 [tasks.prod]
-depends = "//:plugins"
+depends = ":plugins"
 dir = "docker"
 interactive = true
 env = { COMPOSE_BAKE = true }
 run = "docker compose -f ./docker-compose.prod.yml up --build --remove-orphans"
-depends_post = "//:prod-down"
+depends_post = ":prod-down"
 
 [tasks.prod-scale]
-run = { task = "//:prod", args = [
+run = { task = ":prod", args = [
   "--build",
   "-V",
   "--scale immich-server=3",
@@ -126,23 +126,23 @@ dir = "docker"
 run = "docker compose -f ./docker-compose.prod.yml down --remove-orphans"
 
 [tasks.e2e]
-depends = "//:plugins"
+depends = ":plugins"
 dir = "e2e"
 interactive = true
 env = { COMPOSE_BAKE = true }
 run = "docker compose -f ./docker-compose.yml up --remove-orphans"
-depends_post = "//:e2e-down"
+depends_post = ":e2e-down"
 
 [tasks.e2e-dev]
-depends = "//:plugins"
+depends = ":plugins"
 dir = "e2e"
 interactive = true
 env = { COMPOSE_BAKE = true }
 run = "docker compose -f ./docker-compose.dev.yml up --remove-orphans"
-depends_post = "//:e2e-dev-down"
+depends_post = ":e2e-dev-down"
 
 [tasks.e2e-update]
-run = { task = "//:e2e", args = ["--build", '-V'] }
+run = { task = ":e2e", args = ["--build", '-V'] }
 
 [tasks.e2e-down]
 dir = "e2e"
@@ -176,5 +176,5 @@ run = [
   "find . -name '.svelte-kit' -type d -prune -exec rm -rf '{}' +",
   "find . -name 'coverage' -type d -prune -exec rm -rf '{}' +",
   "find . -name '.pnpm-store' -type d -prune -exec rm -rf '{}' +",
-  { task = "//:*-down" },
+  { task = ":*-down" },
 ]

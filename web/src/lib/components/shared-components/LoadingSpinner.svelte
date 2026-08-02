@@ -23,7 +23,7 @@
 <div>
   <img
     role="status"
-    class={[sizeClasses[size], className].filter(Boolean).join(' ')}
+    class={['animate-spin', sizeClasses[size], className].filter(Boolean).join(' ')}
     {src}
     alt={$t('loading')}
     data-testid="loading-spinner"
