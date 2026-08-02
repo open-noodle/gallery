@@ -8,6 +8,7 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
 import 'package:immich_mobile/domain/models/timeline_zoom_anchor.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
@@ -20,11 +21,11 @@ import 'package:immich_mobile/infrastructure/repositories/settings.repository.da
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
-import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart' as infra;
 import 'package:immich_mobile/providers/photos_filter/timeline_query.provider.dart';
 import 'package:immich_mobile/providers/timeline/temporal_scope.provider.dart';
+import 'package:immich_mobile/providers/timeline/timeline_grouping.provider.dart';
 import 'package:immich_mobile/providers/timeline/zoom_anchor.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -77,7 +78,6 @@ void main() {
   });
 
   testWidgets('Photos year card tap switches to months and scrolls to the tapped year', (tester) async {
-    await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.year);
     final factory = _factoryForServices(
       yearService: _service([
         TimeBucket(date: DateTime(2026), assetCount: 8),
@@ -97,20 +97,21 @@ void main() {
 
     await _pumpPhotosTimeline(tester, factory);
     final ref = ProviderScope.containerOf(tester.element(find.byType(Timeline)));
+    await ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.years);
+    await tester.pumpAndSettle();
 
     await tester.tap(find.bySemanticsLabel('2025, 8 photos, show months'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
 
-    expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+    expect(ref.read(timelineOverviewModeProvider), TimelineOverviewMode.months);
     expect(ref.read(timelineTemporalScopeProvider), const TimelineTemporalScope.none());
     expect(ref.read(timelineZoomAnchorProvider), const TimelineZoomAnchor.none());
     expect(_scrollPixels(tester), greaterThan(0));
   });
 
   testWidgets('Photos month card tap switches to detailed mode and scrolls to the tapped month', (tester) async {
-    await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.month);
     final factory = _factoryForServices(
       yearService: _service([TimeBucket(date: DateTime(2025), assetCount: 9)]),
       monthService: _service([
@@ -130,13 +131,15 @@ void main() {
 
     await _pumpPhotosTimeline(tester, factory);
     final ref = ProviderScope.containerOf(tester.element(find.byType(Timeline)));
+    await ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.months);
+    await tester.pumpAndSettle();
 
     await tester.tap(find.bySemanticsLabel('March 2025, 9 photos, show days'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
 
-    expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
+    expect(ref.read(timelineOverviewModeProvider), TimelineOverviewMode.all);
     expect(ref.read(timelineTemporalScopeProvider), const TimelineTemporalScope.none());
     expect(ref.read(timelineZoomAnchorProvider), const TimelineZoomAnchor.none());
     expect(_scrollPixels(tester), greaterThan(0));
@@ -148,7 +151,6 @@ void main() {
   // The mock factory honours the temporal scope like the real DB query, so if
   // the year drilldown ever scopes the query again this test fails.
   testWidgets('Photos year card tap keeps months from other years reachable', (tester) async {
-    await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.year);
     final factory = _scopeAwareFactory(
       yearBuckets: [
         TimeBucket(date: DateTime(2026), assetCount: 8),
@@ -165,13 +167,16 @@ void main() {
     addTearDown(factory.disposeServices);
 
     await _pumpPhotosTimeline(tester, factory);
+    final ref = ProviderScope.containerOf(tester.element(find.byType(Timeline)));
+    await ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.years);
+    await tester.pumpAndSettle();
 
     await tester.tap(find.bySemanticsLabel('2025, 8 photos, show months'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
 
-    expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+    expect(ref.read(timelineOverviewModeProvider), TimelineOverviewMode.months);
     expect(find.bySemanticsLabel('December 2024, 8 photos, show days'), findsOneWidget);
     expect(find.bySemanticsLabel('June 2025, 8 photos, show days'), findsOneWidget);
     expect(find.bySemanticsLabel('February 2026, 8 photos, show days'), findsOneWidget);
@@ -180,7 +185,6 @@ void main() {
   // Regression for Hagen bug 2: switching grouping via the selector must keep the
   // current position instead of jumping to the most recent content at the top.
   testWidgets('Switching All -> Months keeps the scrolled position instead of resetting to the top', (tester) async {
-    await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.day);
     final factory = _factoryForServices(
       yearService: _service([
         TimeBucket(date: DateTime(2026), assetCount: 30),
@@ -217,13 +221,13 @@ void main() {
     final scrolledOffset = _scrollPixels(tester);
     expect(scrolledOffset, greaterThan(0));
 
-    // Switch grouping the same way the selector does.
-    await ref.read(settingsProvider).write(.timelineGroupAssetsBy, GroupAssetsBy.month);
+    // Switch the zoom level the same way the selector does.
+    await ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.months);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
 
-    expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+    expect(ref.read(timelineOverviewModeProvider), TimelineOverviewMode.months);
     // Position preserved: not reset to the most recent content at the top.
     expect(_scrollPixels(tester), greaterThan(0));
     // Landed on the old content: the previously visible month is rendered while
@@ -238,8 +242,6 @@ void main() {
   testWidgets('Round-trip All → Months → All without card tap returns to the same day (not 1st of month)', (
     tester,
   ) async {
-    await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.day);
-
     // Two day buckets for June: the 9th is the most-recent (top), the 1st is
     // further down. We put older content below so there is room to scroll.
     final factory = _factoryForServices(
@@ -264,20 +266,20 @@ void main() {
 
     // At this point the day timeline is loaded at the top — Jun 9 is visible.
     // Step 1: switch to Months (no card tap — simulates the grouping selector).
-    await ref.read(settingsProvider).write(.timelineGroupAssetsBy, GroupAssetsBy.month);
+    await ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.months);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
 
-    expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+    expect(ref.read(timelineOverviewModeProvider), TimelineOverviewMode.months);
 
     // Step 2: switch back to All without tapping any card.
-    await ref.read(settingsProvider).write(.timelineGroupAssetsBy, GroupAssetsBy.day);
+    await ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.all);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
 
-    expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
+    expect(ref.read(timelineOverviewModeProvider), TimelineOverviewMode.all);
 
     // The timeline must have resolved back to the Jun 9 segment (not Jun 1).
     // Both segments are in the day timeline, so the anchor date drives which one
@@ -295,8 +297,6 @@ void main() {
   // scrolling to maxScrollExtent actually moves the scroll position.
   // Each overview card is 144 + 12 vertical padding (6 top + 6 bottom) = 156px; 5 cards = 780px > 600px.
   testWidgets('Round-trip with scroll in month view uses the scrolled-to month', (tester) async {
-    await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.day);
-
     final factory = _factoryForServices(
       yearService: _service([
         TimeBucket(date: DateTime(2026), assetCount: 9),
@@ -323,7 +323,7 @@ void main() {
     final ref = ProviderScope.containerOf(tester.element(find.byType(Timeline)));
 
     // Switch to Months — Jun 9 remembered.
-    await ref.read(settingsProvider).write(.timelineGroupAssetsBy, GroupAssetsBy.month);
+    await ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.months);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
@@ -339,12 +339,12 @@ void main() {
     // Switch back to All. The top-visible month is no longer June (user scrolled
     // past it), so the remembered Jun 9 is outside the top bucket's period and
     // must be dropped in favour of the bucket's truncated date.
-    await ref.read(settingsProvider).write(.timelineGroupAssetsBy, GroupAssetsBy.day);
+    await ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.all);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
 
-    expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
+    expect(ref.read(timelineOverviewModeProvider), TimelineOverviewMode.all);
     // lastPositionDate was overwritten with the top-visible month's bucket date
     // (NOT Jun 9, since the user scrolled away from June). A negative assertion is used
     // deliberately: the exact top-visible month depends on viewport/card-extent layout math,
@@ -367,8 +367,8 @@ void main() {
       groupBy: any(named: 'groupBy'),
       temporalScope: any(named: 'temporalScope'),
     ),
-  ).thenAnswer((_) {
-    final groupBy = SettingsRepository.instance.appConfig.timeline.groupAssetsBy;
+  ).thenAnswer((invocation) {
+    final groupBy = invocation.namedArguments[const Symbol('groupBy')] as GroupAssetsBy? ?? GroupAssetsBy.day;
     return switch (groupBy) {
       GroupAssetsBy.year => yearService,
       GroupAssetsBy.month => monthService,
@@ -415,7 +415,7 @@ void main() {
     final scope =
         invocation.namedArguments[const Symbol('temporalScope')] as TimelineTemporalScope? ??
         const TimelineTemporalScope.none();
-    final groupBy = SettingsRepository.instance.appConfig.timeline.groupAssetsBy;
+    final groupBy = invocation.namedArguments[const Symbol('groupBy')] as GroupAssetsBy? ?? GroupAssetsBy.day;
     return switch (groupBy) {
       GroupAssetsBy.year => build(yearBuckets),
       GroupAssetsBy.month => build(_filterBucketsByScope(monthBuckets, scope)),
@@ -490,9 +490,9 @@ Future<void> _pumpPhotosTimeline(
         child: const MaterialApp(
           home: TimelineRouteScope(
             timelineServiceBuilder: buildPhotosTimelineRouteService,
-            // These tests pin the MAIN Photos page contract: grouping follows and
-            // writes the persisted setting.
-            persistGrouping: true,
+            // These tests pin the MAIN Photos page contract: the app-level grouping,
+            // shared across the page rather than scoped per route.
+            sharedGrouping: true,
             child: Timeline(appBar: null, bottomSheet: null, withScrubber: false),
           ),
         ),

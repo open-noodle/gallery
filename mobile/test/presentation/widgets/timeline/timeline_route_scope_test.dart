@@ -8,6 +8,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
 import 'package:immich_mobile/domain/models/timeline_zoom_anchor.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
@@ -174,10 +175,12 @@ void main() {
                       key: const Key('left-drilldown'),
                       onPressed: () {
                         final handler = ref.read(timelineOverviewDrilldownProvider);
-                        unawaited(handler?.call(TimeBucket(date: DateTime(2025), assetCount: 4), GroupAssetsBy.year));
+                        unawaited(
+                          handler?.call(TimeBucket(date: DateTime(2025), assetCount: 4), TimelineOverviewMode.years),
+                        );
                       },
                       child: Text(
-                        'left:${ref.watch(timelineTemporalScopeProvider).kind.name}:${_anchorLabel(ref.watch(timelineZoomAnchorProvider))}:${ref.watch(timelineGroupingProvider).name}',
+                        'left:${ref.watch(timelineTemporalScopeProvider).kind.name}:${_anchorLabel(ref.watch(timelineZoomAnchorProvider))}:${ref.watch(timelineOverviewModeProvider).name}',
                       ),
                     ),
                   ),
@@ -187,7 +190,7 @@ void main() {
                 child: TimelineRouteScope(
                   child: Consumer(
                     builder: (context, ref, child) => Text(
-                      'right:${ref.watch(timelineTemporalScopeProvider).kind.name}:${_anchorLabel(ref.watch(timelineZoomAnchorProvider))}:${ref.watch(timelineGroupingProvider).name}',
+                      'right:${ref.watch(timelineTemporalScopeProvider).kind.name}:${_anchorLabel(ref.watch(timelineZoomAnchorProvider))}:${ref.watch(timelineOverviewModeProvider).name}',
                       key: const Key('right-drilldown'),
                     ),
                   ),
@@ -199,20 +202,20 @@ void main() {
       ),
     );
 
-    expect(find.text('left:none:none:day'), findsOneWidget);
-    expect(find.text('right:none:none:day'), findsOneWidget);
+    expect(find.text('left:none:none:all'), findsOneWidget);
+    expect(find.text('right:none:none:all'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('left-drilldown')));
     await tester.pumpAndSettle();
 
-    expect(find.text('left:none:year:2025:month'), findsOneWidget);
-    expect(find.text('right:none:none:day'), findsOneWidget);
-    // Drilldown inside a route changes only the route-local grouping; the persisted
+    expect(find.text('left:none:year:2025:months'), findsOneWidget);
+    expect(find.text('right:none:none:all'), findsOneWidget);
+    // Drilldown inside a route changes only the route-local mode; the persisted
     // setting is never written.
     expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
   });
 
-  testWidgets('route grouping opens at All regardless of the persisted setting', (tester) async {
+  testWidgets('route mode opens at All regardless of the persisted setting', (tester) async {
     await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.month);
 
     await tester.pumpWidget(
@@ -220,18 +223,18 @@ void main() {
         child: MaterialApp(
           home: TimelineRouteScope(
             child: Consumer(
-              builder: (context, ref, child) => Text('grouping:${ref.watch(timelineGroupingProvider).name}'),
+              builder: (context, ref, child) => Text('grouping:${ref.watch(timelineOverviewModeProvider).name}'),
             ),
           ),
         ),
       ),
     );
 
-    expect(find.text('grouping:day'), findsOneWidget);
+    expect(find.text('grouping:all'), findsOneWidget);
     expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
   });
 
-  testWidgets('grouping changes stay local to the invoking route', (tester) async {
+  testWidgets('mode changes stay local to the invoking route', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
@@ -241,15 +244,15 @@ void main() {
                 child: Consumer(
                   builder: (context, ref, child) => TextButton(
                     key: const Key('left-grouping'),
-                    onPressed: () => unawaited(ref.read(timelineGroupingProvider.notifier).set(GroupAssetsBy.month)),
-                    child: Text('left:${ref.watch(timelineGroupingProvider).name}'),
+                    onPressed: () => unawaited(ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.months)),
+                    child: Text('left:${ref.watch(timelineOverviewModeProvider).name}'),
                   ),
                 ),
               ),
               TimelineRouteScope(
                 child: Consumer(
                   builder: (context, ref, child) =>
-                      Text('right:${ref.watch(timelineGroupingProvider).name}', key: const Key('right-grouping')),
+                      Text('right:${ref.watch(timelineOverviewModeProvider).name}', key: const Key('right-grouping')),
                 ),
               ),
             ],
@@ -258,45 +261,72 @@ void main() {
       ),
     );
 
-    expect(find.text('left:day'), findsOneWidget);
-    expect(find.text('right:day'), findsOneWidget);
+    expect(find.text('left:all'), findsOneWidget);
+    expect(find.text('right:all'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('left-grouping')));
     await tester.pump();
 
-    expect(find.text('left:month'), findsOneWidget);
-    expect(find.text('right:day'), findsOneWidget);
+    expect(find.text('left:months'), findsOneWidget);
+    expect(find.text('right:all'), findsOneWidget);
     expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
   });
 
-  testWidgets('persistGrouping: true follows and writes the persisted setting', (tester) async {
+  testWidgets('sharedGrouping: true opens at All and never writes the Group by setting', (tester) async {
     await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.month);
 
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
           home: TimelineRouteScope(
-            persistGrouping: true,
+            sharedGrouping: true,
             child: Consumer(
               builder: (context, ref, child) =>
-                  Text('grouping:${ref.watch(timelineGroupingProvider).name}', key: const Key('persist-probe')),
+                  Text('grouping:${ref.watch(timelineOverviewModeProvider).name}', key: const Key('shared-probe')),
             ),
           ),
         ),
       ),
     );
 
-    expect(find.text('grouping:month'), findsOneWidget);
+    expect(find.text('grouping:all'), findsOneWidget);
 
-    final ref = ProviderScope.containerOf(tester.element(find.byKey(const Key('persist-probe'))));
-    await tester.runAsync(() => ref.read(timelineGroupingProvider.notifier).set(GroupAssetsBy.year));
+    final ref = ProviderScope.containerOf(tester.element(find.byKey(const Key('shared-probe'))));
+    await tester.runAsync(() => ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.years));
     await tester.pump();
 
-    expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.year);
-    expect(find.text('grouping:year'), findsOneWidget);
+    expect(find.text('grouping:years'), findsOneWidget);
+    expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
   });
 
-  testWidgets('timelineServiceProvider rebuilds with the route-local grouping', (tester) async {
+  testWidgets('route service buckets by the Group by setting while the selector shows All', (tester) async {
+    await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.month);
+    final groupings = <GroupAssetsBy>[];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: TimelineRouteScope(
+            timelineServiceBuilder: (ref, temporalScope, groupBy) {
+              groupings.add(groupBy);
+              return _emptyService(TimelineOrigin.main);
+            },
+            child: Consumer(
+              builder: (context, ref, child) {
+                ref.watch(timelineServiceProvider);
+                return Text('grouping:${ref.watch(timelineOverviewModeProvider).name}');
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('grouping:all'), findsOneWidget);
+    expect(groupings, [GroupAssetsBy.month]);
+  });
+
+  testWidgets('timelineServiceProvider rebuilds with the route-local mode', (tester) async {
     final groupings = <GroupAssetsBy>[];
 
     await tester.pumpWidget(
@@ -312,8 +342,8 @@ void main() {
                 ref.watch(timelineServiceProvider);
                 return TextButton(
                   key: const Key('grouping-service'),
-                  onPressed: () => unawaited(ref.read(timelineGroupingProvider.notifier).set(GroupAssetsBy.month)),
-                  child: Text('grouping:${ref.watch(timelineGroupingProvider).name}'),
+                  onPressed: () => unawaited(ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.months)),
+                  child: Text('grouping:${ref.watch(timelineOverviewModeProvider).name}'),
                 );
               },
             ),
@@ -341,11 +371,11 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('timeline-grouping-month')));
+    await tester.tap(find.byKey(const Key('timeline-grouping-months')));
     await tester.pump();
 
     final ref = ProviderScope.containerOf(tester.element(find.byType(TimelineGroupingSelector)));
-    expect(ref.read(timelineGroupingProvider), GroupAssetsBy.month);
+    expect(ref.read(timelineOverviewModeProvider), TimelineOverviewMode.months);
     expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
   });
 

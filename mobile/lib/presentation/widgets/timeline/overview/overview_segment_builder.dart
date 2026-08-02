@@ -1,15 +1,20 @@
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/overview/overview_card.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/overview/overview_segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/segment_builder.dart';
 
 class TimelineOverviewSegmentBuilder extends SegmentBuilder {
-  const TimelineOverviewSegmentBuilder({required super.buckets, required super.groupBy});
+  const TimelineOverviewSegmentBuilder({required super.buckets, required this.mode});
+
+  /// The zoom level these cards represent. The inherited [SegmentBuilder.groupBy] is
+  /// unused for overview segments and stays at its upstream default.
+  final TimelineOverviewMode mode;
 
   List<Segment> generate() {
-    if (groupBy != GroupAssetsBy.year && groupBy != GroupAssetsBy.month) {
-      throw ArgumentError.value(groupBy, 'groupBy', 'Overview segments support only year and month grouping');
+    if (mode == TimelineOverviewMode.all) {
+      throw ArgumentError.value(mode, 'mode', 'Overview segments support only years and months');
     }
 
     final segments = <Segment>[];
@@ -27,8 +32,8 @@ class TimelineOverviewSegmentBuilder extends SegmentBuilder {
           endOffset: endOffset,
           firstAssetIndex: assetIndex,
           bucket: bucket,
-          groupBy: groupBy,
-          header: groupBy == GroupAssetsBy.year ? HeaderType.year : HeaderType.month,
+          mode: mode,
+          header: mode == TimelineOverviewMode.years ? HeaderType.year : HeaderType.month,
         ),
       );
 
