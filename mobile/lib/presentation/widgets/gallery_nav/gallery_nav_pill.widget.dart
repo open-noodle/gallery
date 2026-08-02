@@ -50,7 +50,6 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
     if (!mounted) return;
     final pillBox = _pillKey.currentContext?.findRenderObject() as RenderBox?;
     if (pillBox == null) return;
-    final pillOrigin = pillBox.localToGlobal(Offset.zero);
 
     final rects = <GalleryTabEnum, Rect>{};
     for (final entry in _keys.entries) {
@@ -58,8 +57,11 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
       if (ctx == null) continue;
       final box = ctx.findRenderObject() as RenderBox?;
       if (box == null) continue;
-      final origin = box.localToGlobal(Offset.zero) - pillOrigin;
-      rects[entry.key] = origin & box.size;
+      // Project through the full transform rather than diffing origins: the
+      // segments sit inside a `FittedBox` that may scale them down (#909), so
+      // their raw `size` is the pre-scale size and would leave the underlay
+      // wider than the segment it highlights.
+      rects[entry.key] = MatrixUtils.transformRect(box.getTransformTo(pillBox), Offset.zero & box.size);
     }
     if (rects.length == _keys.length && !_rectsEqual(rects, _segmentRects)) {
       setState(() => _segmentRects = rects);
@@ -151,28 +153,36 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: _edgeInset),
-                child: Row(
-                  // Google-Photos-style: cluster the tabs (content width) instead of
-                  // spreading them edge-to-edge; the pill sizes to this Row.
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final tab in GalleryTabEnum.values)
-                      KeyedSubtree(
-                        key: _keys[tab],
-                        child: Opacity(
-                          opacity: widget.disabledTabs.contains(tab) ? 0.3 : 1.0,
-                          child: IgnorePointer(
-                            ignoring: widget.disabledTabs.contains(tab),
-                            child: GalleryNavSegment(
-                              key: Key('gallery-nav-segment-${tab.name}'),
-                              tab: tab,
-                              active: widget.activeTab == tab,
-                              onTap: () => widget.onTabTap(tab),
+                // Long localized labels can make the tab row wider than the space
+                // the pill was given, which used to clip the trailing tab out of
+                // the pill entirely (#909). Scale the cluster down to fit rather
+                // than truncating labels; `scaleDown` never enlarges, so the pill
+                // still sizes to its content whenever there is room.
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    // Google-Photos-style: cluster the tabs (content width) instead of
+                    // spreading them edge-to-edge; the pill sizes to this Row.
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final tab in GalleryTabEnum.values)
+                        KeyedSubtree(
+                          key: _keys[tab],
+                          child: Opacity(
+                            opacity: widget.disabledTabs.contains(tab) ? 0.3 : 1.0,
+                            child: IgnorePointer(
+                              ignoring: widget.disabledTabs.contains(tab),
+                              child: GalleryNavSegment(
+                                key: Key('gallery-nav-segment-${tab.name}'),
+                                tab: tab,
+                                active: widget.activeTab == tab,
+                                onTap: () => widget.onTabTap(tab),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],

@@ -122,6 +122,63 @@ void main() {
     expect((underlayAfterLibrary.width - librarySeg.width).abs(), lessThan(0.5));
   });
 
+  // #909: long localized labels (e.g. French "Bibliothèque") made the tab row
+  // wider than the pill, so the trailing tab was clipped away and unreachable.
+  // `Center` matters: a bare `SizedBox(width:)` under the tight full-screen
+  // constraints of `pumpConsumerWidget` is a no-op, so the pill would never
+  // actually be narrowed.
+  Widget constrained(
+    double width, {
+    GalleryTabEnum active = GalleryTabEnum.photos,
+    void Function(GalleryTabEnum)? onTap,
+  }) {
+    return Center(
+      child: SizedBox(
+        width: width,
+        child: GalleryNavPill(activeTab: active, onTabTap: onTap ?? (_) {}),
+      ),
+    );
+  }
+
+  testWidgets('constrained width: every segment stays inside the pill (#909)', (tester) async {
+    await tester.pumpConsumerWidget(constrained(300));
+    await tester.pumpAndSettle();
+
+    final pill = tester.getRect(find.byType(GalleryNavPill));
+    for (final tab in GalleryTabEnum.values) {
+      final segment = tester.getRect(find.byKey(Key('gallery-nav-segment-${tab.name}')));
+      expect(segment.left, greaterThanOrEqualTo(pill.left - 0.5), reason: '${tab.name} overflows the pill on the left');
+      expect(
+        segment.right,
+        lessThanOrEqualTo(pill.right + 0.5),
+        reason: '${tab.name} overflows the pill on the right and is clipped away',
+      );
+    }
+  });
+
+  testWidgets('constrained width: every tab is still tappable (#909)', (tester) async {
+    final tapped = <GalleryTabEnum>[];
+    await tester.pumpConsumerWidget(constrained(300, onTap: tapped.add));
+    await tester.pumpAndSettle();
+
+    for (final tab in GalleryTabEnum.values) {
+      await tester.tap(find.byKey(Key('gallery-nav-segment-${tab.name}')));
+      await tester.pumpAndSettle();
+    }
+
+    expect(tapped, GalleryTabEnum.values);
+  });
+
+  testWidgets('constrained width: underlay still lines up with the active segment (#909)', (tester) async {
+    await tester.pumpConsumerWidget(constrained(300, active: GalleryTabEnum.albums));
+    await tester.pumpAndSettle();
+
+    final segment = tester.getRect(find.byKey(const Key('gallery-nav-segment-albums')));
+    final underlay = tester.getRect(find.byKey(const Key('gallery-nav-underlay')));
+    expect((underlay.left - segment.left).abs(), lessThan(0.5));
+    expect((underlay.width - segment.width).abs(), lessThan(0.5));
+  });
+
   testWidgets('disabledTabs: dims Albums+Library to 0.3 opacity, blocks taps', (tester) async {
     int tapped = -1;
     await tester.pumpConsumerWidget(
