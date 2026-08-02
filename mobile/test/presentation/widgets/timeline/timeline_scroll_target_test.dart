@@ -140,6 +140,71 @@ void main() {
       isNull,
     );
   });
+
+  group('assetRowOffset', () {
+    // startOffset 1000, headerExtent 40, spacing 2 -> gridOffset 1042
+    // tileHeight 100, spacing 2 -> mainAxisExtend 102
+    FixedSegment segment({int firstAssetIndex = 500, int assetCount = 30, int columnCount = 4}) => FixedSegment(
+      firstIndex: 10,
+      lastIndex: 20,
+      startOffset: 1000,
+      endOffset: 2000,
+      firstAssetIndex: firstAssetIndex,
+      bucket: TimeBucket(date: DateTime(2026, 4, 3), assetCount: assetCount),
+      tileHeight: 100,
+      columnCount: columnCount,
+      headerExtent: 40,
+      spacing: 2,
+      header: HeaderType.day,
+    );
+
+    double? offset(FixedSegment s, int index, {int columnCount = 4}) =>
+        assetRowOffset(segment: s, assetIndexInTimeline: index, columnCount: columnCount);
+
+    test('the first asset of the segment sits on the first grid row', () {
+      expect(offset(segment(), 500), 1042);
+    });
+
+    test('an asset within the first row still sits on the first grid row', () {
+      expect(offset(segment(), 503), 1042);
+    });
+
+    test('the first asset of the second row advances by one row extent', () {
+      expect(offset(segment(), 504), 1042 + 102);
+    });
+
+    test('the last asset resolves to its own row', () {
+      // 30 assets, 4 per row -> asset 29 is on row 7 (0-indexed).
+      expect(offset(segment(), 529), 1042 + (102 * 7));
+    });
+
+    test('a columnCount of 1 puts every asset on its own row', () {
+      expect(offset(segment(columnCount: 1), 503, columnCount: 1), 1042 + (102 * 3));
+    });
+
+    test('a non-zero firstAssetIndex is subtracted before the row maths', () {
+      // Same in-segment position as `offset(segment(), 504)` above, different base.
+      expect(offset(segment(firstAssetIndex: 0), 4), 1042 + 102);
+    });
+
+    test('an index below firstAssetIndex returns null', () {
+      expect(offset(segment(), 499), isNull);
+    });
+
+    test('an index at or past the end of the segment returns null', () {
+      expect(offset(segment(), 530), isNull);
+      expect(offset(segment(), 999), isNull);
+    });
+
+    test('an empty segment returns null for every index', () {
+      expect(offset(segment(assetCount: 0), 500), isNull);
+    });
+
+    test('a zero or negative columnCount returns null instead of dividing by zero', () {
+      expect(offset(segment(), 504, columnCount: 0), isNull);
+      expect(offset(segment(), 504, columnCount: -4), isNull);
+    });
+  });
 }
 
 FixedSegment _segment(DateTime date, double startOffset, double endOffset) {
