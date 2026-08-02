@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
@@ -36,30 +37,18 @@ void main() {
     await db.close();
   });
 
-  testWidgets('renders grouping choices without none', (tester) async {
+  testWidgets('offers only the month + day and month choices', (tester) async {
     await tester.pumpConsumerWidget(const GroupSettings());
     await tester.pumpAndSettle();
 
-    expect(find.text('year'.tr()), findsOneWidget);
-    expect(find.text('month'.tr()), findsOneWidget);
     expect(find.text('asset_list_layout_settings_group_by_month_day'.tr()), findsOneWidget);
+    expect(find.text('month'.tr()), findsOneWidget);
+    expect(find.text('year'.tr()), findsNothing);
     expect(find.text('asset_list_layout_settings_group_automatically'.tr()), findsNothing);
     expect(find.text('none'.tr()), findsNothing);
   });
 
-  testWidgets('selecting year persists selected grouping', (tester) async {
-    await tester.pumpConsumerWidget(const GroupSettings());
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('year'.tr()));
-    await tester.pumpAndSettle();
-
-    expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.year);
-  });
-
-  testWidgets('selecting month from year persists selected grouping', (tester) async {
-    await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.year);
-
+  testWidgets('selecting month persists selected grouping', (tester) async {
     await tester.pumpConsumerWidget(const GroupSettings());
     await tester.pumpAndSettle();
 
@@ -68,4 +57,32 @@ void main() {
 
     expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
   });
+
+  testWidgets('selecting month + day from month persists selected grouping', (tester) async {
+    await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.month);
+
+    await tester.pumpConsumerWidget(const GroupSettings());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('asset_list_layout_settings_group_by_month_day'.tr()));
+    await tester.pumpAndSettle();
+
+    expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
+  });
+
+  testWidgets('a persisted year grouping shows month + day as the selected choice', (tester) async {
+    await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.year);
+
+    await tester.pumpConsumerWidget(const GroupSettings());
+    await tester.pumpAndSettle();
+
+    final radioGroup = tester.widget<RadioGroup<GroupAssetsBy>>(find.byType(RadioGroup<GroupAssetsBy>));
+    expect(radioGroup.groupValue, GroupAssetsBy.day);
+  });
+
+  // L-3 ("a stored year value falls back to Month + day selected") is not added here: the test
+  // above already covers it end to end. `SettingsRadioListTile.groupBy` is the very same value
+  // `RadioGroup.groupValue` reads one line later inside the widget's own build() — any bug that
+  // breaks one breaks the other identically, so asserting via the inner widget too is a duplicate,
+  // not a distinct scenario. Do not re-add it.
 }

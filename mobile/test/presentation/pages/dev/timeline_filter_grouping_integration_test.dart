@@ -21,6 +21,7 @@ import 'package:immich_mobile/domain/models/search_result.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/domain/services/search.service.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
@@ -35,13 +36,14 @@ import 'package:immich_mobile/presentation/widgets/timeline/overview/overview_se
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/search.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart' as infra;
 import 'package:immich_mobile/providers/photos_filter/filter_count.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter_search.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/timeline_query.provider.dart';
+import 'package:immich_mobile/providers/timeline/temporal_scope.provider.dart';
+import 'package:immich_mobile/providers/timeline/timeline_grouping.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -99,6 +101,18 @@ ProviderContainer _makeContainer({required SearchService search, required Drift 
       // Override timelineArgsProvider so timelineSegmentProvider (autoDispose)
       // can be read without a widget tree.
       timelineArgsProvider.overrideWith((_) => const TimelineArgs(maxWidth: 375, maxHeight: 812, columnCount: 3)),
+      // Mirrors the Photos page's TimelineRouteScope wiring: the service is rebuilt from the
+      // temporal scope and the bucket granularity (the zoom level, or the persisted
+      // "Group by" setting while the selector is on All).
+      timelineServiceProvider.overrideWith((ref) {
+        final service = buildPhotosTimelineRouteService(
+          ref,
+          ref.watch(timelineTemporalScopeProvider),
+          ref.watch(timelineGroupingSpecProvider).groupBy,
+        );
+        ref.onDispose(service.dispose);
+        return service;
+      }),
     ],
   );
 }
@@ -141,13 +155,12 @@ void main() {
     final assets = _assets();
     when(() => search.search(any(), 1)).thenAnswer((_) async => SearchResult(assets: assets, nextPage: null));
 
-    await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.month);
-
     final container = _makeContainer(search: search, db: db);
     addTearDown(container.dispose);
 
     // Set a non-smart, non-empty filter (notInAlbum=true → no context → non-smart).
     container.read(photosFilterProvider.notifier).setNotInAlbum(true);
+    await container.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.months);
 
     // Keep `photosFilterSearchProvider` (autoDispose) alive for the duration of
     // this test by subscribing a listener.  Without a listener the autoDispose
@@ -158,7 +171,7 @@ void main() {
 
     // Read the photos timeline query provider — this builds the search-backed
     // TimelineService backed by the REAL TimelineFactory / DriftTimelineRepository.
-    final svc = container.read(photosTimelineQueryProvider);
+    final svc = container.read(timelineServiceProvider);
     expect(svc.origin, TimelineOrigin.search);
 
     // Wait for the page-1 search load to settle deterministically.
@@ -186,16 +199,7 @@ void main() {
     expect(countSum, assets.length, reason: 'No assets should be dropped during month-grouping');
 
     // Verify the segment provider too: TimelineOverviewSegments, not FixedSegments.
-    // Override timelineServiceProvider in a child scope to point at the real svc
-    // (timelineSegmentProvider depends on timelineServiceProvider).
-    final routeScope = ProviderContainer(
-      parent: container,
-      overrides: [timelineServiceProvider.overrideWithValue(svc)],
-    );
-    addTearDown(routeScope.dispose);
-
-    final segStream = routeScope.read(timelineSegmentProvider.future);
-    final segments = await segStream;
+    final segments = await container.read(timelineSegmentProvider.future);
 
     expect(segments, everyElement(isA<TimelineOverviewSegment>()));
     expect(segments.length, 2, reason: 'One overview card per month');
@@ -211,12 +215,10 @@ void main() {
   // month → day:  TimeBuckets (still dated) grouped at day granularity.
   // month → year: TimeBuckets grouped at year granularity (1 bucket).
   // ---------------------------------------------------------------------------
-  test('Changing groupAssetsBy while filter is active rebuilds service buckets at new granularity', () async {
+  test('Changing the grouping while a filter is active rebuilds service buckets at new granularity', () async {
     final search = _MockSearch();
     final assets = _assets();
     when(() => search.search(any(), 1)).thenAnswer((_) async => SearchResult(assets: assets, nextPage: null));
-
-    await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.month);
 
     final container = _makeContainer(search: search, db: db);
     addTearDown(container.dispose);
@@ -227,28 +229,19 @@ void main() {
     final sub = container.listen(photosFilterSearchProvider, (_, __) {});
     addTearDown(sub.close);
 
-    // Read the month-grouped service.
-    final svcMonth = container.read(photosTimelineQueryProvider);
+    // Selecting Months groups the filtered results by month.
+    await container.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.months);
     await container.read(photosFilterSearchProvider.notifier).firstLoad;
 
-    final monthBuckets = await svcMonth.watchBuckets().first;
+    final monthBuckets = await container.read(timelineServiceProvider).watchBuckets().first;
     expect(monthBuckets, everyElement(isA<TimeBucket>()));
     expect(monthBuckets.length, 2, reason: 'Month grouping: 2024-03 + 2024-01');
 
-    // Switch to day grouping via the settings provider (same mechanism as the UI selector).
-    await container.read(settingsProvider).write(.timelineGroupAssetsBy, GroupAssetsBy.day);
-
-    // On this branch settingsProvider exposes the SettingsRepository singleton (its
-    // identity never changes), so a grouping write does not invalidate
-    // timelineFactoryProvider. In the app the rebuild comes from
-    // timeline_route_scope.dart watching appConfigProvider; model that rebuild here.
-    container.invalidate(photosTimelineQueryProvider);
-    final svcDay = container.read(photosTimelineQueryProvider);
-
-    // A grouping change rebuilds only the service (not the notifier); firstLoad is already resolved.
+    // Back to All: with the default "Month + day" setting the service regroups by day.
+    await container.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.all);
     await container.read(photosFilterSearchProvider.notifier).firstLoad;
 
-    final dayBuckets = await svcDay.watchBuckets().first;
+    final dayBuckets = await container.read(timelineServiceProvider).watchBuckets().first;
     // Day grouping: the 2 March assets share the same date (2024-03-15), so
     // there are 2 distinct day buckets: 2024-03-15 and 2024-01-10.
     expect(dayBuckets, everyElement(isA<TimeBucket>()));
@@ -265,30 +258,8 @@ void main() {
     final dayCountSum = dayBuckets.fold<int>(0, (acc, b) => acc + b.assetCount);
     expect(dayCountSum, assets.length, reason: 'No assets dropped after regrouping to day');
 
-    // Switch to year grouping (route-scope rebuild modeled as above).
-    await container.read(settingsProvider).write(.timelineGroupAssetsBy, GroupAssetsBy.year);
-    container.invalidate(photosTimelineQueryProvider);
-    final svcYear = container.read(photosTimelineQueryProvider);
-    await container.read(photosFilterSearchProvider.notifier).firstLoad;
-
-    final yearBuckets = await svcYear.watchBuckets().first;
-    expect(yearBuckets, everyElement(isA<TimeBucket>()));
-    expect(yearBuckets.length, 1, reason: 'Year grouping: all 3 assets are in 2024');
-    expect((yearBuckets[0] as TimeBucket).date.year, 2024);
-    expect(yearBuckets[0].assetCount, assets.length);
-
-    // Segment provider emits FixedSegments for the day service in its route scope.
-    final dayRouteScope = ProviderContainer(
-      parent: container,
-      overrides: [timelineServiceProvider.overrideWithValue(svcDay)],
-    );
-    addTearDown(dayRouteScope.dispose);
-
-    // Restore day grouping (same mechanism as the UI selector) so the segment provider reads day.
-    await container.read(settingsProvider).write(.timelineGroupAssetsBy, GroupAssetsBy.day);
-
-    final daySegments = await dayRouteScope.read(timelineSegmentProvider.future);
-    // With day grouping + TimeBuckets the segment provider uses FixedSegmentBuilder.
+    // Segment provider emits FixedSegments for the day service.
+    final daySegments = await container.read(timelineSegmentProvider.future);
     for (final seg in daySegments) {
       expect(
         seg,
@@ -296,6 +267,48 @@ void main() {
         reason: 'Day grouping produces FixedSegments, not overview cards',
       );
     }
+
+    // Selecting Years groups the filtered results by year.
+    await container.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.years);
+    await container.read(photosFilterSearchProvider.notifier).firstLoad;
+
+    final yearBuckets = await container.read(timelineServiceProvider).watchBuckets().first;
+    expect(yearBuckets, everyElement(isA<TimeBucket>()));
+    expect(yearBuckets.length, 1, reason: 'Year grouping: all 3 assets are in 2024');
+    expect((yearBuckets[0] as TimeBucket).date.year, 2024);
+    expect(yearBuckets[0].assetCount, assets.length);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Test 2b (#903) — the "Group by" setting is a header granularity, so under an
+  // active filter "All" + Month must still be a photo grid, just with month buckets.
+  // ---------------------------------------------------------------------------
+  test('Filtered + All with the month Group by setting produces month buckets on the grid', () async {
+    final search = _MockSearch();
+    final assets = _assets();
+    when(() => search.search(any(), 1)).thenAnswer((_) async => SearchResult(assets: assets, nextPage: null));
+
+    await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.month);
+
+    final container = _makeContainer(search: search, db: db);
+    addTearDown(container.dispose);
+
+    container.read(photosFilterProvider.notifier).setNotInAlbum(true);
+
+    final sub = container.listen(photosFilterSearchProvider, (_, __) {});
+    addTearDown(sub.close);
+
+    expect(container.read(timelineOverviewModeProvider), TimelineOverviewMode.all, reason: 'Selector opens on All');
+    await container.read(photosFilterSearchProvider.notifier).firstLoad;
+
+    final buckets = await container.read(timelineServiceProvider).watchBuckets().first;
+    expect(buckets.length, 2, reason: 'Month granularity: 2024-03 + 2024-01');
+    expect((buckets[0] as TimeBucket).date.month, 3);
+    expect((buckets[0] as TimeBucket).date.day, 1, reason: 'Month buckets are truncated to the 1st');
+
+    final segments = await container.read(timelineSegmentProvider.future);
+    expect(segments, everyElement(isNot(isA<TimelineOverviewSegment>())), reason: 'Still a grid, not cards');
+    expect(segments.map((segment) => segment.header), everyElement(HeaderType.month));
   });
 
   // ---------------------------------------------------------------------------
@@ -303,8 +316,8 @@ void main() {
   //
   // The drill-down handler lives in `sharedTimelineOverviewDrilldownProvider`
   // and is fully tested by `overview_drilldown_provider_test.dart`.  The handler
-  // calls `timelineGroupingProvider.notifier.set(...)` (persisted via the root
-  // notifier on the Photos page; route-local elsewhere) and sets a
+  // calls `timelineOverviewModeProvider.notifier.set(...)` (the root notifier on the
+  // Photos page; route-local elsewhere) and sets a
   // zoom anchor — it does NOT inspect the timeline service at all, so the
   // filtered vs unfiltered distinction makes no difference to the handler logic.
   //
@@ -312,7 +325,7 @@ void main() {
   // `TimelineOverviewCard` would require a full `EasyLocalization` + Flutter
   // widget tree (the card uses `Semantics` labels via localized month names), and
   // the value added would be duplicating what the zoom test already covers (it
-  // exercises the exact same tap → GroupAssetsBy.day + anchor path on the same
+  // exercises the exact same tap → TimelineOverviewMode.all + anchor path on the same
   // handler).  The load-bearing acceptance is fully covered by tests 1 and 2.
   // ---------------------------------------------------------------------------
 }
