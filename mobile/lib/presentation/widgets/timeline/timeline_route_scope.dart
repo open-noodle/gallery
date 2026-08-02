@@ -18,19 +18,20 @@ class TimelineRouteScope extends StatelessWidget {
     super.key,
     required this.child,
     this.timelineServiceBuilder,
-    this.persistGrouping = false,
+    this.sharedGrouping = false,
     this.overrides = const [],
   });
 
   final Widget child;
   final TimelineRouteServiceBuilder? timelineServiceBuilder;
 
-  /// Whether grouping inside this route follows and writes the persisted
-  /// `Setting.groupAssetsBy`. The main Photos timeline passes true so its grouping
-  /// keeps surviving restarts; detail routes (albums, spaces, favorites, ...) leave
-  /// this false so they open grouped at "All" and keep grouping changes local to
-  /// the route.
-  final bool persistGrouping;
+  /// Whether this route shares the app-level grouping. The main Photos timeline passes
+  /// true so its Years / Months / All choice survives navigating away and back; detail
+  /// routes (albums, spaces, favorites, ...) leave this false so they get their own
+  /// grouping and changes stay local to the route. Either way grouping starts at "All"
+  /// and is never persisted — the "Group by" setting is a separate, header-granularity
+  /// choice.
+  final bool sharedGrouping;
   final List<Override> overrides;
 
   @override
@@ -39,13 +40,15 @@ class TimelineRouteScope extends StatelessWidget {
       overrides: [
         timelineTemporalScopeProvider.overrideWith(TimelineTemporalScopeNotifier.new),
         timelineZoomAnchorProvider.overrideWith(TimelineZoomAnchorNotifier.new),
-        if (!persistGrouping) timelineGroupingProvider.overrideWith(RouteTimelineGroupingNotifier.new),
+        if (!sharedGrouping) timelineOverviewModeProvider.overrideWith(TimelineOverviewModeNotifier.new),
         timelineOverviewDrilldownProvider.overrideWith((ref) => ref.watch(sharedTimelineOverviewDrilldownProvider)),
         timelineOverviewRepresentativeCacheProvider.overrideWith(TimelineOverviewRepresentativeCacheNotifier.new),
         if (timelineServiceBuilder != null)
           timelineServiceProvider.overrideWith((ref) {
             final temporalScope = ref.watch(timelineTemporalScopeProvider);
-            final groupBy = ref.watch(timelineGroupingProvider);
+            // The bucket granularity, not the zoom level: on "All" the query must group by the
+            // persisted "Group by" setting so month-only headers get month buckets.
+            final groupBy = ref.watch(timelineGroupingSpecProvider).groupBy;
             final service = timelineServiceBuilder!(ref, temporalScope, groupBy);
             ref.onDispose(service.dispose);
             return service;

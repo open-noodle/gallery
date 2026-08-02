@@ -214,7 +214,7 @@ void main() {
     await pumpFavoritePage(tester, factoryHarness);
 
     // Switch to Months THROUGH THE PILL (the user-facing path, not the provider shortcut).
-    await tester.tap(find.byKey(const Key('timeline-grouping-month')));
+    await tester.tap(find.byKey(const Key('timeline-grouping-months')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump(const Duration(milliseconds: 600));

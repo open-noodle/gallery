@@ -1,7 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
-import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 
 class TimelineOverviewRepresentative {
@@ -19,9 +19,9 @@ class TimelineOverviewRepresentativeCacheNotifier extends Notifier<Map<String, T
   /// against a previous service can never write an entry under the new one.
   int _generation = 0;
 
-  /// Cache key for a bucket. `groupBy` is part of the key so a year and a month bucket that share
+  /// Cache key for a bucket. `mode` is part of the key so a year and a month bucket that share
   /// the same date (e.g. 2024-01-01) don't collide. Shared with the card and tests to avoid drift.
-  static String keyFor(GroupAssetsBy groupBy, DateTime date) => '${groupBy.name}:${date.toIso8601String()}';
+  static String keyFor(TimelineOverviewMode mode, DateTime date) => '${mode.name}:${date.toIso8601String()}';
 
   @override
   Map<String, TimelineOverviewRepresentative> build() {
