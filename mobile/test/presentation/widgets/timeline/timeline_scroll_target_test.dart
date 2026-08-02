@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/models/timeline_zoom_anchor.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_scroll_target.dart';
@@ -40,7 +41,7 @@ void main() {
     expect(findTimelineScrollTargetSegment([_nonTimeSegment(0, 100)], DateTime(2026, 4, 3)), isNull);
   });
 
-  test('findTimelineZoomAnchorSegment resolves a year anchor in month grouping', () {
+  test('findTimelineZoomAnchorSegment resolves a year anchor in months mode', () {
     final segments = [
       _segment(DateTime(2026, 1), 0, 100),
       _segment(DateTime(2025, 12), 100, 200),
@@ -48,12 +49,12 @@ void main() {
     ];
 
     expect(
-      findTimelineZoomAnchorSegment(segments, const TimelineZoomAnchor.year(2025), GroupAssetsBy.month),
+      findTimelineZoomAnchorSegment(segments, const TimelineZoomAnchor.year(2025), TimelineOverviewMode.months),
       segments[1],
     );
   });
 
-  test('findTimelineZoomAnchorSegment resolves a month anchor in day grouping', () {
+  test('findTimelineZoomAnchorSegment resolves a month anchor in all mode', () {
     final segments = [
       _segment(DateTime(2025, 4, 1), 0, 100),
       _segment(DateTime(2025, 3, 20), 100, 200),
@@ -61,7 +62,7 @@ void main() {
     ];
 
     expect(
-      findTimelineZoomAnchorSegment(segments, TimelineZoomAnchor.month(year: 2025, month: 3), GroupAssetsBy.day),
+      findTimelineZoomAnchorSegment(segments, TimelineZoomAnchor.month(year: 2025, month: 3), TimelineOverviewMode.all),
       segments[1],
     );
   });
@@ -69,28 +70,28 @@ void main() {
   test('findTimelineZoomAnchorSegment does not fall back to nearby years or months', () {
     final segments = [_segment(DateTime(2026, 1), 0, 100), _segment(DateTime(2024, 12), 100, 200)];
 
-    expect(findTimelineZoomAnchorSegment(segments, const TimelineZoomAnchor.year(2025), GroupAssetsBy.month), isNull);
+    expect(findTimelineZoomAnchorSegment(segments, const TimelineZoomAnchor.year(2025), TimelineOverviewMode.months), isNull);
     expect(
       findTimelineZoomAnchorSegment(
         [_segment(DateTime(2025, 2), 0, 100), _segment(DateTime(2025, 4), 100, 200)],
         TimelineZoomAnchor.month(year: 2025, month: 3),
-        GroupAssetsBy.day,
+        TimelineOverviewMode.all,
       ),
       isNull,
     );
   });
 
-  test('findTimelineZoomAnchorSegment ignores anchors in stale grouping modes', () {
+  test('findTimelineZoomAnchorSegment ignores anchors in stale modes', () {
     final segments = [_segment(DateTime(2025, 3), 0, 100)];
 
-    expect(findTimelineZoomAnchorSegment(segments, const TimelineZoomAnchor.year(2025), GroupAssetsBy.day), isNull);
+    expect(findTimelineZoomAnchorSegment(segments, const TimelineZoomAnchor.year(2025), TimelineOverviewMode.all), isNull);
     expect(
-      findTimelineZoomAnchorSegment(segments, TimelineZoomAnchor.month(year: 2025, month: 3), GroupAssetsBy.month),
+      findTimelineZoomAnchorSegment(segments, TimelineZoomAnchor.month(year: 2025, month: 3), TimelineOverviewMode.months),
       isNull,
     );
   });
 
-  test('findTimelineZoomAnchorSegment resolves a date anchor by month fallback in month grouping', () {
+  test('findTimelineZoomAnchorSegment resolves a date anchor by month fallback in months mode', () {
     final segments = [
       _segment(DateTime(2026, 1), 0, 100),
       _segment(DateTime(2017, 11), 100, 200),
@@ -98,12 +99,12 @@ void main() {
     ];
 
     expect(
-      findTimelineZoomAnchorSegment(segments, TimelineZoomAnchor.date(DateTime(2017, 11, 15)), GroupAssetsBy.month),
+      findTimelineZoomAnchorSegment(segments, TimelineZoomAnchor.date(DateTime(2017, 11, 15)), TimelineOverviewMode.months),
       segments[1],
     );
   });
 
-  test('findTimelineZoomAnchorSegment resolves a date anchor by year fallback in year grouping', () {
+  test('findTimelineZoomAnchorSegment resolves a date anchor by year fallback in years mode', () {
     final segments = [
       _segment(DateTime(2026), 0, 100),
       _segment(DateTime(2020), 100, 200),
@@ -111,23 +112,30 @@ void main() {
     ];
 
     expect(
-      findTimelineZoomAnchorSegment(segments, TimelineZoomAnchor.date(DateTime(2020, 8, 1)), GroupAssetsBy.year),
+      findTimelineZoomAnchorSegment(segments, TimelineZoomAnchor.date(DateTime(2020, 8, 1)), TimelineOverviewMode.years),
       segments[1],
     );
   });
+
+  // Z-6 ("resolves a month anchor in All mode over month-granularity segments") is not added
+  // here: it exercises the identical guard as 'resolves a month anchor in all mode' above.
+  // findTimelineZoomAnchorSegment never inspects day-of-month, so "month-granularity segments"
+  // is not a distinct code path, and findTimelineZoomAnchorSegment's third parameter is a typed
+  // TimelineOverviewMode — a spec.mode/spec.groupBy mix-up at the call site is now a compile
+  // error, not something this pure-function test could ever catch. Do not re-add it.
 
   test('findTimelineZoomAnchorSegment ignores non-time bucket segments', () {
     final segments = [_nonTimeSegment(0, 100), _segment(DateTime(2025, 3), 100, 200)];
 
     expect(
-      findTimelineZoomAnchorSegment(segments, TimelineZoomAnchor.month(year: 2025, month: 3), GroupAssetsBy.day),
+      findTimelineZoomAnchorSegment(segments, TimelineZoomAnchor.month(year: 2025, month: 3), TimelineOverviewMode.all),
       segments[1],
     );
     expect(
       findTimelineZoomAnchorSegment(
         [_nonTimeSegment(0, 100)],
         const TimelineZoomAnchor.year(2025),
-        GroupAssetsBy.month,
+        TimelineOverviewMode.months,
       ),
       isNull,
     );
