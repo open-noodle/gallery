@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
   import { shortcuts, type ShortcutOptions } from '#lib/actions/shortcut.ts';
   import {
     setFocusToAsset as setFocusAssetInit,
@@ -13,7 +12,6 @@
   import AssetDeleteConfirmModal from '#lib/modals/AssetDeleteConfirmModal.svelte';
   import NavigateToDateModal from '#lib/modals/NavigateToDateModal.svelte';
   import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
-  import { Route } from '#lib/route.ts';
   import { handleStack } from '#lib/services/stack.service.ts';
   import { keyboardManager } from '#lib/stores/keyboard-manager.svelte.ts';
   import { showDeleteModal } from '#lib/stores/preferences.store.ts';
@@ -104,7 +102,6 @@
 
     const shortcuts: ShortcutOptions[] = [
       { shortcut: { key: '?', shift: true }, onShortcut: handleOpenShortcutModal },
-      { shortcut: { key: '/' }, onShortcut: () => goto(Route.explore()) },
       { shortcut: { key: 'A', ctrl: true }, onShortcut: () => selectAllAssets(timelineManager, assetInteraction) },
       { shortcut: { key: 'ArrowRight' }, onShortcut: () => setFocusTo('earlier', 'asset') },
       { shortcut: { key: 'ArrowLeft' }, onShortcut: () => setFocusTo('later', 'asset') },
