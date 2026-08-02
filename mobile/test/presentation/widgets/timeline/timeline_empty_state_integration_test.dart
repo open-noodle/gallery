@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart' as drift;
@@ -10,22 +11,29 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/config/app_config.dart';
 import 'package:immich_mobile/domain/models/config/timeline_config.dart';
+import 'package:immich_mobile/domain/models/search_result.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
+import 'package:immich_mobile/domain/services/search.service.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
+import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_empty_state.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
+import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/search.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart' as infra;
+import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/timeline_query.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/widgets/common/immich_loading_indicator.dart';
@@ -40,6 +48,21 @@ import '../../../test_utils.dart';
 class _MockTimelineFactory extends Mock implements TimelineFactory {}
 
 class _MockUserService extends Mock implements UserService {}
+
+class _MockSearchService extends Mock implements SearchService {}
+
+class _FakeSearchFilter extends Fake implements SearchFilter {}
+
+/// Yields a fixed [SearchFilter] from build() so the 800 ms timeline debounce
+/// picks it up on its first read instead of a timer later.
+class _FixedFilter extends PhotosFilterNotifier {
+  _FixedFilter(this._initial);
+
+  final SearchFilter _initial;
+
+  @override
+  SearchFilter build() => _initial;
+}
 
 class _StubCurrentUserNotifier extends CurrentUserProvider {
   _StubCurrentUserNotifier(super.service, UserDto user) {
@@ -130,6 +153,58 @@ Future<TimelineService> _pumpTimeline(
   return service;
 }
 
+/// Wires the REAL search chain behind an active photos filter:
+///   SearchService (mocked at the network boundary) → photosFilterSearchProvider
+///   (real, scoped by TimelineRouteScope) → TimelineFactory.fromAssetStream
+///   (real) → TimelineService → Timeline → TimelineEmptyState.
+///
+/// `fromAssetStream` emits an empty bucket list immediately, so the empty state is
+/// built while page 1 is still in flight — the #901 window. Returns the completer
+/// that lets the test decide when (and with what) the search answers.
+Future<Completer<SearchResult?>> _pumpSearchingTimeline(WidgetTester tester, Drift db) async {
+  final completer = Completer<SearchResult?>();
+  final search = _MockSearchService();
+  when(() => search.search(any(), any())).thenAnswer((_) => completer.future);
+
+  final user = _testUser();
+  final userService = _MockUserService();
+  when(() => userService.tryGetMyUser()).thenReturn(user);
+  when(() => userService.watchMyUser()).thenAnswer((_) => const Stream<UserDto?>.empty());
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        appConfigProvider.overrideWithValue(const AppConfig(timeline: TimelineConfig(tilesPerRow: 3))),
+        driftProvider.overrideWithValue(db),
+        searchServiceProvider.overrideWithValue(search),
+        infra.userServiceProvider.overrideWithValue(userService),
+        currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(userService, user)),
+        timelineUsersProvider.overrideWith((_) => Stream<List<String>>.value([user.id])),
+        photosFilterProvider.overrideWith(() => _FixedFilter(SearchFilter.empty()..context = 'mountain')),
+      ],
+      child: EasyLocalization(
+        supportedLocales: const [Locale('en')],
+        path: '../i18n',
+        fallbackLocale: const Locale('en'),
+        child: MaterialApp(
+          home: DefaultAssetBundle(
+            bundle: _FakeAssetBundle(),
+            child: const TimelineRouteScope(
+              timelineServiceBuilder: buildPhotosTimelineRouteService,
+              child: Timeline(appBar: null, bottomSheet: null, withScrubber: false, emptyWidget: TimelineEmptyState()),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  // Not pumpAndSettle: the loading indicator animates forever.
+  for (var i = 0; i < 5; i++) {
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+  return completer;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -142,8 +217,10 @@ void main() {
     await initializeDateFormatting('en');
     registerFallbackValue(const TimelineTemporalScope.none());
     registerFallbackValue(GroupAssetsBy.day);
+    registerFallbackValue(_FakeSearchFilter());
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
     await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    await SettingsRepository.ensureInitialized(db);
   });
 
   setUp(() async {
@@ -180,6 +257,32 @@ void main() {
       // onData resolved with a non-empty grid: neither the loader nor the empty state.
       expect(find.byType(ImmichLoadingIndicator), findsNothing);
       expect(find.byType(TimelineEmptyState), findsNothing);
+    });
+  });
+
+  group('filtered search empty state (#901)', () {
+    testWidgets('holds a loader while page 1 is in flight, then falls back to the no-results state', (tester) async {
+      final completer = await _pumpSearchingTimeline(tester, db);
+
+      // The search-backed service already emitted its (empty) bucket list, so the
+      // empty state is on screen — but the server has not answered yet, so it must
+      // not claim there is nothing to find.
+      expect(find.byType(TimelineEmptyState), findsOneWidget);
+      expect(find.byType(ImmichLoadingIndicator), findsOneWidget);
+      expect(find.byIcon(Icons.search_off_rounded), findsNothing);
+
+      // Server answers with no matches: now the no-results state is the truth.
+      completer.complete(null);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byType(ImmichLoadingIndicator), findsNothing);
+      expect(find.byIcon(Icons.search_off_rounded), findsOneWidget);
+
+      // Tear the tree down inside the test so Riverpod's autoDispose scheduler
+      // timer fires here rather than tripping the "timer still pending" invariant.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
     });
   });
 }
