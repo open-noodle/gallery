@@ -202,20 +202,29 @@ documented unauthenticated-GitHub-API transient (`mise install github:extism/js-
 mobile-only delta — see the three-rate-limits table in the rolling memory). Since #906 moved the
 branch, the full suite was re-dispatched on the new tip and that run is the gate of record.
 
-| Workflow                                  | Status    |
-| ----------------------------------------- | --------- |
-| `test.yml`                                | see below |
-| `docker.yml`                              | see below |
-| `static_analysis.yml`                     | see below |
-| `gallery-build-mobile.yml`                | see below |
-| `gallery-rebase-smoke.yml`                | see below |
-| `gallery-mobile-smoke.yml`                | see below |
-| `gallery-ml-smoke.yml`                    | see below |
-| `storage-migration-tests.yml`             | see below |
-| `storage-migration-e2e.yml`               | see below |
-| `gallery-revert-to-immich-validation.yml` | see below |
+**10/10 GREEN** on `a825f5798cd`.
 
-(Results recorded in the follow-up commit once the suite completes.)
+| Workflow                                  | Status    | Notes                                             |
+| ----------------------------------------- | --------- | ------------------------------------------------- |
+| `test.yml`                                | **GREEN** | inspected job-by-job: **21/21 success**           |
+| `docker.yml`                              | **GREEN** | the pre-#906 403 transient did not recur          |
+| `static_analysis.yml`                     | **GREEN** | the gate that was red on `main`                   |
+| `gallery-build-mobile.yml`                | **GREEN** | iOS + Android compile                             |
+| `gallery-rebase-smoke.yml`                | **GREEN** |                                                   |
+| `gallery-mobile-smoke.yml`                | **GREEN** |                                                   |
+| `gallery-ml-smoke.yml`                    | **GREEN** |                                                   |
+| `storage-migration-tests.yml`             | **GREEN** |                                                   |
+| `storage-migration-e2e.yml`               | **GREEN** |                                                   |
+| `gallery-revert-to-immich-validation.yml` | **GREEN** | read to `Post-phase drift (0 item(s))` → `PASSED` |
+
+`test.yml` was not trusted on its workflow-level conclusion: all 21 jobs were enumerated, including
+the drift-sensitive ones (Lint Web, Unit Test Mobile, SQL Schema Checks, OpenAPI Clients) — none
+failed or was unexpectedly skipped. Likewise the revert-to-immich run was read past its coverage
+grep to the actual `validation PASSED` line, since a passing grep is necessary but not sufficient.
+
+Dispatch was staggered 4 / 2 / 4 (wave 2 once wave 1 was in flight, wave 3 once ≤3 runs were
+incomplete). That produced **no GHCR rate limiting** on the final tip — consistent with the previous
+two cycles.
 
 ## Branch state
 
@@ -228,7 +237,9 @@ branch, the full suite was re-dispatched on the new tip and that run is the gate
 ## Follow-ups
 
 1. **No port to `main` needed** — #906 already fixed the collision there, identically. Worth
-   confirming `main`'s CI went green at `53f414ab79f`.
+   confirming `main`'s own CI went green at `53f414ab79f`.
+   1b. The `cast_nullable_to_non_nullable` fix stays rolling-only and travels to `main` with the
+   eventual cutover; nothing to do now.
 2. Consider why the #886/#911 collision reached `main` at all: both PRs were green individually, and
    neither was rebased onto the other before merge, so no gate ever compiled the combination. A
    required up-to-date-branch check, or making `Gallery Build Mobile` run on `pull_request` (its
