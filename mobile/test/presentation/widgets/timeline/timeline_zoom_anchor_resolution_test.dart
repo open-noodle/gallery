@@ -8,6 +8,7 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/models/timeline_zoom_anchor.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
@@ -17,6 +18,7 @@ import 'package:immich_mobile/infrastructure/repositories/settings.repository.da
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
+import 'package:immich_mobile/providers/timeline/timeline_grouping.provider.dart';
 import 'package:immich_mobile/providers/timeline/zoom_anchor.provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
 // easy_localization initializes shared_preferences internally; tests need the mock initializer.
@@ -53,8 +55,7 @@ void main() {
     await db.close();
   });
 
-  testWidgets('resolves a year anchor in month grouping and clears it after scrolling', (tester) async {
-    await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.month);
+  testWidgets('resolves a year anchor in months mode and clears it after scrolling', (tester) async {
     final service = _service([
       TimeBucket(date: DateTime(2026, 4), assetCount: 8),
       TimeBucket(date: DateTime(2026, 3), assetCount: 8),
@@ -69,6 +70,8 @@ void main() {
 
     await _pumpTimeline(tester, service);
     final ref = ProviderScope.containerOf(tester.element(find.byType(Timeline)));
+    await ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.months);
+    await tester.pumpAndSettle();
 
     ref.read(timelineZoomAnchorProvider.notifier).setYear(2025);
     await tester.pump();
@@ -79,8 +82,7 @@ void main() {
     expect(_scrollPixels(tester), greaterThan(0));
   });
 
-  testWidgets('resolves a month anchor in day grouping and clears it after scrolling', (tester) async {
-    await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.day);
+  testWidgets('resolves a month anchor in all mode and clears it after scrolling', (tester) async {
     final service = _service([
       TimeBucket(date: DateTime(2025, 5, 2), assetCount: 9),
       TimeBucket(date: DateTime(2025, 4, 2), assetCount: 9),
@@ -103,8 +105,35 @@ void main() {
     expect(_scrollPixels(tester), greaterThan(0));
   });
 
-  testWidgets('keeps a missing year anchor pending without scrolling', (tester) async {
+  // #903: with "Group by" set to Month, drilling a month card down to All lands on a photo
+  // grid of month buckets — the month anchor must still resolve against those buckets.
+  testWidgets('resolves a month anchor on a month-grouped grid and clears it after scrolling', (tester) async {
     await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.month);
+    final service = _service([
+      TimeBucket(date: DateTime(2025, 6), assetCount: 9),
+      TimeBucket(date: DateTime(2025, 5), assetCount: 9),
+      TimeBucket(date: DateTime(2025, 4), assetCount: 9),
+      TimeBucket(date: DateTime(2025, 3), assetCount: 9),
+      TimeBucket(date: DateTime(2025, 2), assetCount: 9),
+      TimeBucket(date: DateTime(2025), assetCount: 9),
+    ]);
+    addTearDown(service.dispose);
+
+    await _pumpTimeline(tester, service);
+    final ref = ProviderScope.containerOf(tester.element(find.byType(Timeline)));
+    // The selector stays on All: the month bucketing comes from the setting, not the selector.
+    expect(ref.read(timelineOverviewModeProvider), TimelineOverviewMode.all);
+
+    ref.read(timelineZoomAnchorProvider.notifier).setMonth(year: 2025, month: 3);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pumpAndSettle();
+
+    expect(ref.read(timelineZoomAnchorProvider), const TimelineZoomAnchor.none());
+    expect(_scrollPixels(tester), greaterThan(0));
+  });
+
+  testWidgets('keeps a missing year anchor pending without scrolling', (tester) async {
     final service = _service([
       TimeBucket(date: DateTime(2026, 4), assetCount: 8),
       TimeBucket(date: DateTime(2026, 3), assetCount: 8),
@@ -115,6 +144,8 @@ void main() {
 
     await _pumpTimeline(tester, service);
     final ref = ProviderScope.containerOf(tester.element(find.byType(Timeline)));
+    await ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.months);
+    await tester.pumpAndSettle();
 
     ref.read(timelineZoomAnchorProvider.notifier).setYear(2025);
     await tester.pump();
