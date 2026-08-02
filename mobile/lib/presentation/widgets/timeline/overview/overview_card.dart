@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 
@@ -14,33 +15,31 @@ class TimelineOverviewCard extends StatelessWidget {
   const TimelineOverviewCard({
     super.key,
     required this.bucket,
-    required this.groupBy,
+    required this.mode,
     this.representativeAsset,
     this.onTap,
   });
 
   final TimeBucket bucket;
-  final GroupAssetsBy groupBy;
+  final TimelineOverviewMode mode;
   final BaseAsset? representativeAsset;
   final VoidCallback? onTap;
 
   String _label(BuildContext context) {
     final locale = context.locale.toLanguageTag();
-    return switch (groupBy) {
-      GroupAssetsBy.year => DateFormat.y(locale).format(bucket.date),
-      GroupAssetsBy.month => DateFormat.yMMM(locale).format(bucket.date),
-      GroupAssetsBy.day || GroupAssetsBy.auto || GroupAssetsBy.none => DateFormat.yMMMEd(locale).format(bucket.date),
+    return switch (mode) {
+      TimelineOverviewMode.years => DateFormat.y(locale).format(bucket.date),
+      TimelineOverviewMode.months => DateFormat.yMMM(locale).format(bucket.date),
+      TimelineOverviewMode.all => DateFormat.yMMMEd(locale).format(bucket.date),
     };
   }
 
   String _semanticsPeriod(BuildContext context) {
     final locale = context.locale.toLanguageTag();
-    return switch (groupBy) {
-      GroupAssetsBy.year => DateFormat.y(locale).format(bucket.date),
-      GroupAssetsBy.month => DateFormat.yMMMM(locale).format(bucket.date),
-      GroupAssetsBy.day ||
-      GroupAssetsBy.auto ||
-      GroupAssetsBy.none => DateFormat.yMMMMEEEEd(locale).format(bucket.date),
+    return switch (mode) {
+      TimelineOverviewMode.years => DateFormat.y(locale).format(bucket.date),
+      TimelineOverviewMode.months => DateFormat.yMMMM(locale).format(bucket.date),
+      TimelineOverviewMode.all => DateFormat.yMMMMEEEEd(locale).format(bucket.date),
     };
   }
 
@@ -55,10 +54,10 @@ class TimelineOverviewCard extends StatelessWidget {
   }
 
   String? _actionLabel() {
-    final key = switch (groupBy) {
-      GroupAssetsBy.year => 'timeline_overview_show_months',
-      GroupAssetsBy.month => 'timeline_overview_show_days',
-      GroupAssetsBy.day || GroupAssetsBy.auto || GroupAssetsBy.none => null,
+    final key = switch (mode) {
+      TimelineOverviewMode.years => 'timeline_overview_show_months',
+      TimelineOverviewMode.months => 'timeline_overview_show_days',
+      TimelineOverviewMode.all => null,
     };
     if (key == null) {
       return null;
@@ -69,10 +68,10 @@ class TimelineOverviewCard extends StatelessWidget {
       return translated;
     }
 
-    return switch (groupBy) {
-      GroupAssetsBy.year => 'show months',
-      GroupAssetsBy.month => 'show days',
-      GroupAssetsBy.day || GroupAssetsBy.auto || GroupAssetsBy.none => null,
+    return switch (mode) {
+      TimelineOverviewMode.years => 'show months',
+      TimelineOverviewMode.months => 'show days',
+      TimelineOverviewMode.all => null,
     };
   }
 

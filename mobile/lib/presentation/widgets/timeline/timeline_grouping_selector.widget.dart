@@ -5,10 +5,14 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/providers/timeline/timeline_grouping.provider.dart';
 
-const timelineGroupingSelectorGroups = <GroupAssetsBy>[GroupAssetsBy.year, GroupAssetsBy.month, GroupAssetsBy.day];
+const timelineOverviewModeSelectorOrder = <TimelineOverviewMode>[
+  TimelineOverviewMode.years,
+  TimelineOverviewMode.months,
+  TimelineOverviewMode.all,
+];
 
 class TimelineGroupingSelector extends ConsumerWidget {
   const TimelineGroupingSelector({super.key, this.enabled = true, this.bare = false}) : compact = false;
@@ -38,7 +42,7 @@ class TimelineGroupingSelector extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selected = ref.watch(timelineGroupingProvider);
+    final selected = ref.watch(timelineOverviewModeProvider);
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
@@ -46,9 +50,9 @@ class TimelineGroupingSelector extends ConsumerWidget {
       return _TimelineGroupingCompactSelector(
         selected: selected,
         enabled: enabled,
-        onSelected: (groupBy) async {
+        onSelected: (mode) async {
           unawaited(HapticFeedback.selectionClick());
-          await ref.read(timelineGroupingProvider.notifier).set(groupBy);
+          await ref.read(timelineOverviewModeProvider.notifier).set(mode);
         },
       );
     }
@@ -78,15 +82,15 @@ class TimelineGroupingSelector extends ConsumerWidget {
                 clipBehavior: Clip.antiAlias,
                 child: Row(
                   children: [
-                    for (final groupBy in timelineGroupingSelectorGroups)
+                    for (final mode in timelineOverviewModeSelectorOrder)
                       Expanded(
                         child: _TimelineGroupingSegment(
-                          groupBy: groupBy,
-                          selected: selected == groupBy,
+                          mode: mode,
+                          selected: selected == mode,
                           enabled: enabled,
                           onTap: () async {
                             unawaited(HapticFeedback.selectionClick());
-                            await ref.read(timelineGroupingProvider.notifier).set(groupBy);
+                            await ref.read(timelineOverviewModeProvider.notifier).set(mode);
                           },
                         ),
                       ),
@@ -113,27 +117,27 @@ final timelineGroupingZoomingInProvider = StateProvider<bool>((ref) => true);
 class _TimelineGroupingCompactSelector extends ConsumerWidget {
   const _TimelineGroupingCompactSelector({required this.selected, required this.enabled, required this.onSelected});
 
-  final GroupAssetsBy selected;
+  final TimelineOverviewMode selected;
   final bool enabled;
-  final Future<void> Function(GroupAssetsBy groupBy) onSelected;
+  final Future<void> Function(TimelineOverviewMode mode) onSelected;
 
   Future<void> _selectNext(WidgetRef ref) async {
     final direction = ref.read(timelineGroupingZoomingInProvider.notifier);
-    final GroupAssetsBy next;
+    final TimelineOverviewMode next;
     switch (selected) {
-      case GroupAssetsBy.year:
-        next = GroupAssetsBy.month;
+      case TimelineOverviewMode.years:
+        next = TimelineOverviewMode.months;
         direction.state = true; // continue zooming in toward All
-      case GroupAssetsBy.month:
+      case TimelineOverviewMode.months:
         if (direction.state) {
-          next = GroupAssetsBy.day;
+          next = TimelineOverviewMode.all;
           direction.state = false; // reached the zoom-in extreme (All); bounce back up next
         } else {
-          next = GroupAssetsBy.year;
+          next = TimelineOverviewMode.years;
           direction.state = true; // reached the zoom-out extreme (Years); bounce back down next
         }
-      case GroupAssetsBy.day || GroupAssetsBy.auto || GroupAssetsBy.none:
-        next = GroupAssetsBy.month;
+      case TimelineOverviewMode.all:
+        next = TimelineOverviewMode.months;
         direction.state = false; // continue zooming out toward Years
     }
     await onSelected(next);
@@ -144,21 +148,21 @@ class _TimelineGroupingCompactSelector extends ConsumerWidget {
     final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
     final offset = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
     final position = RelativeRect.fromRect(offset & renderBox.size, Offset.zero & overlay.size);
-    final selectedGroupBy = await showMenu<GroupAssetsBy>(
+    final selectedMode = await showMenu<TimelineOverviewMode>(
       context: context,
       position: position,
       items: [
-        for (final groupBy in timelineGroupingSelectorGroups)
-          PopupMenuItem<GroupAssetsBy>(
-            key: Key('timeline-grouping-menu-${groupBy.name}'),
-            value: groupBy,
-            child: Text(_label(context, groupBy)),
+        for (final mode in timelineOverviewModeSelectorOrder)
+          PopupMenuItem<TimelineOverviewMode>(
+            key: Key('timeline-grouping-menu-${mode.name}'),
+            value: mode,
+            child: Text(_label(context, mode)),
           ),
       ],
     );
 
-    if (selectedGroupBy != null && context.mounted) {
-      await onSelected(selectedGroupBy);
+    if (selectedMode != null && context.mounted) {
+      await onSelected(selectedMode);
     }
   }
 
@@ -223,13 +227,13 @@ class _TimelineGroupingCompactSelector extends ConsumerWidget {
 
 class _TimelineGroupingSegment extends StatelessWidget {
   const _TimelineGroupingSegment({
-    required this.groupBy,
+    required this.mode,
     required this.selected,
     required this.enabled,
     required this.onTap,
   });
 
-  final GroupAssetsBy groupBy;
+  final TimelineOverviewMode mode;
   final bool selected;
   final bool enabled;
   final Future<void> Function() onTap;
@@ -240,11 +244,11 @@ class _TimelineGroupingSegment extends StatelessWidget {
     final colors = theme.colorScheme;
     final foreground = selected ? colors.onPrimary : colors.onSurface.withValues(alpha: 0.86);
     final duration = MediaQuery.disableAnimationsOf(context) ? Duration.zero : Durations.short3;
-    final label = _label(context, groupBy);
+    final label = _label(context, mode);
     final canTap = enabled && !selected;
 
     return Semantics(
-      key: Key('timeline-grouping-${groupBy.name}'),
+      key: Key('timeline-grouping-${mode.name}'),
       button: true,
       selected: selected,
       enabled: enabled,
@@ -284,12 +288,11 @@ class _TimelineGroupingSegment extends StatelessWidget {
 // Labels mirror the web timeline grouping control (Years / Months / All) so the two
 // platforms read identically. Both the inline segments and the compact app-bar chip use
 // these; the chip is sized to fit the widest label ("Months") to avoid truncation.
-String _label(BuildContext context, GroupAssetsBy groupBy) {
-  return switch (groupBy) {
-    GroupAssetsBy.year => _translated('timeline_grouping_years', 'Years'),
-    GroupAssetsBy.month => _translated('timeline_grouping_months', 'Months'),
-    GroupAssetsBy.day => _translated('timeline_grouping_all', 'All'),
-    GroupAssetsBy.auto || GroupAssetsBy.none => _translated('timeline_grouping_all', 'All'),
+String _label(BuildContext context, TimelineOverviewMode mode) {
+  return switch (mode) {
+    TimelineOverviewMode.years => _translated('timeline_grouping_years', 'Years'),
+    TimelineOverviewMode.months => _translated('timeline_grouping_months', 'Months'),
+    TimelineOverviewMode.all => _translated('timeline_grouping_all', 'All'),
   };
 }
 

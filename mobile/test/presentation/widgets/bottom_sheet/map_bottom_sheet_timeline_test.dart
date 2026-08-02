@@ -168,7 +168,7 @@ void main() {
   testWidgets('tapping Months regroups the map timeline without persisting the setting', (tester) async {
     final harness = await _pumpMapTimeline(tester);
 
-    await tester.tap(find.byKey(const Key('timeline-grouping-month')));
+    await tester.tap(find.byKey(const Key('timeline-grouping-months')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
 
@@ -213,7 +213,7 @@ void main() {
   testWidgets('grouping selection survives a map move', (tester) async {
     final harness = await _pumpMapTimeline(tester);
 
-    await tester.tap(find.byKey(const Key('timeline-grouping-month')));
+    await tester.tap(find.byKey(const Key('timeline-grouping-months')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     verify(
