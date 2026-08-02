@@ -105,10 +105,17 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                GalleryNavPill(
-                  activeTab: GalleryTabEnum.values[widget.tabsRouter.activeIndex],
-                  disabledTabs: isReadonly ? const {GalleryTabEnum.albums, GalleryTabEnum.library} : const {},
-                  onTabTap: _onTabTap,
+                // Flexible, not fixed: long localized labels (e.g. French
+                // "Bibliothèque") make the pill's natural width exceed a narrow
+                // phone, which used to push the search blob off-screen entirely
+                // (#909). The blob is laid out first and keeps its full size; the
+                // pill takes what is left and shrinks its tabs to fit.
+                Flexible(
+                  child: GalleryNavPill(
+                    activeTab: GalleryTabEnum.values[widget.tabsRouter.activeIndex],
+                    disabledTabs: isReadonly ? const {GalleryTabEnum.albums, GalleryTabEnum.library} : const {},
+                    onTabTap: _onTabTap,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 GallerySearchBlob(enabled: !isReadonly, onTap: () => openGallerySearch(widget.tabsRouter, ref.read)),
