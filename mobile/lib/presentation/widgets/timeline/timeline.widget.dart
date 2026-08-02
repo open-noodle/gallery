@@ -480,9 +480,9 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
         _daySwitchRequested = false;
         _drainingTarget = null;
       case ScrollDrainAction.switchToDayGrouping:
-        // Overview groupings render cards, not tiles. Drill to day the same way a
-        // card tap does, then keep retrying until the rebuilt segments arrive.
-        // `attempts` MUST increment here: if the grouping is pinned and set() is a
+        // Overview modes render cards, not tiles. Drill to the photo grid the same
+        // way a card tap does, then keep retrying until the rebuilt segments arrive.
+        // `attempts` MUST increment here: if the mode is pinned and set() is a
         // no-op, the budget is the only thing that ends this loop.
         _scrollDrainAttempts++;
         if (!_daySwitchRequested) {
