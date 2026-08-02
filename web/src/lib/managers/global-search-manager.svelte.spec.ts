@@ -662,6 +662,28 @@ describe('real providers', () => {
     );
   });
 
+  // #894: the field modes (filename / description / OCR) omitted `withSharedSpaces`, so the
+  // palette searched only the user's OWN assets. A Space member whose photos live in a Space
+  // owned by someone else got an empty Photos section — while smart search, which does send
+  // the flag, worked. `withSharedSpaces` is inherited from BaseSearchSchema onto
+  // MetadataSearchDto and honoured by SearchService.searchMetadata, so the omission was the
+  // whole bug. Keep every field mode aligned with smart mode here.
+  it.each(['metadata', 'description', 'ocr'] as const)(
+    'photos includes shared-space assets in %s mode',
+    async (mode) => {
+      localStorage.setItem('searchQueryType', mode);
+      const m = new GlobalSearchManager();
+      m.setQuery('Strand');
+      await vi.advanceTimersByTimeAsync(200);
+      expect(searchAssets).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadataSearchDto: expect.objectContaining({ withSharedSpaces: true }),
+        }),
+        expect.anything(),
+      );
+    },
+  );
+
   it('people provider calls searchPerson with name and withHidden=false', async () => {
     const m = new GlobalSearchManager();
     m.setQuery('alice');
