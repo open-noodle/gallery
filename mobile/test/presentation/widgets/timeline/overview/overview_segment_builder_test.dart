@@ -10,6 +10,7 @@ import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
@@ -59,7 +60,7 @@ void main() {
         TimeBucket(date: DateTime(2025), assetCount: 5),
         TimeBucket(date: DateTime(2024), assetCount: 2),
       ],
-      groupBy: GroupAssetsBy.year,
+      mode: TimelineOverviewMode.years,
     ).generate();
 
     expect(segments, hasLength(2));
@@ -80,7 +81,7 @@ void main() {
   test('month overview uses month headers and keeps one child per bucket', () {
     final segments = TimelineOverviewSegmentBuilder(
       buckets: [TimeBucket(date: DateTime(2025, 3), assetCount: 4)],
-      groupBy: GroupAssetsBy.month,
+      mode: TimelineOverviewMode.months,
     ).generate();
 
     expect(segments.single.firstIndex, 0);
@@ -92,11 +93,11 @@ void main() {
     expect(segments.single.indexToLayoutOffset(segments.single.lastIndex + 1), segments.single.endOffset);
   });
 
-  test('builder rejects non-overview grouping modes', () {
+  test('builder rejects the all mode', () {
     expect(
       () => TimelineOverviewSegmentBuilder(
         buckets: [TimeBucket(date: DateTime(2025), assetCount: 1)],
-        groupBy: GroupAssetsBy.day,
+        mode: TimelineOverviewMode.all,
       ).generate(),
       throwsArgumentError,
     );
@@ -126,7 +127,7 @@ void main() {
       endOffset: kTimelineOverviewSegmentExtent * 2,
       firstAssetIndex: 5,
       bucket: TimeBucket(date: DateTime(2024), assetCount: 1),
-      groupBy: GroupAssetsBy.year,
+      mode: TimelineOverviewMode.years,
       header: HeaderType.year,
     );
 
@@ -163,7 +164,7 @@ void main() {
   });
 
   testWidgets('passes overview drilldown handler to rendered card when override exists', (tester) async {
-    final tapped = <({DateTime date, GroupAssetsBy groupBy})>[];
+    final tapped = <({DateTime date, TimelineOverviewMode mode})>[];
     final representativeAsset = TestUtils.createRemoteAsset(id: 'asset-0');
     final timelineService = TimelineService((
       bucketSource: () => Stream.value([TimeBucket(date: DateTime(2025), assetCount: 1)]),
@@ -179,7 +180,7 @@ void main() {
       endOffset: kTimelineOverviewSegmentExtent,
       firstAssetIndex: 0,
       bucket: TimeBucket(date: DateTime(2025), assetCount: 1),
-      groupBy: GroupAssetsBy.year,
+      mode: TimelineOverviewMode.years,
       header: HeaderType.year,
     );
 
@@ -191,8 +192,8 @@ void main() {
         child: ProviderScope(
           overrides: [
             timelineServiceProvider.overrideWithValue(timelineService),
-            timelineOverviewDrilldownProvider.overrideWithValue((bucket, groupBy) async {
-              tapped.add((date: bucket.date, groupBy: groupBy));
+            timelineOverviewDrilldownProvider.overrideWithValue((bucket, mode) async {
+              tapped.add((date: bucket.date, mode: mode));
             }),
           ],
           child: MaterialApp(
@@ -206,7 +207,7 @@ void main() {
     await tester.tap(find.byType(TimelineOverviewCard));
     await tester.pump();
 
-    expect(tapped, [(date: DateTime(2025), groupBy: GroupAssetsBy.year)]);
+    expect(tapped, [(date: DateTime(2025), mode: TimelineOverviewMode.years)]);
   });
 
   testWidgets('leaves rendered card onTap null without overview drilldown handler', (tester) async {
@@ -225,7 +226,7 @@ void main() {
       endOffset: kTimelineOverviewSegmentExtent,
       firstAssetIndex: 0,
       bucket: TimeBucket(date: DateTime(2025), assetCount: 1),
-      groupBy: GroupAssetsBy.year,
+      mode: TimelineOverviewMode.years,
       header: HeaderType.year,
     );
 
@@ -250,7 +251,7 @@ void main() {
   });
 
   testWidgets('leaves zero-count overview card onTap null even with drilldown handler override', (tester) async {
-    final tapped = <({DateTime date, GroupAssetsBy groupBy})>[];
+    final tapped = <({DateTime date, TimelineOverviewMode mode})>[];
     final timelineService = TimelineService((
       bucketSource: () => Stream.value([TimeBucket(date: DateTime(2025), assetCount: 0)]),
       assetSource: (_, _) async => const <BaseAsset>[],
@@ -265,7 +266,7 @@ void main() {
       endOffset: kTimelineOverviewSegmentExtent,
       firstAssetIndex: 0,
       bucket: TimeBucket(date: DateTime(2025), assetCount: 0),
-      groupBy: GroupAssetsBy.year,
+      mode: TimelineOverviewMode.years,
       header: HeaderType.year,
     );
 
@@ -277,8 +278,8 @@ void main() {
         child: ProviderScope(
           overrides: [
             timelineServiceProvider.overrideWithValue(timelineService),
-            timelineOverviewDrilldownProvider.overrideWithValue((bucket, groupBy) async {
-              tapped.add((date: bucket.date, groupBy: groupBy));
+            timelineOverviewDrilldownProvider.overrideWithValue((bucket, mode) async {
+              tapped.add((date: bucket.date, mode: mode));
             }),
           ],
           child: MaterialApp(
@@ -353,7 +354,7 @@ void main() {
       endOffset: kTimelineOverviewSegmentExtent,
       firstAssetIndex: 0,
       bucket: TimeBucket(date: DateTime(2025), assetCount: pool.length),
-      groupBy: GroupAssetsBy.year,
+      mode: TimelineOverviewMode.years,
       header: HeaderType.year,
     );
 
@@ -409,7 +410,7 @@ void main() {
       endOffset: kTimelineOverviewSegmentExtent,
       firstAssetIndex: 0,
       bucket: TimeBucket(date: DateTime(2025), assetCount: 1),
-      groupBy: GroupAssetsBy.year,
+      mode: TimelineOverviewMode.years,
       header: HeaderType.year,
     );
 
@@ -452,7 +453,7 @@ void main() {
       endOffset: kTimelineOverviewSegmentExtent,
       firstAssetIndex: 0,
       bucket: TimeBucket(date: DateTime(2025), assetCount: 0),
-      groupBy: GroupAssetsBy.year,
+      mode: TimelineOverviewMode.years,
       header: HeaderType.year,
     );
 

@@ -7,13 +7,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_selector.widget.dart';
-import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
+import 'package:immich_mobile/providers/timeline/timeline_grouping.provider.dart';
 import 'package:immich_mobile/widgets/settings/asset_list_settings/asset_list_group_settings.dart';
 
 import '../../../test_utils.dart';
@@ -40,13 +41,26 @@ void main() {
     await db.close();
   });
 
-  Semantics segment(WidgetTester tester, GroupAssetsBy groupBy) {
-    return tester.widget<Semantics>(find.byKey(Key('timeline-grouping-${groupBy.name}')));
+  Semantics segment(WidgetTester tester, TimelineOverviewMode mode) {
+    return tester.widget<Semantics>(find.byKey(Key('timeline-grouping-${mode.name}')));
   }
 
-  bool selected(WidgetTester tester, GroupAssetsBy groupBy) {
-    return segment(tester, groupBy).properties.selected ?? false;
+  bool selected(WidgetTester tester, TimelineOverviewMode mode) {
+    return segment(tester, mode).properties.selected ?? false;
   }
+
+  ProviderContainer containerOf(WidgetTester tester) {
+    return ProviderScope.containerOf(tester.element(find.byType(TimelineGroupingSelector)));
+  }
+
+  // The selector is view state, so drive it through its own provider rather than through
+  // Setting.groupAssetsBy — that setting is the independent "Photo Grid" -> "Group by" choice.
+  Future<void> setGrouping(WidgetTester tester, TimelineOverviewMode mode) async {
+    await containerOf(tester).read(timelineOverviewModeProvider.notifier).set(mode);
+    await tester.pumpAndSettle();
+  }
+
+  TimelineOverviewMode grouping(WidgetTester tester) => containerOf(tester).read(timelineOverviewModeProvider);
 
   group('TimelineGroupingSelector', () {
     testWidgets('renders years, months, and days segments in an app-bar action slot', (tester) async {
@@ -60,10 +74,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('timeline-grouping-selector')), findsOneWidget);
-      expect(find.byKey(const Key('timeline-grouping-year')), findsOneWidget);
-      expect(find.byKey(const Key('timeline-grouping-month')), findsOneWidget);
-      expect(find.byKey(const Key('timeline-grouping-day')), findsOneWidget);
-      expect(selected(tester, GroupAssetsBy.day), isTrue);
+      expect(find.byKey(const Key('timeline-grouping-years')), findsOneWidget);
+      expect(find.byKey(const Key('timeline-grouping-months')), findsOneWidget);
+      expect(find.byKey(const Key('timeline-grouping-all')), findsOneWidget);
+      expect(selected(tester, TimelineOverviewMode.all), isTrue);
     });
 
     testWidgets('bare variant draws no surface or border of its own (for hosts that paint the pill)', (tester) async {
@@ -88,32 +102,41 @@ void main() {
       expect((material.shape! as StadiumBorder).side.style, BorderStyle.solid);
     });
 
-    testWidgets('initializes selected segment from Setting.groupAssetsBy', (tester) async {
+    testWidgets('selects the segment matching the active grouping', (tester) async {
+      await tester.pumpConsumerWidget(const TimelineGroupingSelector());
+      await tester.pumpAndSettle();
+      await setGrouping(tester, TimelineOverviewMode.months);
+
+      expect(selected(tester, TimelineOverviewMode.months), isTrue);
+      expect(selected(tester, TimelineOverviewMode.all), isFalse);
+      expect(selected(tester, TimelineOverviewMode.years), isFalse);
+    });
+
+    testWidgets('opens on the All segment regardless of the Group by setting', (tester) async {
       await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.month);
 
       await tester.pumpConsumerWidget(const TimelineGroupingSelector());
       await tester.pumpAndSettle();
 
-      expect(selected(tester, GroupAssetsBy.month), isTrue);
-      expect(selected(tester, GroupAssetsBy.day), isFalse);
-      expect(selected(tester, GroupAssetsBy.year), isFalse);
+      expect(selected(tester, TimelineOverviewMode.all), isTrue);
+      expect(selected(tester, TimelineOverviewMode.months), isFalse);
     });
 
     testWidgets('selected segment exposes button semantics without duplicate child text', (tester) async {
-      await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.month);
       final semantics = tester.ensureSemantics();
       try {
         await tester.pumpConsumerWidget(const TimelineGroupingSelector());
         await tester.pumpAndSettle();
+        await setGrouping(tester, TimelineOverviewMode.months);
 
         expect(tester.getSemantics(find.byKey(const Key('timeline-grouping-selector'))).label, 'Timeline grouping');
         expect(find.bySemanticsLabel('Years'), findsOneWidget);
         expect(find.bySemanticsLabel('Months'), findsOneWidget);
         expect(find.bySemanticsLabel('All'), findsOneWidget);
 
-        final years = tester.getSemantics(find.byKey(const Key('timeline-grouping-year')));
-        final months = tester.getSemantics(find.byKey(const Key('timeline-grouping-month')));
-        final days = tester.getSemantics(find.byKey(const Key('timeline-grouping-day')));
+        final years = tester.getSemantics(find.byKey(const Key('timeline-grouping-years')));
+        final months = tester.getSemantics(find.byKey(const Key('timeline-grouping-months')));
+        final days = tester.getSemantics(find.byKey(const Key('timeline-grouping-all')));
 
         expect(years.flagsCollection.isButton, isTrue);
         expect(years.flagsCollection.toStrings(), contains('hasSelectedState'));
@@ -131,88 +154,78 @@ void main() {
       }
     });
 
-    testWidgets('normalizes unsupported auto and none values to the All segment visually', (tester) async {
-      await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.auto);
-      await tester.pumpConsumerWidget(const TimelineGroupingSelector());
-      await tester.pumpAndSettle();
-      expect(selected(tester, GroupAssetsBy.day), isTrue);
-
-      await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.none);
-      final container = ProviderScope.containerOf(tester.element(find.byType(TimelineGroupingSelector)));
-      container.invalidate(settingsProvider);
-      await tester.pumpAndSettle();
-      expect(selected(tester, GroupAssetsBy.day), isTrue);
-    });
-
-    testWidgets('tapping each segment writes the matching GroupAssetsBy setting', (tester) async {
+    testWidgets('tapping each segment changes the grouping without writing the Group by setting', (tester) async {
       await tester.pumpConsumerWidget(const TimelineGroupingSelector());
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('timeline-grouping-year')));
+      await tester.tap(find.byKey(const Key('timeline-grouping-years')));
       await tester.pumpAndSettle();
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.year);
-      expect(selected(tester, GroupAssetsBy.year), isTrue);
+      expect(grouping(tester), TimelineOverviewMode.years);
+      expect(selected(tester, TimelineOverviewMode.years), isTrue);
 
-      await tester.tap(find.byKey(const Key('timeline-grouping-month')));
+      await tester.tap(find.byKey(const Key('timeline-grouping-months')));
       await tester.pumpAndSettle();
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
-      expect(selected(tester, GroupAssetsBy.month), isTrue);
+      expect(grouping(tester), TimelineOverviewMode.months);
+      expect(selected(tester, TimelineOverviewMode.months), isTrue);
 
-      await tester.tap(find.byKey(const Key('timeline-grouping-day')));
+      await tester.tap(find.byKey(const Key('timeline-grouping-all')));
       await tester.pumpAndSettle();
+      expect(grouping(tester), TimelineOverviewMode.all);
+      expect(selected(tester, TimelineOverviewMode.all), isTrue);
+
       expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
-      expect(selected(tester, GroupAssetsBy.day), isTrue);
     });
 
-    testWidgets('settings picker changes update the selector', (tester) async {
+    // #903: picking "Month" under Photo Grid must group the photo grid's headers, not flip the
+    // timeline into the Months overview cards. The selector has to stay where it was.
+    testWidgets('settings picker changes leave the selector alone', (tester) async {
       await tester.pumpConsumerWidget(
         const SingleChildScrollView(child: Column(children: [TimelineGroupingSelector(), GroupSettings()])),
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.descendant(of: find.byType(GroupSettings), matching: find.text('year'.tr())));
+      await tester.tap(find.descendant(of: find.byType(GroupSettings), matching: find.text('month'.tr())));
       await tester.pumpAndSettle();
 
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.year);
-      expect(selected(tester, GroupAssetsBy.year), isTrue);
+      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+      expect(grouping(tester), TimelineOverviewMode.all);
+      expect(selected(tester, TimelineOverviewMode.all), isTrue);
+      expect(selected(tester, TimelineOverviewMode.months), isFalse);
     });
 
-    testWidgets('disabled selector does not write settings', (tester) async {
-      await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.day);
+    testWidgets('disabled selector does not change the grouping', (tester) async {
       await tester.pumpConsumerWidget(const TimelineGroupingSelector(enabled: false));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('timeline-grouping-year')), warnIfMissed: false);
+      await tester.tap(find.byKey(const Key('timeline-grouping-years')), warnIfMissed: false);
       await tester.pumpAndSettle();
 
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
-      expect(selected(tester, GroupAssetsBy.day), isTrue);
+      expect(grouping(tester), TimelineOverviewMode.all);
+      expect(selected(tester, TimelineOverviewMode.all), isTrue);
     });
 
-    testWidgets('disabled selector removes actionable semantics and does not write settings', (tester) async {
-      await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.day);
+    testWidgets('disabled selector removes actionable semantics and does not change the grouping', (tester) async {
       final semantics = tester.ensureSemantics();
       try {
         await tester.pumpConsumerWidget(const TimelineGroupingSelector(enabled: false));
         await tester.pumpAndSettle();
 
-        for (final groupBy in timelineGroupingSelectorGroups) {
-          final label = switch (groupBy) {
-            GroupAssetsBy.year => 'Years',
-            GroupAssetsBy.month => 'Months',
-            GroupAssetsBy.day => 'All',
-            GroupAssetsBy.auto || GroupAssetsBy.none => 'All',
+        for (final mode in timelineOverviewModeSelectorOrder) {
+          final label = switch (mode) {
+            TimelineOverviewMode.years => 'Years',
+            TimelineOverviewMode.months => 'Months',
+            TimelineOverviewMode.all => 'All',
           };
-          final node = tester.getSemantics(find.byKey(Key('timeline-grouping-${groupBy.name}')));
+          final node = tester.getSemantics(find.byKey(Key('timeline-grouping-${mode.name}')));
           expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isFalse, reason: label);
           expect(node.flagsCollection.toStrings(), contains('hasEnabledState'), reason: label);
           expect(node.flagsCollection.toStrings(), isNot(contains('isEnabled')), reason: label);
         }
 
-        await tester.tap(find.byKey(const Key('timeline-grouping-year')), warnIfMissed: false);
+        await tester.tap(find.byKey(const Key('timeline-grouping-years')), warnIfMissed: false);
         await tester.pumpAndSettle();
 
-        expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
+        expect(grouping(tester), TimelineOverviewMode.all);
       } finally {
         semantics.dispose();
       }
@@ -229,8 +242,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.getSize(find.byKey(const Key('timeline-grouping-selector'))).height, greaterThanOrEqualTo(48));
-      for (final groupBy in timelineGroupingSelectorGroups) {
-        expect(tester.getSize(find.byKey(Key('timeline-grouping-${groupBy.name}'))).height, greaterThanOrEqualTo(48));
+      for (final mode in timelineOverviewModeSelectorOrder) {
+        expect(tester.getSize(find.byKey(Key('timeline-grouping-${mode.name}'))).height, greaterThanOrEqualTo(48));
       }
     });
 
@@ -251,9 +264,9 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(tester.getSize(find.byKey(const Key('timeline-grouping-selector'))).width, lessThanOrEqualTo(150));
-      expect(find.byKey(const Key('timeline-grouping-year')), findsOneWidget);
-      expect(find.byKey(const Key('timeline-grouping-month')), findsOneWidget);
-      expect(find.byKey(const Key('timeline-grouping-day')), findsOneWidget);
+      expect(find.byKey(const Key('timeline-grouping-years')), findsOneWidget);
+      expect(find.byKey(const Key('timeline-grouping-months')), findsOneWidget);
+      expect(find.byKey(const Key('timeline-grouping-all')), findsOneWidget);
     });
 
     testWidgets('reduced motion removes nonessential selector animation', (tester) async {
@@ -282,29 +295,26 @@ void main() {
     });
 
     testWidgets('rtl layout preserves tap behavior and directional visual order', (tester) async {
-      await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.month);
-
       await tester.pumpConsumerWidget(
         const Directionality(textDirection: TextDirection.rtl, child: TimelineGroupingSelector()),
       );
       await tester.pumpAndSettle();
+      await setGrouping(tester, TimelineOverviewMode.months);
 
-      final years = tester.getCenter(find.byKey(const Key('timeline-grouping-year')));
-      final months = tester.getCenter(find.byKey(const Key('timeline-grouping-month')));
-      final days = tester.getCenter(find.byKey(const Key('timeline-grouping-day')));
+      final years = tester.getCenter(find.byKey(const Key('timeline-grouping-years')));
+      final months = tester.getCenter(find.byKey(const Key('timeline-grouping-months')));
+      final days = tester.getCenter(find.byKey(const Key('timeline-grouping-all')));
 
       expect(years.dx, greaterThan(months.dx));
       expect(months.dx, greaterThan(days.dx));
 
-      await tester.tap(find.byKey(const Key('timeline-grouping-day')));
+      await tester.tap(find.byKey(const Key('timeline-grouping-all')));
       await tester.pumpAndSettle();
 
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
+      expect(grouping(tester), TimelineOverviewMode.all);
     });
 
     testWidgets('compact mode renders only the current grouping in a small app-bar chip', (tester) async {
-      await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.day);
-
       await tester.pumpConsumerWidget(
         const CustomScrollView(
           slivers: [
@@ -316,9 +326,9 @@ void main() {
 
       expect(find.byKey(const Key('timeline-grouping-compact-selector')), findsOneWidget);
       expect(find.byKey(const Key('timeline-grouping-selector')), findsNothing);
-      expect(find.byKey(const Key('timeline-grouping-year')), findsNothing);
-      expect(find.byKey(const Key('timeline-grouping-month')), findsNothing);
-      expect(find.byKey(const Key('timeline-grouping-day')), findsNothing);
+      expect(find.byKey(const Key('timeline-grouping-years')), findsNothing);
+      expect(find.byKey(const Key('timeline-grouping-months')), findsNothing);
+      expect(find.byKey(const Key('timeline-grouping-all')), findsNothing);
       expect(find.text('All'), findsOneWidget);
       expect(find.text('Day'), findsNothing);
       expect(find.text('Days'), findsNothing);
@@ -327,40 +337,38 @@ void main() {
     });
 
     testWidgets('compact mode tapping Day zooms out to Month', (tester) async {
-      await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.day);
-
       await tester.pumpConsumerWidget(const TimelineGroupingSelector.compact());
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('timeline-grouping-compact-selector')));
       await tester.pumpAndSettle();
 
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+      expect(grouping(tester), TimelineOverviewMode.months);
       expect(find.text('Months'), findsOneWidget);
     });
 
     testWidgets('compact mode bounces between extremes', (tester) async {
-      await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.year);
       await tester.pumpConsumerWidget(const TimelineGroupingSelector.compact());
       await tester.pumpAndSettle();
+      await setGrouping(tester, TimelineOverviewMode.years);
 
       final selector = find.byKey(const Key('timeline-grouping-compact-selector'));
 
       // Year -> Month -> Day (heading down)
       await tester.tap(selector);
       await tester.pumpAndSettle();
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+      expect(grouping(tester), TimelineOverviewMode.months);
       await tester.tap(selector);
       await tester.pumpAndSettle();
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
+      expect(grouping(tester), TimelineOverviewMode.all);
 
       // Day -> Month -> Year (direction inverted at Day; preserved through Month)
       await tester.tap(selector);
       await tester.pumpAndSettle();
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+      expect(grouping(tester), TimelineOverviewMode.months);
       await tester.tap(selector);
       await tester.pumpAndSettle();
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.year);
+      expect(grouping(tester), TimelineOverviewMode.years);
     });
 
     testWidgets('compact mode keeps bouncing back to Years when the chip is recreated between taps', (tester) async {
@@ -368,8 +376,6 @@ void main() {
       // (every grouping change flashes the timelineSegmentProvider loading state). The bounce
       // direction must survive that recreation, otherwise the chip gets stuck oscillating
       // Months <-> All and never returns to Years.
-      await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.year);
-
       var generation = 0;
       late StateSetter setOuter;
       await tester.pumpConsumerWidget(
@@ -383,6 +389,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await setGrouping(tester, TimelineOverviewMode.years);
 
       final selector = find.byKey(const Key('timeline-grouping-compact-selector'));
 
@@ -394,36 +401,30 @@ void main() {
       }
 
       await tapAndRecreate();
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month); // Years -> Months
+      expect(grouping(tester), TimelineOverviewMode.months); // Years -> Months
       await tapAndRecreate();
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day); // Months -> All
+      expect(grouping(tester), TimelineOverviewMode.all); // Months -> All
       await tapAndRecreate();
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month); // All -> Months
+      expect(grouping(tester), TimelineOverviewMode.months); // All -> Months
       await tapAndRecreate();
-      expect(
-        SettingsRepository.instance.appConfig.timeline.groupAssetsBy,
-        GroupAssetsBy.year,
-      ); // Months -> Years (the bug)
+      expect(grouping(tester), TimelineOverviewMode.years); // Months -> Years (the bug)
     });
 
     testWidgets('compact mode opens a direct selection menu on long press', (tester) async {
-      await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.day);
-
       await tester.pumpConsumerWidget(const TimelineGroupingSelector.compact());
       await tester.pumpAndSettle();
 
       await tester.longPress(find.byKey(const Key('timeline-grouping-compact-selector')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('timeline-grouping-menu-month')));
+      await tester.tap(find.byKey(const Key('timeline-grouping-menu-months')));
       await tester.pumpAndSettle();
 
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+      expect(grouping(tester), TimelineOverviewMode.months);
       expect(find.text('Months'), findsOneWidget);
       expect(find.text('Month'), findsNothing);
     });
 
     testWidgets('compact mode resumes bouncing after a long-press menu selection', (tester) async {
-      await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.day);
       await tester.pumpConsumerWidget(const TimelineGroupingSelector.compact());
       await tester.pumpAndSettle();
 
@@ -432,17 +433,17 @@ void main() {
       // Pick Year directly via the long-press menu.
       await tester.longPress(selector);
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('timeline-grouping-menu-year')));
+      await tester.tap(find.byKey(const Key('timeline-grouping-menu-years')));
       await tester.pumpAndSettle();
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.year);
+      expect(grouping(tester), TimelineOverviewMode.years);
 
       // Subsequent taps bounce down: Year -> Month -> Day.
       await tester.tap(selector);
       await tester.pumpAndSettle();
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+      expect(grouping(tester), TimelineOverviewMode.months);
       await tester.tap(selector);
       await tester.pumpAndSettle();
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
+      expect(grouping(tester), TimelineOverviewMode.all);
     });
 
     testWidgets('compact mode shows the full "Months" label at normal size and never clips when enlarged', (
@@ -451,8 +452,6 @@ void main() {
       // "Months" is the widest grouping label. At the default text scale it must render at full
       // size inside the compact chip; when the OS enlarges text it may scale down to fit but must
       // never clip (the old "Mo..." truncation).
-      await SettingsRepository.instance.write(SettingsKey.timelineGroupAssetsBy, GroupAssetsBy.month);
-
       Future<void> pumpAt(double scale) async {
         await tester.pumpConsumerWidget(
           MediaQuery(
@@ -465,6 +464,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+        await setGrouping(tester, TimelineOverviewMode.months);
       }
 
       // Default scale: the glyphs are painted at their full intrinsic width (not shrunk, not clipped).

@@ -3,8 +3,10 @@ import 'package:drift/native.dart';
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
@@ -13,6 +15,7 @@ import 'package:immich_mobile/infrastructure/repositories/store.repository.dart'
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_bottom_pill.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_selector.widget.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
+import 'package:immich_mobile/providers/timeline/timeline_grouping.provider.dart';
 // easy_localization initializes shared_preferences internally; tests need the mock initializer.
 // ignore: depend_on_referenced_packages
 import 'package:shared_preferences/shared_preferences.dart';
@@ -59,9 +62,9 @@ void main() {
       expect(find.byKey(const Key('timeline-grouping-bottom-pill')), findsOneWidget);
       expect(find.byType(TimelineGroupingSelector), findsOneWidget);
       // Full selector, not the compact chip: all three segments are present.
-      expect(find.byKey(const Key('timeline-grouping-year')), findsOneWidget);
-      expect(find.byKey(const Key('timeline-grouping-month')), findsOneWidget);
-      expect(find.byKey(const Key('timeline-grouping-day')), findsOneWidget);
+      expect(find.byKey(const Key('timeline-grouping-years')), findsOneWidget);
+      expect(find.byKey(const Key('timeline-grouping-months')), findsOneWidget);
+      expect(find.byKey(const Key('timeline-grouping-all')), findsOneWidget);
       expect(find.byKey(const Key('timeline-grouping-compact-selector')), findsNothing);
       // The pill surface hugs the selector (218 self-cap + 2×8 padding) instead of
       // spanning the screen — keeps the scrubber's right-edge margin clear.
@@ -81,17 +84,19 @@ void main() {
       expect((selectorMaterial.shape! as StadiumBorder).side, BorderSide.none);
     });
 
-    // Hosted at root (no TimelineRouteScope): pins the ROOT grouping fallback, where segment
-    // taps persist the setting. The pill's production contract (route-local, store untouched)
-    // is covered by the route-scope and favorites page tests.
-    testWidgets('tapping a segment outside a route scope writes Setting.groupAssetsBy', (tester) async {
+    // Hosted at root (no TimelineRouteScope): pins the ROOT mode fallback. The pill's
+    // route-local contract is covered by the route-scope and favorites page tests.
+    testWidgets('tapping a segment outside a route scope updates the root mode', (tester) async {
       await tester.pumpConsumerWidget(host());
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('timeline-grouping-month')));
+      await tester.tap(find.byKey(const Key('timeline-grouping-months')));
       await tester.pumpAndSettle();
 
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
+      final container = ProviderScope.containerOf(tester.element(find.byType(TimelineGroupingSelector)));
+      expect(container.read(timelineOverviewModeProvider), TimelineOverviewMode.months);
+      // The "Photo Grid" -> "Group by" setting is independent of the selector (#903).
+      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
     });
 
     testWidgets('hides while multiselect is enabled and reappears after', (tester) async {
@@ -210,9 +215,10 @@ void main() {
       await tester.pumpConsumerWidget(Directionality(textDirection: TextDirection.rtl, child: host()));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('timeline-grouping-year')));
+      await tester.tap(find.byKey(const Key('timeline-grouping-years')));
       await tester.pumpAndSettle();
-      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.year);
+      final container = ProviderScope.containerOf(tester.element(find.byType(TimelineGroupingSelector)));
+      expect(container.read(timelineOverviewModeProvider), TimelineOverviewMode.years);
     });
   });
 }
