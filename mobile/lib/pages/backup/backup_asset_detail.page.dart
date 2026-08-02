@@ -7,7 +7,7 @@ import 'package:immich_mobile/extensions/theme_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/pages/common/large_leading_tile.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
-import 'package:immich_mobile/providers/asset_viewer/scroll_to_date_notifier.provider.dart';
+import 'package:immich_mobile/providers/asset_viewer/scroll_to_asset_notifier.provider.dart';
 import 'package:immich_mobile/providers/backup/backup.provider.dart';
 import 'package:immich_mobile/repositories/asset_media.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
@@ -91,7 +91,7 @@ class BackupAssetDetailPage extends ConsumerWidget {
                       }
 
                       await context.navigateTo(const MainTimelineRoute());
-                      scrollToDateNotifierProvider.scrollToDate(asset.createdAt);
+                      scrollToAssetNotifierProvider.scrollToAsset(asset);
                     },
                   );
                 },
