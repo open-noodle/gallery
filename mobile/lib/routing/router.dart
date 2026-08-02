@@ -158,11 +158,10 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: WhatsNewRoute.page, guards: [_duplicateGuard]),
     AutoRoute(page: AppLogRoute.page, guards: [_duplicateGuard]),
     AutoRoute(page: AppLogDetailRoute.page, guards: [_duplicateGuard]),
-    CustomRoute(
-      page: SpacesRoute.page,
-      guards: [_authGuard, _duplicateGuard],
-      transitionsBuilder: TransitionsBuilders.slideLeft,
-    ),
+    // Keep the platform page transition: a CustomRoute would render its own
+    // transitionsBuilder instead of the PageTransitionsTheme, and iOS would
+    // never install the Cupertino edge swipe-back gesture (#899).
+    AutoRoute(page: SpacesRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SpaceDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SpaceMembersRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SpaceAlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
