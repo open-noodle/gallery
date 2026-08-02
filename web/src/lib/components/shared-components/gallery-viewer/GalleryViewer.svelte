@@ -58,6 +58,22 @@
     arrowNavigation?: boolean;
     allowDeletion?: boolean;
     enableGrouping?: boolean;
+    /**
+     * Element this gallery scrolls inside. Defaults to the document, which is what the
+     * full-page callers (search, folders, memory, shared link) use. Surfaces embedded in
+     * an inner `overflow-y-auto` pane — e.g. the smart search results inside
+     * `UserPageLayout` — must pass their scroll container, otherwise `document`'s
+     * scrollTop never moves and virtualization freezes on the first viewport.
+     */
+    scrollElement?: HTMLElement;
+    /**
+     * Overrides click-to-open. Defaults to route navigation (`navigateToAsset`). Callers
+     * that own their own asset viewer (and so need extra context such as `spaceId`) pass
+     * their own opener together with `withAssetViewer={false}`.
+     */
+    onAssetOpen?: (asset: AssetResponseDto) => void;
+    /** Set to `false` when the caller mounts its own `AssetViewer`. */
+    withAssetViewer?: boolean;
   };
 
   let {
@@ -75,6 +91,9 @@
     arrowNavigation = true,
     allowDeletion = true,
     enableGrouping = false,
+    scrollElement = undefined,
+    onAssetOpen = undefined,
+    withAssetViewer = true,
   }: Props = $props();
 
   let galleryGrouping = $state<TimelineGrouping>('day');
@@ -124,7 +143,27 @@
     assets[index] = asset;
   };
 
-  const updateSlidingWindow = () => (scrollTop = document.scrollingElement?.scrollTop ?? 0);
+  const updateSlidingWindow = () => (scrollTop = (scrollElement ?? document.scrollingElement)?.scrollTop ?? 0);
+
+  // `scroll` doesn't bubble, so the `svelte:document` handler below only ever sees
+  // document-level scrolling. Attach directly when we're virtualizing inside a container.
+  $effect(() => {
+    const element = scrollElement;
+    if (!element) {
+      return;
+    }
+    updateSlidingWindow();
+    element.addEventListener('scroll', updateSlidingWindow, { passive: true });
+    return () => element.removeEventListener('scroll', updateSlidingWindow);
+  });
+
+  const openAsset = (asset: AssetResponseDto) => {
+    if (onAssetOpen) {
+      onAssetOpen(asset);
+      return;
+    }
+    void navigateToAsset(asset);
+  };
 
   const debouncedOnEndReached = debounce(() => onEndReached?.(), 750, { maxWait: 100, leading: true });
 
@@ -386,7 +425,7 @@
   const scrollToGalleryAssetIndex = (index: number) => {
     const top = geometry.getTop(index);
     scrollTop = top;
-    document.scrollingElement?.scrollTo?.({ top });
+    (scrollElement ?? document.scrollingElement)?.scrollTo?.({ top });
   };
 
   $effect(() => {
@@ -520,10 +559,10 @@
                   handleSelectAssets(currentAsset);
                   return;
                 }
-                void navigateToAsset(asset);
+                openAsset(asset);
               }}
               onSelect={() => handleSelectAssets(currentAsset)}
-              onPreview={assetInteraction.selectionActive ? () => void navigateToAsset(asset) : undefined}
+              onPreview={assetInteraction.selectionActive ? () => openAsset(asset) : undefined}
               onMouseEvent={() => assetMouseEventHandler(currentAsset)}
               {showArchiveIcon}
               asset={currentAsset}
@@ -547,7 +586,7 @@
 </div>
 
 <!-- Overlay Asset Viewer -->
-{#if assetViewerManager.isViewing}
+{#if withAssetViewer && assetViewerManager.isViewing}
   <Portal target="body">
     {#if LazyAssetViewer.current}
       {@const AssetViewer = LazyAssetViewer.current}
