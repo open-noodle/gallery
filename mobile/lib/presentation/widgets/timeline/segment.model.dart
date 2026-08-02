@@ -44,6 +44,10 @@ abstract class Segment {
 
   bool isWithinOffset(double offset) => startOffset <= offset && offset <= endOffset;
 
+  /// True when this segment renders a year/month overview card rather than rows
+  /// of asset tiles. Overridden by [TimelineOverviewSegment].
+  bool get isOverview => false;
+
   int getMinChildIndexForScrollOffset(double scrollOffset);
   int getMaxChildIndexForScrollOffset(double scrollOffset);
   double indexToLayoutOffset(int index);
