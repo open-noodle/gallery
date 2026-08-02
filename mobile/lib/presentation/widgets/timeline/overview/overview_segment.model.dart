@@ -26,6 +26,9 @@ class TimelineOverviewSegment extends Segment {
   final TimelineOverviewMode mode;
 
   @override
+  bool get isOverview => true;
+
+  @override
   int getMinChildIndexForScrollOffset(double scrollOffset) => firstIndex;
 
   @override
