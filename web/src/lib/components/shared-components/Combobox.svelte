@@ -414,7 +414,7 @@
         <li
           aria-selected={index === selectedIndex}
           bind:this={optionRefs[index]}
-          class="wrap-break-words w-full cursor-pointer px-4 py-2 text-start transition-all hover:bg-gray-200 aria-selected:bg-gray-200 dark:hover:bg-gray-700 aria-selected:dark:bg-gray-700"
+          class="w-full cursor-pointer px-4 py-2 text-start wrap-break-word transition-all hover:bg-gray-200 aria-selected:bg-gray-200 dark:hover:bg-gray-700 aria-selected:dark:bg-gray-700"
           id={`${listboxId}-${index}`}
           onclick={() => handleSelect(option)}
           role="option"
