@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/overview/overview_segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/scroll_drain.dart';
@@ -212,6 +213,6 @@ TimelineOverviewSegment _overviewSegment() => TimelineOverviewSegment(
   endOffset: 100,
   firstAssetIndex: 0,
   bucket: TimeBucket(date: DateTime(2026, 1), assetCount: 12),
-  groupBy: GroupAssetsBy.year,
+  mode: TimelineOverviewMode.years,
   header: HeaderType.none,
 );
