@@ -46,8 +46,11 @@
    * See `docs/superpowers/specs/2026-07-24-selection-toolbar-consistency-design.md`.
    */
   interface Props {
-    timelineManager: TimelineManager;
+    /** Absent on surfaces with no timeline behind them — e.g. smart search results. */
+    timelineManager?: TimelineManager;
     assetInteraction: AssetMultiSelectManager;
+    /** Overrides the timeline-wide select-all. Required when `timelineManager` is absent. */
+    onSelectAll?: () => void;
     /** Present on album surfaces (regular album OR space album). */
     album?: AlbumResponseDto;
     /** Present on space surfaces (direct space OR space album). */
@@ -67,6 +70,7 @@
   let {
     timelineManager,
     assetInteraction,
+    onSelectAll,
     album,
     space,
     downloadFilename,
@@ -184,7 +188,7 @@
       <CreateSharedLink />
     {/if}
     {#if caps.canSelectAll}
-      <SelectAllAssets {timelineManager} {assetInteraction} />
+      <SelectAllAssets {timelineManager} {assetInteraction} {onSelectAll} />
     {/if}
     {#if caps.canAddToAlbum}
       <ActionButton action={Actions.AddToAlbum} />
