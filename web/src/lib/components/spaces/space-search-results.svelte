@@ -1,14 +1,16 @@
 <script lang="ts">
   import { lazyComponent } from '$lib/utils/lazy-component.svelte';
   import { page } from '$app/state';
+  import GalleryViewer from '$lib/components/shared-components/gallery-viewer/GalleryViewer.svelte';
   import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import Portal from '$lib/elements/Portal.svelte';
   import type { AssetCursor } from '$lib/components/asset-viewer/AssetViewer.svelte';
+  import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
+  import type { Viewport } from '$lib/managers/timeline-manager/types';
   import { handlePromiseError } from '$lib/utils';
   import { navigate } from '$lib/utils/navigation';
   import { type AssetResponseDto, getAssetInfo } from '@immich/sdk';
-  import { SvelteMap } from 'svelte/reactivity';
   import { t } from 'svelte-i18n';
 
   interface Props {
@@ -21,14 +23,28 @@
     isShared: boolean;
     sortMode: 'relevance' | 'asc' | 'desc';
     total?: number;
+    /** Re-runs the current search — used to restore results after an undone delete. */
+    onReload?: () => void;
   }
 
-  let { results, isLoading, hasMore, totalLoaded, onLoadMore, spaceId, isShared, sortMode, total }: Props = $props();
+  let {
+    results = $bindable(),
+    isLoading,
+    hasMore,
+    totalLoaded,
+    onLoadMore,
+    spaceId,
+    isShared,
+    sortMode,
+    total,
+    onReload,
+  }: Props = $props();
 
   let isViewerOpen = $state(false);
   let sentinelElement: HTMLElement | undefined = $state();
   let scrollContainer: HTMLElement | undefined = $state();
   let observer: IntersectionObserver | undefined;
+  const viewport: Viewport = $state({ width: 0, height: 0 });
 
   $effect(() => {
     if (!(sentinelElement && scrollContainer)) {
@@ -86,28 +102,6 @@
     await navigate({ targetRoute: 'current', assetId: null });
   };
 
-  // Date grouping for date-sorted modes
-  type DateGroup = { key: string; label: string; assets: AssetResponseDto[] };
-
-  const groupByMonth = (assets: AssetResponseDto[]): DateGroup[] => {
-    const map = new SvelteMap<string, DateGroup>();
-    for (const asset of assets) {
-      const date = asset.fileCreatedAt ? new Date(asset.fileCreatedAt) : undefined;
-      const key = date ? `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}` : 'unknown';
-      let group = map.get(key);
-      if (!group) {
-        const label = date
-          ? date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', timeZone: 'UTC' })
-          : $t('unknown_date');
-        group = { key, label, assets: [] };
-        map.set(key, group);
-      }
-      group.assets.push(asset);
-    }
-    return [...map.values()];
-  };
-
-  let dateGroups = $derived(sortMode === 'relevance' ? [] : groupByMonth(results));
   const resultCount = $derived(total ?? totalLoaded);
   const hasExactTotal = $derived(total !== undefined);
 
@@ -116,7 +110,14 @@
   const LazyAssetViewer = lazyComponent(() => import('$lib/components/asset-viewer/AssetViewer.svelte'));
 </script>
 
-<section bind:this={scrollContainer} class="flex-1 immich-scrollbar overflow-y-auto p-4">
+<!-- `viewport.height` is the *visible* height of the scroll container (what GalleryViewer
+     virtualizes against), while `viewport.width` is measured on the inner content div so it
+     excludes this section's padding. -->
+<section
+  bind:this={scrollContainer}
+  bind:clientHeight={viewport.height}
+  class="flex-1 immich-scrollbar overflow-y-auto p-4"
+>
   {#if isLoading && results.length === 0}
     <div class="flex justify-center py-8" data-testid="search-loading">
       <LoadingSpinner />
@@ -147,39 +148,20 @@
       {/if}
     </div>
 
-    {#if sortMode === 'relevance'}
-      <div class="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3">
-        {#each results as asset (asset.id)}
-          <button
-            type="button"
-            class="aspect-square cursor-pointer overflow-hidden rounded-sm"
-            onclick={() => openAsset(asset)}
-          >
-            <img src="/api/assets/{asset.id}/thumbnail" alt={asset.originalFileName} class="size-full object-cover" />
-          </button>
-        {/each}
-      </div>
-    {:else}
-      {#each dateGroups as group, i (group.key)}
-        <h3
-          class="mt-4 mb-2 text-sm font-medium text-gray-500 first:mt-0 dark:text-gray-400"
-          data-testid="date-group-header-{i}"
-        >
-          {group.label}
-        </h3>
-        <div class="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3">
-          {#each group.assets as asset (asset.id)}
-            <button
-              type="button"
-              class="aspect-square cursor-pointer overflow-hidden rounded-sm"
-              onclick={() => openAsset(asset)}
-            >
-              <img src="/api/assets/{asset.id}/thumbnail" alt={asset.originalFileName} class="size-full object-cover" />
-            </button>
-          {/each}
-        </div>
-      {/each}
-    {/if}
+    <!-- Justified (aspect-ratio preserving) layout with hover selection, matching the
+         timeline and the legacy /search page. See discussion #908. -->
+    <div bind:clientWidth={viewport.width}>
+      <GalleryViewer
+        bind:assets={results}
+        assetInteraction={assetMultiSelectManager}
+        scrollElement={scrollContainer}
+        onAssetOpen={(asset) => handlePromiseError(openAsset(asset))}
+        withAssetViewer={false}
+        showArchiveIcon={true}
+        {viewport}
+        {onReload}
+      />
+    </div>
 
     {#if hasMore}
       <div bind:this={sentinelElement} data-testid="scroll-sentinel" class="flex justify-center py-4">
