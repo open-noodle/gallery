@@ -362,7 +362,15 @@ class MemoryPage extends HookConsumerWidget {
                       ],
                     ),
                   ),
-                  MemoryBottomInfo(memory: memories[mIndex], title: title),
+                  MemoryBottomInfo(
+                    // currentAssetPage tracks the ACTIVE memory only; other pages in
+                    // the vertical PageView show their own first asset.
+                    asset: memoryAssetForPage(
+                      memories[mIndex],
+                      mIndex == currentMemoryIndex.value ? currentAssetPage.value : 0,
+                    ),
+                    title: title,
+                  ),
                 ],
               );
             },
