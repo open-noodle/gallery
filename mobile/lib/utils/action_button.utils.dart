@@ -27,7 +27,7 @@ import 'package:immich_mobile/presentation/actions/stack.action.dart';
 import 'package:immich_mobile/presentation/actions/upload.action.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/base_action_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/like_activity_action_button.widget.dart';
-import 'package:immich_mobile/providers/asset_viewer/scroll_to_date_notifier.provider.dart';
+import 'package:immich_mobile/providers/asset_viewer/scroll_to_asset_notifier.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 
 class ActionButtonContext {
@@ -223,7 +223,7 @@ enum ActionButtonType {
                 }
 
                 await buildContext.navigateTo(const MainTimelineRoute());
-                scrollToDateNotifierProvider.scrollToDate(context.asset.createdAt);
+                scrollToAssetNotifierProvider.scrollToAsset(context.asset);
               },
       ),
       ActionButtonType.cast => const ActionMenuItem(action: CastAction()),
