@@ -67,7 +67,7 @@ void main() {
       notifier.scrollToAsset(_asset('a2'));
 
       expect(notifications, greaterThanOrEqualTo(2));
-      expect((notifier.value?.asset as RemoteAsset).id, 'a2');
+      expect((notifier.value!.asset as RemoteAsset).id, 'a2');
     });
 
     test('treats two copies of the same asset as the same target', () {
