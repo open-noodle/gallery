@@ -34,6 +34,19 @@ describe('LoadingSpinner Component', () => {
     expect(img?.className).toContain('h-5');
   });
 
+  it('should animate so it reads as a loading indicator, not a static logo', () => {
+    const { container } = render(LoadingSpinner);
+    const img = container.querySelector('[data-testid="loading-spinner"]');
+    expect(img?.className).toContain('animate-spin');
+  });
+
+  it('should keep animating when a custom class is supplied', () => {
+    const { container } = render(LoadingSpinner, { props: { class: 'custom-spinner' } });
+    const img = container.querySelector('[data-testid="loading-spinner"]');
+    expect(img?.className).toContain('animate-spin');
+    expect(img?.className).toContain('custom-spinner');
+  });
+
   it('should load gallery loader SVG', () => {
     const { container } = render(LoadingSpinner);
     const img = container.querySelector('[data-testid="loading-spinner"]');
