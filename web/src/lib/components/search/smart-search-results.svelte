@@ -14,6 +14,16 @@
     isShared: boolean;
     isLoading?: boolean;
     total?: number;
+    /**
+     * Loaded results, exposed so the host page's multi-select toolbar can act on them
+     * (select-all, and removing/updating assets after a bulk action).
+     */
+    results?: AssetResponseDto[];
+    /**
+     * Bump to force a re-run of the current search — how a host page restores results after an
+     * undone delete, since undo hands back TimelineAssets rather than full AssetResponseDtos.
+     */
+    reloadToken?: number;
   }
 
   let {
@@ -25,9 +35,10 @@
     isShared,
     isLoading = $bindable(false),
     total,
+    results: searchResults = $bindable([]),
+    reloadToken = 0,
   }: Props = $props();
 
-  let searchResults = $state<AssetResponseDto[]>([]);
   let hasMoreResults = $state(false);
   let searchPage = $state(1);
   let searchAbortController: AbortController | undefined;
@@ -82,10 +93,18 @@
     void executeSearch(searchPage + 1, true);
   };
 
+  // Re-runs the current search from page 1. Used by GalleryViewer's own delete-with-undo path;
+  // a host page triggers the same thing by bumping `reloadToken`.
+  const handleReload = () => {
+    searchPage = 1;
+    void executeSearch(1, false);
+  };
+
   $effect(() => {
     // Track everything that should trigger a re-search
     const _ = [
       searchQuery,
+      reloadToken,
       filters.personIds,
       filters.city,
       filters.country,
@@ -120,11 +139,12 @@
 </script>
 
 <SpaceSearchResults
-  results={searchResults}
+  bind:results={searchResults}
   {isLoading}
   hasMore={hasMoreResults}
   totalLoaded={searchResults.length}
   onLoadMore={handleLoadMore}
+  onReload={handleReload}
   {spaceId}
   {isShared}
   sortMode={filters.sortOrder}
