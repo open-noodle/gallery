@@ -13,11 +13,15 @@ import 'package:immich_mobile/presentation/widgets/timeline/timeline_empty_state
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_selector.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/feature_message.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/memory_lane.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter_search.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/timeline_query.provider.dart';
 import 'package:immich_mobile/widgets/common/immich_sliver_app_bar.dart';
+
+/// Scroll offset the memories strip occupies at the top of the timeline —
+/// matches [DriftMemoryLane]'s own max height so the scrubber lines up.
+const double _memoryLaneHeight = 200;
 
 @RoutePage()
 class MainTimelinePage extends ConsumerStatefulWidget {
@@ -53,7 +57,9 @@ class _MainTimelinePageState extends ConsumerState<MainTimelinePage> {
 
   @override
   Widget build(BuildContext context) {
-    final hasMemories = ref.watch(memoryLaneProvider.select((state) => state.value?.isNotEmpty ?? false));
+    // The memories strip is browse-only: an active search or filter takes the
+    // space back so results start at the top of the viewport (#902, web parity).
+    final showMemories = ref.watch(photosMemoryLaneVisibleProvider);
     return TimelineRouteScope(
       timelineServiceBuilder: buildPhotosTimelineRouteService,
       // The main Photos timeline is the only route on the app-level grouping, so its
@@ -78,13 +84,13 @@ class _MainTimelinePageState extends ConsumerState<MainTimelinePage> {
                 return false;
               },
               child: Timeline(
-                topSliverWidget: const SliverMainAxisGroup(
+                topSliverWidget: SliverMainAxisGroup(
                   slivers: [
-                    PhotosFilterSubheader(),
-                    SliverToBoxAdapter(child: MemoryLane()),
+                    const PhotosFilterSubheader(),
+                    if (showMemories) const SliverToBoxAdapter(child: MemoryLane()),
                   ],
                 ),
-                topSliverWidgetHeight: hasMemories ? 200 : 0,
+                topSliverWidgetHeight: showMemories ? _memoryLaneHeight : 0,
                 showStorageIndicator: true,
                 appBar: const PhotosTimelineAppBar(),
                 bottomSliverWidget: const _SearchLoadMoreFooter(),
