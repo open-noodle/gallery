@@ -19,6 +19,7 @@ import 'package:immich_mobile/extensions/asyncvalue_extensions.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/download_status_floating_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/general_bottom_sheet.widget.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/asset_scan.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/constants.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/scroll_drain.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/scrubber.widget.dart';
@@ -28,10 +29,11 @@ import 'package:immich_mobile/presentation/widgets/timeline/timeline_drag_region
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_anchor.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_bottom_pill.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_scroll_target.dart';
-import 'package:immich_mobile/providers/asset_viewer/scroll_to_date_notifier.provider.dart';
+import 'package:immich_mobile/providers/asset_viewer/scroll_to_asset_notifier.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
+import 'package:immich_mobile/providers/timeline/highlighted_asset.provider.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
 import 'package:immich_mobile/providers/timeline/timeline_grouping.provider.dart';
 import 'package:immich_mobile/providers/timeline/zoom_anchor.provider.dart';
@@ -213,10 +215,10 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
     ref.listenManual(multiSelectProvider.select((s) => s.isEnabled), _onMultiSelectionToggled);
 
     // Drain any pending "view in timeline" request. It is latched in
-    // [scrollToDateNotifierProvider] so it survives this timeline being mounted
+    // [scrollToAssetNotifierProvider] so it survives this timeline being mounted
     // fresh by the navigation (e.g. coming from a memory or a notification)
     // before its segments have loaded and laid out.
-    scrollToDateNotifierProvider.addListener(_requestScrollDrain);
+    scrollToAssetNotifierProvider.addListener(_requestScrollDrain);
     ref.listenManual(timelineSegmentProvider, (_, __) => _requestScrollDrain());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _requestScrollDrain();
@@ -302,6 +304,12 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
     if (previous == null || previous == next) {
       return;
     }
+    // A pending "view in timeline" request is about to scroll precisely — including
+    // for the grouping change this very drain loop just triggered. Don't overwrite
+    // its target with a position-derived anchor.
+    if (scrollToAssetNotifierProvider.value != null) {
+      return;
+    }
     // A card-tap drilldown sets an explicit year/month anchor right before it
     // changes the mode; don't overwrite it with a position-derived anchor.
     if (!ref.read(timelineZoomAnchorProvider).isEmpty) {
@@ -355,7 +363,8 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    scrollToDateNotifierProvider.removeListener(_requestScrollDrain);
+    scrollToAssetNotifierProvider.removeListener(_requestScrollDrain);
+    _resolvingScrollTarget = null;
     _scrollController.dispose();
     unawaited(_eventSubscription?.cancel());
     super.dispose();
@@ -378,13 +387,43 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
   bool _scrollDrainScheduled = false;
   int _scrollDrainAttempts = 0;
   static const int _maxScrollDrainAttempts = 180;
+  bool _daySwitchRequested = false;
+
+  /// Set once the overview->day switch has actually taken effect, so the wait for the
+  /// rebuilt segments gets its own attempt budget rather than the remainder of the one
+  /// the grouping write consumed.
+  bool _postDaySwitchBudgetReset = false;
+
+  /// The target the currently-open drain cycle is working on, so a NEWER request
+  /// arriving mid-cycle gets a fresh attempt budget instead of the old one's remainder.
+  TimelineScrollTarget? _drainingTarget;
+
+  /// Non-null while an async index resolution is in flight. Blocks the drain loop
+  /// from starting a second concurrent scan.
+  TimelineScrollTarget? _resolvingScrollTarget;
+
+  /// Incremented per resolution so a superseded cycle cannot touch shared state
+  /// (scrubbing, highlight) after a newer jump has started.
+  int _scrollResolveGeneration = 0;
 
   /// Ensures a single retry loop is running to apply a pending scroll request.
   void _requestScrollDrain() {
-    if (scrollToDateNotifierProvider.value == null) return;
-    if (_scrollDrainScheduled) return;
+    final pending = scrollToAssetNotifierProvider.value;
+    if (pending == null) return;
+    if (_scrollDrainScheduled) {
+      if (pending != _drainingTarget) {
+        _drainingTarget = pending;
+        _scrollDrainAttempts = 0;
+        _daySwitchRequested = false;
+        _postDaySwitchBudgetReset = false;
+      }
+      return;
+    }
     _scrollDrainScheduled = true;
+    _drainingTarget = pending;
     _scrollDrainAttempts = 0;
+    _daySwitchRequested = false;
+    _postDaySwitchBudgetReset = false;
     _attemptScrollDrain();
   }
 
@@ -399,16 +438,29 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
       return;
     }
 
-    final date = scrollToDateNotifierProvider.value;
+    // A resolution is already in flight; it will restart the loop when it settles.
+    if (_resolvingScrollTarget != null) {
+      return;
+    }
+
+    final target = scrollToAssetNotifierProvider.value;
+    final date = target?.date;
     final segments = ref.read(timelineSegmentProvider).valueOrNull;
     final laidOut = _scrollController.hasClients && _scrollController.position.hasContentDimensions;
     final matched = date != null && segments != null && _findSegmentForDate(segments, date) != null;
+    final isOverview = segmentsAreOverview(segments);
+
+    if (_daySwitchRequested && !isOverview && !_postDaySwitchBudgetReset) {
+      _postDaySwitchBudgetReset = true;
+      _scrollDrainAttempts = 0;
+    }
 
     final action = decideScrollDrain(
       hasPending: date != null,
       segmentsLoaded: segments != null,
       laidOut: laidOut,
       segmentMatched: matched,
+      isOverviewTimeline: isOverview,
       attempts: _scrollDrainAttempts,
       maxAttempts: _maxScrollDrainAttempts,
     );
@@ -416,14 +468,28 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
     switch (action) {
       case ScrollDrainAction.idle:
         _scrollDrainScheduled = false;
+        _daySwitchRequested = false;
+        _drainingTarget = null;
       case ScrollDrainAction.scroll:
-        _scrollToDate(date!, segments!);
-        scrollToDateNotifierProvider.consume();
-        _scrollDrainScheduled = false;
+        _drainingTarget = null;
+        unawaited(_beginScrollToAsset(target!, segments!));
       case ScrollDrainAction.giveUp:
         // Budget exhausted: drop the request so it cannot leak into a later timeline.
-        scrollToDateNotifierProvider.consume();
+        scrollToAssetNotifierProvider.consume();
         _scrollDrainScheduled = false;
+        _daySwitchRequested = false;
+        _drainingTarget = null;
+      case ScrollDrainAction.switchToDayGrouping:
+        // Overview groupings render cards, not tiles. Drill to day the same way a
+        // card tap does, then keep retrying until the rebuilt segments arrive.
+        // `attempts` MUST increment here: if the grouping is pinned and set() is a
+        // no-op, the budget is the only thing that ends this loop.
+        _scrollDrainAttempts++;
+        if (!_daySwitchRequested) {
+          _daySwitchRequested = true;
+          unawaited(ref.read(timelineGroupingProvider.notifier).set(GroupAssetsBy.day));
+        }
+        WidgetsBinding.instance.addPostFrameCallback((_) => _attemptScrollDrain());
       case ScrollDrainAction.retry:
         _scrollDrainAttempts++;
         WidgetsBinding.instance.addPostFrameCallback((_) => _attemptScrollDrain());
@@ -438,19 +504,121 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
     return findTimelineScrollTargetSegment(segments, date);
   }
 
-  void _scrollToDate(DateTime date, List<Segment> segments) {
-    final segment = _findSegmentForDate(segments, date);
-    if (segment == null) return;
+  /// Resolves [target] to its exact row and scrolls there, falling back to the top
+  /// of the matched segment when the asset cannot be located.
+  ///
+  /// Owns the tail of the drain cycle: it consumes the request and releases
+  /// `_scrollDrainScheduled` only after the async resolution settles, so a failed
+  /// lookup cannot silently drop the request.
+  Future<void> _beginScrollToAsset(TimelineScrollTarget target, List<Segment> segments) async {
+    final segment = _findSegmentForDate(segments, target.date);
+    if (segment == null) {
+      // Defensive: decideScrollDrain only returns `scroll` when a segment matched,
+      // so this is unreachable today. Release the cycle and re-open it rather than
+      // returning bare, which would strand the still-latched request forever.
+      _scrollDrainScheduled = false;
+      _drainingTarget = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _requestScrollDrain();
+      });
+      return;
+    }
+
+    _resolvingScrollTarget = target;
+    // Drop any highlight still showing from a previous jump.
+    ref.read(timelineHighlightedAssetProvider.notifier).clear();
+
+    final columnCount = ref.read(timelineArgsProvider).columnCount;
+    final assetIndex = await findAssetIndex(
+      loadAssets: ref.read(timelineServiceProvider).loadAssets,
+      firstAssetIndex: segment.firstAssetIndex,
+      assetCount: segment.bucket.assetCount,
+      target: target.asset,
+    );
+
+    // `==` on TimelineScrollTarget compares date + refersToSameAsset, so re-tapping
+    // the SAME photo mid-resolution reads as unchanged and is absorbed. That is
+    // intended: the destination is identical, and restarting would only re-scan.
+    final outcome = decideScrollResolve(
+      stillMounted: mounted,
+      // `hasContentDimensions` matches the pre-await gate: `maxScrollExtent` below
+      // asserts on an attached-but-unlaid-out position in debug builds.
+      stillHasClients: _scrollController.hasClients && _scrollController.position.hasContentDimensions,
+      targetUnchanged: scrollToAssetNotifierProvider.value == target,
+    );
+    _resolvingScrollTarget = null;
+
+    switch (outcome) {
+      case ScrollResolveOutcome.abandonUnmounted:
+        // The controller may have lost its clients while the widget is still alive;
+        // in that case re-open the cycle rather than stranding the latched request.
+        _scrollDrainScheduled = false;
+        _daySwitchRequested = false;
+        _drainingTarget = null;
+        if (mounted) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _requestScrollDrain();
+          });
+        }
+        return;
+      case ScrollResolveOutcome.abandonStale:
+        // A newer request is latched. Release the cycle and let its listener run.
+        _scrollDrainScheduled = false;
+        _daySwitchRequested = false;
+        _drainingTarget = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _requestScrollDrain();
+        });
+        return;
+      case ScrollResolveOutcome.proceed:
+        break;
+    }
+
+    final rowOffset = assetIndex == null
+        ? null
+        : assetRowOffset(segment: segment, assetIndexInTimeline: assetIndex, columnCount: columnCount);
+
+    // Fallback: the asset is not in this segment (most likely a stack child — the
+    // timeline collapses stacks to the primary, memories do not) or the geometry
+    // could not be computed. Landing on the correct day beats not moving at all.
+    final desiredOffset = rowOffset ?? (segment.startOffset - 50);
+    final targetOffset = desiredOffset.clamp(0.0, _scrollController.position.maxScrollExtent);
+
+    scrollToAssetNotifierProvider.consume();
+    _scrollDrainScheduled = false;
+    _daySwitchRequested = false;
+    _drainingTarget = null;
 
     final timelineState = ref.read(timelineStateProvider.notifier);
-    final maxExtent = _scrollController.position.maxScrollExtent;
-    final targetOffset = (segment.startOffset - 50).clamp(0.0, maxExtent);
+    // Bumped here, where the cycle commits to scrolling — NOT on entry. A cycle that
+    // bailed earlier never touched scrubbing, so it must not supersede (and strand the
+    // un-scrub of) a cycle that did.
+    final generation = ++_scrollResolveGeneration;
     timelineState.setScrubbing(true);
-    unawaited(
-      _scrollController
-          .animateTo(targetOffset, duration: const Duration(milliseconds: 500), curve: Curves.easeInOut)
-          .whenComplete(() => timelineState.setScrubbing(false)),
-    );
+    try {
+      await _scrollController.animateTo(
+        targetOffset,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    } catch (_) {
+      // An interrupted animation (user scrolls, controller detached, or a newer jump
+      // replaced the ScrollActivity) completes with an error. Swallow it: this runs
+      // under unawaited(), so an escaping error would surface as an unhandled async
+      // error, and the finally below still restores the scrubbing state.
+    } finally {
+      // Only the newest resolution may clear scrubbing. A superseded cycle resumes
+      // early when its ScrollActivity is replaced, and must not un-scrub an animation
+      // that is still running.
+      if (mounted && generation == _scrollResolveGeneration) {
+        timelineState.setScrubbing(false);
+      }
+    }
+
+    // Only mark a tile we actually landed on — not the day-level fallback.
+    if (mounted && rowOffset != null && generation == _scrollResolveGeneration) {
+      ref.read(timelineHighlightedAssetProvider.notifier).highlight(target.asset);
+    }
   }
 
   void _scheduleZoomAnchorResolution({
