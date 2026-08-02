@@ -8,6 +8,7 @@ import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/app_settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
+import 'package:immich_mobile/providers/timeline/timeline_grouping.provider.dart';
 import 'package:immich_ui/immich_ui.dart';
 
 class GroupSettings extends HookConsumerWidget {
@@ -15,7 +16,7 @@ class GroupSettings extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final groupBy = useValueNotifier(ref.watch(appConfigProvider.select((s) => s.timeline.groupAssetsBy)));
+    final groupBy = useValueNotifier(ref.watch(timelineGridGroupingProvider));
 
     Future<void> updateAppSettings(GroupAssetsBy groupBy) async {
       await ref.read(settingsProvider).write(.timelineGroupAssetsBy, groupBy);
@@ -40,7 +41,6 @@ class GroupSettings extends HookConsumerWidget {
               title: context.t.asset_list_layout_settings_group_by_month_day,
               value: GroupAssetsBy.day,
             ),
-            SettingsRadioGroup(title: context.t.year, value: GroupAssetsBy.year),
             SettingsRadioGroup(title: context.t.month, value: GroupAssetsBy.month),
           ],
           groupBy: groupBy.value,

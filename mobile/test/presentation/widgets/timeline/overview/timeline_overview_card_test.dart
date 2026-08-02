@@ -6,6 +6,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
@@ -77,7 +78,7 @@ void main() {
       wrap(
         TimelineOverviewCard(
           bucket: TimeBucket(date: DateTime(2025), assetCount: 1),
-          groupBy: GroupAssetsBy.year,
+          mode: TimelineOverviewMode.years,
           representativeAsset: asset,
         ),
       ),
@@ -97,7 +98,7 @@ void main() {
       wrap(
         TimelineOverviewCard(
           bucket: TimeBucket(date: DateTime(2025, 3), assetCount: 4),
-          groupBy: GroupAssetsBy.month,
+          mode: TimelineOverviewMode.months,
         ),
       ),
     );
@@ -112,7 +113,7 @@ void main() {
       wrap(
         TimelineOverviewCard(
           bucket: TimeBucket(date: DateTime(2024), assetCount: 2),
-          groupBy: GroupAssetsBy.year,
+          mode: TimelineOverviewMode.years,
         ),
       ),
     );
@@ -131,7 +132,7 @@ void main() {
       wrap(
         TimelineOverviewCard(
           bucket: TimeBucket(date: DateTime(2025), assetCount: 1),
-          groupBy: GroupAssetsBy.year,
+          mode: TimelineOverviewMode.years,
           onTap: () => taps++,
         ),
       ),
@@ -157,7 +158,7 @@ void main() {
       wrap(
         TimelineOverviewCard(
           bucket: TimeBucket(date: DateTime(2025, 3), assetCount: 4),
-          groupBy: GroupAssetsBy.month,
+          mode: TimelineOverviewMode.months,
           onTap: () {},
         ),
       ),
@@ -179,7 +180,7 @@ void main() {
       wrap(
         TimelineOverviewCard(
           bucket: TimeBucket(date: DateTime(2025), assetCount: 0),
-          groupBy: GroupAssetsBy.year,
+          mode: TimelineOverviewMode.years,
         ),
       ),
     );
@@ -198,7 +199,7 @@ void main() {
       wrap(
         TimelineOverviewCard(
           bucket: TimeBucket(date: DateTime(2025, 3), assetCount: 2),
-          groupBy: GroupAssetsBy.month,
+          mode: TimelineOverviewMode.months,
           onTap: () {},
         ),
       ),
@@ -221,7 +222,7 @@ void main() {
       wrap(
         TimelineOverviewCard(
           bucket: TimeBucket(date: DateTime(2025, 3), assetCount: 3),
-          groupBy: GroupAssetsBy.month,
+          mode: TimelineOverviewMode.months,
           onTap: () {},
         ),
         supportedLocales: const [Locale('de'), Locale('en')],
@@ -244,7 +245,7 @@ void main() {
       wrap(
         TimelineOverviewCard(
           bucket: TimeBucket(date: DateTime(2025, 3), assetCount: 5),
-          groupBy: GroupAssetsBy.month,
+          mode: TimelineOverviewMode.months,
           onTap: () => taps++,
         ),
         supportedLocales: const [Locale('ar'), Locale('en')],
@@ -269,7 +270,7 @@ void main() {
           width: 320,
           child: TimelineOverviewCard(
             bucket: TimeBucket(date: DateTime(2025), assetCount: 1),
-            groupBy: GroupAssetsBy.year,
+            mode: TimelineOverviewMode.years,
             onTap: () {},
           ),
         ),
@@ -293,7 +294,7 @@ void main() {
           width: 240,
           child: TimelineOverviewCard(
             bucket: TimeBucket(date: DateTime(2025, 9), assetCount: 10),
-            groupBy: GroupAssetsBy.month,
+            mode: TimelineOverviewMode.months,
             onTap: () {},
           ),
         ),
@@ -314,7 +315,7 @@ void main() {
       wrap(
         TimelineOverviewCard(
           bucket: TimeBucket(date: DateTime(2025), assetCount: 1),
-          groupBy: GroupAssetsBy.year,
+          mode: TimelineOverviewMode.years,
         ),
         mediaQuery: const MediaQueryData(highContrast: true),
         theme: ThemeData.dark(),
@@ -334,7 +335,7 @@ void main() {
       wrap(
         TimelineOverviewCard(
           bucket: TimeBucket(date: DateTime(2025), assetCount: 1),
-          groupBy: GroupAssetsBy.year,
+          mode: TimelineOverviewMode.years,
           onTap: () {},
         ),
         mediaQuery: const MediaQueryData(disableAnimations: true, accessibleNavigation: true),
@@ -350,7 +351,7 @@ void main() {
       wrap(
         TimelineOverviewCard(
           bucket: TimeBucket(date: DateTime(2025), assetCount: 1),
-          groupBy: GroupAssetsBy.year,
+          mode: TimelineOverviewMode.years,
           onTap: () {},
         ),
       ),
@@ -371,12 +372,12 @@ void main() {
           children: [
             TimelineOverviewCard(
               bucket: TimeBucket(date: DateTime(2025), assetCount: 2),
-              groupBy: GroupAssetsBy.year,
+              mode: TimelineOverviewMode.years,
               onTap: () {},
             ),
             TimelineOverviewCard(
               bucket: TimeBucket(date: DateTime(2024), assetCount: 3),
-              groupBy: GroupAssetsBy.year,
+              mode: TimelineOverviewMode.years,
               onTap: () {},
             ),
           ],
@@ -398,12 +399,12 @@ void main() {
           children: [
             TimelineOverviewCard(
               bucket: TimeBucket(date: DateTime(2025), assetCount: 2),
-              groupBy: GroupAssetsBy.year,
+              mode: TimelineOverviewMode.years,
               onTap: () {},
             ),
             TimelineOverviewCard(
               bucket: TimeBucket(date: DateTime(2024), assetCount: 3),
-              groupBy: GroupAssetsBy.year,
+              mode: TimelineOverviewMode.years,
               onTap: () {},
             ),
           ],

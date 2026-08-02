@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/constants.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment_builder.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/overview/overview_segment_builder.dart';
@@ -76,16 +77,18 @@ final timelineSegmentProvider = StreamProvider.autoDispose<List<Segment>>((ref) 
   final availableTileWidth = maxWidth - (spacing * (columnCount - 1));
   final tileExtent = math.max(0, availableTileWidth) / columnCount;
 
-  final GroupAssetsBy groupBy = groupByArg ?? ref.watch(timelineGroupingProvider);
+  // A pinned groupBy (the cleanup preview) always means the flat grid at that granularity.
+  final spec = groupByArg != null
+      ? (mode: TimelineOverviewMode.all, groupBy: groupByArg)
+      : ref.watch(timelineGroupingSpecProvider);
 
   final timelineService = ref.watch(timelineServiceProvider);
   yield* timelineService.watchBuckets().map((buckets) {
-    // A date-less bucket source (e.g. relevance-sorted search, or a `fromAssets` timeline) cannot
-    // render the year/month overview — fall back to the flat grid regardless of the grouping setting.
+    // A date-less bucket source (relevance-sorted search, or a `fromAssets` timeline) has no
+    // dates to group by — fall back to the flat grid regardless of the mode.
     final isDateless = buckets.isNotEmpty && buckets.first is! TimeBucket;
-    final effectiveGroupBy = isDateless ? GroupAssetsBy.day : groupBy;
-    if (effectiveGroupBy == GroupAssetsBy.year || effectiveGroupBy == GroupAssetsBy.month) {
-      return TimelineOverviewSegmentBuilder(buckets: buckets, groupBy: effectiveGroupBy).generate();
+    if (spec.mode != TimelineOverviewMode.all && !isDateless) {
+      return TimelineOverviewSegmentBuilder(buckets: buckets, mode: spec.mode).generate();
     }
 
     return FixedSegmentBuilder(
@@ -93,13 +96,11 @@ final timelineSegmentProvider = StreamProvider.autoDispose<List<Segment>>((ref) 
       tileHeight: tileExtent,
       columnCount: columnCount,
       spacing: spacing,
-      groupBy: effectiveGroupBy,
+      groupBy: isDateless ? GroupAssetsBy.day : spec.groupBy,
     ).generate();
   });
-  // timelineGroupingProvider must be listed so the auto-scoped copy of this provider
-  // inside a TimelineRouteScope resolves the ROUTE-LOCAL grouping override; without it
-  // the copy reads the root (persisted) grouping and detail routes silently render
-  // the persisted grouping instead of their own.
-}, dependencies: [timelineServiceProvider, timelineArgsProvider, timelineGroupingProvider]);
+  // timelineGroupingSpecProvider must be listed so the auto-scoped copy of this provider
+  // inside a TimelineRouteScope resolves the ROUTE-LOCAL mode rather than the root one.
+}, dependencies: [timelineServiceProvider, timelineArgsProvider, timelineGroupingSpecProvider]);
 
 final timelineStateProvider = NotifierProvider<TimelineStateNotifier, TimelineState>(TimelineStateNotifier.new);
