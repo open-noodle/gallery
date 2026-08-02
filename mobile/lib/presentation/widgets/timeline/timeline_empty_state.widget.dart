@@ -4,20 +4,25 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/photos_filter_search.provider.dart';
 import 'package:immich_mobile/providers/sync_status.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/widgets/common/immich_loading_indicator.dart';
 
 /// Shown on the main Photos timeline when it resolves to zero assets.
 ///
-/// Three states, in priority order:
-///  1. a photos filter is active but matched nothing -> a compact "no results"
-///     state that lets the user clear the filter (never tells an existing user
-///     to enable backup);
-///  2. the initial remote sync is still running -> a loading indicator, so the
+/// Four states, in priority order:
+///  1. a photos filter is active and its search request is still in flight -> a
+///     loading indicator. The search-backed timeline service starts at zero
+///     assets, so without this the "no results" state would be rendered for the
+///     whole duration of every search request (#901);
+///  2. a photos filter is active and the search has answered with nothing -> a
+///     compact "no results" state that lets the user clear the filter (never
+///     tells an existing user to enable backup);
+///  3. the initial remote sync is still running -> a loading indicator, so the
 ///     brief empty bucket emission during sync (the upstream "blank timeline"
 ///     race) never flashes the onboarding state for accounts that have photos;
-///  3. otherwise the account simply has no backed-up photos yet -> a first-run
+///  4. otherwise the account simply has no backed-up photos yet -> a first-run
 ///     onboarding state pointing at backup.
 class TimelineEmptyState extends ConsumerWidget {
   const TimelineEmptyState({super.key});
@@ -26,6 +31,12 @@ class TimelineEmptyState extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final hasActiveFilter = ref.watch(photosFilterProvider.select((f) => !f.isEmpty));
     if (hasActiveFilter) {
+      // Read from inside the TimelineRouteScope, same as the load-more footer, so
+      // this is the scoped notifier actually feeding the timeline.
+      final isSearching = ref.watch(photosFilterSearchProvider.select((s) => s.isLoading));
+      if (isSearching) {
+        return const Center(child: ImmichLoadingIndicator());
+      }
       return const _FilteredEmpty();
     }
 
