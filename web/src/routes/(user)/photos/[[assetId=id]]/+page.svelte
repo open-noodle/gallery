@@ -19,6 +19,7 @@
   import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
   import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import EmptyPlaceholder from '#lib/components/shared-components/EmptyPlaceholder.svelte';
+  import ArchiveAction from '#lib/components/timeline/actions/ArchiveAction.svelte';
   import ChangeDate from '#lib/components/timeline/actions/ChangeDateAction.svelte';
   import ChangeDescription from '#lib/components/timeline/actions/ChangeDescriptionAction.svelte';
   import ChangeLocation from '#lib/components/timeline/actions/ChangeLocationAction.svelte';
@@ -39,7 +40,16 @@
   import { globalSearchManager } from '#lib/managers/global-search-manager.svelte.ts';
   import { memoryManager } from '#lib/managers/memory-manager.svelte.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
-  import type { TimelineGrouping, TimelineTemporalAnchor } from '#lib/managers/timeline-manager/types.ts';
+  import type {
+    TimelineAsset,
+    TimelineGrouping,
+    TimelineTemporalAnchor,
+  } from '#lib/managers/timeline-manager/types.ts';
+  import {
+    removeSearchResults,
+    selectAllSearchResults,
+    updateSearchResults,
+  } from '#lib/utils/search-result-selection.ts';
   import { Route } from '#lib/route.ts';
   import { getAssetBulkActions } from '#lib/services/asset.service.ts';
   import { getStackBulkActions } from '#lib/services/stack.service.ts';
@@ -76,6 +86,7 @@
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
   import MemoryCard from '#lib/components/memories/MemoryCard.svelte';
   import {
+    type AssetResponseDto,
     AssetTypeEnum,
     AssetVisibility,
     getFilterSuggestions,
@@ -85,9 +96,9 @@
     type SmartSearchFacetsResponseDto,
   } from '@immich/sdk';
   import { ActionButton, CommandPaletteDefaultProvider, ImageCarousel, modalManager } from '@immich/ui';
-  import SearchAddAllToCollectionModal from '$lib/modals/SearchAddAllToCollectionModal.svelte';
-  import { filterStateToSearchTerms } from '$lib/utils/filter-search-terms';
-  import type { SearchTerms } from '$lib/services/search.service';
+  import SearchAddAllToCollectionModal from '#lib/modals/SearchAddAllToCollectionModal.svelte';
+  import { filterStateToSearchTerms } from '#lib/utils/filter-search-terms.ts';
+  import type { SearchTerms } from '#lib/services/search.service.ts';
   import { mdiDotsVertical } from '@mdi/js';
   import { DateTime } from 'luxon';
   import { untrack } from 'svelte';
@@ -126,6 +137,11 @@
   >();
   let isLoading = $state(false);
   const showSearchResults = $derived(committedQuery.trim().length > 0);
+  // Loaded smart search results. The timeline (and its TimelineManager) is unmounted while
+  // these are showing, so the multi-select toolbar acts on this array instead (#908).
+  let searchResults = $state<AssetResponseDto[]>([]);
+  // Bumped to force a re-run of the search (undo-delete restores the removed assets).
+  let searchReloadToken = $state(0);
   const options = $derived({
     ...buildPhotosTimelineOptions(filters),
     grouping: timelineGrouping,
@@ -399,8 +415,48 @@
   };
 
   const handleSetVisibility = (assetIds: string[]) => {
-    timelineManager.removeAssets(assetIds);
+    if (showSearchResults) {
+      removeSearchResults(searchResults, assetIds);
+    } else {
+      timelineManager.removeAssets(assetIds);
+    }
     assetMultiSelectManager.clear();
+  };
+
+  // While search results are showing, the timeline is unmounted — bulk actions have to mutate
+  // the result list instead of the TimelineManager (#908).
+  const handleFavorite = (ids: string[], isFavorite: boolean) => {
+    if (showSearchResults) {
+      updateSearchResults(searchResults, ids, (asset) => (asset.isFavorite = isFavorite));
+      return;
+    }
+    timelineManager.update(ids, (asset) => (asset.isFavorite = isFavorite));
+  };
+
+  const handleArchive = (ids: string[], visibility: AssetVisibility) => {
+    if (showSearchResults) {
+      updateSearchResults(searchResults, ids, (asset) => (asset.visibility = visibility));
+      return;
+    }
+    timelineManager.update(ids, (asset) => (asset.visibility = visibility));
+  };
+
+  const handleAssetDelete = (assetIds: string[]) => {
+    if (showSearchResults) {
+      removeSearchResults(searchResults, assetIds);
+      return;
+    }
+    timelineManager.removeAssets(assetIds);
+  };
+
+  const handleUndoDelete = (assets: TimelineAsset[]) => {
+    if (showSearchResults) {
+      // Undo hands back TimelineAssets; the results list holds full AssetResponseDtos, so
+      // re-running the search is how they come back.
+      searchReloadToken++;
+      return;
+    }
+    timelineManager.upsertAssets(assets);
   };
 
   registerSelectionContext({
@@ -408,16 +464,10 @@
     clearSelection: () => assetMultiSelectManager.clear(),
     canAddToAlbum: () => true,
     canAddToSpace: () => true,
-    getOnFavorite: () =>
-      timelineManager
-        ? (ids, isFavorite) => timelineManager.update(ids, (asset) => (asset.isFavorite = isFavorite))
-        : undefined,
-    getOnArchive: () =>
-      timelineManager
-        ? (ids, visibility) => timelineManager.update(ids, (asset) => (asset.visibility = visibility))
-        : undefined,
-    getOnDelete: () => (timelineManager ? (assetIds) => timelineManager.removeAssets(assetIds) : undefined),
-    getOnUndoDelete: () => (timelineManager ? (assets) => timelineManager.upsertAssets(assets) : undefined),
+    getOnFavorite: () => (showSearchResults || timelineManager ? handleFavorite : undefined),
+    getOnArchive: () => (showSearchResults || timelineManager ? handleArchive : undefined),
+    getOnDelete: () => (showSearchResults || timelineManager ? handleAssetDelete : undefined),
+    getOnUndoDelete: () => (showSearchResults || timelineManager ? handleUndoDelete : undefined),
   });
 
   function clearSearch() {
@@ -595,6 +645,8 @@
       {#if showSearchResults}
         <SmartSearchResults
           bind:isLoading
+          bind:results={searchResults}
+          reloadToken={searchReloadToken}
           searchQuery={committedQuery}
           {filters}
           language={$lang}
@@ -649,20 +701,26 @@
     <CommandPaletteDefaultProvider name={$t('assets')} actions={Object.values(Actions)} />
 
     <ActionButton action={Actions.CreateSharedLink} />
-    <SelectAllAssets {timelineManager} assetInteraction={assetMultiSelectManager} />
+    {#if showSearchResults}
+      <SelectAllAssets
+        assetInteraction={assetMultiSelectManager}
+        onSelectAll={() => selectAllSearchResults(searchResults, assetMultiSelectManager)}
+      />
+    {:else}
+      <SelectAllAssets {timelineManager} assetInteraction={assetMultiSelectManager} />
+    {/if}
     <ActionButton action={Actions.AddToAlbum} />
 
     {#if assetMultiSelectManager.isAllUserOwned}
-      <FavoriteAction
-        removeFavorite={assetMultiSelectManager.isAllFavorite}
-        onFavorite={(ids, isFavorite) => timelineManager.update(ids, (asset) => (asset.isFavorite = isFavorite))}
-      />
+      <FavoriteAction removeFavorite={assetMultiSelectManager.isAllFavorite} onFavorite={handleFavorite} />
 
       <ButtonContextMenu icon={mdiDotsVertical} title={$t('menu')}>
         <DownloadAction menuItem />
-        <ActionMenuItem action={StackActions.Stack} />
-        <ActionMenuItem action={StackActions.Unstack} />
-        {#if isLinkActionAvailable}
+        {#if !showSearchResults}
+          <ActionMenuItem action={StackActions.Stack} />
+          <ActionMenuItem action={StackActions.Unstack} />
+        {/if}
+        {#if !showSearchResults && isLinkActionAvailable}
           <LinkLivePhotoAction
             menuItem
             unlink={assetMultiSelectManager.assets.length === 1}
@@ -674,14 +732,9 @@
         <ChangeDate menuItem />
         <ChangeDescription menuItem />
         <ChangeLocation menuItem />
-        <ActionMenuItem action={Actions.Archive} />
-        <ActionMenuItem action={Actions.Unarchive} />
+        <ArchiveAction menuItem onArchive={handleArchive} />
         <ActionMenuItem action={Actions.Tag} />
-        <DeleteAssets
-          menuItem
-          onAssetDelete={(assetIds) => timelineManager.removeAssets(assetIds)}
-          onUndoDelete={(assets) => timelineManager.upsertAssets(assets)}
-        />
+        <DeleteAssets menuItem onAssetDelete={handleAssetDelete} onUndoDelete={handleUndoDelete} />
         <SetVisibilityAction menuItem onVisibilitySet={handleSetVisibility} />
         <hr />
         <ActionMenuItem action={Actions.RegenerateThumbnailJob} />
