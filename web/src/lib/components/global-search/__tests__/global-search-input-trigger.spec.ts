@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
@@ -15,6 +15,19 @@ const { mockPage } = vi.hoisted(() => ({
 
 vi.mock('$app/state', () => ({ page: mockPage }));
 
+const { mediaState } = vi.hoisted(() => ({ mediaState: { pointerCoarse: false, minLg: false } }));
+
+vi.mock('$lib/stores/media-query-manager.svelte', () => ({
+  mediaQueryManager: {
+    get pointerCoarse() {
+      return mediaState.pointerCoarse;
+    },
+    get minLg() {
+      return mediaState.minLg;
+    },
+  },
+}));
+
 describe('global-search-input-trigger', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -23,6 +36,8 @@ describe('global-search-input-trigger', () => {
     mockPage.route.id = null;
     mockPage.params = {};
     sessionStorage.clear();
+    mediaState.pointerCoarse = false;
+    mediaState.minLg = false;
   });
 
   it('opens a dropdown from an editable search field', async () => {
@@ -179,6 +194,114 @@ describe('global-search-input-trigger', () => {
     expect(document.querySelector('[data-cmdk-dropdown-panel]')).toBeNull();
   });
 
+  it('opens the modal palette when the search field is tapped', async () => {
+    const openSpy = vi.spyOn(globalSearchManager, 'open');
+    const user = userEvent.setup();
+
+    render(GlobalSearchInputTrigger);
+
+    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await user.pointer({ keys: '[TouchA]', target: input });
+
+    expect(openSpy).toHaveBeenCalledWith('modal');
+    expect(globalSearchManager.presentation).toBe('modal');
+    expect(document.querySelector('[data-cmdk-dropdown-panel]')).toBeNull();
+  });
+
+  it('does not focus the search field when it is tapped', async () => {
+    const user = userEvent.setup();
+
+    render(GlobalSearchInputTrigger);
+
+    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await user.pointer({ keys: '[TouchA]', target: input });
+
+    expect(input).not.toHaveFocus();
+  });
+
+  it('opens the inline dropdown for pen input rather than the modal', async () => {
+    const user = userEvent.setup();
+
+    render(GlobalSearchInputTrigger);
+
+    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await fireEvent.pointerDown(input, { pointerType: 'pen' });
+    await user.click(input);
+
+    expect(globalSearchManager.presentation).toBe('dropdown');
+  });
+
+  it('opens the inline dropdown when a pointerdown carries no pointer type', async () => {
+    const user = userEvent.setup();
+
+    render(GlobalSearchInputTrigger);
+
+    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await fireEvent.pointerDown(input);
+    await user.click(input);
+
+    expect(globalSearchManager.presentation).toBe('dropdown');
+  });
+
+  it('does not let focus downgrade an open modal to the inline dropdown', async () => {
+    render(GlobalSearchInputTrigger);
+
+    globalSearchManager.open('modal');
+
+    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await fireEvent.focus(input);
+
+    expect(globalSearchManager.presentation).toBe('modal');
+    expect(document.querySelector('[data-cmdk-dropdown-panel]')).toBeNull();
+  });
+
+  it('upgrades an already-open inline dropdown to the modal when tapped', async () => {
+    const user = userEvent.setup();
+
+    render(GlobalSearchInputTrigger);
+
+    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await user.click(input);
+    expect(globalSearchManager.presentation).toBe('dropdown');
+
+    await user.pointer({ keys: '[TouchA]', target: input });
+
+    expect(globalSearchManager.presentation).toBe('modal');
+    expect(document.querySelector('[data-cmdk-dropdown-panel]')).toBeNull();
+  });
+
+  it('reopens the modal on a second tap after the first modal was closed', async () => {
+    const user = userEvent.setup();
+
+    render(GlobalSearchInputTrigger);
+
+    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await user.pointer({ keys: '[TouchA]', target: input });
+    expect(globalSearchManager.presentation).toBe('modal');
+
+    globalSearchManager.close();
+    expect(globalSearchManager.isOpen).toBe(false);
+
+    await user.pointer({ keys: '[TouchA]', target: input });
+
+    expect(globalSearchManager.isOpen).toBe(true);
+    expect(globalSearchManager.presentation).toBe('modal');
+    expect(document.querySelector('[data-cmdk-dropdown-panel]')).toBeNull();
+  });
+
+  it('opens the inline dropdown, not the modal, when focus arrives via Tab with no pointer event', async () => {
+    const user = userEvent.setup();
+
+    render(GlobalSearchInputTrigger);
+
+    await user.tab();
+
+    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
+    expect(input).toHaveFocus();
+    expect(globalSearchManager.presentation).toBe('dropdown');
+    expect(document.querySelector('[data-cmdk-dropdown-panel]')).not.toBeNull();
+  });
+
   it('renders the placeholder and hotkey hint', () => {
     render(GlobalSearchInputTrigger);
 
@@ -251,5 +374,31 @@ describe('global-search-input-trigger', () => {
     await user.click(screen.getByText('search_sort_oldest'));
 
     expect(applySortSpy).toHaveBeenCalledWith('asc', '');
+  });
+
+  it('hides the keyboard hint when the pointer is coarse', () => {
+    mediaState.pointerCoarse = true;
+
+    render(GlobalSearchInputTrigger);
+
+    expect(screen.queryByText(/^(⌘K|Ctrl\+K)$/)).not.toBeInTheDocument();
+  });
+
+  it('keeps the search field usable when the keyboard hint is hidden', () => {
+    mediaState.pointerCoarse = true;
+
+    render(GlobalSearchInputTrigger);
+
+    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
+    expect(input).toBeInTheDocument();
+    expect(screen.getByTestId('cmdk-input-trigger')).toBeInTheDocument();
+  });
+
+  it('shows the keyboard hint when the pointer is not coarse', () => {
+    mediaState.pointerCoarse = false;
+
+    render(GlobalSearchInputTrigger);
+
+    expect(screen.getByText(/^(⌘K|Ctrl\+K)$/)).toBeInTheDocument();
   });
 });
