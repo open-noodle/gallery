@@ -2724,12 +2724,18 @@ export class GlobalSearchManager {
             const items = response.assets.items;
             return items.length === 0 ? { status: 'empty' } : { status: 'ok', items, total: items.length };
           }
-          // MetadataSearchDto does not have a withSharedSpaces field — shared-space
-          // scoping for metadata search would require passing spaceId, which we do not
-          // have in the palette. Only smart search includes shared-space content in v1.
+          // withSharedSpaces:true for the same reason as smart mode above — without it the
+          // field modes searched only the user's OWN assets, so a Space member whose photos
+          // live in someone else's Space saw an empty Photos section while smart search
+          // worked (#894). `withSharedSpaces` is inherited from BaseSearchSchema onto
+          // MetadataSearchDto and honoured by SearchService.searchMetadata; only
+          // SmartSearchDto re-declares it, which previously made it look smart-only.
+          // Safe to send unconditionally: the server rejects withSharedSpaces only when
+          // combined with spaceId, which the palette never sends here.
           const metadataSearchDto: MetadataSearchDto = {
             size: 5,
             visibility: AssetVisibility.Timeline,
+            withSharedSpaces: true,
             ...(mode === 'metadata' && { originalFileName: query }),
             ...(mode === 'description' && { description: query }),
             ...(mode === 'ocr' && { ocr: query }),
