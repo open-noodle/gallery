@@ -4,9 +4,16 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/memory.model.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/memory/memory_title.widget.dart';
-import 'package:immich_mobile/providers/asset_viewer/scroll_to_date_notifier.provider.dart';
+import 'package:immich_mobile/providers/asset_viewer/scroll_to_asset_notifier.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:intl/intl.dart';
+
+/// The asset shown on [page] of [memory], clamped to the memory's bounds.
+///
+/// `currentAssetPage` in the memory page belongs to the ACTIVE memory, so an
+/// inactive page in the vertical PageView can ask for an index this memory does
+/// not have.
+RemoteAsset memoryAssetForPage(Memory memory, int page) => memory.assets[page.clamp(0, memory.assets.length - 1)];
 
 class MemoryBottomInfo extends StatelessWidget {
   final Memory memory;
@@ -50,8 +57,8 @@ class MemoryBottomInfo extends StatelessWidget {
                 // Activate the existing timeline tab without rebuilding it (a fresh
                 // TabShellRoute would reload the timeline to the top and discard the scroll).
                 await context.navigateTo(const MainTimelineRoute());
-                // #28941: scroll to the date in the viewer's local time, not UTC.
-                scrollToDateNotifierProvider.scrollToDate(fileCreatedDate.toLocal());
+                // #28941: the notifier converts to the viewer's local time itself.
+                scrollToAssetNotifierProvider.scrollToAsset(asset);
               },
               shape: const CircleBorder(),
               color: Colors.white.withValues(alpha: 0.2),
