@@ -12,6 +12,7 @@ import 'package:immich_mobile/utils/error_handler.dart';
 /// [ownedAssetsActionProvider] — see the design doc's hard constraint.
 final _hasRemoteAssetsProvider = Provider.family.autoDispose<bool, ActionSource>(
   (ref, source) => ref.watch(assetsActionProvider(source)).remote().isNotEmpty,
+  dependencies: [assetsActionProvider],
 );
 
 class RemoveFromSpaceAction extends AssetActionBuilder {
