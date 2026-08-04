@@ -84,6 +84,24 @@ const albumFolderRow = (overrides: Partial<Record<string, unknown>> = {}) => ({
   ...overrides,
 });
 
+/** Helper to build a space-owner + linkable-album fixture for the linkAlbum-with-a-folder tests below. */
+const setupAlbumLink = (mocks: ServiceMocks) => {
+  const auth = factory.auth({ user: { isAdmin: false } });
+  const space = factory.sharedSpace({ faceRecognitionEnabled: false });
+  const albumId = newUuid();
+  mocks.sharedSpace.getMember.mockResolvedValue(
+    makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Owner }),
+  );
+  mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([albumId]));
+  mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set());
+  mocks.sharedSpace.addAlbum.mockResolvedValue({ spaceId: space.id, albumId } as any);
+  mocks.sharedSpace.getById.mockResolvedValue(space);
+  mocks.sharedSpace.update.mockResolvedValue(space);
+  mocks.album.getById.mockResolvedValue({ albumName: 'Rome' } as any);
+  mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+  return { auth, space, albumId };
+};
+
 /** Helper to build a move fixture (folder + destination target) for the updateAlbumFolder move tests below. */
 const setupAlbumFolderMove = (
   mocks: ServiceMocks,
@@ -14138,6 +14156,42 @@ describe(SharedSpaceService.name, () => {
         await expect(sut.setAlbumFolder(auth, space.id, newUuid(), { folderId: null } as any)).rejects.toBeInstanceOf(
           ForbiddenException,
         );
+        expect(mocks.sharedSpace.setAlbumLinkFolder).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('linkAlbum with a folder', () => {
+      // A-10: one request, not link-then-move — otherwise a bulk link doubles its round-trips
+      // and every album visibly flashes at the root first.
+      it('A-10: links and places the album in a single call', async () => {
+        const { auth, space, albumId } = setupAlbumLink(mocks);
+        const folder = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+        mocks.sharedSpace.setAlbumLinkFolder.mockResolvedValue(true);
+
+        await sut.linkAlbum(auth, space.id, albumId, folder.id);
+
+        expect(mocks.sharedSpace.addAlbum).toHaveBeenCalled();
+        expect(mocks.sharedSpace.setAlbumLinkFolder).toHaveBeenCalledWith(space.id, albumId, folder.id);
+      });
+
+      // A-09: the folder is validated BEFORE the link is created, so a bad folderId never
+      // leaves a half-finished link behind.
+      it('A-09: rejects an invalid folderId without creating the link', async () => {
+        const { auth, space, albumId } = setupAlbumLink(mocks);
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(void 0 as any);
+
+        await expect(sut.linkAlbum(auth, space.id, albumId, newUuid())).rejects.toBeInstanceOf(BadRequestException);
+        expect(mocks.sharedSpace.addAlbum).not.toHaveBeenCalled();
+      });
+
+      it('links to the space root when no folder is given, exactly as before', async () => {
+        const { auth, space, albumId } = setupAlbumLink(mocks);
+
+        await sut.linkAlbum(auth, space.id, albumId);
+
+        expect(mocks.sharedSpace.addAlbum).toHaveBeenCalled();
+        expect(mocks.sharedSpace.getAlbumFolderById).not.toHaveBeenCalled();
         expect(mocks.sharedSpace.setAlbumLinkFolder).not.toHaveBeenCalled();
       });
     });

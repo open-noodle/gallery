@@ -46,6 +46,7 @@ import {
   SharedSpaceAlbumFolderMoveAlbumDto,
   SharedSpaceAlbumFolderParamDto,
   SharedSpaceAlbumFolderUpdateDto,
+  SharedSpaceAlbumLinkQueryDto,
   SharedSpaceAlbumLinkUpdateDto,
   SharedSpaceAlbumMemberTimelineDto,
   SharedSpaceAlbumParamDto,
@@ -706,11 +707,17 @@ export class SharedSpaceController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @Endpoint({
     summary: 'Link an album to a shared space',
-    description: 'Link an album so its photos appear in the space. Requires space editor/owner and album owner/editor.',
+    description:
+      'Link an album so its photos appear in the space. Requires space editor/owner and album owner/editor. ' +
+      'Pass folderId to place the album directly in a folder in the same request.',
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
-  linkAlbum(@Auth() auth: AuthDto, @Param() { id, albumId }: SharedSpaceAlbumParamDto): Promise<void> {
-    return this.service.linkAlbum(auth, id, albumId);
+  linkAlbum(
+    @Auth() auth: AuthDto,
+    @Param() { id, albumId }: SharedSpaceAlbumParamDto,
+    @Query() { folderId }: SharedSpaceAlbumLinkQueryDto,
+  ): Promise<void> {
+    return this.service.linkAlbum(auth, id, albumId, folderId ?? null);
   }
 
   @Patch(':id/albums/:albumId')

@@ -213,6 +213,13 @@ const SharedSpaceAlbumParamSchema = z.object({
   albumId: z.uuidv4(),
 });
 
+// A QUERY param, not a body. A NestJS `@Body() dto` emits `required: true` in the OpenAPI
+// document even when every field is optional, which would change the generated Dart
+// `linkAlbum` signature and break mobile's existing no-argument call.
+const SharedSpaceAlbumLinkQuerySchema = z.object({
+  folderId: z.uuidv4().optional().describe('Place the newly linked album in this folder'),
+});
+
 // security-9: every path param is a uuidv4, so a non-UUID segment becomes a 400 rather than a
 // raw Postgres 22P02 -> 500.
 const SharedSpaceAlbumFolderParamSchema = z.object({
@@ -322,6 +329,7 @@ export class SharedSpaceAlbumFolderCreateDto extends createZodDto(SharedSpaceAlb
 export class SharedSpaceAlbumFolderUpdateDto extends createZodDto(SharedSpaceAlbumFolderUpdateSchema) {}
 export class SharedSpaceAlbumFolderMoveAlbumDto extends createZodDto(SharedSpaceAlbumFolderMoveAlbumSchema) {}
 export class SharedSpaceAlbumParamDto extends createZodDto(SharedSpaceAlbumParamSchema) {}
+export class SharedSpaceAlbumLinkQueryDto extends createZodDto(SharedSpaceAlbumLinkQuerySchema) {}
 export class SharedSpaceAlbumFolderParamDto extends createZodDto(SharedSpaceAlbumFolderParamSchema) {}
 export class SharedSpaceMemberParamDto extends createZodDto(SharedSpaceMemberParamSchema) {}
 export class SharedSpacePersonParamDto extends createZodDto(SharedSpacePersonParamSchema) {}

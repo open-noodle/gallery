@@ -881,11 +881,20 @@ export class SharedSpaceService extends BaseService {
     }
   }
 
-  async linkAlbum(auth: AuthDto, spaceId: string, albumId: string): Promise<void> {
+  async linkAlbum(auth: AuthDto, spaceId: string, albumId: string, folderId?: string | null): Promise<void> {
     await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
     // Actor must own or be an editor of the album (cannot re-share a read-only album).
     // AlbumUpdate = owner ∪ album_user-editor and is NOT extended by the space grant → no circularity.
     await this.requireAccess({ auth, permission: Permission.AlbumUpdate, ids: [albumId] });
+
+    // A-09: validate the destination BEFORE creating the link, so a bad folderId cannot leave a
+    // half-finished link behind.
+    if (folderId) {
+      const folder = await this.sharedSpaceRepository.getAlbumFolderById(spaceId, folderId);
+      if (!folder) {
+        throw new BadRequestException('Folder not found');
+      }
+    }
 
     const result = await this.sharedSpaceRepository.addAlbum({
       spaceId,
@@ -914,6 +923,12 @@ export class SharedSpaceService extends BaseService {
       // create-side trigger can miss the other's just-committed row, leaving a member of this
       // space without a grant for the newly-linked album. The reconcile self-heals it.
       await this.queueAlbumGrantReconcile([albumId]);
+    }
+
+    // A-10: placed last, after logActivity, so re-linking an already-linked album (result is
+    // falsy) still lands it in the requested folder.
+    if (folderId) {
+      await this.sharedSpaceRepository.setAlbumLinkFolder(spaceId, albumId, folderId);
     }
   }
 
