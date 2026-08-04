@@ -1,4 +1,18 @@
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
+
+/// The segments a drain may act on, or null while the timeline is still swapping
+/// to a different source.
+///
+/// `AsyncValue.valueOrNull` keeps serving the PREVIOUS segments while the stream
+/// refreshes, which is exactly the window a "view in timeline" jump out of search
+/// opens: clearing the Photos filter swaps `timelineServiceProvider`, but the
+/// search segments — same dates, same matches — stay visible to the drain for a
+/// few frames. Scrolling to one of those moves the timeline being left behind and
+/// consumes the request, so the jump never lands (#898). Treat a refreshing stream
+/// as not-loaded-yet and let the drain retry until the new segments arrive.
+List<Segment>? drainableSegments(AsyncValue<List<Segment>> segments) =>
+    segments.isLoading ? null : segments.valueOrNull;
 
 /// What the timeline should do this frame with a pending "view in timeline"
 /// scroll request.
