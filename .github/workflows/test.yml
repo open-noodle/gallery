@@ -53,9 +53,6 @@ jobs:
             machine-learning:
               - 'machine-learning/**'
               - 'mise.toml'
-            branding:
-              - 'branding/**'
-              - 'i18n/**'
             upstream-preflight:
               - '.github/workflows/test.yml'
               - 'tools/upstream-preflight/**'
@@ -251,12 +248,28 @@ jobs:
   # Behavioural gate for the branding pipeline. ShellCheck only lints these
   # scripts; nothing in CI ran patch_i18n() and asserted what it produces, which
   # is how the delete-and-fall-back-to-English behaviour behind issue #844 went
-  # unnoticed. The script patches a throwaway copy of i18n/, so it needs no
-  # image tooling, no network and no build — just bash and jq.
-  branding-i18n-tests:
-    name: Test i18n Branding
+  # unnoticed. Only test-i18n-branding.sh was ever wired up; the other five
+  # branding scripts ran in no workflow at all.
+  #
+  # This runs branding/scripts/gallery-branding-check.sh, the umbrella gate: it
+  # creates a throwaway detached worktree at HEAD, runs every branding
+  # regression test (email, app-download, i18n, oauth-callback), then applies the
+  # full branding overlay and verifies the result. It never mutates the checkout
+  # and asserts as much on exit. ~14s end to end, and it works on the shallow
+  # clone actions/checkout produces.
+  #
+  # It is deliberately NOT gated on a path filter. apply-branding rewrites SOURCE
+  # files (web/, server/, mobile/), so what breaks it is usually an edit to a file
+  # it patches, not to branding/ itself. Upstream #30527 is the worked example: it
+  # moved the app-download store URLs out of AppDownloadModal.svelte into
+  # @immich/ui `Constants`, turning apply-branding's literal-URL rewrites into
+  # silent no-ops so a branded build shipped upstream's Play/App Store links. It
+  # touched only web/, so the old `branding/**` filter would have skipped this job
+  # precisely when it was needed. At ~14s, always running it is cheaper than
+  # trying to enumerate which paths can invalidate branding.
+  branding-tests:
+    name: Test Branding
     needs: pre-job
-    if: ${{ fromJSON(needs.pre-job.outputs.should_run).branding == true }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -267,8 +280,15 @@ jobs:
           persist-credentials: false
           token: ${{ github.token }}
 
-      - name: Run i18n branding regression tests
-        run: ./branding/scripts/test-i18n-branding.sh
+      # apply-branding resizes the Android 12 splash assets and verify-mobile-assets
+      # measures icon bounds, both via ImageMagick. It is no longer preinstalled on
+      # the ubuntu runner images, so install it explicitly rather than letting the
+      # check fail with "ImageMagick convert or magick is required".
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
+
+      - name: Run branding pipeline checks
+        run: ./branding/scripts/gallery-branding-check.sh
 
   i18n-tests:
     name: Test i18n
