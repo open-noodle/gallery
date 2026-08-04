@@ -1,11 +1,16 @@
 import { getResizeObserverMock } from '#lib/__mocks__/resize-observer.mock.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import AssetAddToCollectionModal from '#lib/modals/AssetAddToCollectionModal.svelte';
 import { queryClient } from '#lib/queries/client.ts';
 import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
-import { factory } from '#test/unit/factories.ts';
-import { renderWithTooltips } from '#test/unit/helpers.ts';
+import { renderWithTooltips } from '#tests/helpers';
 import type { UserConfigDto } from '@immich/sdk';
+import { modalManager } from '@immich/ui';
 import '@testing-library/jest-dom';
+import { fireEvent, screen } from '@testing-library/svelte';
+import { assetFactory } from '#test-data/factories/asset-factory';
+import { preferencesFactory } from '#test-data/factories/preferences-factory';
+import { userAdminFactory } from '#test-data/factories/user-factory';
 import AssetViewerNavBar from './AssetViewerNavBar.svelte';
 
 vi.mock(import('#lib/managers/feature-flags-manager.svelte.js'), function () {
@@ -46,10 +51,10 @@ describe('AssetViewerNavBar component', () => {
   });
 
   it('shows back button', () => {
-    const preferences = factory.preferences({ cast: { gCastEnabled: false } });
+    const preferences = preferencesFactory.build({ cast: { gCastEnabled: false } });
     authManager.setPreferences(preferences);
 
-    const asset = factory.asset({ isTrashed: false });
+    const asset = assetFactory.build({ isTrashed: false });
     const { getByLabelText } = renderWithTooltips(AssetViewerNavBar, { asset, ...additionalProps });
     // @ts-expect-error pending a type fix: https://github.com/testing-library/jest-dom/pull/742/changes
     expect(getByLabelText('go_back')).toBeInTheDocument();
@@ -76,8 +81,8 @@ describe('AssetViewerNavBar component', () => {
   describe('if the current user owns the asset', () => {
     it('shows delete button', () => {
       const ownerId = 'id-of-the-user';
-      const user = factory.user({ id: ownerId });
-      const asset = factory.asset({ ownerId, isTrashed: false });
+      const user = userAdminFactory.build({ id: ownerId });
+      const asset = assetFactory.build({ ownerId, isTrashed: false });
       authManager.setUser(user);
       queryClient.setQueryData(getUserConfigQuery().queryKey, {
         machineLearning: {
@@ -90,12 +95,44 @@ describe('AssetViewerNavBar component', () => {
         trash: { enabled: true, days: 30 },
       } as UserConfigDto);
 
-      const preferences = factory.preferences({ cast: { gCastEnabled: false } });
+      const preferences = preferencesFactory.build({ cast: { gCastEnabled: false } });
       authManager.setPreferences(preferences);
 
       const { getByLabelText } = renderWithTooltips(AssetViewerNavBar, { asset, ...additionalProps });
       // @ts-expect-error pending a type fix: https://github.com/testing-library/jest-dom/pull/742/changes
       expect(getByLabelText('delete')).toBeInTheDocument();
+    });
+  });
+
+  // #889: viewing a shared-space photo owned by someone else, "add to album or space" used to
+  // list every personal album — all of which the server must reject.
+  describe('add to album on a shared-space photo the user does not own', () => {
+    const renderSpaceViewer = async (space: { id: string; canWrite: boolean }) => {
+      authManager.setUser(userAdminFactory.build({ id: 'space-member' }));
+      authManager.setPreferences(preferencesFactory.build({ cast: { gCastEnabled: false } }));
+      const asset = assetFactory.build({ id: 'space-photo', ownerId: 'space-owner', isTrashed: false });
+
+      renderWithTooltips(AssetViewerNavBar, { asset, space, ...additionalProps });
+      await fireEvent.click(screen.getByLabelText('more'));
+    };
+
+    it('narrows the picker to the space for an editor', async () => {
+      const show = vi.spyOn(modalManager, 'show').mockResolvedValue(undefined as never);
+
+      await renderSpaceViewer({ id: 'space-1', canWrite: true });
+      await fireEvent.click(screen.getByText('add_to_album_or_space'));
+
+      expect(show).toHaveBeenCalledWith(AssetAddToCollectionModal, {
+        assetIds: ['space-photo'],
+        restrictToSpaceId: 'space-1',
+      });
+      show.mockRestore();
+    });
+
+    it('does not offer the action to a viewer', async () => {
+      await renderSpaceViewer({ id: 'space-1', canWrite: false });
+
+      expect(screen.queryByText('add_to_album_or_space')).not.toBeInTheDocument();
     });
   });
 });

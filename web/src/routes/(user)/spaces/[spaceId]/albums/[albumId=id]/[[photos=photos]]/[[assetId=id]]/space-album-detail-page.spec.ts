@@ -362,6 +362,25 @@ describe('Space album detail page', () => {
     expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-enable-routing', 'true');
   });
 
+  // #889 — the in-place asset viewer gates add-to-album on the space capability, so the browse
+  // timeline has to carry it (an album linked to this space is the only target the server can
+  // accept another member's photo into).
+  it('browse timeline carries the space capability for an editor', () => {
+    renderPage();
+    expect(screen.getByTestId('space-album-timeline')).toHaveAttribute(
+      'data-space',
+      JSON.stringify({ id: 'space-1', canWrite: true }),
+    );
+  });
+
+  it('browse timeline carries the space capability as read-only for a viewer', () => {
+    renderPage({ members: [makeMember(SharedSpaceRole.Viewer)] });
+    expect(screen.getByTestId('space-album-timeline')).toHaveAttribute(
+      'data-space',
+      JSON.stringify({ id: 'space-1', canWrite: false }),
+    );
+  });
+
   it('in browse mode, the timeline-desktop-grouping-control renders', () => {
     renderPage();
     expect(screen.getByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
