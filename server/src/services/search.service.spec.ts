@@ -1094,6 +1094,28 @@ describe(SearchService.name, () => {
         );
       });
 
+      // #830: the reference asset for "Show similar photos" is often one the caller reaches only
+      // through a Space, so the access check has to clear on space membership rather than
+      // ownership, and the space scope has to survive onto the queryAssetId path.
+      it('should scope a queryAssetId search to shared spaces for a member who does not own the reference asset', async () => {
+        const assetId = newUuid();
+        const spaceId = newUuid();
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+        mocks.access.asset.checkAlbumAccess.mockResolvedValue(new Set());
+        mocks.access.asset.checkPartnerAccess.mockResolvedValue(new Set());
+        mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([assetId]));
+        mocks.search.getEmbedding.mockResolvedValue('[4, 5, 6]');
+        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
+
+        await sut.searchSmart(authStub.user1, { queryAssetId: assetId, withSharedSpaces: true });
+
+        expect(mocks.search.getEmbedding).toHaveBeenCalledWith(assetId);
+        expect(mocks.search.searchSmart).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ embedding: '[4, 5, 6]', timelineSpaceIds: [spaceId] }),
+        );
+      });
+
       it('should fall back to owner-only when withSharedSpaces is true but user has no spaces', async () => {
         mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
 
