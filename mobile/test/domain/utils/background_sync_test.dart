@@ -8,7 +8,7 @@ class _FakeBackgroundSyncManager extends BackgroundSyncManager {
   final Completer<bool> remoteCompleter = Completer<bool>();
 
   @override
-  Future<bool> syncRemote() {
+  Future<bool> syncRemote({bool enqueue = false}) {
     calls.add('remote-start');
     return remoteCompleter.future.then((success) {
       calls.add('remote-complete');
