@@ -576,6 +576,7 @@
         assetInteraction={assetMultiSelectManager}
         onEscape={handleBack}
         spaceId={space.id}
+        space={{ id: space.id, canWrite: isEditor }}
         {temporalAnchor}
         onTimelineBucketActivate={handleTimelineBucketActivate}
         onTemporalAnchorResolved={() => (temporalAnchor = undefined)}

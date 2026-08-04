@@ -57,6 +57,12 @@
     albumUsers?: UserResponseDto[];
     person?: PersonResponseDto;
     spaceId?: string;
+    /**
+     * The shared space this timeline belongs to, mirroring what the surface hands
+     * `SelectionToolbar`. Forwarded to the asset viewer so single-photo actions can be gated the
+     * same way the multi-select bar gates them (#889).
+     */
+    space?: { id: string; canWrite: boolean };
     onSelect?: (asset: TimelineAsset) => void;
     onEscape?: () => void;
     onScroll?: (scrollTop: number) => void;
@@ -96,6 +102,7 @@
     albumUsers = [],
     person,
     spaceId,
+    space,
     onSelect = () => {},
     onEscape = () => {},
     onScroll,
@@ -889,6 +896,7 @@
       {album}
       {person}
       {spaceId}
+      {space}
     />
   {/if}
 </Portal>

@@ -270,6 +270,25 @@ describe('Spaces person detail page', () => {
     expect(screen.queryByTestId('person-asset-asset-1')).not.toBeInTheDocument();
   });
 
+  // #889 — the asset viewer opened from this timeline gates add-to-album on the space capability.
+  it('passes the space capability into the timeline for an editor', () => {
+    renderPage();
+
+    expect(screen.getByTestId('space-person-timeline')).toHaveAttribute(
+      'data-space',
+      JSON.stringify({ id: 'space-1', canWrite: true }),
+    );
+  });
+
+  it('passes the space capability into the timeline as read-only for a viewer', () => {
+    renderPage({ members: [makeMember({ role: SharedSpaceRole.Viewer })] });
+
+    expect(screen.getByTestId('space-person-timeline')).toHaveAttribute(
+      'data-space',
+      JSON.stringify({ id: 'space-1', canWrite: false }),
+    );
+  });
+
   it('renders space person timeline grouping controls and passes mobile grouping props', async () => {
     renderPage();
 
