@@ -1365,6 +1365,179 @@ export class SharedSpaceRepository {
       .execute();
   }
 
+  // ==========================================
+  // Shared Space Album Folder CRUD
+  // ==========================================
+
+  @GenerateSql({ params: [{ spaceId: DummyValue.UUID, parentId: null, name: 'Trips', createdById: DummyValue.UUID }] })
+  createAlbumFolder(dto: { spaceId: string; parentId: string | null; name: string; createdById: string | null }) {
+    return this.db.insertInto('shared_space_album_folder').values(dto).returningAll().executeTakeFirstOrThrow();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  getAlbumFolderById(spaceId: string, folderId: string) {
+    return this.db
+      .selectFrom('shared_space_album_folder')
+      .selectAll()
+      .where('spaceId', '=', spaceId)
+      .where('id', '=', folderId)
+      .executeTakeFirst();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getAlbumFoldersBySpace(spaceId: string) {
+    return this.db
+      .selectFrom('shared_space_album_folder')
+      .selectAll()
+      .where('spaceId', '=', spaceId)
+      .orderBy('name', 'asc')
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async countAlbumFoldersBySpace(spaceId: string): Promise<number> {
+    const row = await this.db
+      .selectFrom('shared_space_album_folder')
+      .select((eb) => eb.fn.countAll<string>().as('count'))
+      .where('spaceId', '=', spaceId)
+      .executeTakeFirstOrThrow();
+    return Number(row.count);
+  }
+
+  // Self first, then each parent up to the root. The service uses `.length` as the folder's
+  // depth (root = 1) and reverses the array for the breadcrumb.
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getAlbumFolderAncestors(folderId: string) {
+    return this.db
+      .withRecursive('ancestors', (qb) =>
+        qb
+          .selectFrom('shared_space_album_folder')
+          .select(['id', 'parentId', 'name'])
+          .where('id', '=', folderId)
+          .unionAll(
+            qb
+              .selectFrom('shared_space_album_folder as f')
+              .innerJoin('ancestors as a', 'a.parentId', 'f.id')
+              .select(['f.id', 'f.parentId', 'f.name']),
+          ),
+      )
+      .selectFrom('ancestors')
+      .selectAll()
+      .execute();
+  }
+
+  // Self at depth 0, descendants at increasing depth. max(depth) is the subtree's height,
+  // which the move guard adds to the target's depth.
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getAlbumFolderSubtree(folderId: string) {
+    return this.db
+      .withRecursive('subtree', (qb) =>
+        qb
+          .selectFrom('shared_space_album_folder')
+          .select(['id', sql<number>`0`.as('depth')])
+          .where('id', '=', folderId)
+          .unionAll(
+            qb
+              .selectFrom('shared_space_album_folder as f')
+              .innerJoin('subtree as s', 's.id', 'f.parentId')
+              .select(['f.id', sql<number>`s.depth + 1`.as('depth')]),
+          ),
+      )
+      .selectFrom('subtree')
+      .selectAll()
+      .execute();
+  }
+
+  // excludeId keeps a rename-to-itself (N-03) and a move-to-current-parent (M-09) from
+  // colliding with the row being modified.
+  @GenerateSql({ params: [DummyValue.UUID, null, 'Trips', null] })
+  async hasSiblingAlbumFolderName(
+    spaceId: string,
+    parentId: string | null,
+    name: string,
+    excludeId: string | null,
+  ): Promise<boolean> {
+    let query = this.db
+      .selectFrom('shared_space_album_folder')
+      .select('id')
+      .where('spaceId', '=', spaceId)
+      .where(sql<boolean>`LOWER(BTRIM("name")) = LOWER(BTRIM(${name}))`);
+
+    query = parentId === null ? query.where('parentId', 'is', null) : query.where('parentId', '=', parentId);
+
+    if (excludeId) {
+      query = query.where('id', '!=', excludeId);
+    }
+
+    const row = await query.executeTakeFirst();
+    return !!row;
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, { name: 'Travel' }] })
+  async updateAlbumFolder(
+    spaceId: string,
+    folderId: string,
+    dto: { name?: string; parentId?: string | null },
+  ): Promise<boolean> {
+    const result = await this.db
+      .updateTable('shared_space_album_folder')
+      .set(dto)
+      .where('spaceId', '=', spaceId)
+      .where('id', '=', folderId)
+      .executeTakeFirst();
+    return Number(result.numUpdatedRows) > 0;
+  }
+
+  // Promote-then-delete, in ONE transaction. Direct child folders and direct album links move
+  // to the deleted folder's parent; grandchildren keep their parents. Because children are
+  // cleared first, the CASCADE self-FK never fires here — it only ever runs on space deletion.
+  //
+  // Everything inside the callback uses `trx`. Running a `this.db` query inside a Kysely
+  // transaction callback deadlocks (issue #595).
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  deleteAlbumFolderPromotingChildren(spaceId: string, folderId: string): Promise<boolean> {
+    return this.db.transaction().execute(async (trx) => {
+      const folder = await trx
+        .selectFrom('shared_space_album_folder')
+        .select(['id', 'parentId'])
+        .where('spaceId', '=', spaceId)
+        .where('id', '=', folderId)
+        .forUpdate()
+        .executeTakeFirst();
+
+      if (!folder) {
+        return false;
+      }
+
+      await trx
+        .updateTable('shared_space_album_folder')
+        .set({ parentId: folder.parentId })
+        .where('parentId', '=', folderId)
+        .execute();
+
+      await trx
+        .updateTable('shared_space_album')
+        .set({ folderId: folder.parentId })
+        .where('folderId', '=', folderId)
+        .execute();
+
+      await trx.deleteFrom('shared_space_album_folder').where('id', '=', folderId).execute();
+
+      return true;
+    });
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, DummyValue.UUID] })
+  async setAlbumLinkFolder(spaceId: string, albumId: string, folderId: string | null): Promise<boolean> {
+    const result = await this.db
+      .updateTable('shared_space_album')
+      .set({ folderId })
+      .where('spaceId', '=', spaceId)
+      .where('albumId', '=', albumId)
+      .executeTakeFirst();
+    return Number(result.numUpdatedRows) > 0;
+  }
+
   @GenerateSql({ params: [DummyValue.UUID] })
   async getAlbumAssetCount(albumId: string): Promise<number> {
     const row = await this.db

@@ -270,3 +270,345 @@ describe('shared_space_album_folder schema', () => {
     expect(updated.updatedAt.getTime()).toBeGreaterThan(folder.updatedAt.getTime());
   });
 });
+
+describe('SharedSpaceRepository — album folder primitives', () => {
+  // P-01
+  it('P-01: createAlbumFolder persists the row and getAlbumFolderById round-trips it', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+
+    const created = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+
+    expect(created).toMatchObject({ spaceId: space.id, parentId: null, name: 'Trips', createdById: user.id });
+    await expect(sut.getAlbumFolderById(space.id, created.id)).resolves.toMatchObject({ id: created.id });
+  });
+
+  // P-01: getAlbumFolderById is space-scoped, so a folder id from another space reads as absent
+  // rather than leaking. This is the read-side half of the same-space invariant.
+  it('P-01: getAlbumFolderById does not return a folder from another space', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const { space: other } = await ctx.newSharedSpace({ createdById: user.id });
+    const folder = await sut.createAlbumFolder({
+      spaceId: other.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+
+    await expect(sut.getAlbumFolderById(space.id, folder.id)).resolves.toBeUndefined();
+  });
+
+  // P-02 — this is the repository half of R-08, the cross-space read-leak test.
+  it('P-02: getAlbumFoldersBySpace returns every folder of the space and none from another', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const { space: other } = await ctx.newSharedSpace({ createdById: user.id });
+
+    const a = await sut.createAlbumFolder({ spaceId: space.id, parentId: null, name: 'Trips', createdById: user.id });
+    const b = await sut.createAlbumFolder({ spaceId: space.id, parentId: a.id, name: '2026', createdById: user.id });
+    await sut.createAlbumFolder({ spaceId: other.id, parentId: null, name: 'Secret', createdById: user.id });
+
+    const rows = await sut.getAlbumFoldersBySpace(space.id);
+
+    expect(rows.map((r) => r.id).sort()).toEqual([a.id, b.id].sort());
+  });
+
+  // P-03
+  it('P-03: getAlbumFolderAncestors returns the chain self-first up to the root', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    const y2026 = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: trips.id,
+      name: '2026',
+      createdById: user.id,
+    });
+    const italy = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: y2026.id,
+      name: 'Italy',
+      createdById: user.id,
+    });
+
+    const chain = await sut.getAlbumFolderAncestors(italy.id);
+
+    expect(chain.map((c) => c.id)).toEqual([italy.id, y2026.id, trips.id]);
+  });
+
+  // P-03: a root folder is its own single-element chain — depth 1, per the spec's convention.
+  it('P-03: getAlbumFolderAncestors returns a single element for a root folder', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+
+    await expect(sut.getAlbumFolderAncestors(trips.id)).resolves.toHaveLength(1);
+  });
+
+  // P-04
+  it('P-04: getAlbumFolderSubtree returns the folder and all descendants with relative depth', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    const y2026 = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: trips.id,
+      name: '2026',
+      createdById: user.id,
+    });
+    const italy = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: y2026.id,
+      name: 'Italy',
+      createdById: user.id,
+    });
+
+    const subtree = await sut.getAlbumFolderSubtree(trips.id);
+
+    expect(subtree.sort((x, y) => x.depth - y.depth)).toEqual([
+      { id: trips.id, depth: 0 },
+      { id: y2026.id, depth: 1 },
+      { id: italy.id, depth: 2 },
+    ]);
+  });
+
+  // P-04: a leaf is depth 0 and alone — this is what makes height() zero for a leaf, which
+  // the move depth formula (depth(target) + 1 + height) depends on.
+  it('P-04: getAlbumFolderSubtree returns only self for a leaf', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+
+    await expect(sut.getAlbumFolderSubtree(trips.id)).resolves.toEqual([{ id: trips.id, depth: 0 }]);
+  });
+
+  // P-05: promotion is ONE LEVEL and SHALLOW. Grandchildren keep their parents.
+  it('P-05: deleteAlbumFolderPromotingChildren promotes direct children one level only', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    const y2026 = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: trips.id,
+      name: '2026',
+      createdById: user.id,
+    });
+    const italy = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: y2026.id,
+      name: 'Italy',
+      createdById: user.id,
+    });
+    const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Rome' });
+    await ctx.database
+      .insertInto('shared_space_album')
+      .values({ spaceId: space.id, albumId: album.id, folderId: italy.id })
+      .execute();
+
+    const deleted = await sut.deleteAlbumFolderPromotingChildren(space.id, y2026.id);
+
+    expect(deleted).toBe(true);
+    // 2026's direct child Italy moves up to Trips…
+    await expect(sut.getAlbumFolderById(space.id, italy.id)).resolves.toMatchObject({ parentId: trips.id });
+    // …but the album inside Italy is untouched.
+    const link = await ctx.database
+      .selectFrom('shared_space_album')
+      .selectAll()
+      .where('albumId', '=', album.id)
+      .executeTakeFirstOrThrow();
+    expect(link.folderId).toBe(italy.id);
+  });
+
+  // P-05: album links directly inside the deleted folder are repointed, never unlinked.
+  it('P-05: deleteAlbumFolderPromotingChildren repoints album links and never unlinks', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const archive = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Archive',
+      createdById: user.id,
+    });
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: archive.id,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Rome' });
+    await ctx.database
+      .insertInto('shared_space_album')
+      .values({ spaceId: space.id, albumId: album.id, folderId: trips.id })
+      .execute();
+
+    await sut.deleteAlbumFolderPromotingChildren(space.id, trips.id);
+
+    const link = await ctx.database
+      .selectFrom('shared_space_album')
+      .selectAll()
+      .where('albumId', '=', album.id)
+      .executeTakeFirstOrThrow();
+    expect(link.folderId).toBe(archive.id);
+  });
+
+  it('P-05: deleteAlbumFolderPromotingChildren returns false for an unknown folder', async () => {
+    const { ctx, sut } = setup();
+    const { space } = await seed(ctx);
+
+    await expect(
+      sut.deleteAlbumFolderPromotingChildren(space.id, '00000000-0000-4000-8000-000000000000'),
+    ).resolves.toBe(false);
+  });
+
+  // P-06
+  it('P-06: countAlbumFoldersBySpace counts only this space', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const { space: other } = await ctx.newSharedSpace({ createdById: user.id });
+    await sut.createAlbumFolder({ spaceId: space.id, parentId: null, name: 'A', createdById: user.id });
+    await sut.createAlbumFolder({ spaceId: space.id, parentId: null, name: 'B', createdById: user.id });
+    await sut.createAlbumFolder({ spaceId: other.id, parentId: null, name: 'C', createdById: user.id });
+
+    await expect(sut.countAlbumFoldersBySpace(space.id)).resolves.toBe(2);
+  });
+
+  // P-07
+  it('P-07: setAlbumLinkFolder writes folderId on the link', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Rome' });
+    await ctx.database.insertInto('shared_space_album').values({ spaceId: space.id, albumId: album.id }).execute();
+
+    await expect(sut.setAlbumLinkFolder(space.id, album.id, trips.id)).resolves.toBe(true);
+
+    const link = await ctx.database
+      .selectFrom('shared_space_album')
+      .selectAll()
+      .where('albumId', '=', album.id)
+      .executeTakeFirstOrThrow();
+    expect(link.folderId).toBe(trips.id);
+  });
+
+  // P-07: no link row -> nothing updated. This is what turns A-06 into a 400 rather than a
+  // silent success.
+  it('P-07: setAlbumLinkFolder returns false when the album is not linked to the space', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Unlinked' });
+
+    await expect(sut.setAlbumLinkFolder(space.id, album.id, trips.id)).resolves.toBe(false);
+  });
+
+  it('P-07: setAlbumLinkFolder clears the placement when given null', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Rome' });
+    await ctx.database
+      .insertInto('shared_space_album')
+      .values({ spaceId: space.id, albumId: album.id, folderId: trips.id })
+      .execute();
+
+    await sut.setAlbumLinkFolder(space.id, album.id, null);
+
+    const link = await ctx.database
+      .selectFrom('shared_space_album')
+      .selectAll()
+      .where('albumId', '=', album.id)
+      .executeTakeFirstOrThrow();
+    expect(link.folderId).toBeNull();
+  });
+
+  it('hasSiblingAlbumFolderName detects a case-insensitive collision and honours excludeId', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+
+    await expect(sut.hasSiblingAlbumFolderName(space.id, null, 'trips', null)).resolves.toBe(true);
+    // Excluding the row itself is what makes rename-to-same-name (N-03) a no-op instead of a 400.
+    await expect(sut.hasSiblingAlbumFolderName(space.id, null, 'trips', trips.id)).resolves.toBe(false);
+    await expect(sut.hasSiblingAlbumFolderName(space.id, null, 'Family', null)).resolves.toBe(false);
+  });
+
+  it('updateAlbumFolder renames and reparents, and returns false for an unknown folder', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const archive = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Archive',
+      createdById: user.id,
+    });
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+
+    await expect(sut.updateAlbumFolder(space.id, trips.id, { name: 'Travel', parentId: archive.id })).resolves.toBe(
+      true,
+    );
+    await expect(sut.getAlbumFolderById(space.id, trips.id)).resolves.toMatchObject({
+      name: 'Travel',
+      parentId: archive.id,
+    });
+
+    await expect(sut.updateAlbumFolder(space.id, '00000000-0000-4000-8000-000000000000', { name: 'X' })).resolves.toBe(
+      false,
+    );
+  });
+});
