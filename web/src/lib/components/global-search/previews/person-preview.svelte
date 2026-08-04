@@ -1,6 +1,9 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { createUrl, getAssetMediaUrl, getPeopleThumbnailUrl } from '$lib/utils';
+  import { getGlobalPersonHref } from '$lib/utils/global-person-route';
   import { AssetMediaSize, searchAssets, type AssetResponseDto, type PersonResponseDto } from '@immich/sdk';
+  import { Button } from '@immich/ui';
   import { t } from 'svelte-i18n';
 
   interface Props {
@@ -90,4 +93,9 @@
       {/each}
     </div>
   {/if}
+  <div class="flex gap-2">
+    <Button variant="ghost" size="small" onclick={() => goto(getGlobalPersonHref(person))}>
+      {$t('cmdk_open_person_page')}
+    </Button>
+  </div>
 </div>
