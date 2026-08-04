@@ -1,12 +1,15 @@
 import { searchAssets } from '@immich/sdk';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { goto } from '$app/navigation';
 import PersonPreview from '../previews/person-preview.svelte';
 
 vi.mock('@immich/sdk', async () => {
   const actual = await vi.importActual<typeof import('@immich/sdk')>('@immich/sdk');
   return { ...actual, searchAssets: vi.fn() };
 });
+
+vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 
 describe('person-preview', () => {
   beforeEach(() => {
@@ -85,5 +88,38 @@ describe('person-preview', () => {
     await fireEvent.error(img!);
     expect(container.querySelector(':scope [data-cmdk-preview-person] > img')).toBeNull();
     expect(container.querySelector(':scope [data-cmdk-preview-person] > div[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it('offers a button to the person management page', () => {
+    render(PersonPreview, { props: { person: { id: 'p1', name: 'Alice' } as never } });
+
+    // This spec does not init svelte-i18n, so $t() returns the raw key.
+    expect(screen.getByText('cmdk_open_person_page')).toBeInTheDocument();
+  });
+
+  it('navigates to the person page for a personal person', async () => {
+    render(PersonPreview, {
+      props: { person: { id: 'p1', name: 'Alice', primaryProfile: { id: 'p1', type: 'user-person' } } as never },
+    });
+
+    await fireEvent.click(screen.getByText('cmdk_open_person_page'));
+
+    expect(goto).toHaveBeenCalledWith('/people/p1');
+  });
+
+  it('navigates to the profile id for a space person', async () => {
+    render(PersonPreview, {
+      props: {
+        person: {
+          id: 'sp1',
+          name: 'Bob',
+          primaryProfile: { id: 'profile-1', type: 'space-person', spaceId: 'space-1' },
+        } as never,
+      },
+    });
+
+    await fireEvent.click(screen.getByText('cmdk_open_person_page'));
+
+    expect(goto).toHaveBeenCalledWith('/people/profile-1');
   });
 });
