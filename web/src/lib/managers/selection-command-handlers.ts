@@ -59,7 +59,15 @@ export function handleAddSelectedToAlbum(ctx?: CommandContext) {
   if (!selection?.canAddToAlbum) {
     return;
   }
-  return modalManager.show(AssetAddToCollectionModal, { assetIds: selection.selectedAssetIds });
+  // #889: mirrors SelectionToolbar's `addToAlbumRestrictedToSpace`. Assets the caller does not own
+  // only reach an album as #764 contributions, which the server accepts solely for albums linked
+  // to a space where the caller is Owner/Editor — so the picker must offer nothing else.
+  const space = ctx?.space;
+  const restrictToSpaceId = !selection.isAllUserOwned && space?.canWrite ? space.id : undefined;
+  return modalManager.show(AssetAddToCollectionModal, {
+    assetIds: selection.selectedAssetIds,
+    restrictToSpaceId,
+  });
 }
 
 export function handleAddSelectedToSpace(ctx?: CommandContext) {
