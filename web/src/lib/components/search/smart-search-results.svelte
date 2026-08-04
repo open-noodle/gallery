@@ -9,6 +9,8 @@
     searchQuery: string;
     filters: FilterState;
     spaceId?: string;
+    /** Shared-space surface + the caller's write capability on it — see `Timeline` (#889). */
+    space?: { id: string; canWrite: boolean };
     withSharedSpaces?: boolean;
     language?: string;
     isShared: boolean;
@@ -30,6 +32,7 @@
     searchQuery,
     filters,
     spaceId,
+    space,
     withSharedSpaces,
     language,
     isShared,
@@ -146,6 +149,7 @@
   onLoadMore={handleLoadMore}
   onReload={handleReload}
   {spaceId}
+  {space}
   {isShared}
   sortMode={filters.sortOrder}
   {total}
