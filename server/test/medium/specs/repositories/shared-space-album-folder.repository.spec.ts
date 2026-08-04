@@ -819,3 +819,69 @@ describe('SharedSpaceRepository — album folder moves', () => {
     await holder;
   });
 });
+
+describe('album placement lifecycle', () => {
+  // A-07: unlinking drops the link row entirely, so no orphan placement survives, and a
+  // re-link starts at the root.
+  it('A-07: unlinking removes the placement and re-linking lands at the root', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const folder = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Rome' });
+    await ctx.database
+      .insertInto('shared_space_album')
+      .values({ spaceId: space.id, albumId: album.id, folderId: folder.id })
+      .execute();
+
+    await ctx.database
+      .deleteFrom('shared_space_album')
+      .where('spaceId', '=', space.id)
+      .where('albumId', '=', album.id)
+      .execute();
+
+    await ctx.database.insertInto('shared_space_album').values({ spaceId: space.id, albumId: album.id }).execute();
+
+    const link = await ctx.database
+      .selectFrom('shared_space_album')
+      .selectAll()
+      .where('albumId', '=', album.id)
+      .executeTakeFirstOrThrow();
+    expect(link.folderId).toBeNull();
+  });
+
+  // C-03: delete-during-move. Whichever order the two land in, the album must never end up
+  // pointing at a folder row that no longer exists.
+  it('C-03: an album is never orphaned into a deleted folder', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const folder = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Rome' });
+    await ctx.database.insertInto('shared_space_album').values({ spaceId: space.id, albumId: album.id }).execute();
+
+    await Promise.allSettled([
+      sut.deleteAlbumFolderPromotingChildren(space.id, folder.id),
+      sut.setAlbumLinkFolder(space.id, album.id, folder.id),
+    ]);
+
+    const link = await ctx.database
+      .selectFrom('shared_space_album')
+      .selectAll()
+      .where('albumId', '=', album.id)
+      .executeTakeFirstOrThrow();
+
+    if (link.folderId !== null) {
+      // If the placement survived, the folder it points at must still exist.
+      await expect(sut.getAlbumFolderById(space.id, link.folderId)).resolves.toBeDefined();
+    }
+  });
+});

@@ -29,6 +29,7 @@ import {
   SharedSpaceActivityResponseDto,
   SharedSpaceAlbumFolderCreateDto,
   SharedSpaceAlbumFolderDto,
+  SharedSpaceAlbumFolderMoveAlbumDto,
   SharedSpaceAlbumFolderUpdateDto,
   SharedSpaceAlbumLinkUpdateDto,
   SharedSpaceAlbumMemberTimelineDto,
@@ -967,6 +968,34 @@ export class SharedSpaceService extends BaseService {
     await this.sharedSpaceRepository.setAlbumShowInTimeline(spaceId, albumId, dto.showInTimeline);
   }
 
+  async setAlbumFolder(
+    auth: AuthDto,
+    spaceId: string,
+    albumId: string,
+    dto: SharedSpaceAlbumFolderMoveAlbumDto,
+  ): Promise<void> {
+    // Space Editor only — album ownership is deliberately not required. Folders are
+    // space-scoped metadata, so any editor may reorganise any linked album. Matches
+    // updateAlbumLink, which gates on space Editor alone.
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    const folderId = dto.folderId ?? null;
+
+    if (folderId !== null) {
+      // Space-scoped lookup: this is the only thing preventing a cross-space placement,
+      // since PG14 cannot express the composite FK that would enforce it in the schema.
+      const folder = await this.sharedSpaceRepository.getAlbumFolderById(spaceId, folderId);
+      if (!folder) {
+        throw new BadRequestException('Folder not found');
+      }
+    }
+
+    const updated = await this.sharedSpaceRepository.setAlbumLinkFolder(spaceId, albumId, folderId);
+    if (!updated) {
+      throw new BadRequestException('Album is not linked to this space');
+    }
+  }
+
   async getLinkedAlbums(auth: AuthDto, spaceId: string): Promise<SharedSpaceLinkedAlbumDto[]> {
     await this.requireMembership(auth, spaceId);
     const rows = await this.sharedSpaceRepository.getLinkedAlbums(spaceId);
@@ -997,6 +1026,7 @@ export class SharedSpaceService extends BaseService {
         addedById: row.addedById,
         linkedAt: (row.linkedAt as unknown as Date).toISOString(),
         hiddenFromMyTimeline: hiddenAlbumIds.has(row.id),
+        folderId: row.folderId,
       };
     });
   }

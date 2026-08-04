@@ -202,6 +202,12 @@ const SharedSpaceAlbumFolderUpdateSchema = z
   })
   .meta({ id: 'SharedSpaceAlbumFolderUpdateDto' });
 
+const SharedSpaceAlbumFolderMoveAlbumSchema = z
+  .object({
+    folderId: z.uuidv4().nullable().describe('Destination folder ID; null moves the album to the space root'),
+  })
+  .meta({ id: 'SharedSpaceAlbumFolderMoveAlbumDto' });
+
 const SharedSpaceAlbumParamSchema = z.object({
   id: z.uuidv4(),
   albumId: z.uuidv4(),
@@ -240,6 +246,7 @@ const SharedSpaceLinkedAlbumSchema = AlbumResponseSchema.omit({ albumUsers: true
     hiddenFromMyTimeline: z
       .boolean()
       .describe('Whether the caller has hidden this album from their own timeline (§2 personal switch)'),
+    folderId: z.string().nullable().describe('Folder this album sits in within the space, or null for the root'),
   })
   .meta({ id: 'SharedSpaceLinkedAlbumDto' });
 
@@ -306,6 +313,7 @@ export class SharedSpaceTimelineHidePreviewDto extends createZodDto(SharedSpaceT
 export class SharedSpaceAlbumFolderDto extends createZodDto(SharedSpaceAlbumFolderSchema) {}
 export class SharedSpaceAlbumFolderCreateDto extends createZodDto(SharedSpaceAlbumFolderCreateSchema) {}
 export class SharedSpaceAlbumFolderUpdateDto extends createZodDto(SharedSpaceAlbumFolderUpdateSchema) {}
+export class SharedSpaceAlbumFolderMoveAlbumDto extends createZodDto(SharedSpaceAlbumFolderMoveAlbumSchema) {}
 export class SharedSpaceAlbumParamDto extends createZodDto(SharedSpaceAlbumParamSchema) {}
 export class SharedSpaceMemberParamDto extends createZodDto(SharedSpaceMemberParamSchema) {}
 export class SharedSpacePersonParamDto extends createZodDto(SharedSpacePersonParamSchema) {}

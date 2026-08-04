@@ -1176,6 +1176,7 @@ export class SharedSpaceRepository {
         .select([
           'shared_space_album.addedById',
           'shared_space_album.showInTimeline',
+          'shared_space_album.folderId',
           'shared_space_album.createdAt as linkedAt',
         ])
         .select((eb) =>

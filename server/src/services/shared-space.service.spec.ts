@@ -14027,5 +14027,119 @@ describe(SharedSpaceService.name, () => {
         expect(mocks.sharedSpace.deleteAlbumFolderPromotingChildren).not.toHaveBeenCalled();
       });
     });
+
+    describe('setAlbumFolder', () => {
+      // A-01
+      it('A-01: moves an album into a folder', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const folder = albumFolderRow({ spaceId: space.id });
+        const albumId = newUuid();
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+        mocks.sharedSpace.setAlbumLinkFolder.mockResolvedValue(true);
+
+        await sut.setAlbumFolder(auth, space.id, albumId, { folderId: folder.id } as any);
+
+        expect(mocks.sharedSpace.setAlbumLinkFolder).toHaveBeenCalledWith(space.id, albumId, folder.id);
+      });
+
+      // A-02 — moving to the root needs no folder lookup at all.
+      it('A-02: moves an album to the space root', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const albumId = newUuid();
+        mocks.sharedSpace.setAlbumLinkFolder.mockResolvedValue(true);
+
+        await sut.setAlbumFolder(auth, space.id, albumId, { folderId: null } as any);
+
+        expect(mocks.sharedSpace.setAlbumLinkFolder).toHaveBeenCalledWith(space.id, albumId, null);
+        expect(mocks.sharedSpace.getAlbumFolderById).not.toHaveBeenCalled();
+      });
+
+      // A-03 / C-02: the write is an unconditional UPDATE, so repeating it or racing it is
+      // last-write-wins with no conflict detection. That is deliberate for placement metadata.
+      it('A-03: moving into the same folder again is idempotent', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const folder = albumFolderRow({ spaceId: space.id });
+        const albumId = newUuid();
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+        mocks.sharedSpace.setAlbumLinkFolder.mockResolvedValue(true);
+
+        await sut.setAlbumFolder(auth, space.id, albumId, { folderId: folder.id } as any);
+        await sut.setAlbumFolder(auth, space.id, albumId, { folderId: folder.id } as any);
+
+        expect(mocks.sharedSpace.setAlbumLinkFolder).toHaveBeenCalledTimes(2);
+      });
+
+      // A-04: placement lives on the (spaceId, albumId) join row, so the update is scoped to
+      // this space and an album linked elsewhere keeps its other placement untouched.
+      it('A-04: scopes the write to this space only', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const folder = albumFolderRow({ spaceId: space.id });
+        const albumId = newUuid();
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+        mocks.sharedSpace.setAlbumLinkFolder.mockResolvedValue(true);
+
+        await sut.setAlbumFolder(auth, space.id, albumId, { folderId: folder.id } as any);
+
+        expect(mocks.sharedSpace.setAlbumLinkFolder).toHaveBeenCalledWith(space.id, albumId, folder.id);
+      });
+
+      // A-05: the cross-space invariant that PG14 cannot express as a composite FK. This test
+      // and the medium test P-07 are the only things enforcing it.
+      it('A-05: rejects a folder belonging to another space', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(void 0 as any);
+
+        await expect(
+          sut.setAlbumFolder(auth, space.id, newUuid(), { folderId: newUuid() } as any),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(mocks.sharedSpace.setAlbumLinkFolder).not.toHaveBeenCalled();
+      });
+
+      // A-06: no link row means nothing to place. The repository returning false is what makes
+      // this a 400 rather than a silent success.
+      it('A-06: rejects an album that is not linked to the space', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const folder = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+        mocks.sharedSpace.setAlbumLinkFolder.mockResolvedValue(false);
+
+        await expect(
+          sut.setAlbumFolder(auth, space.id, newUuid(), { folderId: folder.id } as any),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      // A-08
+      it('A-08: rejects a folder id that does not exist', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(void 0 as any);
+
+        await expect(
+          sut.setAlbumFolder(auth, space.id, newUuid(), { folderId: newUuid() } as any),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      // R-07: space Editor alone is sufficient — album ownership is deliberately NOT required,
+      // matching updateAlbumLink. Folders are space-scoped metadata.
+      it('R-07: allows an editor to move an album they do not own', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const folder = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+        mocks.sharedSpace.setAlbumLinkFolder.mockResolvedValue(true);
+
+        await sut.setAlbumFolder(auth, space.id, newUuid(), { folderId: folder.id } as any);
+
+        expect(mocks.access.album.checkOwnerAccess).not.toHaveBeenCalled();
+        expect(mocks.sharedSpace.setAlbumLinkFolder).toHaveBeenCalled();
+      });
+
+      it('R-03: refuses a viewer', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks, SharedSpaceRole.Viewer);
+
+        await expect(sut.setAlbumFolder(auth, space.id, newUuid(), { folderId: null } as any)).rejects.toBeInstanceOf(
+          ForbiddenException,
+        );
+        expect(mocks.sharedSpace.setAlbumLinkFolder).not.toHaveBeenCalled();
+      });
+    });
   });
 });
