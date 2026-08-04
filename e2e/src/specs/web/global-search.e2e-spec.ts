@@ -576,7 +576,7 @@ test.describe('global search palette', () => {
     // fixtures inline — the outer beforeAll already handled admin setup + the baseline
     // asset upload + metadata drain. We reuse the outer beforeEach so auth cookies and
     // the /photos landing + cmdk input trigger hydration wait are handled automatically.
-    test('scope @ narrows to people section and activating navigates to /people/:id', async ({ page }) => {
+    test('scope @ narrows to people section and activating filters the timeline', async ({ page }) => {
       // The palette searches with withSharedSpaces=true, so people are surfaced through
       // identity-backed faces rather than legacy owner-only name search.
       const person = await createSearchablePerson(admin.accessToken, 'Alice Scope');
@@ -595,7 +595,7 @@ test.describe('global search palette', () => {
         .getByText(/alice scope/i)
         .first()
         .click();
-      await expect(page).toHaveURL(new RegExp(`/people/${person.id}`));
+      await expect(page).toHaveURL(new RegExp(String.raw`/photos\?people=person%3A${person.id}`));
     });
 
     test('scope / activates album', async ({ page }) => {

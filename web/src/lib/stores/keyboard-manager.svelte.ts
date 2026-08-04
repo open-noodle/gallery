@@ -8,11 +8,8 @@ class KeyboardManager {
     if (globalThis.window === undefined) {
       return;
     }
-    // eslint-disable-next-line unicorn/no-unnecessary-global-this
     addEventListener('keydown', this.#update);
-    // eslint-disable-next-line unicorn/no-unnecessary-global-this
     addEventListener('keyup', this.#update);
-    // eslint-disable-next-line unicorn/no-unnecessary-global-this
     addEventListener('blur', this.#clear);
   }
 
