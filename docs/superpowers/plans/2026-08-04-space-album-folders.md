@@ -3454,6 +3454,7 @@ git commit -m "feat(web): add space album folder tree utilities"
 - Create: `web/src/lib/components/spaces/space-album-folder-card.svelte` + `.spec.ts`
 - Create: `web/src/lib/components/spaces/space-album-folder-breadcrumb.svelte` + `.spec.ts`
 - Create: `web/src/lib/modals/SpaceAlbumFolderPickerModal.svelte` + `.spec.ts`
+- Create: `web/src/lib/modals/SpaceAlbumFolderNameModal.svelte`
 - Modify: `i18n/en.json`
 
 **Interfaces:**
@@ -3656,6 +3657,7 @@ describe('SpaceAlbumFolderBreadcrumb', () => {
 Create `web/src/lib/modals/SpaceAlbumFolderPickerModal.spec.ts`:
 
 ```ts
+import SpaceAlbumFolderNameModal from '$lib/modals/SpaceAlbumFolderNameModal.svelte';
 import SpaceAlbumFolderPickerModal from '$lib/modals/SpaceAlbumFolderPickerModal.svelte';
 import type { SharedSpaceAlbumFolderDto } from '@immich/sdk';
 import { render, screen } from '@testing-library/svelte';
@@ -3884,9 +3886,8 @@ Create `web/src/lib/modals/SpaceAlbumFolderPickerModal.svelte`. Follow `SpaceLin
 <script lang="ts">
   import { buildFolderTree, isDescendant, type FolderNode } from '$lib/utils/space-album-folders';
   import type { SharedSpaceAlbumFolderDto } from '@immich/sdk';
-  import { FormModal } from '@immich/ui';
+  import { FormModal, Icon } from '@immich/ui';
   import { mdiFolder } from '@mdi/js';
-  import { Icon } from '@immich/ui';
   import { t } from 'svelte-i18n';
 
   interface Props {
@@ -3944,7 +3945,45 @@ Create `web/src/lib/modals/SpaceAlbumFolderPickerModal.svelte`. Follow `SpaceLin
 </FormModal>
 ```
 
-- [ ] **Step 7: Run the tests to verify they pass**
+- [ ] **Step 7: Build the folder-name modal**
+
+`modalManager.showDialog` resolves to a **boolean** — every call site in this codebase uses it as a confirm (`const confirmed = await modalManager.showDialog(...)`), and the modal specs mock it as `mockResolvedValue(true)`. It cannot collect a folder name. Create a single-field modal instead, on the `LibraryFolderAddModal` pattern.
+
+Create `web/src/lib/modals/SpaceAlbumFolderNameModal.svelte`:
+
+```svelte
+<script lang="ts">
+  import { Field, FormModal, Input } from '@immich/ui';
+  import { mdiFolderPlusOutline } from '@mdi/js';
+  import { t } from 'svelte-i18n';
+
+  type Props = {
+    title: string;
+    /** Pre-filled when renaming; empty when creating. */
+    initialName?: string;
+    onClose: (name?: string) => void;
+  };
+
+  const { title, initialName = '', onClose }: Props = $props();
+
+  let value = $state(initialName);
+
+  // Trim here as well as on the server: it keeps "  " from arriving as a submittable name,
+  // and the server re-validates regardless.
+  const onSubmit = () => {
+    const name = value.trim();
+    onClose(name || undefined);
+  };
+</script>
+
+<FormModal {title} icon={mdiFolderPlusOutline} {onClose} {onSubmit} size="small" submitText={$t('save')}>
+  <Field label={$t('space_album_folder_name_label')}>
+    <Input bind:value />
+  </Field>
+</FormModal>
+```
+
+- [ ] **Step 8: Run the tests to verify they pass**
 
 ```bash
 cd web && pnpm vitest --run src/lib/components/spaces/space-album-folder-card.spec.ts src/lib/components/spaces/space-album-folder-breadcrumb.spec.ts src/lib/modals/SpaceAlbumFolderPickerModal.spec.ts
@@ -3952,10 +3991,10 @@ cd web && pnpm vitest --run src/lib/components/spaces/space-album-folder-card.sp
 
 Expected: PASS (13 tests).
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add web/src/lib/components/spaces web/src/lib/modals/SpaceAlbumFolderPickerModal.svelte i18n/en.json
+git add web/src/lib/components/spaces web/src/lib/modals/SpaceAlbumFolderPickerModal.svelte web/src/lib/modals/SpaceAlbumFolderNameModal.svelte i18n/en.json
 git commit -m "feat(web): add space album folder card, breadcrumb, and picker"
 ```
 
@@ -3974,7 +4013,7 @@ git commit -m "feat(web): add space album folder card, breadcrumb, and picker"
 - Modify: `web/src/lib/modals/SpaceLinkAlbumModal.svelte`
 - Modify: `web/src/routes/(user)/spaces/[spaceId]/albums/+page.svelte`
 - Modify: `web/src/routes/(user)/spaces/[spaceId]/albums/space-albums-page.spec.ts`
-- Create: `web/src/lib/components/spaces/space-albums-list.spec.ts`
+- Modify: `web/src/lib/components/spaces/space-albums-list.spec.ts` _(exists, 228 lines — extend, do not overwrite)_
 
 **Interfaces:**
 
@@ -3997,7 +4036,10 @@ In `web/src/lib/route.ts`:
 Create `web/src/lib/components/spaces/space-albums-list.spec.ts`:
 
 ```ts
+// Appended to the EXISTING space-albums-list.spec.ts — reuse its mocks and imports rather
+// than re-declaring them. These are the only additions the folder tests need:
 import SpaceAlbumsList from '$lib/components/spaces/space-albums-list.svelte';
+import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
 import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 import { render, screen } from '@testing-library/svelte';
 
@@ -4036,8 +4078,12 @@ const defaults = {
 };
 
 describe('SpaceAlbumsList with folders', () => {
+  // The view settings STORE persists across tests in this file just as mock history does
+  // (web vitest has no clearMocks), so both need resetting. The existing suite in this file
+  // already does exactly this — match it rather than inventing a second convention.
   beforeEach(() => {
     vi.clearAllMocks();
+    spaceAlbumViewSettings.reset();
   });
 
   // W-01: folders are the primary organisational layer, so they always come first.
@@ -4068,8 +4114,11 @@ describe('SpaceAlbumsList with folders', () => {
   });
 
   // W-07: group-by regroups the ALBUMS at this level; folders are never grouped.
+  // Grouping comes from the spaceAlbumViewSettings STORE, not from a prop.
   it('W-07: leaves folders ungrouped above the grouped album list', () => {
-    const { container } = render(SpaceAlbumsList, { ...defaults, groupBy: 'year' });
+    spaceAlbumViewSettings.update((settings) => ({ ...settings, groupBy: SpaceAlbumGroupBy.Year }));
+
+    const { container } = render(SpaceAlbumsList, defaults);
 
     const folders = container.querySelectorAll('[data-testid="space-album-folder-card"]');
     expect(folders).toHaveLength(2);
@@ -4081,11 +4130,9 @@ describe('SpaceAlbumsList with folders', () => {
   // W-18: while searching, the path subtitle is already the organising signal — grouping the
   // space-wide hits on top of it would bury it.
   it('W-18: renders flattened hits ungrouped even when group-by is active', () => {
-    const { container } = render(SpaceAlbumsList, {
-      ...defaults,
-      searchQuery: 'ven',
-      groupBy: 'year',
-    });
+    spaceAlbumViewSettings.update((settings) => ({ ...settings, groupBy: SpaceAlbumGroupBy.Year }));
+
+    const { container } = render(SpaceAlbumsList, { ...defaults, searchQuery: 'ven' });
 
     expect(container.querySelectorAll('[data-testid^="space-album-group-"]')).toHaveLength(0);
     expect(screen.getByText('Venice')).toBeInTheDocument();
@@ -4297,27 +4344,47 @@ Change the existing `filtered` derivation's source from `albums` to `levelAlbums
 
 Guard the existing grouped/ungrouped album rendering with `{#if !isSearching}` so it does not double-render during a search.
 
+Where the list renders `<SpaceAlbumsTable …>`, pass the folder props through, including
+`allAlbums={albums}` alongside the existing `albums={sorted}` — the first is every album in the
+space, the second is this level's.
+
 - [ ] **Step 6: Add folder rows to the table view**
 
-In `space-albums-table.svelte`, add the same `folders` / `currentFolderId` / `onOpenFolder` props, then emit folder rows **before** the album rows so List mode matches Cover mode's ordering:
+`space-albums-table.svelte` is **not** a plain `<table>` grid. Its rows are flex containers
+(`<tr class="flex w-full place-items-center …">`) with explicit per-cell width classes, and albums
+render through a `{#snippet albumRow(album)}`. Folder rows must be a sibling snippet using the same
+width classes, or the two row types will not line up.
+
+It also needs `allAlbums` as a **separate prop**: the existing `albums` prop is already the
+current level's sorted list (the list passes `albums={sorted}`), so computing a recursive count
+from it would make every folder row read "0 albums".
 
 ```svelte
 <script lang="ts">
   import { getFolderContents, getRecursiveAlbumCount } from '$lib/utils/space-album-folders';
   import type { SharedSpaceAlbumFolderDto } from '@immich/sdk';
-  import { Icon } from '@immich/ui';
   import { mdiFolder } from '@mdi/js';
+  import { SortOrder } from '$lib/stores/preferences.store';
 
-  // ...existing props...
+  interface Props {
+    // ...existing props (spaceId, albums, canManage, groups, grouped, onUnlink, onToggleTimeline)...
+    folders?: SharedSpaceAlbumFolderDto[];
+    /** EVERY linked album in the space, not just this level — recursive counts need the lot. */
+    allAlbums?: SharedSpaceLinkedAlbumDto[];
+    currentFolderId?: string | null;
+    onOpenFolder?: (folder: SharedSpaceAlbumFolderDto) => void;
+  }
+
   let {
+    // ...existing destructured props...
     folders = [],
+    allAlbums = [],
     currentFolderId = null,
     onOpenFolder,
-    // ...existing destructured props...
   }: Props = $props();
 
-  // Folders sort by name, honouring the sort direction but not the sort key — identical rule
-  // to the cover grid, so switching view modes never reorders the folder list.
+  // Same rule as the cover grid: sort by name, honour the sort DIRECTION, ignore the sort key.
+  // Switching view modes must never reorder the folder list.
   const levelFolders = $derived(
     getFolderContents(folders, [], currentFolderId)
       .folders.slice()
@@ -4330,33 +4397,39 @@ In `space-albums-table.svelte`, add the same `folders` / `currentFolderId` / `on
 </script>
 ```
 
-and, as the first rows of the existing `<tbody>`:
+Add a `folderRow` snippet beside the existing `albumRow`, copying its `<tr>` and `<td>` classes
+verbatim so the columns align. Only the leading cell differs:
+
+```svelte
+{#snippet folderRow(folder: SharedSpaceAlbumFolderDto)}
+  <tr
+    class="flex w-full cursor-pointer place-items-center border-3 border-transparent p-2 text-center odd:bg-subtle/80 even:bg-subtle/20 hover:border-immich-primary/75 md:px-5 md:py-2 odd:dark:bg-immich-dark-gray/75 even:dark:bg-immich-dark-gray/50 dark:hover:border-immich-dark-primary/75"
+    data-testid="space-album-folder-row"
+    onclick={() => onOpenFolder?.(folder)}
+  >
+    <td class="text-md flex w-8/12 items-center gap-2 text-start text-ellipsis sm:w-4/12 md:w-4/12 xl:w-[30%] 2xl:w-[40%]">
+      <Icon icon={mdiFolder} size="20" />
+      {folder.name}
+    </td>
+    <td class="text-md w-4/12 text-ellipsis sm:w-2/12 md:w-2/12 xl:w-[15%]">
+      {$t('space_album_folder_albums_count', {
+        values: { count: getRecursiveAlbumCount(folders, allAlbums, folder.id) },
+      })}
+    </td>
+    <!-- One empty cell per REMAINING column in albumRow, with that column's exact width
+         classes copied across. Read albumRow and mirror it — the counts must match. -->
+  </tr>
+{/snippet}
+```
+
+Render the folder rows before the album rows, inside the existing `<tbody>` and **outside** any
+group wrapper, so folders stay ungrouped even when group-by is active (W-07):
 
 ```svelte
     {#each levelFolders as folder (folder.id)}
-      <tr
-        class="cursor-pointer border-b border-gray-200 hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800"
-        data-testid="space-album-folder-row"
-        onclick={() => onOpenFolder?.(folder)}
-      >
-        <td class="flex items-center gap-2 px-4 py-3 font-medium">
-          <Icon icon={mdiFolder} size="20" />
-          {folder.name}
-        </td>
-        <td class="px-4 py-3">
-          {$t('space_album_folder_albums_count', {
-            values: { count: getRecursiveAlbumCount(folders, albums, folder.id) },
-          })}
-        </td>
-        <!-- One empty cell per remaining album column, so the folder rows stay aligned with
-             the album rows below them. Match the count to this table's existing header. -->
-        <td></td>
-        <td></td>
-      </tr>
+      {@render folderRow(folder)}
     {/each}
 ```
-
-Adjust the trailing empty `<td>` count to match the column count this table's header already declares.
 
 - [ ] **Step 7: Add the New folder button**
 
@@ -4425,10 +4498,11 @@ async function reload() {
 
 const navigateToFolder = (folderId: string | null) => goto(Route.viewSpaceAlbums({ id: space.id, folderId }));
 
+// showDialog resolves to a BOOLEAN, so it cannot collect a name — this uses the dedicated
+// single-field modal from Task 9.
 async function handleCreateFolder() {
-  const name = await modalManager.showDialog({
+  const name = await modalManager.show(SpaceAlbumFolderNameModal, {
     title: $t('space_album_folder_new'),
-    prompt: $t('space_album_folder_name_label'),
   });
   if (!name) {
     return;
@@ -4445,9 +4519,9 @@ async function handleCreateFolder() {
 }
 
 async function handleRenameFolder(folder: SharedSpaceAlbumFolderDto) {
-  const name = await modalManager.showDialog({
+  const name = await modalManager.show(SpaceAlbumFolderNameModal, {
     title: $t('space_album_folder_rename'),
-    prompt: $t('space_album_folder_name_label'),
+    initialName: folder.name,
   });
   if (!name || name === folder.name) {
     return;
