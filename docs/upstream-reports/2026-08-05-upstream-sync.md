@@ -223,7 +223,29 @@ underlying commands (`pub get`, `build_runner build`, `easy_localization:generat
 
 ## Remote CI Verification
 
-See the follow-up commit recording the dispatched run results.
+- **Test branch**: `rebase/upstream-b57`
+- **Commit validated**: `02357618d33`
+
+**10/10 green, first pass.**
+
+| Workflow                                  | Status | Notes                                             |
+| ----------------------------------------- | ------ | ------------------------------------------------- |
+| `test.yml`                                | GREEN  | 21/21 jobs success, 0 skipped                     |
+| `docker.yml`                              | GREEN  |                                                   |
+| `static_analysis.yml`                     | GREEN  | dart analyze + format + generated-file freshness  |
+| `gallery-build-mobile.yml`                | GREEN  | iOS + Android compile                             |
+| `gallery-mobile-smoke.yml`                | GREEN  |                                                   |
+| `gallery-ml-smoke.yml`                    | GREEN  |                                                   |
+| `gallery-rebase-smoke.yml`                | GREEN  |                                                   |
+| `storage-migration-tests.yml`             | GREEN  |                                                   |
+| `storage-migration-e2e.yml`               | GREEN  |                                                   |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | read to `Post-phase drift (0 item(s))` / `PASSED` |
+
+No failures, no re-dispatches, no flakes.
+
+**First run of the `Test Branding` job on the rolling branch** — the umbrella branding gate arrived via the
+#928 fork sync and passed here, so the branding pipeline is now gated on the branch that carries upstream's
+`web/` changes, which is where it has the most value.
 
 ## Post-Rebase Verification
 
