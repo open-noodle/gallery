@@ -162,6 +162,15 @@ branding rewrites are all literal-match.
 
 ### Follow-up work
 
+- **★ Six of the eight `branding/scripts/*.sh` are referenced by no workflow at all.** Found while asking why nothing
+  caught the #30527 regression: the answer is that the fork's own regression test for it,
+  `test-app-download-branding.sh`, **never runs in CI**. Only `test-i18n-branding.sh` is wired (via the
+  `branding-i18n-tests` job in `test.yml`); `test-app-download-branding.sh`, `test-email-branding.sh`,
+  `test-oauth-callback-branding.sh`, `verify-branding.sh`, `verify-mobile-assets.sh` and `gallery-branding-check.sh` are
+  not. All three unwired regression tests **pass today** and are fast (no network, no image tooling), so wiring them is
+  cheap. Recommended as its own PR against `main` rather than buried in a rebase cycle, so the gate protects every branch
+  immediately instead of waiting for a cutover. Detector:
+  `for f in branding/scripts/*.sh; do n=$(basename "$f"); grep -rq "$n" .github/workflows/ || echo "NOT IN CI: $n"; done`
 - **`branding/scripts/verify-branding.sh` reports a false OK for this class.** Its `AppDownloadModal.svelte` check only
   asserts that Immich strings are _absent_; once upstream moved the URLs into the package, that passed vacuously while
   the modal was in fact unbranded. It should additionally assert the Noodle URLs are _present_. Not changed this cycle
@@ -179,6 +188,7 @@ branding rewrites are all literal-match.
 | `web check:svelte`                           | PASS   | exit 0 — 575 files, 0 errors, 0 warnings (not a 0-file no-op) |
 | Server unit tests                            | PASS   | 157 files passed / 1 skipped; 5265 tests passed               |
 | Web unit tests                               | PASS   | 300 files passed / 1 skipped; 4096 tests passed               |
+| web eslint (`tscompat` off)                  | PASS   | 0 errors — see warning note below                             |
 | Branding regression test                     | PASS   | 10/10 assertions (was failing 2/10 before the fix)            |
 | `revert-to-immich.sql` coverage detector     | PASS   | no missing entries                                            |
 | Post-rebase audits (batches 50–53)           | PASS   | all 7 checks green per batch                                  |
@@ -189,9 +199,54 @@ branding rewrites are all literal-match.
 audit's "Generated Artifact Review" reported no generated artifact needing attention. Running `make sql` without a live
 database would delete every file under `server/src/queries/`.
 
+**On the 21 eslint warnings.** The local run must use `--rule '{"tscompat/tscompat":"off"}'` to work around the
+`@koddsson/eslint-plugin-tscompat` crash, and disabling that rule makes its 20 in-tree `eslint-disable` directives look
+stale — those warnings are artifacts of the workaround and do not occur in CI, where the rule is enabled. The 21st
+(`searchResultTotal` unused, in the search route) is real but **pre-existing**: this cycle does not touch that file, and
+`web`'s lint script is `eslint . --concurrency 6` with **no `--max-warnings`**, so warnings do not gate Lint Web — which
+is why the previous cycle was green with it present. It is already fixed by the unpushed local `main` commit noted under
+Follow-up work, and will arrive here through a future fork sync.
+
 ## Remote CI Verification
 
-See the follow-up commit recording the dispatched run results.
+- **Test branch**: `rebase/upstream-b53`
+- **Commits validated**: `e534912cc75` (7 workflows) and `cf8154d066b` (3 re-dispatched after the mobile fix)
+
+**10/10 green.**
+
+| Workflow                                  | Status | Validated on  | Notes                         |
+| ----------------------------------------- | ------ | ------------- | ----------------------------- |
+| `test.yml`                                | GREEN  | `cf8154d066b` | 21/21 jobs success, 0 skipped |
+| `docker.yml`                              | GREEN  | `e534912cc75` |                               |
+| `static_analysis.yml`                     | GREEN  | `cf8154d066b` |                               |
+| `gallery-build-mobile.yml`                | GREEN  | `e534912cc75` | iOS + Android                 |
+| `gallery-mobile-smoke.yml`                | GREEN  | `cf8154d066b` |                               |
+| `gallery-ml-smoke.yml`                    | GREEN  | `e534912cc75` |                               |
+| `gallery-rebase-smoke.yml`                | GREEN  | `e534912cc75` |                               |
+| `storage-migration-tests.yml`             | GREEN  | `e534912cc75` |                               |
+| `storage-migration-e2e.yml`               | GREEN  | `e534912cc75` |                               |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | `e534912cc75` |                               |
+
+The seven workflows validated on `e534912cc75` were not re-dispatched: the only change on `cf8154d066b` is a mobile test
+file, which is not an input to any of them.
+
+### First-pass failures and their disposition
+
+The first pass was 7/10. Both causes are recorded here because one is a recurring class.
+
+**Real (3 workflows, 1 defect).** `Static Code Analysis`, `Test`/`Unit Test Mobile` and `Gallery Mobile Smoke` all failed
+on a single fork-only test fake: upstream #30478 widened `BackgroundSyncManager.syncRemote()` to
+`syncRemote({bool enqueue = false})`, and `mobile/test/domain/utils/background_sync_test.dart`'s hand-written
+`_FakeBackgroundSyncManager` still overrode the no-arg form — an invalid override. The three mocktail-based
+`MockBackgroundSyncManager` classes were unaffected because `extends Mock` routes through `noSuchMethod` and declares no
+signature, so **a signature widening surfaces only in hand-written fakes**. Fixed in `cf8154d066b`. This is a third
+instance of the zero-conflict break class (see Inconsistencies) and, unlike the other two, it would have been caught in
+~30s by `mise //mobile:analyze` — the mobile gate was left to remote CI, costing a full round.
+
+**Environmental (1 workflow).** `End-to-End Tests (Server & CLI) (ubuntu-latest)` failed with
+`TimeoutError: The operation was aborted due to timeout` during `pnpm --filter @immich/sdk install --frozen-lockfile`
+inside the Docker build; `End-to-End Tests Success` is only its aggregate gate. Confirmed transient by re-run — both
+runners are green on `cf8154d066b`.
 
 ## Post-Rebase Verification
 
