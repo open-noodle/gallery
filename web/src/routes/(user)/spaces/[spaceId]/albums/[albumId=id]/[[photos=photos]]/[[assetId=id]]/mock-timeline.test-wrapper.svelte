@@ -11,6 +11,7 @@
     singleSelect?: boolean;
     assetInteraction?: unknown;
     timelineManager?: Record<string, unknown>;
+    space?: { id: string; canWrite: boolean };
     grouping?: TimelineGrouping;
     onGroupingChange?: (grouping: TimelineGrouping) => void;
     onTimelineBucketActivate?: (bucket: ActivatableTimelineBucket) => void;
@@ -26,6 +27,7 @@
     singleSelect = false,
     assetInteraction,
     timelineManager = $bindable(),
+    space,
     grouping = 'day',
     empty,
     // remaining props accepted but not used in mock rendering
@@ -56,6 +58,7 @@
   data-single-select={String(singleSelect)}
   data-mode={derivedMode}
   data-grouping={grouping}
+  data-space={JSON.stringify(space ?? null)}
 >
   <div data-testid="timeline-options">{serializedOptions}</div>
   {@render empty?.()}

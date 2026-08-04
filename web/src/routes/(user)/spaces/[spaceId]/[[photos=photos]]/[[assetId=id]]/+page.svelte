@@ -873,6 +873,7 @@
         {filters}
         language={$lang}
         spaceId={space.id}
+        space={{ id: space.id, canWrite: isEditor }}
         isShared={true}
         total={smartFacetTotal}
       />
@@ -896,6 +897,7 @@
           {isSelectionMode}
           onEscape={handleEscape}
           spaceId={space.id}
+          space={{ id: space.id, canWrite: isEditor }}
           onTimelineBucketActivate={handleTimelineBucketActivate}
           {temporalAnchor}
           onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
