@@ -1,9 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/overview/overview_segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/scroll_drain.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
 
 void main() {
   group('decideScrollDrain', () {
@@ -158,6 +160,34 @@ void main() {
       // Defensive: the builder never mixes them today, but treating "any overview
       // card present" as overview keeps the scroll from targeting a card.
       expect(segmentsAreOverview([_fixedSegment(), _overviewSegment()]), isTrue);
+    });
+  });
+
+  group('drainableSegments', () {
+    test('serves the segments of a settled stream', () {
+      final segments = [_fixedSegment()];
+
+      expect(drainableSegments(AsyncData(segments)), same(segments));
+    });
+
+    test('has nothing to drain before the first segments arrive', () {
+      expect(drainableSegments(const AsyncLoading()), isNull);
+    });
+
+    test('withholds the previous timeline segments while the stream is refreshing', () {
+      // #898: clearing the Photos filter swaps the timeline off its search-backed
+      // service, but `valueOrNull` keeps serving the SEARCH segments until the new
+      // ones arrive. Draining against those scrolls the results being left behind
+      // and consumes the request, so the jump never lands on the global timeline.
+      final searchSegments = [_fixedSegment()];
+      final refreshing = const AsyncLoading<List<Segment>>().copyWithPrevious(AsyncData(searchSegments));
+
+      expect(refreshing.valueOrNull, same(searchSegments), reason: 'precondition: the stale value is still served');
+      expect(drainableSegments(refreshing), isNull);
+    });
+
+    test('has nothing to drain when the stream failed', () {
+      expect(drainableSegments(AsyncError(Exception('boom'), StackTrace.empty)), isNull);
     });
   });
 
