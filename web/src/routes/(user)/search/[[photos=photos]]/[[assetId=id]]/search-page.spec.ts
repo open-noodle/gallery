@@ -266,6 +266,63 @@ describe('Search page cmdk selection context', () => {
     await waitFor(() => expect(screen.getByTestId('gallery-viewer')).toHaveAttribute('data-enable-grouping', 'true'));
   });
 
+  // #830: "Show similar photos" on a photo shared through a Space returned nothing for a member
+  // who does not own it — the page searched only the caller's own (and partner) assets, so the
+  // space owner got a long list and every other member got zero. Global search on this page has to
+  // cover shared-space content the way the command palette already does (#894).
+  it('includes shared spaces when searching by a reference asset', async () => {
+    mockFeatureFlagsManager.value.smartSearch = true;
+    const query = encodeURIComponent(JSON.stringify({ queryAssetId: 'asset-1' }));
+    mockPage.url = new URL(`https://gallery.test/search?${QueryParameter.QUERY}=${query}`);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(mockSearchSmart).toHaveBeenCalledWith({
+        smartSearchDto: expect.objectContaining({ queryAssetId: 'asset-1', withSharedSpaces: true }),
+      });
+    });
+  });
+
+  it('includes shared spaces for metadata searches', async () => {
+    const query = encodeURIComponent(JSON.stringify({ city: 'Berlin' }));
+    mockPage.url = new URL(`https://gallery.test/search?${QueryParameter.QUERY}=${query}`);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(mockSearchAssets).toHaveBeenCalledWith({
+        metadataSearchDto: expect.objectContaining({ city: 'Berlin', withSharedSpaces: true }),
+      });
+    });
+  });
+
+  // The server rejects `spaceId` + `withSharedSpaces` together with a 400, so a space-scoped URL
+  // must not pick up the global default.
+  it('omits shared spaces when the search is already scoped to one space', async () => {
+    mockFeatureFlagsManager.value.smartSearch = true;
+    const query = encodeURIComponent(JSON.stringify({ query: 'beach', spaceId: 'space-1' }));
+    mockPage.url = new URL(`https://gallery.test/search?${QueryParameter.QUERY}=${query}`);
+
+    renderPage();
+
+    await waitFor(() => expect(mockSearchSmart).toHaveBeenCalled());
+    expect(mockSearchSmart.mock.calls[0][0].smartSearchDto).not.toHaveProperty('withSharedSpaces');
+  });
+
+  it('lets an explicit withSharedSpaces:false in the URL win over the default', async () => {
+    const query = encodeURIComponent(JSON.stringify({ city: 'Berlin', withSharedSpaces: false }));
+    mockPage.url = new URL(`https://gallery.test/search?${QueryParameter.QUERY}=${query}`);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(mockSearchAssets).toHaveBeenCalledWith({
+        metadataSearchDto: expect.objectContaining({ withSharedSpaces: false }),
+      });
+    });
+  });
+
   it('resolves scoped person filter chips from shared people search', async () => {
     const query = encodeURIComponent(
       JSON.stringify({ personIds: ['space-person:space-person-1'], withSharedSpaces: true }),
