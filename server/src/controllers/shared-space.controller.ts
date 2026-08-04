@@ -41,6 +41,11 @@ import {
 import {
   SharedSpaceActivityQueryDto,
   SharedSpaceActivityResponseDto,
+  SharedSpaceAlbumFolderCreateDto,
+  SharedSpaceAlbumFolderDto,
+  SharedSpaceAlbumFolderMoveAlbumDto,
+  SharedSpaceAlbumFolderParamDto,
+  SharedSpaceAlbumFolderUpdateDto,
   SharedSpaceAlbumLinkUpdateDto,
   SharedSpaceAlbumMemberTimelineDto,
   SharedSpaceAlbumParamDto,
@@ -764,5 +769,83 @@ export class SharedSpaceController {
   })
   unlinkAlbum(@Auth() auth: AuthDto, @Param() { id, albumId }: SharedSpaceAlbumParamDto): Promise<void> {
     return this.service.unlinkAlbum(auth, id, albumId);
+  }
+
+  @Get(':id/album-folders')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({
+    summary: 'List the album folders of a shared space',
+    description:
+      'Returns every folder in the space as a flat list; the client builds the tree. Folder names are member-only information, so non-members are refused rather than given an empty list.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  getSharedSpaceAlbumFolders(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+  ): Promise<SharedSpaceAlbumFolderDto[]> {
+    return this.service.getAlbumFolders(auth, id);
+  }
+
+  @Post(':id/album-folders')
+  @Authenticated({ permission: Permission.SharedSpaceAlbumFolderCreate })
+  @Endpoint({
+    summary: 'Create an album folder in a shared space',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  createSharedSpaceAlbumFolder(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Body() dto: SharedSpaceAlbumFolderCreateDto,
+  ): Promise<SharedSpaceAlbumFolderDto> {
+    return this.service.createAlbumFolder(auth, id, dto);
+  }
+
+  @Patch(':id/album-folders/:folderId')
+  @Authenticated({ permission: Permission.SharedSpaceAlbumFolderUpdate })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Rename or move an album folder',
+    description: 'Pass parentId: null to move the folder to the space root.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  updateSharedSpaceAlbumFolder(
+    @Auth() auth: AuthDto,
+    @Param() { id, folderId }: SharedSpaceAlbumFolderParamDto,
+    @Body() dto: SharedSpaceAlbumFolderUpdateDto,
+  ): Promise<void> {
+    return this.service.updateAlbumFolder(auth, id, folderId, dto);
+  }
+
+  @Delete(':id/album-folders/:folderId')
+  @Authenticated({ permission: Permission.SharedSpaceAlbumFolderDelete })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Delete an album folder',
+    description:
+      'Direct children are promoted one level up. Albums are never unlinked, and structure below the deleted folder is preserved.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  deleteSharedSpaceAlbumFolder(
+    @Auth() auth: AuthDto,
+    @Param() { id, folderId }: SharedSpaceAlbumFolderParamDto,
+  ): Promise<void> {
+    return this.service.deleteAlbumFolder(auth, id, folderId);
+  }
+
+  @Put(':id/albums/:albumId/folder')
+  @Authenticated({ permission: Permission.SharedSpaceAlbumUpdate })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Move a linked album into a folder',
+    description:
+      "Separate from PATCH :id/albums/:albumId so that endpoint's required showInTimeline stays required — making it optional would regenerate the Dart client into three-state territory.",
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  setSharedSpaceAlbumFolder(
+    @Auth() auth: AuthDto,
+    @Param() { id, albumId }: SharedSpaceAlbumParamDto,
+    @Body() dto: SharedSpaceAlbumFolderMoveAlbumDto,
+  ): Promise<void> {
+    return this.service.setAlbumFolder(auth, id, albumId, dto);
   }
 }

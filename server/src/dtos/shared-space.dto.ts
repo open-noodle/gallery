@@ -213,6 +213,13 @@ const SharedSpaceAlbumParamSchema = z.object({
   albumId: z.uuidv4(),
 });
 
+// security-9: every path param is a uuidv4, so a non-UUID segment becomes a 400 rather than a
+// raw Postgres 22P02 -> 500.
+const SharedSpaceAlbumFolderParamSchema = z.object({
+  id: z.uuidv4(),
+  folderId: z.uuidv4(),
+});
+
 // security-9: every one of these path params is a uuidv4 id in Immich (space.id, user.id,
 // shared_space_person.id, asset_face.id for faceId, library.id) — validating them here turns a
 // non-UUID path segment into a 400 instead of a raw Postgres 22P02 -> 500.
@@ -315,6 +322,7 @@ export class SharedSpaceAlbumFolderCreateDto extends createZodDto(SharedSpaceAlb
 export class SharedSpaceAlbumFolderUpdateDto extends createZodDto(SharedSpaceAlbumFolderUpdateSchema) {}
 export class SharedSpaceAlbumFolderMoveAlbumDto extends createZodDto(SharedSpaceAlbumFolderMoveAlbumSchema) {}
 export class SharedSpaceAlbumParamDto extends createZodDto(SharedSpaceAlbumParamSchema) {}
+export class SharedSpaceAlbumFolderParamDto extends createZodDto(SharedSpaceAlbumFolderParamSchema) {}
 export class SharedSpaceMemberParamDto extends createZodDto(SharedSpaceMemberParamSchema) {}
 export class SharedSpacePersonParamDto extends createZodDto(SharedSpacePersonParamSchema) {}
 export class SharedSpacePersonFaceParamDto extends createZodDto(SharedSpacePersonFaceParamSchema) {}

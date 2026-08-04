@@ -261,6 +261,9 @@ export enum Permission {
   SharedSpaceAlbumCreate = 'sharedSpaceAlbum.create',
   SharedSpaceAlbumUpdate = 'sharedSpaceAlbum.update',
   SharedSpaceAlbumDelete = 'sharedSpaceAlbum.delete',
+  SharedSpaceAlbumFolderCreate = 'sharedSpaceAlbumFolder.create',
+  SharedSpaceAlbumFolderUpdate = 'sharedSpaceAlbumFolder.update',
+  SharedSpaceAlbumFolderDelete = 'sharedSpaceAlbumFolder.delete',
 
   UserGroupCreate = 'userGroup.create',
   UserGroupRead = 'userGroup.read',
