@@ -28,6 +28,8 @@
     person?: PersonResponseDto;
     removeAction?: AssetAction.UNARCHIVE | AssetAction.ARCHIVE | AssetAction.SET_VISIBILITY_TIMELINE | null;
     spaceId?: string;
+    /** Shared-space surface + the caller's write capability on it — see `Timeline` (#889). */
+    space?: { id: string; canWrite: boolean };
   }
 
   let {
@@ -40,6 +42,7 @@
     album,
     person,
     spaceId,
+    space,
   }: Props = $props();
 
   const getAsset = (id: string) => {
@@ -250,6 +253,7 @@
     {album}
     {person}
     {spaceId}
+    {space}
     onAssetChange={(asset) => {
       timelineManager?.upsertAssets([toTimelineAsset(asset)]);
     }}

@@ -284,4 +284,69 @@ describe('add to album/space entry points', () => {
     action.onAction(action);
     expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, { assetIds: ['single-1'] });
   });
+
+  // #889: the viewer used to offer every personal album for a space photo the caller does not own.
+  // The server can only ever accept those as #764 contributions into an album linked to the space,
+  // so an unrestricted picker guaranteed "assets cannot be added to the album".
+  describe('single-photo viewer "+" on a space surface', () => {
+    // `authManager.authenticated` — and with it the ownership check — is false unless BOTH the
+    // user and the preferences are set, so setting only the user would make every case look
+    // non-owned and the assertions unfalsifiable.
+    beforeEach(() => authManager.setPreferences(preferencesFactory.build()));
+    afterEach(() => authManager.reset());
+
+    it('narrows the picker to the space when a space editor opens a photo they do not own', () => {
+      authManager.setUser(userAdminFactory.build({ id: 'editor-1' }));
+      const asset = assetFactory.build({ id: 'not-mine', ownerId: 'someone-else' });
+
+      const action = getAssetActions(() => '', asset, { space: { id: 'space-1', canWrite: true } }).AddToAlbum;
+      action.onAction(action);
+
+      expect(action.$if?.()).toBe(true);
+      expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, {
+        assetIds: ['not-mine'],
+        restrictToSpaceId: 'space-1',
+      });
+    });
+
+    it('leaves the picker unrestricted for a photo the space editor owns', () => {
+      authManager.setUser(userAdminFactory.build({ id: 'editor-1' }));
+      const asset = assetFactory.build({ id: 'mine', ownerId: 'editor-1' });
+
+      const action = getAssetActions(() => '', asset, { space: { id: 'space-1', canWrite: true } }).AddToAlbum;
+      action.onAction(action);
+
+      expect(action.$if?.()).toBe(true);
+      expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, {
+        assetIds: ['mine'],
+        restrictToSpaceId: undefined,
+      });
+    });
+
+    it('hides the action for a space viewer looking at a photo they do not own', () => {
+      authManager.setUser(userAdminFactory.build({ id: 'viewer-1' }));
+      const asset = assetFactory.build({ id: 'not-mine', ownerId: 'someone-else' });
+
+      const action = getAssetActions(() => '', asset, { space: { id: 'space-1', canWrite: false } }).AddToAlbum;
+
+      expect(action.$if?.()).toBe(false);
+    });
+
+    it('keeps the action off a space surface for a photo the user does not own', () => {
+      // Partner-shared assets legitimately reach the caller's own album through
+      // Permission.AssetShare, which the viewer cannot evaluate — so it must not gate on ownership
+      // outside a space.
+      authManager.setUser(userAdminFactory.build({ id: 'partner-of-owner' }));
+      const asset = assetFactory.build({ id: 'partners-photo', ownerId: 'the-partner' });
+
+      const action = getAssetActions(() => '', asset).AddToAlbum;
+      action.onAction(action);
+
+      expect(action.$if?.()).toBe(true);
+      expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, {
+        assetIds: ['partners-photo'],
+        restrictToSpaceId: undefined,
+      });
+    });
+  });
 });

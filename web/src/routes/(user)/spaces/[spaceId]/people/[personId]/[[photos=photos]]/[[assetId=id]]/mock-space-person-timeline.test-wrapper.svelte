@@ -8,6 +8,7 @@
     options?: Record<string, unknown>;
     enableRouting?: boolean;
     spaceId?: string;
+    space?: { id: string; canWrite: boolean };
     grouping?: TimelineGrouping;
     onGroupingChange?: (grouping: TimelineGrouping) => void;
     onTimelineBucketActivate?: (bucket: ActivatableTimelineBucket) => void;
@@ -22,6 +23,7 @@
     options = {},
     enableRouting = false,
     spaceId,
+    space,
     grouping = 'day',
     onGroupingChange,
     onTimelineBucketActivate,
@@ -54,6 +56,7 @@
   data-testid="space-person-timeline"
   data-enable-routing={String(enableRouting)}
   data-space-id={spaceId}
+  data-space={JSON.stringify(space ?? null)}
   data-has-timeline-manager={String(timelineManager !== undefined)}
 >
   <div data-testid="timeline-stub" data-options={serializedOptions}></div>
