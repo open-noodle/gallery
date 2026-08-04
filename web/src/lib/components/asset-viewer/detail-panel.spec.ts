@@ -135,6 +135,11 @@ vi.mock('$lib/components/shared-components/LoadingSpinner.svelte', async () => {
 });
 
 describe('DetailPanel', () => {
+  const searchTermsFromHref = (href: string | null) => {
+    const query = new URL(href ?? '', 'https://gallery.test').searchParams.get('query');
+    return query === null ? {} : JSON.parse(query);
+  };
+
   const makeFace = (
     id: string,
     person: PersonResponseDto,
@@ -406,6 +411,51 @@ describe('DetailPanel', () => {
 
     await waitFor(() => expect(screen.getByText('Karolin')).toBeInTheDocument());
     expect(container.querySelector('p[title*="2027"]')).toBeNull();
+  });
+
+  // #732: the camera and lens links jump to the deprecated /search page, whose metadata search is
+  // scoped to own + partner assets unless `withSharedSpaces` is set. Without it a Space member
+  // clicking the camera of a photo another member shared into the Space gets zero results — not
+  // even the photo they clicked on. Same omission, same fix as the palette in #894.
+  it('scopes the camera link search to shared spaces', async () => {
+    const asset = assetFactory.build({
+      ownerId: 'someone-else',
+      exifInfo: { make: 'Apple', model: 'iPhone 17 Pro' },
+    });
+
+    const { container } = renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+
+    const link = await waitFor(() => {
+      const anchor = container.querySelector<HTMLAnchorElement>(':scope [data-testid="detail-panel-camera"] a');
+      expect(anchor).not.toBeNull();
+      return anchor!;
+    });
+
+    expect(searchTermsFromHref(link.getAttribute('href'))).toEqual({
+      make: 'Apple',
+      model: 'iPhone 17 Pro',
+      withSharedSpaces: true,
+    });
+  });
+
+  it('scopes the lens link search to shared spaces', async () => {
+    const asset = assetFactory.build({
+      ownerId: 'someone-else',
+      exifInfo: { lensModel: 'iPhone 17 Pro front camera' },
+    });
+
+    const { container } = renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+
+    const link = await waitFor(() => {
+      const anchor = container.querySelector<HTMLAnchorElement>(':scope [data-testid="detail-panel-lens"] a');
+      expect(anchor).not.toBeNull();
+      return anchor!;
+    });
+
+    expect(searchTermsFromHref(link.getAttribute('href'))).toEqual({
+      lensModel: 'iPhone 17 Pro front camera',
+      withSharedSpaces: true,
+    });
   });
 
   it('renders Google, Apple, and OpenStreetMap links in the image info panel map popup', async () => {
