@@ -1532,14 +1532,32 @@ export class SharedSpaceRepository {
   // transactions touch disjoint rows, both ancestor checks pass, and the result is a detached
   // cycle. Folder moves are rare, so serialising them per space costs nothing.
   //
+  // Two-argument hashtext form: the single-arg pg_advisory_xact_lock(hashtext(id)) shares one
+  // cluster-wide keyspace with DatabaseRepository.withLock's pg_advisory_lock(DatabaseLock.X) and
+  // with identity-merge-propagation.service.ts's own lock. Namespacing with a constant first key
+  // keeps this lock's ids out of collision range with either of those.
+  //
+  // This depends on READ COMMITTED (Postgres's default, unchanged here): under REPEATABLE READ
+  // the transaction's snapshot is taken before the lock blocks, so the ancestor re-read below
+  // would still see pre-lock data and both concurrent moves could pass the cycle check.
+  //
   // Everything below uses `trx` — a `this.db` query inside a transaction callback deadlocks (#595).
+  //
+  // The verdict is authoritative for CYCLES only. Depth-cap and destination name-uniqueness are
+  // optimistic pre-checks the service runs before calling this — this method does not repeat
+  // them, so a concurrently-committed move could in principle still slip a depth or name
+  // violation past it. Only the cycle, which corrupts the tree structurally, is worth the
+  // transaction-scoped re-check.
   moveAlbumFolderChecked(
     spaceId: string,
     folderId: string,
     newParentId: string | null,
+    name?: string,
   ): Promise<'ok' | 'cycle' | 'notfound'> {
     return this.db.transaction().execute(async (trx) => {
-      await sql`SELECT pg_advisory_xact_lock(hashtext(${spaceId}))`.execute(trx);
+      await sql`SELECT pg_advisory_xact_lock(hashtext('shared-space-album-folder-move'), hashtext(${spaceId}))`.execute(
+        trx,
+      );
 
       const folder = await trx
         .selectFrom('shared_space_album_folder')
@@ -1552,7 +1570,7 @@ export class SharedSpaceRepository {
         return 'notfound' as const;
       }
 
-      if (newParentId) {
+      if (newParentId !== null) {
         const target = await trx
           .selectFrom('shared_space_album_folder')
           .select(['id'])
@@ -1588,9 +1606,13 @@ export class SharedSpaceRepository {
         }
       }
 
+      // The rename (when given) lands in the SAME statement as the reparent, so the row is never
+      // briefly visible under its old name at the new parent — the transient state that would
+      // trip the destination's uniqueness index even though the caller's pre-check, run against
+      // the intended END state, passed.
       await trx
         .updateTable('shared_space_album_folder')
-        .set({ parentId: newParentId })
+        .set({ parentId: newParentId, ...(name !== undefined && { name }) })
         .where('id', '=', folderId)
         .execute();
 

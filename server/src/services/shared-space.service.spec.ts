@@ -13817,13 +13817,18 @@ describe(SharedSpaceService.name, () => {
     });
 
     describe('updateAlbumFolder (move)', () => {
-      // M-01
+      // M-01: move-only — no rename, so the 4th (name) arg to moveAlbumFolderChecked is undefined.
       it('M-01: moves a folder under another folder', async () => {
         const { auth, space, folder, target } = setupAlbumFolderMove(mocks);
 
         await sut.updateAlbumFolder(auth, space.id, folder.id, { parentId: target.id } as any);
 
-        expect(mocks.sharedSpace.moveAlbumFolderChecked).toHaveBeenCalledWith(space.id, folder.id, target.id);
+        expect(mocks.sharedSpace.moveAlbumFolderChecked).toHaveBeenCalledWith(
+          space.id,
+          folder.id,
+          target.id,
+          undefined,
+        );
       });
 
       // M-02
@@ -13832,7 +13837,7 @@ describe(SharedSpaceService.name, () => {
 
         await sut.updateAlbumFolder(auth, space.id, folder.id, { parentId: null } as any);
 
-        expect(mocks.sharedSpace.moveAlbumFolderChecked).toHaveBeenCalledWith(space.id, folder.id, null);
+        expect(mocks.sharedSpace.moveAlbumFolderChecked).toHaveBeenCalledWith(space.id, folder.id, null, undefined);
       });
 
       // M-03: caught before any query — a folder is trivially its own descendant.
@@ -13845,14 +13850,33 @@ describe(SharedSpaceService.name, () => {
         expect(mocks.sharedSpace.moveAlbumFolderChecked).not.toHaveBeenCalled();
       });
 
-      // M-04 / M-05: the target's ancestor chain contains the moved folder, at any depth.
-      it.each([
-        ['M-04', 'a direct child'],
-        ['M-05', 'a deep descendant'],
-      ])('%s: rejects moving a folder into %s', async () => {
+      // M-04: the target's ancestor chain contains the moved folder ONE level up — the target is
+      // folder's direct child.
+      it('M-04: rejects moving a folder into a direct child', async () => {
         const { auth, space, folder, target } = setupAlbumFolderMove(mocks);
         mocks.sharedSpace.getAlbumFolderAncestors.mockResolvedValue([
           { id: target.id, parentId: folder.id, name: 'Archive' },
+          { id: folder.id, parentId: null, name: 'Trips' },
+        ]);
+
+        await expect(
+          sut.updateAlbumFolder(auth, space.id, folder.id, { parentId: target.id } as any),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(mocks.sharedSpace.moveAlbumFolderChecked).not.toHaveBeenCalled();
+      });
+
+      // M-05: same guard, but several levels down — folder is a distant ancestor of the target,
+      // not its immediate parent, so the check has to walk the WHOLE chain, not just the first
+      // link. A 2-element chain (as M-04 uses) can't distinguish "walks the chain" from "checks
+      // only the immediate parent"; this one is 4 elements deep with folder at the far end.
+      it('M-05: rejects moving a folder into a deep descendant', async () => {
+        const { auth, space, folder, target } = setupAlbumFolderMove(mocks);
+        const mid1 = newUuid();
+        const mid2 = newUuid();
+        mocks.sharedSpace.getAlbumFolderAncestors.mockResolvedValue([
+          { id: target.id, parentId: mid2, name: 'Archive' },
+          { id: mid2, parentId: mid1, name: 'Mid2' },
+          { id: mid1, parentId: folder.id, name: 'Mid1' },
           { id: folder.id, parentId: null, name: 'Trips' },
         ]);
 
@@ -13959,14 +13983,16 @@ describe(SharedSpaceService.name, () => {
         ).rejects.toBeInstanceOf(BadRequestException);
       });
 
+      // B-1: the rename must travel through the SAME repository call as the reparent — not a
+      // separate updateAlbumFolder statement afterwards — or the row is briefly persisted at the
+      // destination under its OLD name, which can collide there even when the new name is fine.
       it('renames and moves in a single call', async () => {
         const { auth, space, folder, target } = setupAlbumFolderMove(mocks);
-        mocks.sharedSpace.updateAlbumFolder.mockResolvedValue(true);
 
         await sut.updateAlbumFolder(auth, space.id, folder.id, { name: 'Travel', parentId: target.id } as any);
 
-        expect(mocks.sharedSpace.moveAlbumFolderChecked).toHaveBeenCalledWith(space.id, folder.id, target.id);
-        expect(mocks.sharedSpace.updateAlbumFolder).toHaveBeenCalledWith(space.id, folder.id, { name: 'Travel' });
+        expect(mocks.sharedSpace.moveAlbumFolderChecked).toHaveBeenCalledWith(space.id, folder.id, target.id, 'Travel');
+        expect(mocks.sharedSpace.updateAlbumFolder).not.toHaveBeenCalled();
       });
     });
 

@@ -1098,22 +1098,31 @@ export class SharedSpaceService extends BaseService {
     }
 
     // excludeId = folderId: renaming to the current name, or moving into the current parent,
-    // must not collide with the row being modified.
+    // must not collide with the row being modified. This is an optimistic pre-check against the
+    // intended END state — moveAlbumFolderChecked applies the rename and the reparent in the
+    // same statement, so the row is never persisted mid-transition under a name/parent
+    // combination this check didn't clear (B-1: a two-statement move-then-rename could write the
+    // folder into the destination still under its OLD name, colliding with a same-named sibling
+    // already there even though the new name would have been fine).
     await this.assertNoAlbumFolderNameConflict(spaceId, destinationParentId, name, folderId);
 
     if (isMove) {
-      const outcome = await this.sharedSpaceRepository.moveAlbumFolderChecked(spaceId, folderId, destinationParentId);
+      const outcome = await this.sharedSpaceRepository.moveAlbumFolderChecked(
+        spaceId,
+        folderId,
+        destinationParentId,
+        dto.name === undefined ? undefined : name,
+      );
       if (outcome === 'cycle') {
         throw new BadRequestException('A folder cannot be moved into one of its own descendants');
       }
       if (outcome === 'notfound') {
         throw new BadRequestException('Folder not found');
       }
+      return;
     }
 
-    if (dto.name !== undefined) {
-      await this.sharedSpaceRepository.updateAlbumFolder(spaceId, folderId, { name });
-    }
+    await this.sharedSpaceRepository.updateAlbumFolder(spaceId, folderId, { name });
   }
 
   async deleteAlbumFolder(auth: AuthDto, spaceId: string, folderId: string): Promise<void> {

@@ -668,10 +668,50 @@ describe('SharedSpaceRepository — album folder moves', () => {
     await expect(sut.moveAlbumFolderChecked(space.id, foreign.id, null)).resolves.toBe('notfound');
   });
 
+  // B-1: the destination already has a folder named exactly what the MOVED folder is currently
+  // called. A naive two-statement implementation (UPDATE parentId, then UPDATE name) would write
+  // the row into the destination still under its old name — "Trips" — colliding with the
+  // existing "Trips" there via shared_space_album_folder_nested_name_key, even though the
+  // caller's pre-check (which validates the NEW name "Trips 2024" against the destination) says
+  // this move is legal. The combined UPDATE must never pass through that transient state.
+  it('moveAlbumFolderChecked renames and reparents atomically, without a transient name collision', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const archive = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Archive',
+      createdById: user.id,
+    });
+    // Archive already holds a folder named "Trips" — the CURRENT name of the folder about to move in.
+    await sut.createAlbumFolder({ spaceId: space.id, parentId: archive.id, name: 'Trips', createdById: user.id });
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+
+    await expect(sut.moveAlbumFolderChecked(space.id, trips.id, archive.id, 'Trips 2024')).resolves.toBe('ok');
+
+    await expect(sut.getAlbumFolderById(space.id, trips.id)).resolves.toMatchObject({
+      parentId: archive.id,
+      name: 'Trips 2024',
+    });
+  });
+
   // C-01: the mutual race. Both pre-checks pass before either write lands, so correctness
   // depends entirely on the per-space advisory lock serialising the two transactions —
   // locking only the moved row would leave them touching disjoint rows and both would commit,
   // producing a detached cycle.
+  //
+  // B-2: this end-to-end race is NOT a reliable regression detector by itself. postgres.js opens
+  // connections lazily and kysely-postgres-js reserves one per transaction, so with only one
+  // connection open when Promise.all fires, the first move's three sub-millisecond loopback
+  // queries and commit typically finish before the second move's fresh TCP connect + auth
+  // handshake completes — the two end up serialised by connection setup, not by the lock under
+  // test. Deleting the lock line does not reliably fail this test. The two mechanism tests below
+  // are the actual regression coverage; this one stays as a smoke check.
   it('C-01: concurrent X->Y and Y->X moves cannot both succeed', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
@@ -689,5 +729,93 @@ describe('SharedSpaceRepository — album folder moves', () => {
     // And the tree is still a tree: exactly one of them still sits at the root.
     const rows = await sut.getAlbumFoldersBySpace(space.id);
     expect(rows.filter((r) => r.parentId === null)).toHaveLength(1);
+  });
+
+  // B-2 mechanism test: hold the exact advisory lock key moveAlbumFolderChecked takes, from a
+  // second connection we control directly, and prove a concurrent move on the SAME space blocks
+  // until we release it. Unlike the C-01 race above, this is deterministic on any machine —
+  // deleting the lock line fails it instantly, because there is nothing left to make the move
+  // wait.
+  it('C-01 mechanism: a held lock on the same space blocks a concurrent move until released', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    const archive = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Archive',
+      createdById: user.id,
+    });
+
+    const { promise: releaseSignal, resolve: releaseLock } = Promise.withResolvers<void>();
+    const { promise: lockAcquiredSignal, resolve: lockAcquired } = Promise.withResolvers<void>();
+
+    const holder = ctx.database.transaction().execute(async (trx) => {
+      await sql`SELECT pg_advisory_xact_lock(hashtext('shared-space-album-folder-move'), hashtext(${space.id}))`.execute(
+        trx,
+      );
+      lockAcquired();
+      await releaseSignal;
+    });
+
+    await lockAcquiredSignal;
+
+    const movePromise = sut.moveAlbumFolderChecked(space.id, trips.id, archive.id);
+
+    const raceResult = await Promise.race([
+      movePromise.then(() => 'resolved' as const),
+      new Promise<'pending'>((resolve) => setTimeout(() => resolve('pending'), 300)),
+    ]);
+    expect(raceResult).toBe('pending');
+
+    releaseLock();
+    await holder;
+
+    await expect(movePromise).resolves.toBe('ok');
+  });
+
+  // B-2 negative control: the lock must be scoped PER SPACE, not global — holding the identical
+  // lock key for a DIFFERENT space must not block this move at all. Without this, a test that
+  // merely proves "some lock exists" could pass even if the space id were dropped from the key
+  // entirely (i.e. every move in the whole instance serialised against every other).
+  it('C-01 mechanism: a held lock on a different space does not block the move', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const { space: otherSpace } = await ctx.newSharedSpace({ createdById: user.id });
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    const archive = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Archive',
+      createdById: user.id,
+    });
+
+    const { promise: releaseSignal, resolve: releaseLock } = Promise.withResolvers<void>();
+    const { promise: lockAcquiredSignal, resolve: lockAcquired } = Promise.withResolvers<void>();
+
+    const holder = ctx.database.transaction().execute(async (trx) => {
+      await sql`SELECT pg_advisory_xact_lock(hashtext('shared-space-album-folder-move'), hashtext(${otherSpace.id}))`.execute(
+        trx,
+      );
+      lockAcquired();
+      await releaseSignal;
+    });
+
+    await lockAcquiredSignal;
+
+    await expect(sut.moveAlbumFolderChecked(space.id, trips.id, archive.id)).resolves.toBe('ok');
+
+    releaseLock();
+    await holder;
   });
 });
