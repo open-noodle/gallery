@@ -4,7 +4,7 @@ import { applyTextFilters, buildFilterContext } from '$lib/components/filter-pan
 import { createUrl } from '$lib/utils';
 import { clearTimelineTemporalFilter } from '$lib/utils/timeline-temporal-filters';
 
-type PhotosPersonFilterReference = {
+export type PhotosPersonFilterReference = {
   id: string;
   filterId?: string | null;
   primaryProfile?: {
