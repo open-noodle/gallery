@@ -77,6 +77,8 @@
     onRemoveFromAlbum?: (assetIds: string[]) => void;
     onRandom?: () => Promise<{ id: string } | undefined>;
     spaceId?: string;
+    /** Shared-space surface + the caller's write capability on it — see `Timeline` (#889). */
+    space?: { id: string; canWrite: boolean };
   }
 
   let {
@@ -94,6 +96,7 @@
     onRemoveFromAlbum,
     onRandom,
     spaceId,
+    space,
   }: Props = $props();
 
   const {
@@ -526,6 +529,7 @@
         {onRemoveFromAlbum}
         {isPlayingOriginalVideo}
         {setPlayOriginalVideo}
+        {space}
       />
     </div>
   {/if}
