@@ -241,6 +241,15 @@ patch_app_download_modal() {
   [[ -f "$modal" ]] || return 0
 
   # Repoint the Play Store + App Store badges to the Noodle Gallery apps.
+  #
+  # Upstream #30527 moved these hrefs off literal URLs onto `Constants.Get.*`
+  # expressions imported from @immich/ui, so the URLs now live inside the npm
+  # package where a source rewrite cannot reach them. Handle the Constants form
+  # first, and keep the literal-URL rewrites so the patch still works if
+  # upstream ever moves back — matching neither form is a silent no-op that
+  # ships Immich store links, which is what test-app-download-branding.sh guards.
+  sed -i "s|{Constants\.Get\.Android}|\"${PLAY_STORE_URL}\"|g" "$modal"
+  sed -i "s|{Constants\.Get\.iOS}|\"${APP_STORE_URL}\"|g" "$modal"
   sed -i "s|https://play\.google\.com/store/apps/details?id=app\.alextran\.immich|${PLAY_STORE_URL}|g" "$modal"
   sed -i "s|https://apps\.apple\.com/us/app/immich/id1613945652|${APP_STORE_URL}|g" "$modal"
 
@@ -273,6 +282,13 @@ patch_app_download_modal() {
   # fdroidBadge import is now unused — drop it to keep the build lint-clean
   # regardless of where it sits in the destructured import list.
   sed -i "s/, fdroidBadge//g; s/fdroidBadge, //g" "$modal"
+
+  # Same for Constants once every href above became a literal. Guard on it still
+  # being referenced so an upstream change that uses Constants for something else
+  # in this modal doesn't get its import stripped out from under it.
+  if ! grep -q "Constants\." "$modal"; then
+    sed -i "s/, Constants//g; s/Constants, //g" "$modal"
+  fi
 
   echo "  Patched AppDownloadModal.svelte"
 }
