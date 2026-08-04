@@ -45,6 +45,30 @@ const newCanonPair = async (ctx: Awaited<ReturnType<typeof setup>>['ctx'], userI
   return { r5, sevenD };
 };
 
+/**
+ * A live photo is stored as two asset rows: the still and its motion video, linked one way by
+ * `still.livePhotoVideoId -> motion.id`. Moving the still into the Locked Folder writes
+ * `visibility = locked` on the still only — the motion row keeps the `hidden` visibility it was
+ * given when the pair was linked. Seeds that exact shape.
+ */
+const newLivePhoto = async (
+  ctx: Awaited<ReturnType<typeof setup>>['ctx'],
+  ownerId: string,
+  stillVisibility: AssetVisibility,
+) => {
+  const { asset: motion } = await ctx.newAsset({
+    ownerId,
+    type: AssetType.Video,
+    visibility: AssetVisibility.Hidden,
+  });
+  const { asset: still } = await ctx.newAsset({
+    ownerId,
+    visibility: stillVisibility,
+    livePhotoVideoId: motion.id,
+  });
+  return { still, motion };
+};
+
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
@@ -1862,6 +1886,53 @@ describe(SearchRepository.name, () => {
       const ids = result.map((face) => face.id);
       expect(ids).toContain(timelineFace.id); // positive control
       expect(ids).not.toContain(lockedFace.id);
+    });
+  });
+
+  // #869 follow-up: `not-locked` excludes only `visibility = locked`, which is written on the still
+  // half of a live photo alone. The motion half keeps `hidden` and so stayed in results for a session
+  // that had never entered the PIN.
+  describe('locked live photo motion half', () => {
+    it('omits the motion half of a locked live photo from a non-elevated smart search', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { motion } = await newLivePhoto(ctx, user.id, AssetVisibility.Locked);
+      await addEmbedding(ctx.database, motion.id);
+
+      const { items } = await sut.searchSmart(
+        { page: 1, size: 10 },
+        { embedding: matchingEmbedding, userIds: [user.id], visibility: 'not-locked' },
+      );
+
+      expect(items.map(({ id }) => id)).not.toContain(motion.id);
+    });
+
+    it('keeps the motion half of an unlocked live photo in a non-elevated smart search', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { motion } = await newLivePhoto(ctx, user.id, AssetVisibility.Timeline);
+      await addEmbedding(ctx.database, motion.id);
+
+      const { items } = await sut.searchSmart(
+        { page: 1, size: 10 },
+        { embedding: matchingEmbedding, userIds: [user.id], visibility: 'not-locked' },
+      );
+
+      expect(items.map(({ id }) => id)).toContain(motion.id);
+    });
+
+    it('returns the motion half of a locked live photo to an elevated smart search', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { motion } = await newLivePhoto(ctx, user.id, AssetVisibility.Locked);
+      await addEmbedding(ctx.database, motion.id);
+
+      const { items } = await sut.searchSmart(
+        { page: 1, size: 10 },
+        { embedding: matchingEmbedding, userIds: [user.id], visibility: undefined },
+      );
+
+      expect(items.map(({ id }) => id)).toContain(motion.id);
     });
   });
 });

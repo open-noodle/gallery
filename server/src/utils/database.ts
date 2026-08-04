@@ -161,6 +161,42 @@ export function withDefaultVisibility<O>(qb: SelectQueryBuilder<DB, 'asset', O>)
 }
 
 /**
+ * Fork (#869 follow-up): "is this asset in the Locked Folder?", accounting for live photos.
+ *
+ * A live photo is two asset rows — the still and its motion video — linked one way by
+ * `still.livePhotoVideoId -> motion.id`. Moving the still into the Locked Folder writes
+ * `visibility = locked` on the still only; the motion row keeps the `hidden` visibility it was given
+ * when the pair was linked. A plain `visibility != locked` gate therefore let the motion half of a
+ * locked live photo through, so it stayed in search results and its thumbnail stayed readable
+ * without an elevated session. A motion video counts as locked for as long as its still is.
+ */
+const stillIsLocked = (eb: ExpressionBuilder<DB, keyof DB>) =>
+  eb.exists(
+    eb
+      .selectFrom('asset as still')
+      .select(sql.lit(1).as('locked'))
+      .whereRef('still.livePhotoVideoId', '=', 'asset.id')
+      .where('still.visibility', '=', sql.lit(AssetVisibility.Locked)),
+  );
+
+export function isLockedAsset(eb: ExpressionBuilder<DB, keyof DB>): Expression<SqlBool> {
+  return eb.or([eb('asset.visibility', '=', sql.lit(AssetVisibility.Locked)), stillIsLocked(eb)]);
+}
+
+/**
+ * The negation of `isLockedAsset`, spelled out as a conjunction rather than `not(isLockedAsset)`.
+ * De Morgan makes the two identical, but only the conjunction form leaves the subquery as a
+ * standalone `NOT EXISTS` that Postgres can plan as an anti-join against
+ * `asset_livePhotoVideoId_visibility_idx`. Buried under a `NOT (... OR ...)` it degrades into a
+ * hashed SubPlan in the scan filter, which costs the outer scan its parallelism.
+ *
+ * Usage: `.where((eb) => isNotLockedAsset(eb))` in place of `.where('asset.visibility', '!=', Locked)`.
+ */
+export function isNotLockedAsset(eb: ExpressionBuilder<DB, keyof DB>): Expression<SqlBool> {
+  return eb.and([eb('asset.visibility', '!=', sql.lit(AssetVisibility.Locked)), eb.not(stillIsLocked(eb))]);
+}
+
+/**
  * Escape ILIKE wildcards so user-supplied filter text matches literally — e.g. a filename search for
  * "IMG_2024" must not treat "_" as a single-char wildcard, and "%" must not match everything. Pairs
  * with an `ESCAPE '\'` clause on the ILIKE. Backslash is escaped first so it does not double-escape
@@ -810,7 +846,7 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
       .$if(!!options.visibility, (qb) => {
         switch (options.visibility) {
           case 'not-locked': {
-            return qb.where('asset.visibility', '!=', AssetVisibility.Locked);
+            return qb.where((eb) => isNotLockedAsset(eb));
           }
           case 'timeline-or-archive': {
             return withDefaultVisibility(qb);

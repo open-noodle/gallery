@@ -1,7 +1,7 @@
 import { Kysely } from 'kysely';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { FilterSuggestionsResponseDto, SearchSuggestionType } from 'src/dtos/search.dto';
-import { AlbumUserRole, AssetVisibility, SharedSpaceRole } from 'src/enum';
+import { AlbumUserRole, AssetType, AssetVisibility, SharedSpaceRole } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { DatabaseRepository } from 'src/repositories/database.repository';
@@ -132,6 +132,26 @@ const seedPersonWithFaceOn = async (
     await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
   }
   return person;
+};
+
+/**
+ * #869 follow-up: a live photo is two asset rows — the still and its motion video, linked one way by
+ * `still.livePhotoVideoId -> motion.id`. Moving the still into the Locked Folder writes
+ * `visibility = locked` on the still only; the motion row keeps the `hidden` visibility it was given
+ * when the pair was linked, which is what a plain `visibility != locked` gate let through.
+ */
+const seedLivePhoto = async (ctx: SearchCtx, ownerId: string, stillVisibility: AssetVisibility) => {
+  const { asset: motion } = await ctx.newAsset({
+    ownerId,
+    type: AssetType.Video,
+    visibility: AssetVisibility.Hidden,
+  });
+  const { asset: still } = await ctx.newAsset({
+    ownerId,
+    visibility: stillVisibility,
+    livePhotoVideoId: motion.id,
+  });
+  return { still, motion };
 };
 
 // Slice 5: seed a directly-shared space asset with distinct facet values for each type.
@@ -393,6 +413,66 @@ describe(SearchService.name, () => {
       });
 
       expect(result.map((person) => person.name)).toEqual([]);
+    });
+  });
+
+  // #869 follow-up: locking a live photo writes `visibility = locked` on the still half only, so every
+  // `!= locked` gate still let the motion half — and everything reachable through it — out to a session
+  // that had never entered the PIN.
+  describe('locked live photo motion half', () => {
+    it('omits the motion half from a non-elevated metadata search', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { motion } = await seedLivePhoto(ctx, user.id, AssetVisibility.Locked);
+
+      const { assets } = await sut.searchMetadata(factory.auth({ user: { id: user.id } }), {});
+
+      expect(assets.items.map(({ id }) => id)).not.toContain(motion.id);
+    });
+
+    it('keeps the motion half of an unlocked live photo in a non-elevated metadata search', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { motion } = await seedLivePhoto(ctx, user.id, AssetVisibility.Timeline);
+
+      const { assets } = await sut.searchMetadata(factory.auth({ user: { id: user.id } }), {});
+
+      expect(assets.items.map(({ id }) => id)).toContain(motion.id);
+    });
+
+    it('omits the location of the motion half from non-elevated filter suggestions', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { motion } = await seedLivePhoto(ctx, user.id, AssetVisibility.Locked);
+      await ctx.newExif({ assetId: motion.id, country: 'Vaultland' });
+
+      const result = await sut.getFilterSuggestions(factory.auth({ user: { id: user.id } }), {});
+
+      expect(result.countries).not.toContain('Vaultland');
+    });
+
+    it('omits a person backed only by the motion half from a non-elevated person search', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { motion } = await seedLivePhoto(ctx, user.id, AssetVisibility.Locked);
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Motion Mona' });
+      await ctx.newAssetFace({ assetId: motion.id, personId: person.id });
+
+      const result = await sut.searchPerson(factory.auth({ user: { id: user.id } }), { name: 'Mona' });
+
+      expect(result.map((person) => person.name)).toEqual([]);
+    });
+
+    it('returns a person backed only by the motion half once the session is elevated', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { motion } = await seedLivePhoto(ctx, user.id, AssetVisibility.Locked);
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Motion Mona' });
+      await ctx.newAssetFace({ assetId: motion.id, personId: person.id });
+
+      const result = await sut.searchPerson(elevated(user.id), { name: 'Mona' });
+
+      expect(result.map((person) => person.name)).toEqual(['Motion Mona']);
     });
   });
 

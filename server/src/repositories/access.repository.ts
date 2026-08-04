@@ -4,7 +4,7 @@ import { InjectKysely } from 'nestjs-kysely';
 import { ChunkedSet, DummyValue, GenerateSql } from 'src/decorators';
 import { AlbumUserRole, AssetVisibility, SharedSpaceRole } from 'src/enum';
 import { DB } from 'src/schema';
-import { asUuid } from 'src/utils/database';
+import { asUuid, isNotLockedAsset } from 'src/utils/database';
 import { asBaseEb, sharedLinkAssetIsServable, sharedLinkCreatorCanPublish } from 'src/utils/shared-link-space-tether';
 import {
   spaceAssetPathBranches,
@@ -241,7 +241,7 @@ class AssetAccess {
       .select('asset.id')
       .where('asset.id', 'in', [...assetIds])
       .where('asset.ownerId', '=', userId)
-      .$if(!hasElevatedPermission, (eb) => eb.where('asset.visibility', '!=', AssetVisibility.Locked))
+      .$if(!hasElevatedPermission, (qb) => qb.where((eb) => isNotLockedAsset(eb)))
       .execute()
       .then((assets) => new Set(assets.map((asset) => asset.id)));
   }
@@ -821,7 +821,7 @@ class PersonAccess {
       .leftJoin('asset_face', 'asset_face.id', 'person.faceAssetId')
       .leftJoin('asset', 'asset.id', 'asset_face.assetId')
       .where('person.id', 'in', [...personIds])
-      .where((eb) => eb.or([eb('asset.visibility', 'is', null), eb('asset.visibility', '!=', AssetVisibility.Locked)]))
+      .where((eb) => eb.or([eb('asset.visibility', 'is', null), isNotLockedAsset(eb)]))
       .execute()
       .then((persons) => new Set(persons.map((person) => person.id)));
   }

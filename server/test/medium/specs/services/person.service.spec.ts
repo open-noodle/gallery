@@ -4,6 +4,7 @@ import { AssetEditAction, MirrorAxis } from 'src/dtos/editing.dto';
 import { AssetFaceCreateDto } from 'src/dtos/person.dto';
 import {
   AssetFileType,
+  AssetType,
   AssetVisibility,
   JobName,
   JobStatus,
@@ -154,6 +155,21 @@ const setupRecognition = (db?: Kysely<DB>) => {
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
   return { sut, ctx };
+};
+
+/**
+ * #869 follow-up: the motion video of a live photo whose still sits in the Locked Folder. Locking
+ * writes `visibility = locked` on the still only — the motion row keeps the `hidden` visibility it
+ * was given when the pair was linked.
+ */
+const seedLockedLivePhotoMotion = async (ctx: ReturnType<typeof setup>['ctx'], ownerId: string) => {
+  const { asset: motion } = await ctx.newAsset({
+    ownerId,
+    type: AssetType.Video,
+    visibility: AssetVisibility.Hidden,
+  });
+  await ctx.newAsset({ ownerId, visibility: AssetVisibility.Locked, livePhotoVideoId: motion.id });
+  return motion;
 };
 
 /**
@@ -2076,6 +2092,46 @@ describe(PersonService.name, () => {
         .where('id', '=', queryFace.id)
         .executeTakeFirstOrThrow();
       expect(row.personId).toBe(person.id);
+    });
+  });
+
+  // #869 follow-up: locking a live photo writes `visibility = locked` on the still half only — the
+  // motion video keeps the `hidden` visibility it was given when the pair was linked. Both person gates
+  // above compared `asset.visibility` to `locked` directly, so a face detected on the motion half kept
+  // leaking through them after the still was locked.
+  describe('locked live photo motion half', () => {
+    it('omits a face on the motion half from a non-elevated face picker', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Motion Mona' });
+      const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const motion = await seedLockedLivePhotoMotion(ctx, user.id);
+      await ctx.newAssetFace({ assetId: timelineAsset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: motion.id, personId: person.id });
+
+      const result = await sut.getFacesForPicker(factory.auth({ user: { id: user.id } }), person.id, {
+        page: 1,
+        size: 50,
+      });
+
+      expect(result.faces.map((face) => face.assetId)).toEqual([timelineAsset.id]);
+    });
+
+    it('refuses a thumbnail cropped from the motion half while the session is not elevated', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const motion = await seedLockedLivePhotoMotion(ctx, user.id);
+      const { person } = await ctx.newPerson({
+        ownerId: user.id,
+        name: 'Motion Mona',
+        thumbnailPath: 'upload/thumbs/mona.jpeg',
+      });
+      const { result: faceId } = await ctx.newAssetFace({ assetId: motion.id, personId: person.id });
+      await ctx.get(PersonRepository).update({ id: person.id, faceAssetId: faceId });
+
+      await expect(sut.getThumbnail(factory.auth({ user: { id: user.id } }), person.id)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
   });
 });

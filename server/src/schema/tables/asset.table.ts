@@ -70,6 +70,18 @@ import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database';
   columns: ['id'],
   where: `visibility = 'timeline' AND "deletedAt" IS NULL`,
 })
+// Gallery-fork (#869): backs `isNotLockedAsset` — "is this asset the motion half of a live photo whose
+// still sits in the Locked Folder?". Every visibility gate anti-joins against that set; carrying
+// `visibility` in the index keeps the anti-join an index-only scan instead of a full `asset` scan to
+// find the locked rows. Partial on `livePhotoVideoId IS NOT NULL` so it holds one entry per live photo.
+// (The predicate cannot filter on `visibility = 'locked'` directly: that enum value is added by
+// `ALTER TYPE ... ADD VALUE`, and every migration runs in one transaction on a fresh database, where
+// Postgres refuses to use a not-yet-committed enum value.)
+@Index({
+  name: 'asset_livePhotoVideoId_visibility_idx',
+  columns: ['livePhotoVideoId', 'visibility'],
+  where: `"livePhotoVideoId" IS NOT NULL`,
+})
 // For all assets, each originalpath must be unique per user and library
 export class AssetTable {
   @PrimaryGeneratedColumn()

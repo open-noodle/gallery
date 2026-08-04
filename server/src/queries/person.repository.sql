@@ -249,14 +249,25 @@ where
       "face_identity_face"."assetFaceId" = "asset_face"."id"
       and face_identity_face."identityId" IS DISTINCT FROM person."identityId"
   )
-  and "asset"."visibility" != $4
+  and (
+    "asset"."visibility" != 'locked'
+    and not exists (
+      select
+        1 as "locked"
+      from
+        "asset" as "still"
+      where
+        "still"."livePhotoVideoId" = "asset"."id"
+        and "still"."visibility" = 'locked'
+    )
+  )
 order by
   "asset"."fileCreatedAt" desc,
   "asset_face"."id"
 limit
-  $5
+  $4
 offset
-  $6
+  $5
 
 -- PersonRepository.getRepresentativeFaceForUpdate
 select
@@ -399,7 +410,18 @@ where
         "asset_face"."personId" = "person"."id"
         and "asset_face"."deletedAt" is null
         and "asset_face"."isVisible" is true
-        and "asset"."visibility" = $4
+        and (
+          "asset"."visibility" = 'locked'
+          or exists (
+            select
+              1 as "locked"
+            from
+              "asset" as "still"
+            where
+              "still"."livePhotoVideoId" = "asset"."id"
+              and "still"."visibility" = 'locked'
+          )
+        )
     )
     or exists (
       select
@@ -411,13 +433,24 @@ where
         "asset_face"."personId" = "person"."id"
         and "asset_face"."deletedAt" is null
         and "asset_face"."isVisible" is true
-        and "asset"."visibility" != $5
+        and (
+          "asset"."visibility" != 'locked'
+          and not exists (
+            select
+              1 as "locked"
+            from
+              "asset" as "still"
+            where
+              "still"."livePhotoVideoId" = "asset"."id"
+              and "still"."visibility" = 'locked'
+          )
+        )
     )
   )
 order by
-  f_unaccent ("person"."name") <->>> f_unaccent ($6)
+  f_unaccent ("person"."name") <->>> f_unaccent ($4)
 limit
-  $7
+  $5
 
 -- PersonRepository.getDistinctNames
 select distinct

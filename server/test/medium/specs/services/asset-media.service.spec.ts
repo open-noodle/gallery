@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
 import { AssetMediaStatus } from 'src/dtos/asset-media-response.dto';
 import { AssetMediaSize } from 'src/dtos/asset-media.dto';
-import { AssetFileType, SharedLinkType } from 'src/enum';
+import { AssetFileType, AssetType, AssetVisibility, SharedLinkType } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AlbumRepository } from 'src/repositories/album.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
@@ -30,6 +30,27 @@ const setup = (db?: Kysely<DB>) => {
     real: [AccessRepository, AlbumRepository, AssetRepository, SharedLinkRepository, UserRepository],
     mock: [EventRepository, LoggingRepository, JobRepository, StorageRepository],
   });
+};
+
+/**
+ * #869 follow-up: the motion video of a live photo whose still sits in the Locked Folder. Locking
+ * writes `visibility = locked` on the still only — the motion row keeps the `hidden` visibility it
+ * was given when the pair was linked.
+ */
+const newLockedLivePhoto = async (ctx: ReturnType<typeof setup>['ctx'], ownerId: string) => {
+  const { asset: motion } = await ctx.newAsset({
+    ownerId,
+    type: AssetType.Video,
+    visibility: AssetVisibility.Hidden,
+  });
+  await ctx.newAsset({ ownerId, visibility: AssetVisibility.Locked, livePhotoVideoId: motion.id });
+  await ctx.newAssetFile({
+    assetId: motion.id,
+    type: AssetFileType.Thumbnail,
+    path: '/motion/thumbnail.jpg',
+    isEdited: false,
+  });
+  return motion;
 };
 
 beforeAll(async () => {
@@ -425,6 +446,34 @@ describe(AssetService.name, () => {
       const resultEdited = await sut.viewThumbnail(auth, asset.id, { size: AssetMediaSize.THUMBNAIL, edited: true });
       expect(resultEdited).toBeInstanceOf(ImmichFileResponse);
       expect((resultEdited as ImmichFileResponse).path).toBe('/edited/thumbnail.jpg');
+    });
+
+    // #869 follow-up: a live photo is two asset rows and only the still carries `visibility = locked`.
+    // The motion half keeps `hidden`, so the owner-access check — which drops locked assets for a
+    // session that has not entered the PIN — served its thumbnail while the folder was locked.
+    describe('locked live photo motion half', () => {
+      it('refuses the motion thumbnail to a session that is not elevated', async () => {
+        const { sut, ctx } = setup();
+        const { user } = await ctx.newUser();
+        const motion = await newLockedLivePhoto(ctx, user.id);
+
+        const auth = factory.auth({ user: { id: user.id } });
+
+        await expect(sut.viewThumbnail(auth, motion.id, { size: AssetMediaSize.THUMBNAIL })).rejects.toThrow(
+          'Not found or no asset.view access',
+        );
+      });
+
+      it('serves the motion thumbnail to an elevated session', async () => {
+        const { sut, ctx } = setup();
+        const { user } = await ctx.newUser();
+        const motion = await newLockedLivePhoto(ctx, user.id);
+
+        const auth = factory.auth({ user: { id: user.id }, session: { hasElevatedPermission: true } });
+        const result = await sut.viewThumbnail(auth, motion.id, { size: AssetMediaSize.THUMBNAIL });
+
+        expect((result as ImmichFileResponse).path).toBe('/motion/thumbnail.jpg');
+      });
     });
   });
 });

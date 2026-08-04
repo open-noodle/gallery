@@ -9,7 +9,7 @@ import { DB } from 'src/schema';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table';
 import { PersonTable } from 'src/schema/tables/person.table';
-import { dummy, removeUndefinedKeys, withFilePath } from 'src/utils/database';
+import { dummy, isLockedAsset, isNotLockedAsset, removeUndefinedKeys, withFilePath } from 'src/utils/database';
 import { retargetDeclinePersonId } from 'src/utils/face-decline-merge';
 import { reviewableAssetVisibility } from 'src/utils/face-review';
 import { retargetVerdictPersonId } from 'src/utils/face-verdict-merge';
@@ -85,7 +85,8 @@ const isBlank = (value: string | null | undefined) => !value || value.trim().len
 /**
  * Correlated "does this `person` row have a live, visible face on a locked (or non-locked) asset?"
  * subquery. Only counts faces that are themselves live and visible, so a person left behind by a
- * deleted or hidden face is not treated as backed by that face's asset.
+ * deleted or hidden face is not treated as backed by that face's asset. "Locked" follows
+ * `isLockedAsset`, so the motion half of a locked live photo counts as locked like its still.
  */
 const visibleFaceOnAsset = (eb: ExpressionBuilder<DB, 'person'>, { locked }: { locked: boolean }) =>
   eb
@@ -95,7 +96,7 @@ const visibleFaceOnAsset = (eb: ExpressionBuilder<DB, 'person'>, { locked }: { l
     .whereRef('asset_face.personId', '=', 'person.id')
     .where('asset_face.deletedAt', 'is', null)
     .where('asset_face.isVisible', 'is', true)
-    .where('asset.visibility', locked ? '=' : '!=', AssetVisibility.Locked);
+    .where((eb) => (locked ? isLockedAsset(eb) : isNotLockedAsset(eb)));
 
 export interface DeleteFacesOptions {
   sourceType: SourceType;
@@ -616,7 +617,7 @@ export class PersonRepository {
           ),
         ),
       )
-      .$if(!options.hasElevatedPermission, (qb) => qb.where('asset.visibility', '!=', AssetVisibility.Locked))
+      .$if(!options.hasElevatedPermission, (qb) => qb.where((eb) => isNotLockedAsset(eb)))
       .$if(!!options.scope, (qb) =>
         qb.where((eb) =>
           eb.and([

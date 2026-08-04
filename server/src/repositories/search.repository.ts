@@ -24,6 +24,7 @@ import {
   hasPeople,
   hasSpacePeople,
   hasTags,
+  isNotLockedAsset,
   searchAssetBuilder,
   searchAssetBuilderLegacy,
   searchMetadataV3Examples,
@@ -1414,7 +1415,7 @@ export class SearchRepository {
       .innerJoin('asset', 'tag_asset.assetId', 'asset.id')
       .$if(!!visibility, (qb) =>
         visibility === 'not-locked'
-          ? qb.where('asset.visibility', '!=', AssetVisibility.Locked)
+          ? qb.where((eb) => isNotLockedAsset(eb))
           : qb.where('asset.visibility', '=', visibility!),
       )
       .where('asset.deletedAt', 'is', null)
@@ -1640,7 +1641,7 @@ export class SearchRepository {
         .select('asset.id')
         .$if(!!visibility, (qb) =>
           visibility === 'not-locked'
-            ? qb.where('asset.visibility', '!=', AssetVisibility.Locked)
+            ? qb.where((eb) => isNotLockedAsset(eb))
             : qb.where('asset.visibility', '=', visibility!),
         )
         .where('asset.deletedAt', 'is', null),

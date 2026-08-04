@@ -360,6 +360,12 @@ ALTER TABLE "session" DROP COLUMN IF EXISTS "oauthBearerToken";
 DROP INDEX IF EXISTS "idx_asset_exif_description_trigram";
 DELETE FROM "migration_overrides" WHERE "name" = 'index_idx_asset_exif_description_trigram';
 
+-- 1785000000000-AddLivePhotoVideoVisibilityIndex added a fork-only partial index
+-- on asset ("livePhotoVideoId", "visibility") backing the Locked Folder gate for
+-- the motion half of a live photo, plus its migration_overrides registration row.
+DROP INDEX IF EXISTS "asset_livePhotoVideoId_visibility_idx";
+DELETE FROM "migration_overrides" WHERE "name" = 'index_asset_livePhotoVideoId_visibility_idx';
+
 -- 1783628194057-DisablePostgresJit set jit=off on the application role. Restore
 -- the PostgreSQL default so the reverted database carries no Gallery-specific
 -- planner tuning.
@@ -439,6 +445,7 @@ DELETE FROM "kysely_migrations"
    '1784000000000-FixFaceRepairScanInFlightIndexOverride',
    '1784800000000-RepairSharedSpaceAlbumGrantDrift',
    '1785000000000-AddFaceRepairLock',
+   '1785000000000-AddLivePhotoVideoVisibilityIndex',
    '1786000000000-FaceRepairLockPersonNullable',
    '1787000000000-AddFacePersonVerdict',
    '1788000000000-ReconcileFacePersonVerdictConstraints',

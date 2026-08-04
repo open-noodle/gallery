@@ -130,7 +130,18 @@ from
 where
   "asset"."id" in ($1)
   and "asset"."ownerId" = $2
-  and "asset"."visibility" != $3
+  and (
+    "asset"."visibility" != 'locked'
+    and not exists (
+      select
+        1 as "locked"
+      from
+        "asset" as "still"
+      where
+        "still"."livePhotoVideoId" = "asset"."id"
+        and "still"."visibility" = 'locked'
+    )
+  )
 
 -- AccessRepository.asset.checkPartnerAccess
 select
@@ -532,7 +543,18 @@ where
   "person"."id" in ($1)
   and (
     "asset"."visibility" is null
-    or "asset"."visibility" != $2
+    or (
+      "asset"."visibility" != 'locked'
+      and not exists (
+        select
+          1 as "locked"
+        from
+          "asset" as "still"
+        where
+          "still"."livePhotoVideoId" = "asset"."id"
+          and "still"."visibility" = 'locked'
+      )
+    )
   )
 
 -- AccessRepository.person.checkSharedSpaceAccess
