@@ -21,7 +21,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { goto } from '$app/navigation';
 import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
 import * as recentModule from '$lib/stores/cmdk-recent';
-import { addEntry, getEntries, __resetForTests as resetRecentStore } from '$lib/stores/cmdk-recent';
+import { addEntry, getEntries, __resetForTests as resetRecentStore, type RecentEntry } from '$lib/stores/cmdk-recent';
 import { getTypedSearchDisplayText, storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
 import type { TypedSearchResolveContext } from '$lib/utils/typed-search/typed-search-resolver';
 import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
@@ -1080,16 +1080,17 @@ describe('activate()', () => {
     expect(m.isOpen).toBe(false);
   });
 
-  it('activate("person", item) navigates to /people/:id and records recent entry', () => {
+  it('activate("person", item) filters the timeline and records recent entry', () => {
     const m = new GlobalSearchManager();
     m.open();
     m.activate('person', { id: 'p1', name: 'Alice' });
-    expect(goto).toHaveBeenCalledWith('/people/p1');
+    // No primaryProfile and no filterId, so getPhotosPersonFilterId falls through to the raw id.
+    expect(goto).toHaveBeenCalledWith('/photos?people=p1');
     const entries = getEntries();
     expect(entries[0]).toMatchObject({ kind: 'person', personId: 'p1', label: 'Alice' });
   });
 
-  it('activate("person", item) opens identity-backed space-primary people as identity-wide person detail', () => {
+  it('activate("person", item) filters by the scoped filterId for an identity-backed space person', () => {
     const m = new GlobalSearchManager();
     m.open();
     m.activate('person', {
@@ -1099,11 +1100,12 @@ describe('activate()', () => {
       filterId: 'space-person:space-person-1',
     });
 
-    expect(goto).toHaveBeenCalledWith('/people/space-person-1');
+    // On /photos (not that space's timeline), so the prefixed id is the correct encoding.
+    expect(goto).toHaveBeenCalledWith('/photos?people=space-person%3Aspace-person-1');
     expect(getEntries()).toHaveLength(0);
   });
 
-  it('activate("person", item) navigates legacy space-primary people to identity-wide person detail', () => {
+  it('activate("person", item) reconstructs the prefixed id for a legacy space person', () => {
     const m = new GlobalSearchManager();
     m.open();
     m.activate('person', {
@@ -1111,15 +1113,15 @@ describe('activate()', () => {
       name: 'Alice',
       primaryProfile: { type: 'space-person', id: 'space-person-1', spaceId: 'space-1' },
     });
-    expect(goto).toHaveBeenCalledWith('/people/space-person-1');
+    expect(goto).toHaveBeenCalledWith('/photos?people=space-person%3Aspace-person-1');
     expect(getEntries()).toHaveLength(0);
   });
 
-  it('activate("place", item) navigates to /map with hash and records recent entry', () => {
+  it('activate("place", item) filters the timeline by city and records recent entry', () => {
     const m = new GlobalSearchManager();
     m.open();
     m.activate('place', { name: 'Paris', latitude: 48.8566, longitude: 2.3522 });
-    expect(goto).toHaveBeenCalledWith('/map#12/48.8566/2.3522');
+    expect(goto).toHaveBeenCalledWith('/photos?city=Paris');
     const entries = getEntries();
     expect(entries[0]).toMatchObject({ kind: 'place', id: 'place:48.8566:2.3522', label: 'Paris' });
   });
@@ -2645,15 +2647,15 @@ describe('activateRecent()', () => {
     expect(m.isOpen).toBe(false);
   });
 
-  it('person entry navigates and closes', () => {
+  it('person entry filters the timeline and closes', () => {
     const m = new GlobalSearchManager();
     m.open();
     m.activateRecent({ kind: 'person', id: 'person:p1', personId: 'p1', label: 'Alice', lastUsed: 1 });
-    expect(goto).toHaveBeenCalledWith('/people/p1');
+    expect(goto).toHaveBeenCalledWith('/photos?people=person%3Ap1');
     expect(m.isOpen).toBe(false);
   });
 
-  it('place entry navigates and closes', () => {
+  it('place entry filters the timeline by city and closes', () => {
     const m = new GlobalSearchManager();
     m.open();
     m.activateRecent({
@@ -2664,7 +2666,7 @@ describe('activateRecent()', () => {
       label: 'Paris',
       lastUsed: 1,
     });
-    expect(goto).toHaveBeenCalledWith('/map#12/48.8566/2.3522');
+    expect(goto).toHaveBeenCalledWith('/photos?city=Paris');
     expect(m.isOpen).toBe(false);
   });
 
@@ -6798,5 +6800,483 @@ describe('tag activation navigation', () => {
       personNames: new Map(),
       tagNames: new Map([['t1', 'beach']]),
     });
+  });
+});
+
+describe('person activation navigation', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+    mockPage.url = new URL('https://gallery.test/photos');
+  });
+
+  const lastGoto = () => vi.mocked(goto).mock.calls.at(-1)?.[0] as string | undefined;
+
+  const userPerson = (overrides: Partial<PersonResponseDto> = {}) =>
+    ({
+      id: 'p1',
+      name: 'Alice',
+      primaryProfile: { id: 'p1', type: 'user-person' },
+      ...overrides,
+    }) as PersonResponseDto;
+
+  const spacePerson = (spaceId: string, overrides: Partial<PersonResponseDto> = {}) =>
+    ({
+      id: 'sp1',
+      name: 'Bob',
+      primaryProfile: { id: 'profile-1', type: 'space-person', spaceId },
+      ...overrides,
+    }) as PersonResponseDto;
+
+  it('filters the timeline instead of opening the person management page', () => {
+    const m = new GlobalSearchManager();
+
+    m.activate('person', userPerson());
+
+    expect(lastGoto()).toBe('/photos?people=person%3Ap1');
+  });
+
+  it('preserves the filters already on the page (AND)', () => {
+    const m = new GlobalSearchManager();
+    m.registerSearchablePageFilters(() => ({ ...createFilterState(), tagIds: ['t1'], rating: 4 }));
+
+    m.activate('person', userPerson());
+
+    const dest = lastGoto();
+    expect(dest).toContain('tags=t1');
+    expect(dest).toContain('rating=4');
+    expect(dest).toContain('people=person%3Ap1');
+  });
+
+  it('drops a stale smart query so the person filter is the only constraint', () => {
+    const m = new GlobalSearchManager();
+    // Matches the existing tag behaviour — buildSearchablePageUrl is called with an empty query,
+    // which deletes both `q` and a non-explicit `sort`.
+    mockPage.url = new URL('https://gallery.test/photos?q=sunset&sort=asc');
+
+    m.activate('person', userPerson());
+
+    expect(lastGoto()).toBe('/photos?people=person%3Ap1');
+  });
+
+  it('does not duplicate a person already filtering the page', () => {
+    const m = new GlobalSearchManager();
+    m.registerSearchablePageFilters(() => ({ ...createFilterState(), personIds: ['person:p1'] }));
+
+    m.activate('person', userPerson());
+
+    expect(lastGoto()).toBe('/photos?people=person%3Ap1');
+  });
+
+  it('appends to people already filtering the page', () => {
+    const m = new GlobalSearchManager();
+    m.registerSearchablePageFilters(() => ({ ...createFilterState(), personIds: ['person:p0'] }));
+
+    m.activate('person', userPerson());
+
+    expect(lastGoto()).toBe('/photos?people=person%3Ap0%2Cperson%3Ap1');
+  });
+
+  it('stays on a space timeline and uses the bare profile id for that space person', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/spaces/space-1');
+
+    m.activate('person', spacePerson('space-1'));
+
+    expect(lastGoto()).toBe('/spaces/space-1?people=profile-1');
+  });
+
+  it('stays on the /photos sub-route of a space timeline', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
+
+    m.activate('person', spacePerson('space-1'));
+
+    expect(lastGoto()).toBe('/spaces/space-1/photos?people=profile-1');
+  });
+
+  it('leaves the space for /photos when the person belongs to a different space', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/spaces/space-1');
+
+    m.activate('person', spacePerson('space-2'));
+
+    expect(lastGoto()).toBe('/photos?people=space-person%3Aprofile-1');
+  });
+
+  it('leaves the space for /photos for a personal person', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/spaces/space-1');
+
+    m.activate('person', userPerson());
+
+    expect(lastGoto()).toBe('/photos?people=person%3Ap1');
+  });
+
+  it('drops the space surface filters when it leaves the space', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/spaces/space-1');
+    // Space-scoped person ids are bare profile ids and mean nothing on /photos, so carrying the
+    // space's filter state across would produce a garbage query.
+    m.registerSearchablePageFilters(() => ({ ...createFilterState(), personIds: ['space-profile-9'] }));
+
+    m.activate('person', userPerson());
+
+    expect(lastGoto()).toBe('/photos?people=person%3Ap1');
+  });
+
+  it('uses the prefixed id for a space person while on /photos', () => {
+    const m = new GlobalSearchManager();
+
+    m.activate('person', spacePerson('space-2'));
+
+    expect(lastGoto()).toBe('/photos?people=space-person%3Aprofile-1');
+  });
+
+  it('targets /photos from a space page that is not a timeline', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/albums/album-1');
+
+    m.activate('person', spacePerson('space-1'));
+
+    expect(lastGoto()).toBe('/photos?people=space-person%3Aprofile-1');
+  });
+
+  it('targets /photos from a non-searchable page', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/albums/album-1');
+
+    m.activate('person', userPerson());
+
+    expect(lastGoto()).toBe('/photos?people=person%3Ap1');
+  });
+
+  it('targets /photos from the map, matching the tag precedent', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/map');
+
+    m.activate('person', userPerson());
+
+    expect(lastGoto()).toBe('/photos?people=person%3Ap1');
+  });
+
+  it('stays on /recently-added', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/recently-added');
+
+    m.activate('person', userPerson());
+
+    expect(lastGoto()).toBe('/recently-added?people=person%3Ap1');
+  });
+
+  it('prefers the server-supplied filterId', () => {
+    const m = new GlobalSearchManager();
+
+    m.activate('person', userPerson({ filterId: 'person:identity-7' }));
+
+    expect(lastGoto()).toBe('/photos?people=person%3Aidentity-7');
+  });
+
+  it('falls back to the bare id when there is no primaryProfile', () => {
+    const m = new GlobalSearchManager();
+
+    m.activate('person', { id: 'p9', name: 'Zoe' } as PersonResponseDto);
+
+    expect(lastGoto()).toBe('/photos?people=p9');
+  });
+
+  it('drops a stale ?at= scroll target from the destination', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/photos?at=asset-1');
+
+    m.activate('person', userPerson());
+
+    expect(lastGoto()).toBe('/photos?people=person%3Ap1');
+  });
+
+  it('caches the person name so the filter chip is not a raw id', () => {
+    const m = new GlobalSearchManager();
+
+    m.activate('person', userPerson());
+
+    expect(storeTypedSearchNames).toHaveBeenCalledWith('/photos?people=person%3Ap1', {
+      personNames: new Map([['person:p1', 'Alice']]),
+      tagNames: new Map(),
+    });
+  });
+
+  it('caches the bare profile id as the key for an in-space person', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/spaces/space-1');
+
+    m.activate('person', spacePerson('space-1'));
+
+    expect(storeTypedSearchNames).toHaveBeenCalledWith('/spaces/space-1?people=profile-1', {
+      personNames: new Map([['profile-1', 'Bob']]),
+      tagNames: new Map(),
+    });
+  });
+
+  it('caches no name for a nameless person so the chip falls back to the id', () => {
+    const m = new GlobalSearchManager();
+
+    m.activate('person', userPerson({ name: '' }));
+
+    expect(storeTypedSearchNames).toHaveBeenCalledWith('/photos?people=person%3Ap1', {
+      personNames: new Map(),
+      tagNames: new Map(),
+    });
+  });
+
+  it('closes the palette after navigating', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+
+    m.activate('person', userPerson());
+
+    expect(m.isOpen).toBe(false);
+  });
+
+  it('records a recent entry for a personal person', () => {
+    const m = new GlobalSearchManager();
+
+    m.activate('person', userPerson());
+
+    expect(getEntries().some((e) => e.kind === 'person' && e.id === 'person:p1')).toBe(true);
+  });
+
+  it('records no recent entry for a space person', () => {
+    const m = new GlobalSearchManager();
+
+    m.activate('person', spacePerson('space-1'));
+
+    expect(getEntries().some((e) => e.kind === 'person')).toBe(false);
+  });
+
+  it('routes a recent person entry to the filtered timeline too', () => {
+    const m = new GlobalSearchManager();
+
+    m.activateRecent({ kind: 'person', id: 'person:p1', personId: 'p1', label: 'Alice', lastUsed: 1 });
+
+    expect(lastGoto()).toBe('/photos?people=person%3Ap1');
+    expect(storeTypedSearchNames).toHaveBeenCalledWith('/photos?people=person%3Ap1', {
+      personNames: new Map([['person:p1', 'Alice']]),
+      tagNames: new Map(),
+    });
+  });
+
+  it('routes a recent person entry onto the space timeline it is replayed from', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/spaces/space-1');
+
+    // Recents only ever hold personal people, so replaying one inside a space leaves the space.
+    m.activateRecent({ kind: 'person', id: 'person:p1', personId: 'p1', label: 'Alice', lastUsed: 1 });
+
+    expect(lastGoto()).toBe('/photos?people=person%3Ap1');
+  });
+
+  it('ignores a corrupt person recent without navigating', () => {
+    const m = new GlobalSearchManager();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    m.activateRecent({ kind: 'person', id: 'person:broken', label: 'Alice', lastUsed: 1 } as never);
+
+    expect(goto).not.toHaveBeenCalled();
+  });
+});
+
+describe('place activation navigation', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+    mockPage.url = new URL('https://gallery.test/photos');
+  });
+
+  const lastGoto = () => vi.mocked(goto).mock.calls.at(-1)?.[0] as string | undefined;
+  const paris = { name: 'Paris', latitude: 48.8566, longitude: 2.3522 };
+  // Route.map builds a Leaflet-style hash, not a query string: `/map#<zoom>/<lat>/<lng>`.
+  const PARIS_MAP = '/map#12/48.8566/2.3522';
+
+  it('filters the timeline by city instead of jumping to the map', () => {
+    const m = new GlobalSearchManager();
+
+    m.activate('place', paris);
+
+    expect(lastGoto()).toBe('/photos?city=Paris');
+  });
+
+  it('stays on a space timeline', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/spaces/space-1');
+
+    m.activate('place', paris);
+
+    expect(lastGoto()).toBe('/spaces/space-1?city=Paris');
+  });
+
+  it('targets /photos from a non-searchable page', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/albums/album-1');
+
+    m.activate('place', paris);
+
+    expect(lastGoto()).toBe('/photos?city=Paris');
+  });
+
+  it('stays on /recently-added', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/recently-added');
+
+    m.activate('place', paris);
+
+    expect(lastGoto()).toBe('/recently-added?city=Paris');
+  });
+
+  it('recentres the map when the user is already on the map', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/map');
+
+    m.activate('place', paris);
+
+    expect(lastGoto()).toBe(PARIS_MAP);
+  });
+
+  it('replaces a city already filtering the page rather than accumulating', () => {
+    const m = new GlobalSearchManager();
+    m.registerSearchablePageFilters(() => ({ ...createFilterState(), city: 'Berlin' }));
+
+    m.activate('place', paris);
+
+    expect(lastGoto()).toBe('/photos?city=Paris');
+  });
+
+  it('preserves the other filters already on the page and drops a stale smart query', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/photos?q=beach');
+    m.registerSearchablePageFilters(() => ({ ...createFilterState(), personIds: ['person:p1'] }));
+
+    m.activate('place', paris);
+
+    const dest = lastGoto();
+    expect(dest).toContain('people=person%3Ap1');
+    expect(dest).toContain('city=Paris');
+    expect(dest).not.toContain('q=beach');
+  });
+
+  it('recentres the map for a nameless place, which cannot produce a city filter', () => {
+    const m = new GlobalSearchManager();
+
+    m.activate('place', { latitude: 48.8566, longitude: 2.3522 });
+
+    expect(lastGoto()).toBe(PARIS_MAP);
+  });
+
+  it('records a recent entry and closes the palette', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+
+    m.activate('place', paris);
+
+    expect(getEntries().some((e) => e.kind === 'place')).toBe(true);
+    expect(m.isOpen).toBe(false);
+  });
+
+  it('routes a recent place entry to the filtered timeline too', () => {
+    const m = new GlobalSearchManager();
+
+    m.activateRecent({
+      kind: 'place',
+      id: 'place:48.8566:2.3522',
+      latitude: 48.8566,
+      longitude: 2.3522,
+      label: 'Paris',
+      lastUsed: 1,
+    });
+
+    expect(lastGoto()).toBe('/photos?city=Paris');
+  });
+
+  it('falls back to recentring the map for a recent place with no label', () => {
+    const m = new GlobalSearchManager();
+
+    m.activateRecent({
+      kind: 'place',
+      id: 'place:48.8566:2.3522',
+      latitude: 48.8566,
+      longitude: 2.3522,
+      label: '',
+      lastUsed: 1,
+    });
+
+    expect(lastGoto()).toBe(PARIS_MAP);
+  });
+});
+
+describe('palette destination table', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+    mockPage.url = new URL('https://gallery.test/spaces/space-1');
+  });
+
+  const lastGoto = () => vi.mocked(goto).mock.calls.at(-1)?.[0] as string | undefined;
+
+  // Pinned from /spaces/space-1 so any result kind that silently starts navigating off the
+  // surface the user was reading shows up as a diff here. Album / space / nav / command are
+  // destinations rather than filters and are expected to leave; `photo` is included as a
+  // destination control alongside the three kinds (tag / person / place) whose filter-vs-
+  // destination behaviour Tasks 2-5 actually changed, so this table deliberately covers only
+  // those four kinds. The rest are pinned elsewhere, not duplicated here: album/space via
+  // activateAlbum/activateSpace (same spec file, ~line 2690-2805), nav in
+  // describe('activate navigation') (~line 4373-4423), command handlers in
+  // command-items.spec.ts (~lines 661, 910, 934), and the typed/smart-search commit path at
+  // ~line 1517.
+  it.each([
+    ['tag', { id: 't1', name: 'beach' }, '/spaces/space-1?tags=t1'],
+    [
+      'person',
+      { id: 'p1', name: 'Alice', primaryProfile: { id: 'p1', type: 'user-person' } },
+      '/photos?people=person%3Ap1',
+    ],
+    ['place', { name: 'Paris', latitude: 48.8566, longitude: 2.3522 }, '/spaces/space-1?city=Paris'],
+    ['photo', { id: 'a1', originalFileName: 'IMG_1.jpg' }, '/photos/a1'],
+  ])('activate(%s) lands on %s', (kind, item, expected) => {
+    const m = new GlobalSearchManager();
+
+    m.activate(kind as 'tag' | 'person' | 'place' | 'photo', item);
+
+    expect(lastGoto()).toBe(expected);
+  });
+
+  it.each([
+    [{ kind: 'tag', id: 'tag:t1', tagId: 't1', label: 'beach', lastUsed: 1 }, '/spaces/space-1?tags=t1'],
+    [{ kind: 'person', id: 'person:p1', personId: 'p1', label: 'Alice', lastUsed: 1 }, '/photos?people=person%3Ap1'],
+    [
+      { kind: 'place', id: 'place:48.8566:2.3522', latitude: 48.8566, longitude: 2.3522, label: 'Paris', lastUsed: 1 },
+      '/spaces/space-1?city=Paris',
+    ],
+    [{ kind: 'photo', id: 'photo:a1', assetId: 'a1', label: 'IMG_1.jpg', lastUsed: 1 }, '/photos/a1'],
+  ])('activateRecent(%o) lands on %s', (entry, expected) => {
+    const m = new GlobalSearchManager();
+
+    m.activateRecent(entry as RecentEntry);
+
+    expect(lastGoto()).toBe(expected);
+  });
+
+  it('never routes a palette result to the deprecated /search page', () => {
+    const m = new GlobalSearchManager();
+
+    m.activate('tag', { id: 't1', name: 'beach' });
+    m.activate('person', { id: 'p1', name: 'Alice' });
+    m.activate('place', { name: 'Paris', latitude: 48.8566, longitude: 2.3522 });
+    m.activate('photo', { id: 'a1' });
+
+    const destinations = vi.mocked(goto).mock.calls.map((c) => String(c[0]));
+    expect(destinations).toHaveLength(4);
+    expect(destinations.filter((d) => d.startsWith('/search'))).toEqual([]);
   });
 });
