@@ -225,11 +225,19 @@
 
           <div>
             {#if asset.exifInfo?.make || asset.exifInfo?.model}
+              <!--
+                withSharedSpaces:true — /search is scoped to own + partner assets without it, so a
+                Space member clicking the camera of a photo another member shared into the Space got
+                zero results, not even the photo they clicked on (#732). Same omission the palette
+                had in #894. Safe unconditionally: the server rejects withSharedSpaces only when it
+                is combined with spaceId/albumId, which these links never send.
+              -->
               <p>
                 <a
                   href={Route.search({
                     make: asset.exifInfo?.make ?? undefined,
                     model: asset.exifInfo?.model ?? undefined,
+                    withSharedSpaces: true,
                   })}
                   title="{$t('search_for')} {asset.exifInfo.make || ''} {asset.exifInfo.model || ''}"
                   class="hover:text-primary"
@@ -261,7 +269,7 @@
             {#if asset.exifInfo?.lensModel}
               <p>
                 <a
-                  href={Route.search({ lensModel: asset.exifInfo.lensModel })}
+                  href={Route.search({ lensModel: asset.exifInfo.lensModel, withSharedSpaces: true })}
                   title="{$t('search_for')} {asset.exifInfo.lensModel}"
                   class="line-clamp-1 hover:text-primary"
                 >
