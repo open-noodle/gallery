@@ -1384,11 +1384,9 @@ describe('album folders', () => {
     });
 
     // F-08 / F-10 — getAlbumFolderById is space-scoped, so a parent from another space and a
-    // parent that does not exist are indistinguishable, and both are a 400.
-    it.each([
-      ['F-08', 'a parent belonging to another space'],
-      ['F-10', 'a parent that does not exist'],
-    ])('%s: rejects %s', async () => {
+    // parent that does not exist are DELIBERATELY indistinguishable: neither response confirms
+    // the other space's contents. One behaviour, one test.
+    it('F-08/F-10: rejects a parent that is missing or belongs to another space', async () => {
       const { auth, space } = setupEditor();
       mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(void 0 as any);
 
@@ -1541,15 +1539,12 @@ describe('album folders', () => {
   });
 
   describe('deleteAlbumFolder', () => {
-    // D-01 through D-05 all funnel into the same transactional repository call; the promotion
-    // semantics themselves are proven against a real database in P-05.
-    it.each([
-      ['D-01', 'a root folder holding albums'],
-      ['D-02', 'a nested folder holding an album'],
-      ['D-03', 'a middle folder with a grandchild'],
-      ['D-04', 'a folder holding both folders and albums'],
-      ['D-05', 'an empty folder'],
-    ])('%s: deletes %s by promoting its children', async () => {
+    // D-01–D-05 are PROMOTION SEMANTICS, owned by Task 2's P-05 medium tests, which prove
+    // them against a real database — including the load-bearing D-03 case that grandchildren
+    // keep their parents. At this layer the delete is a single delegation, so the only thing
+    // worth asserting is that it delegates with the right arguments. Five identical it.each
+    // cases would assert nothing five times over.
+    it('delegates to the promoting repository call (D-01–D-05 semantics live in P-05)', async () => {
       const { auth, space } = setupEditor();
       const folder = folderRow({ spaceId: space.id });
       mocks.sharedSpace.deleteAlbumFolderPromotingChildren.mockResolvedValue(true);
@@ -5192,7 +5187,14 @@ cd ../e2e && pnpm test
 
 - [ ] **Step 2: Update spec §5.7 with the advisory-lock correction**
 
-Task 4 replaced the spec's proposed `FOR UPDATE`-on-ancestor-chain mitigation with a per-space advisory lock, because the original does not serialise the mutual X→Y / Y→X race. Edit `docs/superpowers/specs/2026-08-04-space-album-folders-design.md` §5.7 to describe what was actually built, then re-run prettier over it.
+Two spec edits, then prettier:
+
+1. **§5.7** — Task 4 replaced the proposed `FOR UPDATE`-on-ancestor-chain mitigation with a
+   per-space advisory lock, because the original does not serialise the mutual X→Y / Y→X race
+   (both transactions lock disjoint rows). Describe what was actually built.
+2. **§9** — move D-01–D-05 and F-08/F-10 from "Server unit" to the medium row. Their semantics
+   are proven by P-05 and by the space-scoped `getAlbumFolderById`; the service layer only
+   delegates, so asserting them per-ID there would be five tests that cannot fail differently.
 
 ```bash
 npx prettier --write docs/superpowers/specs/2026-08-04-space-album-folders-design.md
