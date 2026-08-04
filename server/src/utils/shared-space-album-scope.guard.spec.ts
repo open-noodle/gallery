@@ -285,6 +285,7 @@ const VIS_ALLOWLIST: Record<string, string> = {
     'membership lookup; returns spaceId, not asset data (on album-leg allowlist too)',
   'shared-space.repository.ts::getLinkedLibraries': 'returns library metadata rows, not asset rows',
   'shared-space.repository.ts::hasLibraryLink': 'boolean link-existence check; no asset data',
+  'shared-space.repository.ts::hasAlbumLink': 'boolean link-existence check; no asset data',
   'shared-space.repository.ts::getLinkedAlbums': 'returns album metadata rows for management UI; no asset content',
   'shared-space.repository.ts::getLinkedAlbumsContainingAssets':
     "resolves linked-album id/name for the caller's OWN selected assetIds (remove-from-space message); returns album metadata only, no asset content",
