@@ -1035,6 +1035,31 @@ void main() {
     });
   });
 
+  group('view in timeline button', () {
+    ActionButtonContext contextFor(TimelineOrigin origin) => ActionButtonContext(
+      asset: createRemoteAsset(),
+      isOwner: true,
+      isArchived: false,
+      isTrashEnabled: true,
+      isInLockedView: false,
+      currentAlbum: null,
+      advancedTroubleshooting: false,
+      isStacked: false,
+      source: ActionSource.viewer,
+      timelineOrigin: origin,
+    );
+
+    test('is offered on a photo opened from search results', () {
+      // The entry point #898 is about: search results are the Photos timeline with a
+      // filter applied, so the viewer opened from them carries the search origin.
+      expect(ActionButtonType.viewInTimeline.shouldShow(contextFor(TimelineOrigin.search)), isTrue);
+    });
+
+    test('is not offered when the photo is already in the global timeline', () {
+      expect(ActionButtonType.viewInTimeline.shouldShow(contextFor(TimelineOrigin.main)), isFalse);
+    });
+  });
+
   group('ActionButtonBuilder', () {
     test('should return buttons that should show', () {
       final remoteAsset = createRemoteAsset();
