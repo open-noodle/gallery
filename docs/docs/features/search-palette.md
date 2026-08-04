@@ -8,16 +8,16 @@ The top navigation search field opens this same palette. On searchable pages, th
 
 Each query runs in parallel against the configured providers and groups the results into named sections:
 
-| Section           | What it returns                                                              |
-| ----------------- | ---------------------------------------------------------------------------- |
-| **Photos**        | Top smart-search matches with thumbnails. Activate to open the asset viewer. |
-| **People**        | Named faces from your library and any shared spaces you can access.          |
-| **Places**        | Cities, regions, and countries from your reverse-geocoded photos.            |
-| **Tags**          | Tags assigned to your assets, plus inherited tags from parent tags.          |
-| **Albums**        | Your albums, matched on album name.                                          |
-| **Shared spaces** | Spaces you own or belong to, matched on space name.                          |
-| **Commands**      | Verbs — upload files, create things, sign out, toggle theme, manage pages.   |
-| **Navigation**    | Admin and settings pages — fuzzy-matched against the live page catalog.      |
+| Section           | What it returns                                                                                                               |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Photos**        | Top smart-search matches with thumbnails. Activate to open the asset viewer.                                                  |
+| **People**        | Named faces from your library and any shared spaces you can access. Activate to filter the timeline you're on by that person. |
+| **Places**        | Cities, regions, and countries from your reverse-geocoded photos. Activate to filter the timeline you're on by that city.     |
+| **Tags**          | Tags assigned to your assets, plus inherited tags from parent tags.                                                           |
+| **Albums**        | Your albums, matched on album name.                                                                                           |
+| **Shared spaces** | Spaces you own or belong to, matched on space name.                                                                           |
+| **Commands**      | Verbs — upload files, create things, sign out, toggle theme, manage pages.                                                    |
+| **Navigation**    | Admin and settings pages — fuzzy-matched against the live page catalog.                                                       |
 
 Empty sections collapse silently so the result list stays tight. If smart search is unhealthy (the ML server is unreachable), a banner appears at the top of the palette and offers a one-tap switch to filename mode.
 
@@ -285,7 +285,7 @@ When you open the palette for the first time on a fresh browser — no recents y
 On large screens (≥ `lg` breakpoint) a preview pane appears to the right of the result list:
 
 - **Photos** → larger thumbnail with file name and an **Open** affordance
-- **People** → face thumbnail with the person's name
+- **People** → face thumbnail with the person's name and an **Open person page** button
 - **Places** → region/country breakdown
 - **Tags** → tag value with parent path
 
