@@ -417,6 +417,7 @@
             assetInteraction={assetMultiSelectManager}
             isSelectionMode={false}
             singleSelect={false}
+            space={{ id: space.id, canWrite: isSpaceEditor }}
             grouping={timelineGrouping}
             onGroupingChange={handleTimelineGroupingChange}
             onTimelineBucketActivate={handleTimelineBucketActivate}
