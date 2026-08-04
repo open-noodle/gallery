@@ -177,6 +177,14 @@
     const searchDto: SearchTerms = {
       page: nextPage,
       withExif: true,
+      // #830: this page is Gallery's global search surface, but a URL-driven search only ever
+      // covered the caller's own (and partner) assets. A Space member who opened "Show similar
+      // photos" on a photo shared with them — or pasted the same `queryAssetId` URL — got zero
+      // results while the space owner got a long list. Opt into shared spaces the way the command
+      // palette already does (#894); the server scopes them to spaces the member has kept in their
+      // timeline. Spread before `terms` so an explicit value in the URL still wins, and skip it
+      // entirely for a space-scoped URL — the server rejects `spaceId` + `withSharedSpaces`.
+      ...(!terms.spaceId && { withSharedSpaces: true }),
       ...terms,
     };
 
