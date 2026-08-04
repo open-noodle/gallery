@@ -16093,13 +16093,24 @@
         "x-immich-state": "Beta"
       },
       "put": {
-        "description": "Link an album so its photos appear in the space. Requires space editor/owner and album owner/editor.",
+        "description": "Link an album so its photos appear in the space. Requires space editor/owner and album owner/editor. Pass folderId to place the album directly in a folder in the same request.",
         "operationId": "linkAlbum",
         "parameters": [
           {
             "name": "albumId",
             "required": true,
             "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "folderId",
+            "required": false,
+            "in": "query",
+            "description": "Place the newly linked album in this folder",
             "schema": {
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",

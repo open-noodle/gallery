@@ -8270,11 +8270,14 @@ export function updateSharedSpaceAlbum({ albumId, id, sharedSpaceAlbumLinkUpdate
 /**
  * Link an album to a shared space
  */
-export function linkAlbum({ albumId, id }: {
+export function linkAlbum({ albumId, folderId, id }: {
     albumId: string;
+    folderId?: string;
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/albums/${encodeURIComponent(albumId)}`, {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/albums/${encodeURIComponent(albumId)}${QS.query(QS.explode({
+        folderId
+    }))}`, {
         ...opts,
         method: "PUT"
     }));
