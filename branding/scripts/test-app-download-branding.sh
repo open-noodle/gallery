@@ -62,6 +62,10 @@ absent "$MODAL" 'app\.alextran\.immich' 'play store link no longer targets the I
 absent "$MODAL" 'apps\.apple\.com/us/app/immich/id1613945652' 'app store link no longer targets the Immich app'
 absent "$MODAL" 'f-droid\.org' 'F-Droid link removed (no Noodle F-Droid app)'
 absent "$MODAL" 'fdroidBadge' 'unused fdroidBadge import dropped'
+# Upstream #30527 routes the hrefs through Constants.Get.* from @immich/ui. Once
+# all three are rewritten to literals the import is dead, and leaving it behind
+# breaks the branded build's zero-warning lint.
+absent "$MODAL" 'Constants' 'unused Constants import dropped (upstream #30527)'
 
 echo "Badges + fallback point at Noodle Gallery:"
 present "$MODAL" "$PLAY_STORE_URL" 'play store link is the Noodle Gallery app'
