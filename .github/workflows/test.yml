@@ -279,6 +279,13 @@ jobs:
           persist-credentials: false
           token: ${{ github.token }}
 
+      # apply-branding resizes the Android 12 splash assets and verify-mobile-assets
+      # measures icon bounds, both via ImageMagick. It is no longer preinstalled on
+      # the ubuntu runner images, so install it explicitly rather than letting the
+      # check fail with "ImageMagick convert or magick is required".
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
+
       - name: Run branding pipeline checks
         run: ./branding/scripts/gallery-branding-check.sh
 
