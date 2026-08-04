@@ -612,3 +612,82 @@ describe('SharedSpaceRepository — album folder primitives', () => {
     );
   });
 });
+
+describe('SharedSpaceRepository — album folder moves', () => {
+  it('moveAlbumFolderChecked reparents a folder', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const archive = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Archive',
+      createdById: user.id,
+    });
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+
+    await expect(sut.moveAlbumFolderChecked(space.id, trips.id, archive.id)).resolves.toBe('ok');
+    await expect(sut.getAlbumFolderById(space.id, trips.id)).resolves.toMatchObject({ parentId: archive.id });
+  });
+
+  it('moveAlbumFolderChecked reports a cycle when the target is a descendant', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    const y2026 = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: trips.id,
+      name: '2026',
+      createdById: user.id,
+    });
+
+    await expect(sut.moveAlbumFolderChecked(space.id, trips.id, y2026.id)).resolves.toBe('cycle');
+    await expect(sut.getAlbumFolderById(space.id, trips.id)).resolves.toMatchObject({ parentId: null });
+  });
+
+  it('moveAlbumFolderChecked reports notfound for a folder in another space', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const { space: other } = await ctx.newSharedSpace({ createdById: user.id });
+    const foreign = await sut.createAlbumFolder({
+      spaceId: other.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+
+    await expect(sut.moveAlbumFolderChecked(space.id, foreign.id, null)).resolves.toBe('notfound');
+  });
+
+  // C-01: the mutual race. Both pre-checks pass before either write lands, so correctness
+  // depends entirely on the per-space advisory lock serialising the two transactions —
+  // locking only the moved row would leave them touching disjoint rows and both would commit,
+  // producing a detached cycle.
+  it('C-01: concurrent X->Y and Y->X moves cannot both succeed', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const x = await sut.createAlbumFolder({ spaceId: space.id, parentId: null, name: 'X', createdById: user.id });
+    const y = await sut.createAlbumFolder({ spaceId: space.id, parentId: null, name: 'Y', createdById: user.id });
+
+    const results = await Promise.all([
+      sut.moveAlbumFolderChecked(space.id, x.id, y.id),
+      sut.moveAlbumFolderChecked(space.id, y.id, x.id),
+    ]);
+
+    expect(results.filter((r) => r === 'ok')).toHaveLength(1);
+    expect(results.filter((r) => r === 'cycle')).toHaveLength(1);
+
+    // And the tree is still a tree: exactly one of them still sits at the root.
+    const rows = await sut.getAlbumFoldersBySpace(space.id);
+    expect(rows.filter((r) => r.parentId === null)).toHaveLength(1);
+  });
+});

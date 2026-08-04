@@ -1527,6 +1527,77 @@ export class SharedSpaceRepository {
     });
   }
 
+  // Serialised per space by a transaction-scoped advisory lock. A row lock on the moved folder
+  // alone is NOT enough: in the mutual race (move X into Y while moving Y into X) the two
+  // transactions touch disjoint rows, both ancestor checks pass, and the result is a detached
+  // cycle. Folder moves are rare, so serialising them per space costs nothing.
+  //
+  // Everything below uses `trx` — a `this.db` query inside a transaction callback deadlocks (#595).
+  moveAlbumFolderChecked(
+    spaceId: string,
+    folderId: string,
+    newParentId: string | null,
+  ): Promise<'ok' | 'cycle' | 'notfound'> {
+    return this.db.transaction().execute(async (trx) => {
+      await sql`SELECT pg_advisory_xact_lock(hashtext(${spaceId}))`.execute(trx);
+
+      const folder = await trx
+        .selectFrom('shared_space_album_folder')
+        .select(['id'])
+        .where('spaceId', '=', spaceId)
+        .where('id', '=', folderId)
+        .executeTakeFirst();
+
+      if (!folder) {
+        return 'notfound' as const;
+      }
+
+      if (newParentId) {
+        const target = await trx
+          .selectFrom('shared_space_album_folder')
+          .select(['id'])
+          .where('spaceId', '=', spaceId)
+          .where('id', '=', newParentId)
+          .executeTakeFirst();
+
+        if (!target) {
+          return 'notfound' as const;
+        }
+
+        // Re-read the target's ancestor chain under the lock, so a concurrently-committed move
+        // is visible here even though it was not when the service ran its optimistic check.
+        const ancestors = await trx
+          .withRecursive('ancestors', (qb) =>
+            qb
+              .selectFrom('shared_space_album_folder')
+              .select(['id', 'parentId'])
+              .where('id', '=', newParentId)
+              .unionAll(
+                qb
+                  .selectFrom('shared_space_album_folder as f')
+                  .innerJoin('ancestors as a', 'a.parentId', 'f.id')
+                  .select(['f.id', 'f.parentId']),
+              ),
+          )
+          .selectFrom('ancestors')
+          .select('id')
+          .execute();
+
+        if (ancestors.some((a) => a.id === folderId)) {
+          return 'cycle' as const;
+        }
+      }
+
+      await trx
+        .updateTable('shared_space_album_folder')
+        .set({ parentId: newParentId })
+        .where('id', '=', folderId)
+        .execute();
+
+      return 'ok' as const;
+    });
+  }
+
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, DummyValue.UUID] })
   async setAlbumLinkFolder(spaceId: string, albumId: string, folderId: string | null): Promise<boolean> {
     const result = await this.db

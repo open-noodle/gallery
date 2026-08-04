@@ -1064,16 +1064,56 @@ export class SharedSpaceService extends BaseService {
       throw new BadRequestException('Folder not found');
     }
 
-    if (dto.name === undefined) {
+    if (dto.name === undefined && dto.parentId === undefined) {
       throw new BadRequestException('Nothing to update');
     }
 
-    const name = this.normalizeAlbumFolderName(dto.name);
-    // excludeId = folderId, so renaming a folder to the name it already has is a no-op
-    // rather than a collision with itself.
-    await this.assertNoAlbumFolderNameConflict(spaceId, folder.parentId, name, folderId);
+    const isMove = dto.parentId !== undefined;
+    const destinationParentId = isMove ? (dto.parentId ?? null) : folder.parentId;
+    const name = dto.name === undefined ? folder.name : this.normalizeAlbumFolderName(dto.name);
 
-    await this.sharedSpaceRepository.updateAlbumFolder(spaceId, folderId, { name });
+    if (isMove && destinationParentId !== null) {
+      if (destinationParentId === folderId) {
+        throw new BadRequestException('A folder cannot be moved into itself');
+      }
+
+      const target = await this.sharedSpaceRepository.getAlbumFolderById(spaceId, destinationParentId);
+      if (!target) {
+        throw new BadRequestException('Destination folder not found');
+      }
+
+      const targetAncestors = await this.sharedSpaceRepository.getAlbumFolderAncestors(destinationParentId);
+      if (targetAncestors.some((ancestor) => ancestor.id === folderId)) {
+        throw new BadRequestException('A folder cannot be moved into one of its own descendants');
+      }
+
+      const subtree = await this.sharedSpaceRepository.getAlbumFolderSubtree(folderId);
+      const height = Math.max(...subtree.map((node) => node.depth));
+      const resultingDepth = targetAncestors.length + 1 + height;
+      if (resultingDepth > SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH) {
+        throw new BadRequestException(
+          `Folder nesting is limited to ${SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH} levels (this would be ${resultingDepth})`,
+        );
+      }
+    }
+
+    // excludeId = folderId: renaming to the current name, or moving into the current parent,
+    // must not collide with the row being modified.
+    await this.assertNoAlbumFolderNameConflict(spaceId, destinationParentId, name, folderId);
+
+    if (isMove) {
+      const outcome = await this.sharedSpaceRepository.moveAlbumFolderChecked(spaceId, folderId, destinationParentId);
+      if (outcome === 'cycle') {
+        throw new BadRequestException('A folder cannot be moved into one of its own descendants');
+      }
+      if (outcome === 'notfound') {
+        throw new BadRequestException('Folder not found');
+      }
+    }
+
+    if (dto.name !== undefined) {
+      await this.sharedSpaceRepository.updateAlbumFolder(spaceId, folderId, { name });
+    }
   }
 
   async deleteAlbumFolder(auth: AuthDto, spaceId: string, folderId: string): Promise<void> {

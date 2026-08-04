@@ -84,6 +84,24 @@ const albumFolderRow = (overrides: Partial<Record<string, unknown>> = {}) => ({
   ...overrides,
 });
 
+/** Helper to build a move fixture (folder + destination target) for the updateAlbumFolder move tests below. */
+const setupAlbumFolderMove = (
+  mocks: ServiceMocks,
+  folderOverrides: Partial<Record<string, unknown>> = {},
+  targetOverrides: Partial<Record<string, unknown>> = {},
+) => {
+  const { auth, space } = setupAlbumFolderEditor(mocks);
+  const folder = albumFolderRow({ spaceId: space.id, name: 'Trips', ...folderOverrides });
+  const target = albumFolderRow({ spaceId: space.id, name: 'Archive', ...targetOverrides });
+  mocks.sharedSpace.getAlbumFolderById.mockImplementation((_s: string, id: string) =>
+    Promise.resolve(id === folder.id ? folder : id === target.id ? target : undefined),
+  );
+  mocks.sharedSpace.getAlbumFolderAncestors.mockResolvedValue([{ id: target.id, parentId: null, name: 'Archive' }]);
+  mocks.sharedSpace.getAlbumFolderSubtree.mockResolvedValue([{ id: folder.id, depth: 0 }]);
+  mocks.sharedSpace.moveAlbumFolderChecked.mockResolvedValue('ok');
+  return { auth, space, folder, target };
+};
+
 const makeRichRow = (over: Record<string, unknown> = {}) => {
   const albumId = newUuid();
   const ownerUser = factory.user({ name: 'Owner One' });
@@ -13795,6 +13813,160 @@ describe(SharedSpaceService.name, () => {
         await expect(sut.updateAlbumFolder(auth, space.id, folder.id, {} as any)).rejects.toBeInstanceOf(
           BadRequestException,
         );
+      });
+    });
+
+    describe('updateAlbumFolder (move)', () => {
+      // M-01
+      it('M-01: moves a folder under another folder', async () => {
+        const { auth, space, folder, target } = setupAlbumFolderMove(mocks);
+
+        await sut.updateAlbumFolder(auth, space.id, folder.id, { parentId: target.id } as any);
+
+        expect(mocks.sharedSpace.moveAlbumFolderChecked).toHaveBeenCalledWith(space.id, folder.id, target.id);
+      });
+
+      // M-02
+      it('M-02: moves a folder back to the space root', async () => {
+        const { auth, space, folder } = setupAlbumFolderMove(mocks, { parentId: newUuid() });
+
+        await sut.updateAlbumFolder(auth, space.id, folder.id, { parentId: null } as any);
+
+        expect(mocks.sharedSpace.moveAlbumFolderChecked).toHaveBeenCalledWith(space.id, folder.id, null);
+      });
+
+      // M-03: caught before any query — a folder is trivially its own descendant.
+      it('M-03: rejects moving a folder into itself', async () => {
+        const { auth, space, folder } = setupAlbumFolderMove(mocks);
+
+        await expect(
+          sut.updateAlbumFolder(auth, space.id, folder.id, { parentId: folder.id } as any),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(mocks.sharedSpace.moveAlbumFolderChecked).not.toHaveBeenCalled();
+      });
+
+      // M-04 / M-05: the target's ancestor chain contains the moved folder, at any depth.
+      it.each([
+        ['M-04', 'a direct child'],
+        ['M-05', 'a deep descendant'],
+      ])('%s: rejects moving a folder into %s', async () => {
+        const { auth, space, folder, target } = setupAlbumFolderMove(mocks);
+        mocks.sharedSpace.getAlbumFolderAncestors.mockResolvedValue([
+          { id: target.id, parentId: folder.id, name: 'Archive' },
+          { id: folder.id, parentId: null, name: 'Trips' },
+        ]);
+
+        await expect(
+          sut.updateAlbumFolder(auth, space.id, folder.id, { parentId: target.id } as any),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(mocks.sharedSpace.moveAlbumFolderChecked).not.toHaveBeenCalled();
+      });
+
+      // M-06: depth(target) + 1 + height(subtree) = 7 + 1 + 4 = 12 > 10.
+      it('M-06: rejects a move whose combined depth exceeds the cap', async () => {
+        const { auth, space, folder, target } = setupAlbumFolderMove(mocks);
+        mocks.sharedSpace.getAlbumFolderAncestors.mockResolvedValue(
+          Array.from({ length: 7 }, () => ({ id: newUuid(), parentId: null, name: 'x' })),
+        );
+        mocks.sharedSpace.getAlbumFolderSubtree.mockResolvedValue([
+          { id: folder.id, depth: 0 },
+          { id: newUuid(), depth: 1 },
+          { id: newUuid(), depth: 2 },
+          { id: newUuid(), depth: 3 },
+          { id: newUuid(), depth: 4 },
+        ]);
+
+        await expect(sut.updateAlbumFolder(auth, space.id, folder.id, { parentId: target.id } as any)).rejects.toThrow(
+          /12/,
+        );
+        expect(mocks.sharedSpace.moveAlbumFolderChecked).not.toHaveBeenCalled();
+      });
+
+      it('M-06: allows a move that lands exactly at the depth cap', async () => {
+        const { auth, space, folder, target } = setupAlbumFolderMove(mocks);
+        mocks.sharedSpace.getAlbumFolderAncestors.mockResolvedValue(
+          Array.from({ length: 7 }, () => ({ id: newUuid(), parentId: null, name: 'x' })),
+        );
+        mocks.sharedSpace.getAlbumFolderSubtree.mockResolvedValue([
+          { id: folder.id, depth: 0 },
+          { id: newUuid(), depth: 1 },
+          { id: newUuid(), depth: 2 },
+        ]);
+
+        await sut.updateAlbumFolder(auth, space.id, folder.id, { parentId: target.id } as any);
+
+        expect(mocks.sharedSpace.moveAlbumFolderChecked).toHaveBeenCalled();
+      });
+
+      // M-07: the collision check runs against the DESTINATION parent, not the current one.
+      it('M-07: rejects a move that collides with a name at the destination', async () => {
+        const { auth, space, folder, target } = setupAlbumFolderMove(mocks);
+        mocks.sharedSpace.hasSiblingAlbumFolderName.mockResolvedValue(true);
+
+        await expect(
+          sut.updateAlbumFolder(auth, space.id, folder.id, { parentId: target.id } as any),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(mocks.sharedSpace.hasSiblingAlbumFolderName).toHaveBeenCalledWith(
+          space.id,
+          target.id,
+          folder.name,
+          folder.id,
+        );
+      });
+
+      // M-08: getAlbumFolderById is space-scoped, so a target in another space reads as absent.
+      it('M-08: rejects a move to a folder in another space', async () => {
+        const { auth, space, folder } = setupAlbumFolderMove(mocks);
+        mocks.sharedSpace.getAlbumFolderById.mockImplementation((_s: string, id: string) =>
+          Promise.resolve(id === folder.id ? folder : undefined),
+        );
+
+        await expect(
+          sut.updateAlbumFolder(auth, space.id, folder.id, { parentId: newUuid() } as any),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(mocks.sharedSpace.moveAlbumFolderChecked).not.toHaveBeenCalled();
+      });
+
+      // M-09: moving into the parent it already has must be a no-op, which only works because
+      // the name pre-check excludes the row itself.
+      it('M-09: moving into the current parent is idempotent', async () => {
+        const { auth, space, target } = setupAlbumFolderMove(mocks);
+        const folder = albumFolderRow({ spaceId: space.id, name: 'Trips', parentId: target.id });
+        mocks.sharedSpace.getAlbumFolderById.mockImplementation((_s: string, id: string) =>
+          Promise.resolve(id === folder.id ? folder : id === target.id ? target : undefined),
+        );
+        mocks.sharedSpace.getAlbumFolderSubtree.mockResolvedValue([{ id: folder.id, depth: 0 }]);
+
+        await sut.updateAlbumFolder(auth, space.id, folder.id, { parentId: target.id } as any);
+
+        expect(mocks.sharedSpace.hasSiblingAlbumFolderName).toHaveBeenCalledWith(
+          space.id,
+          target.id,
+          folder.name,
+          folder.id,
+        );
+        expect(mocks.sharedSpace.moveAlbumFolderChecked).toHaveBeenCalled();
+      });
+
+      // C-01, service half: the repository re-checks under lock and can still report a cycle
+      // that the optimistic pre-check missed. That verdict must surface as a 400.
+      it('C-01: surfaces a cycle detected inside the repository transaction', async () => {
+        const { auth, space, folder, target } = setupAlbumFolderMove(mocks);
+        mocks.sharedSpace.moveAlbumFolderChecked.mockResolvedValue('cycle');
+
+        await expect(
+          sut.updateAlbumFolder(auth, space.id, folder.id, { parentId: target.id } as any),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      it('renames and moves in a single call', async () => {
+        const { auth, space, folder, target } = setupAlbumFolderMove(mocks);
+        mocks.sharedSpace.updateAlbumFolder.mockResolvedValue(true);
+
+        await sut.updateAlbumFolder(auth, space.id, folder.id, { name: 'Travel', parentId: target.id } as any);
+
+        expect(mocks.sharedSpace.moveAlbumFolderChecked).toHaveBeenCalledWith(space.id, folder.id, target.id);
+        expect(mocks.sharedSpace.updateAlbumFolder).toHaveBeenCalledWith(space.id, folder.id, { name: 'Travel' });
       });
     });
 

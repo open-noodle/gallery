@@ -191,6 +191,14 @@ const SharedSpaceAlbumFolderCreateSchema = z
 const SharedSpaceAlbumFolderUpdateSchema = z
   .object({
     name: z.string().trim().min(1).max(SHARED_SPACE_ALBUM_FOLDER_NAME_MAX).optional().describe('New folder name'),
+    parentId: z
+      .uuidv4()
+      .nullable()
+      .optional()
+      .describe('New parent folder ID; null moves the folder to the space root'),
+  })
+  .refine((dto) => dto.name !== undefined || dto.parentId !== undefined, {
+    message: 'Provide at least one of name or parentId',
   })
   .meta({ id: 'SharedSpaceAlbumFolderUpdateDto' });
 
