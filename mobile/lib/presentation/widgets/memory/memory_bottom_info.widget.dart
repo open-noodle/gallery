@@ -1,9 +1,10 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/memory.model.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
-import 'package:immich_mobile/providers/asset_viewer/scroll_to_asset_notifier.provider.dart';
+import 'package:immich_mobile/providers/asset_viewer/view_in_timeline_action.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:intl/intl.dart';
 
@@ -14,13 +15,13 @@ import 'package:intl/intl.dart';
 /// not have.
 RemoteAsset memoryAssetForPage(Memory memory, int page) => memory.assets[page.clamp(0, memory.assets.length - 1)];
 
-class MemoryBottomInfo extends StatelessWidget {
+class MemoryBottomInfo extends ConsumerWidget {
   final RemoteAsset asset;
   final String title;
   const MemoryBottomInfo({super.key, required this.asset, required this.title});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final df = DateFormat.yMMMMd();
     final fileCreatedDate = asset.createdAt;
     return Padding(
@@ -45,18 +46,14 @@ class MemoryBottomInfo extends StatelessWidget {
             message: context.t.view_in_timeline,
             child: MaterialButton(
               minWidth: 0,
-              onPressed: () async {
-                await context.maybePop();
-                if (!context.mounted) {
-                  return;
-                }
-
+              onPressed: () => viewAssetInTimeline(
+                asset: asset,
+                read: ref.read,
+                popViewer: () => context.maybePop(),
                 // Activate the existing timeline tab without rebuilding it (a fresh
                 // TabShellRoute would reload the timeline to the top and discard the scroll).
-                await context.navigateTo(const MainTimelineRoute());
-                // #28941: the notifier converts to the viewer's local time itself.
-                scrollToAssetNotifierProvider.scrollToAsset(asset);
-              },
+                goToTimeline: () => context.navigateTo(const MainTimelineRoute()),
+              ),
               shape: const CircleBorder(),
               color: Colors.white.withValues(alpha: 0.2),
               elevation: 0,
