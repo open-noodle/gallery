@@ -972,4 +972,26 @@ describe('Spaces page search URL state', () => {
     // when withStacked is requested).
     expect(screen.getByTestId('timeline-options')).toHaveTextContent('"withStacked":true');
   });
+
+  // #889 — the asset viewer opened from this timeline has to know it is on a space surface and
+  // whether the viewer may contribute, or it offers "add to album" targets the server must reject.
+  it('passes the space capability into the space Timeline for an editor', async () => {
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
+
+    renderPage({ members: [makeMember({ role: SharedSpaceRole.Editor })] });
+
+    expect(await screen.findByTestId('timeline-space')).toHaveTextContent(
+      JSON.stringify({ id: 'space-1', canWrite: true }),
+    );
+  });
+
+  it('passes the space capability into the space Timeline as read-only for a viewer', async () => {
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
+
+    renderPage({ members: [makeMember({ role: SharedSpaceRole.Viewer })] });
+
+    expect(await screen.findByTestId('timeline-space')).toHaveTextContent(
+      JSON.stringify({ id: 'space-1', canWrite: false }),
+    );
+  });
 });
