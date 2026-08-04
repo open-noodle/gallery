@@ -25,7 +25,11 @@ import {
   SpaceRepresentativeFaceUpdateDto,
 } from 'src/dtos/shared-space-person.dto';
 import {
+  SHARED_SPACE_ALBUM_FOLDER_NAME_MAX,
   SharedSpaceActivityResponseDto,
+  SharedSpaceAlbumFolderCreateDto,
+  SharedSpaceAlbumFolderDto,
+  SharedSpaceAlbumFolderUpdateDto,
   SharedSpaceAlbumLinkUpdateDto,
   SharedSpaceAlbumMemberTimelineDto,
   SharedSpaceAssetAddDto,
@@ -104,6 +108,11 @@ const getNameSourcePrecedence = (nameSource: string) => NAME_SOURCE_PRECEDENCE[n
  * always-reappears bug can't queue passes forever.
  */
 export const SHARED_SPACE_DEDUP_MAX_PASSES = 100;
+
+/** Root is depth 1; the cap is inclusive, so a folder at depth 10 cannot take a child. */
+export const SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH = 10;
+/** Bounds the whole-space folder fetch the web client uses to render the tree. */
+export const SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE = 500;
 
 type SpacePersonMatchResult = {
   id: string;
@@ -990,6 +999,135 @@ export class SharedSpaceService extends BaseService {
         hiddenFromMyTimeline: hiddenAlbumIds.has(row.id),
       };
     });
+  }
+
+  async getAlbumFolders(auth: AuthDto, spaceId: string): Promise<SharedSpaceAlbumFolderDto[]> {
+    // Membership first: a folder name is itself information, so a non-member gets 403 rather
+    // than an empty list that would confirm the space exists.
+    await this.requireMembership(auth, spaceId);
+    const rows = await this.sharedSpaceRepository.getAlbumFoldersBySpace(spaceId);
+    return rows.map((row) => this.mapAlbumFolder(row));
+  }
+
+  async createAlbumFolder(
+    auth: AuthDto,
+    spaceId: string,
+    dto: SharedSpaceAlbumFolderCreateDto,
+  ): Promise<SharedSpaceAlbumFolderDto> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    const name = this.normalizeAlbumFolderName(dto.name);
+    const parentId = dto.parentId ?? null;
+
+    if (parentId) {
+      // getAlbumFolderById is space-scoped, so a cross-space parent and a missing parent are
+      // the same 400 — deliberately, so neither confirms the other space's contents.
+      const parent = await this.sharedSpaceRepository.getAlbumFolderById(spaceId, parentId);
+      if (!parent) {
+        throw new BadRequestException('Parent folder not found');
+      }
+      const ancestors = await this.sharedSpaceRepository.getAlbumFolderAncestors(parentId);
+      const depth = ancestors.length + 1;
+      if (depth > SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH) {
+        throw new BadRequestException(
+          `Folder nesting is limited to ${SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH} levels (this would be ${depth})`,
+        );
+      }
+    }
+
+    const count = await this.sharedSpaceRepository.countAlbumFoldersBySpace(spaceId);
+    if (count >= SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE) {
+      throw new BadRequestException(`A space is limited to ${SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE} folders`);
+    }
+
+    await this.assertNoAlbumFolderNameConflict(spaceId, parentId, name, null);
+
+    const created = await this.sharedSpaceRepository.createAlbumFolder({
+      spaceId,
+      parentId,
+      name,
+      createdById: auth.user.id,
+    });
+    return this.mapAlbumFolder(created);
+  }
+
+  async updateAlbumFolder(
+    auth: AuthDto,
+    spaceId: string,
+    folderId: string,
+    dto: SharedSpaceAlbumFolderUpdateDto,
+  ): Promise<void> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    const folder = await this.sharedSpaceRepository.getAlbumFolderById(spaceId, folderId);
+    if (!folder) {
+      throw new BadRequestException('Folder not found');
+    }
+
+    if (dto.name === undefined) {
+      throw new BadRequestException('Nothing to update');
+    }
+
+    const name = this.normalizeAlbumFolderName(dto.name);
+    // excludeId = folderId, so renaming a folder to the name it already has is a no-op
+    // rather than a collision with itself.
+    await this.assertNoAlbumFolderNameConflict(spaceId, folder.parentId, name, folderId);
+
+    await this.sharedSpaceRepository.updateAlbumFolder(spaceId, folderId, { name });
+  }
+
+  async deleteAlbumFolder(auth: AuthDto, spaceId: string, folderId: string): Promise<void> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    // Promotion happens inside the repository transaction: direct children move up one level,
+    // then the row is deleted. Grandchildren keep their parents, and no album is ever unlinked.
+    const deleted = await this.sharedSpaceRepository.deleteAlbumFolderPromotingChildren(spaceId, folderId);
+    if (!deleted) {
+      throw new BadRequestException('Folder not found');
+    }
+  }
+
+  private normalizeAlbumFolderName(rawName: string): string {
+    const name = (rawName ?? '').trim();
+    if (!name) {
+      throw new BadRequestException('Folder name cannot be empty');
+    }
+    if (name.length > SHARED_SPACE_ALBUM_FOLDER_NAME_MAX) {
+      throw new BadRequestException(`Folder name cannot exceed ${SHARED_SPACE_ALBUM_FOLDER_NAME_MAX} characters`);
+    }
+    return name;
+  }
+
+  private async assertNoAlbumFolderNameConflict(
+    spaceId: string,
+    parentId: string | null,
+    name: string,
+    excludeId: string | null,
+  ): Promise<void> {
+    const conflict = await this.sharedSpaceRepository.hasSiblingAlbumFolderName(spaceId, parentId, name, excludeId);
+    if (conflict) {
+      throw new BadRequestException('A folder with that name already exists here');
+    }
+  }
+
+  private mapAlbumFolder(row: {
+    id: string;
+    spaceId: string;
+    parentId: string | null;
+    name: string;
+    createdById: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }): SharedSpaceAlbumFolderDto {
+    return {
+      id: row.id,
+      spaceId: row.spaceId,
+      parentId: row.parentId,
+      name: row.name,
+      createdById: row.createdById,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
   }
 
   async unlinkLibrary(auth: AuthDto, spaceId: string, libraryId: string): Promise<void> {

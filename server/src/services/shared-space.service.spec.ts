@@ -63,6 +63,27 @@ const makeMemberResult = (overrides: any = {}) => ({
   ...overrides,
 });
 
+/** Helper to build an editor/viewer/owner space membership for the album folders tests below. */
+const setupAlbumFolderEditor = (mocks: ServiceMocks, role: SharedSpaceRole = SharedSpaceRole.Editor) => {
+  const auth = factory.auth({ user: { isAdmin: false } });
+  const space = factory.sharedSpace({ faceRecognitionEnabled: false });
+  mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ spaceId: space.id, userId: auth.user.id, role }));
+  return { auth, space };
+};
+
+const albumFolderRow = (overrides: Partial<Record<string, unknown>> = {}) => ({
+  id: newUuid(),
+  spaceId: newUuid(),
+  parentId: null,
+  name: 'Trips',
+  createdById: newUuid(),
+  createdAt: newDate(),
+  updatedAt: newDate(),
+  createId: newUuid(),
+  updateId: newUuid(),
+  ...overrides,
+});
+
 const makeRichRow = (over: Record<string, unknown> = {}) => {
   const albumId = newUuid();
   const ownerUser = factory.user({ name: 'Owner One' });
@@ -13493,6 +13514,320 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.sharedSpace.logActivity).not.toHaveBeenCalledWith(
         expect.objectContaining({ type: SharedSpaceActivityType.PersonMerge }),
       );
+    });
+  });
+
+  describe('album folders', () => {
+    beforeEach(() => {
+      mocks.sharedSpace.countAlbumFoldersBySpace.mockResolvedValue(0);
+      mocks.sharedSpace.hasSiblingAlbumFolderName.mockResolvedValue(false);
+      mocks.sharedSpace.getAlbumFolderAncestors.mockResolvedValue([]);
+    });
+
+    describe('getAlbumFolders', () => {
+      it('returns the space folders for a member', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks, SharedSpaceRole.Viewer);
+        const row = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.getAlbumFoldersBySpace.mockResolvedValue([row]);
+
+        const result = await sut.getAlbumFolders(auth, space.id);
+
+        expect(result).toEqual([
+          expect.objectContaining({ id: row.id, spaceId: space.id, parentId: null, name: 'Trips' }),
+        ]);
+      });
+
+      // R-06: a folder name is itself information ("Divorce", "Medical"), so a non-member must be
+      // refused outright rather than handed an empty list that confirms the space exists.
+      it('R-06: throws for a non-member instead of returning an empty list', async () => {
+        const auth = factory.auth({ user: { isAdmin: false } });
+        const space = factory.sharedSpace({ faceRecognitionEnabled: false });
+        mocks.sharedSpace.getMember.mockResolvedValue(void 0 as any);
+
+        await expect(sut.getAlbumFolders(auth, space.id)).rejects.toBeInstanceOf(ForbiddenException);
+        expect(mocks.sharedSpace.getAlbumFoldersBySpace).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('createAlbumFolder', () => {
+      // F-01
+      it('F-01: creates a root folder', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const created = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.createAlbumFolder.mockResolvedValue(created);
+
+        const result = await sut.createAlbumFolder(auth, space.id, { name: 'Trips' } as any);
+
+        expect(mocks.sharedSpace.createAlbumFolder).toHaveBeenCalledWith({
+          spaceId: space.id,
+          parentId: null,
+          name: 'Trips',
+          createdById: auth.user.id,
+        });
+        expect(result).toEqual(expect.objectContaining({ id: created.id, parentId: null }));
+      });
+
+      // F-02
+      it('F-02: creates a nested folder under an existing parent', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const parent = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(parent);
+        mocks.sharedSpace.getAlbumFolderAncestors.mockResolvedValue([{ id: parent.id, parentId: null, name: 'Trips' }]);
+        mocks.sharedSpace.createAlbumFolder.mockResolvedValue(
+          albumFolderRow({ spaceId: space.id, parentId: parent.id, name: '2026' }),
+        );
+
+        await sut.createAlbumFolder(auth, space.id, { name: '2026', parentId: parent.id } as any);
+
+        expect(mocks.sharedSpace.createAlbumFolder).toHaveBeenCalledWith(
+          expect.objectContaining({ parentId: parent.id, name: '2026' }),
+        );
+      });
+
+      // F-03 — 400, not 409. shared-space.service.ts never throws ConflictException; that is
+      // reserved codebase-wide for merge-policy's structured cross-owner conflict.
+      it('F-03: rejects a case-insensitive sibling collision', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        mocks.sharedSpace.hasSiblingAlbumFolderName.mockResolvedValue(true);
+
+        await expect(sut.createAlbumFolder(auth, space.id, { name: 'trips' } as any)).rejects.toBeInstanceOf(
+          BadRequestException,
+        );
+        expect(mocks.sharedSpace.createAlbumFolder).not.toHaveBeenCalled();
+      });
+
+      // F-04: the collision check is scoped to the destination parent, so the same name may
+      // legitimately exist elsewhere in the tree.
+      it('F-04: scopes the collision check to the target parent', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        mocks.sharedSpace.createAlbumFolder.mockResolvedValue(albumFolderRow({ spaceId: space.id, name: '2026' }));
+
+        await sut.createAlbumFolder(auth, space.id, { name: '2026' } as any);
+
+        expect(mocks.sharedSpace.hasSiblingAlbumFolderName).toHaveBeenCalledWith(space.id, null, '2026', null);
+      });
+
+      // F-05
+      it('F-05: trims the stored name', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        mocks.sharedSpace.createAlbumFolder.mockResolvedValue(albumFolderRow({ spaceId: space.id }));
+
+        await sut.createAlbumFolder(auth, space.id, { name: '  Trips  ' } as any);
+
+        expect(mocks.sharedSpace.createAlbumFolder).toHaveBeenCalledWith(expect.objectContaining({ name: 'Trips' }));
+      });
+
+      // F-06 / F-07 — the service re-validates rather than trusting zod, so these hold for any
+      // caller and are provable at this layer.
+      it.each([
+        ['F-06', ' '.repeat(3)],
+        ['F-06', ''],
+        ['F-07', 'x'.repeat(129)],
+      ])('%s: rejects an invalid name', async (_id, name) => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+
+        await expect(sut.createAlbumFolder(auth, space.id, { name } as any)).rejects.toBeInstanceOf(
+          BadRequestException,
+        );
+        expect(mocks.sharedSpace.createAlbumFolder).not.toHaveBeenCalled();
+      });
+
+      it('F-07: accepts a name of exactly the maximum length', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        mocks.sharedSpace.createAlbumFolder.mockResolvedValue(albumFolderRow({ spaceId: space.id }));
+
+        await sut.createAlbumFolder(auth, space.id, { name: 'x'.repeat(128) } as any);
+
+        expect(mocks.sharedSpace.createAlbumFolder).toHaveBeenCalled();
+      });
+
+      // F-08 / F-10 — getAlbumFolderById is space-scoped, so a parent from another space and a
+      // parent that does not exist are DELIBERATELY indistinguishable: neither response confirms
+      // the other space's contents. One behaviour, one test.
+      it('F-08/F-10: rejects a parent that is missing or belongs to another space', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(void 0 as any);
+
+        await expect(
+          sut.createAlbumFolder(auth, space.id, { name: '2026', parentId: newUuid() } as any),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(mocks.sharedSpace.createAlbumFolder).not.toHaveBeenCalled();
+      });
+
+      // F-09: root is depth 1, so a parent with a 10-element ancestor chain is at depth 10 and
+      // cannot take a child.
+      it('F-09: rejects a create that would exceed the depth cap', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const parent = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(parent);
+        mocks.sharedSpace.getAlbumFolderAncestors.mockResolvedValue(
+          Array.from({ length: 10 }, () => ({ id: newUuid(), parentId: null, name: 'x' })),
+        );
+
+        await expect(
+          sut.createAlbumFolder(auth, space.id, { name: 'too deep', parentId: parent.id } as any),
+        ).rejects.toThrow(/11/);
+        expect(mocks.sharedSpace.createAlbumFolder).not.toHaveBeenCalled();
+      });
+
+      // F-11: the cap is inclusive — depth 10 itself is allowed.
+      it('F-11: allows a create that lands exactly at the depth cap', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const parent = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(parent);
+        mocks.sharedSpace.getAlbumFolderAncestors.mockResolvedValue(
+          Array.from({ length: 9 }, () => ({ id: newUuid(), parentId: null, name: 'x' })),
+        );
+        mocks.sharedSpace.createAlbumFolder.mockResolvedValue(
+          albumFolderRow({ spaceId: space.id, parentId: parent.id }),
+        );
+
+        await sut.createAlbumFolder(auth, space.id, { name: 'depth ten', parentId: parent.id } as any);
+
+        expect(mocks.sharedSpace.createAlbumFolder).toHaveBeenCalled();
+      });
+
+      // F-12: the cap is what makes the web client's whole-space folder fetch safe.
+      it('F-12: rejects a create beyond the per-space folder cap', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        mocks.sharedSpace.countAlbumFoldersBySpace.mockResolvedValue(500);
+
+        await expect(sut.createAlbumFolder(auth, space.id, { name: 'one too many' } as any)).rejects.toBeInstanceOf(
+          BadRequestException,
+        );
+        expect(mocks.sharedSpace.createAlbumFolder).not.toHaveBeenCalled();
+      });
+
+      it('F-12: allows a create at one below the cap', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        mocks.sharedSpace.countAlbumFoldersBySpace.mockResolvedValue(499);
+        mocks.sharedSpace.createAlbumFolder.mockResolvedValue(albumFolderRow({ spaceId: space.id }));
+
+        await sut.createAlbumFolder(auth, space.id, { name: 'last one' } as any);
+
+        expect(mocks.sharedSpace.createAlbumFolder).toHaveBeenCalled();
+      });
+
+      // R-03 / R-09: the role gate runs FIRST, so an unauthorised actor learns nothing about
+      // whether their payload was otherwise valid.
+      it('R-09: refuses a viewer before validating the payload', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks, SharedSpaceRole.Viewer);
+
+        await expect(
+          sut.createAlbumFolder(auth, space.id, { name: '', parentId: newUuid() } as any),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(mocks.sharedSpace.getAlbumFolderById).not.toHaveBeenCalled();
+        expect(mocks.sharedSpace.countAlbumFoldersBySpace).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('updateAlbumFolder (rename)', () => {
+      // N-01
+      it('N-01: renames a folder', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const folder = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+        mocks.sharedSpace.updateAlbumFolder.mockResolvedValue(true);
+
+        await sut.updateAlbumFolder(auth, space.id, folder.id, { name: 'Travel' } as any);
+
+        expect(mocks.sharedSpace.updateAlbumFolder).toHaveBeenCalledWith(space.id, folder.id, { name: 'Travel' });
+      });
+
+      // N-02
+      it('N-02: rejects renaming onto a sibling name', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const folder = albumFolderRow({ spaceId: space.id, name: 'Family' });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+        mocks.sharedSpace.hasSiblingAlbumFolderName.mockResolvedValue(true);
+
+        await expect(sut.updateAlbumFolder(auth, space.id, folder.id, { name: 'trips' } as any)).rejects.toBeInstanceOf(
+          BadRequestException,
+        );
+        expect(mocks.sharedSpace.updateAlbumFolder).not.toHaveBeenCalled();
+      });
+
+      // N-03: the collision pre-check must exclude the row being renamed, or renaming a folder
+      // to its own name would find itself and 400.
+      it('N-03: renaming to the same name is a no-op, not a collision', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const folder = albumFolderRow({ spaceId: space.id, name: 'Trips' });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+        mocks.sharedSpace.updateAlbumFolder.mockResolvedValue(true);
+
+        await sut.updateAlbumFolder(auth, space.id, folder.id, { name: 'Trips' } as any);
+
+        expect(mocks.sharedSpace.hasSiblingAlbumFolderName).toHaveBeenCalledWith(
+          space.id,
+          folder.parentId,
+          'Trips',
+          folder.id,
+        );
+        expect(mocks.sharedSpace.updateAlbumFolder).toHaveBeenCalled();
+      });
+
+      // N-04
+      it('N-04: trims the new name', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const folder = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+        mocks.sharedSpace.updateAlbumFolder.mockResolvedValue(true);
+
+        await sut.updateAlbumFolder(auth, space.id, folder.id, { name: '  Travel  ' } as any);
+
+        expect(mocks.sharedSpace.updateAlbumFolder).toHaveBeenCalledWith(space.id, folder.id, { name: 'Travel' });
+      });
+
+      it('rejects renaming a folder that does not exist in this space', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(void 0 as any);
+
+        await expect(
+          sut.updateAlbumFolder(auth, space.id, newUuid(), { name: 'Travel' } as any),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      it('rejects an empty update payload', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const folder = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+
+        await expect(sut.updateAlbumFolder(auth, space.id, folder.id, {} as any)).rejects.toBeInstanceOf(
+          BadRequestException,
+        );
+      });
+    });
+
+    describe('deleteAlbumFolder', () => {
+      // D-01–D-05 are PROMOTION SEMANTICS, owned by Task 2's P-05 medium tests, which prove
+      // them against a real database — including the load-bearing D-03 case that grandchildren
+      // keep their parents. At this layer the delete is a single delegation, so the only thing
+      // worth asserting is that it delegates with the right arguments. Five identical it.each
+      // cases would assert nothing five times over.
+      it('delegates to the promoting repository call (D-01–D-05 semantics live in P-05)', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const folder = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.deleteAlbumFolderPromotingChildren.mockResolvedValue(true);
+
+        await sut.deleteAlbumFolder(auth, space.id, folder.id);
+
+        expect(mocks.sharedSpace.deleteAlbumFolderPromotingChildren).toHaveBeenCalledWith(space.id, folder.id);
+      });
+
+      // D-06
+      it('D-06: rejects deleting a folder that is already gone', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        mocks.sharedSpace.deleteAlbumFolderPromotingChildren.mockResolvedValue(false);
+
+        await expect(sut.deleteAlbumFolder(auth, space.id, newUuid())).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      it('R-03: refuses a viewer', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks, SharedSpaceRole.Viewer);
+
+        await expect(sut.deleteAlbumFolder(auth, space.id, newUuid())).rejects.toBeInstanceOf(ForbiddenException);
+        expect(mocks.sharedSpace.deleteAlbumFolderPromotingChildren).not.toHaveBeenCalled();
+      });
     });
   });
 });
