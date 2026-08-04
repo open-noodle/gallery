@@ -14194,6 +14194,22 @@ describe(SharedSpaceService.name, () => {
         expect(mocks.sharedSpace.getAlbumFolderById).not.toHaveBeenCalled();
         expect(mocks.sharedSpace.setAlbumLinkFolder).not.toHaveBeenCalled();
       });
+
+      // Regression guard for A-10's placement: an idempotent re-link (addAlbum resolves falsy
+      // because the row already exists) must still honour the requested folderId. The placement
+      // write is deliberately OUTSIDE the `if (result)` branch used for face-sync/activity-log
+      // side effects — if it were moved inside that branch, this is the only test that would fail.
+      it('re-links an already-linked album and still places it (placement is outside the if(result) branch)', async () => {
+        const { auth, space, albumId } = setupAlbumLink(mocks);
+        mocks.sharedSpace.addAlbum.mockResolvedValue(void 0 as any);
+        const folder = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+        mocks.sharedSpace.setAlbumLinkFolder.mockResolvedValue(true);
+
+        await sut.linkAlbum(auth, space.id, albumId, folder.id);
+
+        expect(mocks.sharedSpace.setAlbumLinkFolder).toHaveBeenCalledWith(space.id, albumId, folder.id);
+      });
     });
   });
 });
