@@ -122,7 +122,19 @@ export const getAssetBulkActions = (
   return { AddToAlbum, RefreshFacesJob, RefreshMetadataJob, RegenerateThumbnailJob, TranscodeVideoJob };
 };
 
-export const getAssetActions = ($t: MessageFormatter, asset: AssetResponseDto & { stackPrimaryAssetId?: string }) => {
+export const getAssetActions = (
+  $t: MessageFormatter,
+  asset: AssetResponseDto & { stackPrimaryAssetId?: string },
+  {
+    space,
+  }: {
+    /**
+     * The shared space this asset is being viewed through, when the viewer sits on a space
+     * surface. Drives the add-to-album gating below; absent everywhere else.
+     */
+    space?: { id: string; canWrite: boolean };
+  } = {},
+) => {
   const sharedLink = getSharedLink();
   const authUser = authManager.authenticated ? authManager.user : undefined;
   const isOwner = !!(authUser && authUser.id === asset.ownerId);
@@ -136,6 +148,17 @@ export const getAssetActions = ($t: MessageFormatter, asset: AssetResponseDto & 
   // omits `ownerId` altogether, so ownership is unknowable client-side there — treat unknown as
   // shareable rather than hiding the button from the owner of the asset they linked.
   const canShare = !!authUser && (isOwner || !asset.ownerId);
+
+  // #889: an asset the caller does not own reaches an album only through the #764 contribution
+  // path, which the server accepts solely for albums linked to a space where the caller is
+  // Owner/Editor. Offering the ordinary picker there lists nothing but targets the server must
+  // reject, so on a space surface the picker is narrowed to that space's albums — and dropped
+  // entirely for a space Viewer, who has no contribution path at all. Mirrors the multi-select
+  // rule in `getSelectionCapabilities`. Off a space surface `space` is undefined and nothing
+  // changes: partner-shared assets do land in the caller's own album (Permission.AssetShare),
+  // and the viewer cannot evaluate that from the DTO.
+  const canAddToAlbum = isOwner || space === undefined || space.canWrite;
+  const restrictToSpaceId = !isOwner && space?.canWrite ? space.id : undefined;
 
   const Share: ActionItem = {
     title: $t('share'),
@@ -209,8 +232,8 @@ export const getAssetActions = ($t: MessageFormatter, asset: AssetResponseDto & 
     title: $t('add_to_album_or_space'),
     icon: mdiPlus,
     shortcuts: [{ key: 'l' }],
-    $if: () => asset.visibility !== AssetVisibility.Locked && !asset.isTrashed,
-    onAction: () => modalManager.show(AssetAddToCollectionModal, { assetIds: [asset.id] }),
+    $if: () => canAddToAlbum && asset.visibility !== AssetVisibility.Locked && !asset.isTrashed,
+    onAction: () => modalManager.show(AssetAddToCollectionModal, { assetIds: [asset.id], restrictToSpaceId }),
   };
 
   const Offline: ActionItem = {

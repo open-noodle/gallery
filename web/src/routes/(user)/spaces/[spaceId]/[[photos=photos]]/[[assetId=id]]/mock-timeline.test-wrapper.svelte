@@ -13,6 +13,7 @@
     temporalAnchor?: { year: number; month?: number };
     onTemporalAnchorResolved?: () => void;
     withStacked?: boolean;
+    space?: { id: string; canWrite: boolean };
     children?: Snippet;
     [key: string]: unknown;
   }
@@ -27,6 +28,7 @@
     temporalAnchor,
     onTemporalAnchorResolved,
     withStacked = false,
+    space,
     ...rest
   }: Props = $props();
 
@@ -59,6 +61,7 @@
 <div {...rest} data-testid="timeline-stub" data-has-timeline={String(timelineManager !== undefined)}>
   <div data-testid="timeline-options">{JSON.stringify(options)}</div>
   <div data-testid="timeline-withstacked">{String(withStacked)}</div>
+  <div data-testid="timeline-space">{JSON.stringify(space ?? null)}</div>
   <button
     type="button"
     data-testid="activate-year-bucket"
