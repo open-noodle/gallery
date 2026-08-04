@@ -32,7 +32,7 @@ import { authManager } from '$lib/managers/auth-manager.svelte';
 import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
 import { Route } from '$lib/route';
 import { addEntry, getEntries, makePlaceId, removeEntry, type RecentEntry } from '$lib/stores/cmdk-recent';
-import { getGlobalPersonHref } from '$lib/utils/global-person-route';
+import { getPhotosPersonFilterId, type PhotosPersonFilterReference } from '$lib/utils/photos-filter-options';
 import {
   buildSearchablePageUrl,
   getSearchablePageBasePath,
@@ -154,8 +154,29 @@ const PROVIDER_TIMEOUT_MS = 15_000;
 const idle = Object.freeze({ status: 'idle' as const });
 const tagCacheTooLarge = Object.freeze({ status: 'error' as const, message: 'tag_cache_too_large' });
 
-function getPersonRoute(person: Pick<PersonResponseDto, 'id' | 'primaryProfile'>): string {
-  return getGlobalPersonHref(person);
+/**
+ * Drop `id -> ''` pairs before they reach the typed-search name cache. `active-filters-bar` falls
+ * back to rendering the raw id only for a *missing* entry, so caching an empty string renders a
+ * blank chip instead.
+ */
+function withoutEmptyLabels(names?: Map<string, string>): Map<string, string> {
+  // Ephemeral map, serialized into sessionStorage by storeTypedSearchNames; nothing reads it
+  // reactively, so a plain Map is correct here.
+  return new Map([...(names ?? [])].filter(([, label]) => label.trim() !== ''));
+}
+
+/**
+ * The space id of the current page when that page is a space *timeline* (`/spaces/<id>` or
+ * `/spaces/<id>/photos`). Deliberately not a `pathname.startsWith('/spaces/')` test:
+ * `/spaces/<id>/albums/<albumId>` is a space page but not a searchable one, so no filter can be
+ * applied in place there.
+ */
+function getCurrentSpaceTimelineId(pathname: string): string | undefined {
+  const base = getSearchablePageBasePath(pathname);
+  if (!base?.startsWith('/spaces/')) {
+    return undefined;
+  }
+  return base.split('/').filter(Boolean)[1];
 }
 
 // Entity-section keys dispatched by runBatch per scope. Navigation is intentionally
@@ -1616,6 +1637,49 @@ export class GlobalSearchManager {
   }
 
   /**
+   * Single funnel for "palette result -> filter the surface you're on".
+   *
+   * Every row that maps onto a filter-panel filter (tag, person, place) and every field-search
+   * mode routes through here so they cannot drift apart. The rule: AND the new filter into
+   * whatever the current searchable page is already filtered by and stay put; if the current page
+   * is not searchable, fall back to /photos.
+   *
+   * `target` overrides the base page for the case where the current surface *cannot express* the
+   * filter (a space-scoped person id means nothing on /photos and vice versa). Passing it also
+   * drops the current surface's filters: leaving the surface leaves its filter state behind,
+   * because those ids are scoped to the surface we are leaving.
+   *
+   * `buildSearchDestination` deliberately does NOT use this — it owns the smart-search `/map?q=`
+   * special case, which would silently drop a filter if inherited here.
+   *
+   * `names` seeds the typed-search name cache so a freshly added chip reads "Alice" rather than a
+   * raw uuid. Passing it at all — even with empty maps — writes an entry; omitting it writes
+   * nothing, which is what the field modes want, as their chips carry their own text.
+   */
+  private navigateToFilteredResults(options: {
+    applyFilter: (filters: FilterState) => FilterState;
+    target?: URL;
+    names?: { personNames?: Map<string, string>; tagNames?: Map<string, string> };
+  }): void {
+    const current = options.target
+      ? createFilterState()
+      : (this.searchablePageFiltersProvider?.() ?? createFilterState());
+    const filters = options.applyFilter({ ...current });
+    // Ephemeral URL object for destination construction only; no reactive state is retained.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+    const fallback = new URL('/photos', page.url);
+    const base = options.target ?? (getSearchablePageBasePath(page.url.pathname) ? page.url : fallback);
+    const destination = buildSearchablePageUrl(base, '', this.searchSortOrder, filters) ?? '/photos';
+    if (options.names) {
+      storeTypedSearchNames(destination, {
+        personNames: withoutEmptyLabels(options.names.personNames),
+        tagNames: withoutEmptyLabels(options.names.tagNames),
+      });
+    }
+    void goto(destination);
+  }
+
+  /**
    * Navigate the current searchable page (or `/photos`) to a full result set filtered by the
    * active field-search mode. The current filters are preserved and the one text field is
    * AND-ed in, so "See all" / Enter from a field mode lands on the filterable timeline rather
@@ -1626,32 +1690,25 @@ export class GlobalSearchManager {
     if (!trimmed) {
       return;
     }
-    const filters: FilterState = { ...(this.searchablePageFiltersProvider?.() ?? createFilterState()) };
-    switch (mode) {
-      case 'metadata': {
-        filters.originalFileName = trimmed;
-        break;
-      }
-      case 'description': {
-        filters.description = trimmed;
-        break;
-      }
-      case 'ocr': {
-        filters.ocr = trimmed;
-        break;
-      }
-      case 'smart': {
-        // Unreachable: navigateToFieldResults is only called for field modes.
-        return;
-      }
+    if (mode === 'smart') {
+      // Unreachable: navigateToFieldResults is only called for field modes.
+      return;
     }
-    // Field results are always a filtered timeline, never a /map view. Target the current
-    // searchable page if there is one, else /photos — going through buildSearchDestination
-    // would route /map through its `q=` special-case and drop the text filter entirely.
-    // Ephemeral URL object for destination construction only; no reactive state is retained.
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const base = getSearchablePageBasePath(page.url.pathname) ? page.url : new URL('/photos', page.url);
-    void goto(buildSearchablePageUrl(base, '', this.searchSortOrder, filters) ?? '/photos');
+    this.navigateToFilteredResults({
+      applyFilter: (filters: FilterState): FilterState => {
+        switch (mode) {
+          case 'metadata': {
+            return { ...filters, originalFileName: trimmed };
+          }
+          case 'description': {
+            return { ...filters, description: trimmed };
+          }
+          case 'ocr': {
+            return { ...filters, ocr: trimmed };
+          }
+        }
+      },
+    });
   }
 
   /**
@@ -1663,26 +1720,74 @@ export class GlobalSearchManager {
    * typed-search name cache so that chip reads "beach" instead of a raw uuid.
    */
   private navigateToTagResults(tagId: string, tagName: string): void {
-    const current = this.searchablePageFiltersProvider?.() ?? createFilterState();
-    const filters: FilterState = {
-      ...current,
-      tagIds: current.tagIds.includes(tagId) ? current.tagIds : [...current.tagIds, tagId],
-    };
-    // Same targeting rule as navigateToFieldResults: a tag is always a filtered timeline, so
-    // skip buildSearchDestination and its /map `q=` special-case, which would drop the filter.
+    this.navigateToFilteredResults({
+      applyFilter: (filters) => ({
+        ...filters,
+        tagIds: filters.tagIds.includes(tagId) ? filters.tagIds : [...filters.tagIds, tagId],
+      }),
+      // Ephemeral map, serialized into sessionStorage by storeTypedSearchNames; an empty tag name
+      // is stripped by withoutEmptyLabels so the chip falls back to the id, not a blank label.
+      // eslint-disable-next-line svelte/prefer-svelte-reactivity
+      names: { tagNames: new Map([[tagId, tagName]]) },
+    });
+  }
+
+  /**
+   * Navigate to the current surface filtered by `person`.
+   *
+   * The filter-id encoding is scope-dependent, and getting it wrong yields a silently empty
+   * timeline: a space timeline forwards `personIds` to the API as `spacePersonIds` — bare profile
+   * ids scoped to that space (space-filter-options.ts) — while /photos and /recently-added forward
+   * them prefixed, `person:` / `space-person:` (photos-filter-options.ts). So a space person can
+   * only filter in place on its OWN space; every other combination targets /photos with the
+   * prefixed id. This mirrors the scope split that `getPersonFilterId(person, scope)` in the
+   * typed-search resolver already makes — but not its unprefixed-id fallback: that resolver
+   * prefixes a bare id with `person:`, while `getPhotosPersonFilterId` here returns it bare.
+   */
+  private navigateToPersonResults(person: PhotosPersonFilterReference & { name?: string }): void {
+    const spaceId = getCurrentSpaceTimelineId(page.url.pathname);
+    const profile = person.primaryProfile;
+    const spaceProfileId =
+      spaceId !== undefined && profile?.type === 'space-person' && profile.spaceId === spaceId ? profile.id : undefined;
+    const filterId = spaceProfileId ?? getPhotosPersonFilterId(person);
     // Ephemeral URL object for destination construction only; no reactive state is retained.
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const base = getSearchablePageBasePath(page.url.pathname) ? page.url : new URL('/photos', page.url);
-    const destination = buildSearchablePageUrl(base, '', this.searchSortOrder, filters) ?? '/photos';
-    // An empty name must stay OUT of the map: active-filters-bar falls back to the raw id only
-    // for a missing entry, so caching '' would render a blank chip.
-    // Ephemeral maps, serialized into sessionStorage by storeTypedSearchNames on the next line;
-    // nothing reads them reactively, so plain Maps are correct here.
-    /* eslint-disable svelte/prefer-svelte-reactivity */
-    const tagNames = tagName ? new Map([[tagId, tagName]]) : new Map<string, string>();
-    storeTypedSearchNames(destination, { personNames: new Map(), tagNames });
-    /* eslint-enable svelte/prefer-svelte-reactivity */
-    void goto(destination);
+    const target = spaceId !== undefined && spaceProfileId === undefined ? new URL('/photos', page.url) : undefined;
+    this.navigateToFilteredResults({
+      target,
+      applyFilter: (filters) => ({
+        ...filters,
+        personIds: filters.personIds.includes(filterId) ? filters.personIds : [...filters.personIds, filterId],
+      }),
+      // Ephemeral map, serialized into sessionStorage by storeTypedSearchNames; an empty name is
+      // stripped by withoutEmptyLabels so the chip falls back to the id, not a blank label.
+      // eslint-disable-next-line svelte/prefer-svelte-reactivity
+      names: { personNames: new Map([[filterId, person.name ?? '']]) },
+    });
+  }
+
+  /**
+   * Navigate to the current surface filtered by `place`.
+   *
+   * PlacesResponseDto carries name / lat / lng / admin1name / admin2name. Of those only `name`
+   * maps onto a searchable-page param (`city`) — there is no `state` filter. place-preview.svelte
+   * searches by both `city: place.name` and `state: place.admin1name`, so for two same-named
+   * cities in different states the destination is a deliberate superset of what the preview showed.
+   *
+   * /map is the exception: it is a place's own contextual surface, and it is not a searchable
+   * page, so the filter path would bounce the user off the map they were reading. A nameless
+   * place cannot produce a city filter at all, so it recentres too.
+   */
+  private navigateToPlaceResults(place: { name?: string; latitude: number; longitude: number }): void {
+    const city = place.name?.trim();
+    if (!city || page.url.pathname.startsWith('/map')) {
+      void goto(Route.map({ zoom: 12, lat: place.latitude, lng: place.longitude }));
+      return;
+    }
+    this.navigateToFilteredResults({
+      // `city` is single-valued, so a new place replaces whatever city was filtering the page.
+      applyFilter: (filters) => ({ ...filters, city }),
+    });
   }
 
   async applySearchSort(sortOrder: SearchablePageSortOrder, text = this.query) {
@@ -1811,7 +1916,7 @@ export class GlobalSearchManager {
             lastUsed: now,
           });
         }
-        void goto(getPersonRoute(p));
+        this.navigateToPersonResults(p);
         break;
       }
       case 'place': {
@@ -1824,7 +1929,7 @@ export class GlobalSearchManager {
           label: p.name ?? '',
           lastUsed: now,
         });
-        void goto(Route.map({ zoom: 12, lat: p.latitude, lng: p.longitude }));
+        this.navigateToPlaceResults(p);
         break;
       }
       case 'tag': {
@@ -1967,11 +2072,19 @@ export class GlobalSearchManager {
         break;
       }
       case 'person': {
-        void goto(Route.viewPerson({ id: entry.personId }));
+        // Recents only ever hold non-space people — activate('person') skips the addEntry for a
+        // space person — and the server builds filterId as `person:<profileId>`
+        // (face-identity.repository.ts), so this reconstruction is exact and a replayed recent
+        // lands exactly where a fresh pick lands.
+        this.navigateToPersonResults({
+          id: entry.personId,
+          filterId: `person:${entry.personId}`,
+          name: entry.label,
+        });
         break;
       }
       case 'place': {
-        void goto(Route.map({ zoom: 12, lat: entry.latitude, lng: entry.longitude }));
+        this.navigateToPlaceResults({ name: entry.label, latitude: entry.latitude, longitude: entry.longitude });
         break;
       }
       case 'tag': {

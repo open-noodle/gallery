@@ -63,7 +63,6 @@
   let nextPage = $state(1);
   let searchResultAlbums: AlbumResponseDto[] = $state([]);
   let searchResultAssets: AssetResponseDto[] = $state([]);
-  let searchResultTotal = $state(0);
   let isLoading = $state(true);
   let scrollY = $state(0);
   let scrollYHistory = 0;
@@ -167,7 +166,6 @@
     nextPage = 1;
     searchResultAssets = [];
     searchResultAlbums = [];
-    searchResultTotal = 0;
     await loadNextPage(true);
   }
 
@@ -194,7 +192,6 @@
 
       searchResultAlbums.push(...albums.items);
       searchResultAssets.push(...assets.items);
-      searchResultTotal = assets.total;
 
       nextPage = Number(assets.nextPage) || 0;
     } catch (error) {
