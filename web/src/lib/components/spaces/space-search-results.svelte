@@ -20,6 +20,8 @@
     totalLoaded: number;
     onLoadMore: () => void;
     spaceId?: string;
+    /** Shared-space surface + the caller's write capability on it — see `Timeline` (#889). */
+    space?: { id: string; canWrite: boolean };
     isShared: boolean;
     sortMode: 'relevance' | 'asc' | 'desc';
     total?: number;
@@ -34,6 +36,7 @@
     totalLoaded,
     onLoadMore,
     spaceId,
+    space,
     isShared,
     sortMode,
     total,
@@ -177,7 +180,7 @@
   {#if isViewerOpen && cursor}
     {#if LazyAssetViewer.current}
       {@const AssetViewer = LazyAssetViewer.current}
-      <AssetViewer {cursor} {isShared} {spaceId} onClose={() => handlePromiseError(handleClose())} />
+      <AssetViewer {cursor} {isShared} {spaceId} {space} onClose={() => handlePromiseError(handleClose())} />
     {/if}
   {/if}
 </Portal>

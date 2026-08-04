@@ -317,6 +317,31 @@ describe('SpaceSearchResults', () => {
       expect(props.isShared).toBe(false);
     });
 
+    // #889 — the viewer opened from space search results has to know it is on a space surface,
+    // or add-to-album offers personal albums the server cannot accept a non-owned photo into.
+    it('should forward the space capability to AssetViewer', async () => {
+      render(SpaceSearchResults, {
+        props: {
+          results: mockAssets,
+          isLoading: false,
+          hasMore: false,
+          totalLoaded: 3,
+          onLoadMore: vi.fn(),
+          sortMode: 'relevance',
+          spaceId: 'space-1',
+          space: { id: 'space-1', canWrite: true },
+          isShared: true,
+        },
+      });
+
+      await fireEvent.click(screen.getByTestId('gallery-asset-asset-1'));
+
+      await vi.waitFor(() => expect(assetViewerPropsCalls.length).toBeGreaterThan(0));
+
+      const props = assetViewerPropsCalls.at(-1)!;
+      expect(props.space).toEqual({ id: 'space-1', canWrite: true });
+    });
+
     it('should call getAssetInfo WITH spaceId when spaceId prop is set', async () => {
       render(SpaceSearchResults, {
         props: {
