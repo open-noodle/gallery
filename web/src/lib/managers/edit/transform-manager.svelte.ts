@@ -191,7 +191,6 @@ class TransformManager implements EditToolManager {
       passive: true,
     });
 
-    // eslint-disable-next-line unicorn/no-unnecessary-global-this
     addEventListener('mousemove', (e: MouseEvent) => transformManager.handleMouseMove(e), { passive: true });
 
     const transformEdits = edits.filter((e) => e.action === 'rotate' || e.action === 'mirror');
@@ -209,7 +208,6 @@ class TransformManager implements EditToolManager {
   }
 
   onDeactivate() {
-    // eslint-disable-next-line unicorn/no-unnecessary-global-this
     removeEventListener('mousemove', transformManager.handleMouseMove);
 
     this.reset();
@@ -553,7 +551,6 @@ class TransformManager implements EditToolManager {
     }
 
     document.body.style.userSelect = 'none';
-    // eslint-disable-next-line unicorn/no-unnecessary-global-this
     addEventListener('mouseup', () => this.handleMouseUp(), { passive: true });
   }
 
@@ -572,7 +569,6 @@ class TransformManager implements EditToolManager {
   }
 
   handleMouseUp() {
-    // eslint-disable-next-line unicorn/no-unnecessary-global-this
     removeEventListener('mouseup', this.handleMouseUp);
     document.body.style.userSelect = '';
 
