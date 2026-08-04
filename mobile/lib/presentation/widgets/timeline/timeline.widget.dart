@@ -461,7 +461,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
 
     final target = scrollToAssetNotifierProvider.value;
     final date = target?.date;
-    final segments = ref.read(timelineSegmentProvider).valueOrNull;
+    final segments = drainableSegments(ref.read(timelineSegmentProvider));
     final laidOut = _scrollController.hasClients && _scrollController.position.hasContentDimensions;
     final matched = date != null && segments != null && _findSegmentForDate(segments, date) != null;
     final isOverview = segmentsAreOverview(segments);
