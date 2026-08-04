@@ -76,6 +76,8 @@
     onClose?: (assetId: string) => void;
     onRandom?: () => Promise<{ id: string } | undefined>;
     spaceId?: string;
+    /** Shared-space surface + the caller's write capability on it — see `Timeline` (#889). */
+    space?: { id: string; canWrite: boolean };
   }
 
   let {
@@ -92,6 +94,7 @@
     onClose,
     onRandom,
     spaceId,
+    space,
   }: Props = $props();
 
   const {
@@ -534,6 +537,7 @@
         onClose={onClose ? () => onClose(stack?.primaryAssetId ?? asset.id) : undefined}
         {isPlayingOriginalVideo}
         {setPlayOriginalVideo}
+        {space}
       />
     </div>
   {/if}
