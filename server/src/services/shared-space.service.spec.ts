@@ -13755,6 +13755,35 @@ describe(SharedSpaceService.name, () => {
         expect(mocks.sharedSpace.getAlbumFolderById).not.toHaveBeenCalled();
         expect(mocks.sharedSpace.countAlbumFoldersBySpace).not.toHaveBeenCalled();
       });
+
+      // Task 3 review, Part A (path 1/3): the name pre-check (F-03) is optimistic — a concurrent
+      // create can still race past it and hit the partial unique index, which Postgres reports as
+      // error 23505. That must map to the same 400 the pre-check throws, not escape as a raw 500.
+      it('maps a raced unique-violation (23505) on the insert to a 400 with the pre-check message', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        mocks.sharedSpace.createAlbumFolder.mockRejectedValue(
+          Object.assign(
+            new Error('duplicate key value violates unique constraint "shared_space_album_folder_root_name_key"'),
+            { code: '23505' },
+          ),
+        );
+
+        const promise = sut.createAlbumFolder(auth, space.id, { name: 'Trips' } as any);
+
+        await expect(promise).rejects.toBeInstanceOf(BadRequestException);
+        await expect(promise).rejects.toThrow('A folder with that name already exists here');
+      });
+
+      // Task 3 review, Part A: only code 23505 is mapped — any other repository error (a
+      // different constraint, a connection failure, …) must propagate unchanged, same error
+      // object, not rewrapped.
+      it('propagates a non-23505 repository error unchanged', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const error = Object.assign(new Error('violates foreign key constraint'), { code: '23503' });
+        mocks.sharedSpace.createAlbumFolder.mockRejectedValue(error);
+
+        await expect(sut.createAlbumFolder(auth, space.id, { name: 'Trips' } as any)).rejects.toBe(error);
+      });
     });
 
     describe('updateAlbumFolder (rename)', () => {
@@ -13831,6 +13860,23 @@ describe(SharedSpaceService.name, () => {
         await expect(sut.updateAlbumFolder(auth, space.id, folder.id, {} as any)).rejects.toBeInstanceOf(
           BadRequestException,
         );
+      });
+
+      // Task 3 review, Part A (path 2/3): the rename pre-check (N-02) is optimistic — a
+      // concurrent rename to the same target name can still race past it, and the UPDATE itself
+      // raises Postgres 23505. Map it to the same 400 the pre-check throws.
+      it('maps a raced unique-violation (23505) on the rename UPDATE to a 400', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const folder = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+        mocks.sharedSpace.updateAlbumFolder.mockRejectedValue(
+          Object.assign(new Error('duplicate key value violates unique constraint'), { code: '23505' }),
+        );
+
+        const promise = sut.updateAlbumFolder(auth, space.id, folder.id, { name: 'Travel' } as any);
+
+        await expect(promise).rejects.toBeInstanceOf(BadRequestException);
+        await expect(promise).rejects.toThrow('A folder with that name already exists here');
       });
     });
 
@@ -14014,6 +14060,21 @@ describe(SharedSpaceService.name, () => {
 
         expect(mocks.sharedSpace.moveAlbumFolderChecked).toHaveBeenCalledWith(space.id, folder.id, target.id, 'Travel');
         expect(mocks.sharedSpace.updateAlbumFolder).not.toHaveBeenCalled();
+      });
+
+      // Task 3 review, Part A (path 3/3): same race, but through the move path's final UPDATE
+      // inside moveAlbumFolderChecked's own transaction — the rejection propagates out of
+      // db.transaction().execute and must still map to the same 400, not escape as a raw 500.
+      it('maps a raced unique-violation (23505) on the move to a 400', async () => {
+        const { auth, space, folder, target } = setupAlbumFolderMove(mocks);
+        mocks.sharedSpace.moveAlbumFolderChecked.mockRejectedValue(
+          Object.assign(new Error('duplicate key value violates unique constraint'), { code: '23505' }),
+        );
+
+        const promise = sut.updateAlbumFolder(auth, space.id, folder.id, { parentId: target.id } as any);
+
+        await expect(promise).rejects.toBeInstanceOf(BadRequestException);
+        await expect(promise).rejects.toThrow('A folder with that name already exists here');
       });
     });
 
