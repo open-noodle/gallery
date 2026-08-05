@@ -57,3 +57,32 @@ describe('album_space_asset_delete_audit trigger parity (#764, migration 1783100
     expect(migrationSource('1783100000000-AddAlbumSpaceAssetSyncAndAudit.ts')).toContain(expected);
   });
 });
+
+describe('shared_space_album_folder_delete_audit trigger parity (space album folders mobile Task 1, migration 1786000000000)', () => {
+  it('generates trigger DDL byte-identical to the statement the migration executed', () => {
+    // Verbatim from 1786000000000-SharedSpaceAlbumFolderAuditTable.ts. Asserted against the
+    // migration source below too, so this literal cannot silently rot away from it.
+    const expected = `CREATE OR REPLACE TRIGGER "shared_space_album_folder_delete_audit"
+  AFTER DELETE ON "shared_space_album_folder"
+  REFERENCING OLD TABLE AS "old"
+  FOR EACH STATEMENT
+  EXECUTE FUNCTION shared_space_album_folder_delete_audit();`;
+
+    expect(overrideSql('trigger_shared_space_album_folder_delete_audit')).toBe(expected);
+
+    // The migration executes this as a plain (unescaped) template literal, so the source contains
+    // the text verbatim — no template-literal unescaping to hand-simulate.
+    expect(migrationSource('1786000000000-SharedSpaceAlbumFolderAuditTable.ts')).toContain(expected);
+  });
+
+  // The pre-existing updatedAt trigger on the same table, as a control: proves the assertion above
+  // is exercising real generation rather than an accident of how this one trigger is declared.
+  it('keeps the sibling updatedAt trigger on the same table in parity', () => {
+    const expected = `CREATE OR REPLACE TRIGGER "shared_space_album_folder_updatedAt"
+  BEFORE UPDATE ON "shared_space_album_folder"
+  FOR EACH ROW
+  EXECUTE FUNCTION updated_at();`;
+
+    expect(overrideSql('trigger_shared_space_album_folder_updatedAt')).toBe(expected);
+  });
+});
