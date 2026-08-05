@@ -113,11 +113,18 @@ export const getFolderContents = (
   const isRoot = (folder: SharedSpaceAlbumFolderDto) =>
     !folder.parentId || folder.parentId === folder.id || !index.has(folder.parentId);
 
+  // T-08 (mirrored from mobile): an album whose folderId names a folder we have not loaded yet
+  // falls back to the ROOT rather than being hidden. Another editor can delete a folder — or, on
+  // mobile, sync can deliver the album-link row before the folder row — between our folder fetch
+  // and our album fetch; either way an album vanishing from the grid is the worse failure.
+  const effectiveFolderId = (album: SharedSpaceLinkedAlbumDto): string | null =>
+    album.folderId && index.has(album.folderId) ? album.folderId : null;
+
   return {
     // A self-referencing folder (parentId === id) is a root per `isRoot` above — it must not
     // also satisfy `f.parentId === folderId` and list itself as its own child (U-02's case).
     folders: folders.filter((f) => (folderId === null ? isRoot(f) : f.parentId === folderId && f.id !== folderId)),
-    albums: albums.filter((a) => (a.folderId ?? null) === folderId),
+    albums: albums.filter((a) => effectiveFolderId(a) === folderId),
   };
 };
 

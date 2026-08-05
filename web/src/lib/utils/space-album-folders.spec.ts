@@ -149,6 +149,17 @@ describe('space-album-folders', () => {
 
       expect(getFolderContents([cyclic], [], 'loop')).toEqual({ folders: [], albums: [] });
     });
+
+    // T-08 (mirrored from mobile): a folder-link row for a folder we have not loaded yet is
+    // routine mid-flight state (another editor's delete, or on mobile a sync race), not corrupt
+    // input. The album must fall back to the ROOT rather than being hidden at every level.
+    it('U-04: shows an album at the root when its folder is not loaded, instead of hiding it', () => {
+      const albums = [album('a1', 'Rome', 'not-synced-yet')];
+
+      const atRoot = getFolderContents(tripsTree(), albums, null);
+
+      expect(atRoot.albums.map((a) => a.id)).toEqual(['a1']);
+    });
   });
 
   describe('getRecursiveAlbumCount', () => {
