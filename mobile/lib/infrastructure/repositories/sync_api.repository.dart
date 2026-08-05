@@ -23,7 +23,8 @@ class SyncApiRepository {
     return _api.syncApi.deleteSyncAck(SyncAckDeleteDto(types: Optional.present(types)));
   }
 
-  /// The five Phase-2B space-album request types. Kept in one place so the capability
+  /// The Phase-2B space-album request types (originally five; SharedSpaceAlbumFoldersV1
+  /// joined as part of the nestable-folders feature). Kept in one place so the capability
   /// filter and the version-gate fallback can never drift apart.
   static const _spaceAlbumSyncTypes = [
     SyncRequestType.sharedSpaceAlbumsV1,
@@ -31,6 +32,7 @@ class SyncApiRepository {
     SyncRequestType.sharedSpaceAlbumToAssetsV1,
     SyncRequestType.sharedSpaceAlbumAssetsV1,
     SyncRequestType.sharedSpaceAlbumAssetExifsV1,
+    SyncRequestType.sharedSpaceAlbumFoldersV1,
   ];
 
   Future<void> streamChanges(
@@ -304,6 +306,9 @@ const _kResponseMap = <SyncEntityType, Function(Object)>{
   SyncEntityType.sharedSpaceAlbumLinkV1: SyncSharedSpaceAlbumLinkV1.fromJson,
   SyncEntityType.sharedSpaceAlbumLinkBackfillV1: SyncSharedSpaceAlbumLinkV1.fromJson,
   SyncEntityType.sharedSpaceAlbumLinkDeleteV1: SyncSharedSpaceAlbumLinkDeleteV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumFolderV1: SyncSharedSpaceAlbumFolderV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumFolderBackfillV1: SyncSharedSpaceAlbumFolderV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumFolderDeleteV1: SyncSharedSpaceAlbumFolderDeleteV1.fromJson,
   SyncEntityType.sharedSpaceAlbumToAssetV1: SyncAlbumToAssetV1.fromJson,
   SyncEntityType.sharedSpaceAlbumToAssetBackfillV1: SyncAlbumToAssetV1.fromJson,
   SyncEntityType.sharedSpaceAlbumToAssetDeleteV1: SyncAlbumToAssetDeleteV1.fromJson,
