@@ -12,6 +12,13 @@ DEEP_LINK_SCHEME=$(jq -r '.mobile.deep_link_scheme' "$CONFIG")
 BUNDLE_ID=$(jq -r '.mobile.bundle_id' "$CONFIG")
 OAUTH_CALLBACK=$(jq -r '.mobile.oauth_callback' "$CONFIG")
 OAUTH_CALLBACK_SCHEME="${OAUTH_CALLBACK%%:*}"
+# Used by the modal checks below to assert the Noodle URLs are actually PRESENT, not
+# merely that the Immich ones are gone. Same keys apply-branding.sh patches them from.
+APP_STORE_URL=$(jq -r '.mobile.app_store_url' "$CONFIG")
+PLAY_STORE_URL=$(jq -r '.mobile.play_store_url' "$CONFIG")
+REPO_DOCS_URL=$(jq -r '.repository.docs_url' "$CONFIG")
+REPO_ISSUES_URL=$(jq -r '.repository.issues_url' "$CONFIG")
+REPO_RELEASES_URL=$(jq -r '.repository.releases_url' "$CONFIG")
 EXIT_CODE=0
 
 echo "=== Verifying branding: $NAME ==="
@@ -165,7 +172,19 @@ if [[ -f "$help_modal" ]]; then
     echo "  WARN: Upstream GitHub URL found outside upstream section in HelpAndFeedbackModal.svelte"
     EXIT_CODE=1
   else
-    echo "  OK: HelpAndFeedbackModal.svelte (URLs patched)"
+    # Same absent-only weakness as the app-download check below: if upstream restructures
+    # these hrefs the Immich pattern vanishes and this passes vacuously. Require the
+    # patched-in Noodle URLs to be present too.
+    missing=""
+    grep -qF "$REPO_DOCS_URL" "$help_modal" || missing="$missing docs"
+    grep -qF "$REPO_ISSUES_URL" "$help_modal" || missing="$missing issues"
+    if [[ -n "$missing" ]]; then
+      echo "  WARN: HelpAndFeedbackModal.svelte is missing Noodle URL(s):$missing"
+      echo "        (no upstream URL either — the hrefs likely moved and apply-branding no-opped)"
+      EXIT_CODE=1
+    else
+      echo "  OK: HelpAndFeedbackModal.svelte (URLs patched)"
+    fi
   fi
 fi
 
@@ -177,7 +196,23 @@ if [[ -f "$app_download_modal" ]]; then
     echo "  WARN: Immich store link/F-Droid badge still present in AppDownloadModal.svelte"
     EXIT_CODE=1
   else
-    echo "  OK: AppDownloadModal.svelte (store links patched)"
+    # Absence is not proof of branding. If upstream moves the hrefs out of this file the
+    # Immich patterns disappear too, so the check above passes while the branded build
+    # still ships upstream's links. Upstream #30527 did exactly that — it replaced the
+    # literal URLs with @immich/ui `Constants.Get.*` expressions, silently neutering
+    # apply-branding's seds. So also require the Noodle links to actually be here;
+    # apply-branding resolves both the literal and the Constants form to literals.
+    missing=""
+    grep -qF "$PLAY_STORE_URL" "$app_download_modal" || missing="$missing play-store"
+    grep -qF "$APP_STORE_URL" "$app_download_modal" || missing="$missing app-store"
+    grep -qF "$REPO_RELEASES_URL" "$app_download_modal" || missing="$missing github-releases"
+    if [[ -n "$missing" ]]; then
+      echo "  WARN: AppDownloadModal.svelte is missing Noodle link(s):$missing"
+      echo "        (no Immich links either — the hrefs likely moved and apply-branding no-opped)"
+      EXIT_CODE=1
+    else
+      echo "  OK: AppDownloadModal.svelte (store links patched)"
+    fi
   fi
 fi
 
