@@ -262,7 +262,10 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   /// pre-excluded. The picker returns the selected ids via [context.maybePop];
   /// this method calls [_onAlbumsPicked] once on the returned list to loop the
   /// PUT endpoint and fire the sync-nudge.
-  Future<void> _openLinkPicker() async {
+  /// [folderId] is the space album folder the user is currently viewing on the albums page;
+  /// null links at the space root. This page always shows the root, so its own affordances pass
+  /// nothing — only the albums page, which can be several folders deep, supplies it.
+  Future<void> _openLinkPicker([String? folderId]) async {
     // Collect the ids of albums already linked to this space so the picker
     // can exclude them from the candidate list.
     final linkedAlbumIds =
@@ -277,15 +280,15 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       SpaceLinkAlbumRoute(spaceId: widget.spaceId, linkedAlbumIds: linkedAlbumIds),
     );
     if (picked == null || picked.isEmpty) return;
-    await _onAlbumsPicked(picked);
+    await _onAlbumsPicked(picked, folderId);
   }
 
   /// B6: Loop PUT /shared-spaces/:id/albums/:albumId for each picked album,
   /// then fire the sync-nudge and show a success toast.
-  Future<void> _onAlbumsPicked(List<String> ids) async {
+  Future<void> _onAlbumsPicked(List<String> ids, [String? folderId]) async {
     if (ids.isEmpty) return;
     try {
-      await ref.read(spaceAlbumActionsProvider).link(widget.spaceId, ids);
+      await ref.read(spaceAlbumActionsProvider).link(widget.spaceId, ids, folderId: folderId);
       if (context.mounted) {
         ImmichToast.show(
           context: context,
@@ -444,7 +447,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
           spaceId: widget.spaceId,
           canEdit: _canEdit,
           // B5: opens the link picker.
-          onLinkTap: _openLinkPicker,
+          onLinkTap: () => _openLinkPicker(),
           // B4: tapping an album tile pushes the detail page.
           onAlbumTap: (albumId) =>
               context.pushRoute(SpaceAlbumDetailRoute(spaceId: widget.spaceId, albumId: albumId, canEdit: _canEdit)),

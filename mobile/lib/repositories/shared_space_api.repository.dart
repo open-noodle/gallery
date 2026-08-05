@@ -217,8 +217,13 @@ class SharedSpaceApiRepository extends ApiRepository {
 
   /// Link an album to a shared space (PUT /shared-spaces/{id}/albums/{albumId}).
   /// SDK arg order is (albumId, id) where id = spaceId.
-  Future<void> linkAlbum(String spaceId, String albumId) async {
-    await _api.linkAlbum(albumId, spaceId);
+  ///
+  /// [folderId] places the album inside a space album folder; null links it at the space root.
+  /// The query param is optional-and-not-nullable server-side, so null must be OMITTED rather
+  /// than sent — the generated client already drops null named args, which is what makes
+  /// passing null here mean "root" instead of a 400.
+  Future<void> linkAlbum(String spaceId, String albumId, {String? folderId}) async {
+    await _api.linkAlbum(albumId, spaceId, folderId: folderId);
   }
 
   /// Unlink an album from a shared space (DELETE /shared-spaces/{id}/albums/{albumId}).
