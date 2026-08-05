@@ -576,6 +576,25 @@ const SyncSharedSpaceAlbumLinkDeleteV1Schema = z
   })
   .meta({ id: 'SyncSharedSpaceAlbumLinkDeleteV1' });
 
+// --- gallery-fork: shared-space album folder DTOs ---
+
+const SyncSharedSpaceAlbumFolderV1Schema = z
+  .object({
+    id: z.string().describe('Folder ID'),
+    spaceId: z.string().describe('Shared space ID'),
+    parentId: z.string().nullable().describe('Parent folder ID'),
+    name: z.string().describe('Folder name'),
+    createdAt: isoDatetimeToDate.describe('Created at'),
+    updatedAt: isoDatetimeToDate.describe('Updated at'),
+  })
+  .meta({ id: 'SyncSharedSpaceAlbumFolderV1' });
+
+const SyncSharedSpaceAlbumFolderDeleteV1Schema = z
+  .object({
+    folderId: z.string().describe('Folder ID'),
+  })
+  .meta({ id: 'SyncSharedSpaceAlbumFolderDeleteV1' });
+
 @ExtraModel()
 export class SyncSharedSpaceDeleteV1 extends createZodDto(SyncSharedSpaceDeleteV1Schema) {}
 
@@ -614,6 +633,12 @@ export class SyncSharedSpaceAlbumLinkV1 extends createZodDto(SyncSharedSpaceAlbu
 
 @ExtraModel()
 export class SyncSharedSpaceAlbumLinkDeleteV1 extends createZodDto(SyncSharedSpaceAlbumLinkDeleteV1Schema) {}
+
+@ExtraModel()
+export class SyncSharedSpaceAlbumFolderV1 extends createZodDto(SyncSharedSpaceAlbumFolderV1Schema) {}
+
+@ExtraModel()
+export class SyncSharedSpaceAlbumFolderDeleteV1 extends createZodDto(SyncSharedSpaceAlbumFolderDeleteV1Schema) {}
 
 export type SyncItem = {
   [SyncEntityType.AuthUserV1]: SyncAuthUserV1;
@@ -703,6 +728,9 @@ export type SyncItem = {
   [SyncEntityType.SharedSpaceAlbumLinkV1]: SyncSharedSpaceAlbumLinkV1;
   [SyncEntityType.SharedSpaceAlbumLinkBackfillV1]: SyncSharedSpaceAlbumLinkV1;
   [SyncEntityType.SharedSpaceAlbumLinkDeleteV1]: SyncSharedSpaceAlbumLinkDeleteV1;
+  [SyncEntityType.SharedSpaceAlbumFolderV1]: SyncSharedSpaceAlbumFolderV1;
+  [SyncEntityType.SharedSpaceAlbumFolderBackfillV1]: SyncSharedSpaceAlbumFolderV1;
+  [SyncEntityType.SharedSpaceAlbumFolderDeleteV1]: SyncSharedSpaceAlbumFolderDeleteV1;
   [SyncEntityType.SharedSpaceAlbumToAssetV1]: SyncAlbumToAssetV1;
   [SyncEntityType.SharedSpaceAlbumToAssetBackfillV1]: SyncAlbumToAssetV1;
   [SyncEntityType.SharedSpaceAlbumToAssetDeleteV1]: SyncAlbumToAssetDeleteV1;
