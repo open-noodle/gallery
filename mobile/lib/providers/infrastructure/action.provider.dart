@@ -11,11 +11,11 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
 import 'package:immich_mobile/domain/services/remote_album.service.dart';
 import 'package:immich_mobile/providers/asset_viewer/asset_viewer.provider.dart';
-import 'package:immich_mobile/providers/background_sync.provider.dart';
 import 'package:immich_mobile/providers/backup/asset_upload_progress.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album_actions.dart';
+import 'package:immich_mobile/providers/infrastructure/space_album_sync_nudge.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
@@ -130,7 +130,7 @@ class ActionNotifier extends Notifier<void> {
         return ActionResult(count: 0, success: false, error: error.toString());
       }
       if (addedRemote > 0) {
-        await _nudgeSpaceSyncIfLinked(album.id);
+        await nudgeSpaceSyncIfLinked(ref, album.id);
       }
     }
 
@@ -251,26 +251,12 @@ class ActionNotifier extends Notifier<void> {
     try {
       final removedCount = await _service.removeFromAlbum(ids, albumId);
       if (removedCount > 0) {
-        await _nudgeSpaceSyncIfLinked(albumId);
+        await nudgeSpaceSyncIfLinked(ref, albumId);
       }
       return ActionResult(count: removedCount, success: true);
     } catch (error, stack) {
       _logger.severe('Failed to remove assets from album', error, stack);
       return ActionResult(count: ids.length, success: false, error: error.toString());
-    }
-  }
-
-  /// Fork: album views update through the album path's optimistic local write, but
-  /// space-album surfaces are fed by the sync stream — after mutating a linked album's
-  /// membership, nudge a sync so they converge now instead of at the next natural cycle.
-  /// Best-effort: a failed nudge never fails the mutation; the stream catches up later.
-  Future<void> _nudgeSpaceSyncIfLinked(String albumId) async {
-    try {
-      if (await ref.read(spaceAlbumRepositoryProvider).isAlbumLinked(albumId)) {
-        await ref.read(backgroundSyncProvider).syncRemote();
-      }
-    } catch (error, stack) {
-      _logger.warning('Failed to nudge sync after a linked-album mutation', error, stack);
     }
   }
 
