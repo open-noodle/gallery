@@ -339,17 +339,17 @@ parents, so structure below the deleted folder survives intact.
 
 ### 5.6 RBAC — `R-*`
 
-| ID   | Actor                                   | Action                                        | Then                                                         |
-| ---- | --------------------------------------- | --------------------------------------------- | ------------------------------------------------------------ |
-| R-01 | space **owner**                         | any folder write                              | 204/201                                                      |
-| R-02 | space **editor**                        | any folder write                              | 204/201                                                      |
-| R-03 | space **viewer**                        | any folder write                              | 403 (`requireRole`)                                          |
-| R-04 | **non-member**                          | any folder write                              | 403                                                          |
-| R-05 | space **viewer**                        | `GET /:id/album-folders`                      | 200 with the folder list                                     |
-| R-06 | **non-member**                          | `GET /:id/album-folders`                      | **403, not an empty 200**                                    |
-| R-07 | space **editor**                        | move an album owned by someone else           | 204 — space Editor is sufficient, matching `updateAlbumLink` |
-| R-08 | member of spaces A+B, each with folders | `GET /A/album-folders`                        | returns **all of A's folders and none of B's**               |
-| R-09 | space **viewer**                        | create a folder with a cross-space `parentId` | **403, not 400** — the role gate precedes validation         |
+| ID   | Actor                                   | Action                                                   | Then                                                          |
+| ---- | --------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------- |
+| R-01 | space **owner**                         | any folder write                                         | 204/201                                                       |
+| R-02 | space **editor**                        | any folder write                                         | 204/201                                                       |
+| R-03 | space **viewer**                        | any folder write                                         | 403 (`requireRole`)                                           |
+| R-04 | **non-member**                          | any folder write                                         | 403                                                           |
+| R-05 | space **viewer**                        | `GET /:id/album-folders`                                 | 200 with the folder list                                      |
+| R-06 | **non-member**                          | `GET /:id/album-folders`                                 | **403, not an empty 200**                                     |
+| R-07 | space **editor**                        | move an album owned by someone else                      | 204 — space Editor is sufficient, matching `updateAlbumLink`  |
+| R-08 | member of spaces A+B, each with folders | `GET /A/album-folders`                                   | returns **all of A's folders and none of B's**                |
+| R-09 | space **viewer**                        | create a folder with a well-formed, schema-valid payload | **403** — the role gate precedes every content/business check |
 
 R-06 is a privacy requirement, not a formality: **a folder name is itself information** ("Divorce",
 "Medical", "Surprise party"). Returning `[]` to a non-member would confirm the space exists. The
@@ -357,10 +357,24 @@ membership gate must precede any read.
 
 R-08 is the cross-space read-leak test. It is the read-side counterpart to A-05.
 
-R-09 pins gate **ordering**, mirroring how `shared-space-album.e2e-spec.ts` documents it for linking
-("Gate 1 is checked BEFORE gate 2, so a space viewer … fails with 403 from the role gate"). Every
-folder route runs `requireRole` / `requireMembership` **first**, so an unauthorised actor learns
-nothing about whether their payload was otherwise valid.
+R-09 pins gate **ordering** — but not the ordering originally claimed here. NestJS resolves a
+request as Guards → Pipes → handler, so the global `ZodValidationPipe` validates and 400s a
+**malformed** body (missing required fields, wrong types) before the handler — and therefore
+before the service's `requireRole` — ever runs; this was verified live during Task 12. A viewer
+sending a schema-invalid payload gets 400, not 403, and that leaks nothing: the DTO schema is
+public OpenAPI surface, and its validation touches no space or membership data, so learning "your
+JSON didn't match the shape" tells an unauthorised caller nothing about the space they don't
+belong to.
+
+What R-09 actually pins is narrower and still true: `requireRole` is the first line of every one
+of these service methods (`shared-space.service.ts`), so it runs before **all** content and
+business checks the service itself performs — name collision, cross-space parent, depth cap. A
+viewer submitting a well-formed, schema-valid payload is refused 403 regardless of whether that
+payload would otherwise have been accepted; the role gate never lets an unauthorised caller learn
+whether their content was valid. `shared-space-album-folder.e2e-spec.ts`'s R-09 test exercises
+exactly this: a schema-valid `{ name: 'Trips', parentId: null }` from a viewer, where `'Trips'`
+deliberately collides with an existing folder name so the test also catches a regression where a
+content check got reordered ahead of `requireRole`.
 
 R-07 records a deliberate decision: folders are space-scoped metadata, so any space editor may
 reorganise any linked album regardless of who owns or linked it. This matches `updateAlbumLink`,
@@ -374,23 +388,63 @@ which already gates on space Editor alone.
 | C-02 | album A at root            | two editors concurrently move A to different folders     | both 204; last write wins, A has one placement                                        |
 | C-03 | `Trips` containing album A | one editor deletes `Trips` while another moves A into it | either A ends at root or the move 400s; **A is never orphaned into a deleted folder** |
 
-C-01 is a genuine TOCTOU: both ancestor checks pass before either write lands. Mitigation — the
-descendant CTE runs **inside the same transaction as the `UPDATE`**, taking `FOR UPDATE` on the
-moved folder's ancestor chain, so the second transaction re-reads post-commit state and rejects.
+C-01 is a genuine TOCTOU: both ancestor checks pass before either write lands. A row lock on the
+moved folder's ancestor chain — the mitigation originally proposed here — does **not** serialise
+this race: moving X into Y takes `FOR UPDATE` on Y's ancestor chain (Y and Y's ancestors), while
+the concurrent move of Y into X takes it on X's ancestor chain (X and X's ancestors). The two
+transactions lock **disjoint rows** — X→Y never touches X's row, Y→X never touches Y's row — so
+neither blocks the other. Both ancestor checks run against pre-commit state, both pass, both
+commit, and the result is a detached cycle: X's parent is Y and Y's parent is X, with neither
+reachable from a root.
+
+What was actually built is a per-space, transaction-scoped **advisory** lock, taken as the first
+statement of `moveAlbumFolderChecked` (`shared-space.repository.ts`), before either folder is read:
+
+```sql
+SELECT pg_advisory_xact_lock(hashtext('shared-space-album-folder-move'), hashtext(spaceId))
+```
+
+This is the two-argument, namespaced form. The lock key isn't derived from either folder being
+moved — it's derived from `spaceId` alone — so it serialises **every** concurrent folder move
+within a space, not just a colliding pair; folder moves are rare enough that this costs nothing.
+Because the lock is acquired before the ancestor re-check, the second transaction to reach it
+blocks until the first commits or rolls back, then re-reads the ancestor chain under the first
+mover's already-committed state and correctly detects the cycle. The single-argument
+`pg_advisory_xact_lock(hashtext(id))` form was deliberately avoided: it would share one
+cluster-wide keyspace with `DatabaseRepository.withLock`'s `pg_advisory_lock(DatabaseLock.X)` and
+with `identity-merge-propagation.service.ts`'s own lock, so a plain hash of `spaceId` could
+collide with an unrelated lock taken by either of those. Namespacing with a constant first key
+(`hashtext('shared-space-album-folder-move')`) keeps this lock's ids out of collision range with
+both.
+
+This also depends on Postgres's default `READ COMMITTED` isolation (unchanged here): under
+`REPEATABLE READ` the transaction's snapshot is taken before the lock blocks, so the ancestor
+re-read would still see pre-lock data and both concurrent moves could pass the cycle check anyway.
 
 C-03 is why the promote-and-delete is one transaction, and why `folderId` is `ON DELETE SET NULL`
 rather than left dangling: even if a move interleaves, the worst outcome is an album at root.
 
 ### 5.8 Cascade — `X-*`
 
-| ID   | Given                              | When                    | Then                                                                 |
-| ---- | ---------------------------------- | ----------------------- | -------------------------------------------------------------------- |
-| X-01 | a space with a 3-deep folder tree  | delete the space        | all folders gone; no constraint violation from the self-FK           |
-| X-02 | album A in `Trips`, A soft-deleted | —                       | existing soft-delete trigger removes the link row; folder unaffected |
-| X-03 | `Trips` containing album A         | delete album A entirely | link row cascades away; `Trips` remains, now empty                   |
+| ID   | Given                              | When                    | Then                                                                       |
+| ---- | ---------------------------------- | ----------------------- | -------------------------------------------------------------------------- |
+| X-01 | a space with a 3-deep folder tree  | delete the space        | all folders gone; no constraint violation from the self-FK                 |
+| X-02 | album A in `Trips`, A soft-deleted | —                       | link row **survives** with `folderId` intact; `Trips` placement unaffected |
+| X-03 | `Trips` containing album A         | delete album A entirely | link row cascades away; `Trips` remains, now empty                         |
 
 `shared_space` has no `deletedAt` column — spaces are hard-deleted, so X-01 exercises a real
 cascade rather than a soft-delete path.
+
+X-02 was originally written as "the soft-delete trigger removes the link row" — it does not.
+Migration `1782050000000` (`album_soft_delete_shared_space_album`) only writes audit/tombstone
+rows (`shared_space_album_audit`, `shared_space_album_user_audit`) and revokes member grants on
+soft-delete; it never deletes from `shared_space_album` itself. Proof is in its own RESTORE
+branch, which reads `FROM shared_space_album` (and `UPDATE shared_space_album ... WHERE
+"albumId" IN (...)`) to re-grant members and re-deliver the row on restore — that branch cannot
+work if the soft-delete branch had already deleted the row. Consequence: because the link row
+(and its `folderId` column) is never touched by either branch, **a folder placement survives an
+album trash/restore cycle** — an album trashed while filed in `Trips` is still in `Trips` after
+restore, with no code path re-homing it to root.
 
 ### 5.9 Repository primitives — `P-*`
 
@@ -627,16 +681,27 @@ and constraint
 outcomes; service unit tests assert branch and exception outcomes (per §4.5); e2e tests assert
 status codes and role gating.
 
-| Layer                   | Location                                                                                  | Owns                                                                           |
-| ----------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Server unit             | `src/services/shared-space.service.spec.ts`                                               | F-_, N-_, M-_, D-_, A-01–A-10                                                  |
-| Server unit             | `src/controllers/shared-space.controller.spec.ts`                                         | route wiring, param/query validation                                           |
-| Server medium (real DB) | `test/medium/specs/repositories/shared-space-album-folder.repository.spec.ts` _(new)_     | P-01–P-07, C-01–C-03, X-01–X-03, F-03/F-04 index behaviour                     |
-| Server medium (sync)    | `test/medium/specs/sync/shared-space-album-link-sync.spec.ts`                             | S-01                                                                           |
-| Web unit                | `src/lib/utils/space-album-folders.spec.ts` _(new)_                                       | U-01–U-11                                                                      |
-| Web unit                | `src/lib/components/spaces/space-album-folder-card.spec.ts` _(new)_ and siblings          | W-01, W-07, W-08, W-11, W-17, W-20                                             |
-| Web unit                | `src/routes/(user)/spaces/[spaceId]/albums/space-albums-page.spec.ts` _(exists — extend)_ | W-02–W-06, W-09, W-10, W-12–W-16, W-18, W-19                                   |
-| e2e API                 | `e2e/src/specs/server/api/shared-space-album-folder.e2e-spec.ts` _(new)_                  | R-01–R-09, mirroring the existing `shared-space-album.e2e-spec.ts` role matrix |
+| Layer                   | Location                                                                                  | Owns                                                                              |
+| ----------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Server unit             | `src/services/shared-space.service.spec.ts`                                               | F-01–F-07, F-09, F-11, F-12, N-_, M-_, D-06, A-01–A-10                            |
+| Server unit             | `src/controllers/shared-space.controller.spec.ts`                                         | route wiring, param/query validation                                              |
+| Server medium (real DB) | `test/medium/specs/repositories/shared-space-album-folder.repository.spec.ts` _(new)_     | P-01–P-07, C-01–C-03, X-01–X-03, D-01–D-05, F-03/F-04 index behaviour, F-08, F-10 |
+| Server medium (sync)    | `test/medium/specs/sync/shared-space-album-link-sync.spec.ts`                             | S-01                                                                              |
+| Web unit                | `src/lib/utils/space-album-folders.spec.ts` _(new)_                                       | U-01–U-11                                                                         |
+| Web unit                | `src/lib/components/spaces/space-album-folder-card.spec.ts` _(new)_ and siblings          | W-01, W-07, W-08, W-11, W-17, W-20                                                |
+| Web unit                | `src/routes/(user)/spaces/[spaceId]/albums/space-albums-page.spec.ts` _(exists — extend)_ | W-02–W-06, W-09, W-10, W-12–W-16, W-18, W-19                                      |
+| e2e API                 | `e2e/src/specs/server/api/shared-space-album-folder.e2e-spec.ts` _(new)_                  | R-01–R-09, mirroring the existing `shared-space-album.e2e-spec.ts` role matrix    |
+
+D-01–D-05 and F-08/F-10 moved here from the service unit row: their semantics — child/link
+promotion one level deep, and rejection of a `parentId` that exists but belongs to another space —
+are proven by the medium repository spec's P-05 coverage and by `getAlbumFolderById`'s
+space-scoped `WHERE spaceId = ? AND id = ?` lookup, both of which run against a real database. The
+service layer only delegates to those primitives (`deleteAlbumFolderPromotingChildren`,
+`getAlbumFolderById`) and branches on their return value; asserting the same five/two IDs again at
+the service unit layer, against a mocked repository, would just be re-asserting the mock's
+configured return value rather than proving anything the mock couldn't be configured to lie
+about. D-06 (delete twice → 400 not found) stays at the service unit layer: that's a service-level
+branch on an empty repository result, not a space-scoped or child-promotion semantic.
 
 **S-01** (sync regression): moving an album between folders re-emits its `SharedSpaceAlbumLinkSync`
 row with **unchanged payload content** — asserting `folderId` is absent from the sync payload, so a
