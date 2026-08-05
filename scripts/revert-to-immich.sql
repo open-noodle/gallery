@@ -128,6 +128,7 @@ DROP TABLE IF EXISTS "shared_space_album_user" CASCADE;
 DROP TABLE IF EXISTS "shared_space_album_user_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_album_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_album" CASCADE;
+DROP TABLE IF EXISTS "shared_space_album_folder_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_album_folder" CASCADE;
 DROP TABLE IF EXISTS "shared_space_member" CASCADE;
 DROP TABLE IF EXISTS "shared_space" CASCADE;
@@ -176,6 +177,7 @@ DROP FUNCTION IF EXISTS shared_space_album_delete_audit() CASCADE;
 DROP FUNCTION IF EXISTS shared_space_member_delete_album_audit() CASCADE;
 DROP FUNCTION IF EXISTS shared_space_delete_album_audit() CASCADE;
 DROP FUNCTION IF EXISTS shared_space_album_user_delete_after_audit() CASCADE;
+DROP FUNCTION IF EXISTS shared_space_album_folder_delete_audit() CASCADE;
 DROP FUNCTION IF EXISTS album_soft_delete_shared_space_album() CASCADE;
 DROP FUNCTION IF EXISTS album_space_asset_delete_audit() CASCADE;
 
@@ -245,6 +247,7 @@ DELETE FROM "migration_overrides"
    'index_shared_space_album_folder_parentId_idx',
    'index_shared_space_album_folder_nested_name_key',
    'index_shared_space_album_folder_root_name_key',
+   'function_shared_space_album_folder_delete_audit',
    'trigger_asset_library_delete_audit',
    'trigger_classification_category_updatedAt',
    'trigger_face_identity_face_updatedAt',
@@ -268,6 +271,7 @@ DELETE FROM "migration_overrides"
    'trigger_album_space_asset_delete_audit',
    'trigger_album_space_asset_updatedAt',
    'trigger_shared_space_album_updatedAt',
+   'trigger_shared_space_album_folder_delete_audit',
    'trigger_shared_space_library_updatedAt',
    'trigger_shared_space_member_after_insert',
    'trigger_shared_space_member_after_insert_library',
@@ -400,6 +404,7 @@ DELETE FROM "kysely_migrations"
    '1783700000000-FixSharedSpaceMemberJoinGrantCreateId',
    '1784800000000-RepairSharedSpaceAlbumGrantDrift',
    '1785000000000-AddSharedSpaceAlbumFolderTable',
+   '1786000000000-SharedSpaceAlbumFolderAuditTable',
 
    -- Build-time compatibility alias (server/bin/sync-gallery-migrations.mjs).
    -- Gallery's postbuild records ChangeDurationToInteger under BOTH its current
@@ -469,6 +474,7 @@ BEGIN
        'shared_space_album', 'shared_space_album_audit',
        'shared_space_album_user', 'shared_space_album_user_audit',
        'shared_space_album_asset_audit', 'shared_space_album_folder',
+       'shared_space_album_folder_audit',
        'album_space_asset_audit',
        'face_identity_face', 'face_identity',
        'shared_space', 'user_group_member', 'user_group',
