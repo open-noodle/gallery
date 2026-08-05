@@ -21,6 +21,7 @@
     mdiArrowDownThin,
     mdiArrowUpThin,
     mdiChevronDown,
+    mdiFolderPlusOutline,
     mdiFolderRemoveOutline,
     mdiFormatListBulletedSquare,
     mdiLinkVariantPlus,
@@ -37,9 +38,17 @@
     canManage?: boolean;
     onCreate?: () => void;
     onLink?: () => void;
+    onCreateFolder?: () => void;
   }
 
-  let { groupIds = [], searchQuery = $bindable(''), canManage = false, onCreate, onLink }: Props = $props();
+  let {
+    groupIds = [],
+    searchQuery = $bindable(''),
+    canManage = false,
+    onCreate,
+    onLink,
+    onCreateFolder,
+  }: Props = $props();
 
   let showSortMenu = $state(false);
   let showGroupMenu = $state(false);
@@ -246,6 +255,15 @@
     {/if}
 
     {#if canManage}
+      <Button
+        size="small"
+        variant="ghost"
+        leadingIcon={mdiFolderPlusOutline}
+        onclick={() => onCreateFolder?.()}
+        data-testid="create-folder-button"
+      >
+        {$t('space_album_folder_new')}
+      </Button>
       <Button size="small" leadingIcon={mdiPlus} onclick={() => onCreate?.()} data-testid="create-album-button">
         {$t('create_album')}
       </Button>

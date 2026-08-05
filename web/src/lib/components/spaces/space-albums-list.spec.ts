@@ -1,5 +1,5 @@
-import type { SharedSpaceLinkedAlbumDto, SharedSpaceMemberResponseDto } from '@immich/sdk';
-import { screen, waitFor } from '@testing-library/svelte';
+import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto, SharedSpaceMemberResponseDto } from '@immich/sdk';
+import { render, screen, waitFor } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { get } from 'svelte/store';
 import SpaceAlbumsList from '$lib/components/spaces/space-albums-list.svelte';
@@ -307,5 +307,114 @@ describe('SpaceAlbumsList', () => {
     const order = screen.getAllByTestId('space-album-card').map((card) => card.textContent);
     expect(order[0]).toContain('RecentLink');
     expect(order[1]).toContain('OldLink');
+  });
+
+  describe('folders', () => {
+    function makeFolder(id: string, name: string, parentId: string | null = null): SharedSpaceAlbumFolderDto {
+      return {
+        id,
+        spaceId: 's-1',
+        parentId,
+        name,
+        createdById: null,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      };
+    }
+
+    // Web vitest has no clearMocks — mock AND store state leak across tests in a file — so both
+    // need resetting even though the outer beforeEach already resets spaceAlbumViewSettings.
+    beforeEach(() => {
+      vi.clearAllMocks();
+      spaceAlbumViewSettings.reset();
+    });
+
+    // W-01: folders are the primary organisational layer, so they always come first.
+    it('W-01: renders folders before albums', () => {
+      const folders = [makeFolder('trips', 'Trips'), makeFolder('family', 'Family')];
+      const albums = [makeAlbum({ id: 'a1', albumName: 'Rome' }), makeAlbum({ id: 'a2', albumName: 'Venice' })];
+      const { container } = render(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false });
+
+      const rendered = [
+        ...container.querySelectorAll('[data-testid="space-album-folder-card"],[data-testid="space-album-card"]'),
+      ];
+      expect(rendered[0]).toHaveAttribute('data-testid', 'space-album-folder-card');
+      expect(rendered.at(-1)).toHaveAttribute('data-testid', 'space-album-card');
+    });
+
+    it('W-01: shows only this level — the album inside Trips is not at the root', () => {
+      const folders = [makeFolder('trips', 'Trips'), makeFolder('family', 'Family')];
+      const albums = [
+        makeAlbum({ id: 'a1', albumName: 'Rome' }),
+        makeAlbum({ id: 'a2', albumName: 'Venice', folderId: 'trips' }),
+      ];
+      render(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false });
+
+      expect(screen.getByText('Rome')).toBeInTheDocument();
+      expect(screen.queryByText('Venice')).not.toBeInTheDocument();
+    });
+
+    // W-08: reusing the space-level empty state here would wrongly claim the space has no
+    // albums at all, when it only means THIS folder is empty.
+    it('W-08: renders the folder-specific empty state for an empty folder', () => {
+      const folders = [makeFolder('trips', 'Trips'), makeFolder('family', 'Family')];
+      render(SpaceAlbumsList, { spaceId: 's-1', albums: [], folders, canManage: false, currentFolderId: 'family' });
+
+      // Unlike space-albums-page.spec.ts, this file's beforeAll registers the real en-US locale
+      // (see above), so $t() resolves actual copy here rather than raw i18n keys.
+      expect(screen.getByTestId('space-album-folder-empty')).toHaveTextContent('No albums in this folder yet');
+      expect(screen.queryByTestId('empty-state-message')).not.toBeInTheDocument();
+    });
+
+    // W-07: group-by regroups the ALBUMS at this level; folders are never grouped.
+    it('W-07: leaves folders ungrouped above the grouped album list', () => {
+      spaceAlbumViewSettings.update((settings) => ({ ...settings, groupBy: SpaceAlbumGroupBy.Year }));
+      const folders = [makeFolder('trips', 'Trips'), makeFolder('family', 'Family')];
+      const albums = [makeAlbum({ id: 'a1' }), makeAlbum({ id: 'a2' })];
+
+      const { container } = render(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false });
+
+      const folderCards = container.querySelectorAll('[data-testid="space-album-folder-card"]');
+      expect(folderCards).toHaveLength(2);
+      for (const el of folderCards) {
+        expect(el.closest('[data-testid^="space-album-group-"]')).toBeNull();
+      }
+    });
+
+    // W-18: while searching, the path subtitle is already the organising signal — grouping the
+    // space-wide hits on top of it would bury it.
+    it('W-18: renders flattened hits ungrouped even when group-by is active', () => {
+      spaceAlbumViewSettings.update((settings) => ({ ...settings, groupBy: SpaceAlbumGroupBy.Year }));
+      const folders = [makeFolder('trips', 'Trips')];
+      const albums = [makeAlbum({ id: 'a2', albumName: 'Venice', folderId: 'trips' })];
+
+      const { container } = render(SpaceAlbumsList, {
+        spaceId: 's-1',
+        albums,
+        folders,
+        canManage: false,
+        searchQuery: 'ven',
+      });
+
+      expect(container.querySelectorAll('[data-testid^="space-album-group-"]')).toHaveLength(0);
+      expect(screen.getByText('Venice')).toBeInTheDocument();
+    });
+
+    // W-09: search escapes the current folder entirely and labels each hit with its path.
+    it('W-09: hides folders and the breadcrumb while searching, and shows paths', () => {
+      const folders = [makeFolder('trips', 'Trips')];
+      const albums = [makeAlbum({ id: 'a2', albumName: 'Venice', folderId: 'trips' })];
+
+      const { container } = render(SpaceAlbumsList, {
+        spaceId: 's-1',
+        albums,
+        folders,
+        canManage: false,
+        searchQuery: 'ven',
+      });
+
+      expect(container.querySelectorAll('[data-testid="space-album-folder-card"]')).toHaveLength(0);
+      expect(screen.getByTestId('space-album-search-path-a2')).toHaveTextContent('Trips');
+    });
   });
 });

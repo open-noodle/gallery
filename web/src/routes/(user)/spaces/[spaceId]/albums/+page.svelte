@@ -1,24 +1,34 @@
 <script lang="ts">
   import { goto, invalidateAll } from '$app/navigation';
+  import { page } from '$app/stores';
   import { onMount } from 'svelte';
+  import SpaceAlbumFolderBreadcrumb from '$lib/components/spaces/space-album-folder-breadcrumb.svelte';
   import SpaceAlbumsControls from '$lib/components/spaces/space-albums-controls.svelte';
   import SpaceAlbumsList from '$lib/components/spaces/space-albums-list.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { eventManager } from '$lib/managers/event-manager.svelte';
   import AlbumHideFromMyTimelineConfirmModal from '$lib/modals/AlbumHideFromMyTimelineConfirmModal.svelte';
   import AlbumHideFromSpacePhotosConfirmModal from '$lib/modals/AlbumHideFromSpacePhotosConfirmModal.svelte';
+  import SpaceAlbumFolderNameModal from '$lib/modals/SpaceAlbumFolderNameModal.svelte';
+  import SpaceAlbumFolderPickerModal from '$lib/modals/SpaceAlbumFolderPickerModal.svelte';
   import SpaceLinkAlbumModal from '$lib/modals/SpaceLinkAlbumModal.svelte';
   import { Route } from '$lib/route';
   import { handleError } from '$lib/utils/handle-error';
   import { createAlbum } from '$lib/utils/album-utils';
+  import { getFolderPath } from '$lib/utils/space-album-folders';
   import {
     getAlbumTimelineHidePreview,
+    createSharedSpaceAlbumFolder,
+    deleteSharedSpaceAlbumFolder,
+    getSharedSpaceAlbumFolders,
     getSharedSpaceAlbums,
     linkAlbum,
     SharedSpaceRole,
     unlinkAlbum,
     updateAlbumTimelineForMember,
     updateSharedSpaceAlbum,
+    updateSharedSpaceAlbumFolder,
+    type SharedSpaceAlbumFolderDto,
     type SharedSpaceLinkedAlbumDto,
     type SharedSpaceMemberResponseDto,
     type SharedSpaceResponseDto,
@@ -37,6 +47,7 @@
   const space = $derived<SharedSpaceResponseDto>(data.space);
   const members = $derived<SharedSpaceMemberResponseDto[]>(data.members);
   let albums = $state<SharedSpaceLinkedAlbumDto[]>(data.linkedAlbums);
+  let folders = $state<SharedSpaceAlbumFolderDto[]>([]);
   let groupIds = $state<string[]>([]);
   let searchQuery = $state('');
 
@@ -47,9 +58,30 @@
 
   const linkedAlbumIds = $derived(albums.map((a) => a.id));
 
+  const requestedFolderId = $derived($page.url.searchParams.get('folder'));
+
+  // A folder another editor deleted must degrade to the root rather than break the page.
+  const currentFolderId = $derived(
+    requestedFolderId && folders.some((f) => f.id === requestedFolderId) ? requestedFolderId : null,
+  );
+
+  const folderPath = $derived(getFolderPath(folders, currentFolderId));
+
+  $effect(() => {
+    // Strip a stale ?folder= so a refresh or a share of this URL does not keep resolving to a
+    // folder that no longer exists. replaceState: the fallback is not a history entry. Gated on
+    // folders.length > 0 so we do not strip the param before the initial folder fetch resolves.
+    if (requestedFolderId && folders.length > 0 && currentFolderId === null) {
+      void goto(Route.viewSpaceAlbums({ id: space.id }), { replaceState: true });
+    }
+  });
+
   async function reload() {
     try {
-      albums = await getSharedSpaceAlbums({ id: space.id });
+      [albums, folders] = await Promise.all([
+        getSharedSpaceAlbums({ id: space.id }),
+        getSharedSpaceAlbumFolders({ id: space.id }),
+      ]);
     } catch (error) {
       handleError(error, $t('spaces_linked_albums_error_load'));
     }
@@ -61,6 +93,10 @@
   onMount(() => {
     void reload();
   });
+
+  // A real (pushState) navigation, not a replace — drilling into a folder must be undoable with
+  // the browser back button.
+  const navigateToFolder = (folderId: string | null) => goto(Route.viewSpaceAlbums({ id: space.id, folderId }), {});
 
   async function handleUnlink(album: SharedSpaceLinkedAlbumDto) {
     const confirmed = await modalManager.showDialog({
@@ -173,7 +209,7 @@
       return; // create failed; createAlbum already showed a toast
     }
     try {
-      await linkAlbum({ id: space.id, albumId: newAlbum.id });
+      await linkAlbum({ id: space.id, albumId: newAlbum.id, folderId: currentFolderId ?? undefined });
       eventManager.emit('SpaceLinkAlbum', { spaceId: space.id });
       await invalidateAll();
       await goto(Route.viewSpaceAlbum({ spaceId: space.id, albumId: newAlbum.id }));
@@ -188,6 +224,7 @@
     const linkedCount = await modalManager.show(SpaceLinkAlbumModal, {
       spaceId: space.id,
       linkedAlbumIds,
+      folderId: currentFolderId ?? undefined,
     });
     // The modal returns how many albums it linked; only refresh when something changed.
     if (linkedCount) {
@@ -198,10 +235,92 @@
       await invalidateAll();
     }
   }
+
+  // showDialog resolves to a boolean, so it cannot collect a name — this uses the dedicated
+  // single-field modal from Task 9.
+  async function handleCreateFolder() {
+    const name = await modalManager.show(SpaceAlbumFolderNameModal, {
+      title: $t('space_album_folder_new'),
+    });
+    if (!name) {
+      return;
+    }
+    try {
+      await createSharedSpaceAlbumFolder({
+        id: space.id,
+        sharedSpaceAlbumFolderCreateDto: { name, parentId: currentFolderId },
+      });
+      await reload();
+    } catch (error) {
+      handleError(error, $t('space_album_folder_error_create'));
+    }
+  }
+
+  async function handleRenameFolder(folder: SharedSpaceAlbumFolderDto) {
+    const name = await modalManager.show(SpaceAlbumFolderNameModal, {
+      title: $t('space_album_folder_rename'),
+      initialName: folder.name,
+    });
+    if (!name || name === folder.name) {
+      return;
+    }
+    try {
+      await updateSharedSpaceAlbumFolder({
+        id: space.id,
+        folderId: folder.id,
+        sharedSpaceAlbumFolderUpdateDto: { name },
+      });
+      await reload();
+    } catch (error) {
+      handleError(error, $t('space_album_folder_error_rename'));
+    }
+  }
+
+  async function moveFolder(folderId: string, parentId: string | null) {
+    try {
+      await updateSharedSpaceAlbumFolder({
+        id: space.id,
+        folderId,
+        sharedSpaceAlbumFolderUpdateDto: { parentId },
+      });
+      await reload();
+    } catch (error) {
+      handleError(error, $t('space_album_folder_error_move'));
+    }
+  }
+
+  async function handleMoveFolder(folder: SharedSpaceAlbumFolderDto) {
+    const result = await modalManager.show(SpaceAlbumFolderPickerModal, {
+      folders,
+      excludeFolderId: folder.id,
+      currentFolderId: folder.parentId,
+    });
+    if (!result) {
+      return;
+    }
+    await moveFolder(folder.id, result.folderId);
+  }
+
+  async function handleDeleteFolder(folder: SharedSpaceAlbumFolderDto) {
+    const confirmed = await modalManager.showDialog({
+      title: $t('space_album_folder_delete'),
+      prompt: $t('space_album_folder_delete_confirm', { values: { name: folder.name } }),
+    });
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await deleteSharedSpaceAlbumFolder({ id: space.id, folderId: folder.id });
+      // If we were standing inside it, the fallback effect above returns us to the root.
+      await reload();
+    } catch (error) {
+      handleError(error, $t('space_album_folder_error_delete'));
+    }
+  }
 </script>
 
 <div class="flex h-full flex-col">
-  {#if albums.length === 0}
+  {#if albums.length === 0 && folders.length === 0}
     <div class="flex min-h-[calc(66vh-11rem)] w-full place-content-center items-center dark:text-white">
       <div class="flex flex-col content-center items-center gap-4 text-center">
         <Icon icon={mdiImageMultipleOutline} size="3.5em" />
@@ -232,17 +351,23 @@
       </div>
     </div>
   {:else}
+    {#if folders.length > 0}
+      <SpaceAlbumFolderBreadcrumb path={folderPath} onNavigate={(id) => void navigateToFolder(id)} />
+    {/if}
     <SpaceAlbumsControls
       {groupIds}
       bind:searchQuery
       canManage={isEditor}
       onCreate={handleCreateAlbum}
       onLink={openLinkAlbumModal}
+      onCreateFolder={handleCreateFolder}
     />
     <div class="px-4 pt-4">
       <SpaceAlbumsList
         spaceId={space.id}
         {albums}
+        {folders}
+        {currentFolderId}
         canManage={isEditor}
         {members}
         bind:groupIds
@@ -250,6 +375,10 @@
         onUnlink={handleUnlink}
         onToggleTimeline={handleToggleTimeline}
         onToggleMyTimeline={handleToggleMyTimeline}
+        onOpenFolder={(f) => void navigateToFolder(f.id)}
+        onRenameFolder={handleRenameFolder}
+        onMoveFolder={handleMoveFolder}
+        onDeleteFolder={handleDeleteFolder}
       />
     </div>
   {/if}

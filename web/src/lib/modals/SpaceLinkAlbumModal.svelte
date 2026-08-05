@@ -13,10 +13,12 @@
   type Props = {
     spaceId: string;
     linkedAlbumIds: string[];
+    /** The folder open when the modal was launched; newly linked albums land here in one request. */
+    folderId?: string | null;
     onClose: (linkedCount?: number) => void;
   };
 
-  const { spaceId, linkedAlbumIds, onClose }: Props = $props();
+  const { spaceId, linkedAlbumIds, folderId = null, onClose }: Props = $props();
 
   let albums = $state<AlbumResponseDto[]>([]);
   let loading = $state(true);
@@ -63,7 +65,7 @@
     let linked = 0;
     for (const albumId of selectedIds) {
       try {
-        await linkAlbum({ id: spaceId, albumId });
+        await linkAlbum({ id: spaceId, albumId, folderId: folderId ?? undefined });
         linked++;
       } catch (error) {
         handleError(error, $t('spaces_linked_albums_error_link'));

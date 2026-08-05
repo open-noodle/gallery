@@ -1,6 +1,7 @@
 import {
   SharedSpaceRole,
   type AlbumResponseDto,
+  type SharedSpaceAlbumFolderDto,
   type SharedSpaceLinkedAlbumDto,
   type SharedSpaceMemberResponseDto,
   type SharedSpaceResponseDto,
@@ -20,11 +21,18 @@ import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
 import SpaceAlbumsPage from './+page.svelte';
 
+// A mutable holder so individual tests can point `$page.url` at a `?folder=` query string before
+// rendering — `$app/stores`'s `page` store is a plain object mock (like the rest of this file's
+// mocks), not a real SvelteKit router, so nothing else keeps it in sync with `goto()` calls.
+const { pageMock } = vi.hoisted(() => ({
+  pageMock: { url: new URL('http://localhost/spaces/space-1/albums') },
+}));
+
 vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn() }));
 vi.mock('$app/stores', () => ({
   page: {
     subscribe: (run: (v: unknown) => void) => {
-      run({ url: new URL('http://localhost/spaces/space-1/albums'), route: { id: '' } });
+      run({ url: pageMock.url, route: { id: '' } });
       return () => {};
     },
   },
@@ -100,10 +108,31 @@ function makeMember(role: SharedSpaceRole): SharedSpaceMemberResponseDto {
   };
 }
 
-function renderPage(albums: SharedSpaceLinkedAlbumDto[], role: SharedSpaceRole = SharedSpaceRole.Editor) {
-  // The page re-fetches linked albums on mount (reload) to pick up edits made on the detail page;
-  // return the same set so the mount reload doesn't wipe the rendered cards.
+function makeFolder(id: string, name: string, parentId: string | null = null): SharedSpaceAlbumFolderDto {
+  return {
+    id,
+    spaceId: 'space-1',
+    parentId,
+    name,
+    createdById: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+}
+
+function renderPage(
+  albums: SharedSpaceLinkedAlbumDto[],
+  role: SharedSpaceRole = SharedSpaceRole.Editor,
+  options: { folders?: SharedSpaceAlbumFolderDto[]; folderParam?: string } = {},
+) {
+  const { folders = [], folderParam } = options;
+
+  pageMock.url = new URL(`http://localhost/spaces/space-1/albums${folderParam ? `?folder=${folderParam}` : ''}`);
+
+  // The page re-fetches linked albums and folders on mount (reload) to pick up edits made on the
+  // detail page; return the same sets so the mount reload doesn't wipe the rendered cards.
   sdkMock.getSharedSpaceAlbums.mockResolvedValue(albums);
+  sdkMock.getSharedSpaceAlbumFolders.mockResolvedValue(folders);
   const props = {
     data: {
       space: BASE_SPACE,
@@ -135,6 +164,10 @@ describe('Space albums page', () => {
     authManager.setUser(userAdminFactory.build({ id: 'current-user-id' }));
     authManager.setPreferences(preferencesFactory.build());
     sdkMock.getSharedSpaceAlbums.mockResolvedValue([]);
+    sdkMock.getSharedSpaceAlbumFolders.mockResolvedValue([]);
+    // pageMock is a plain object, not a vi.fn — vi.resetAllMocks() above doesn't touch it, and web
+    // vitest has no clearMocks, so a `?folder=` set by one test would otherwise leak into the next.
+    pageMock.url = new URL('http://localhost/spaces/space-1/albums');
   });
 
   it('renders one card per album', () => {
@@ -480,6 +513,99 @@ describe('Space albums page', () => {
 
       await waitFor(() => expect(emitSpy).toHaveBeenCalledWith('SpaceLinkAlbum', { spaceId: BASE_SPACE.id }));
       emitSpy.mockRestore();
+    });
+  });
+
+  describe('folders', () => {
+    // W-02
+    it('W-02: opening a folder pushes ?folder= onto the URL', async () => {
+      renderPage([], SharedSpaceRole.Editor, { folders: [makeFolder('trips', 'Trips')] });
+
+      const openButton = await screen.findByTestId('space-album-folder-card-open');
+      await fireEvent.click(openButton);
+
+      expect(goto).toHaveBeenCalledWith(expect.stringContaining('folder=trips'), expect.anything());
+    });
+
+    // W-03
+    it('W-03: a breadcrumb crumb navigates up one level', async () => {
+      renderPage([], SharedSpaceRole.Editor, {
+        folders: [makeFolder('trips', 'Trips'), makeFolder('y2026', '2026', 'trips')],
+        folderParam: 'y2026',
+      });
+
+      const crumb = await screen.findByTestId('breadcrumb-trips');
+      await fireEvent.click(crumb);
+
+      expect(goto).toHaveBeenCalledWith(expect.stringContaining('folder=trips'), expect.anything());
+    });
+
+    // W-04: the drill-in is a real navigation, so browser back is free — this asserts we use
+    // goto() with history rather than mutating local state.
+    it('W-04: drill-in uses history navigation so browser back works', async () => {
+      renderPage([], SharedSpaceRole.Editor, { folders: [makeFolder('trips', 'Trips')] });
+
+      const openButton = await screen.findByTestId('space-album-folder-card-open');
+      await fireEvent.click(openButton);
+
+      expect(goto).toHaveBeenCalledWith(expect.any(String), expect.not.objectContaining({ replaceState: true }));
+    });
+
+    // W-05: a space with no folders must be pixel-identical to today.
+    it('W-05: renders no breadcrumb when the space has no folders', async () => {
+      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, { folders: [] });
+
+      await screen.findByText('Rome');
+      expect(screen.queryByTestId('space-album-folder-breadcrumb')).not.toBeInTheDocument();
+    });
+
+    // W-06: another editor deleting the folder you have open must not break your page.
+    it('W-06: falls back to the root and strips an unknown ?folder=', async () => {
+      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
+        folders: [makeFolder('trips', 'Trips')],
+        folderParam: 'deleted',
+      });
+
+      await waitFor(() => expect(screen.getByText('Rome')).toBeInTheDocument());
+      await waitFor(() =>
+        expect(goto).toHaveBeenCalledWith(expect.not.stringContaining('folder='), { replaceState: true }),
+      );
+    });
+
+    // W-10: search is not folder state — clearing it must restore where you were.
+    it('W-10: clearing the search returns to the folder you were in', async () => {
+      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' })], SharedSpaceRole.Editor, {
+        folders: [makeFolder('trips', 'Trips')],
+        folderParam: 'trips',
+      });
+
+      await screen.findByTestId('space-album-folder-breadcrumb');
+      const search = screen.getByTestId('space-albums-search');
+
+      await fireEvent.input(search, { target: { value: 'zzz' } });
+      expect(screen.queryByText('Rome')).not.toBeInTheDocument();
+
+      await fireEvent.input(search, { target: { value: '' } });
+
+      expect(screen.getByText('Rome')).toBeInTheDocument();
+      expect(screen.getByTestId('space-album-folder-breadcrumb')).toBeInTheDocument();
+    });
+
+    // W-16: one request, not link-then-move.
+    it('W-16: creating an album inside a folder links it straight into that folder', async () => {
+      sdkMock.createAlbum.mockResolvedValue({ id: 'new-1', albumName: '' } as AlbumResponseDto);
+      sdkMock.linkAlbum.mockResolvedValue(undefined as never);
+      renderPage([], SharedSpaceRole.Editor, {
+        folders: [makeFolder('trips', 'Trips')],
+        folderParam: 'trips',
+      });
+
+      const createButton = await screen.findByTestId('create-album-button');
+      await fireEvent.click(createButton);
+
+      await waitFor(() =>
+        expect(sdkMock.linkAlbum).toHaveBeenCalledWith(expect.objectContaining({ folderId: 'trips' })),
+      );
     });
   });
 

@@ -1,7 +1,11 @@
 <script lang="ts">
-  import type { SharedSpaceLinkedAlbumDto, SharedSpaceMemberResponseDto } from '@immich/sdk';
+  import type {
+    SharedSpaceAlbumFolderDto,
+    SharedSpaceLinkedAlbumDto,
+    SharedSpaceMemberResponseDto,
+  } from '@immich/sdk';
   import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { AlbumViewMode } from '$lib/stores/preferences.store';
+  import { AlbumViewMode, SortOrder } from '$lib/stores/preferences.store';
   import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
   import {
     buildSpaceAlbumGroups,
@@ -10,7 +14,14 @@
     toggleSpaceAlbumGroupCollapsing,
   } from '$lib/utils/space-album-grouping';
   import { sortSpaceAlbums } from '$lib/utils/space-album-sort';
+  import {
+    flattenForSearch,
+    getFolderContents,
+    getFolderPreviewAssetIds,
+    getRecursiveAlbumCount,
+  } from '$lib/utils/space-album-folders';
   import SpaceAlbumCard from '$lib/components/spaces/space-album-card.svelte';
+  import SpaceAlbumFolderCard from '$lib/components/spaces/space-album-folder-card.svelte';
   import SpaceAlbumsTable from '$lib/components/spaces/space-albums-table.svelte';
   import { Icon } from '@immich/ui';
   import { mdiChevronRight } from '@mdi/js';
@@ -20,6 +31,8 @@
   interface Props {
     spaceId: string;
     albums: SharedSpaceLinkedAlbumDto[];
+    folders?: SharedSpaceAlbumFolderDto[];
+    currentFolderId?: string | null;
     canManage: boolean;
     members?: SharedSpaceMemberResponseDto[];
     groupIds?: string[];
@@ -27,11 +40,17 @@
     onUnlink?: (album: SharedSpaceLinkedAlbumDto) => void;
     onToggleTimeline?: (album: SharedSpaceLinkedAlbumDto) => void;
     onToggleMyTimeline?: (album: SharedSpaceLinkedAlbumDto) => void;
+    onOpenFolder?: (folder: SharedSpaceAlbumFolderDto) => void;
+    onRenameFolder?: (folder: SharedSpaceAlbumFolderDto) => void;
+    onMoveFolder?: (folder: SharedSpaceAlbumFolderDto) => void;
+    onDeleteFolder?: (folder: SharedSpaceAlbumFolderDto) => void;
   }
 
   let {
     spaceId,
     albums,
+    folders = [],
+    currentFolderId = null,
     canManage,
     members = [],
     // eslint-disable-next-line no-useless-assignment
@@ -40,14 +59,44 @@
     onUnlink,
     onToggleTimeline,
     onToggleMyTimeline,
+    onOpenFolder,
+    onRenameFolder,
+    onMoveFolder,
+    onDeleteFolder,
   }: Props = $props();
+
+  const isSearching = $derived((searchQuery ?? '').trim().length > 0);
+
+  // While searching we leave the folder tree entirely: hits come from the whole space, each
+  // labelled with its path. `?folder=` is untouched, so clearing the box restores this level.
+  const searchHits = $derived(isSearching ? flattenForSearch(folders, albums, searchQuery) : []);
+
+  const contents = $derived(getFolderContents(folders, albums, currentFolderId ?? null));
+
+  // Folders sort by NAME, honouring the sort direction but ignoring the sort key: assetCount and
+  // mostRecentPhoto do not map onto a folder, and reshuffling them under "sort by item count" is
+  // noise. Folders are never part of a search result set.
+  const sortedFolders = $derived(
+    isSearching
+      ? []
+      : contents.folders
+          .slice()
+          .sort((a, b) =>
+            $spaceAlbumViewSettings.sortOrder === SortOrder.Desc
+              ? b.name.localeCompare(a.name)
+              : a.name.localeCompare(b.name),
+          ),
+  );
+
+  // Everything downstream — filter, sort, group — now sees only THIS level's albums.
+  const levelAlbums = $derived(isSearching ? [] : contents.albums);
 
   const filtered = $derived.by(() => {
     const q = (searchQuery ?? '').trim().toLowerCase();
     if (!q) {
-      return albums;
+      return levelAlbums;
     }
-    return albums.filter(
+    return levelAlbums.filter(
       (a) => a.albumName.toLowerCase().includes(q) || (a.description ?? '').toLowerCase().includes(q),
     );
   });
@@ -77,57 +126,116 @@
   });
 </script>
 
-{#if filtered.length === 0}
-  <p data-testid="space-albums-no-results" class="p-4 text-center text-gray-500">{$t('space_albums_no_matching')}</p>
-{:else if $spaceAlbumViewSettings.view === AlbumViewMode.List}
-  {#if isGrouped}
-    <SpaceAlbumsTable
-      {spaceId}
-      albums={sorted}
-      {canManage}
-      {groups}
-      grouped
-      {onUnlink}
-      {onToggleTimeline}
-      {onToggleMyTimeline}
-    />
+{#if isSearching}
+  {#if searchHits.length === 0}
+    <p data-testid="space-albums-no-results" class="p-4 text-center text-gray-500">{$t('space_albums_no_matching')}</p>
   {:else}
-    <SpaceAlbumsTable {spaceId} albums={sorted} {canManage} {onUnlink} {onToggleTimeline} {onToggleMyTimeline} />
-  {/if}
-{:else if isGrouped}
-  {#each groups as group (group.id)}
-    {@const collapsed = isSpaceAlbumGroupCollapsed($spaceAlbumViewSettings, group.id)}
-    {@const iconRotation = collapsed ? 'rotate-0' : 'rotate-90'}
-    <div class="grid">
-      <button
-        type="button"
-        onclick={() => toggleSpaceAlbumGroupCollapsing(group.id)}
-        class="mt-2 w-full cursor-pointer rounded-md py-2 pe-2 text-start transition-colors hover:bg-subtle hover:text-primary dark:text-immich-dark-fg dark:hover:bg-immich-dark-gray"
-        aria-expanded={!collapsed}
-        data-testid="space-album-group-{group.id}"
-      >
-        <Icon
-          icon={mdiChevronRight}
-          size="24"
-          class="-mt-2.5 inline-block transition-all duration-250 {iconRotation}"
-        />
-        <span class="text-3xl font-bold text-black dark:text-white">{group.name}</span>
-        <span class="ms-1.5">({$t('albums_count', { values: { count: group.albums.length } })})</span>
-      </button>
-      <hr class="dark:border-immich-dark-gray" />
+    <!-- Flattened, deliberately UNGROUPED: the path subtitle is the organising signal. -->
+    <div class="grid grid-auto-fill-56 gap-y-4">
+      {#each searchHits as hit (hit.album.id)}
+        <div>
+          <SpaceAlbumCard {spaceId} album={hit.album} {canManage} {onUnlink} {onToggleTimeline} {onToggleMyTimeline} />
+          {#if hit.path.length > 0}
+            <p class="px-5 text-xs opacity-70" data-testid="space-album-search-path-{hit.album.id}">
+              {hit.path.join(' › ')}
+            </p>
+          {/if}
+        </div>
+      {/each}
     </div>
-    {#if !collapsed}
-      <div class="mt-4 grid grid-auto-fill-56 gap-y-4" transition:slide={{ duration: 300 }}>
-        {#each group.albums as album (album.id)}
-          <SpaceAlbumCard {spaceId} {album} {canManage} {onUnlink} {onToggleTimeline} {onToggleMyTimeline} />
+  {/if}
+{:else if currentFolderId && levelAlbums.length === 0 && sortedFolders.length === 0}
+  <!-- Reusing the space-level empty state here would wrongly claim the space has no albums at
+       all, when it only means THIS folder is empty. -->
+  <p class="p-8 text-center text-gray-500" data-testid="space-album-folder-empty">
+    {$t('space_album_folder_empty')}
+  </p>
+{:else if sortedFolders.length > 0 || filtered.length > 0}
+  {#if $spaceAlbumViewSettings.view === AlbumViewMode.List}
+    {#if isGrouped}
+      <SpaceAlbumsTable
+        {spaceId}
+        albums={sorted}
+        {folders}
+        allAlbums={albums}
+        {currentFolderId}
+        {canManage}
+        {groups}
+        grouped
+        {onUnlink}
+        {onToggleTimeline}
+        {onToggleMyTimeline}
+        {onOpenFolder}
+      />
+    {:else}
+      <SpaceAlbumsTable
+        {spaceId}
+        albums={sorted}
+        {folders}
+        allAlbums={albums}
+        {currentFolderId}
+        {canManage}
+        {onUnlink}
+        {onToggleTimeline}
+        {onToggleMyTimeline}
+        {onOpenFolder}
+      />
+    {/if}
+  {:else}
+    {#if sortedFolders.length > 0}
+      <div class="grid grid-auto-fill-56 gap-y-4" data-testid="space-album-folders-grid">
+        {#each sortedFolders as folder (folder.id)}
+          <SpaceAlbumFolderCard
+            {folder}
+            albumCount={getRecursiveAlbumCount(folders, albums, folder.id)}
+            previewAssetIds={getFolderPreviewAssetIds(folders, albums, folder.id)}
+            {canManage}
+            onOpen={onOpenFolder}
+            onRename={onRenameFolder}
+            onMove={onMoveFolder}
+            onDelete={onDeleteFolder}
+          />
         {/each}
       </div>
     {/if}
-  {/each}
-{:else}
-  <div class="grid grid-auto-fill-56 gap-y-4">
-    {#each sorted as album (album.id)}
-      <SpaceAlbumCard {spaceId} {album} {canManage} {onUnlink} {onToggleTimeline} {onToggleMyTimeline} />
-    {/each}
-  </div>
+    {#if filtered.length > 0}
+      {#if isGrouped}
+        {#each groups as group (group.id)}
+          {@const collapsed = isSpaceAlbumGroupCollapsed($spaceAlbumViewSettings, group.id)}
+          {@const iconRotation = collapsed ? 'rotate-0' : 'rotate-90'}
+          <div class="grid">
+            <button
+              type="button"
+              onclick={() => toggleSpaceAlbumGroupCollapsing(group.id)}
+              class="mt-2 w-full cursor-pointer rounded-md py-2 pe-2 text-start transition-colors hover:bg-subtle hover:text-primary dark:text-immich-dark-fg dark:hover:bg-immich-dark-gray"
+              aria-expanded={!collapsed}
+              data-testid="space-album-group-{group.id}"
+            >
+              <Icon
+                icon={mdiChevronRight}
+                size="24"
+                class="-mt-2.5 inline-block transition-all duration-250 {iconRotation}"
+              />
+              <span class="text-3xl font-bold text-black dark:text-white">{group.name}</span>
+              <span class="ms-1.5">({$t('albums_count', { values: { count: group.albums.length } })})</span>
+            </button>
+            <hr class="dark:border-immich-dark-gray" />
+          </div>
+          {#if !collapsed}
+            <div class="mt-4 grid grid-auto-fill-56 gap-y-4" transition:slide={{ duration: 300 }}>
+              {#each group.albums as album (album.id)}
+                <SpaceAlbumCard {spaceId} {album} {canManage} {onUnlink} {onToggleTimeline} {onToggleMyTimeline} />
+              {/each}
+            </div>
+          {/if}
+        {/each}
+      {:else}
+        <div class="grid grid-auto-fill-56 gap-y-4">
+          {#each sorted as album (album.id)}
+            <SpaceAlbumCard {spaceId} {album} {canManage} {onUnlink} {onToggleTimeline} {onToggleMyTimeline} />
+          {/each}
+        </div>
+      {/if}
+    {/if}
+  {/if}
 {/if}
