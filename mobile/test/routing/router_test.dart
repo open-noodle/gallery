@@ -111,6 +111,18 @@ void main() {
       expect(router.stack.map((route) => route.name), ['SpaceAlbumsRoute']);
     });
 
+    // Same `folderId` (both null — the space root) but a DIFFERENT `spaceId`: the guard must not
+    // block this. Every other test here holds spaceId fixed at 'space-1' and varies folderId, so
+    // none of them would catch a mutation that dropped the `spaceId` half of the guard's
+    // condition, leaving only the `folderId` comparison — this test is what pins that half down.
+    test('pushing SpaceAlbums for a different space is not blocked even with the same folderId', () async {
+      await router.push(SpaceAlbumsRoute(spaceId: 'space-1', canEdit: true)).timeout(_never, onTimeout: () => null);
+      await router.push(SpaceAlbumsRoute(spaceId: 'space-2', canEdit: true)).timeout(_never, onTimeout: () => null);
+
+      expect(router.stack.map((route) => route.name), ['SpaceAlbumsRoute', 'SpaceAlbumsRoute']);
+      expect((router.stack.last.routeData.args as SpaceAlbumsRouteArgs).spaceId, 'space-2');
+    });
+
     // The sibling space routes are NOT self-recursive, so they must keep the plain guard — this
     // pins the exemption to the one route that needs args-aware duplicate detection instead of
     // letting it spread.

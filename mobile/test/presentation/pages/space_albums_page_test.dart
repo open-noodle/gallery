@@ -10,10 +10,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/locales.dart';
+import 'package:immich_mobile/domain/models/album/album.model.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
-import 'package:immich_mobile/domain/models/album/album.model.dart';
 import 'package:immich_mobile/domain/models/space_album_folder.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/asset.service.dart';
@@ -266,9 +266,12 @@ Future<RootStackRouter> pumpPageWithFolderStream(
 /// a self-pop cascades through exactly the right number of routes.
 ///
 /// [folderIds] entries need not be distinct: two adjacent entries with the SAME id reproduce a
-/// double-tap on a folder card, which `SpaceAlbumsRoute` allows today (see router.dart:167-172 —
-/// no duplicate guard, since a normal drill-down legitimately re-pushes this route with a
-/// DIFFERENT folderId, and an args-aware guard distinguishing the two is a separate future task).
+/// double-tap on a folder card. `AppRouter` now blocks that at the push site in PRODUCTION
+/// (`SpaceAlbumsDuplicateGuard`, router.dart:179 — see space_albums_duplicate_guard.dart), but
+/// this harness deliberately builds its OWN router (below) with NO guard at all on
+/// `SpaceAlbumsRoute`, so the identical-args self-pop case stays directly reachable and tested
+/// here regardless of that production guard — this divergence from `AppRouter`'s route table is
+/// intentional, not an oversight.
 Future<RootStackRouter> pumpStackedFolderPagesWithFolderStream(
   WidgetTester tester,
   Stream<List<SpaceAlbumFolder>> folderStream, {
