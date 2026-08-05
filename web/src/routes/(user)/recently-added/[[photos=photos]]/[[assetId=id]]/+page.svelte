@@ -512,7 +512,7 @@
         onFiltersChange={handleFiltersChange}
       />
     {/key}
-    <div class="flex flex-1 flex-col overflow-hidden pl-4">
+    <div class="flex flex-1 flex-col overflow-hidden pl-2">
       {#snippet recentlyAddedFiltersBar()}
         <ActiveFiltersBar
           embedded
