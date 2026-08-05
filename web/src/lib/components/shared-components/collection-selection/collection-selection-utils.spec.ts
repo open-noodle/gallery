@@ -84,8 +84,10 @@ describe('collection helpers', () => {
 
 describe('CollectionModalRowConverter', () => {
   const conv = new CollectionModalRowConverter();
-  const a = (id: string, name: string) => albumToCollection(album(id, name));
-  const s = (id: string, name: string) => spaceToCollection(space(id, name));
+  const a = (id: string, name: string, extra: Record<string, unknown> = {}) =>
+    albumToCollection({ ...album(id, name), ...extra } as AlbumResponseDto);
+  const s = (id: string, name: string, extra: Record<string, unknown> = {}) =>
+    spaceToCollection(space(id, name, extra));
   const opts = { showSpaces: true };
 
   it('always emits New Album then New Space first when spaces shown', () => {
@@ -118,6 +120,36 @@ describe('CollectionModalRowConverter', () => {
     const items = rows.filter((r) => r.type === CollectionModalRowType.COLLECTION_ITEM);
     expect(items).toHaveLength(1);
     expect(items[0].collection!.id).toBe('a1');
+  });
+
+  it('matches descriptions as well as names, for albums and spaces alike', () => {
+    const all = [
+      a('a1', 'Vacances 2019', { description: 'Crete' }),
+      s('s1', 'Sommer', { description: 'Crete again' }),
+      a('a2', 'Construction'),
+      s('s2', 'Renovation'),
+    ];
+    const items = conv
+      .toModalRows('crete', [], all, -1, [], opts)
+      .filter((r) => r.type === CollectionModalRowType.COLLECTION_ITEM);
+    expect(items.map((r) => r.collection!.id).sort()).toEqual(['a1', 's1']);
+  });
+
+  it('normalizes description matches the same way it normalizes names', () => {
+    const all = [a('a1', 'Trip', { description: 'Tüscany' }), s('s1', 'Other')];
+    const items = conv
+      .toModalRows('tuscany', [], all, -1, [], opts)
+      .filter((r) => r.type === CollectionModalRowType.COLLECTION_ITEM);
+    expect(items.map((r) => r.collection!.id)).toEqual(['a1']);
+  });
+
+  it('tolerates absent and null descriptions without matching everything', () => {
+    // Space description is `string | null | undefined` in the SDK; album description may be ''.
+    const all = [a('a1', 'Alpha', { description: '' }), s('s1', 'Beta', { description: null }), s('s2', 'Gamma')];
+    const items = conv
+      .toModalRows('zzz', [], all, -1, [], opts)
+      .filter((r) => r.type === CollectionModalRowType.COLLECTION_ITEM);
+    expect(items).toHaveLength(0);
   });
 
   it('focus offset is 2 (two create rows): index 2 selects the first item', () => {
