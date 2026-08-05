@@ -6,6 +6,7 @@
   import { useActions, type ActionArray } from '$lib/actions/use-actions';
   import NavigationBar from '$lib/components/shared-components/navigation-bar/NavigationBar.svelte';
   import UserSidebar from '$lib/components/shared-components/side-bar/UserSidebar.svelte';
+  import { sidebarModeStore } from '$lib/stores/sidebar-mode.svelte';
   import type { HeaderButtonActionItem } from '$lib/types';
   import { openFileUploadDialog } from '$lib/utils/file-uploader';
   import { Button, ContextMenuButton, HStack, isMenuItemType, type MenuItemType } from '@immich/ui';
@@ -49,19 +50,48 @@
   let scrollbarClass = $derived(scrollbar ? 'immich-scrollbar' : 'scrollbar-hidden');
   let hasHeaderRow = $derived(!!(title || buttons));
   let hasTitleClass = $derived(hasHeaderRow ? 'top-16 h-[calc(100%-(--spacing(16)))]' : 'top-0 h-full');
+
+  // /tags and /folders supply a tree explorer wrapping upstream Sidebar.svelte, which is
+  // always 16rem above 850px. Collapsing their grid column to the rail width would clip it,
+  // and a tag tree has no meaningful icon-only form, so those pages opt out of the rail.
+  const sidebarWidth = $derived.by(() => {
+    if (sidebar) {
+      return sidebarModeStore.layout === 'overlay' ? '0' : 'expanded';
+    }
+    return sidebarModeStore.layout === 'overlay' ? '0' : sidebarModeStore.layout;
+  });
+
+  const sidebarWidthValue = $derived(
+    { '0': '0px', rail: 'calc(var(--spacing) * 20)', expanded: 'calc(var(--spacing) * 64)' }[sidebarWidth],
+  );
 </script>
 
 <header>
   {#if !hideNavbar}
-    <NavigationBar onUploadClick={() => openFileUploadDialog()} />
+    <NavigationBar onUploadClick={() => openFileUploadDialog()} railAware={!sidebar} />
   {/if}
 </header>
+<!-- The two height sources are not interchangeable: with a navbar the grid sits *below* a real
+     4rem element, so it subtracts --navbar-height; with `hideNavbar` the page floats an 80px
+     ControlAppBar over itself instead and pads by --control-bar-height to clear it.
+
+     The reserve gets the content panel's 8px chrome gutter added to it. The panel drops its top
+     margin so the navbar can own that gutter and centre its search field in the band the two of
+     them form (see --navbar-height), but a hidden navbar owns nothing - the reserve is all that
+     stands between the panel and an 80px bar it would otherwise slide under, since the reserve
+     is 76px and only ever cleared the bar with the panel's margin on top of it. The literal
+     matches the gutter in gallery-theme.css; --control-bar-height itself cannot absorb it,
+     because the album, person, partner and shared-link viewers spend it on full-bleed <main>
+     elements that never had the margin. -->
 <div
   tabindex="-1"
-  class="relative z-0 grid grid-cols-[--spacing(0)_auto] overflow-hidden sidebar:grid-cols-[--spacing(64)_auto]
+  data-testid="user-page-grid"
+  data-sidebar-width={sidebarWidth}
+  style:--sidebar-width={sidebarWidthValue}
+  class="relative z-0 grid grid-cols-[var(--sidebar-width)_auto] overflow-hidden
     {hideNavbar ? 'h-dvh' : 'h-[calc(100dvh-var(--navbar-height))] max-md:h-[calc(100dvh-var(--navbar-height-md))]'}
-    {hideNavbar ? 'pt-(--navbar-height)' : ''}
-    {hideNavbar ? 'max-md:pt-(--navbar-height-md)' : ''}"
+    {hideNavbar ? 'pt-[calc(var(--control-bar-height)+8px)]' : ''}
+    {hideNavbar ? 'max-md:pt-[calc(var(--control-bar-height-md)+8px)]' : ''}"
 >
   {#if sidebar}
     {@render sidebar()}
