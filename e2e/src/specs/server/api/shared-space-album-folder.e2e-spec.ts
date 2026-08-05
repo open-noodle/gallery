@@ -36,6 +36,10 @@ describe('/shared-spaces/:id/album-folders', () => {
   let space: SharedSpaceResponseDto;
   let otherSpace: SharedSpaceResponseDto;
   let folderId: string;
+  // Set by R-08's arrange step — a real folder id that genuinely belongs to otherSpace, reused by
+  // the cross-space-400 test below so it exercises "a folder that exists, just in the wrong
+  // space" rather than a folder id that doesn't exist anywhere.
+  let otherSpaceFolderId: string;
 
   beforeAll(async () => {
     await utils.resetDatabase();
@@ -132,10 +136,16 @@ describe('/shared-spaces/:id/album-folders', () => {
 
   // R-08: the listing is space-scoped — the read-side counterpart to the cross-space write guard.
   it('R-08: the listing contains this space and no other', async () => {
-    await request(app)
+    // Arrange: this create must actually succeed, or the "Secret" absence assertion below would
+    // pass vacuously (e.g. a bad token or a future schema change silently failing this POST would
+    // make "not.toContain('Secret')" true for the wrong reason, masking the exact cross-space
+    // leak this test exists to catch).
+    const created = await request(app)
       .post(`/shared-spaces/${otherSpace.id}/album-folders`)
       .set(asBearerAuth(stranger.accessToken))
       .send({ name: 'Secret' });
+    expect(created.status).toBe(201);
+    otherSpaceFolderId = created.body.id;
 
     const { body } = await request(app)
       .get(`/shared-spaces/${space.id}/album-folders`)
@@ -150,6 +160,16 @@ describe('/shared-spaces/:id/album-folders', () => {
   // `name` is schema-valid here (min length 1) — a schema-invalid payload would be rejected by
   // the global ZodValidationPipe before the request reaches the service at all, which would
   // produce a 400 regardless of role and wouldn't isolate the role gate.
+  //
+  // Accidental but load-bearing: 'Trips' duplicates the folder name created in beforeAll, so this
+  // payload would ALSO fail the service's own name-collision check if that check ever ran. Because
+  // this suite executes in declaration order (vitest.config.ts pins maxWorkers: 1 / isolate:
+  // false, and nothing here shuffles), that duplicate is guaranteed to exist by the time this test
+  // runs. That means this test doesn't just prove "a Viewer is denied" — it also catches a
+  // regression where a content check (the name-collision check specifically) got reordered ahead
+  // of requireRole(): if that happened, this exact request would flip 403 -> 400, whereas R-03's
+  // non-colliding 'Nope' payload would not detect it. Do not "tidy" this name to something unique
+  // — that would silently remove this property.
   it('R-09: a viewer sending an otherwise-valid create still gets 403 (role gate, not a content check)', async () => {
     const { status } = await request(app)
       .post(`/shared-spaces/${space.id}/album-folders`)
@@ -176,10 +196,15 @@ describe('/shared-spaces/:id/album-folders', () => {
     const album = await utils.createAlbum(owner.accessToken, { albumName: 'Cross Space' });
     await utils.linkSpaceAlbum(owner.accessToken, space.id, album.id);
 
+    // Uses otherSpaceFolderId — a folder that genuinely exists, just in otherSpace rather than
+    // this space — instead of a globally-nonexistent UUID. getAlbumFolderById is scoped
+    // `WHERE spaceId = ? AND id = ?`, so a real id from the wrong space and an id that doesn't
+    // exist anywhere are provably indistinguishable to the code: both miss that lookup and 400
+    // identically. Using the real cross-space id just makes this test's behaviour match its name.
     const { status } = await request(app)
       .put(`/shared-spaces/${space.id}/albums/${album.id}/folder`)
       .set(asBearerAuth(owner.accessToken))
-      .send({ folderId: '00000000-0000-4000-8000-000000000000' });
+      .send({ folderId: otherSpaceFolderId });
 
     expect(status).toBe(400);
   });
