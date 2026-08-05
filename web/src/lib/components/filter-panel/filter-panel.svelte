@@ -3,20 +3,7 @@
   import { browser } from '$app/environment';
   import { SvelteSet } from 'svelte/reactivity';
   import { t } from 'svelte-i18n';
-  import {
-    mdiClose,
-    mdiCalendar,
-    mdiAccount,
-    mdiMapMarker,
-    mdiCamera,
-    mdiTag,
-    mdiStar,
-    mdiImage,
-    mdiHeart,
-    mdiImageAlbum,
-    mdiTextSearch,
-    mdiTune,
-  } from '@mdi/js';
+  import { mdiClose, mdiTune } from '@mdi/js';
   import { untrack } from 'svelte';
   import type {
     FilterPanelConfig,
@@ -27,6 +14,7 @@
   } from './filter-panel';
   import { buildFilterContext, createFilterState, loadFilterCollapsed, saveFilterCollapsed } from './filter-panel';
   import FilterSection from './filter-section.svelte';
+  import FilterSectionMenu from './filter-section-menu.svelte';
   import TemporalPicker from './temporal-picker.svelte';
   import PeopleFilter from './people-filter.svelte';
   import LocationFilter from './location-filter.svelte';
@@ -327,19 +315,6 @@
     };
   });
 
-  const sectionIcons: Record<string, string> = {
-    timeline: mdiCalendar,
-    people: mdiAccount,
-    location: mdiMapMarker,
-    camera: mdiCamera,
-    tags: mdiTag,
-    rating: mdiStar,
-    media: mdiImage,
-    favorites: mdiHeart,
-    albums: mdiImageAlbum,
-    text: mdiTextSearch,
-  };
-
   let sectionTitles = $derived<Record<string, string>>({
     timeline: $t('timeline'),
     people: $t('people'),
@@ -448,6 +423,8 @@
 
   let visibleSections = $state(loadVisibleSections(config.sections, storageKey));
 
+  let sectionMenuOpen = $state(false);
+
   const EXPANDED_SECTIONS_KEY = 'gallery-filter-expanded-sections';
 
   function loadExpandedSections(configSections: FilterSectionType[]): SvelteSet<FilterSectionType> {
@@ -512,6 +489,15 @@
       } catch {
         /* localStorage unavailable */
       }
+    }
+  });
+
+  // externalToggle keeps this panel mounted at w-0 while collapsed rather than unmounting it, so
+  // an open menu would survive the collapse and still be open on reopen - and in the meantime is
+  // a popover painting out of a zero-width, inert box.
+  $effect(() => {
+    if (collapsed) {
+      sectionMenuOpen = false;
     }
   });
 
@@ -707,7 +693,21 @@
         <div
           class="sticky top-0 z-5 flex items-center justify-between border-b border-gray-200 bg-light px-4 py-2.5 dark:border-gray-700"
         >
-          <span class="text-sm font-medium">{$t('filters')}</span>
+          <div class="flex items-center gap-1">
+            <span class="text-sm font-medium">{$t('filters')}</span>
+            {#if config.sections.length > 0}
+              <FilterSectionMenu
+                bind:open={sectionMenuOpen}
+                sections={config.sections}
+                visible={visibleSections}
+                titles={sectionTitles}
+                toggleLabels={sectionToggleLabels}
+                {hasActiveFilter}
+                onToggle={toggleSection}
+                onShowAll={showAllSections}
+              />
+            {/if}
+          </div>
           <button
             type="button"
             class="flex size-6 items-center justify-center rounded-full text-gray-500 hover:bg-subtle dark:text-gray-400"
@@ -718,36 +718,6 @@
             <Icon icon={mdiClose} size="16" />
           </button>
         </div>
-
-        {#if config.sections.length > 0}
-          <div
-            class="flex items-center justify-center gap-0.5 border-b border-gray-200 px-3 py-2 dark:border-gray-700"
-            data-testid="section-toggle-row"
-          >
-            {#each config.sections as section (section)}
-              <button
-                type="button"
-                class="relative flex size-[30px] items-center justify-center rounded-[10px] transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-90 motion-reduce:transition-none motion-reduce:active:scale-100
-              {visibleSections.has(section)
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-gray-400 hover:bg-subtle hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400'}"
-                onclick={() => toggleSection(section)}
-                aria-label={sectionToggleLabels[section]}
-                aria-pressed={visibleSections.has(section)}
-                title={sectionTitles[section]}
-                data-testid="section-toggle-{section}"
-              >
-                <Icon icon={sectionIcons[section]} size="16" />
-                {#if !visibleSections.has(section) && hasActiveFilter(section)}
-                  <span
-                    class="absolute -top-0.5 -right-0.5 size-2 rounded-full border-[1.5px] border-light bg-immich-primary dark:bg-immich-dark-primary"
-                    data-testid="section-toggle-dot-{section}"
-                  ></span>
-                {/if}
-              </button>
-            {/each}
-          </div>
-        {/if}
 
         <div class="pt-4">
           {#each config.sections as section (section)}

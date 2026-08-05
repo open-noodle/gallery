@@ -18,6 +18,7 @@ const {
   mockMemoryManager,
   mockRegisterSelectionContext,
   mockRegisterSearchablePageFilters,
+  readableFn,
 } = vi.hoisted(() => ({
   mockPage: {
     url: new URL('https://gallery.test/photos?q=nature'),
@@ -38,6 +39,17 @@ const {
   },
   mockRegisterSelectionContext: vi.fn(),
   mockRegisterSearchablePageFilters: vi.fn(() => vi.fn()),
+  // `memoryLaneTitle` and `getAltText` are `derived(t, ...)` stores *holding a function*, read by
+  // the page as `$memoryLaneTitle(memory)` / `$getAltText(asset)`. As bare vi.fn()s they threw
+  // `store_invalid_shape` the first time anything rendered the memories strip - which nothing did
+  // until the test below - so they are mocked at the right shape. Hoisted with the rest: a
+  // top-level const is not initialised yet when a vi.mock factory runs.
+  readableFn: (value: unknown) => ({
+    subscribe: (run: (value: unknown) => void) => {
+      run(value);
+      return () => {};
+    },
+  }),
 }));
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn().mockResolvedValue(undefined) }));
@@ -192,7 +204,7 @@ vi.mock('$lib/services/asset.service', () => ({
 vi.mock('$lib/utils', () => ({
   createUrl: vi.fn(() => ''),
   getAssetMediaUrl: vi.fn(() => ''),
-  memoryLaneTitle: vi.fn(() => 'memory'),
+  memoryLaneTitle: readableFn(() => 'memory'),
 }));
 
 vi.mock('$lib/utils/file-uploader', () => ({
@@ -208,7 +220,7 @@ vi.mock('$lib/utils/photos-filter-options', async (importOriginal) => {
 });
 
 vi.mock('$lib/utils/thumbnail-util', () => ({
-  getAltText: vi.fn(() => 'alt'),
+  getAltText: readableFn(() => 'alt'),
 }));
 
 vi.mock('$lib/utils/timeline-util', () => ({
@@ -230,6 +242,9 @@ describe('Photos page search URL state', () => {
     mockAssetMultiSelectManager.selectionActive = false;
     mockAssetMultiSelectManager.assets = [];
     mockMemoryManager.memories = [];
+    // Shared object across the whole file, and nothing else puts it back - the memories test
+    // below turns it on and every test after it would otherwise render the strip too.
+    mockAuthManager.preferences.memories.enabled = false;
     mockRegisterSearchablePageFilters.mockReturnValue(vi.fn());
     sessionStorage.clear();
     sdkMock.getFilterSuggestions.mockResolvedValue({
@@ -985,5 +1000,23 @@ describe('Photos page search URL state', () => {
 
     const bar = await screen.findByTestId('active-filters-bar-stub');
     expect(bar).toHaveAttribute('data-has-add-all', 'true');
+  });
+  // The strip is @immich/ui's ImageCarousel, which carries its own `mt-3` from when it was the
+  // first thing in the timeline. The route grouping bar sits above it now and already ends in
+  // 8px of padding plus an 8px margin, so that third helping put 28px between the
+  // Years/Months/All pill and the strip where the timeline gets 16px with memories off.
+  // Asserted on the rendered section rather than on the prop: the override only works because
+  // the library merges the incoming class with twMerge, and a prop assertion would pass just as
+  // well against a library that concatenated them and left `mt-3` winning.
+  it('drops the memories strip top margin the grouping bar now provides', () => {
+    mockPage.url = new URL('https://gallery.test/photos');
+    mockAuthManager.preferences.memories.enabled = true;
+    mockMemoryManager.memories = [{ id: 'memory-1', assets: [{ id: 'asset-1' }] }];
+
+    const { container } = renderPage();
+
+    const strip = container.querySelector('a[href*="/memory"]')!.closest('section')!;
+    expect([...strip.classList]).toContain('mt-0');
+    expect([...strip.classList]).not.toContain('mt-3');
   });
 });
