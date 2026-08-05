@@ -108,6 +108,16 @@ export const SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH = 10;
 /** Bounds the whole-space folder fetch the web client uses to render the tree. */
 export const SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE = 500;
 
+/**
+ * Shared by the optimistic pre-check ({@link SharedSpaceService.assertNoAlbumFolderNameConflict})
+ * and the raced-23505 mapper ({@link SharedSpaceService.withAlbumFolderNameConflictMapped}) so the
+ * two 400 paths can never drift apart in wording. The mobile client
+ * (`mobile/lib/pages/library/spaces/space_albums.page.dart`, `_folderErrorKey`) substring-matches
+ * `'already exists here'` on this exact text to pick the specific `space_album_folder_name_taken`
+ * toast instead of a generic error — do not reword this without updating that match too.
+ */
+export const SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE = 'A folder with that name already exists here';
+
 type SpacePersonMatchResult = {
   id: string;
   identityId?: string | null;
@@ -1082,7 +1092,7 @@ export class SharedSpaceService extends BaseService {
   ): Promise<void> {
     const conflict = await this.sharedSpaceRepository.hasSiblingAlbumFolderName(spaceId, parentId, name, excludeId);
     if (conflict) {
-      throw new BadRequestException('A folder with that name already exists here');
+      throw new BadRequestException(SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE);
     }
   }
 
@@ -1101,7 +1111,7 @@ export class SharedSpaceService extends BaseService {
       return await operation();
     } catch (error) {
       if ((error as { code?: string })?.code === '23505') {
-        throw new BadRequestException('A folder with that name already exists here');
+        throw new BadRequestException(SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE);
       }
       throw error;
     }
