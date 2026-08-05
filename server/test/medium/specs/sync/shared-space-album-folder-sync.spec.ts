@@ -43,6 +43,7 @@ describe('shared_space_album_folder_audit', () => {
     expect(audit[0].spaceId).toBe(space.id);
     // `id` is the audit row's OWN uuidv7 — it is the sync cursor, not the folder's id.
     expect(audit[0].id).not.toBe(folder.id);
+    expect(audit[0].deletedAt).toBeInstanceOf(Date);
   });
 
   it('records one row per folder when several are deleted at once', async () => {
