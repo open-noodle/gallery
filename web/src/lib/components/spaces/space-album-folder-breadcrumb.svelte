@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { canDrop, getActiveDragPayload, readDragPayload, type DragPayload } from '$lib/utils/space-album-folder-dnd';
+  import {
+    canDrop,
+    getActiveDragPayload,
+    readDragPayload,
+    setActiveDragPayload,
+    type DragPayload,
+  } from '$lib/utils/space-album-folder-dnd';
   import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiChevronRight } from '@mdi/js';
@@ -36,6 +42,12 @@
     event.preventDefault();
     dropTarget = null;
     const payload = event.dataTransfer && readDragPayload(event.dataTransfer);
+    // Same detached-source reasoning as the folder card's own ondrop: a crumb drop can be the
+    // end of a drag whose source node the resulting move just removed from the DOM, so the
+    // matching `dragend` (which normally clears this) may never bubble back to the source
+    // element's own listener. Clearing here too means a later, unrelated drag never inherits a
+    // stale payload that would make some other folder card/crumb wrongly highlight and accept it.
+    setActiveDragPayload(null);
     if (payload) {
       onDropItem?.(payload, targetFolderId);
     }

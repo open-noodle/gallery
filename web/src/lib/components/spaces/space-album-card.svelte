@@ -26,7 +26,12 @@
   role="listitem"
   draggable={canManage}
   ondragstart={(event) => {
-    if (!event.dataTransfer) {
+    // draggable="false" on this div does not stop the inner <a>/cover image from being natively
+    // draggable, and dragstart bubbles — so without this guard a viewer could still drag the
+    // cover and write a payload. No target ever accepts it (every drop target also gates on
+    // canManage) and the server enforces regardless, but this keeps that guarantee local rather
+    // than relying on every other surface getting it right.
+    if (!canManage || !event.dataTransfer) {
       return;
     }
     const payload = { kind: 'album' as const, id: album.id };

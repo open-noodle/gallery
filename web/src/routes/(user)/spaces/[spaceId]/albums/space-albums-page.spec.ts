@@ -17,7 +17,7 @@ import { authManager } from '$lib/managers/auth-manager.svelte';
 import { eventManager } from '$lib/managers/event-manager.svelte';
 import SpaceLinkAlbumModal from '$lib/modals/SpaceLinkAlbumModal.svelte';
 import { spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
-import { writeDragPayload, type DragPayload } from '$lib/utils/space-album-folder-dnd';
+import { setActiveDragPayload, writeDragPayload, type DragPayload } from '$lib/utils/space-album-folder-dnd';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
 import SpaceAlbumsPage from './+page.svelte';
@@ -165,21 +165,34 @@ function renderPage(
   });
 }
 
-/**
- * Builds a fake DataTransfer carrying `payload`, then fires dragover followed by drop on the
- * folder card for `targetFolderId`. space-album-folder-card's data-testid is shared across every
- * rendered card, so the target is matched via its data-folder-id attribute instead. dragover
- * fires first because that's what a real browser requires before drop can fire at all — jsdom's
- * fireEvent.drop doesn't enforce that, but firing both keeps the sequence realistic and exercises
- * the card's dragover handler too, not just its drop handler.
- */
-async function dropOnFolder(payload: DragPayload, targetFolderId: string) {
+const makeFakeDataTransfer = () => {
   const store = new Map<string, string>();
-  const dataTransfer = {
+  return {
     setData: (type: string, value: string) => store.set(type, value),
     getData: (type: string) => store.get(type) ?? '',
     types: [...store.keys()],
   } as unknown as DataTransfer;
+};
+
+/**
+ * Builds a fake DataTransfer carrying `payload`, then fires dragover followed by drop on the
+ * folder card for `targetFolderId`. space-album-folder-card's data-testid is shared across every
+ * rendered card, so the target is matched via its data-folder-id attribute instead.
+ *
+ * `setActiveDragPayload` is called first, matching what a real `dragstart` does — without it,
+ * the card's `canAccept()` reads a permanently-empty active-drag slot, `ondragover` always
+ * early-returns, and `drop` becomes the only handler doing anything (jsdom's fireEvent.drop
+ * doesn't require a prior preventDefault()'d dragover the way a real browser does), meaning the
+ * dragover gate — and the `folders`/`albums` props it depends on — go completely untested.
+ *
+ * `drop` only fires if dragover accepted (preventDefault() ran), exactly matching a real
+ * browser: no accepted dragover means no `drop` event at all, not merely a `drop` that some
+ * other guard happens to reject. Returns whether dragover accepted, so a caller can assert on it
+ * directly (see the breadcrumb variant below and the dedicated dragover-gate test).
+ */
+async function dropOnFolder(payload: DragPayload, targetFolderId: string): Promise<boolean> {
+  setActiveDragPayload(payload);
+  const dataTransfer = makeFakeDataTransfer();
   writeDragPayload(dataTransfer, payload);
 
   const cards = await screen.findAllByTestId('space-album-folder-card');
@@ -188,8 +201,31 @@ async function dropOnFolder(payload: DragPayload, targetFolderId: string) {
     throw new Error(`dropOnFolder: no rendered folder card for target "${targetFolderId}"`);
   }
 
-  await fireEvent.dragOver(card, { dataTransfer });
-  await fireEvent.drop(card, { dataTransfer });
+  const dragOverAccepted = !(await fireEvent.dragOver(card, { dataTransfer }));
+  if (dragOverAccepted) {
+    await fireEvent.drop(card, { dataTransfer });
+  }
+  setActiveDragPayload(null);
+  return dragOverAccepted;
+}
+
+/**
+ * Same idea as `dropOnFolder`, but for a breadcrumb crumb: `targetFolderId: null` targets the
+ * root crumb (`breadcrumb-root`), anything else targets `breadcrumb-{id}`.
+ */
+async function dropOnCrumb(payload: DragPayload, targetFolderId: string | null): Promise<boolean> {
+  setActiveDragPayload(payload);
+  const dataTransfer = makeFakeDataTransfer();
+  writeDragPayload(dataTransfer, payload);
+
+  const crumb = await screen.findByTestId(targetFolderId === null ? 'breadcrumb-root' : `breadcrumb-${targetFolderId}`);
+
+  const dragOverAccepted = !(await fireEvent.dragOver(crumb, { dataTransfer }));
+  if (dragOverAccepted) {
+    await fireEvent.drop(crumb, { dataTransfer });
+  }
+  setActiveDragPayload(null);
+  return dragOverAccepted;
 }
 
 describe('Space albums page', () => {
@@ -210,6 +246,10 @@ describe('Space albums page', () => {
     // pageMock is a plain object, not a vi.fn — vi.resetAllMocks() above doesn't touch it, and web
     // vitest has no clearMocks, so a `?folder=` set by one test would otherwise leak into the next.
     pageMock.url = new URL('http://localhost/spaces/space-1/albums');
+    // getActiveDragPayload is bare module state too — reset so a payload left active by one
+    // test (e.g. a dropOnFolder/dropOnCrumb call that never reached its own cleanup because of
+    // an assertion throwing first) can't leak into the next test's dragover check.
+    setActiveDragPayload(null);
   });
 
   it('renders one card per album', () => {
@@ -778,8 +818,12 @@ describe('Space albums page', () => {
         folders: [makeFolder('trips', 'Trips')],
       });
 
-      await dropOnFolder({ kind: 'album', id: 'a1' }, 'trips');
+      const accepted = await dropOnFolder({ kind: 'album', id: 'a1' }, 'trips');
 
+      // dragover accepted the drop (preventDefault ran) — a real browser only lets `drop` fire
+      // at all when this is true, so this is what actually gates the request, not merely
+      // handleDropItem's own after-the-fact canDrop re-check.
+      expect(accepted).toBe(true);
       await waitFor(() =>
         expect(sdkMock.setSharedSpaceAlbumFolder).toHaveBeenCalledWith(
           expect.objectContaining({ albumId: 'a1', sharedSpaceAlbumFolderMoveAlbumDto: { folderId: 'trips' } }),
@@ -793,8 +837,9 @@ describe('Space albums page', () => {
         folders: [makeFolder('trips', 'Trips'), makeFolder('family', 'Family')],
       });
 
-      await dropOnFolder({ kind: 'folder', id: 'trips' }, 'family');
+      const accepted = await dropOnFolder({ kind: 'folder', id: 'trips' }, 'family');
 
+      expect(accepted).toBe(true);
       await waitFor(() =>
         expect(sdkMock.updateSharedSpaceAlbumFolder).toHaveBeenCalledWith({
           id: 'space-1',
@@ -818,13 +863,17 @@ describe('Space albums page', () => {
       });
 
       // Invalid: "y2026" is a descendant of "trips" — dropping trips onto it must be a no-op.
-      await dropOnFolder({ kind: 'folder', id: 'trips' }, 'y2026');
+      // dragover never accepts (never preventDefault()s), so — matching a real browser — `drop`
+      // never even fires.
+      const invalidAccepted = await dropOnFolder({ kind: 'folder', id: 'trips' }, 'y2026');
+      expect(invalidAccepted).toBe(false);
       expect(sdkMock.setSharedSpaceAlbumFolder).not.toHaveBeenCalled();
       expect(sdkMock.updateSharedSpaceAlbumFolder).not.toHaveBeenCalled();
 
       // Prove the drop handler actually ran (rather than the event never reaching it at all): a
       // legal drop in the very same view — moving Rome from Italy into 2026 — does fire a request.
-      await dropOnFolder({ kind: 'album', id: 'a1' }, 'y2026');
+      const validAccepted = await dropOnFolder({ kind: 'album', id: 'a1' }, 'y2026');
+      expect(validAccepted).toBe(true);
       await waitFor(() =>
         expect(sdkMock.setSharedSpaceAlbumFolder).toHaveBeenCalledWith(
           expect.objectContaining({ albumId: 'a1', sharedSpaceAlbumFolderMoveAlbumDto: { folderId: 'y2026' } }),
@@ -841,11 +890,13 @@ describe('Space albums page', () => {
       );
 
       // Invalid: a1 already sits in "trips".
-      await dropOnFolder({ kind: 'album', id: 'a1' }, 'trips');
+      const invalidAccepted = await dropOnFolder({ kind: 'album', id: 'a1' }, 'trips');
+      expect(invalidAccepted).toBe(false);
       expect(sdkMock.setSharedSpaceAlbumFolder).not.toHaveBeenCalled();
 
       // Prove the handler ran: a2, which does NOT already sit in "trips", legally drops there.
-      await dropOnFolder({ kind: 'album', id: 'a2' }, 'trips');
+      const validAccepted = await dropOnFolder({ kind: 'album', id: 'a2' }, 'trips');
+      expect(validAccepted).toBe(true);
       await waitFor(() =>
         expect(sdkMock.setSharedSpaceAlbumFolder).toHaveBeenCalledWith(
           expect.objectContaining({ albumId: 'a2', sharedSpaceAlbumFolderMoveAlbumDto: { folderId: 'trips' } }),
@@ -862,8 +913,9 @@ describe('Space albums page', () => {
         folders: [makeFolder('trips', 'Trips'), makeFolder('y2026', '2026', 'trips')],
       });
 
-      await dropOnFolder({ kind: 'folder', id: 'y2026' }, 'trips');
+      const accepted = await dropOnFolder({ kind: 'folder', id: 'y2026' }, 'trips');
 
+      expect(accepted).toBe(false);
       expect(sdkMock.setSharedSpaceAlbumFolder).not.toHaveBeenCalled();
       expect(sdkMock.updateSharedSpaceAlbumFolder).not.toHaveBeenCalled();
     });
@@ -890,7 +942,11 @@ describe('Space albums page', () => {
           expect.objectContaining({ albumId: 'a1', sharedSpaceAlbumFolderMoveAlbumDto: { folderId: 'trips' } }),
         ),
       );
-      await waitFor(() => expect(handleErrorMock).toHaveBeenCalled());
+      // The move-specific message, not merely "handleError fired at all" — reload()'s own
+      // (also-rejected, for the isolation reason above) albums refetch fires its OWN handleError
+      // call with a different message ("Failed to load albums"), so a bare toHaveBeenCalled()
+      // would stay green even with the move's own handleError call deleted entirely.
+      await waitFor(() => expect(handleErrorMock).toHaveBeenCalledWith(expect.anything(), 'Unable to move'));
       // ...but rolled back: still visible at the root, where it started, not stranded in "trips".
       expect(screen.getByText('Rome')).toBeInTheDocument();
     });
@@ -919,7 +975,10 @@ describe('Space albums page', () => {
           sharedSpaceAlbumFolderUpdateDto: { parentId: 'family' },
         }),
       );
-      await waitFor(() => expect(handleErrorMock).toHaveBeenCalled());
+      // Same reasoning as the album variant above: the specific move message, not a bare
+      // "something called handleError" that reload()'s own rejected folders refetch would
+      // also satisfy on its own.
+      await waitFor(() => expect(handleErrorMock).toHaveBeenCalledWith(expect.anything(), 'Unable to move'));
       // Rolled back: "Trips" is still a root-level folder card, not moved under "Family".
       expect(screen.getByText('Trips')).toBeInTheDocument();
     });
@@ -942,10 +1001,75 @@ describe('Space albums page', () => {
 
       await dropOnFolder({ kind: 'album', id: 'a1' }, 'trips');
 
-      await waitFor(() => expect(handleErrorMock).toHaveBeenCalled());
+      // The move-specific message — see the W-15 comment above for why a bare toHaveBeenCalled()
+      // can't tell "the move's own handleError call ran" apart from "only reload's unrelated,
+      // deliberately-rejected albums refetch called handleError".
+      await waitFor(() => expect(handleErrorMock).toHaveBeenCalledWith(expect.anything(), 'Unable to move'));
       expect(screen.getByText('Rome')).toBeInTheDocument();
       // The stale folder disappears from the grid once the reload lands.
       await waitFor(() => expect(screen.queryByTestId('space-album-folder-card')).not.toBeInTheDocument());
+    });
+
+    // Page-level proof that `folders`/`albums`/`canManage`/`onDropItem` are actually threaded
+    // through to SpaceAlbumFolderBreadcrumb (not just to the folder-card grid) — before this
+    // suite had no page-level drop assertion against the breadcrumb at all.
+    it('W-12: dropping an album on the root breadcrumb crumb calls the move endpoint', async () => {
+      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' })], SharedSpaceRole.Editor, {
+        folders: [makeFolder('trips', 'Trips')],
+        folderParam: 'trips',
+      });
+      await screen.findByTestId('space-album-folder-breadcrumb');
+
+      const accepted = await dropOnCrumb({ kind: 'album', id: 'a1' }, null);
+
+      expect(accepted).toBe(true);
+      await waitFor(() =>
+        expect(sdkMock.setSharedSpaceAlbumFolder).toHaveBeenCalledWith(
+          expect.objectContaining({ albumId: 'a1', sharedSpaceAlbumFolderMoveAlbumDto: { folderId: null } }),
+        ),
+      );
+    });
+
+    // The kebab "Move to folder…" is the accessible route — HTML5 drag-and-drop works on
+    // neither touch nor keyboard, so this is the PRIMARY way to move an album, not a fallback.
+    // Was previously uncovered at the page level: handleMoveAlbum and the onMove threading at
+    // all three SpaceAlbumCard render sites could be deleted with the suite green.
+    // No `folders` fixture here: SpaceAlbumFolderPickerModal is mocked out via modalManagerMock,
+    // so no real folder list needs to render — and a real rendered folder card would ALSO offer
+    // a "Move to folder…" option in its own kebab (same i18n key), making `findByText` ambiguous.
+    it('kebab "Move to folder…" opens the picker and calls the move endpoint', async () => {
+      modalManagerMock.show.mockResolvedValue({ folderId: 'trips' });
+      const album = makeAlbum({ id: 'a1', albumName: 'Rome', folderId: null });
+      renderPage([album], SharedSpaceRole.Editor);
+
+      const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
+      expect(menuButton).not.toBeNull();
+      await fireEvent.click(menuButton!);
+      await fireEvent.click(await screen.findByText('Move to folder…'));
+
+      await waitFor(() =>
+        expect(modalManagerMock.show).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ excludeFolderId: null, currentFolderId: null }),
+        ),
+      );
+      await waitFor(() =>
+        expect(sdkMock.setSharedSpaceAlbumFolder).toHaveBeenCalledWith(
+          expect.objectContaining({ albumId: 'a1', sharedSpaceAlbumFolderMoveAlbumDto: { folderId: 'trips' } }),
+        ),
+      );
+    });
+
+    it('kebab "Move to folder…": dismissing the picker fires no request', async () => {
+      modalManagerMock.show.mockResolvedValue(undefined);
+      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor);
+
+      const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
+      await fireEvent.click(menuButton!);
+      await fireEvent.click(await screen.findByText('Move to folder…'));
+
+      await waitFor(() => expect(modalManagerMock.show).toHaveBeenCalled());
+      expect(sdkMock.setSharedSpaceAlbumFolder).not.toHaveBeenCalled();
     });
 
     it('viewer cannot drag: the album card is not draggable', () => {

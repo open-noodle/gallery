@@ -2,7 +2,7 @@ import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immi
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import SpaceAlbumFolderBreadcrumb from '$lib/components/spaces/space-album-folder-breadcrumb.svelte';
-import { setActiveDragPayload, writeDragPayload } from '$lib/utils/space-album-folder-dnd';
+import { getActiveDragPayload, setActiveDragPayload, writeDragPayload } from '$lib/utils/space-album-folder-dnd';
 
 const crumb = (id: string, name: string, parentId: string | null = null) =>
   ({
@@ -172,6 +172,30 @@ describe('SpaceAlbumFolderBreadcrumb', () => {
       await fireEvent.drop(tripsCrumb, { dataTransfer });
 
       expect(onDropItem).toHaveBeenCalledWith({ kind: 'album', id: 'a1' }, 'trips');
+    });
+
+    // A drop can be the tail end of a drag whose source node the resulting move already
+    // detached from the DOM (an optimistic re-render scoping the moved item out of view), so the
+    // matching `dragend` that normally clears the active-drag slot may never fire on that
+    // element. A crumb drop must clear it directly rather than leave a stale payload for a later,
+    // unrelated drag to inherit.
+    it('clears the active drag payload on drop', async () => {
+      render(SpaceAlbumFolderBreadcrumb, {
+        path: [crumb('trips', 'Trips')],
+        folders,
+        albums: [album('a1')],
+        canManage: true,
+        onNavigate: vi.fn(),
+        onDropItem: vi.fn(),
+      });
+      const tripsCrumb = screen.getByTestId('breadcrumb-trips');
+
+      setActiveDragPayload({ kind: 'album', id: 'a1' });
+      const dataTransfer = makeDataTransfer();
+      writeDragPayload(dataTransfer, { kind: 'album', id: 'a1' });
+      await fireEvent.drop(tripsCrumb, { dataTransfer });
+
+      expect(getActiveDragPayload()).toBeNull();
     });
   });
 });

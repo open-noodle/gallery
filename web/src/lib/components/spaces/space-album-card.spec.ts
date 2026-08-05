@@ -199,4 +199,26 @@ describe('SpaceAlbumCard', () => {
 
     expect(getActiveDragPayload()).toBeNull();
   });
+
+  // draggable="false" on the outer div does not stop the inner <a>/cover image from being
+  // natively draggable in a real browser (dragstart bubbles up regardless), so the handler
+  // itself has to gate on canManage rather than relying solely on the draggable attribute.
+  it('dragstart writes nothing when canManage is false, even if a dragstart is fired', async () => {
+    const { container } = renderWithTooltips(SpaceAlbumCard, {
+      spaceId: 's-1',
+      album: { ...album, id: 'a-9' },
+      canManage: false,
+    });
+    const card = container.querySelector('[data-testid="space-album-card"]')!;
+    const dataTransfer = {
+      setData: vi.fn(),
+      getData: () => '',
+      types: [] as string[],
+    } as unknown as DataTransfer;
+
+    await fireEvent.dragStart(card, { dataTransfer });
+
+    expect(dataTransfer.setData).not.toHaveBeenCalled();
+    expect(getActiveDragPayload()).toBeNull();
+  });
 });

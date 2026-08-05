@@ -37,6 +37,19 @@ describe('space-album-folder-dnd', () => {
     expect(readDragPayload(dt)).toEqual({ kind: 'album', id: 'a1' });
   });
 
+  // The actually load-bearing half of the previous test: writeDragPayload must NOT also write
+  // under a generic type like text/plain. Nothing in the app currently reads text/plain off a
+  // drag, but that emptiness is what keeps this payload invisible to any code that keys off it —
+  // asserting only the positive (SPACE_ITEM_MIME round-trips) would miss a regression that wrote
+  // to both.
+  it('does not also write the payload under a generic MIME type', () => {
+    const dt = makeDataTransfer();
+
+    writeDragPayload(dt, { kind: 'album', id: 'a1' });
+
+    expect(dt.getData('text/plain')).toBe('');
+  });
+
   it('returns null for a drag carrying no gallery payload', () => {
     expect(readDragPayload(makeDataTransfer())).toBeNull();
   });
