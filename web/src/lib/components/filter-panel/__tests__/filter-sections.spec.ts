@@ -1306,6 +1306,12 @@ describe('storageKey prop', () => {
     localStorage.clear();
   });
 
+  // The section toggles now live inside the cog's popover, so anything that clicks or queries one
+  // has to open it first.
+  async function openSectionMenu() {
+    await fireEvent.click(screen.getByTestId('section-menu-btn'));
+  }
+
   it('should use custom storage key for localStorage persistence', async () => {
     const customKey = 'gallery-filter-photos';
     render(FilterPanel, {
@@ -1315,6 +1321,7 @@ describe('storageKey prop', () => {
         storageKey: customKey,
       },
     });
+    await openSectionMenu();
     const ratingToggle = screen.getByTestId('section-toggle-rating');
     await fireEvent.click(ratingToggle);
     const stored = localStorage.getItem(customKey);
@@ -1331,6 +1338,7 @@ describe('storageKey prop', () => {
         timeBuckets: [],
       },
     });
+    await openSectionMenu();
     const ratingToggle = screen.getByTestId('section-toggle-rating');
     await fireEvent.click(ratingToggle);
     expect(localStorage.getItem('gallery-filter-visible-sections')).toBeTruthy();

@@ -73,7 +73,7 @@
   }}
 />
 
-<main class="relative h-dvh overflow-hidden px-2 pt-(--navbar-height) max-md:pt-(--navbar-height-md) md:px-6">
+<main class="relative h-dvh overflow-hidden px-2 pt-(--control-bar-height) max-md:pt-(--control-bar-height-md) md:px-6">
   <Timeline enableRouting={true} {album} bind:timelineManager {options} assetInteraction={assetMultiSelectManager}>
     <section class="px-2 pt-8 md:px-0 md:pt-24">
       <!-- ALBUM TITLE -->

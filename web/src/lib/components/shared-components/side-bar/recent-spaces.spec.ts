@@ -14,6 +14,15 @@ import { sharedSpaceLinkedAlbumFactory } from '@test-data/factories/shared-space
 const mockPage = vi.hoisted(() => ({ url: new URL('https://gallery.test/photos') }));
 vi.mock('$app/state', () => ({ page: mockPage }));
 
+const sidebarMocks = vi.hoisted(() => ({
+  sidebarModeStore: {
+    layout: 'expanded' as 'overlay' | 'rail' | 'expanded',
+    hoverExpanded: false,
+    railExpanded: false,
+  },
+}));
+vi.mock('$lib/stores/sidebar-mode.svelte', () => ({ sidebarModeStore: sidebarMocks.sidebarModeStore }));
+
 vi.mock('$lib/utils/handle-error', () => ({
   handleError: vi.fn(),
 }));
@@ -37,6 +46,9 @@ describe('RecentSpaces component', () => {
     recentSpaceAlbumsExpanded.set({});
     userInteraction.spaceAlbums = undefined;
     mockPage.url = new URL('https://gallery.test/photos');
+    sidebarMocks.sidebarModeStore.layout = 'expanded';
+    sidebarMocks.sidebarModeStore.hoverExpanded = false;
+    sidebarMocks.sidebarModeStore.railExpanded = false;
   });
 
   const renderAndFlush = async () => {
@@ -114,6 +126,61 @@ describe('RecentSpaces component', () => {
   // The sidebar always identifies a space by its thumbnail. New-activity is still surfaced on the
   // Spaces page (space card / table) and by the in-timeline new-assets divider, so the sidebar
   // doesn't trade the space's identity for an activity dot.
+  // The rail keeps these rows so it holds the expanded sidebar's vertical rhythm - dropping them
+  // was what made rows below an expanded Spaces jump on hover. Collapsed, a row is just its
+  // thumbnail, centred, which is how Google Photos' rail shows spaces and albums.
+  describe('rail mode', () => {
+    const railWithAlbums = async (albumCount: number) => {
+      const space = sharedSpaceFactory.build({ id: 'rail-1', albumCount, thumbnailAssetId: 'asset-rail-1' });
+      const albums = Array.from({ length: albumCount }, (_, i) =>
+        sharedSpaceLinkedAlbumFactory.build({ id: `album-${i}`, linkedAt: `2026-01-0${i + 1}T00:00:00.000Z` }),
+      );
+      sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
+      sdkMock.getSharedSpaceAlbums.mockResolvedValueOnce(albums);
+      recentSpaceAlbumsExpanded.set({ 'rail-1': true });
+      sidebarMocks.sidebarModeStore.layout = 'rail';
+      await renderAndFlush();
+      return space;
+    };
+
+    it('collapses the space row to its centred thumbnail', async () => {
+      await railWithAlbums(1);
+
+      const row = screen.getByTestId('sidebar-space-rail-1');
+      // Centred by padding, not `justify-center`, so expanding animates instead of snapping
+      // the thumbnail to the row's start first. See sidebar-nav-item for the full reasoning.
+      expect(row.className).not.toContain('justify-center');
+      expect(row.className).toContain('w-12');
+      expect(screen.getByTestId('sidebar-space-thumbnail-rail-1')).toBeInTheDocument();
+    });
+
+    it('drops the chevron, which is unreadable beside a 24px thumbnail', async () => {
+      await railWithAlbums(1);
+
+      expect(screen.queryByTestId('sidebar-space-chevron-rail-1')).not.toBeInTheDocument();
+    });
+
+    it('keeps the see-all row so the rail stays a row-for-row match', async () => {
+      // Four albums: only three render, so the see-all row appears.
+      await railWithAlbums(4);
+
+      const seeAll = screen.getByTestId('sidebar-space-see-all-rail-1');
+      expect(seeAll.className).toContain('w-12');
+      expect(seeAll.className).not.toMatch(/\bps-16\b/);
+    });
+
+    it('restores the full rows while hover-expanded', async () => {
+      sidebarMocks.sidebarModeStore.hoverExpanded = true;
+      sidebarMocks.sidebarModeStore.railExpanded = true;
+      await railWithAlbums(1);
+
+      const row = screen.getByTestId('sidebar-space-rail-1');
+      expect(row.className).toContain('ps-12');
+      expect(row.className).not.toContain('w-12');
+      expect(screen.getByTestId('sidebar-space-chevron-rail-1')).toBeInTheDocument();
+    });
+  });
+
   describe('space thumbnail', () => {
     it('shows the space thumbnail when there are no new assets', async () => {
       const space = sharedSpaceFactory.build({
@@ -273,11 +340,12 @@ describe('RecentSpaces component', () => {
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
       await renderAndFlush();
 
-      // @immich/ui's NavbarItem renders its own expand/collapse chevron at size="1em"; the Spaces
-      // chevron sits directly above this one, so anything larger reads as a mismatched pair.
+      // The Spaces row's own chevron sits directly above this one, so the two have to stay the
+      // same size or they read as a mismatched pair. Both moved from 1em to 1.25em together:
+      // 1em was too faint beside a 1.375em nav icon and a 1.5em thumbnail.
       const icon = screen.getByTestId('sidebar-space-chevron-space-a').querySelector('svg');
-      expect(icon).toHaveAttribute('width', '1em');
-      expect(icon).toHaveAttribute('height', '1em');
+      expect(icon).toHaveAttribute('width', '1.25em');
+      expect(icon).toHaveAttribute('height', '1.25em');
     });
 
     it('shows no chevron when albumCount is undefined', async () => {

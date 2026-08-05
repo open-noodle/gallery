@@ -141,8 +141,14 @@
 body {
   background-color: var(--gallery-chrome);
 }
+/* The sidebar shell paints its surface on an inner scroll panel that is absolutely
+ * positioned over the <nav>, so recoloring the nav alone leaves the user looking at the
+ * panel's own `bg-light` — the darker *content* surface, not the chrome. Both are listed:
+ * the nav still shows through during the rail's width transition. Panel identified by its
+ * scroll-container class signature, as the <main> rule below does. */
 #dashboard-navbar,
-#sidebar {
+#sidebar,
+#sidebar > div.absolute.overflow-y-auto {
   background-color: var(--gallery-chrome);
 }
 /* Google-Photos-style sidebar nav pills: fully-rounded on BOTH sides for the hover/active background,
@@ -152,7 +158,18 @@ body {
   border-radius: 9999px;
 }
 /* Reserve the scrollbar gutter so expanding Spaces/Albums (which overflows the sidebar and shows the
- * thin scrollbar) doesn't shrink the pill width and shift the side margins. */
+ * thin scrollbar) doesn't shrink the pill width and shift the side margins. A gutter only applies to
+ * a scroll container, so it has to name whichever element scrolls: /tags and /folders opt out of the
+ * rail and scroll the <nav> itself. Doubles as the inline-end breathing room opposite `ps-2` —
+ * without it the tree rows run flush to the edge.
+ *
+ * The rail shell's inner scroll panel deliberately does NOT get a gutter. Its pills are inset by
+ * their own symmetric margins, and a gutter would stack on top of the end margin only, so the pill
+ * would sit 12px from the start edge and 12px + a scrollbar from the end — the lopsided look this
+ * inset exists to fix, and worse on platforms with classic scrollbars. Without it the scrollbar
+ * simply narrows the panel's content box, so the pill keeps 12px from whichever edge it meets, the
+ * scrollbar's or the panel's. That is what Google Photos does, and it cannot shift the rail's
+ * start-anchored icons either, since a scrollbar only ever takes width from the end. */
 #sidebar {
   scrollbar-gutter: stable;
 }
@@ -180,7 +197,17 @@ main:has(> div.absolute.overflow-y-auto) {
   background-color: var(--immich-ui-light);
   border-radius: 16px;
   overflow: clip;
-  margin: 8px; /* chrome gutter so all four rounded corners read as a floating panel */
+  /* Chrome gutter so the rounded corners read as a floating panel - but none at the inline
+   * start, where the sidebar already provides the boundary, and none at the top, where the
+   * navbar does. A start gutter widened the chrome band beyond the sidebar itself, so the
+   * rail's icons, centred in their 5rem column, sat left of centre in the grey the user
+   * actually sees. A top gutter did the same to the navbar: it paints the same chrome, so the
+   * two read as one band and the search field ended up 4px from the top of it and 12px from
+   * the bottom. --navbar-height carries the 8px instead, and UserPageLayout adds it to the
+   * ControlAppBar reserve on the pages that hide the navbar - so the panel's own top edge is
+   * unmoved either way, only the field inside the navbar shifts down onto the band's centre. */
+  margin-block: 0 8px;
+  margin-inline: 0 8px;
 }
 /* Inset ONLY the page header row (title + actions: Albums, Settings, …) so it
  * clears the panel's rounded corners. Keyed on the stable page-header-title-row
