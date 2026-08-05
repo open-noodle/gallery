@@ -1968,6 +1968,7 @@ class SpaceAlbumsRoute extends PageRouteInfo<SpaceAlbumsRouteArgs> {
     Key? key,
     required String spaceId,
     required bool canEdit,
+    String? folderId,
     void Function(String)? onToggle,
     void Function(String)? onUnlink,
     VoidCallback? onLink,
@@ -1978,6 +1979,7 @@ class SpaceAlbumsRoute extends PageRouteInfo<SpaceAlbumsRouteArgs> {
            key: key,
            spaceId: spaceId,
            canEdit: canEdit,
+           folderId: folderId,
            onToggle: onToggle,
            onUnlink: onUnlink,
            onLink: onLink,
@@ -1995,6 +1997,7 @@ class SpaceAlbumsRoute extends PageRouteInfo<SpaceAlbumsRouteArgs> {
         key: args.key,
         spaceId: args.spaceId,
         canEdit: args.canEdit,
+        folderId: args.folderId,
         onToggle: args.onToggle,
         onUnlink: args.onUnlink,
         onLink: args.onLink,
@@ -2008,6 +2011,7 @@ class SpaceAlbumsRouteArgs {
     this.key,
     required this.spaceId,
     required this.canEdit,
+    this.folderId,
     this.onToggle,
     this.onUnlink,
     this.onLink,
@@ -2019,6 +2023,8 @@ class SpaceAlbumsRouteArgs {
 
   final bool canEdit;
 
+  final String? folderId;
+
   final void Function(String)? onToggle;
 
   final void Function(String)? onUnlink;
@@ -2027,7 +2033,7 @@ class SpaceAlbumsRouteArgs {
 
   @override
   String toString() {
-    return 'SpaceAlbumsRouteArgs{key: $key, spaceId: $spaceId, canEdit: $canEdit, onToggle: $onToggle, onUnlink: $onUnlink, onLink: $onLink}';
+    return 'SpaceAlbumsRouteArgs{key: $key, spaceId: $spaceId, canEdit: $canEdit, folderId: $folderId, onToggle: $onToggle, onUnlink: $onUnlink, onLink: $onLink}';
   }
 
   @override
@@ -2037,12 +2043,17 @@ class SpaceAlbumsRouteArgs {
     return key == other.key &&
         spaceId == other.spaceId &&
         canEdit == other.canEdit &&
+        folderId == other.folderId &&
         onLink == other.onLink;
   }
 
   @override
   int get hashCode =>
-      key.hashCode ^ spaceId.hashCode ^ canEdit.hashCode ^ onLink.hashCode;
+      key.hashCode ^
+      spaceId.hashCode ^
+      canEdit.hashCode ^
+      folderId.hashCode ^
+      onLink.hashCode;
 }
 
 /// generated route for

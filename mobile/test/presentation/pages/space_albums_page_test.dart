@@ -1,33 +1,69 @@
 import 'dart:async';
 
+import 'package:auto_route/auto_route.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/constants/locales.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
+import 'package:immich_mobile/domain/models/space_album_folder.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
+import 'package:immich_mobile/domain/utils/background_sync.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/generated/codegen_loader.g.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/pages/library/spaces/collection_sort.dart';
 import 'package:immich_mobile/pages/library/spaces/space_albums.page.dart';
+import 'package:immich_mobile/presentation/widgets/spaces/space_album_folder_card.widget.dart';
+import 'package:immich_mobile/providers/background_sync.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
+import 'package:immich_mobile/repositories/drift_album_api_repository.dart';
+import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
+import 'package:immich_mobile/routing/router.dart';
+import 'package:mocktail/mocktail.dart';
 
 import '../../test_utils.dart';
 import '../../widget_tester_extensions.dart';
 
 // ---------------------------------------------------------------------------
+// Mocks (Task 10 — "Move to folder…" wiring)
+// ---------------------------------------------------------------------------
+
+class MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiRepository {}
+
+class MockBackgroundSyncManager extends Mock implements BackgroundSyncManager {}
+
+/// `spaceAlbumActionsProvider` eagerly builds ALL three of its dependencies (repo, album-api-repo,
+/// sync manager) regardless of which `SpaceAlbumActions` method is actually called — see
+/// `space_album_actions.dart`'s `Provider<SpaceAlbumActions>`. `moveAlbumToFolder` never touches
+/// the album-api-repo, but without overriding it here the real `driftAlbumApiRepositoryProvider`
+/// still gets built during `ref.read(spaceAlbumActionsProvider)`, which resolves the real
+/// `apiServiceProvider` -> `ApiService()` -> `NetworkRepository.client` -> `_client!`, a null
+/// check on a static field only ever set by the native-platform-only `NetworkRepository.init()` —
+/// crashing with "Null check operator used on a null value" every time. The page's own try/catch
+/// swallows that (showing an error toast, correct production behaviour), which silently turns into
+/// "the mocked repo was never called" here instead of a loud crash. Overriding it with a mock sidesteps
+/// the real ApiService/NetworkRepository chain entirely.
+class MockDriftAlbumApiRepository extends Mock implements DriftAlbumApiRepository {}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+const spaceId = 'space-1';
 
 SpaceAlbum _album({
   required String id,
   String? name,
   int assetCount = 0,
   bool showInTimeline = true,
+  String? folderId,
   DateTime? linkedAt,
   DateTime? updatedAt,
   DateTime? createdAt,
@@ -36,16 +72,114 @@ SpaceAlbum _album({
   name: name ?? 'Album $id',
   assetCount: assetCount,
   showInTimeline: showInTimeline,
+  folderId: folderId,
   linkedAt: linkedAt ?? DateTime.utc(2026, 1, 1),
   updatedAt: updatedAt ?? DateTime.utc(2026, 1, 1),
   createdAt: createdAt ?? DateTime.utc(2026, 1, 1),
 );
 
+/// Task 10 (U-*) test fixture — positional (id, name), matching the plan's brief verbatim.
+SpaceAlbum album(String id, String name, {String? folderId}) => _album(id: id, name: name, folderId: folderId);
+
+/// Task 10 (U-*) test fixture — positional (id, name), matching the plan's brief verbatim.
+SpaceAlbumFolder folder(String id, String name, {String? parentId}) =>
+    SpaceAlbumFolder(id: id, spaceId: spaceId, parentId: parentId, name: name);
+
 /// Overrides [spaceAlbumsProvider] with a fixed list, for use with
 /// [WidgetTester.pumpConsumerWidget]'s `overrides` param.
+///
+/// Task 10 added a folders stream the page now watches unconditionally — every override list
+/// must supply one (an empty list here) or the page throws resolving `driftProvider`.
 List<Override> _overrides({required String spaceId, required List<SpaceAlbum> albums}) => [
   spaceAlbumsProvider(spaceId).overrideWith((_) => Stream.value(albums)),
+  spaceAlbumFoldersProvider(spaceId).overrideWith((_) => Stream.value(const <SpaceAlbumFolder>[])),
 ];
+
+/// Pumps [SpaceAlbumsPage] with fixed folder/album lists — no database, no router. Used by every
+/// U-* test that only asserts on-screen content (U-01, U-04, U-05, U-09, U-10, U-13).
+///
+/// Uses a taller-than-default viewport (matching the move-to-folder tests further down this file)
+/// because folders render as their OWN sliver section above the albums section (§4.2): a single
+/// folder card already consumes most of the default 800x600 test surface, so a folder + album card
+/// together need more room to both land in the tree without scrolling — the same category of
+/// default-viewport limitation the pre-existing "row 2 may be below the fold" comment on the search
+/// test (below) already flags for this file.
+Future<void> pumpPage(
+  WidgetTester tester, {
+  required List<SpaceAlbumFolder> folders,
+  required List<SpaceAlbum> albums,
+  String? folderId,
+  bool canEdit = true,
+}) async {
+  tester.view.devicePixelRatio = 3.0;
+  tester.view.physicalSize = const Size(2400, 3600);
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpConsumerWidget(
+    SpaceAlbumsPage(spaceId: spaceId, canEdit: canEdit, folderId: folderId),
+    overrides: [
+      spaceAlbumsProvider(spaceId).overrideWith((_) => Stream.value(albums)),
+      spaceAlbumFoldersProvider(spaceId).overrideWith((_) => Stream.value(folders)),
+    ],
+  );
+}
+
+/// Pushes [SpaceAlbumsPage] onto a real AutoRoute stack (harness home is a plain placeholder, NOT
+/// a [SpaceAlbumsPage], so a pop leaves zero [SpaceAlbumsPage] instances behind — see U-11) with
+/// the folders provider backed by the caller's own controllable [folderStream]. Returns the
+/// router so the caller can drive further navigation (U-02, U-03) or just let U-11's `maybePop`
+/// play out.
+Future<RootStackRouter> pumpPageWithFolderStream(
+  WidgetTester tester,
+  Stream<List<SpaceAlbumFolder>> folderStream, {
+  required String folderId,
+  List<SpaceAlbum> albums = const [],
+  bool canEdit = true,
+}) async {
+  final router = RootStackRouter.build(
+    routes: [
+      AutoRoute(initial: true, page: PageInfo('SpaceAlbumsHarness', builder: (_) => const SizedBox.shrink())),
+      AutoRoute(page: SpaceAlbumsRoute.page),
+    ],
+  );
+
+  await tester.pumpWidget(
+    EasyLocalization(
+      supportedLocales: locales.values.toList(),
+      path: translationsPath,
+      startLocale: locales.values.first,
+      fallbackLocale: locales.values.first,
+      saveLocale: false,
+      useFallbackTranslations: true,
+      assetLoader: const CodegenLoader(),
+      child: ProviderScope(
+        overrides: [
+          spaceAlbumsProvider(spaceId).overrideWith((_) => Stream.value(albums)),
+          spaceAlbumFoldersProvider(spaceId).overrideWith((_) => folderStream),
+        ],
+        child: Builder(
+          builder: (context) => MaterialApp.router(
+            debugShowCheckedModeBanner: false,
+            routerConfig: router.config(),
+            localizationsDelegates: context.localizationDelegates,
+            supportedLocales: context.supportedLocales,
+            locale: context.locale,
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pump();
+  // NOT awaited: `push`'s Future resolves only once the pushed route is later POPPED (Navigator
+  // semantics — see `_addNewPage` in auto_route, which returns the pop completer), so awaiting it
+  // here would deadlock forever: nothing pops this route until the CALLER (after this helper
+  // returns) drives the folder stream and lets U-11's `context.maybePop()` fire. Matches the
+  // sibling pattern (`timeline_scroll_to_top_test.dart`'s `unawaited(router.pushPath(...))`).
+  unawaited(router.push(SpaceAlbumsRoute(spaceId: spaceId, canEdit: canEdit, folderId: folderId)));
+  await tester.pumpAndSettle();
+  return router;
+}
 
 /// The visually-first card among [ids] (top-left-most in reading order),
 /// determined from actual on-screen position — robust to grid
@@ -65,8 +199,6 @@ String _firstCardByPosition(WidgetTester tester, List<String> ids) {
 // ---------------------------------------------------------------------------
 
 void main() {
-  const spaceId = 'space-1';
-
   late Drift db;
 
   setUpAll(() async {
@@ -385,7 +517,10 @@ void main() {
 
     await tester.pumpConsumerWidget(
       const SpaceAlbumsPage(spaceId: spaceId, canEdit: true),
-      overrides: [spaceAlbumsProvider(spaceId).overrideWith((_) => controller.stream)],
+      overrides: [
+        spaceAlbumsProvider(spaceId).overrideWith((_) => controller.stream),
+        spaceAlbumFoldersProvider(spaceId).overrideWith((_) => Stream.value(const <SpaceAlbumFolder>[])),
+      ],
     );
 
     await tester.enterText(find.byKey(const Key('space-albums-search-field')), 'ita');
@@ -430,5 +565,262 @@ void main() {
     );
     expect(gesture.onTap, isNotNull);
     expect(gesture.behavior, HitTestBehavior.opaque);
+  });
+
+  // ---------------------------------------------------------------------
+  // Task 10 — folders (U-01..U-05, U-09..U-11, U-13)
+  // ---------------------------------------------------------------------
+
+  testWidgets('U-01: renders folders before albums', (tester) async {
+    await pumpPage(tester, folders: [folder('trips', 'Trips')], albums: [album('a1', 'Rome')]);
+
+    final folderY = tester.getTopLeft(find.byType(SpaceAlbumFolderCard)).dy;
+    final albumY = tester.getTopLeft(find.byKey(const Key('space-album-card-a1'))).dy;
+    expect(folderY, lessThan(albumY));
+  });
+
+  testWidgets('U-04: a space with no folders renders the flat list unchanged', (tester) async {
+    await pumpPage(tester, folders: const [], albums: [album('a1', 'Rome')]);
+
+    expect(find.byType(SpaceAlbumFolderCard), findsNothing);
+    expect(find.text('Rome'), findsOneWidget);
+  });
+
+  testWidgets('U-05: an empty folder shows the folder-specific empty state', (tester) async {
+    await pumpPage(tester, folders: [folder('trips', 'Trips')], albums: const [], folderId: 'trips');
+
+    expect(find.byKey(const Key('space-album-folder-empty')), findsOneWidget);
+    expect(find.byKey(const Key('space-albums-empty')), findsNothing);
+  });
+
+  testWidgets('U-09: a query hides folders and shows space-wide hits with paths', (tester) async {
+    await pumpPage(
+      tester,
+      folders: [folder('trips', 'Trips')],
+      albums: [
+        album('a1', 'Venice', folderId: 'trips'),
+        album('a2', 'Rome'),
+      ],
+    );
+
+    await tester.enterText(find.byKey(const Key('space-albums-search-field')), 'ven');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SpaceAlbumFolderCard), findsNothing);
+    expect(find.text('Venice'), findsOneWidget);
+    expect(find.textContaining('Trips'), findsWidgets);
+  });
+
+  // U-13 — the page ALREADY renders a no-match state (Key('space-albums-no-match')) when a
+  // query filters everything out. Switching search to tree-wide flattening must PRESERVE it;
+  // replacing it with a blank grid would silently regress existing behaviour.
+  testWidgets('U-13: a tree-wide search matching nothing shows the no-match state', (tester) async {
+    await pumpPage(tester, folders: [folder('trips', 'Trips')], albums: [album('a1', 'Rome')]);
+
+    await tester.enterText(find.byKey(const Key('space-albums-search-field')), 'zzzz');
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('space-albums-no-match')), findsOneWidget);
+    expect(find.byType(SpaceAlbumFolderCard), findsNothing);
+  });
+
+  testWidgets('U-10: clearing the query returns to the current level', (tester) async {
+    await pumpPage(tester, folders: [folder('trips', 'Trips')], albums: [album('a1', 'Rome')]);
+
+    await tester.enterText(find.byKey(const Key('space-albums-search-field')), 'zzz');
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('space-albums-search-field')), '');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SpaceAlbumFolderCard), findsOneWidget);
+    expect(find.text('Rome'), findsOneWidget);
+  });
+
+  // U-11 — the local-first difference from web: the screen can be invalidated underneath the
+  // user by an incoming sync at any moment, not only on navigation. If the folder we are inside
+  // disappears from the stream, we must pop rather than sit on a folder that no longer exists.
+  testWidgets('U-11: pops when the folder you are inside disappears from the stream', (tester) async {
+    final controller = StreamController<List<SpaceAlbumFolder>>();
+    addTearDown(controller.close);
+    await pumpPageWithFolderStream(tester, controller.stream, folderId: 'trips');
+    controller.add([folder('trips', 'Trips')]);
+    await tester.pumpAndSettle();
+
+    controller.add(const []);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SpaceAlbumsPage), findsNothing);
+  });
+
+  // T-08 (tree module) already guarantees this at the unit level; this re-verifies at the PAGE
+  // level that no redundant "folder exists" filter was layered on top of `folderContents` here —
+  // exactly the trap called out for this task (see teeth check #2 in the task report).
+  testWidgets('an album whose folder has not synced yet still appears at the root', (tester) async {
+    await pumpPage(
+      tester,
+      folders: const [], // 'ghost-folder' has not synced — no row for it at all
+      albums: [album('a1', 'Orphaned', folderId: 'ghost-folder')],
+    );
+
+    expect(find.byKey(const Key('space-album-card-a1')), findsOneWidget);
+    expect(find.text('Orphaned'), findsOneWidget);
+  });
+
+  // ---------------------------------------------------------------------
+  // Task 10 — navigation (U-02, U-03), observed via the route stack per the
+  // repo's existing auto_route navigation-assertion pattern (see
+  // test/presentation/widgets/filter_sheet/strips/strips_test.dart and
+  // test/presentation/widgets/timeline/timeline_scroll_to_top_test.dart).
+  // ---------------------------------------------------------------------
+
+  /// Pushes [SpaceAlbumsPage] (root level) onto a real AutoRoute stack, harness home a plain
+  /// placeholder (not a [SpaceAlbumsPage]) so the stack composition is unambiguous.
+  Future<RootStackRouter> pumpRoutedPage(
+    WidgetTester tester, {
+    required List<SpaceAlbumFolder> folders,
+    required List<SpaceAlbum> albums,
+    bool canEdit = true,
+  }) async {
+    final router = RootStackRouter.build(
+      routes: [
+        AutoRoute(initial: true, page: PageInfo('SpaceAlbumsHarness', builder: (_) => const SizedBox.shrink())),
+        AutoRoute(page: SpaceAlbumsRoute.page),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasyLocalization(
+        supportedLocales: locales.values.toList(),
+        path: translationsPath,
+        startLocale: locales.values.first,
+        fallbackLocale: locales.values.first,
+        saveLocale: false,
+        useFallbackTranslations: true,
+        assetLoader: const CodegenLoader(),
+        child: ProviderScope(
+          overrides: [
+            spaceAlbumsProvider(spaceId).overrideWith((_) => Stream.value(albums)),
+            spaceAlbumFoldersProvider(spaceId).overrideWith((_) => Stream.value(folders)),
+          ],
+          child: Builder(
+            builder: (context) => MaterialApp.router(
+              debugShowCheckedModeBanner: false,
+              routerConfig: router.config(),
+              localizationsDelegates: context.localizationDelegates,
+              supportedLocales: context.supportedLocales,
+              locale: context.locale,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    // NOT awaited — see the identical comment on `pumpPageWithFolderStream` above: `push`'s Future
+    // only resolves once this route is popped, and neither U-02 nor U-03 ever pops THIS (root)
+    // route (U-03 pops the child folder route pushed by tapping the card), so awaiting it here
+    // would deadlock.
+    unawaited(router.push(SpaceAlbumsRoute(spaceId: spaceId, canEdit: canEdit)));
+    await tester.pumpAndSettle();
+    return router;
+  }
+
+  testWidgets('U-02: tapping a folder card pushes the route one level deeper', (tester) async {
+    final router = await pumpRoutedPage(tester, folders: [folder('trips', 'Trips')], albums: [album('a1', 'Rome')]);
+    expect(router.stackData.length, 2); // harness home + the root SpaceAlbumsPage
+
+    await tester.tap(find.byType(SpaceAlbumFolderCard));
+    await tester.pumpAndSettle();
+
+    expect(router.stackData.length, 3);
+    final topArgs = router.stackData.last.args as SpaceAlbumsRouteArgs;
+    expect(topArgs.folderId, 'trips');
+  });
+
+  testWidgets('U-03: system back from a folder returns to the parent level', (tester) async {
+    final router = await pumpRoutedPage(tester, folders: [folder('trips', 'Trips')], albums: [album('a1', 'Rome')]);
+
+    await tester.tap(find.byType(SpaceAlbumFolderCard));
+    await tester.pumpAndSettle();
+    expect((router.stackData.last.args as SpaceAlbumsRouteArgs).folderId, 'trips');
+
+    await router.maybePop();
+    await tester.pumpAndSettle();
+
+    expect(router.stackData.length, 2);
+    expect((router.stackData.last.args as SpaceAlbumsRouteArgs).folderId, isNull);
+  });
+
+  // ---------------------------------------------------------------------
+  // Task 10 — "Move to folder…" wiring on the album card. The picker's
+  // `picked` flag is the only thing that distinguishes a dismissal from
+  // "picked the root" (both resolve folderId: null) — see teeth check #1
+  // in the task report.
+  // ---------------------------------------------------------------------
+
+  testWidgets('dismissing the move-to-folder picker does not move the album', (tester) async {
+    tester.view.devicePixelRatio = 3.0;
+    tester.view.physicalSize = const Size(2400, 3600);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repo = MockSharedSpaceApiRepository();
+    final syncMgr = MockBackgroundSyncManager();
+    when(() => syncMgr.syncRemote()).thenAnswer((_) async => true);
+
+    await tester.pumpConsumerWidget(
+      const SpaceAlbumsPage(spaceId: spaceId, canEdit: true),
+      overrides: [
+        spaceAlbumsProvider(spaceId).overrideWith((_) => Stream.value([album('a1', 'Rome')])),
+        spaceAlbumFoldersProvider(spaceId).overrideWith((_) => Stream.value([folder('trips', 'Trips')])),
+        sharedSpaceApiRepositoryProvider.overrideWithValue(repo),
+        backgroundSyncProvider.overrideWithValue(syncMgr),
+        driftAlbumApiRepositoryProvider.overrideWithValue(MockDriftAlbumApiRepository()),
+      ],
+    );
+
+    await tester.tap(find.byKey(const Key('space-album-card-menu-a1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Move to folder…'));
+    await tester.pumpAndSettle();
+
+    // Tap the modal barrier (outside the sheet) to dismiss without picking.
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    verifyNever(() => repo.setAlbumFolder(any(), any(), any()));
+  });
+
+  testWidgets('picking a folder from the move sheet moves the album', (tester) async {
+    tester.view.devicePixelRatio = 3.0;
+    tester.view.physicalSize = const Size(2400, 3600);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repo = MockSharedSpaceApiRepository();
+    final syncMgr = MockBackgroundSyncManager();
+    when(() => repo.setAlbumFolder(any(), any(), any())).thenAnswer((_) async {});
+    when(() => syncMgr.syncRemote()).thenAnswer((_) async => true);
+
+    await tester.pumpConsumerWidget(
+      const SpaceAlbumsPage(spaceId: spaceId, canEdit: true),
+      overrides: [
+        spaceAlbumsProvider(spaceId).overrideWith((_) => Stream.value([album('a1', 'Rome')])),
+        spaceAlbumFoldersProvider(spaceId).overrideWith((_) => Stream.value([folder('trips', 'Trips')])),
+        sharedSpaceApiRepositoryProvider.overrideWithValue(repo),
+        backgroundSyncProvider.overrideWithValue(syncMgr),
+        driftAlbumApiRepositoryProvider.overrideWithValue(MockDriftAlbumApiRepository()),
+      ],
+    );
+
+    await tester.tap(find.byKey(const Key('space-album-card-menu-a1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Move to folder…'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('folder-option-trips')));
+    await tester.pumpAndSettle();
+
+    verify(() => repo.setAlbumFolder(spaceId, 'a1', 'trips')).called(1);
+    verify(() => syncMgr.syncRemote()).called(1);
   });
 }
