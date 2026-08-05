@@ -1194,7 +1194,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('A folder with that name already exists here'), findsOneWidget);
-    expect(find.text("Couldn't create folder"), findsNothing);
+    expect(find.text('Unable to create folder'), findsNothing);
 
     await settleToast(tester);
   });
