@@ -391,6 +391,25 @@ describe('Space albums page', () => {
       await waitFor(() => expect(invalidateAll).toHaveBeenCalled());
     });
 
+    // Same regression class as the unlink case above, reached a different way: deleting a folder
+    // promotes its albums one level up, so their folderId changes. The album detail page's back
+    // button reads that folderId out of the layout's cached linkedAlbums, so leaving the cache
+    // stale sends the user back to a folder that no longer exists.
+    it('deleting a folder invalidates layout data so album placements stay current', async () => {
+      modalManagerMock.showDialog.mockResolvedValue(true);
+      sdkMock.deleteSharedSpaceAlbumFolder.mockResolvedValue(undefined as never);
+      renderPage([], SharedSpaceRole.Editor, { folders: [makeFolder('trips', 'Trips')] });
+
+      // findBy, not getBy: `folders` starts empty and is only populated by the on-mount fetch,
+      // so the card does not exist on the first paint.
+      const menu = await screen.findByTestId('space-album-folder-card-menu');
+      await fireEvent.click(menu.querySelector('button')!);
+      await fireEvent.click(await screen.findByText('Delete folder'));
+
+      await waitFor(() => expect(sdkMock.deleteSharedSpaceAlbumFolder).toHaveBeenCalled());
+      await waitFor(() => expect(invalidateAll).toHaveBeenCalled());
+    });
+
     it('toggle show-in-timeline calls updateSharedSpaceAlbum and flips optimistic state', async () => {
       sdkMock.updateSharedSpaceAlbum.mockResolvedValue(undefined as never);
       modalManagerMock.show.mockResolvedValue({ confirmed: true, alsoHideFromMyTimeline: false });
@@ -829,6 +848,20 @@ describe('Space albums page', () => {
           expect.objectContaining({ albumId: 'a1', sharedSpaceAlbumFolderMoveAlbumDto: { folderId: 'trips' } }),
         ),
       );
+    });
+
+    // The [spaceId] layout caches linkedAlbums, and each row's folderId is what the album detail
+    // page's back button navigates to. Refreshing only this page's state leaves that cache stale,
+    // so a just-moved album sends you back to the folder it used to live in.
+    it('invalidates the layout cache after moving an album, so back lands in the new folder', async () => {
+      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
+        folders: [makeFolder('trips', 'Trips')],
+      });
+
+      await dropOnFolder({ kind: 'album', id: 'a1' }, 'trips');
+
+      await waitFor(() => expect(sdkMock.setSharedSpaceAlbumFolder).toHaveBeenCalled());
+      await waitFor(() => expect(invalidateAll).toHaveBeenCalled());
     });
 
     // W-12, folder variant: dropping a folder onto another folder calls the folder-move endpoint.

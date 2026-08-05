@@ -368,6 +368,9 @@
       await deleteSharedSpaceAlbumFolder({ id: space.id, folderId: folder.id });
       // If we were standing inside it, the fallback effect above returns us to the root.
       await reload();
+      // Deleting a folder promotes its albums one level up, changing their folderId — so the
+      // layout's cached linkedAlbums are now stale for the same reason as an explicit move.
+      await invalidateAll();
     } catch (error) {
       handleError(error, $t('space_album_folder_error_delete'));
     }
@@ -385,6 +388,11 @@
         sharedSpaceAlbumFolderMoveAlbumDto: { folderId: targetFolderId },
       });
       await reload();
+      // reload() only refreshes THIS page's state. The [spaceId] layout separately caches
+      // linkedAlbums, and each of those rows carries the folderId that the album detail page's
+      // back button navigates to — so without this, opening a just-moved album and pressing
+      // back returns to the folder it used to live in.
+      await invalidateAll();
     } catch (error) {
       albums = previous; // rollback
       handleError(error, $t('space_album_folder_error_move'));
