@@ -676,15 +676,13 @@ describe('SharedSpaceRepository — album folder primitives', () => {
     await expect(sut.hasSiblingAlbumFolderName(space.id, trips.id, '2026', y2026.id)).resolves.toBe(false);
   });
 
-  it('updateAlbumFolder renames and reparents, and returns false for an unknown folder', async () => {
+  // Task 3 review, Part B: updateAlbumFolder's dto is narrowed to `{ name: string }` only — a
+  // parentId write through this method would bypass the advisory-lock + cycle machinery in
+  // moveAlbumFolderChecked, which is now the compiler-enforced only path for reparenting (see
+  // "moveAlbumFolderChecked reparents a folder" below for that coverage).
+  it('updateAlbumFolder renames, and returns false for an unknown folder', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const archive = await sut.createAlbumFolder({
-      spaceId: space.id,
-      parentId: null,
-      name: 'Archive',
-      createdById: user.id,
-    });
     const trips = await sut.createAlbumFolder({
       spaceId: space.id,
       parentId: null,
@@ -692,12 +690,10 @@ describe('SharedSpaceRepository — album folder primitives', () => {
       createdById: user.id,
     });
 
-    await expect(sut.updateAlbumFolder(space.id, trips.id, { name: 'Travel', parentId: archive.id })).resolves.toBe(
-      true,
-    );
+    await expect(sut.updateAlbumFolder(space.id, trips.id, { name: 'Travel' })).resolves.toBe(true);
     await expect(sut.getAlbumFolderById(space.id, trips.id)).resolves.toMatchObject({
       name: 'Travel',
-      parentId: archive.id,
+      parentId: null,
     });
 
     await expect(sut.updateAlbumFolder(space.id, '00000000-0000-4000-8000-000000000000', { name: 'X' })).resolves.toBe(
