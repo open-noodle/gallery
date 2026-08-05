@@ -1,6 +1,5 @@
 import type { SharedSpaceAlbumFolderDto } from '@immich/sdk';
 import { render, screen } from '@testing-library/svelte';
-import SpaceAlbumFolderNameModal from '$lib/modals/SpaceAlbumFolderNameModal.svelte';
 import SpaceAlbumFolderPickerModal from '$lib/modals/SpaceAlbumFolderPickerModal.svelte';
 
 const folder = (id: string, name: string, parentId: string | null = null) =>
