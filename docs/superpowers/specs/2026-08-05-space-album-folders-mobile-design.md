@@ -296,34 +296,45 @@ Every scenario is a test. §9 maps each ID to exactly one owning layer.
 
 ### 5.5 Actions — `A-*`
 
-| ID   | When                   | Then                                                    |
-| ---- | ---------------------- | ------------------------------------------------------- |
-| A-01 | create a folder        | POST called, then one sync-nudge                        |
-| A-02 | rename a folder        | PATCH called with the name, then one sync-nudge         |
-| A-03 | move a folder          | PATCH called with `parentId`, then one sync-nudge       |
-| A-04 | delete a folder        | DELETE called, then one sync-nudge                      |
-| A-05 | move an album          | PUT `…/albums/:id/folder` called, then one sync-nudge   |
-| A-06 | any of the above fails | the exception propagates and **no** sync-nudge is fired |
+| ID   | When                      | Then                                                     |
+| ---- | ------------------------- | -------------------------------------------------------- |
+| A-01 | create a folder           | POST called, then one sync-nudge                         |
+| A-02 | rename a folder           | PATCH called with the name, then one sync-nudge          |
+| A-03 | move a folder             | PATCH called with `parentId`, then one sync-nudge        |
+| A-04 | delete a folder           | DELETE called, then one sync-nudge                       |
+| A-05 | move an album             | PUT `…/albums/:id/folder` called, then one sync-nudge    |
+| A-06 | any of the above fails    | the exception propagates and **no** sync-nudge is fired  |
+| A-07 | move a folder to the ROOT | PATCH sends parentId EXPLICITLY null, not an omitted key |
+| A-08 | move an album to the ROOT | PUT sends folderId null                                  |
 
 A-06 matters: the established comment in `SpaceAlbumActions` states the nudge is deliberately not
 fired on failure, so the next regular cycle reconciles instead.
 
+A-07 matters more than it looks. The generated `SharedSpaceAlbumFolderUpdateDto` is three-state
+(`Optional<String?>`), and this repo's prevailing idiom is
+`x == null ? const Optional.absent() : Optional.present(x)`. Applied to `parentId` that idiom is
+WRONG: moving a folder to the root means sending `parentId: null`, and omitting the key instead
+makes the move a silent no-op. `toJson` writes the key whenever `isPresent`, so the correct call is
+`Optional.present(parentId)` unconditionally. A-07 and A-08 are the only scenarios that would catch
+this, and the bug is invisible until a user tries to move something out of a folder.
+
 ### 5.6 UI — `U-*`
 
-| ID   | Given                                | When                | Then                                                 |
-| ---- | ------------------------------------ | ------------------- | ---------------------------------------------------- |
-| U-01 | folders and root albums              | the page renders    | folders render before albums                         |
-| U-02 | a folder card                        | tapped              | pushes the route one level deeper                    |
-| U-03 | inside a folder                      | system back         | returns to the parent level                          |
-| U-04 | a space with no folders              | the page renders    | identical to today's flat list                       |
-| U-05 | an empty folder                      | the page renders    | folder-specific empty state, not the space-level one |
-| U-06 | a viewer (`canEdit` false)           | the page renders    | no ⋮ on folder cards, no New folder action           |
-| U-07 | the picker for folder X              | it opens            | X and its descendants are disabled                   |
-| U-08 | the picker for an album              | it opens            | every folder is selectable                           |
-| U-09 | a search query                       | typed               | folders hidden; space-wide hits with path lines      |
-| U-10 | a search query                       | cleared             | returns to the current folder's contents             |
-| U-11 | the folder you are inside is deleted | the stream re-emits | the route pops to the parent — see §6                |
-| U-12 | a folder with only subfolders        | the card renders    | the count is recursive, never "0 albums"             |
+| ID   | Given                                | When                                                  | Then                                                 |
+| ---- | ------------------------------------ | ----------------------------------------------------- | ---------------------------------------------------- |
+| U-01 | folders and root albums              | the page renders                                      | folders render before albums                         |
+| U-02 | a folder card                        | tapped                                                | pushes the route one level deeper                    |
+| U-03 | inside a folder                      | system back                                           | returns to the parent level                          |
+| U-04 | a space with no folders              | the page renders                                      | identical to today's flat list                       |
+| U-05 | an empty folder                      | the page renders                                      | folder-specific empty state, not the space-level one |
+| U-06 | a viewer (`canEdit` false)           | the page renders                                      | no ⋮ on folder cards, no New folder action           |
+| U-07 | the picker for folder X              | it opens                                              | X and its descendants are disabled                   |
+| U-08 | the picker for an album              | it opens                                              | every folder is selectable                           |
+| U-09 | a search query                       | typed                                                 | folders hidden; space-wide hits with path lines      |
+| U-10 | a search query                       | cleared                                               | returns to the current folder's contents             |
+| U-11 | the folder you are inside is deleted | the stream re-emits                                   | the route pops to the parent — see §6                |
+| U-12 | a folder with only subfolders        | the card renders                                      | the count is recursive, never "0 albums"             |
+| U-13 | a tree-wide search matching nothing  | the existing no-match state renders, not a blank grid |
 
 ### 5.7 Why R-07 matters more than it looks
 
@@ -363,7 +374,7 @@ reason, then implement.
 | 3     | Mobile: Drift table, `folderId` column, migration to 37                           | R-01–R-08                   |
 | 4     | Mobile: sync handlers                                                             | H-01–H-06                   |
 | 5     | Mobile: pure tree module                                                          | T-01–T-14                   |
-| 6     | Mobile: folder actions                                                            | A-01–A-06                   |
+| 6     | Mobile: folder actions                                                            | A-01–A-08                   |
 | 7     | Mobile: folder card, picker sheet                                                 | U-06, U-07, U-08, U-12      |
 | 8     | Mobile: page integration, navigation, search                                      | U-01–U-05, U-09, U-10, U-11 |
 
@@ -425,8 +436,8 @@ Each scenario ID has exactly one owning layer.
 | Mobile medium (Drift) | `mobile/test/medium/repositories/space_album_repository_test.dart`                          | R-01–R-08                          |
 | Mobile migration      | `mobile/test/drift/main/migration_test.dart` (SchemaVerifier) plus a data-preservation case | R-07, R-08                         |
 | Mobile medium (Drift) | `mobile/test/medium/repositories/sync_stream_folder_test.dart` _(new)_                      | H-01–H-04, H-06                    |
-| Mobile unit           | `mobile/test/providers/infrastructure/space_album_actions_test.dart`                        | A-01–A-06, H-05                    |
-| Mobile widget         | `mobile/test/widgets/spaces/space_album_folder_card_test.dart` _(new)_ and siblings         | U-01, U-05–U-08, U-12              |
+| Mobile unit           | `mobile/test/providers/infrastructure/space_album_actions_test.dart`                        | A-01–A-08, H-05                    |
+| Mobile widget         | `mobile/test/widgets/spaces/space_album_folder_card_test.dart` _(new)_ and siblings         | U-01, U-05–U-08, U-12, U-13        |
 | Mobile widget         | `mobile/test/widgets/spaces/space_albums_page_test.dart` _(new)_                            | U-02, U-03, U-04, U-09, U-10, U-11 |
 
 ### 9.1 Traps this repo has already been bitten by
