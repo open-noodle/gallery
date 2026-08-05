@@ -1004,13 +1004,21 @@ describe('/asset', () => {
     });
 
     it('should handle a duplicate', async () => {
+      // Byte-identical to formats/jpg/el_torcal_rocks.jpg, uploaded by the file-types test above —
+      // duplicate detection is per-owner sha1, so the differing name/extension is irrelevant.
       const filepath = 'formats/jpeg/el_torcal_rocks.jpeg';
-      const { status } = await utils.createAsset(admin.accessToken, {
-        assetData: {
-          bytes: await readFile(join(testAssetDir, filepath)),
-          filename: basename(filepath),
+      const { status } = await utils.createAsset(
+        admin.accessToken,
+        {
+          assetData: {
+            bytes: await readFile(join(testAssetDir, filepath)),
+            filename: basename(filepath),
+          },
         },
-      });
+        // Duplicate detection is the subject here, so read the raw status rather than the
+        // retry-idempotent one createAsset reports by default.
+        { allowDuplicate: true },
+      );
 
       expect(status).toBe(AssetMediaStatus.Duplicate);
     });
