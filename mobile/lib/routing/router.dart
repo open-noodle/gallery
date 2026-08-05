@@ -166,7 +166,12 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: SpaceDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SpaceMembersRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SpacePeopleRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: SpaceAlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
+    // No _duplicateGuard: this route is legitimately self-recursive — drilling into a folder
+    // pushes SpaceAlbumsRoute onto SpaceAlbumsRoute with a different folderId. DuplicateGuard
+    // compares route NAMES only, so it would treat every folder tap as a duplicate and block it.
+    // Comparing args instead is not an option: the args carry callbacks, and closures are never
+    // equal across rebuilds, which would silently disable the guard for every route that has them.
+    AutoRoute(page: SpaceAlbumsRoute.page, guards: [_authGuard]),
     AutoRoute(page: SpaceAlbumDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
     CustomRoute(
       page: SpaceLinkAlbumRoute.page,
