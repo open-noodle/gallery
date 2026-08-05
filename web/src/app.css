@@ -105,9 +105,28 @@
     font-family: var(--font-sans);
     letter-spacing: 0.1px;
 
-    /* Used by layouts to ensure proper spacing between navbar and content */
-    --navbar-height: calc(4.5rem + 4px);
-    --navbar-height-md: calc(4.5rem + 4px - 14px);
+    /* The top NavigationBar's own height, which UserPageLayout subtracts from the viewport to
+       size the page grid beneath it. Google Photos' bar is 3.5rem - a 48px search field with 4px
+       above and below - and ours holds that same field, but carries 4rem because it also owns the
+       8px gutter separating it from the content panel. The panel does not float below the navbar:
+       it starts at the navbar's bottom edge, and the navbar supplies that gap instead (see the
+       panel's `margin-block` in gallery-theme.css). Both surfaces paint --gallery-chrome, so the
+       seam between them is invisible and the user reads one band - which is why the field has to
+       be centred in 4rem. Centred in 3.5rem it sat 4px from the top of that band and 12px from
+       the bottom, visibly low. The md variant is held equal rather than dropped - the field and
+       the gutter are the same at every width, and the logo no longer sets the floor since it is
+       2.5rem on small screens too - so that the ~10 pages referencing it keep working and can
+       differ again later. */
+    --navbar-height: 4rem;
+    --navbar-height-md: 4rem;
+
+    /* Reserve for ControlAppBar - the absolutely-positioned bar that stands in for the navbar on
+       the album, person, partner and shared-link viewers, which render no NavigationBar at all.
+       It measures 80px, so this deliberately stays at the old navbar height rather than tracking
+       --navbar-height: the two shared one value until the navbar was thinned, and reusing it
+       would have slid every one of those pages' content up underneath the control bar. */
+    --control-bar-height: calc(4.5rem + 4px);
+    --control-bar-height-md: calc(4.5rem + 4px - 14px);
   }
 
   :root.dark {
