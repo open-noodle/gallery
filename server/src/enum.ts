@@ -1165,6 +1165,7 @@ export enum SyncRequestType {
   // Shared-space album sync (Phase 2A): one request type per granularity.
   SharedSpaceAlbumsV1 = 'SharedSpaceAlbumsV1',
   SharedSpaceAlbumLinksV1 = 'SharedSpaceAlbumLinksV1',
+  SharedSpaceAlbumFoldersV1 = 'SharedSpaceAlbumFoldersV1',
   SharedSpaceAlbumToAssetsV1 = 'SharedSpaceAlbumToAssetsV1',
   SharedSpaceAlbumAssetsV1 = 'SharedSpaceAlbumAssetsV1',
   SharedSpaceAlbumAssetExifsV1 = 'SharedSpaceAlbumAssetExifsV1',
@@ -1312,6 +1313,10 @@ export enum SyncEntityType {
   SharedSpaceAlbumHiddenV1 = 'SharedSpaceAlbumHiddenV1',
   SharedSpaceAlbumHiddenDeleteV1 = 'SharedSpaceAlbumHiddenDeleteV1',
   SharedSpaceAlbumHiddenBackfillV1 = 'SharedSpaceAlbumHiddenBackfillV1',
+  // folder family (space-keyed) ← clone SharedSpaceAlbumLinkSync
+  SharedSpaceAlbumFolderV1 = 'SharedSpaceAlbumFolderV1',
+  SharedSpaceAlbumFolderDeleteV1 = 'SharedSpaceAlbumFolderDeleteV1',
+  SharedSpaceAlbumFolderBackfillV1 = 'SharedSpaceAlbumFolderBackfillV1',
 
   // membership ← clone AlbumToAssetSync
   SharedSpaceAlbumToAssetV1 = 'SharedSpaceAlbumToAssetV1',

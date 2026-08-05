@@ -85,6 +85,7 @@ export class SyncRepository {
   sharedSpaceAlbum: SharedSpaceAlbumSync;
   sharedSpaceAlbumLink: SharedSpaceAlbumLinkSync;
   sharedSpaceAlbumHidden: SharedSpaceAlbumHiddenSync;
+  sharedSpaceAlbumFolder: SharedSpaceAlbumFolderSync;
   sharedSpaceAlbumToAsset: SharedSpaceAlbumToAssetSync;
   sharedSpaceAlbumAsset: SharedSpaceAlbumAssetSync;
   sharedSpaceAlbumAssetExif: SharedSpaceAlbumAssetExifSync;
@@ -124,6 +125,7 @@ export class SyncRepository {
     this.sharedSpaceAlbum = new SharedSpaceAlbumSync(this.db);
     this.sharedSpaceAlbumLink = new SharedSpaceAlbumLinkSync(this.db);
     this.sharedSpaceAlbumHidden = new SharedSpaceAlbumHiddenSync(this.db);
+    this.sharedSpaceAlbumFolder = new SharedSpaceAlbumFolderSync(this.db);
     this.sharedSpaceAlbumToAsset = new SharedSpaceAlbumToAssetSync(this.db);
     this.sharedSpaceAlbumAsset = new SharedSpaceAlbumAssetSync(this.db);
     this.sharedSpaceAlbumAssetExif = new SharedSpaceAlbumAssetExifSync(this.db);
@@ -1689,6 +1691,52 @@ export class SharedSpaceAlbumHiddenSync extends BaseSync {
       .select(SHARED_SPACE_ALBUM_HIDDEN_SYNC_COLUMNS)
       .where('shared_space_album_hidden.userId', '=', asUuid(options.userId))
       .where('album.deletedAt', 'is', null)
+      .stream();
+  }
+}
+
+// Columns emitted for each folder row.
+const SHARED_SPACE_ALBUM_FOLDER_SYNC_COLUMNS = [
+  'shared_space_album_folder.id',
+  'shared_space_album_folder.spaceId',
+  'shared_space_album_folder.parentId',
+  'shared_space_album_folder.name',
+  'shared_space_album_folder.createdAt',
+  'shared_space_album_folder.updatedAt',
+  'shared_space_album_folder.updateId',
+] as const;
+
+// Streams a space's album folders. Structurally a clone of SharedSpaceAlbumLinkSync, minus the
+// soft-delete join — folders have no deletedAt and no album to check.
+//
+// accessibleSpaces() on BOTH arms is the privacy gate: a folder NAME is member-only information,
+// the same rule the REST listing enforces. Dropping it from either arm is a leak, not a style slip.
+export class SharedSpaceAlbumFolderSync extends BaseSync {
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, spaceId: string) {
+    return this.backfillQuery('shared_space_album_folder', options)
+      .select(SHARED_SPACE_ALBUM_FOLDER_SYNC_COLUMNS)
+      .where('shared_space_album_folder.spaceId', '=', spaceId)
+      .stream();
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getDeletes(options: SyncQueryOptions) {
+    return this.auditQuery('shared_space_album_folder_audit', options)
+      .select(['id', 'spaceId', 'folderId'])
+      .where('spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+      .stream();
+  }
+
+  cleanupAuditTable(daysAgo: number) {
+    return this.auditCleanup('shared_space_album_folder_audit', daysAgo);
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getUpserts(options: SyncQueryOptions) {
+    return this.upsertQuery('shared_space_album_folder', options)
+      .select(SHARED_SPACE_ALBUM_FOLDER_SYNC_COLUMNS)
+      .where('shared_space_album_folder.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
       .stream();
   }
 }
