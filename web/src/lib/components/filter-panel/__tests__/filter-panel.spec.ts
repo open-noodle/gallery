@@ -353,13 +353,30 @@ describe('FilterPanel', () => {
     expect(getByTestId('discovery-panel').hasAttribute('inert')).toBe(true);
   });
 
-  it('gives the toggle-row pills a press-scale and a reduced-motion guard', () => {
-    const { getByTestId } = render(FilterPanel, {
-      props: { config: { sections: ['timeline'], providers: {} }, timeBuckets: [] },
+  // Built-in collapse unmounts the panel body, taking any open menu with it. externalToggle does
+  // not - the panel stays mounted at w-0, clipped and inert - so an open menu survives the
+  // collapse and is still open on reopen unless it is explicitly closed.
+  it('closes an open section menu when collapsed in externalToggle mode', async () => {
+    const { rerender } = render(FilterPanel, {
+      props: {
+        config: { sections: ['timeline', 'people'], providers: {} },
+        timeBuckets: [],
+        externalToggle: true,
+        collapsed: false,
+      },
     });
-    const toggle = getByTestId('section-toggle-timeline');
-    expect(toggle.className).toContain('active:scale-90');
-    expect(toggle.className).toContain('motion-reduce:transition-none');
+
+    await fireEvent.click(screen.getByTestId('section-menu-btn'));
+    expect(screen.getByTestId('section-menu')).toBeTruthy();
+
+    await rerender({
+      config: { sections: ['timeline', 'people'], providers: {} },
+      timeBuckets: [],
+      externalToggle: true,
+      collapsed: true,
+    });
+
+    expect(screen.getByTestId('section-menu-btn')).toHaveAttribute('aria-expanded', 'false');
   });
 
   describe('emptyText prop', () => {
@@ -504,32 +521,162 @@ describe('Section Selector', () => {
     });
   }
 
+  // The section toggles now live inside the cog's popover, so anything that clicks or queries one
+  // has to open it first.
+  async function openSectionMenu() {
+    await fireEvent.click(screen.getByTestId('section-menu-btn'));
+  }
+
   beforeEach(() => {
     localStorage.clear();
   });
 
   // --- Rendering ---
 
-  // Test 1
-  it('should render toggle row with icons for all configured sections', () => {
+  // The cog replaces the old icon row. It is gated exactly as that row was, on the page having
+  // configured sections at all.
+  it('renders the section cog when sections are configured', () => {
+    renderPanel(['people', 'rating']);
+
+    expect(screen.getByTestId('section-menu-btn')).toBeTruthy();
+  });
+
+  it('renders no section cog when the config has no sections', () => {
+    renderPanel([]);
+
+    expect(screen.queryByTestId('section-menu-btn')).toBeNull();
+  });
+
+  it('renders no section cog once the panel is collapsed', async () => {
+    renderPanel(['people', 'rating']);
+
+    await fireEvent.click(screen.getByTestId('collapse-panel-btn'));
+
+    expect(screen.queryByTestId('section-menu-btn')).toBeNull();
+    expect(screen.getByTestId('collapsed-icon-strip')).toBeTruthy();
+  });
+
+  // Boundary of the gate: one section is still enough to warrant the control, and hiding it
+  // leaves the panel on its empty state rather than blank.
+  it('renders the cog for a single configured section and lands on the empty state when hidden', async () => {
+    renderPanel(['people']);
+
+    await openSectionMenu();
+    await fireEvent.click(screen.getByTestId('section-toggle-people'));
+
+    expect(screen.getByTestId('show-all-sections')).toBeTruthy();
+  });
+
+  // Two independent routes back from "everything hidden"; neither may shadow the other.
+  it('restores every section from the menu reset', async () => {
+    renderPanel(['people', 'rating']);
+
+    await openSectionMenu();
+    await fireEvent.click(screen.getByTestId('section-toggle-people'));
+    await fireEvent.click(screen.getByTestId('section-toggle-rating'));
+    await fireEvent.click(screen.getByTestId('section-menu-show-all'));
+
+    expect(screen.getByTestId('filter-section-people')).toBeTruthy();
+    expect(screen.getByTestId('filter-section-rating')).toBeTruthy();
+  });
+
+  it('restores every section from the empty-state link', async () => {
+    renderPanel(['people', 'rating']);
+
+    await openSectionMenu();
+    await fireEvent.click(screen.getByTestId('section-toggle-people'));
+    await fireEvent.click(screen.getByTestId('section-toggle-rating'));
+    await fireEvent.click(screen.getByTestId('show-all-sections'));
+
+    expect(screen.getByTestId('filter-section-people')).toBeTruthy();
+    expect(screen.getByTestId('filter-section-rating')).toBeTruthy();
+  });
+
+  // Show all with nothing hidden must not toggle anything off, and must leave the menu usable.
+  it('leaves everything visible when Show all is used with nothing hidden', async () => {
+    renderPanel(['people', 'rating']);
+
+    await openSectionMenu();
+    await fireEvent.click(screen.getByTestId('section-menu-show-all'));
+
+    expect(screen.getByTestId('filter-section-people')).toBeTruthy();
+    expect(screen.getByTestId('filter-section-rating')).toBeTruthy();
+    expect(screen.getByTestId('section-menu')).toBeTruthy();
+  });
+
+  // The toggles MOVED - they are not also still sitting in the header. Without this, leaving the old
+  // row in place would satisfy every other test in this file: they all find a toggle either way, and
+  // testing-library only throws on duplicate testids.
+  it('keeps the section toggles out of the DOM until the menu is opened', async () => {
+    renderPanel(['people', 'rating']);
+
+    expect(screen.queryByTestId('section-toggle-people')).toBeNull();
+
+    await openSectionMenu();
+
+    expect(screen.getByTestId('section-toggle-people')).toBeTruthy();
+  });
+
+  // The aggregate dot is the only thing on screen saying "something is filtering out of sight" while
+  // the menu is shut, so it is asserted with the menu closed. `personIds` is the field the existing
+  // per-section dot tests at `:660-684` use.
+  it('shows a dot on the cog when a hidden section still holds a filter', async () => {
+    const filters = createFilterState();
+    filters.personIds = ['person-1'];
+    renderPanel(['people', 'rating'], filters);
+
+    await openSectionMenu();
+    await fireEvent.click(screen.getByTestId('section-toggle-people'));
+    await fireEvent.keyDown(screen.getByTestId('section-menu-btn'), { key: 'Escape' });
+
+    expect(screen.getByTestId('section-menu-btn')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByTestId('section-menu-dot')).toBeTruthy();
+  });
+
+  it('shows no dot on the cog when the hidden section holds no filter', async () => {
+    renderPanel(['people', 'rating']);
+
+    await openSectionMenu();
+    await fireEvent.click(screen.getByTestId('section-toggle-people'));
+
+    expect(screen.queryByTestId('section-menu-dot')).toBeNull();
+  });
+
+  // Derived, not latched: showing the section again clears the cue.
+  it('clears the cog dot when the hidden section is shown again', async () => {
+    const filters = createFilterState();
+    filters.personIds = ['person-1'];
+    renderPanel(['people', 'rating'], filters);
+
+    await openSectionMenu();
+    await fireEvent.click(screen.getByTestId('section-toggle-people'));
+    expect(screen.getByTestId('section-menu-dot')).toBeTruthy();
+
+    await fireEvent.click(screen.getByTestId('section-toggle-people'));
+
+    expect(screen.queryByTestId('section-menu-dot')).toBeNull();
+  });
+
+  it('should list every configured section in the menu', async () => {
     renderPanel();
-    expect(screen.getByTestId('section-toggle-row')).toBeTruthy();
+    await openSectionMenu();
     for (const section of allSections) {
       expect(screen.getByTestId(`section-toggle-${section}`)).toBeTruthy();
     }
   });
 
-  it('should keep favorites section toggle label distinct from asset favorite action', () => {
+  it('should keep favorites section toggle label distinct from asset favorite action', async () => {
     renderPanel(['favorites']);
+    await openSectionMenu();
 
     const favoritesToggle = screen.getByTestId('section-toggle-favorites');
     expect(favoritesToggle).toHaveAttribute('aria-label', 'Starred filter section');
-    expect(favoritesToggle).toHaveAttribute('title', 'Favorites');
   });
 
   // Test 2
-  it('should not render toggle icons for unconfigured sections', () => {
+  it('should not render toggle icons for unconfigured sections', async () => {
     renderPanel(['people', 'rating']);
+    await openSectionMenu();
     expect(screen.getByTestId('section-toggle-people')).toBeTruthy();
     expect(screen.getByTestId('section-toggle-rating')).toBeTruthy();
     expect(screen.queryByTestId('section-toggle-location')).toBeNull();
@@ -547,26 +694,13 @@ describe('Section Selector', () => {
     }
   });
 
-  // Test 4
-  it('should not render toggle row in collapsed panel state', async () => {
-    renderPanel(['people', 'rating']);
-    await fireEvent.click(screen.getByTestId('collapse-panel-btn'));
-    expect(screen.queryByTestId('section-toggle-row')).toBeNull();
-    expect(screen.getByTestId('collapsed-icon-strip')).toBeTruthy();
-  });
-
-  // Test 5
-  it('should not crash and not render toggle row with empty sections config', () => {
-    renderPanel([]);
-    expect(screen.queryByTestId('section-toggle-row')).toBeNull();
-  });
-
   // --- Toggle Interaction ---
 
   // Test 6
   it('should hide section from DOM when active icon is clicked', async () => {
     renderPanel();
     expect(screen.getByTestId('filter-section-people')).toBeTruthy();
+    await openSectionMenu();
     await fireEvent.click(screen.getByTestId('section-toggle-people'));
     expect(screen.queryByTestId('filter-section-people')).toBeNull();
   });
@@ -574,6 +708,7 @@ describe('Section Selector', () => {
   // Test 7
   it('should restore section to DOM when inactive icon is clicked', async () => {
     renderPanel();
+    await openSectionMenu();
     await fireEvent.click(screen.getByTestId('section-toggle-people'));
     expect(screen.queryByTestId('filter-section-people')).toBeNull();
     await fireEvent.click(screen.getByTestId('section-toggle-people'));
@@ -583,6 +718,7 @@ describe('Section Selector', () => {
   // Test 8
   it('should not affect other sections when one is toggled', async () => {
     renderPanel();
+    await openSectionMenu();
     await fireEvent.click(screen.getByTestId('section-toggle-people'));
     expect(screen.queryByTestId('filter-section-people')).toBeNull();
     expect(screen.getByTestId('filter-section-location')).toBeTruthy();
@@ -593,6 +729,7 @@ describe('Section Selector', () => {
   // Test 9
   it('should allow multiple sections to be hidden simultaneously', async () => {
     renderPanel();
+    await openSectionMenu();
     await fireEvent.click(screen.getByTestId('section-toggle-people'));
     await fireEvent.click(screen.getByTestId('section-toggle-location'));
     await fireEvent.click(screen.getByTestId('section-toggle-camera'));
@@ -607,6 +744,7 @@ describe('Section Selector', () => {
   it('should return to original state after rapid double-click', async () => {
     renderPanel();
     expect(screen.getByTestId('filter-section-people')).toBeTruthy();
+    await openSectionMenu();
     await fireEvent.click(screen.getByTestId('section-toggle-people'));
     await fireEvent.click(screen.getByTestId('section-toggle-people'));
     expect(screen.getByTestId('filter-section-people')).toBeTruthy();
@@ -616,6 +754,7 @@ describe('Section Selector', () => {
   it('should trigger all-hidden state when single section is hidden', async () => {
     renderPanel(['rating']);
     expect(screen.getByTestId('filter-section-rating')).toBeTruthy();
+    await openSectionMenu();
     await fireEvent.click(screen.getByTestId('section-toggle-rating'));
     expect(screen.queryByTestId('filter-section-rating')).toBeNull();
     expect(screen.getByTestId('show-all-sections')).toBeTruthy();
@@ -626,6 +765,7 @@ describe('Section Selector', () => {
   // Test 12
   it('should show empty state with "Show all" link when all sections hidden', async () => {
     renderPanel(['people', 'rating']);
+    await openSectionMenu();
     await fireEvent.click(screen.getByTestId('section-toggle-people'));
     await fireEvent.click(screen.getByTestId('section-toggle-rating'));
     expect(screen.queryByTestId('filter-section-people')).toBeNull();
@@ -636,6 +776,7 @@ describe('Section Selector', () => {
   // Test 13
   it('should restore all sections when "Show all" is clicked', async () => {
     renderPanel(['people', 'rating']);
+    await openSectionMenu();
     await fireEvent.click(screen.getByTestId('section-toggle-people'));
     await fireEvent.click(screen.getByTestId('section-toggle-rating'));
     expect(screen.getByTestId('show-all-sections')).toBeTruthy();
@@ -648,6 +789,7 @@ describe('Section Selector', () => {
   // Test 14
   it('should update all toggle icons to active/pressed after "Show all"', async () => {
     renderPanel(['people', 'rating']);
+    await openSectionMenu();
     await fireEvent.click(screen.getByTestId('section-toggle-people'));
     await fireEvent.click(screen.getByTestId('section-toggle-rating'));
     await fireEvent.click(screen.getByTestId('show-all-sections'));
@@ -662,6 +804,7 @@ describe('Section Selector', () => {
     const filters = createFilterState();
     filters.personIds = ['person-1'];
     renderPanel(['people', 'rating'], filters);
+    await openSectionMenu();
     await fireEvent.click(screen.getByTestId('section-toggle-people'));
     expect(screen.getByTestId('section-toggle-dot-people')).toBeTruthy();
   });
@@ -669,6 +812,7 @@ describe('Section Selector', () => {
   // Test 16
   it('should not show dot indicator on hidden section without active filter', async () => {
     renderPanel(['people', 'rating']);
+    await openSectionMenu();
     await fireEvent.click(screen.getByTestId('section-toggle-people'));
     expect(screen.queryByTestId('section-toggle-dot-people')).toBeNull();
   });
@@ -678,6 +822,7 @@ describe('Section Selector', () => {
     const filters = createFilterState();
     filters.selectedYear = 2023;
     renderPanel(['timeline', 'rating'], filters);
+    await openSectionMenu();
     await fireEvent.click(screen.getByTestId('section-toggle-timeline'));
     expect(screen.getByTestId('section-toggle-dot-timeline')).toBeTruthy();
   });
@@ -685,8 +830,9 @@ describe('Section Selector', () => {
   // --- Accessibility ---
 
   // Test 18
-  it('should set aria-pressed="true" on visible section toggle icons', () => {
+  it('should set aria-pressed="true" on visible section toggle icons', async () => {
     renderPanel(['people', 'rating']);
+    await openSectionMenu();
     expect(screen.getByTestId('section-toggle-people').getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByTestId('section-toggle-rating').getAttribute('aria-pressed')).toBe('true');
   });
@@ -694,6 +840,7 @@ describe('Section Selector', () => {
   // Test 19
   it('should set aria-pressed="false" on hidden section toggle icons', async () => {
     renderPanel(['people', 'rating']);
+    await openSectionMenu();
     await fireEvent.click(screen.getByTestId('section-toggle-people'));
     expect(screen.getByTestId('section-toggle-people').getAttribute('aria-pressed')).toBe('false');
     expect(screen.getByTestId('section-toggle-rating').getAttribute('aria-pressed')).toBe('true');
@@ -702,6 +849,7 @@ describe('Section Selector', () => {
   // Test 20
   it('should update aria-pressed correctly after toggle click', async () => {
     renderPanel(['people']);
+    await openSectionMenu();
     expect(screen.getByTestId('section-toggle-people').getAttribute('aria-pressed')).toBe('true');
     await fireEvent.click(screen.getByTestId('section-toggle-people'));
     expect(screen.getByTestId('section-toggle-people').getAttribute('aria-pressed')).toBe('false');
@@ -714,6 +862,7 @@ describe('Section Selector', () => {
   // Test 21
   it('should write updated visibility to localStorage when section is toggled', async () => {
     renderPanel(['people', 'rating']);
+    await openSectionMenu();
     await fireEvent.click(screen.getByTestId('section-toggle-people'));
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as { selected: string[] };
     expect(stored.selected).toContain('rating');
@@ -867,6 +1016,7 @@ describe('Section Selector', () => {
   // Test 26
   it('should use the correct localStorage key', async () => {
     renderPanel(['people', 'rating']);
+    await openSectionMenu();
     await fireEvent.click(screen.getByTestId('section-toggle-people'));
     expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
     expect(localStorage.getItem('some-other-key')).toBeNull();
@@ -877,6 +1027,7 @@ describe('Section Selector', () => {
   // Test 27
   it('should preserve visibility state across panel collapse/expand cycle', async () => {
     renderPanel(['people', 'rating']);
+    await openSectionMenu();
     await fireEvent.click(screen.getByTestId('section-toggle-people'));
     expect(screen.queryByTestId('filter-section-people')).toBeNull();
     expect(screen.getByTestId('filter-section-rating')).toBeTruthy();
@@ -894,6 +1045,7 @@ describe('Section Selector', () => {
   // Test 28
   it('should still allow filter interactions on visible sections (regression)', async () => {
     renderPanel(['timeline', 'rating']);
+    await openSectionMenu();
     await fireEvent.click(screen.getByTestId('section-toggle-rating'));
     expect(screen.queryByTestId('filter-section-rating')).toBeNull();
     // Timeline should still work
