@@ -51,8 +51,8 @@
 | `mobile/lib/presentation/widgets/spaces/space_album_folder_picker.widget.dart` | Move-destination sheet                  |
 | `mobile/test/utils/space_album_folders_test.dart`                              | T-01–T-14                               |
 | `mobile/test/medium/repositories/sync_stream_folder_test.dart`                 | H-01–H-04, H-06                         |
-| `mobile/test/widgets/spaces/space_album_folder_card_test.dart`                 | U-06, U-07, U-08, U-12                  |
-| `mobile/test/widgets/spaces/space_albums_page_test.dart`                       | U-01–U-05, U-09, U-10, U-11             |
+| `mobile/test/presentation/widgets/spaces/space_album_folder_card_test.dart`    | U-06, U-07, U-08, U-12                  |
+| `mobile/test/presentation/pages/space_albums_page_test.dart`                   | U-01–U-05, U-09–U-11, U-13              |
 
 **Mobile — modified**
 
@@ -634,44 +634,64 @@ git commit -m "feat(server): include folderId in the album link sync payload"
 Append to `mobile/test/drift/main/migration_test.dart`, inside the existing `main()`:
 
 ```dart
-  // R-07: this is the migration failure that would be catastrophic and silent. Drift's
-  // TableMigration REBUILDS the table; a wrong columnTransformer or a missed column drops rows.
-  // Every album in every space is linked through shared_space_album_link, so getting this wrong
-  // unlinks every album from every space on upgrade — recoverable only by a full resync, and not
-  // obviously attributable to this feature.
-  test('R-07: upgrading v36 to v37 preserves existing album links with a null folderId', () async {
-    final schema = await verifier.schemaAt(36);
-    final oldDb = v36.DatabaseAtV36(schema.newConnection());
-    await oldDb.into(oldDb.sharedSpaceEntity).insert(
-          v36.SharedSpaceEntityCompanion.insert(id: 'space-1', name: 'Family', createdById: 'user-1'),
-        );
-    await oldDb.into(oldDb.sharedSpaceAlbumLinkEntity).insert(
-          v36.SharedSpaceAlbumLinkEntityCompanion.insert(spaceId: 'space-1', albumId: 'album-1'),
-        );
-    await oldDb.close();
+  // R-07: the migration failure that would be catastrophic and silent. Drift's TableMigration
+  // REBUILDS the table; a wrong columnTransformer or a missed column drops rows. Every album in
+  // every space is linked through shared_space_album_link, so getting this wrong unlinks every
+  // album from every space on upgrade.
+  //
+  // Follows this file's established data-migration idiom exactly (see the from23To24 group):
+  // seed the OLD schema with raw SQL, close it, migrate a fresh Drift over the same schema, close
+  // that, then open the NEW schema class to assert. `migrateAndValidate` returns void — it does
+  // NOT hand back a database.
+  group('gallery-fork: from36To37 data migration', () {
+    test('R-07: preserves existing album links, with a null folderId', () async {
+      final schema = await verifier.schemaAt(36);
+      final oldDb = v36.DatabaseAtV36(schema.newConnection());
+      await oldDb.customStatement("""
+        INSERT INTO shared_space_entity (id, name, created_by_id)
+        VALUES ('space-1', 'Family', 'user-1')
+      """);
+      await oldDb.customStatement("""
+        INSERT INTO shared_space_album_link_entity (space_id, album_id, show_in_timeline)
+        VALUES ('space-1', 'album-1', 1)
+      """);
+      await oldDb.close();
 
-    final migrated = await verifier.migrateAndValidate(Drift(schema.newConnection()), 37);
-    final rows = await migrated.customSelect('SELECT * FROM shared_space_album_link_entity').get();
+      final dbForMigration = Drift(schema.newConnection());
+      await verifier.migrateAndValidate(dbForMigration, 37);
+      await dbForMigration.close();
 
-    expect(rows, hasLength(1));
-    expect(rows.single.data['album_id'], 'album-1');
-    expect(rows.single.data['folder_id'], isNull);
-    await migrated.close();
-  });
+      final migratedDb = v37.DatabaseAtV37(schema.newConnection());
+      final row = await migratedDb
+          .customSelect("SELECT * FROM shared_space_album_link_entity WHERE album_id = 'album-1'")
+          .getSingle();
 
-  // R-08
-  test('R-08: upgrading v36 to v37 creates an empty folder table', () async {
-    final schema = await verifier.schemaAt(36);
-    final migrated = await verifier.migrateAndValidate(Drift(schema.newConnection()), 37);
+      expect(row.data['album_id'], 'album-1');
+      expect(row.data['folder_id'], isNull);
+      await migratedDb.close();
+    });
 
-    final rows = await migrated.customSelect('SELECT * FROM shared_space_album_folder_entity').get();
+    // R-08
+    test('R-08: creates an empty folder table', () async {
+      final schema = await verifier.schemaAt(36);
+      final dbForMigration = Drift(schema.newConnection());
+      await verifier.migrateAndValidate(dbForMigration, 37);
+      await dbForMigration.close();
 
-    expect(rows, isEmpty);
-    await migrated.close();
+      final migratedDb = v37.DatabaseAtV37(schema.newConnection());
+      final count = await migratedDb
+          .customSelect('SELECT COUNT(*) AS c FROM shared_space_album_folder_entity')
+          .getSingle();
+
+      expect(count.data['c'], 0);
+      await migratedDb.close();
+    });
   });
 ```
 
-Add `import 'generated/schema_v36.dart' as v36;` beside the existing versioned imports. Match the exact fixture-construction idiom the surrounding tests use — read two of them before writing yours, since companion constructors differ by which columns are required.
+Add `import 'generated/schema_v36.dart' as v36;` and `import 'generated/schema_v37.dart' as v37;` beside the existing versioned imports. Both are produced by the regeneration in Step 7 — write the test first anyway; it should fail on the missing import, which is the correct RED.
+
+The raw-SQL seeding above is deliberate, not laziness: the `from23To24` group in this same file does exactly that, and it avoids depending on which columns a v36 companion happens to require.
 
 - [ ] **Step 2: Run and watch fail**
 
@@ -1713,6 +1733,36 @@ Append to `space_album_actions_test.dart`, following the file's existing mocktai
       verify(() => syncMgr.syncRemote()).called(1);
     });
 
+    // A-07 — the invisible one. Moving a folder to the ROOT must send parentId EXPLICITLY null.
+    // If the wrapper used the repo's usual `null ? absent : present` idiom the key would be
+    // omitted, the server would leave the folder where it was, and nothing else would notice.
+    test('A-07: moveFolder to the root sends an explicitly-null parentId', () async {
+      final repo = MockSharedSpaceApiRepository();
+      final syncMgr = MockBackgroundSyncManager();
+      when(() => repo.moveAlbumFolder(any(), any(), any())).thenAnswer((_) async {});
+      when(() => syncMgr.syncRemote()).thenAnswer((_) async => true);
+      final actions = _makeActions(repo: repo, syncMgr: syncMgr);
+
+      await actions.moveFolder(_spaceId, 'f1', null);
+
+      verify(() => repo.moveAlbumFolder(_spaceId, 'f1', null)).called(1);
+      verify(() => syncMgr.syncRemote()).called(1);
+    });
+
+    // A-08
+    test('A-08: moveAlbumToFolder to the root sends a null folderId', () async {
+      final repo = MockSharedSpaceApiRepository();
+      final syncMgr = MockBackgroundSyncManager();
+      when(() => repo.setAlbumFolder(any(), any(), any())).thenAnswer((_) async {});
+      when(() => syncMgr.syncRemote()).thenAnswer((_) async => true);
+      final actions = _makeActions(repo: repo, syncMgr: syncMgr);
+
+      await actions.moveAlbumToFolder(_spaceId, _albumId, null);
+
+      verify(() => repo.setAlbumFolder(_spaceId, _albumId, null)).called(1);
+      verify(() => syncMgr.syncRemote()).called(1);
+    });
+
     // A-06 — the nudge is deliberately NOT fired on failure; the next regular cycle reconciles.
     // The existing SpaceAlbumActions comment states this, so it is a documented contract, not an
     // implementation detail.
@@ -1756,14 +1806,23 @@ In `shared_space_api.repository.dart`, beside `linkAlbum`/`unlinkAlbum`. The gen
       _api.sharedSpacesApi.updateSharedSpaceAlbumFolder(
         folderId,
         spaceId,
-        SharedSpaceAlbumFolderUpdateDto(name: name),
+        SharedSpaceAlbumFolderUpdateDto(name: Optional.present(name)),
       );
 
+  // parentId is Optional.present(...) UNCONDITIONALLY, including when it is null.
+  //
+  // This is the one place where copying the prevailing repo idiom would introduce a bug. Elsewhere
+  // (activity_api.repository.dart:27, drift_album_api_repository.dart:89) the pattern is
+  // `x == null ? const Optional.absent() : Optional.present(x)` — but for parentId, null MEANS
+  // "move to the space root" and must be SENT. toJson only writes a key when isPresent, so
+  // absent() would omit parentId entirely and the server would leave the folder where it was —
+  // a silent no-op. The field is Optional<String?>, so present(null) is valid and serialises
+  // `parentId: null`. A-07 is the test that catches this.
   Future<void> moveAlbumFolder(String spaceId, String folderId, String? parentId) =>
       _api.sharedSpacesApi.updateSharedSpaceAlbumFolder(
         folderId,
         spaceId,
-        SharedSpaceAlbumFolderUpdateDto(parentId: parentId),
+        SharedSpaceAlbumFolderUpdateDto(parentId: Optional.present(parentId)),
       );
 
   Future<void> deleteAlbumFolder(String spaceId, String folderId) =>
@@ -1777,9 +1836,9 @@ In `shared_space_api.repository.dart`, beside `linkAlbum`/`unlinkAlbum`. The gen
       );
 ```
 
-Check the generated parameter ORDER before writing — the Dart generator orders path params alphabetically, so it is `(albumId, id)` and `(folderId, id)`, not the order the URL reads. Read `mobile/openapi/lib/api/shared_spaces_api.dart` and match exactly. Use whatever null-check helper the file's existing methods use.
+Parameter order is already verified against the generated client: `createSharedSpaceAlbumFolder(id, dto)`, `updateSharedSpaceAlbumFolder(folderId, id, dto)`, `deleteSharedSpaceAlbumFolder(folderId, id)`, `setSharedSpaceAlbumFolder(albumId, id, dto)` — the generator orders path params alphabetically, not as the URL reads. `checkNull` is the file's existing null-check helper and `createSharedSpaceAlbumFolder` returns a nullable DTO, so it is the right wrapper there.
 
-Beware the three-state DTO trap: if a generated update DTO field is optional, `.value` throws when absent — use `.isPresent` if you need to read one back.
+`SharedSpaceAlbumFolderMoveAlbumDto({required this.folderId})` is a PLAIN required nullable, not an Optional — so `setAlbumFolder` passes `folderId` directly, with no wrapper. Only the UPDATE dto is three-state.
 
 - [ ] **Step 4: Add the actions**
 
@@ -1794,6 +1853,29 @@ In `space_album_actions.dart`, extend the doc comment's operation list and add t
 ```
 
 and the same shape for `renameFolder`, `moveFolder`, `deleteFolder`, `moveAlbumToFolder`.
+
+- [ ] **Step 4b: Assert the DTO the wrapper actually builds**
+
+The A-07 test above verifies `SpaceAlbumActions` passes null through, but it mocks the repository,
+so it cannot see the `Optional` decision. Add one test in the same file that exercises the REAL
+`SharedSpaceApiRepository` against a mocked generated api, asserting the DTO it constructs:
+
+```dart
+    test('A-07: the move wrapper sends parentId as present-null, not absent', () {
+      // Optional<String?> — present(null) serialises `parentId: null`; absent() omits the key.
+      final dto = SharedSpaceAlbumFolderUpdateDto(parentId: const Optional.present(null));
+
+      expect(dto.parentId.isPresent, isTrue);
+      expect(dto.toJson().containsKey('parentId'), isTrue);
+      expect(dto.toJson()['parentId'], isNull);
+
+      final absent = SharedSpaceAlbumFolderUpdateDto();
+      expect(absent.toJson().containsKey('parentId'), isFalse);
+    });
+```
+
+This is the assertion that actually pins the fix: it fails the moment someone "tidies" the wrapper
+to the `null ? absent : present` idiom used elsewhere in this repo.
 
 - [ ] **Step 5: Run to verify pass, then teeth-check A-06**
 
@@ -1824,7 +1906,7 @@ git commit -m "feat(mobile): add space album folder mutations"
 
 - Create: `mobile/lib/presentation/widgets/spaces/space_album_folder_card.widget.dart`
 - Create: `mobile/lib/presentation/widgets/spaces/space_album_folder_picker.widget.dart`
-- Create: `mobile/test/widgets/spaces/space_album_folder_card_test.dart`
+- Create: `mobile/test/presentation/widgets/spaces/space_album_folder_card_test.dart`
 - Modify: `i18n/en.json`
 
 **Interfaces:**
@@ -1862,7 +1944,7 @@ grep -o '"space_album_folder_[a-z_]*"' i18n/en.json | sort -u
 
 - [ ] **Step 2: Write the failing widget tests**
 
-Create `mobile/test/widgets/spaces/space_album_folder_card_test.dart`, following the idiom of `mobile/test/widgets/spaces/space_card_test.dart` — read it first for the pump/wrapper helper this repo uses:
+Create `mobile/test/presentation/widgets/spaces/space_album_folder_card_test.dart`, following the idiom of `mobile/test/widgets/spaces/space_card_test.dart` — read it first for the pump/wrapper helper this repo uses:
 
 ```dart
     // U-12 — a folder holding only subfolders must never read "0 albums"; the count is recursive.
@@ -1932,7 +2014,7 @@ Write `tileEnabled` as a helper that finds the tile by key `Key('folder-option-$
 - [ ] **Step 3: Run and watch fail**
 
 ```bash
-cd mobile && flutter test test/widgets/spaces/space_album_folder_card_test.dart
+cd mobile && flutter test test/presentation/widgets/spaces/space_album_folder_card_test.dart
 ```
 
 Expected: FAIL — widgets do not exist.
@@ -1948,7 +2030,7 @@ Create the picker, rendering `buildFolderTree` output as an indented list, each 
 - [ ] **Step 6: Run to verify pass, then teeth-check U-07**
 
 ```bash
-cd mobile && flutter test test/widgets/spaces/space_album_folder_card_test.dart
+cd mobile && flutter test test/presentation/widgets/spaces/space_album_folder_card_test.dart
 ```
 
 Expected: PASS. Then change `isDisabled` to always return false, confirm **U-07 fails** while U-08 stays green, and restore. Report the observation.
@@ -1964,18 +2046,18 @@ git commit -m "feat(mobile): add the space album folder card and picker"
 
 ## Task 10: Mobile — page integration and navigation
 
-**Implements:** U-01, U-02, U-03, U-04, U-05, U-09, U-10, U-11.
+**Implements:** U-01, U-02, U-03, U-04, U-05, U-09, U-10, U-11, U-13.
 
 **Files:**
 
 - Modify: `mobile/lib/pages/library/spaces/space_albums.page.dart`
 - Modify: `mobile/lib/routing/router.dart`
 - Modify: `mobile/lib/providers/infrastructure/space_album.provider.dart`
-- Create: `mobile/test/widgets/spaces/space_albums_page_test.dart`
+- Modify: `mobile/test/presentation/pages/space_albums_page_test.dart` _(EXISTS — extend, do not overwrite)_
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `mobile/test/widgets/spaces/space_albums_page_test.dart`. Build a pump helper that overrides the folder and album providers with fixed lists so the page renders without a database:
+Create `mobile/test/presentation/pages/space_albums_page_test.dart`. Build a pump helper that overrides the folder and album providers with fixed lists so the page renders without a database:
 
 ```dart
     // U-01
@@ -2011,7 +2093,7 @@ Create `mobile/test/widgets/spaces/space_albums_page_test.dart`. Build a pump he
         albums: [album('a1', 'Venice', folderId: 'trips'), album('a2', 'Rome')],
       );
 
-      await tester.enterText(find.byKey(const Key('space-albums-search')), 'ven');
+      await tester.enterText(find.byKey(const Key('space-albums-search-field')), 'ven');
       await tester.pumpAndSettle();
 
       expect(find.byType(SpaceAlbumFolderCard), findsNothing);
@@ -2019,13 +2101,26 @@ Create `mobile/test/widgets/spaces/space_albums_page_test.dart`. Build a pump he
       expect(find.textContaining('Trips'), findsWidgets);
     });
 
+    // U-13 — the page ALREADY renders a no-match state (Key('space-albums-no-match')) when a
+    // query filters everything out. Switching search to tree-wide flattening must PRESERVE it;
+    // replacing it with a blank grid would silently regress existing behaviour.
+    testWidgets('U-13: a tree-wide search matching nothing shows the no-match state', (tester) async {
+      await pumpPage(tester, folders: [folder('trips', 'Trips')], albums: [album('a1', 'Rome')]);
+
+      await tester.enterText(find.byKey(const Key('space-albums-search-field')), 'zzzz');
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('space-albums-no-match')), findsOneWidget);
+      expect(find.byType(SpaceAlbumFolderCard), findsNothing);
+    });
+
     // U-10
     testWidgets('U-10: clearing the query returns to the current level', (tester) async {
       await pumpPage(tester, folders: [folder('trips', 'Trips')], albums: [album('a1', 'Rome')]);
 
-      await tester.enterText(find.byKey(const Key('space-albums-search')), 'zzz');
+      await tester.enterText(find.byKey(const Key('space-albums-search-field')), 'zzz');
       await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(const Key('space-albums-search')), '');
+      await tester.enterText(find.byKey(const Key('space-albums-search-field')), '');
       await tester.pumpAndSettle();
 
       expect(find.byType(SpaceAlbumFolderCard), findsOneWidget);
@@ -2053,7 +2148,7 @@ U-02 and U-03 are navigation; assert them with a mock `StackRouter` or by observ
 - [ ] **Step 2: Run and watch fail**
 
 ```bash
-cd mobile && flutter test test/widgets/spaces/space_albums_page_test.dart
+cd mobile && flutter test test/presentation/pages/space_albums_page_test.dart
 ```
 
 Expected: FAIL.
@@ -2076,7 +2171,7 @@ Add a folders provider (mirroring the existing album provider in `space_album.pr
 - render `contents.folders` as `SpaceAlbumFolderCard`s above the album cards, sorted by name honouring the existing sort direction
 - app-bar title: the folder's name when `folderId != null`, else the space name
 - tapping a folder pushes `SpaceAlbumsRoute(spaceId: spaceId, canEdit: canEdit, folderId: folder.id)`
-- when `searchQuery` is non-empty, render `flattenForSearch(...)` hits instead, each with its path line, and hide the folder cards
+- when `searchQuery` is non-empty, render `flattenForSearch(...)` hits instead, each with its path line, and hide the folder cards. **Keep the existing `_NoMatch` widget** (`Key('space-albums-no-match')`) for the zero-hit case — pre-existing behaviour that tree-wide search must preserve, not replace with an empty grid (U-13)
 - an empty folder renders a folder-specific empty state keyed `space-album-folder-empty`
 - U-11: watch the folder stream; if `folderId != null` and no folder with that id is present **after the stream has emitted at least once**, pop the route
 
@@ -2085,7 +2180,7 @@ The "after at least once" guard matters: popping on the initial empty emission w
 - [ ] **Step 5: Run to verify pass, then teeth-check U-11 and U-05**
 
 ```bash
-cd mobile && flutter test test/widgets/spaces/space_albums_page_test.dart
+cd mobile && flutter test test/presentation/pages/space_albums_page_test.dart
 ```
 
 Expected: PASS. Then remove the pop-on-missing-folder logic, confirm **U-11 fails**, restore. Then point the empty state at the space-level widget, confirm **U-05 fails**, restore. Report both.
@@ -2142,22 +2237,23 @@ git commit -m "fix(web): show an album at the root when its folder is not loaded
 All 53 spec scenario IDs. Verify mechanically with
 `grep -oE '\b[THRVAU]-[0-9]{2}\b'` over the spec and over this plan — the sets must match.
 
-| Group                | IDs                         | Task |
-| -------------------- | --------------------------- | ---- |
-| Tree module          | T-01–T-14                   | 6    |
-| Repository           | R-01–R-06                   | 7    |
-| Migration            | R-07, R-08                  | 4    |
-| Mobile sync handlers | H-01–H-04, H-06             | 5    |
-| Version gate         | H-05                        | 8    |
-| Server sync          | V-01–V-05, V-07             | 2    |
-| Link payload         | V-06                        | 3    |
-| Actions              | A-01–A-06                   | 8    |
-| Folder card + picker | U-06, U-07, U-08, U-12      | 9    |
-| Page integration     | U-01–U-05, U-09, U-10, U-11 | 10   |
+| Group                | IDs                        | Task |
+| -------------------- | -------------------------- | ---- |
+| Tree module          | T-01–T-14                  | 6    |
+| Repository           | R-01–R-06                  | 7    |
+| Migration            | R-07, R-08                 | 4    |
+| Mobile sync handlers | H-01–H-04, H-06            | 5    |
+| Version gate         | H-05                       | 8    |
+| Server sync          | V-01–V-05, V-07            | 2    |
+| Link payload         | V-06                       | 3    |
+| Actions              | A-01–A-08                  | 8    |
+| Folder card + picker | U-06, U-07, U-08, U-12     | 9    |
+| Page integration     | U-01–U-05, U-09–U-11, U-13 | 10   |
 
 **Teeth checks required** (break the line, watch the named test fail, restore, report):
-V-02 and V-04 (Task 2), T-08 and T-10 (Task 6), A-06 (Task 8), U-07 (Task 9), U-05 and U-11 (Task 10).
+V-02 and V-04 (Task 2), T-08 and T-10 (Task 6), A-06 and A-07 (Task 8), U-07 (Task 9), U-05 and
+U-11 (Task 10).
 
-These are the eight assertions whose failure mode is silent: a missing privacy gate, an album that
-vanishes, a preview showing the wrong four, a nudge fired on failure, an illegal destination offered,
+These are the nine assertions whose failure mode is silent: a missing privacy gate, an album that
+vanishes, a preview showing the wrong four, a nudge fired on failure, a move-to-root that silently does nothing, an illegal destination offered,
 the wrong empty state, and a screen stranded on a deleted folder.
