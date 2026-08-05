@@ -6,6 +6,7 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/album/album.model.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
@@ -285,6 +286,15 @@ class SpaceAlbumsPage extends HookConsumerWidget {
     // Create a brand-new album straight into this space, mirroring web's handleCreateAlbum:
     // create the album, then link it to the space at the CURRENT folder. Distinct from "Link",
     // which attaches an album that already exists.
+    //
+    // Creation and the link that follows it are two DIFFERENT failure domains, in two separate
+    // try/catch blocks rather than one wrapping both: if creation itself fails, nothing exists and
+    // the generic `space_album_error_create` ("Unable to create album") toast is accurate. But if
+    // creation SUCCEEDS and only the link fails, the album already exists (unlinked, invisible in
+    // this space) — showing that same "Unable to create album" toast would be a lie the user has
+    // no way to detect, and would invite a retry that creates a duplicate album. That case gets
+    // its own `space_album_error_link_after_create` toast instead, which says what actually
+    // happened: the album was created, but could not be added to this space.
     Future<void> createAlbum() async {
       final name = await _promptFolderName(
         context,
@@ -293,9 +303,24 @@ class SpaceAlbumsPage extends HookConsumerWidget {
       );
       if (name == null) return;
       if (!context.mounted) return;
+
+      final RemoteAlbum? album;
       try {
-        final album = await ref.read(remoteAlbumProvider.notifier).createAlbum(title: name);
-        if (album == null) return;
+        album = await ref.read(remoteAlbumProvider.notifier).createAlbum(title: name);
+      } catch (error) {
+        if (context.mounted) {
+          ImmichToast.show(
+            context: context,
+            msg: 'space_album_error_create'.t(context: context),
+            toastType: ToastType.error,
+          );
+        }
+        return;
+      }
+      if (album == null) return;
+      if (!context.mounted) return;
+
+      try {
         // Link at `currentFolderId`, so an album created inside a folder lands there rather than
         // at the space root. Null is correct for the root: the repository omits the query param
         // rather than sending an explicit null, which the server rejects.
@@ -304,7 +329,7 @@ class SpaceAlbumsPage extends HookConsumerWidget {
         if (context.mounted) {
           ImmichToast.show(
             context: context,
-            msg: 'space_album_error_create'.t(context: context),
+            msg: 'space_album_error_link_after_create'.t(context: context),
             toastType: ToastType.error,
           );
         }

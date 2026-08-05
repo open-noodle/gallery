@@ -13,6 +13,7 @@ import 'package:immich_mobile/constants/locales.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
+import 'package:immich_mobile/domain/models/album/album.model.dart';
 import 'package:immich_mobile/domain/models/space_album_folder.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/asset.service.dart';
@@ -28,7 +29,9 @@ import 'package:immich_mobile/pages/library/spaces/space_albums.page.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_album_folder_card.widget.dart';
 import 'package:immich_mobile/providers/background_sync.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/remote_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album_actions.dart';
 import 'package:immich_mobile/repositories/drift_album_api_repository.dart';
@@ -73,6 +76,24 @@ class MockSpaceAlbumActions extends Mock implements SpaceAlbumActions {}
 /// resolved, not just this level's.
 class MockAssetService extends Mock implements AssetService {}
 
+/// "New album" (createAlbum) tests stub `remoteAlbumProvider`'s `createAlbum` call directly,
+/// mirroring how the folder-CRUD tests above stub `spaceAlbumActionsProvider` with a mock of the
+/// whole facade rather than its sub-dependencies: overriding `remoteAlbumServiceProvider` alone
+/// would still require a logged-in `currentUserProvider` (the real notifier's `createAlbum`
+/// throws "User not logged in" otherwise), which is irrelevant to what these tests assert.
+class _StubRemoteAlbumNotifier extends RemoteAlbumNotifier {
+  _StubRemoteAlbumNotifier(this._createAlbum);
+
+  final Future<RemoteAlbum?> Function(String title) _createAlbum;
+
+  @override
+  RemoteAlbumState build() => const RemoteAlbumState(albums: []);
+
+  @override
+  Future<RemoteAlbum?> createAlbum({required String title, String? description, List<String> assetIds = const []}) =>
+      _createAlbum(title);
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -111,6 +132,22 @@ RemoteAsset _remoteAsset({required String id}) => RemoteAsset(
   createdAt: DateTime(2024, 1, 1),
   updatedAt: DateTime(2024, 1, 1),
   isEdited: false,
+);
+
+/// "New album" (createAlbum) fixture — the album `_StubRemoteAlbumNotifier.createAlbum` resolves
+/// with, standing in for what `remoteAlbumProvider.notifier.createAlbum` would return on success.
+RemoteAlbum _newAlbumFixture(String id) => RemoteAlbum(
+  id: id,
+  name: 'New Album',
+  ownerId: 'owner-1',
+  description: '',
+  createdAt: DateTime(2026, 1, 1),
+  updatedAt: DateTime(2026, 1, 1),
+  isActivityEnabled: false,
+  order: AlbumAssetOrder.desc,
+  assetCount: 0,
+  ownerName: 'Test User',
+  isShared: false,
 );
 
 /// Task 10 (U-*) test fixture — positional (id, name), matching the plan's brief verbatim.
@@ -1520,4 +1557,77 @@ void main() {
 
     await settleToast(tester);
   });
+
+  // ---------------------------------------------------------------------
+  // "New album" (createAlbum) — creates the album, then links it into the
+  // CURRENT folder (mirrors web's handleCreateAlbum). Creation and the
+  // subsequent link are two DIFFERENT failure domains: a link failure after
+  // a successful creation must never claim creation itself failed — the
+  // album already exists (unlinked, invisible in the space), and a
+  // "creation failed" toast would tempt a retry that creates a duplicate.
+  // ---------------------------------------------------------------------
+
+  testWidgets('New album: creation failing shows the create-error toast', (tester) async {
+    final actions = MockSpaceAlbumActions();
+
+    await pumpPage(
+      tester,
+      folders: const [],
+      albums: const [],
+      overrides: [
+        spaceAlbumActionsProvider.overrideWithValue(actions),
+        remoteAlbumProvider.overrideWith(() => _StubRemoteAlbumNotifier((_) async => throw Exception('boom'))),
+      ],
+    );
+
+    await tester.tap(find.byKey(const Key('space-albums-new-album-action')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('space-album-folder-name-field')), 'Trips');
+    await tester.tap(find.byKey(const Key('space-album-folder-name-confirm')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unable to create album'), findsOneWidget);
+    verifyNever(() => actions.link(any(), any(), folderId: any(named: 'folderId')));
+
+    await settleToast(tester);
+  });
+
+  testWidgets(
+    'New album: creation succeeds but the space-link fails shows a link-specific toast, not the create-error one',
+    (tester) async {
+      final actions = MockSpaceAlbumActions();
+      when(() => actions.link(any(), any(), folderId: any(named: 'folderId'))).thenThrow(Exception('link failed'));
+
+      var createCallCount = 0;
+      await pumpPage(
+        tester,
+        folders: const [],
+        albums: const [],
+        overrides: [
+          spaceAlbumActionsProvider.overrideWithValue(actions),
+          remoteAlbumProvider.overrideWith(
+            () => _StubRemoteAlbumNotifier((_) async {
+              createCallCount++;
+              return _newAlbumFixture('new-album-1');
+            }),
+          ),
+        ],
+      );
+
+      await tester.tap(find.byKey(const Key('space-albums-new-album-action')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('space-album-folder-name-field')), 'Trips');
+      await tester.tap(find.byKey(const Key('space-album-folder-name-confirm')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Album created, but could not be linked to this space'), findsOneWidget);
+      expect(find.text('Unable to create album'), findsNothing);
+      verify(() => actions.link(spaceId, ['new-album-1'], folderId: null)).called(1);
+      // A link failure must never trigger a create retry, which would silently leave a
+      // duplicate album behind — exactly one create call for one dialog confirmation.
+      expect(createCallCount, 1);
+
+      await settleToast(tester);
+    },
+  );
 }
