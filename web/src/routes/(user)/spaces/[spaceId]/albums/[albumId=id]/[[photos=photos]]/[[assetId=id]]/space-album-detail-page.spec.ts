@@ -608,7 +608,7 @@ describe('Space album detail page', () => {
     const overlay = screen.getByTestId('add-photos-overlay');
     const main = screen.getByTestId('add-photos-timeline-main');
     expect(overlay).toContainElement(main);
-    expect(main.className).toContain('pt-(--navbar-height)');
+    expect(main.className).toContain('pt-(--control-bar-height)');
   });
 
   it('the picker control bar comes AFTER the timeline-main in DOM so it paints on top and its buttons are clickable', async () => {

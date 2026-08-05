@@ -71,7 +71,7 @@
   }
 </script>
 
-<main class="relative h-dvh overflow-hidden px-2 pt-(--navbar-height) max-md:pt-(--navbar-height-md) md:px-6">
+<main class="relative h-dvh overflow-hidden px-2 pt-(--control-bar-height) max-md:pt-(--control-bar-height-md) md:px-6">
   <TimelineRouteGroupingBar
     grouping={timelineGrouping}
     hidden={hideGroupingControls}

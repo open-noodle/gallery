@@ -557,10 +557,10 @@
 </script>
 
 <main
-  class="relative z-0 flex h-dvh flex-col overflow-hidden px-2 pt-(--navbar-height) md:px-6 md:pt-(--navbar-height-md)"
+  class="relative z-0 flex h-dvh flex-col overflow-hidden px-2 pt-(--control-bar-height) md:px-6 md:pt-(--control-bar-height-md)"
 >
   <!-- Sticky grouping switcher: lives outside the scrolling timeline so it stays visible (see Tags).
-       mt-12 clears the taller ControlAppBar, which exceeds the --navbar-height padding reserve. -->
+       mt-12 clears the taller ControlAppBar, which exceeds the --control-bar-height padding reserve. -->
   <TimelineRouteGroupingBar
     grouping={timelineGrouping}
     hidden={assetMultiSelectManager.selectionActive || action === 'merge'}
