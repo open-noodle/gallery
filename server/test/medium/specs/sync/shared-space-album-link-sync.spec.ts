@@ -1,6 +1,5 @@
 import { Kysely } from 'kysely';
 import { SharedSpaceRole } from 'src/enum';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { SyncRepository } from 'src/repositories/sync.repository';
 import { DB } from 'src/schema';
 import { SyncTestContext } from 'test/medium.factory';
@@ -196,36 +195,48 @@ describe('SharedSpaceAlbumLinkSync — soft-deleted album exclusion (Slice 8)', 
   });
 });
 
-describe('SharedSpaceAlbumLinkSync — folder placement omitted from sync payload (S-01)', () => {
-  // S-01: writing folderId bumps updateId (the table has an updatedAt trigger and an updateId
-  // column), so reorganising an album into a folder re-emits its link row to mobile. That is
-  // acceptable ONLY because folderId is absent from SHARED_SPACE_ALBUM_SYNC_COLUMNS, making the
-  // re-emit an idempotent no-op upsert for a client that has never heard of folders.
-  // If this test fails, someone added folderId to the sync payload — that is a mobile-facing
-  // decision and needs its own spec, not a drive-by column addition here.
-  it('does not leak folderId into the album link sync payload after a folder move', async () => {
+describe('SharedSpaceAlbumLinkSync — folder placement in the sync payload (V-06)', () => {
+  // V-06 (was web S-01, now inverted). Mobile needs an album's placement to render the folder tree,
+  // so folderId is deliberately part of this payload. The original test pinned its ABSENCE, on the
+  // grounds that adding it was a mobile-facing decision needing its own spec — that spec is
+  // docs/superpowers/specs/2026-08-05-space-album-folders-mobile-design.md. Inverted rather than
+  // deleted so that REMOVING the field fails just as loudly as adding it once did.
+  it('V-06: includes folderId in the album link sync payload', async () => {
+    const { ctx, db, sut } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { album } = await ctx.newAlbum({ ownerId: owner.id });
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+    const folder = await db
+      .insertInto('shared_space_album_folder')
+      .values({ spaceId: space.id, parentId: null, name: 'Trips', createdById: null })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    await db
+      .updateTable('shared_space_album')
+      .set({ folderId: folder.id })
+      .where('spaceId', '=', space.id)
+      .where('albumId', '=', album.id)
+      .execute();
+
+    const result: any[] = await Array.fromAsync(sut.getUpserts({ userId: owner.id, nowId: NOW_ID }));
+
+    const row = result.find((r) => r.albumId === album.id);
+    expect(row).toBeDefined();
+    expect(row.folderId).toBe(folder.id);
+  });
+
+  it('V-06: reports a root-level album as folderId null, not missing', async () => {
     const { ctx, sut } = setup();
     const { user: owner } = await ctx.newUser();
     const { album } = await ctx.newAlbum({ ownerId: owner.id });
     const { space } = await ctx.newSharedSpace({ createdById: owner.id });
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
 
-    const sharedSpaceRepository = ctx.get(SharedSpaceRepository);
-    const folder = await sharedSpaceRepository.createAlbumFolder({
-      spaceId: space.id,
-      parentId: null,
-      name: 'Trips',
-      createdById: owner.id,
-    });
-    await sharedSpaceRepository.setAlbumLinkFolder(space.id, album.id, folder.id);
+    const result: any[] = await Array.fromAsync(sut.getUpserts({ userId: owner.id, nowId: NOW_ID }));
 
-    const stream = sut.getUpserts({ nowId: NOW_ID, userId: owner.id });
-    const result: any[] = await Array.fromAsync(stream);
-    const row = result.find((r: any) => r.albumId === album.id);
-
-    // The row still re-emits (that's the expected, harmless side effect of the updateId bump)…
-    expect(row).toBeDefined();
-    // …but its payload must never carry folderId.
-    expect(row).not.toHaveProperty('folderId');
+    const row = result.find((r) => r.albumId === album.id);
+    expect(row).toHaveProperty('folderId');
+    expect(row.folderId).toBeNull();
   });
 });

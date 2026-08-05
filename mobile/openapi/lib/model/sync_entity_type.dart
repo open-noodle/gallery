@@ -98,6 +98,9 @@ enum SyncEntityType {
   sharedSpaceAlbumLinkV1._(r'SharedSpaceAlbumLinkV1'),
   sharedSpaceAlbumLinkDeleteV1._(r'SharedSpaceAlbumLinkDeleteV1'),
   sharedSpaceAlbumLinkBackfillV1._(r'SharedSpaceAlbumLinkBackfillV1'),
+  sharedSpaceAlbumFolderV1._(r'SharedSpaceAlbumFolderV1'),
+  sharedSpaceAlbumFolderDeleteV1._(r'SharedSpaceAlbumFolderDeleteV1'),
+  sharedSpaceAlbumFolderBackfillV1._(r'SharedSpaceAlbumFolderBackfillV1'),
   sharedSpaceAlbumToAssetV1._(r'SharedSpaceAlbumToAssetV1'),
   sharedSpaceAlbumToAssetDeleteV1._(r'SharedSpaceAlbumToAssetDeleteV1'),
   sharedSpaceAlbumToAssetBackfillV1._(r'SharedSpaceAlbumToAssetBackfillV1'),
@@ -255,6 +258,9 @@ class SyncEntityTypeTypeTransformer {
         case r'SharedSpaceAlbumLinkV1': return SyncEntityType.sharedSpaceAlbumLinkV1;
         case r'SharedSpaceAlbumLinkDeleteV1': return SyncEntityType.sharedSpaceAlbumLinkDeleteV1;
         case r'SharedSpaceAlbumLinkBackfillV1': return SyncEntityType.sharedSpaceAlbumLinkBackfillV1;
+        case r'SharedSpaceAlbumFolderV1': return SyncEntityType.sharedSpaceAlbumFolderV1;
+        case r'SharedSpaceAlbumFolderDeleteV1': return SyncEntityType.sharedSpaceAlbumFolderDeleteV1;
+        case r'SharedSpaceAlbumFolderBackfillV1': return SyncEntityType.sharedSpaceAlbumFolderBackfillV1;
         case r'SharedSpaceAlbumToAssetV1': return SyncEntityType.sharedSpaceAlbumToAssetV1;
         case r'SharedSpaceAlbumToAssetDeleteV1': return SyncEntityType.sharedSpaceAlbumToAssetDeleteV1;
         case r'SharedSpaceAlbumToAssetBackfillV1': return SyncEntityType.sharedSpaceAlbumToAssetBackfillV1;

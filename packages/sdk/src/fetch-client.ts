@@ -4140,6 +4140,24 @@ export type SyncPersonV1 = {
     updatedAt: string;
 };
 export type SyncResetV1 = {};
+export type SyncSharedSpaceAlbumFolderDeleteV1 = {
+    /** Folder ID */
+    folderId: string;
+};
+export type SyncSharedSpaceAlbumFolderV1 = {
+    /** Created at */
+    createdAt: string;
+    /** Folder ID */
+    id: string;
+    /** Folder name */
+    name: string;
+    /** Parent folder ID */
+    parentId: string | null;
+    /** Shared space ID */
+    spaceId: string;
+    /** Updated at */
+    updatedAt: string;
+};
 export type SyncSharedSpaceAlbumLinkDeleteV1 = {
     /** Album ID */
     albumId: string;
@@ -4153,6 +4171,8 @@ export type SyncSharedSpaceAlbumLinkV1 = {
     albumId: string;
     /** Created at */
     createdAt: string;
+    /** Album folder ID within the space, or null if at the space root */
+    folderId: string | null;
     /** Whether this album appears in the space timeline */
     showInTimeline: boolean;
     /** Shared space ID */
@@ -9965,6 +9985,9 @@ export enum SyncEntityType {
     SharedSpaceAlbumLinkV1 = "SharedSpaceAlbumLinkV1",
     SharedSpaceAlbumLinkDeleteV1 = "SharedSpaceAlbumLinkDeleteV1",
     SharedSpaceAlbumLinkBackfillV1 = "SharedSpaceAlbumLinkBackfillV1",
+    SharedSpaceAlbumFolderV1 = "SharedSpaceAlbumFolderV1",
+    SharedSpaceAlbumFolderDeleteV1 = "SharedSpaceAlbumFolderDeleteV1",
+    SharedSpaceAlbumFolderBackfillV1 = "SharedSpaceAlbumFolderBackfillV1",
     SharedSpaceAlbumToAssetV1 = "SharedSpaceAlbumToAssetV1",
     SharedSpaceAlbumToAssetDeleteV1 = "SharedSpaceAlbumToAssetDeleteV1",
     SharedSpaceAlbumToAssetBackfillV1 = "SharedSpaceAlbumToAssetBackfillV1",
@@ -10017,6 +10040,7 @@ export enum SyncRequestType {
     SharedSpaceLibrariesV1 = "SharedSpaceLibrariesV1",
     SharedSpaceAlbumsV1 = "SharedSpaceAlbumsV1",
     SharedSpaceAlbumLinksV1 = "SharedSpaceAlbumLinksV1",
+    SharedSpaceAlbumFoldersV1 = "SharedSpaceAlbumFoldersV1",
     SharedSpaceAlbumToAssetsV1 = "SharedSpaceAlbumToAssetsV1",
     SharedSpaceAlbumAssetsV1 = "SharedSpaceAlbumAssetsV1",
     SharedSpaceAlbumAssetExifsV1 = "SharedSpaceAlbumAssetExifsV1"
