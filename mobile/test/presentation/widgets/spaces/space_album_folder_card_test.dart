@@ -19,18 +19,18 @@ class _MockAssetService extends Mock implements AssetService {}
 // Fixtures
 // ---------------------------------------------------------------------------
 
-SpaceAlbumFolder folder(String id, String name, {String? parentId}) =>
+SpaceAlbumFolder _folder(String id, String name, {String? parentId}) =>
     SpaceAlbumFolder(id: id, spaceId: 'space-1', parentId: parentId, name: name);
 
 /// trips (root) -> y2026 -> italy, plus an unrelated root: family.
 List<SpaceAlbumFolder> tripsTree() => [
-  folder('trips', 'Trips'),
-  folder('y2026', '2026', parentId: 'trips'),
-  folder('italy', 'Italy', parentId: 'y2026'),
-  folder('family', 'Family'),
+  _folder('trips', 'Trips'),
+  _folder('y2026', '2026', parentId: 'trips'),
+  _folder('italy', 'Italy', parentId: 'y2026'),
+  _folder('family', 'Family'),
 ];
 
-SpaceAlbum album({required String id, String? thumbnailAssetId, DateTime? updatedAt}) => SpaceAlbum(
+SpaceAlbum _album({required String id, String? thumbnailAssetId, DateTime? updatedAt}) => SpaceAlbum(
   id: id,
   name: 'Album $id',
   thumbnailAssetId: thumbnailAssetId,
@@ -39,7 +39,7 @@ SpaceAlbum album({required String id, String? thumbnailAssetId, DateTime? update
   updatedAt: updatedAt ?? DateTime.utc(2026, 1, 1),
 );
 
-RemoteAsset remoteAsset({required String id}) => RemoteAsset(
+RemoteAsset _remoteAsset({required String id}) => RemoteAsset(
   id: id,
   checksum: 'checksum-$id',
   ownerId: 'owner-1',
@@ -133,35 +133,37 @@ void main() {
     // U-12 — a folder holding only subfolders must never read "0 albums"; the
     // count passed in is the RECURSIVE count, not a per-folder tally.
     testWidgets('U-12: shows the recursive album count', (tester) async {
-      await pumpCard(tester, folder: folder('trips', 'Trips'), albumCount: 12, previewAlbums: const []);
+      await pumpCard(tester, folder: _folder('trips', 'Trips'), albumCount: 12, previewAlbums: const []);
 
       expect(find.textContaining('12'), findsOneWidget);
     });
 
-    testWidgets('U-12: a folder with zero direct or nested albums does not read "0 albums"', (tester) async {
-      await pumpCard(tester, folder: folder('empty', 'Empty'), albumCount: 0, previewAlbums: const []);
+    // Not a U-12 case (U-12 is the folder-with-subfolders-but-nonzero-recursive-
+    // count scenario, covered above) -- this is the plain complement: a folder
+    // that is genuinely empty renders its zero count as-is, with no special-cased
+    // "0 albums" text swapped in for it.
+    testWidgets('a genuinely empty folder renders its zero recursive count as-is', (tester) async {
+      await pumpCard(tester, folder: _folder('empty', 'Empty'), albumCount: 0, previewAlbums: const []);
 
-      // The recursive count is still rendered (it is legitimately zero here),
-      // but nothing about the widget hardcodes or special-cases "0 albums" text.
       expect(find.textContaining('0'), findsOneWidget);
     });
 
     // U-06 — viewers get no management affordances at all.
     testWidgets('U-06: a viewer sees no overflow menu', (tester) async {
-      await pumpCard(tester, folder: folder('trips', 'Trips'), albumCount: 1, canEdit: false);
+      await pumpCard(tester, folder: _folder('trips', 'Trips'), albumCount: 1, canEdit: false);
 
       expect(menuFinder(), findsNothing);
     });
 
     testWidgets('U-06: an editor sees the overflow menu', (tester) async {
-      await pumpCard(tester, folder: folder('trips', 'Trips'), albumCount: 1, canEdit: true);
+      await pumpCard(tester, folder: _folder('trips', 'Trips'), albumCount: 1, canEdit: true);
 
       expect(menuFinder(), findsOneWidget);
     });
 
     testWidgets('tapping the card fires onTap', (tester) async {
       var tapped = false;
-      await pumpCard(tester, folder: folder('trips', 'Trips'), albumCount: 1, onTap: () => tapped = true);
+      await pumpCard(tester, folder: _folder('trips', 'Trips'), albumCount: 1, onTap: () => tapped = true);
 
       await tester.tap(find.byType(SpaceAlbumFolderCard));
       await tester.pump();
@@ -176,7 +178,7 @@ void main() {
 
       await pumpCard(
         tester,
-        folder: folder('trips', 'Trips'),
+        folder: _folder('trips', 'Trips'),
         albumCount: 1,
         onRename: () => renamed = true,
         onMove: () => moved = true,
@@ -203,23 +205,23 @@ void main() {
     });
 
     testWidgets('an empty previewAlbums list falls back to a folder glyph, not a broken tile', (tester) async {
-      await pumpCard(tester, folder: folder('trips', 'Trips'), albumCount: 0, previewAlbums: const []);
+      await pumpCard(tester, folder: _folder('trips', 'Trips'), albumCount: 0, previewAlbums: const []);
 
       expect(find.byIcon(Icons.folder_outlined), findsOneWidget);
       expect(find.byType(Thumbnail), findsNothing);
     });
 
     for (final count in [1, 2, 3, 4]) {
-      testWidgets('a $count-cover previewAlbums list renders exactly $count cover tiles', (tester) async {
+      testWidgets('a $count-cover previewAlbums list renders each cover in its own slot, in order', (tester) async {
         final mockService = _MockAssetService();
-        final albums = [for (var i = 0; i < count; i++) album(id: 'a$i', thumbnailAssetId: 'thumb-$i')];
+        final albums = [for (var i = 0; i < count; i++) _album(id: 'a$i', thumbnailAssetId: 'thumb-$i')];
         for (var i = 0; i < count; i++) {
-          when(() => mockService.getRemoteAsset('thumb-$i')).thenAnswer((_) async => remoteAsset(id: 'thumb-$i'));
+          when(() => mockService.getRemoteAsset('thumb-$i')).thenAnswer((_) async => _remoteAsset(id: 'thumb-$i'));
         }
 
         await pumpCard(
           tester,
-          folder: folder('trips', 'Trips'),
+          folder: _folder('trips', 'Trips'),
           albumCount: count,
           previewAlbums: albums,
           assetService: mockService,
@@ -231,6 +233,19 @@ void main() {
         expect(find.byType(Thumbnail), findsNWidgets(count));
         // No leftover empty-folder glyph once at least one real cover renders.
         expect(find.byIcon(Icons.folder_outlined), findsNothing);
+
+        // Order-sensitive: pins WHICH album lands in WHICH slot, not merely
+        // that `count` Thumbnails exist somewhere. `_buildTile` calls
+        // `getRemoteAsset` synchronously while the collage's Row/Column
+        // children lists are being built, in the exact left-to-right /
+        // top-to-bottom order the tiles are declared (slot 0, 1, 2, 3). So
+        // asserting the mock's call order pins per-tile content: duplicating
+        // one album into another tile's slot leaves an expected id never
+        // called, and swapping two tiles reverses the call order -- either
+        // mutation breaks this `verifyInOrder`, unlike a presence-only check
+        // (each id called exactly once, any order) which a swap would still
+        // pass.
+        verifyInOrder([for (var i = 0; i < count; i++) () => mockService.getRemoteAsset('thumb-$i')]);
       });
     }
   });
