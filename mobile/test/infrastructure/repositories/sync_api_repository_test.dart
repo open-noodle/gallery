@@ -243,11 +243,10 @@ void main() {
       expect(albumTypes.every(types.contains), isTrue, reason: 'the album streams still sync');
     });
 
-    // H-05: a server that supports space albums but predates nestable folders. This is only
-    // reachable through a capability declaration that omits SharedSpaceAlbumFoldersV1 — the
-    // version-number fallback sends only the five legacy types (see mobile-1's
-    // `_legacySpaceAlbumSyncTypes`), never SharedSpaceAlbumFoldersV1, so a bare version number
-    // can never express "albums yes, folders no"; only a capability declaration can.
+    // H-05: a server that supports space albums but predates nestable folders. This state is
+    // also reachable via the version-gate fallback for a pre-declaration server (see the
+    // v5.2.0 regression test above); this test instead exercises the declaration path directly
+    // — a capability declaration that omits SharedSpaceAlbumFoldersV1.
     test('H-05: a server declaring album support without folder support omits SharedSpaceAlbumFoldersV1', () async {
       final types = await capturedRequestTypes(
         const SemVer(major: 5, minor: 0, patch: 0),
