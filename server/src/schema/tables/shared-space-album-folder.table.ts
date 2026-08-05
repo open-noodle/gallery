@@ -1,4 +1,5 @@
 import {
+  AfterDeleteTrigger,
   Column,
   CreateDateColumn,
   ForeignKeyColumn,
@@ -10,11 +11,19 @@ import {
   UpdateDateColumn,
 } from '@immich/sql-tools';
 import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
+import { shared_space_album_folder_delete_audit } from 'src/schema/functions';
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
 import { UserTable } from 'src/schema/tables/user.table';
 
 @Table('shared_space_album_folder')
 @UpdatedAtTrigger('shared_space_album_folder_updatedAt')
+// Fan-out trigger: on delete (direct, or via cascade from shared_space) emits a tombstone row so
+// synced clients drop the folder. Without it a deleted folder lingers in the local tree forever.
+@AfterDeleteTrigger({
+  scope: 'statement',
+  function: shared_space_album_folder_delete_audit,
+  referencingOldTableAs: 'old',
+})
 @Index({ name: 'shared_space_album_folder_spaceId_idx', columns: ['spaceId'] })
 @Index({
   name: 'shared_space_album_folder_parentId_idx',
