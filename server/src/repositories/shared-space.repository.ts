@@ -1484,12 +1484,12 @@ export class SharedSpaceRepository {
     return !!row;
   }
 
+  // dto is deliberately `{ name: string }` only — NOT `parentId` too. A parentId write through
+  // this method would bypass the advisory-lock + cycle machinery in moveAlbumFolderChecked, which
+  // is the only path allowed to reparent a folder. The service only ever calls this for a
+  // rename-only update; moves always go through moveAlbumFolderChecked.
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, { name: 'Travel' }] })
-  async updateAlbumFolder(
-    spaceId: string,
-    folderId: string,
-    dto: { name?: string; parentId?: string | null },
-  ): Promise<boolean> {
+  async updateAlbumFolder(spaceId: string, folderId: string, dto: { name: string }): Promise<boolean> {
     const result = await this.db
       .updateTable('shared_space_album_folder')
       .set(dto)
