@@ -67,8 +67,18 @@ A fork migration in `migrations-gallery/` adds `shared_space_album_folder_audit`
 after-delete trigger, mirroring `shared_space_album_audit` / `shared_space_album_delete_audit`.
 Round timestamp per fork convention, above the current fork high-water mark.
 
-The audit row carries `id` and `spaceId` — `spaceId` because `getDeletes` must gate on
-`accessibleSpaces`, and the folder row is gone by the time the tombstone is read.
+The audit row mirrors `SharedSpaceAlbumAuditTable` field for field, substituting the folder:
+
+| Column      | Purpose                                                                          |
+| ----------- | -------------------------------------------------------------------------------- |
+| `id`        | the audit row's own uuidv7 — the sync CURSOR, not the folder's id                |
+| `spaceId`   | so `getDeletes` can gate on `accessibleSpaces`                                   |
+| `folderId`  | **which folder was deleted** — the client cannot act on the tombstone without it |
+| `deletedAt` | `clock_timestamp()` default, indexed                                             |
+
+`getDeletes` therefore selects `['id', 'spaceId', 'folderId']`, paralleling the link sync's
+`['id', 'spaceId', 'albumId']`. All three are load-bearing: `id` drives the cursor, `spaceId` drives
+the privacy gate, and `folderId` is the payload.
 
 ### 2.4 `folderId` joins the album-link payload
 
@@ -102,7 +112,19 @@ Index on `spaceId`, matching the link entity's `idx_shared_space_album_link_spac
 
 `SharedSpaceAlbumLinkEntity` gains `folderId` — text, nullable, no FK.
 
-`schemaVersion` 36 → 37, with the migration step.
+`schemaVersion` bumps to 37. That is **not** a one-line change — mobile uses drift's step-by-step
+migrations with committed schema snapshots, and four artefacts must move together:
+
+1. a `from36To37` entry in the generated `migrationSteps(...)` helper in `db.repository.dart`,
+   creating the folder table and adding `folderId` to the link table
+2. a new `mobile/drift_schemas/main/drift_schema_v37.json` snapshot (v36 is currently the latest)
+3. regenerated `mobile/test/drift/main/generated/` schema code
+4. all produced by **`dart run drift_dev make-migrations`** — already a mise task
+   (`mobile/mise.toml:89`)
+
+Not optional-by-omission: `mobile/test/drift/main/migration_test.dart` builds a `SchemaVerifier`
+that verifies _every_ possible schema update, so a missing snapshot fails CI rather than passing
+silently. It is the single easiest thing in this spec to miss.
 
 ### 3.2 Why `parentId` has no foreign key
 
@@ -238,14 +260,16 @@ Every scenario is a test. §9 maps each ID to exactly one owning layer.
 
 ### 5.2 Repository — `R-*`
 
-| ID   | Given                         | Then                                                    |
-| ---- | ----------------------------- | ------------------------------------------------------- |
-| R-01 | folders in two spaces         | `watchFolders` emits only the requested space's folders |
-| R-02 | a folder row inserted         | the stream re-emits (reactive)                          |
-| R-03 | a folder row deleted          | the stream re-emits without it                          |
-| R-04 | linked albums with placements | `watchLinkedAlbums` projects `folderId`                 |
-| R-05 | an album with `folderId` null | projected as null, not dropped                          |
-| R-06 | a space deleted               | its folders cascade away via the `spaceId` FK           |
+| ID   | Given                         | Then                                                            |
+| ---- | ----------------------------- | --------------------------------------------------------------- |
+| R-01 | folders in two spaces         | `watchFolders` emits only the requested space's folders         |
+| R-02 | a folder row inserted         | the stream re-emits (reactive)                                  |
+| R-03 | a folder row deleted          | the stream re-emits without it                                  |
+| R-04 | linked albums with placements | `watchLinkedAlbums` projects `folderId`                         |
+| R-05 | an album with `folderId` null | projected as null, not dropped                                  |
+| R-06 | a space deleted               | its folders cascade away via the `spaceId` FK                   |
+| R-07 | a v36 db with existing links  | upgrading to v37 PRESERVES every link row, with `folderId` null |
+| R-08 | a v36 db                      | upgrading to v37 creates an empty folder table                  |
 
 ### 5.3 Mobile sync handlers — `H-*`
 
@@ -256,17 +280,19 @@ Every scenario is a test. §9 maps each ID to exactly one owning layer.
 | H-03 | a child folder arriving before its parent | it persists and reads as a root until the parent lands    |
 | H-04 | a link upsert carrying `folderId`         | the column is written                                     |
 | H-05 | a server without folder support           | no folder stream requested; albums still sync             |
+| H-06 | a space delete arrives                    | its folder rows go too, via the `spaceId` cascade FK      |
 
 ### 5.4 Server sync — `V-*`
 
-| ID   | Actor                    | Then                                                         |
-| ---- | ------------------------ | ------------------------------------------------------------ |
-| V-01 | a member of the space    | receives that space's folders through `getUpserts`           |
-| V-02 | a **non-member**         | receives **none** of that space's folders — the privacy gate |
-| V-03 | a member, folder deleted | receives the tombstone through `getDeletes`                  |
-| V-04 | a **non-member**         | receives **no** tombstones for that space                    |
-| V-05 | a member, backfill       | receives the space's folders through `getBackfill`           |
-| V-06 | any client               | the link payload now carries `folderId` (web S-01, inverted) |
+| ID   | Actor                            | Then                                                         |
+| ---- | -------------------------------- | ------------------------------------------------------------ |
+| V-01 | a member of the space            | receives that space's folders through `getUpserts`           |
+| V-02 | a **non-member**                 | receives **none** of that space's folders — the privacy gate |
+| V-03 | a member, folder deleted         | receives the tombstone through `getDeletes`                  |
+| V-04 | a **non-member**                 | receives **no** tombstones for that space                    |
+| V-05 | a member, backfill               | receives the space's folders through `getBackfill`           |
+| V-06 | any client                       | the link payload now carries `folderId` (web S-01, inverted) |
+| V-07 | a member whose access is REVOKED | stops receiving that space's folders and its tombstones      |
 
 ### 5.5 Actions — `A-*`
 
@@ -299,6 +325,15 @@ fired on failure, so the next regular cycle reconciles instead.
 | U-11 | the folder you are inside is deleted | the stream re-emits | the route pops to the parent — see §6                |
 | U-12 | a folder with only subfolders        | the card renders    | the count is recursive, never "0 albums"             |
 
+### 5.7 Why R-07 matters more than it looks
+
+Adding a nullable column to an existing table looks trivially safe and occasionally is not: drift's
+`TableMigration` rebuilds the table, and a wrong `columnTransformer` or a missed column silently
+drops rows. Every album in every space is linked through that table, so the failure mode is
+"upgrading the app unlinks every album from every space" — recoverable only by a full resync, and
+not obviously attributable to this feature. Worth an explicit test even though the migration itself
+is three lines.
+
 ## 6. Two edge cases that behave differently from web
 
 **An album whose `folderId` names a folder that is not present must render at the ROOT, never
@@ -323,10 +358,10 @@ reason, then implement.
 
 | Slice | Deliverable                                                                       | Tests first                 |
 | ----- | --------------------------------------------------------------------------------- | --------------------------- |
-| 1     | Server: sync types, `SharedSpaceAlbumFolderSync`, audit table + trigger migration | V-01–V-05                   |
+| 1     | Server: sync types, `SharedSpaceAlbumFolderSync`, audit table + trigger migration | V-01–V-05, V-07             |
 | 2     | Server: `folderId` in the link payload; invert S-01                               | V-06                        |
-| 3     | Mobile: Drift table, `folderId` column, migration to 37                           | R-01–R-06                   |
-| 4     | Mobile: sync handlers                                                             | H-01–H-05                   |
+| 3     | Mobile: Drift table, `folderId` column, migration to 37                           | R-01–R-08                   |
+| 4     | Mobile: sync handlers                                                             | H-01–H-06                   |
 | 5     | Mobile: pure tree module                                                          | T-01–T-14                   |
 | 6     | Mobile: folder actions                                                            | A-01–A-06                   |
 | 7     | Mobile: folder card, picker sheet                                                 | U-06, U-07, U-08, U-12      |
@@ -358,27 +393,41 @@ run in parallel with 3–4.
 - `lib/domain/models/space_album_folder.model.dart` _(new)_
 - `lib/utils/space_album_folders.dart` _(new)_
 - `lib/providers/infrastructure/space_album_actions.dart` — five operations
-- `lib/repositories/shared_space_api.repository.dart` — five endpoint calls
+- `lib/repositories/shared_space_api.repository.dart` — five thin wrappers; the generated Dart methods ALREADY EXIST (§8.1)
 - `lib/pages/library/spaces/space_albums.page.dart` — `folderId`, folder grid, search, empty state
 - `lib/presentation/widgets/spaces/space_album_folder_card.widget.dart` _(new)_
 - `lib/presentation/widgets/spaces/space_album_folder_picker.widget.dart` _(new)_
 - `lib/routing/router.dart` — optional `folderId` on the route
 - `i18n/en.json` — folder strings (shared with web; several keys already exist)
 
+### 8.1 The REST client is already generated
+
+All five folder endpoints already exist in `mobile/openapi/lib/api/shared_spaces_api.dart`, emitted
+when the web work regenerated the client:
+
+```
+getSharedSpaceAlbumFolders · createSharedSpaceAlbumFolder · updateSharedSpaceAlbumFolder
+deleteSharedSpaceAlbumFolder · setSharedSpaceAlbumFolder
+```
+
+`SharedSpaceApiRepository` therefore needs only thin wrappers, and regeneration is required solely
+for the new sync DTOs — not the REST surface.
+
 ## 9. Test plan
 
 Each scenario ID has exactly one owning layer.
 
-| Layer                 | Location                                                                                  | Owns                               |
-| --------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------- |
-| Server medium (sync)  | `server/test/medium/specs/sync/shared-space-album-folder-sync.spec.ts` _(new)_            | V-01–V-05                          |
-| Server medium (sync)  | `server/test/medium/specs/sync/shared-space-album-link-sync.spec.ts` — web S-01, inverted | V-06                               |
-| Mobile pure Dart      | `mobile/test/utils/space_album_folders_test.dart` _(new)_                                 | T-01–T-14                          |
-| Mobile medium (Drift) | `mobile/test/medium/repositories/space_album_repository_test.dart`                        | R-01–R-06                          |
-| Mobile medium (Drift) | `mobile/test/medium/repositories/sync_stream_folder_test.dart` _(new)_                    | H-01–H-04                          |
-| Mobile unit           | `mobile/test/providers/infrastructure/space_album_actions_test.dart`                      | A-01–A-06, H-05                    |
-| Mobile widget         | `mobile/test/widgets/spaces/space_album_folder_card_test.dart` _(new)_ and siblings       | U-01, U-05–U-08, U-12              |
-| Mobile widget         | `mobile/test/widgets/spaces/space_albums_page_test.dart` _(new)_                          | U-02, U-03, U-04, U-09, U-10, U-11 |
+| Layer                 | Location                                                                                    | Owns                               |
+| --------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------- |
+| Server medium (sync)  | `server/test/medium/specs/sync/shared-space-album-folder-sync.spec.ts` _(new)_              | V-01–V-05, V-07                    |
+| Server medium (sync)  | `server/test/medium/specs/sync/shared-space-album-link-sync.spec.ts` — web S-01, inverted   | V-06                               |
+| Mobile pure Dart      | `mobile/test/utils/space_album_folders_test.dart` _(new)_                                   | T-01–T-14                          |
+| Mobile medium (Drift) | `mobile/test/medium/repositories/space_album_repository_test.dart`                          | R-01–R-08                          |
+| Mobile migration      | `mobile/test/drift/main/migration_test.dart` (SchemaVerifier) plus a data-preservation case | R-07, R-08                         |
+| Mobile medium (Drift) | `mobile/test/medium/repositories/sync_stream_folder_test.dart` _(new)_                      | H-01–H-04, H-06                    |
+| Mobile unit           | `mobile/test/providers/infrastructure/space_album_actions_test.dart`                        | A-01–A-06, H-05                    |
+| Mobile widget         | `mobile/test/widgets/spaces/space_album_folder_card_test.dart` _(new)_ and siblings         | U-01, U-05–U-08, U-12              |
+| Mobile widget         | `mobile/test/widgets/spaces/space_albums_page_test.dart` _(new)_                            | U-02, U-03, U-04, U-09, U-10, U-11 |
 
 ### 9.1 Traps this repo has already been bitten by
 
@@ -410,7 +459,7 @@ cd ../server
 pnpm check && pnpm lint && pnpm vitest --run --config test/vitest.config.mjs
 pnpm exec vitest run --config test/vitest.config.medium.mjs shared-space-album-folder-sync.spec.ts
 
-make open-api    # after the sync DTO changes
+make open-api    # ONLY for the new sync DTOs — the REST endpoints already exist (§8.1)
 ```
 
 Prettier must be run over this spec — CI Docs Build is strict and covers `docs/superpowers/specs/`.
