@@ -366,19 +366,25 @@ describe('SpaceAlbumsList', () => {
       expect(screen.queryByTestId('empty-state-message')).not.toBeInTheDocument();
     });
 
-    // W-07: group-by regroups the ALBUMS at this level; folders are never grouped.
-    it('W-07: leaves folders ungrouped above the grouped album list', () => {
+    // W-07: group-by regroups the ALBUMS at this level; folders are never grouped, and their grid
+    // sits above every group. `.closest('[data-testid^="space-album-group-"]')` cannot prove
+    // this: the group testid lives on the header BUTTON, which never wraps any card (grouped
+    // album cards included) under any implementation, so that check is vacuous — assert real DOM
+    // order instead.
+    it('W-07: leaves folders ungrouped, rendered above the grouped album list', () => {
       spaceAlbumViewSettings.update((settings) => ({ ...settings, groupBy: SpaceAlbumGroupBy.Year }));
       const folders = [makeFolder('trips', 'Trips'), makeFolder('family', 'Family')];
-      const albums = [makeAlbum({ id: 'a1' }), makeAlbum({ id: 'a2' })];
+      const albums = [
+        makeAlbum({ id: 'a1', endDate: '2020-06-01T00:00:00.000Z' }),
+        makeAlbum({ id: 'a2', endDate: '2024-06-01T00:00:00.000Z' }),
+      ];
 
-      const { container } = render(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false });
+      render(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false });
 
-      const folderCards = container.querySelectorAll('[data-testid="space-album-folder-card"]');
-      expect(folderCards).toHaveLength(2);
-      for (const el of folderCards) {
-        expect(el.closest('[data-testid^="space-album-group-"]')).toBeNull();
-      }
+      expect(screen.getAllByTestId('space-album-folder-card')).toHaveLength(2);
+      const foldersGrid = screen.getByTestId('space-album-folders-grid');
+      const firstGroupHeader = screen.getAllByTestId(/^space-album-group-/)[0];
+      expect(foldersGrid.compareDocumentPosition(firstGroupHeader) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     // W-18: while searching, the path subtitle is already the organising signal — grouping the
@@ -400,8 +406,10 @@ describe('SpaceAlbumsList', () => {
       expect(screen.getByText('Venice')).toBeInTheDocument();
     });
 
-    // W-09: search escapes the current folder entirely and labels each hit with its path.
-    it('W-09: hides folders and the breadcrumb while searching, and shows paths', () => {
+    // W-09: search escapes the current folder entirely and labels each hit with its path. (The
+    // breadcrumb itself lives on the page, not this component — see
+    // "W-09: hides the breadcrumb while searching" in space-albums-page.spec.ts.)
+    it('W-09: hides folders while searching, and labels each hit with its path', () => {
       const folders = [makeFolder('trips', 'Trips')];
       const albums = [makeAlbum({ id: 'a2', albumName: 'Venice', folderId: 'trips' })];
 
@@ -415,6 +423,56 @@ describe('SpaceAlbumsList', () => {
 
       expect(container.querySelectorAll('[data-testid="space-album-folder-card"]')).toHaveLength(0);
       expect(screen.getByTestId('space-album-search-path-a2')).toHaveTextContent('Trips');
+    });
+
+    // Finding: flattenForSearch returns raw server order; a search must not silently discard the
+    // active sort (grouping is the only thing search is allowed to drop, per W-18).
+    it('sorts search hits using the active sort order rather than raw server order', () => {
+      spaceAlbumViewSettings.update((s) => ({ ...s, sortBy: AlbumSortBy.Title, sortOrder: SortOrder.Asc }));
+      // Deliberately inserted out of alpha order, so a passing test proves re-sorting happened.
+      const albums = [makeAlbum({ id: 'b', albumName: 'Bravo Trip' }), makeAlbum({ id: 'a', albumName: 'Alpha Trip' })];
+
+      render(SpaceAlbumsList, { spaceId: 's-1', albums, folders: [], canManage: false, searchQuery: 'trip' });
+
+      expect(idsInCoverOrder()).toEqual(['a', 'b']);
+    });
+
+    // Finding: a List-view user's explicit preference must survive a search — it was previously
+    // discarded in favour of cover cards for the duration of the query.
+    it('respects List view while searching, rendering the table instead of cover cards', () => {
+      spaceAlbumViewSettings.update((s) => ({ ...s, view: AlbumViewMode.List }));
+      const folders = [makeFolder('trips', 'Trips')];
+      const albums = [makeAlbum({ id: 'a2', albumName: 'Venice', folderId: 'trips' })];
+
+      render(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false, searchQuery: 'ven' });
+
+      expect(screen.getByTestId('space-album-row-a2')).toBeInTheDocument();
+      expect(screen.queryByTestId('space-album-card')).not.toBeInTheDocument();
+    });
+
+    // Finding: with no terminal {:else}, a level with zero folders and zero albums (root, before
+    // the caller's on-mount folder fetch resolves — every album here lives in a folder we don't
+    // know about yet) rendered nothing at all instead of some kind of feedback.
+    it('renders a fallback instead of leaving the pane blank when nothing exists at the root level', () => {
+      const albums = [makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'unknown-folder' })];
+      render(SpaceAlbumsList, { spaceId: 's-1', albums, folders: [], canManage: false });
+
+      expect(screen.getByTestId('space-albums-loading')).toBeInTheDocument();
+    });
+
+    // Finding: when the folders fetch has failed, we can't trust `contents.albums`' level-scoping
+    // (we don't know which folder any given folderId belongs under), so degrade to showing every
+    // album in the space flat rather than hiding anything with a non-null folderId.
+    it('foldersUnavailable: falls back to a flat, unscoped album list', () => {
+      const albums = [
+        makeAlbum({ id: 'a1', albumName: 'Rome' }),
+        makeAlbum({ id: 'a2', albumName: 'Venice', folderId: 'trips' }),
+      ];
+      render(SpaceAlbumsList, { spaceId: 's-1', albums, folders: [], canManage: false, foldersUnavailable: true });
+
+      expect(screen.getByText('Rome')).toBeInTheDocument();
+      expect(screen.getByText('Venice')).toBeInTheDocument();
+      expect(screen.queryByTestId('space-albums-loading')).not.toBeInTheDocument();
     });
   });
 });

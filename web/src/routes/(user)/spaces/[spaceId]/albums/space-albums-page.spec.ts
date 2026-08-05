@@ -21,22 +21,17 @@ import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
 import SpaceAlbumsPage from './+page.svelte';
 
-// A mutable holder so individual tests can point `$page.url` at a `?folder=` query string before
-// rendering — `$app/stores`'s `page` store is a plain object mock (like the rest of this file's
-// mocks), not a real SvelteKit router, so nothing else keeps it in sync with `goto()` calls.
+// A mutable holder so individual tests can point `page.url` at a `?folder=` query string before
+// rendering. `$app/state`'s `page` is a plain rune-backed object (not a store — read without a
+// `$` prefix), and this is the established mocking pattern for it elsewhere in this codebase
+// (space-tabs.spec.ts, recent-spaces.spec.ts, global-search.spec.ts). `$app/stores` is deprecated
+// in SvelteKit 2 and removed in 3; the production code under test reads `$app/state` too.
 const { pageMock } = vi.hoisted(() => ({
   pageMock: { url: new URL('http://localhost/spaces/space-1/albums') },
 }));
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn() }));
-vi.mock('$app/stores', () => ({
-  page: {
-    subscribe: (run: (v: unknown) => void) => {
-      run({ url: pageMock.url, route: { id: '' } });
-      return () => {};
-    },
-  },
-}));
+vi.mock('$app/state', () => ({ page: pageMock }));
 
 const { modalManagerMock } = vi.hoisted(() => ({
   modalManagerMock: { show: vi.fn(), showDialog: vi.fn() },
@@ -123,21 +118,34 @@ function makeFolder(id: string, name: string, parentId: string | null = null): S
 function renderPage(
   albums: SharedSpaceLinkedAlbumDto[],
   role: SharedSpaceRole = SharedSpaceRole.Editor,
-  options: { folders?: SharedSpaceAlbumFolderDto[]; folderParam?: string } = {},
+  options: {
+    folders?: SharedSpaceAlbumFolderDto[];
+    folderParam?: string;
+    /** Simulates a failed folders fetch instead of resolving `options.folders`. */
+    foldersRejects?: boolean;
+    /** What the layout's initial (pre-mount-reload) linkedAlbums prop reports — defaults to
+     * `albums`. Set this to something different from `albums` to prove that the mount reload
+     * actually replaces it, rather than the assertion passing on the initial prop alone. */
+    linkedAlbums?: SharedSpaceLinkedAlbumDto[];
+  } = {},
 ) {
-  const { folders = [], folderParam } = options;
+  const { folders = [], folderParam, foldersRejects = false, linkedAlbums = albums } = options;
 
   pageMock.url = new URL(`http://localhost/spaces/space-1/albums${folderParam ? `?folder=${folderParam}` : ''}`);
 
   // The page re-fetches linked albums and folders on mount (reload) to pick up edits made on the
   // detail page; return the same sets so the mount reload doesn't wipe the rendered cards.
   sdkMock.getSharedSpaceAlbums.mockResolvedValue(albums);
-  sdkMock.getSharedSpaceAlbumFolders.mockResolvedValue(folders);
+  if (foldersRejects) {
+    sdkMock.getSharedSpaceAlbumFolders.mockRejectedValue(new Error('network error'));
+  } else {
+    sdkMock.getSharedSpaceAlbumFolders.mockResolvedValue(folders);
+  }
   const props = {
     data: {
       space: BASE_SPACE,
       members: [makeMember(role)],
-      linkedAlbums: albums,
+      linkedAlbums,
       meta: { title: 'Test Space - Albums' },
     },
   };
@@ -219,6 +227,19 @@ describe('Space albums page', () => {
   it('viewer with empty albums list sees no Create album button either', () => {
     renderPage([], SharedSpaceRole.Viewer);
     expect(screen.queryByTestId('empty-create-album-button')).not.toBeInTheDocument();
+  });
+
+  // Finding: without this, a brand-new space had no way to create a folder until an album
+  // existed to put in one — SpaceAlbumsControls (with its New folder button) only renders in the
+  // populated arm of the page.
+  it('offers New folder on the empty state for editors', () => {
+    renderPage([], SharedSpaceRole.Editor);
+    expect(screen.getByTestId('empty-create-folder-button')).toBeInTheDocument();
+  });
+
+  it('viewer with empty albums list sees no New folder button either', () => {
+    renderPage([], SharedSpaceRole.Viewer);
+    expect(screen.queryByTestId('empty-create-folder-button')).not.toBeInTheDocument();
   });
 
   describe('interactions', () => {
@@ -465,6 +486,21 @@ describe('Space albums page', () => {
       expect(goto).toHaveBeenCalledWith(`/spaces/${BASE_SPACE.id}/albums/new-1`);
     });
 
+    it('empty-state New folder opens the folder-name modal and creates the folder at the root', async () => {
+      modalManagerMock.show.mockResolvedValue('Trips');
+      sdkMock.createSharedSpaceAlbumFolder.mockResolvedValue(makeFolder('trips', 'Trips'));
+      renderPage([], SharedSpaceRole.Editor);
+
+      await fireEvent.click(screen.getByTestId('empty-create-folder-button'));
+
+      await waitFor(() =>
+        expect(sdkMock.createSharedSpaceAlbumFolder).toHaveBeenCalledWith({
+          id: 'space-1',
+          sharedSpaceAlbumFolderCreateDto: { name: 'Trips', parentId: null },
+        }),
+      );
+    });
+
     it('create succeeds but link fails → toast, no navigation, reload', async () => {
       sdkMock.createAlbum.mockResolvedValue({ id: 'new-1', albumName: '' } as AlbumResponseDto);
       sdkMock.linkAlbum.mockRejectedValue(new Error('nope'));
@@ -524,7 +560,7 @@ describe('Space albums page', () => {
       const openButton = await screen.findByTestId('space-album-folder-card-open');
       await fireEvent.click(openButton);
 
-      expect(goto).toHaveBeenCalledWith(expect.stringContaining('folder=trips'), expect.anything());
+      expect(goto).toHaveBeenCalledWith(expect.stringContaining('folder=trips'));
     });
 
     // W-03
@@ -537,18 +573,21 @@ describe('Space albums page', () => {
       const crumb = await screen.findByTestId('breadcrumb-trips');
       await fireEvent.click(crumb);
 
-      expect(goto).toHaveBeenCalledWith(expect.stringContaining('folder=trips'), expect.anything());
+      expect(goto).toHaveBeenCalledWith(expect.stringContaining('folder=trips'));
     });
 
     // W-04: the drill-in is a real navigation, so browser back is free — this asserts we use
-    // goto() with history rather than mutating local state.
+    // goto() with history rather than a replaceState navigation (which would collapse browser
+    // back). Reads the mock call directly rather than toHaveBeenCalledWith, since that matcher
+    // is arity-sensitive and navigateToFolder() calls goto() with a single argument.
     it('W-04: drill-in uses history navigation so browser back works', async () => {
       renderPage([], SharedSpaceRole.Editor, { folders: [makeFolder('trips', 'Trips')] });
 
       const openButton = await screen.findByTestId('space-album-folder-card-open');
       await fireEvent.click(openButton);
 
-      expect(goto).toHaveBeenCalledWith(expect.any(String), expect.not.objectContaining({ replaceState: true }));
+      const [, options] = vi.mocked(goto).mock.calls.at(-1) ?? [];
+      expect(options).not.toEqual(expect.objectContaining({ replaceState: true }));
     });
 
     // W-05: a space with no folders must be pixel-identical to today.
@@ -564,6 +603,20 @@ describe('Space albums page', () => {
       renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
         folders: [makeFolder('trips', 'Trips')],
         folderParam: 'deleted',
+      });
+
+      await waitFor(() => expect(screen.getByText('Rome')).toBeInTheDocument());
+      await waitFor(() =>
+        expect(goto).toHaveBeenCalledWith(expect.not.stringContaining('folder='), { replaceState: true }),
+      );
+    });
+
+    // Finding: `folders.length > 0` can't distinguish "haven't loaded yet" from "genuinely zero
+    // folders" — a space whose last folder was just deleted left a dangling ?folder= forever.
+    it('strips ?folder= when the space has been emptied down to zero folders', async () => {
+      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
+        folders: [],
+        folderParam: 'trips',
       });
 
       await waitFor(() => expect(screen.getByText('Rome')).toBeInTheDocument());
@@ -606,6 +659,39 @@ describe('Space albums page', () => {
       await waitFor(() =>
         expect(sdkMock.linkAlbum).toHaveBeenCalledWith(expect.objectContaining({ folderId: 'trips' })),
       );
+    });
+
+    // Finding: the breadcrumb was gated only on folders.length > 0, so it stayed visible during a
+    // search — showing e.g. "Albums › Trips" while the results underneath are actually
+    // space-wide, misrepresenting where they come from.
+    it('W-09: hides the breadcrumb while searching', async () => {
+      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' })], SharedSpaceRole.Editor, {
+        folders: [makeFolder('trips', 'Trips')],
+        folderParam: 'trips',
+      });
+
+      await screen.findByTestId('space-album-folder-breadcrumb');
+      const search = screen.getByTestId('space-albums-search');
+      await fireEvent.input(search, { target: { value: 'rom' } });
+
+      expect(screen.queryByTestId('space-album-folder-breadcrumb')).not.toBeInTheDocument();
+    });
+
+    // Finding: reload() used an atomic Promise.all, so a folders-fetch failure also prevented the
+    // albums refresh from ever landing (the destructuring assignment never runs when either
+    // promise rejects) — and, without foldersUnavailable threaded through, any album that lives
+    // in a folder was invisible forever since root-level filtering only shows folderId === null.
+    it('a folders-fetch failure still refreshes albums and degrades to a flat, unscoped list', async () => {
+      // linkedAlbums: [] at mount — only the reload's resolved albums (below) contain Rome/
+      // Venice, so a passing assertion proves the reload actually landed despite the rejection.
+      renderPage(
+        [makeAlbum({ id: 'a1', albumName: 'Rome' }), makeAlbum({ id: 'a2', albumName: 'Venice', folderId: 'trips' })],
+        SharedSpaceRole.Editor,
+        { foldersRejects: true, linkedAlbums: [] },
+      );
+
+      await screen.findByText('Rome');
+      expect(screen.getByText('Venice')).toBeInTheDocument();
     });
   });
 

@@ -20,6 +20,7 @@
     getFolderPreviewAssetIds,
     getRecursiveAlbumCount,
   } from '$lib/utils/space-album-folders';
+  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import SpaceAlbumCard from '$lib/components/spaces/space-album-card.svelte';
   import SpaceAlbumFolderCard from '$lib/components/spaces/space-album-folder-card.svelte';
   import SpaceAlbumsTable from '$lib/components/spaces/space-albums-table.svelte';
@@ -32,6 +33,9 @@
     spaceId: string;
     albums: SharedSpaceLinkedAlbumDto[];
     folders?: SharedSpaceAlbumFolderDto[];
+    /** The most recent folders fetch failed — fall back to a flat, unscoped album list rather
+     * than hiding every album that lives in a folder we have no metadata for. */
+    foldersUnavailable?: boolean;
     currentFolderId?: string | null;
     canManage: boolean;
     members?: SharedSpaceMemberResponseDto[];
@@ -50,6 +54,7 @@
     spaceId,
     albums,
     folders = [],
+    foldersUnavailable = false,
     currentFolderId = null,
     canManage,
     members = [],
@@ -69,15 +74,31 @@
 
   // While searching we leave the folder tree entirely: hits come from the whole space, each
   // labelled with its path. `?folder=` is untouched, so clearing the box restores this level.
-  const searchHits = $derived(isSearching ? flattenForSearch(folders, albums, searchQuery) : []);
+  // flattenForSearch returns raw server order — re-apply the active sort so a search doesn't
+  // silently discard the user's chosen ordering (grouping is the only thing search drops).
+  const searchHits = $derived.by(() => {
+    if (!isSearching) {
+      return [];
+    }
+    const hits = flattenForSearch(folders, albums, searchQuery);
+    const pathByAlbumId = new Map(hits.map((hit) => [hit.album.id, hit.path]));
+    const sortedHitAlbums = sortAlbums(hits.map((hit) => hit.album) as unknown as AlbumResponseDto[], {
+      sortBy: $spaceAlbumViewSettings.sortBy,
+      orderBy: $spaceAlbumViewSettings.sortOrder,
+    }) as unknown as SharedSpaceLinkedAlbumDto[];
+    return sortedHitAlbums.map((album) => ({ album, path: pathByAlbumId.get(album.id) ?? [] }));
+  });
+
+  const searchHitAlbums = $derived(searchHits.map((hit) => hit.album));
 
   const contents = $derived(getFolderContents(folders, albums, currentFolderId ?? null));
 
   // Folders sort by NAME, honouring the sort direction but ignoring the sort key: assetCount and
   // mostRecentPhoto do not map onto a folder, and reshuffling them under "sort by item count" is
-  // noise. Folders are never part of a search result set.
+  // noise. Folders are never part of a search result set, and are hidden entirely (rather than
+  // shown untrustworthy) while the folder tree failed to load.
   const sortedFolders = $derived(
-    isSearching
+    isSearching || foldersUnavailable
       ? []
       : contents.folders
           .slice()
@@ -88,8 +109,11 @@
           ),
   );
 
-  // Everything downstream — filter, sort, group — now sees only THIS level's albums.
-  const levelAlbums = $derived(isSearching ? [] : contents.albums);
+  // Everything downstream — filter, sort, group — now sees only THIS level's albums. When the
+  // folder tree failed to load we can't reliably scope by level at all (we don't know which
+  // albums belong at THIS level vs. a folder we have no data for), so degrade to every album in
+  // the space, flat — far better than silently hiding anything with a non-null folderId.
+  const levelAlbums = $derived(isSearching ? [] : foldersUnavailable ? albums : contents.albums);
 
   const filtered = $derived.by(() => {
     const q = (searchQuery ?? '').trim().toLowerCase();
@@ -129,6 +153,11 @@
 {#if isSearching}
   {#if searchHits.length === 0}
     <p data-testid="space-albums-no-results" class="p-4 text-center text-gray-500">{$t('space_albums_no_matching')}</p>
+  {:else if $spaceAlbumViewSettings.view === AlbumViewMode.List}
+    <!-- Respect the user's List/Cover preference during a search too — it must not be silently
+         discarded for the duration of the query. Deliberately UNGROUPED and with no folder rows
+         (search escapes the folder tree entirely). -->
+    <SpaceAlbumsTable {spaceId} albums={searchHitAlbums} {canManage} {onUnlink} {onToggleTimeline} />
   {:else}
     <!-- Flattened, deliberately UNGROUPED: the path subtitle is the organising signal. -->
     <div class="grid grid-auto-fill-56 gap-y-4">
@@ -238,4 +267,12 @@
       {/if}
     {/if}
   {/if}
+{:else}
+  <!-- Reachable on first paint (folders starts empty and is only filled by the caller's
+       on-mount reload, so a space whose albums all live in folders is briefly like this) and,
+       without foldersUnavailable being set, on a load failure — never leave the pane silently
+       blank while that resolves. -->
+  <div class="flex justify-center p-8" data-testid="space-albums-loading">
+    <LoadingSpinner />
+  </div>
 {/if}

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto, invalidateAll } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { onMount } from 'svelte';
   import SpaceAlbumFolderBreadcrumb from '$lib/components/spaces/space-album-folder-breadcrumb.svelte';
   import SpaceAlbumsControls from '$lib/components/spaces/space-albums-controls.svelte';
@@ -34,7 +34,7 @@
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
   import { Button, Icon, modalManager } from '@immich/ui';
-  import { mdiImageMultipleOutline, mdiLinkVariantPlus, mdiPlus } from '@mdi/js';
+  import { mdiFolderPlusOutline, mdiImageMultipleOutline, mdiLinkVariantPlus, mdiPlus } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
 
@@ -48,6 +48,15 @@
   const members = $derived<SharedSpaceMemberResponseDto[]>(data.members);
   let albums = $state<SharedSpaceLinkedAlbumDto[]>(data.linkedAlbums);
   let folders = $state<SharedSpaceAlbumFolderDto[]>([]);
+  // True once a folders fetch has ever SUCCEEDED (even with an empty result) — distinct from
+  // `folders.length > 0`, which can't tell "haven't loaded yet" apart from "genuinely zero
+  // folders" and would otherwise never let the fallback effect below strip a dangling ?folder=
+  // for a space that no longer has any folders at all.
+  let foldersLoaded = $state(false);
+  // True when the MOST RECENT folders fetch failed. The list falls back to a flat, unscoped
+  // album view in this state rather than hiding every album that lives in a folder we couldn't
+  // fetch metadata for.
+  let foldersLoadFailed = $state(false);
   let groupIds = $state<string[]>([]);
   let searchQuery = $state('');
 
@@ -58,7 +67,9 @@
 
   const linkedAlbumIds = $derived(albums.map((a) => a.id));
 
-  const requestedFolderId = $derived($page.url.searchParams.get('folder'));
+  const isSearching = $derived(searchQuery.trim().length > 0);
+
+  const requestedFolderId = $derived(page.url.searchParams.get('folder'));
 
   // A folder another editor deleted must degrade to the root rather than break the page.
   const currentFolderId = $derived(
@@ -69,21 +80,40 @@
 
   $effect(() => {
     // Strip a stale ?folder= so a refresh or a share of this URL does not keep resolving to a
-    // folder that no longer exists. replaceState: the fallback is not a history entry. Gated on
-    // folders.length > 0 so we do not strip the param before the initial folder fetch resolves.
-    if (requestedFolderId && folders.length > 0 && currentFolderId === null) {
+    // folder that no longer exists — including a space that has been emptied down to zero
+    // folders entirely. replaceState: the fallback is not a history entry. Gated on
+    // foldersLoaded (not folders.length > 0) so we do not strip the param before the initial
+    // folder fetch resolves, but still do strip it once we've confirmed there is nothing there.
+    if (requestedFolderId && foldersLoaded && currentFolderId === null) {
       void goto(Route.viewSpaceAlbums({ id: space.id }), { replaceState: true });
     }
   });
 
   async function reload() {
-    try {
-      [albums, folders] = await Promise.all([
-        getSharedSpaceAlbums({ id: space.id }),
-        getSharedSpaceAlbumFolders({ id: space.id }),
-      ]);
-    } catch (error) {
-      handleError(error, $t('spaces_linked_albums_error_load'));
+    // Independent fetches: a folders failure must not also block the (usually far more
+    // important) albums refresh the way an atomic Promise.all would. See handleError below for
+    // what each half does when it fails.
+    const [albumsResult, foldersResult] = await Promise.allSettled([
+      getSharedSpaceAlbums({ id: space.id }),
+      getSharedSpaceAlbumFolders({ id: space.id }),
+    ]);
+
+    if (albumsResult.status === 'fulfilled') {
+      albums = albumsResult.value;
+    } else {
+      handleError(albumsResult.reason, $t('spaces_linked_albums_error_load'));
+    }
+
+    if (foldersResult.status === 'fulfilled') {
+      folders = foldersResult.value;
+      foldersLoaded = true;
+      foldersLoadFailed = false;
+    } else {
+      // Deliberately leave `folders` (and foldersLoaded) as they were: a transient refetch
+      // failure after a prior success should keep showing the last-known-good folder tree
+      // rather than wiping it. SpaceAlbumsList degrades to a flat album list while this is true.
+      foldersLoadFailed = true;
+      handleError(foldersResult.reason, $t('spaces_linked_albums_error_load'));
     }
   }
 
@@ -96,7 +126,7 @@
 
   // A real (pushState) navigation, not a replace — drilling into a folder must be undoable with
   // the browser back button.
-  const navigateToFolder = (folderId: string | null) => goto(Route.viewSpaceAlbums({ id: space.id, folderId }), {});
+  const navigateToFolder = (folderId: string | null) => goto(Route.viewSpaceAlbums({ id: space.id, folderId }));
 
   async function handleUnlink(album: SharedSpaceLinkedAlbumDto) {
     const confirmed = await modalManager.showDialog({
@@ -346,12 +376,24 @@
             >
               {$t('space_albums_empty_editor_cta')}
             </Button>
+            <!-- Otherwise a brand-new space has no way to make a folder until an album exists to
+                 put in one. -->
+            <Button
+              variant="ghost"
+              leadingIcon={mdiFolderPlusOutline}
+              onclick={() => void handleCreateFolder()}
+              data-testid="empty-create-folder-button"
+            >
+              {$t('space_album_folder_new')}
+            </Button>
           </div>
         {/if}
       </div>
     </div>
   {:else}
-    {#if folders.length > 0}
+    {#if folders.length > 0 && !isSearching}
+      <!-- Search escapes the folder tree entirely (results are space-wide), so showing where we
+           were would misrepresent where the results actually come from. -->
       <SpaceAlbumFolderBreadcrumb path={folderPath} onNavigate={(id) => void navigateToFolder(id)} />
     {/if}
     <SpaceAlbumsControls
@@ -367,6 +409,7 @@
         spaceId={space.id}
         {albums}
         {folders}
+        foldersUnavailable={foldersLoadFailed}
         {currentFolderId}
         canManage={isEditor}
         {members}
