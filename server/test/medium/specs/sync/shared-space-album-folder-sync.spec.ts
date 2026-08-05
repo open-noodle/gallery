@@ -374,51 +374,87 @@ describe('SharedSpaceAlbumFoldersV1 sync stream (handler level)', () => {
 
     // Grant access to `target` — its folders predate the checkpoint just established, so this is
     // the "create folders first, then add a member" late-joiner scenario end to end.
-    await ctx.newSharedSpaceMember({ spaceId: target.id, userId: auth.user.id, role: SharedSpaceRole.Viewer });
+    const { member: targetMembership } = await ctx.newSharedSpaceMember({
+      spaceId: target.id,
+      userId: auth.user.id,
+      role: SharedSpaceRole.Viewer,
+    });
 
     const response = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAlbumFoldersV1]);
 
     const backfillEvents = response.filter(
       (r: { type: string }) => r.type === SyncEntityType.SharedSpaceAlbumFolderBackfillV1,
-    );
-    expect(backfillEvents.map((r: { data: { id: string } }) => r.data.id).sort()).toEqual(
-      [folderA.id, folderB.id].sort(),
-    );
+    ) as Array<{ data: Record<string, unknown> }>;
+    expect(backfillEvents.map((r) => (r.data as { id: string }).id).sort()).toEqual([folderA.id, folderB.id].sort());
+    // Pin the backfill payload's wire shape exactly, the same way test 1 pins the upsert event's.
+    // The backfill arm is a SEPARATE `send` call site from the upsert arm sharing the same DTO —
+    // nothing stops that call site from leaking updateId onto the wire independently of the
+    // upsert arm (data.id alone would not catch it).
+    for (const event of backfillEvents) {
+      expect(Object.keys(event.data).sort()).toEqual(['createdAt', 'id', 'name', 'parentId', 'spaceId', 'updatedAt']);
+    }
 
     // These predate the checkpoint, so backfill must be the SOLE delivery path for them this round.
     const upsertEvents = response.filter((r: { type: string }) => r.type === SyncEntityType.SharedSpaceAlbumFolderV1);
     expect(upsertEvents).toHaveLength(0);
 
-    const completionAck = response.find(
-      (r: { type: string; ack: string }) =>
-        r.type === SyncEntityType.SyncAckV1 &&
-        r.ack.startsWith(`${SyncEntityType.SharedSpaceAlbumFolderBackfillV1}|`) &&
-        r.ack.endsWith('|complete'),
-    );
+    // The completion ack's id component must be the membership's OWN createId — not merely
+    // something that starts with the right prefix and ends with "|complete". If the wrong id were
+    // ever passed to sendEntityBackfillCompleteAck, isEntityBackfillComplete would never match on
+    // a later round and the backfill would silently re-run forever.
+    const completionAck = response.find((r: { type: string }) => r.type === SyncEntityType.SyncAckV1) as
+      { ack: string } | undefined;
     expect(completionAck).toBeDefined();
+    expect(completionAck!.ack).toBe(
+      `${SyncEntityType.SharedSpaceAlbumFolderBackfillV1}|${targetMembership.createId}|complete`,
+    );
+
+    // Idempotency: once the completion ack is itself acked, the backfill arm must not re-run —
+    // the same property tests 2 and 3 already prove for the upsert and delete arms.
+    await ctx.syncAckAll(auth, response);
+    const idempotentRound = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAlbumFoldersV1]);
+    const idempotentBackfillEvents = idempotentRound.filter(
+      (r: { type: string }) => r.type === SyncEntityType.SharedSpaceAlbumFolderBackfillV1,
+    );
+    expect(idempotentBackfillEvents).toHaveLength(0);
   });
 
-  // Required test 5: non-member exclusion across every arm.
-  it('delivers no folder events of any kind to a user who is not a space member', async () => {
+  // Required test 5 (M-4 positive control): an accessible space's folder arrives, while an
+  // entirely separate, inaccessible space's folder and tombstone do not. The positive control
+  // (includedFolder arriving) proves this specific stream call, for this specific user, would
+  // actually have delivered the excluded space's folder/tombstone had the exclusion been broken —
+  // ruling out "the arm returns nothing for everyone", which tests 1-4 in this file already do by
+  // streaming as a real member and getting real events back.
+  it('delivers folders for an accessible space, but excludes an entirely separate space', async () => {
     const { ctx, db, auth } = await streamSetup();
     const { user: owner } = await ctx.newUser();
-    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
-    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
-    const folder = await newFolder(db, space.id, 'Divorce');
-    const tombstoned = await newFolder(db, space.id, 'Archive');
-    await db.deleteFrom('shared_space_album_folder').where('id', '=', tombstoned.id).execute();
-    // auth.user is never added as a member of `space`.
+
+    // Excluded space: auth.user has NO access. One live folder, one tombstoned folder.
+    const { space: excludedSpace } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: excludedSpace.id, userId: owner.id, role: SharedSpaceRole.Owner });
+    const excludedFolder = await newFolder(db, excludedSpace.id, 'Divorce');
+    const excludedTombstoned = await newFolder(db, excludedSpace.id, 'Medical');
+    await db.deleteFrom('shared_space_album_folder').where('id', '=', excludedTombstoned.id).execute();
+
+    // Included space: auth.user IS a member, with its own folder — the positive control.
+    const { space: includedSpace } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: includedSpace.id, userId: owner.id, role: SharedSpaceRole.Owner });
+    await ctx.newSharedSpaceMember({ spaceId: includedSpace.id, userId: auth.user.id, role: SharedSpaceRole.Editor });
+    const includedFolder = await newFolder(db, includedSpace.id, 'Trips');
 
     const response = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAlbumFoldersV1]);
-    const folderEventTypes = new Set<string>([
-      SyncEntityType.SharedSpaceAlbumFolderV1,
-      SyncEntityType.SharedSpaceAlbumFolderBackfillV1,
-      SyncEntityType.SharedSpaceAlbumFolderDeleteV1,
-    ]);
-    const folderEvents = response.filter((r: { type: string }) => folderEventTypes.has(r.type));
 
-    expect(folderEvents).toHaveLength(0);
-    // Sanity: the folder genuinely exists and is visible to the owner, so this isn't a vacuous pass.
-    expect(folder.spaceId).toBe(space.id);
+    const upsertIds = response
+      .filter((r: { type: string }) => r.type === SyncEntityType.SharedSpaceAlbumFolderV1)
+      .map((r: { data: { id: string } }) => r.data.id);
+    const tombstoneFolderIds = response
+      .filter((r: { type: string }) => r.type === SyncEntityType.SharedSpaceAlbumFolderDeleteV1)
+      .map((r: { data: { folderId: string } }) => r.data.folderId);
+
+    // Positive control: the accessible space's folder DOES arrive.
+    expect(upsertIds).toContain(includedFolder.id);
+    // The inaccessible space's folder and tombstone do NOT arrive.
+    expect(upsertIds).not.toContain(excludedFolder.id);
+    expect(tombstoneFolderIds).not.toContain(excludedTombstoned.id);
   });
 });
