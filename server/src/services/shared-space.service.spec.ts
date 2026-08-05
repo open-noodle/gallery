@@ -25,7 +25,11 @@ import {
   SystemMetadataKey,
   UserAvatarColor,
 } from 'src/enum';
-import { SHARED_SPACE_DEDUP_MAX_PASSES, SharedSpaceService } from 'src/services/shared-space.service';
+import {
+  SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE,
+  SHARED_SPACE_DEDUP_MAX_PASSES,
+  SharedSpaceService,
+} from 'src/services/shared-space.service';
 import { StorageService } from 'src/services/storage.service';
 import { ImmichFileResponse, ImmichStreamResponse } from 'src/utils/file';
 import { CROSS_OWNER_MERGE_ERROR_CODE } from 'src/utils/merge-policy';
@@ -13771,7 +13775,7 @@ describe(SharedSpaceService.name, () => {
         const promise = sut.createAlbumFolder(auth, space.id, { name: 'Trips' } as any);
 
         await expect(promise).rejects.toBeInstanceOf(BadRequestException);
-        await expect(promise).rejects.toThrow('A folder with that name already exists here');
+        await expect(promise).rejects.toThrow(SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE);
       });
 
       // Task 3 review, Part A: only code 23505 is mapped — any other repository error (a
@@ -13806,9 +13810,15 @@ describe(SharedSpaceService.name, () => {
         mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
         mocks.sharedSpace.hasSiblingAlbumFolderName.mockResolvedValue(true);
 
-        await expect(sut.updateAlbumFolder(auth, space.id, folder.id, { name: 'trips' } as any)).rejects.toBeInstanceOf(
-          BadRequestException,
-        );
+        const promise = sut.updateAlbumFolder(auth, space.id, folder.id, { name: 'trips' } as any);
+
+        // Asserts the shared const, not just the exception type: the pre-check
+        // (assertNoAlbumFolderNameConflict) and the raced-23505 mapper
+        // (withAlbumFolderNameConflictMapped) both throw SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE,
+        // and mobile substring-matches that exact text to choose its specific toast — a reword of one
+        // throw site alone must fail this test, not just leave it green on the exception class.
+        await expect(promise).rejects.toBeInstanceOf(BadRequestException);
+        await expect(promise).rejects.toThrow(SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE);
         expect(mocks.sharedSpace.updateAlbumFolder).not.toHaveBeenCalled();
       });
 
@@ -13876,7 +13886,7 @@ describe(SharedSpaceService.name, () => {
         const promise = sut.updateAlbumFolder(auth, space.id, folder.id, { name: 'Travel' } as any);
 
         await expect(promise).rejects.toBeInstanceOf(BadRequestException);
-        await expect(promise).rejects.toThrow('A folder with that name already exists here');
+        await expect(promise).rejects.toThrow(SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE);
       });
     });
 
@@ -14074,7 +14084,7 @@ describe(SharedSpaceService.name, () => {
         const promise = sut.updateAlbumFolder(auth, space.id, folder.id, { parentId: target.id } as any);
 
         await expect(promise).rejects.toBeInstanceOf(BadRequestException);
-        await expect(promise).rejects.toThrow('A folder with that name already exists here');
+        await expect(promise).rejects.toThrow(SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE);
       });
     });
 
