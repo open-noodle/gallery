@@ -4,6 +4,7 @@ import {
   AlbumUserRole,
   AssetMediaCreateDto,
   AssetMediaResponseDto,
+  AssetMediaStatus,
   AssetResponseDto,
   AssetVisibility,
   CreateAlbumDto,
@@ -390,12 +391,28 @@ export const utils = {
   unlinkSpaceAlbum: (accessToken: string, spaceId: string, albumId: string) =>
     sdkUnlinkAlbum({ id: spaceId, albumId }, { headers: asBearerAuth(accessToken) }),
 
+  /**
+   * Upload an asset.
+   *
+   * Idempotent across vitest retries. `retry` re-runs the test body but not `beforeAll`/`beforeEach`,
+   * so an upload that reached the server on a previous attempt is still there. Re-uploading the same
+   * bytes hits the per-owner checksum constraint and the server answers DUPLICATE, which turns one
+   * slow upload into a deterministic failure on every remaining attempt (the asset checksum index has
+   * no `deletedAt` predicate, so even trashing the asset would not free it).
+   *
+   * A DUPLICATE response is therefore reported as CREATED, carrying the existing asset's id — the
+   * postcondition callers actually depend on ("an asset with these bytes exists, here is its id")
+   * already holds. `waitForWebsocketEvent` replays already-seen ids, so downstream waits still settle.
+   *
+   * Pass `allowDuplicate` to observe the raw status when duplicate detection is what's under test.
+   */
   createAsset: async (
     accessToken: string,
     dto?: Partial<Omit<AssetMediaCreateDto, 'assetData' | 'sidecarData'>> & {
       assetData?: FileData;
       sidecarData?: FileData;
     },
+    options?: { allowDuplicate?: boolean },
   ) => {
     const _dto = {
       fileCreatedAt: new Date().toISOString(),
@@ -424,8 +441,13 @@ export const utils = {
     }
 
     const { body } = await builder;
+    const response = body as AssetMediaResponseDto;
 
-    return body as AssetMediaResponseDto;
+    if (!options?.allowDuplicate && response.status === AssetMediaStatus.Duplicate) {
+      return { ...response, status: AssetMediaStatus.Created };
+    }
+
+    return response;
   },
 
   createImageFile: (path: string) => {
