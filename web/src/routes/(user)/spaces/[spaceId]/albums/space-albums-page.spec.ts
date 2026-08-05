@@ -920,6 +920,32 @@ describe('Space albums page', () => {
       expect(sdkMock.updateSharedSpaceAlbumFolder).not.toHaveBeenCalled();
     });
 
+    // Mutation coverage: handleDropItem's OWN canDrop guard (+page.svelte) had zero coverage of
+    // its own — every "invalid drop" test above goes through dropOnFolder, which only fires
+    // `drop` when the preceding dragover accepted, so those `not.toHaveBeenCalled()` assertions
+    // only ever run in a branch where no drop event fired at all. The folder card's own `ondrop`
+    // (space-album-folder-card.svelte) has no canDrop check of its own — it forwards straight to
+    // onDropItem — so handleDropItem's guard is the only thing standing between an illegal drop
+    // and the SDK once dragover is bypassed. Dispatching `drop` directly, with no dragover at
+    // all, exercises exactly that: jsdom's fireEvent.drop doesn't require a prior
+    // preventDefault()'d dragover the way a real browser does, so this reaches the guard even
+    // though a real browser never would have let the drop fire in the first place.
+    it("handleDropItem's own canDrop guard rejects an invalid drop even without a preceding dragover", async () => {
+      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' })], SharedSpaceRole.Editor, {
+        folders: [makeFolder('trips', 'Trips')],
+      });
+
+      const dataTransfer = makeFakeDataTransfer();
+      // a1 already sits in "trips" — an illegal, no-op drop per canDrop.
+      writeDragPayload(dataTransfer, { kind: 'album', id: 'a1' });
+
+      const card = await screen.findByTestId('space-album-folder-card');
+      await fireEvent.drop(card, { dataTransfer }); // no preceding dragover
+
+      expect(sdkMock.setSharedSpaceAlbumFolder).not.toHaveBeenCalled();
+      expect(sdkMock.updateSharedSpaceAlbumFolder).not.toHaveBeenCalled();
+    });
+
     // W-15
     it('W-15: rolls the optimistic move back and toasts when the request fails', async () => {
       sdkMock.setSharedSpaceAlbumFolder.mockRejectedValueOnce(new Error('boom'));

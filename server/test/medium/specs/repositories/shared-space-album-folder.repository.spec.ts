@@ -438,7 +438,7 @@ describe('SharedSpaceRepository — album folder primitives', () => {
 
     const deleted = await sut.deleteAlbumFolderPromotingChildren(space.id, y2026.id);
 
-    expect(deleted).toBe(true);
+    expect(deleted).toEqual({ outcome: 'ok' });
     // 2026's direct child Italy moves up to Trips…
     await expect(sut.getAlbumFolderById(space.id, italy.id)).resolves.toMatchObject({ parentId: trips.id });
     // …but the album inside Italy is untouched.
@@ -482,13 +482,78 @@ describe('SharedSpaceRepository — album folder primitives', () => {
     expect(link.folderId).toBe(archive.id);
   });
 
-  it('P-05: deleteAlbumFolderPromotingChildren returns false for an unknown folder', async () => {
+  it('P-05: deleteAlbumFolderPromotingChildren reports notfound for an unknown folder', async () => {
     const { ctx, sut } = setup();
     const { space } = await seed(ctx);
 
     await expect(
       sut.deleteAlbumFolderPromotingChildren(space.id, '00000000-0000-4000-8000-000000000000'),
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ outcome: 'notfound' });
+  });
+
+  // The CRITICAL fix: deleting "Trips" (root "Trips" -> "Trips/2026", plus a second root "2026")
+  // promotes "2026" straight into a root that already has a folder called "2026" (F-04 explicitly
+  // allows the same name under different parents, so this precondition is legal to construct).
+  // Both partial unique indexes are non-deferrable, so a naive promote UPDATE would 23505 and
+  // escape as an unmapped 500. The fix refuses the delete with a 'conflict' outcome instead, and
+  // the transaction must roll back completely: the folder survives, and its children are untouched.
+  it('P-05: deleteAlbumFolderPromotingChildren refuses a promote that collides with a sibling name, rolling back', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    const nested2026 = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: trips.id,
+      name: '2026',
+      createdById: user.id,
+    });
+    const root2026 = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: '2026',
+      createdById: user.id,
+    });
+
+    await expect(sut.deleteAlbumFolderPromotingChildren(space.id, trips.id)).resolves.toEqual({
+      outcome: 'conflict',
+      name: '2026',
+    });
+
+    // Rolled back: "Trips" still exists, its child is still nested under it, and the pre-existing
+    // root "2026" was never touched.
+    await expect(sut.getAlbumFolderById(space.id, trips.id)).resolves.toMatchObject({ id: trips.id });
+    await expect(sut.getAlbumFolderById(space.id, nested2026.id)).resolves.toMatchObject({ parentId: trips.id });
+    await expect(sut.getAlbumFolderById(space.id, root2026.id)).resolves.toMatchObject({ parentId: null });
+  });
+
+  // Non-colliding sibling: the delete must still succeed normally when there is no name clash —
+  // proves the new pre-check doesn't false-positive on an ordinary promote.
+  it('P-05: deleteAlbumFolderPromotingChildren still promotes normally when no sibling name collides', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    const y2026 = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: trips.id,
+      name: '2026',
+      createdById: user.id,
+    });
+    await sut.createAlbumFolder({ spaceId: space.id, parentId: null, name: 'Unrelated', createdById: user.id });
+
+    await expect(sut.deleteAlbumFolderPromotingChildren(space.id, trips.id)).resolves.toEqual({ outcome: 'ok' });
+
+    await expect(sut.getAlbumFolderById(space.id, y2026.id)).resolves.toMatchObject({ parentId: null });
+    await expect(sut.getAlbumFolderById(space.id, trips.id)).resolves.toBeUndefined();
   });
 
   // P-06
@@ -581,6 +646,34 @@ describe('SharedSpaceRepository — album folder primitives', () => {
     // Excluding the row itself is what makes rename-to-same-name (N-03) a no-op instead of a 400.
     await expect(sut.hasSiblingAlbumFolderName(space.id, null, 'trips', trips.id)).resolves.toBe(false);
     await expect(sut.hasSiblingAlbumFolderName(space.id, null, 'Family', null)).resolves.toBe(false);
+  });
+
+  // Every case above uses ROOT folders (parentId null), which is also all the e2e suite exercises
+  // — the `parentId IS NULL` branch had zero coverage of the NON-null branch at any layer, so this
+  // could be mutated to an unconditional `parentId IS NULL` and every existing test would still
+  // pass. Two folders sharing a name under the SAME non-null parent must collide exactly like two
+  // roots do.
+  it('hasSiblingAlbumFolderName detects a case-insensitive collision under a NON-NULL parent', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    const y2026 = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: trips.id,
+      name: '2026',
+      createdById: user.id,
+    });
+
+    // Would false-negative under an unconditional `parentId IS NULL`: y2026's parentId is
+    // trips.id, never NULL, so that mutation would never find it here.
+    await expect(sut.hasSiblingAlbumFolderName(space.id, trips.id, '2026', null)).resolves.toBe(true);
+    // excludeId still applies one level down.
+    await expect(sut.hasSiblingAlbumFolderName(space.id, trips.id, '2026', y2026.id)).resolves.toBe(false);
   });
 
   it('updateAlbumFolder renames and reparents, and returns false for an unknown folder', async () => {

@@ -254,6 +254,12 @@
       return; // create failed; createAlbum already showed a toast
     }
     try {
+      // `?? undefined` is load-bearing, not cosmetic: linkAlbum's folderId query param is
+      // `.optional()` and NOT nullable, so root must be OMITTED, not sent as null. Worse than a
+      // 400 — oazapfts' `explode` helper filters only `undefined` out of the params object, and
+      // `typeof null === 'object'`, so a literal `null` here makes it recurse into
+      // `Object.entries(null)` and throw a TypeError, hard-breaking album creation at the space
+      // root. Dropping this `??` isn't caught by unit tests because the SDK is module-mocked.
       await linkAlbum({ id: space.id, albumId: newAlbum.id, folderId: currentFolderId ?? undefined });
       eventManager.emit('SpaceLinkAlbum', { spaceId: space.id });
       await invalidateAll();
@@ -266,6 +272,10 @@
   }
 
   async function openLinkAlbumModal() {
+    // `?? undefined` is load-bearing here too — see the comment on the linkAlbum call in
+    // handleCreateAlbum above: linkAlbum's folderId is optional-but-not-nullable, and a literal
+    // null makes oazapfts' `explode` throw (Object.entries(null)) instead of 400ing, breaking
+    // linking at the space root. Not caught by unit tests since the SDK is module-mocked.
     const linkedCount = await modalManager.show(SpaceLinkAlbumModal, {
       spaceId: space.id,
       linkedAlbumIds,

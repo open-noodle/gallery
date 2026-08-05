@@ -44,6 +44,16 @@ export interface TimelineHiddenScope {
   hiddenLibraryIds: string[];
 }
 
+// Internal marker thrown inside deleteAlbumFolderPromotingChildren's transaction to force a
+// normal Kysely rollback (rather than trying to return a value from an already-aborted Postgres
+// transaction) when a promote would collide with an existing folder name at the destination.
+// `folderName` is null for the raced-23505 backstop path, which has no name to report.
+class AlbumFolderPromotionConflictError extends Error {
+  constructor(readonly folderName: string | null) {
+    super('shared_space_album_folder promote conflict');
+  }
+}
+
 type SpacePersonStatistics = {
   assets: number;
   faces: number;
@@ -1493,39 +1503,100 @@ export class SharedSpaceRepository {
   // to the deleted folder's parent; grandchildren keep their parents. Because children are
   // cleared first, the CASCADE self-FK never fires here — it only ever runs on space deletion.
   //
+  // Both partial unique indexes (§3.3 of the design) are non-deferrable, so promoting a child
+  // straight into a destination that already has a same-named folder raises 23505 immediately —
+  // spec F-04 explicitly allows the same name under different parents, so this is a reachable,
+  // documented collision, not an edge case. Two guards catch it:
+  //   1. A pre-check, run after taking the row and before the promote UPDATE, comparing each
+  //      direct child's trimmed/lower-cased name against the DESTINATION parent's other existing
+  //      children (excluding the folder being deleted itself, which is about to disappear and so
+  //      cannot collide with anything). This is the primary path, and the only one that can name
+  //      the colliding folder for the caller.
+  //   2. A narrow catch on the promote UPDATE's own 23505, as a backstop for the race where a
+  //      second editor creates the colliding name between the pre-check and the write. Only this
+  //      one statement's unique-violation is caught here — nothing else in the transaction is
+  //      blanket-caught, and the caught error is rethrown as a typed marker so Kysely still sees
+  //      the callback reject and rolls the transaction back the normal way, rather than us trying
+  //      to return a value from inside an already-aborted Postgres transaction.
+  //
   // Everything inside the callback uses `trx`. Running a `this.db` query inside a Kysely
   // transaction callback deadlocks (issue #595).
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
-  deleteAlbumFolderPromotingChildren(spaceId: string, folderId: string): Promise<boolean> {
-    return this.db.transaction().execute(async (trx) => {
-      const folder = await trx
-        .selectFrom('shared_space_album_folder')
-        .select(['id', 'parentId'])
-        .where('spaceId', '=', spaceId)
-        .where('id', '=', folderId)
-        .forUpdate()
-        .executeTakeFirst();
+  deleteAlbumFolderPromotingChildren(
+    spaceId: string,
+    folderId: string,
+  ): Promise<{ outcome: 'ok' } | { outcome: 'notfound' } | { outcome: 'conflict'; name: string }> {
+    return this.db
+      .transaction()
+      .execute(async (trx) => {
+        const folder = await trx
+          .selectFrom('shared_space_album_folder')
+          .select(['id', 'parentId'])
+          .where('spaceId', '=', spaceId)
+          .where('id', '=', folderId)
+          .forUpdate()
+          .executeTakeFirst();
 
-      if (!folder) {
-        return false;
-      }
+        if (!folder) {
+          return { outcome: 'notfound' as const };
+        }
 
-      await trx
-        .updateTable('shared_space_album_folder')
-        .set({ parentId: folder.parentId })
-        .where('parentId', '=', folderId)
-        .execute();
+        const children = await trx
+          .selectFrom('shared_space_album_folder')
+          .select(['name'])
+          .where('parentId', '=', folderId)
+          .execute();
 
-      await trx
-        .updateTable('shared_space_album')
-        .set({ folderId: folder.parentId })
-        .where('folderId', '=', folderId)
-        .execute();
+        if (children.length > 0) {
+          let destinationSiblings = trx
+            .selectFrom('shared_space_album_folder')
+            .select(['name'])
+            .where('spaceId', '=', spaceId)
+            .where('id', '!=', folderId);
+          destinationSiblings =
+            folder.parentId === null
+              ? destinationSiblings.where('parentId', 'is', null)
+              : destinationSiblings.where('parentId', '=', folder.parentId);
+          const siblings = await destinationSiblings.execute();
 
-      await trx.deleteFrom('shared_space_album_folder').where('id', '=', folderId).execute();
+          const siblingNames = new Set(siblings.map((sibling) => sibling.name.trim().toLowerCase()));
+          const colliding = children.find((child) => siblingNames.has(child.name.trim().toLowerCase()));
+          if (colliding) {
+            throw new AlbumFolderPromotionConflictError(colliding.name);
+          }
+        }
 
-      return true;
-    });
+        try {
+          await trx
+            .updateTable('shared_space_album_folder')
+            .set({ parentId: folder.parentId })
+            .where('parentId', '=', folderId)
+            .execute();
+        } catch (error: unknown) {
+          if ((error as { code?: string })?.code === '23505') {
+            throw new AlbumFolderPromotionConflictError(null);
+          }
+          throw error;
+        }
+
+        await trx
+          .updateTable('shared_space_album')
+          .set({ folderId: folder.parentId })
+          .where('folderId', '=', folderId)
+          .execute();
+
+        await trx.deleteFrom('shared_space_album_folder').where('id', '=', folderId).execute();
+
+        return { outcome: 'ok' as const };
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AlbumFolderPromotionConflictError) {
+          // A raced backstop hit (guard 2) has no name to report — the pre-check (guard 1) is the
+          // only path that knows which child collided.
+          return { outcome: 'conflict' as const, name: error.folderName ?? '' };
+        }
+        throw error;
+      });
   }
 
   // Serialised per space by a transaction-scoped advisory lock. A row lock on the moved folder

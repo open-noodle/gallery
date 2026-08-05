@@ -13904,7 +13904,11 @@ describe(SharedSpaceService.name, () => {
         expect(mocks.sharedSpace.moveAlbumFolderChecked).not.toHaveBeenCalled();
       });
 
-      // M-06: depth(target) + 1 + height(subtree) = 7 + 1 + 4 = 12 > 10.
+      // M-06: depth(target) + 1 + height(subtree) = 7 + 1 + 3 = 11 > 10. Pinned to land EXACTLY
+      // one over the cap (11), not merely "over" (the previous fixture computed 12): a mutation
+      // that widens the guard from `> MAX_DEPTH` to `> MAX_DEPTH + 1` (i.e. effectively `> 11`)
+      // would still reject 12, leaving that mutation undetected. 11 is the only value that
+      // distinguishes the two.
       it('M-06: rejects a move whose combined depth exceeds the cap', async () => {
         const { auth, space, folder, target } = setupAlbumFolderMove(mocks);
         mocks.sharedSpace.getAlbumFolderAncestors.mockResolvedValue(
@@ -13915,11 +13919,10 @@ describe(SharedSpaceService.name, () => {
           { id: newUuid(), depth: 1 },
           { id: newUuid(), depth: 2 },
           { id: newUuid(), depth: 3 },
-          { id: newUuid(), depth: 4 },
         ]);
 
         await expect(sut.updateAlbumFolder(auth, space.id, folder.id, { parentId: target.id } as any)).rejects.toThrow(
-          /12/,
+          /11/,
         );
         expect(mocks.sharedSpace.moveAlbumFolderChecked).not.toHaveBeenCalled();
       });
@@ -14023,7 +14026,7 @@ describe(SharedSpaceService.name, () => {
       it('delegates to the promoting repository call (D-01–D-05 semantics live in P-05)', async () => {
         const { auth, space } = setupAlbumFolderEditor(mocks);
         const folder = albumFolderRow({ spaceId: space.id });
-        mocks.sharedSpace.deleteAlbumFolderPromotingChildren.mockResolvedValue(true);
+        mocks.sharedSpace.deleteAlbumFolderPromotingChildren.mockResolvedValue({ outcome: 'ok' });
 
         await sut.deleteAlbumFolder(auth, space.id, folder.id);
 
@@ -14033,9 +14036,22 @@ describe(SharedSpaceService.name, () => {
       // D-06
       it('D-06: rejects deleting a folder that is already gone', async () => {
         const { auth, space } = setupAlbumFolderEditor(mocks);
-        mocks.sharedSpace.deleteAlbumFolderPromotingChildren.mockResolvedValue(false);
+        mocks.sharedSpace.deleteAlbumFolderPromotingChildren.mockResolvedValue({ outcome: 'notfound' });
 
         await expect(sut.deleteAlbumFolder(auth, space.id, newUuid())).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      // CRITICAL fix: a promote whose destination already has a same-named folder must 400, not
+      // 500. The repository detects this and reports 'conflict' rather than throwing.
+      it('maps a promote name collision to a 400 naming the colliding folder', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        mocks.sharedSpace.deleteAlbumFolderPromotingChildren.mockResolvedValue({
+          outcome: 'conflict',
+          name: '2026',
+        });
+
+        await expect(sut.deleteAlbumFolder(auth, space.id, newUuid())).rejects.toBeInstanceOf(BadRequestException);
+        await expect(sut.deleteAlbumFolder(auth, space.id, newUuid())).rejects.toThrow(/2026/);
       });
 
       it('R-03: refuses a viewer', async () => {

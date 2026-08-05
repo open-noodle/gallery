@@ -1175,9 +1175,20 @@ export class SharedSpaceService extends BaseService {
 
     // Promotion happens inside the repository transaction: direct children move up one level,
     // then the row is deleted. Grandchildren keep their parents, and no album is ever unlinked.
-    const deleted = await this.sharedSpaceRepository.deleteAlbumFolderPromotingChildren(spaceId, folderId);
-    if (!deleted) {
+    // 'conflict' means a direct child's name already exists among the destination parent's other
+    // children (spec F-04 explicitly permits the same name under different parents, so this is
+    // reachable) — refuse the delete rather than silently renaming the user's folder, matching
+    // the move path's own refuse-don't-rename behaviour (M-07).
+    const result = await this.sharedSpaceRepository.deleteAlbumFolderPromotingChildren(spaceId, folderId);
+    if (result.outcome === 'notfound') {
       throw new BadRequestException('Folder not found');
+    }
+    if (result.outcome === 'conflict') {
+      throw new BadRequestException(
+        result.name
+          ? `Cannot delete: "${result.name}" would collide with a folder that already exists at the destination`
+          : 'Cannot delete: a child folder name collides with a folder that already exists at the destination',
+      );
     }
   }
 
