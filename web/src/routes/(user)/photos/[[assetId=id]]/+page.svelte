@@ -614,7 +614,7 @@
         onFiltersChange={handleFiltersChange}
       />
     {/key}
-    <div class="flex flex-1 flex-col overflow-hidden pl-4">
+    <div class="flex flex-1 flex-col overflow-hidden pl-2">
       {#snippet photoFiltersBar()}
         <ActiveFiltersBar
           embedded
@@ -672,7 +672,13 @@
                  room below the memories strip so those cards don't hug it. The wrapper's height feeds
                  the timeline's measured topSectionHeight, so this shifts the cards down cleanly. -->
             <div class={{ 'pb-8': timelineGrouping !== 'day' }}>
-              <ImageCarousel {items} />
+              <!-- ImageCarousel carries its own mt-3, from when the strip was the first thing in the
+                   timeline and needed to stand off the top. The route grouping bar sits above it now
+                   and already ends in 8px of padding and an 8px margin, so the strip's own margin was
+                   a third helping - 28px between the Years/Months/All pill and the strip, against the
+                   16px the timeline gets when memories are off. `class` reaches the section through
+                   twMerge, so mt-0 replaces it rather than fighting it. -->
+              <ImageCarousel {items} class="mt-0" />
             </div>
           {/if}
           {#snippet empty()}
