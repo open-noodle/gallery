@@ -834,8 +834,10 @@
     {/key}
   {/if}
 
-  <!-- Main Content — pl-4 adds breathing room between filter panel and content -->
-  <div class="flex flex-1 flex-col overflow-hidden pl-4">
+  <!-- Main Content — pl-2 adds breathing room between filter panel and content. The same gutter
+       is repeated on every page pairing a filter panel with a timeline (photos, recently-added,
+       albums, space albums); they are meant to match. -->
+  <div class="flex flex-1 flex-col overflow-hidden pl-2">
     {#snippet spaceFiltersBar()}
       <ActiveFiltersBar
         embedded

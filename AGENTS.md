@@ -113,7 +113,7 @@ After `nest build` compiles TypeScript to `dist/`, the npm `postbuild` hook (`se
 
 1. **Copies** `dist/schema/migrations-gallery/*.js` into `dist/schema/migrations/`. This means the built `dist/schema/migrations/` folder contains ALL migrations (upstream + fork) in one flat directory.
 2. **Removes stale copies**: if a fork migration file in `migrations-gallery/` was renamed, it deletes the old copy left behind in `dist/schema/migrations/` from a previous build.
-3. **Writes a build-time compatibility alias**: a `compatibilityAliases` array copies the current `1777667825574-ChangeDurationToInteger.js` to a second copy named `1776735180298-ChangeDurationToInteger.js` (`from` → `to`). `ChangeDurationToInteger` was re-timestamped upstream from `1776735180298` to `1777667825574`, and the fork's source now carries only the current `1777667825574` file. Already-deployed v5-RC/staging databases, however, ran the migration under its **pre-rename** `1776735180298` name and recorded *that* — and Kysely hard-fails on boot if a migration name recorded in the DB has no matching file on disk. The alias makes `dist/schema/migrations/` contain the compiled file under **both** names, so already-deployed DBs (recorded `1776735180298`) and fresh installs (run `1777667825574`) both boot cleanly. **This alias is load-bearing — do not remove it** without a migration path for already-deployed DBs that recorded the pre-rename name.
+3. **Writes a build-time compatibility alias**: a `compatibilityAliases` array copies the current `1777667825574-ChangeDurationToInteger.js` to a second copy named `1776735180298-ChangeDurationToInteger.js` (`from` → `to`). `ChangeDurationToInteger` was re-timestamped upstream from `1776735180298` to `1777667825574`, and the fork's source now carries only the current `1777667825574` file. Already-deployed v5-RC/staging databases, however, ran the migration under its **pre-rename** `1776735180298` name and recorded _that_ — and Kysely hard-fails on boot if a migration name recorded in the DB has no matching file on disk. The alias makes `dist/schema/migrations/` contain the compiled file under **both** names, so already-deployed DBs (recorded `1776735180298`) and fresh installs (run `1777667825574`) both boot cleanly. **This alias is load-bearing — do not remove it** without a migration path for already-deployed DBs that recorded the pre-rename name.
 
 The copy step (1) is needed because:
 
@@ -180,6 +180,20 @@ The copy step (1) is needed because:
 - **Server imports**: No relative imports allowed — use `src/` path alias
 - **TypeScript**: Strict mode in all packages
 - **Async**: `no-floating-promises` and `no-misused-promises` enforced everywhere
+
+## i18n
+
+`i18n/` at the repo root is shared by web and mobile — grep both before deleting or renaming a key.
+
+**Every change that adds or edits a user-facing string must update these nine locales in the same commit, not just `en.json`:**
+
+`de` · `fr` · `it` · `nl` · `pl` · `es` · `ru` · `zh_Hans` · `zh_Hant`
+
+- **Editing an existing key counts.** When the English wording changes meaning, every translation of it is now wrong and must be rewritten. A stale translation is worse than a missing one: a missing key falls back to English, while a stale one confidently describes a UI that no longer exists — `filter_show_sections_hint` told nine locales to "click an icon above" after the icons had been deleted.
+- **Match each file's existing register and terminology.** The German, Italian and Spanish files address the user informally (`du` / `tu` / `tú`); French and Russian use the formal `vous` / `вы`. Reuse the word the file already uses for a concept — look up the nearest existing key instead of inventing a synonym.
+- **Mind gender agreement** when the subject is a noun the file already translates: `la barre latérale` and `боковая панель` are feminine, `panel boczny` masculine, so "Always compact" inflects differently in each.
+- Keys are **alphabetically sorted**, 2-space indent, unescaped Unicode. Insert in place rather than appending, then run `npx prettier --write i18n/*.json` — CI checks the formatting.
+- The remaining ~80 locale files are left to translators; do not hand-edit them.
 
 ## OpenAPI Workflow
 
