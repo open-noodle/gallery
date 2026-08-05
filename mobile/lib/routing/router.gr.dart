@@ -1955,7 +1955,7 @@ class SpaceAlbumsRoute extends PageRouteInfo<SpaceAlbumsRouteArgs> {
     String? folderId,
     void Function(String)? onToggle,
     void Function(String)? onUnlink,
-    VoidCallback? onLink,
+    void Function(String?)? onLink,
     List<PageRouteInfo>? children,
   }) : super(
          SpaceAlbumsRoute.name,
@@ -2013,7 +2013,7 @@ class SpaceAlbumsRouteArgs {
 
   final void Function(String)? onUnlink;
 
-  final VoidCallback? onLink;
+  final void Function(String?)? onLink;
 
   @override
   String toString() {
@@ -2027,17 +2027,12 @@ class SpaceAlbumsRouteArgs {
     return key == other.key &&
         spaceId == other.spaceId &&
         canEdit == other.canEdit &&
-        folderId == other.folderId &&
-        onLink == other.onLink;
+        folderId == other.folderId;
   }
 
   @override
   int get hashCode =>
-      key.hashCode ^
-      spaceId.hashCode ^
-      canEdit.hashCode ^
-      folderId.hashCode ^
-      onLink.hashCode;
+      key.hashCode ^ spaceId.hashCode ^ canEdit.hashCode ^ folderId.hashCode;
 }
 
 /// generated route for

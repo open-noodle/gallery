@@ -16,6 +16,7 @@ import 'package:immich_mobile/pages/library/spaces/collection_sort.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_album_folder_card.widget.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_album_folder_picker.widget.dart';
+import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
@@ -80,7 +81,12 @@ class SpaceAlbumsPage extends HookConsumerWidget {
 
   /// Called when the editor taps the "＋ Link" app-bar action.
   /// No-op default in B3; B5 supplies the link picker.
-  final VoidCallback onLink;
+  ///
+  /// Takes the folder the user is currently looking at, so a linked album lands there rather
+  /// than at the space root. The picker itself lives on the parent space-detail page, which has
+  /// no idea which folder this page is showing — passing it explicitly is what keeps the two in
+  /// step when this route is pushed onto itself for a nested folder.
+  final void Function(String? folderId) onLink;
 
   const SpaceAlbumsPage({
     super.key,
@@ -89,13 +95,13 @@ class SpaceAlbumsPage extends HookConsumerWidget {
     this.folderId,
     void Function(String albumId)? onToggle,
     void Function(String albumId)? onUnlink,
-    VoidCallback? onLink,
+    void Function(String? folderId)? onLink,
   }) : onToggle = onToggle ?? _noop,
        onUnlink = onUnlink ?? _noop,
-       onLink = onLink ?? _voidNoop;
+       onLink = onLink ?? _nullableNoop;
 
   static void _noop(String _) {}
-  static void _voidNoop() {}
+  static void _nullableNoop(String? _) {}
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -147,6 +153,35 @@ class SpaceAlbumsPage extends HookConsumerWidget {
           ImmichToast.show(
             context: context,
             msg: _folderErrorKey(error, 'space_album_folder_error_create').t(context: context),
+            toastType: ToastType.error,
+          );
+        }
+      }
+    }
+
+    // Create a brand-new album straight into this space, mirroring web's handleCreateAlbum:
+    // create the album, then link it to the space at the CURRENT folder. Distinct from "Link",
+    // which attaches an album that already exists.
+    Future<void> createAlbum() async {
+      final name = await _promptFolderName(
+        context,
+        title: 'space_album_new'.t(context: context),
+        confirmLabel: 'create'.t(context: context),
+      );
+      if (name == null) return;
+      if (!context.mounted) return;
+      try {
+        final album = await ref.read(remoteAlbumProvider.notifier).createAlbum(title: name);
+        if (album == null) return;
+        // Link at `currentFolderId`, so an album created inside a folder lands there rather than
+        // at the space root. Null is correct for the root: the repository omits the query param
+        // rather than sending an explicit null, which the server rejects.
+        await ref.read(spaceAlbumActionsProvider).link(spaceId, [album.id], folderId: currentFolderId);
+      } catch (error) {
+        if (context.mounted) {
+          ImmichToast.show(
+            context: context,
+            msg: 'space_album_error_create'.t(context: context),
             toastType: ToastType.error,
           );
         }
@@ -234,8 +269,14 @@ class SpaceAlbumsPage extends HookConsumerWidget {
               label: Text('space_album_folder_new'.t(context: context)),
             ),
             TextButton.icon(
+              key: const Key('space-albums-new-album-action'),
+              onPressed: createAlbum,
+              icon: const Icon(Icons.photo_album_outlined),
+              label: Text('space_album_new'.t(context: context)),
+            ),
+            TextButton.icon(
               key: const Key('space-albums-link-action'),
-              onPressed: onLink,
+              onPressed: () => onLink(folderId),
               icon: const Icon(Icons.add),
               label: Text('link'.t(context: context)),
             ),
@@ -293,7 +334,11 @@ class SpaceAlbumsPage extends HookConsumerWidget {
             // no-match copy implies "try another query", which would be misleading when there is
             // nothing in the space to search at all.
             if (albums.isEmpty) {
-              return _EmptyState(key: const Key('space-albums-empty'), canEdit: canEdit, onLink: onLink);
+              return _EmptyState(
+                key: const Key('space-albums-empty'),
+                canEdit: canEdit,
+                onLink: () => onLink(folderId),
+              );
             }
 
             // U-09: a query escapes the folder tree entirely — folders are hidden and every
@@ -354,7 +399,7 @@ class SpaceAlbumsPage extends HookConsumerWidget {
               // no albums at all, when it only means THIS folder is empty.
               return const _FolderEmptyState(key: Key('space-album-folder-empty'));
             }
-            return _EmptyState(key: const Key('space-albums-empty'), canEdit: canEdit, onLink: onLink);
+            return _EmptyState(key: const Key('space-albums-empty'), canEdit: canEdit, onLink: () => onLink(folderId));
           }
 
           return Column(
@@ -382,6 +427,8 @@ class SpaceAlbumsPage extends HookConsumerWidget {
                       spaceId: spaceId,
                       canEdit: canEdit,
                       folderId: folder.id,
+                      // Forward the raw callback, NOT one bound to this page's folderId — the
+                      // child is a level deeper and must link into its OWN folder.
                       onLink: onLink,
                       onToggle: onToggle,
                       onUnlink: onUnlink,

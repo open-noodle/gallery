@@ -34,10 +34,14 @@ class SpaceAlbumActions {
   ///
   /// Calls PUT for each albumId sequentially. On success fires one sync-nudge.
   /// If [albumIds] is empty, does nothing (no API call, no nudge).
-  Future<void> link(String spaceId, List<String> albumIds) async {
+  ///
+  /// [folderId] is the space album folder to link into; null means the space root. Callers
+  /// linking from inside a folder must pass it, or the album lands at the root instead of
+  /// where the user is looking.
+  Future<void> link(String spaceId, List<String> albumIds, {String? folderId}) async {
     if (albumIds.isEmpty) return;
     for (final albumId in albumIds) {
-      await _repo.linkAlbum(spaceId, albumId);
+      await _repo.linkAlbum(spaceId, albumId, folderId: folderId);
     }
     await _syncManager.syncRemote();
   }
