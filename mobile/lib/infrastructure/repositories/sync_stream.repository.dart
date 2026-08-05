@@ -29,6 +29,7 @@ import 'package:immich_mobile/infrastructure/entities/remote_asset_cloud_id.enti
 import 'package:immich_mobile/infrastructure/entities/shared_space.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_album.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_album_asset.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_album_folder.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_album_hidden.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_album_link.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_asset.entity.drift.dart';
@@ -976,6 +977,7 @@ class SyncStreamRepository extends DriftDatabaseRepository {
             albumId: Value(join.albumId),
             showInTimeline: Value(join.showInTimeline),
             addedById: Value(join.addedById),
+            folderId: Value(join.folderId),
             createdAt: Value(join.createdAt),
             updatedAt: Value(join.updatedAt),
           );
@@ -1041,6 +1043,41 @@ class SyncStreamRepository extends DriftDatabaseRepository {
       });
     } catch (error, stack) {
       _logger.severe('Error: deleteSharedSpaceAlbumHiddenV1', error, stack);
+      rethrow;
+    }
+  }
+
+  // Folders (SharedSpaceAlbumFolderV1). Clone of updateSharedSpaceAlbumLinksV1.
+  Future<void> updateSharedSpaceAlbumFoldersV1(Iterable<SyncSharedSpaceAlbumFolderV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final folder in data) {
+          final companion = SharedSpaceAlbumFolderEntityCompanion(
+            id: Value(folder.id),
+            spaceId: Value(folder.spaceId),
+            parentId: Value(folder.parentId),
+            name: Value(folder.name),
+            createdAt: Value(folder.createdAt),
+            updatedAt: Value(folder.updatedAt),
+          );
+          batch.insert(_db.sharedSpaceAlbumFolderEntity, companion, onConflict: DoUpdate((_) => companion));
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: updateSharedSpaceAlbumFoldersV1', error, stack);
+      rethrow;
+    }
+  }
+
+  Future<void> deleteSharedSpaceAlbumFoldersV1(Iterable<SyncSharedSpaceAlbumFolderDeleteV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final folder in data) {
+          batch.deleteWhere(_db.sharedSpaceAlbumFolderEntity, (t) => t.id.equals(folder.folderId));
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: deleteSharedSpaceAlbumFoldersV1', error, stack);
       rethrow;
     }
   }

@@ -22,6 +22,7 @@ import 'package:immich_mobile/infrastructure/entities/library.entity.drift.dart'
 import 'package:immich_mobile/infrastructure/entities/shared_space.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_album.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_album_asset.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_album_folder.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_album_link.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_library.entity.drift.dart';
@@ -489,6 +490,7 @@ class MediumRepositoryContext {
     required String albumId,
     bool? showInTimeline,
     String? addedById,
+    String? folderId,
     DateTime? createdAt,
   }) {
     return db
@@ -499,8 +501,22 @@ class MediumRepositoryContext {
             albumId: .new(albumId),
             showInTimeline: .new(showInTimeline ?? true),
             addedById: .new(addedById),
+            folderId: .new(folderId),
             createdAt: .new(TestUtils.date(createdAt)),
           ),
+        );
+  }
+
+  Future<void> insertSharedSpaceAlbumFolder({
+    required String spaceId,
+    required String id,
+    String? parentId,
+    String name = 'Folder',
+  }) {
+    return db
+        .into(db.sharedSpaceAlbumFolderEntity)
+        .insert(
+          SharedSpaceAlbumFolderEntityCompanion.insert(id: id, spaceId: spaceId, parentId: Value(parentId), name: name),
         );
   }
 

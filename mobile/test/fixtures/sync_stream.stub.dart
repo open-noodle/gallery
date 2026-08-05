@@ -404,6 +404,9 @@ abstract final class SyncStreamStub {
       albumId: 'album-stub-1',
       showInTimeline: true,
       addedById: null,
+      // null = at the space root. Do not change to a non-null value — see the
+      // note on `makeAlbumLink` in sync_stream_repository_test.dart.
+      folderId: null,
       createdAt: DateTime(2026, 6, 1),
       updatedAt: DateTime(2026, 6, 1),
     ),
@@ -417,6 +420,7 @@ abstract final class SyncStreamStub {
       albumId: 'album-stub-2',
       showInTimeline: false,
       addedById: null,
+      folderId: null,
       createdAt: DateTime(2026, 6, 1),
       updatedAt: DateTime(2026, 6, 1),
     ),

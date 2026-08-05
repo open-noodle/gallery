@@ -364,6 +364,8 @@ void main() {
           albumId: 'album-1',
           showInTimeline: true,
           addedById: 'user-1',
+          // null = at the space root; see the note on `makeAlbumLink` below.
+          folderId: null,
           createdAt: DateTime(2026, 4, 6),
           updatedAt: DateTime(2026, 4, 6),
         ),
@@ -1836,16 +1838,20 @@ void main() {
     );
   }
 
+  // folderId defaults to null (at the space root) so every pre-existing call site keeps
+  // its original meaning; do NOT change the default to a non-null value.
   SyncSharedSpaceAlbumLinkV1 makeAlbumLink({
     String spaceId = 'space-1',
     String albumId = 'album-1',
     bool showInTimeline = true,
+    String? folderId,
   }) {
     return SyncSharedSpaceAlbumLinkV1(
       spaceId: spaceId,
       albumId: albumId,
       showInTimeline: showInTimeline,
       addedById: null,
+      folderId: folderId,
       createdAt: DateTime(2026, 6, 1),
       updatedAt: DateTime(2026, 6, 1),
     );
