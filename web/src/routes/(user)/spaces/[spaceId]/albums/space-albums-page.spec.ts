@@ -579,13 +579,17 @@ describe('Space albums page', () => {
     // W-04: the drill-in is a real navigation, so browser back is free — this asserts we use
     // goto() with history rather than a replaceState navigation (which would collapse browser
     // back). Reads the mock call directly rather than toHaveBeenCalledWith, since that matcher
-    // is arity-sensitive and navigateToFolder() calls goto() with a single argument.
+    // is arity-sensitive and navigateToFolder() calls goto() with a single argument. Asserting
+    // goto was called at all first matters: `.mock.calls.at(-1) ?? []` silently destructures to
+    // `options: undefined` if it never fired, and `expect(undefined).not.toEqual(objectContaining
+    // (...))` passes — a click that does nothing would pass this test without that assertion.
     it('W-04: drill-in uses history navigation so browser back works', async () => {
       renderPage([], SharedSpaceRole.Editor, { folders: [makeFolder('trips', 'Trips')] });
 
       const openButton = await screen.findByTestId('space-album-folder-card-open');
       await fireEvent.click(openButton);
 
+      expect(goto).toHaveBeenCalled();
       const [, options] = vi.mocked(goto).mock.calls.at(-1) ?? [];
       expect(options).not.toEqual(expect.objectContaining({ replaceState: true }));
     });
@@ -692,6 +696,44 @@ describe('Space albums page', () => {
 
       await screen.findByText('Rome');
       expect(screen.getByText('Venice')).toBeInTheDocument();
+    });
+
+    // Finding: `foldersUnavailable` was driven off "most recent fetch failed" alone. Once a
+    // folders fetch has succeeded at least once, a LATER reload (e.g. from creating a folder)
+    // deliberately keeps the stale-but-usable `folders` list on a failure — but the breadcrumb
+    // and currentFolderId are derived from that same stale list, so if the flat-list fallback also
+    // fires here, the breadcrumb keeps saying "you are in Trips" while the content underneath
+    // flattens to every album in the space. Content must keep agreeing with the breadcrumb: still
+    // scoped to Trips (Rome, which lives there) and NOT showing Venice (which lives at the root).
+    it('a folder-fetch failure after a prior success keeps scoping by the stale tree instead of flattening', async () => {
+      const folders = [makeFolder('trips', 'Trips')];
+      const albums = [
+        makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' }),
+        makeAlbum({ id: 'a2', albumName: 'Venice', folderId: null }),
+      ];
+      modalManagerMock.show.mockResolvedValue('Souvenirs');
+      sdkMock.createSharedSpaceAlbumFolder.mockResolvedValue(makeFolder('souvenirs', 'Souvenirs', 'trips'));
+
+      renderPage(albums, SharedSpaceRole.Editor, { folders, folderParam: 'trips' });
+
+      await screen.findByTestId('space-album-folder-breadcrumb');
+      expect(screen.getByText('Rome')).toBeInTheDocument();
+      expect(screen.queryByText('Venice')).not.toBeInTheDocument();
+
+      // The NEXT folders fetch (triggered by creating a folder, which reload()s afterward) fails;
+      // the albums half of that same reload still succeeds.
+      sdkMock.getSharedSpaceAlbumFolders.mockRejectedValueOnce(new Error('network error'));
+
+      await fireEvent.click(screen.getByTestId('create-folder-button'));
+
+      await waitFor(() => expect(sdkMock.createSharedSpaceAlbumFolder).toHaveBeenCalled());
+      await waitFor(() => expect(sdkMock.getSharedSpaceAlbumFolders).toHaveBeenCalledTimes(2));
+
+      // Still "inside Trips" per the breadcrumb, and the content underneath must still agree —
+      // Rome (scoped to Trips) visible, Venice (root-level) still hidden, not flattened.
+      expect(screen.getByTestId('space-album-folder-breadcrumb')).toHaveTextContent('Trips');
+      expect(screen.getByText('Rome')).toBeInTheDocument();
+      expect(screen.queryByText('Venice')).not.toBeInTheDocument();
     });
   });
 

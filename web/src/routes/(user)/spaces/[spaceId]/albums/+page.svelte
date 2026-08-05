@@ -53,9 +53,7 @@
   // folders" and would otherwise never let the fallback effect below strip a dangling ?folder=
   // for a space that no longer has any folders at all.
   let foldersLoaded = $state(false);
-  // True when the MOST RECENT folders fetch failed. The list falls back to a flat, unscoped
-  // album view in this state rather than hiding every album that lives in a folder we couldn't
-  // fetch metadata for.
+  // True when the MOST RECENT folders fetch failed.
   let foldersLoadFailed = $state(false);
   let groupIds = $state<string[]>([]);
   let searchQuery = $state('');
@@ -78,6 +76,15 @@
 
   const folderPath = $derived(getFolderPath(folders, currentFolderId));
 
+  // "Unavailable" must mean we have no usable folder data to scope by — not merely that the
+  // MOST RECENT fetch failed. A prior success leaves `folders` non-empty and deliberately
+  // untouched on a later failure (see reload() below), and that stale-but-usable tree is exactly
+  // what currentFolderId/folderPath/the breadcrumb are still derived from; flattening the album
+  // list in that case would show every album in the space while the breadcrumb still claims
+  // you're inside a specific folder. Only degrade to the flat list when there's genuinely nothing
+  // to scope by (never loaded, or loaded to confirmed-empty and now also failing).
+  const foldersUnavailable = $derived(foldersLoadFailed && folders.length === 0);
+
   $effect(() => {
     // Strip a stale ?folder= so a refresh or a share of this URL does not keep resolving to a
     // folder that no longer exists — including a space that has been emptied down to zero
@@ -98,10 +105,15 @@
       getSharedSpaceAlbumFolders({ id: space.id }),
     ]);
 
+    // Both halves share one error message, so if both fail, show it once rather than stacking two
+    // identical toasts.
+    let notifiedLoadError = false;
+
     if (albumsResult.status === 'fulfilled') {
       albums = albumsResult.value;
     } else {
       handleError(albumsResult.reason, $t('spaces_linked_albums_error_load'));
+      notifiedLoadError = true;
     }
 
     if (foldersResult.status === 'fulfilled') {
@@ -110,10 +122,11 @@
       foldersLoadFailed = false;
     } else {
       // Deliberately leave `folders` (and foldersLoaded) as they were: a transient refetch
-      // failure after a prior success should keep showing the last-known-good folder tree
-      // rather than wiping it. SpaceAlbumsList degrades to a flat album list while this is true.
+      // failure after a prior success should keep showing the last-known-good folder tree rather
+      // than wiping it — `foldersUnavailable` above only forces the flat-list fallback when
+      // `folders` is also empty, so a non-empty stale tree keeps scoping normally.
       foldersLoadFailed = true;
-      handleError(foldersResult.reason, $t('spaces_linked_albums_error_load'));
+      handleError(foldersResult.reason, $t('spaces_linked_albums_error_load'), { notify: !notifiedLoadError });
     }
   }
 
@@ -409,7 +422,7 @@
         spaceId={space.id}
         {albums}
         {folders}
-        foldersUnavailable={foldersLoadFailed}
+        {foldersUnavailable}
         {currentFolderId}
         canManage={isEditor}
         {members}
