@@ -36,6 +36,7 @@ function makeAlbum(overrides: Partial<SharedSpaceLinkedAlbumDto> = {}): SharedSp
     albumName: 'Vacation',
     assetCount: 5,
     albumThumbnailAssetId: null,
+    folderId: null,
     showInTimeline: true,
     hiddenFromMyTimeline: false,
     addedById: null,
