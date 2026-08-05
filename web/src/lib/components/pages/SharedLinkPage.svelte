@@ -76,7 +76,7 @@
 </svelte:head>
 {#if passwordRequired}
   <main
-    class="relative h-dvh overflow-hidden px-6 pt-(--navbar-height) max-md:pt-(--navbar-height-md) sm:px-12 md:px-24 lg:px-40"
+    class="relative h-dvh overflow-hidden px-6 pt-(--control-bar-height) max-md:pt-(--control-bar-height-md) sm:px-12 md:px-24 lg:px-40"
   >
     <div class="mt-20 flex flex-col items-center justify-center">
       <div class="text-2xl font-bold text-primary">{$t('password_required')}</div>
