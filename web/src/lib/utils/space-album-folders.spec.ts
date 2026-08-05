@@ -75,6 +75,17 @@ describe('space-album-folders', () => {
       expect(() => buildFolderTree([cyclic])).not.toThrow();
     });
 
+    // A mutually-cyclic pair (neither self-referencing) gives each folder a "valid" parent in
+    // the other, so a naive single pass never pushes either to `roots` and both silently vanish.
+    it('does not drop a mutually-cyclic pair of folders', () => {
+      const a = folder('a', 'A', 'b');
+      const b = folder('b', 'B', 'a');
+
+      const tree = buildFolderTree([a, b]);
+
+      expect(tree.map((n) => n.folder.id).sort()).toEqual(['a', 'b']);
+    });
+
     it('returns an empty array for no folders', () => {
       expect(buildFolderTree([])).toEqual([]);
     });
@@ -128,6 +139,15 @@ describe('space-album-folders', () => {
         folders: [],
         albums: [],
       });
+    });
+
+    // U-02's self-referencing case, but for getFolderContents: a folder with parentId === id
+    // must not appear as a child of itself, or the UI would offer a folder you can navigate
+    // into forever.
+    it('does not list a self-referencing folder as its own child', () => {
+      const cyclic = folder('loop', 'Loop', 'loop');
+
+      expect(getFolderContents([cyclic], [], 'loop')).toEqual({ folders: [], albums: [] });
     });
   });
 

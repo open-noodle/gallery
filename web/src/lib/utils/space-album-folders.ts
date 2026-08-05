@@ -55,6 +55,37 @@ export const buildFolderTree = (folders: SharedSpaceAlbumFolderDto[]): FolderNod
     }
   }
 
+  // A cycle among two or more folders (e.g. A.parentId = B, B.parentId = A — neither
+  // self-referencing) gives every node in the cycle a "valid" parent above, so none of them is
+  // ever pushed to `roots`, and the whole cycle silently vanishes from the returned tree. Sweep
+  // reachability from the roots we do have, then promote anything unreached — severing it from
+  // whatever cyclic parent it was attached to, so a promoted node doesn't also linger as a child
+  // inside a structure that would recurse forever. Both passes are O(n): the sweep visits each
+  // node once, and the total work across all `.filter()` calls is bounded by the total number of
+  // child-list entries, which is at most n.
+  const reached = new Set<string>();
+  const stack = [...roots];
+  while (stack.length > 0) {
+    const node = stack.pop()!;
+    if (reached.has(node.folder.id)) {
+      continue;
+    }
+    reached.add(node.folder.id);
+    stack.push(...node.children);
+  }
+
+  for (const folder of folders) {
+    if (reached.has(folder.id)) {
+      continue;
+    }
+    const node = nodes.get(folder.id)!;
+    const cyclicParent = folder.parentId ? nodes.get(folder.parentId) : undefined;
+    if (cyclicParent) {
+      cyclicParent.children = cyclicParent.children.filter((c) => c.folder.id !== folder.id);
+    }
+    roots.push(node);
+  }
+
   return roots;
 };
 
@@ -83,7 +114,9 @@ export const getFolderContents = (
     !folder.parentId || folder.parentId === folder.id || !index.has(folder.parentId);
 
   return {
-    folders: folders.filter((f) => (folderId === null ? isRoot(f) : f.parentId === folderId)),
+    // A self-referencing folder (parentId === id) is a root per `isRoot` above — it must not
+    // also satisfy `f.parentId === folderId` and list itself as its own child (U-02's case).
+    folders: folders.filter((f) => (folderId === null ? isRoot(f) : f.parentId === folderId && f.id !== folderId)),
     albums: albums.filter((a) => (a.folderId ?? null) === folderId),
   };
 };
