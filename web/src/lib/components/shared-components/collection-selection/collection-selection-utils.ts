@@ -32,6 +32,12 @@ export const isWritableSpace = (space: SharedSpaceResponseDto, currentUserId: st
   return role === SharedSpaceRole.Owner || role === SharedSpaceRole.Editor;
 };
 
+// Album description is `string`, space description is `string | null | undefined` — normalise both to
+// '' so an absent description can never match (`''.includes(query)` is false for a non-empty query,
+// and the converter only filters when the query is non-empty).
+export const descriptionOf = (c: PickerCollection): string =>
+  (c.kind === 'album' ? c.album.description : c.space.description) ?? '';
+
 export const recencyOf = (c: PickerCollection): number =>
   c.kind === 'album'
     ? new Date(c.album.updatedAt).getTime()
@@ -52,6 +58,12 @@ export const isValidNewSpaceName = (name: string): boolean => {
 // row components share one matcher. (Imported above to keep a single source of truth.)
 export const matchesSearch = (name: string, search: string): boolean =>
   normalizeSearchString(name).includes(normalizeSearchString(search));
+
+// Name or description, for albums and spaces alike. Upstream matches album descriptions in its
+// album-only picker (#30462); this list mixes both kinds, and a user typing a word cannot tell which
+// rows are albums and which are spaces, so both kinds match on the same fields.
+export const matchesCollection = (c: PickerCollection, search: string): boolean =>
+  matchesSearch(c.name, search) || matchesSearch(descriptionOf(c), search);
 
 export enum CollectionModalRowType {
   NEW_ALBUM = 'newAlbum',
@@ -98,7 +110,7 @@ export class CollectionModalRowConverter {
     const visible = options.showSpaces ? all : all.filter((c) => c.kind !== 'space');
     const isSearching = search.trim().length > 0;
     const recentToShow = isSearching ? [] : recent;
-    const filtered = sortByNameAsc(isSearching ? visible.filter((c) => matchesSearch(c.name, search)) : visible);
+    const filtered = sortByNameAsc(isSearching ? visible.filter((c) => matchesCollection(c, search)) : visible);
 
     if (filtered.length === 0) {
       rows.push({
