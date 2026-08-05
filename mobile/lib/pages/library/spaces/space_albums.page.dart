@@ -42,6 +42,11 @@ import 'package:immich_mobile/widgets/common/search_field.dart';
 ///    in B6); "Move to folder…" is wired directly against
 ///    [spaceAlbumActionsProvider] since it doesn't need to be shared with
 ///    the space-detail top sliver's own inline cards.
+///  - Editor-only folder-card ⋮ overflow (Rename / Move to folder… / Delete)
+///    and app-bar "New folder" action, all wired directly against
+///    [spaceAlbumActionsProvider]'s `renameFolder`/`moveFolder`/`deleteFolder`/
+///    `createFolder`. "New folder" creates in the CURRENT folder (this page
+///    instance's own [folderId] as the parent), not always at the space root.
 ///  - Editor-only app-bar "＋ Link" action — stub callback [onLink] (link
 ///    picker lands in B5).
 ///  - Centered empty state for an empty list, and a folder-specific empty
@@ -120,18 +125,119 @@ class SpaceAlbumsPage extends HookConsumerWidget {
       }
     });
 
+    // Folder CRUD (app-bar "New folder" + folder-card ⋮). Defined here, above the `albumsAsync`
+    // branch, rather than inside `data: (albums) {...}` below: none of these need the album list,
+    // and "New folder" is an app-bar action rendered regardless of load/error/data state.
+    Future<void> createFolder() async {
+      final name = await _promptFolderName(
+        context,
+        title: 'space_album_folder_new'.t(context: context),
+        confirmLabel: 'create'.t(context: context),
+      );
+      if (name == null) return;
+      if (!context.mounted) return;
+      try {
+        // Creates in the CURRENT folder, not always at the space root — `currentFolderId` is this
+        // page instance's own `folderId`, i.e. wherever the user is browsing right now.
+        await ref.read(spaceAlbumActionsProvider).createFolder(spaceId, name, parentId: currentFolderId);
+      } catch (_) {
+        if (context.mounted) {
+          ImmichToast.show(
+            context: context,
+            msg: 'space_album_folder_error_create'.t(context: context),
+            toastType: ToastType.error,
+          );
+        }
+      }
+    }
+
+    Future<void> renameFolder(SpaceAlbumFolder folder) async {
+      final name = await _promptFolderName(
+        context,
+        title: 'space_album_folder_rename'.t(context: context),
+        confirmLabel: 'save'.t(context: context),
+        initialName: folder.name,
+      );
+      if (name == null) return;
+      if (!context.mounted) return;
+      try {
+        await ref.read(spaceAlbumActionsProvider).renameFolder(spaceId, folder.id, name);
+      } catch (_) {
+        if (context.mounted) {
+          ImmichToast.show(
+            context: context,
+            msg: 'space_album_folder_error_rename'.t(context: context),
+            toastType: ToastType.error,
+          );
+        }
+      }
+    }
+
+    Future<void> moveFolder(SpaceAlbumFolder folder) async {
+      final result = await showSpaceAlbumFolderPicker(
+        context,
+        folders: folders,
+        // The folder itself and its whole subtree must not be offered as a destination — a folder
+        // can never become its own descendant. Same guard as the picker sheet's own Task 6
+        // `isDescendant` check; passing `excludeFolderId` here is what actually engages it for
+        // this call site (the album-move path above passes `null` since an album has no subtree).
+        excludeFolderId: folder.id,
+        currentFolderId: folder.parentId,
+      );
+      // Same picked-vs-folderId==null distinction as moveAlbumToFolder below: both a dismissal and
+      // picking the root resolve `folderId: null`, so branching on `folderId == null` alone would
+      // treat a dismissal as "move to the root".
+      if (!result.picked) return;
+      if (!context.mounted) return;
+      try {
+        await ref.read(spaceAlbumActionsProvider).moveFolder(spaceId, folder.id, result.folderId);
+      } catch (_) {
+        if (context.mounted) {
+          ImmichToast.show(
+            context: context,
+            msg: 'space_album_folder_error_move'.t(context: context),
+            toastType: ToastType.error,
+          );
+        }
+      }
+    }
+
+    Future<void> deleteFolder(SpaceAlbumFolder folder) async {
+      final confirmed = await _confirmDeleteFolder(context, folder);
+      if (!confirmed) return;
+      if (!context.mounted) return;
+      try {
+        await ref.read(spaceAlbumActionsProvider).deleteFolder(spaceId, folder.id);
+      } catch (_) {
+        if (context.mounted) {
+          ImmichToast.show(
+            context: context,
+            msg: 'space_album_folder_error_delete'.t(context: context),
+            toastType: ToastType.error,
+          );
+        }
+      }
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_title(context, folders)),
         centerTitle: false,
         actions: [
-          if (canEdit)
+          if (canEdit) ...[
+            TextButton.icon(
+              key: const Key('space-albums-new-folder-action'),
+              onPressed: createFolder,
+              icon: const Icon(Icons.create_new_folder_outlined),
+              label: Text('space_album_folder_new'.t(context: context)),
+            ),
             TextButton.icon(
               key: const Key('space-albums-link-action'),
               onPressed: onLink,
               icon: const Icon(Icons.add),
               label: Text('link'.t(context: context)),
             ),
+          ],
         ],
       ),
       body: albumsAsync.when(
@@ -179,6 +285,15 @@ class SpaceAlbumsPage extends HookConsumerWidget {
           }
 
           if (isSearching) {
+            // Restored pre-folder-tree behaviour: a genuinely empty SPACE (not just "this query
+            // matched nothing") takes priority over the no-match state, even mid-search — e.g. the
+            // last linked album was unlinked elsewhere while the user still had a query typed. The
+            // no-match copy implies "try another query", which would be misleading when there is
+            // nothing in the space to search at all.
+            if (albums.isEmpty) {
+              return _EmptyState(key: const Key('space-albums-empty'), canEdit: canEdit, onLink: onLink);
+            }
+
             // U-09: a query escapes the folder tree entirely — folders are hidden and every
             // matching album in the SPACE (not just this level) is listed with its path.
             final hits = flattenForSearch(folders, albums, query.value);
@@ -263,6 +378,9 @@ class SpaceAlbumsPage extends HookConsumerWidget {
                   onUnlink: onUnlink,
                   onMove: moveAlbumToFolder,
                   onAlbumTap: onAlbumTap,
+                  onRenameFolder: renameFolder,
+                  onMoveFolder: moveFolder,
+                  onDeleteFolder: deleteFolder,
                 ),
               ),
             ],
@@ -292,6 +410,110 @@ List<SpaceAlbumFolder> _sortFolders(List<SpaceAlbumFolder> folders, bool isRever
       return c != 0 ? c : a.id.compareTo(b.id);
     });
   return isReverse ? sorted.reversed.toList() : sorted;
+}
+
+/// Prompts for a folder name via a simple text dialog — shared by "New folder" and "Rename".
+/// Returns the trimmed name, or `null` if the user cancelled or left it blank — a blank name is
+/// treated as "nothing to do" rather than an error, so the caller never fires a doomed API call.
+Future<String?> _promptFolderName(
+  BuildContext context, {
+  required String title,
+  required String confirmLabel,
+  String initialName = '',
+}) async {
+  final name = await showDialog<String>(
+    context: context,
+    builder: (_) => _FolderNameDialog(title: title, confirmLabel: confirmLabel, initialName: initialName),
+  );
+  if (name == null || name.isEmpty) return null;
+  return name;
+}
+
+/// The dialog body for [_promptFolderName], mirroring the shape of `NewAlbumNameModal`/
+/// `DriftPersonNameEditForm` elsewhere in the app (AlertDialog + TextFormField, Cancel/confirm
+/// `TextButton`s), written with this file's `.t()` localisation convention rather than those
+/// widgets' older `.tr()` one.
+///
+/// A **StatefulWidget**, not a bare function building a `TextEditingController` inline: the
+/// controller must be disposed only once this widget is actually unmounted (the framework calls
+/// `dispose()` for that), not immediately after `showDialog` resolves — the dialog's pop is
+/// animated, so the `TextFormField` is still in the tree, still rebuilding, for a moment after the
+/// awaited `Future` completes. Disposing right there crashes with "A TextEditingController was
+/// used after being disposed."
+class _FolderNameDialog extends StatefulWidget {
+  const _FolderNameDialog({required this.title, required this.confirmLabel, this.initialName = ''});
+
+  final String title;
+  final String confirmLabel;
+  final String initialName;
+
+  @override
+  State<_FolderNameDialog> createState() => _FolderNameDialogState();
+}
+
+class _FolderNameDialogState extends State<_FolderNameDialog> {
+  late final TextEditingController _controller = TextEditingController(text: widget.initialName);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: SingleChildScrollView(
+        child: TextFormField(
+          key: const Key('space-album-folder-name-field'),
+          controller: _controller,
+          autofocus: true,
+          decoration: InputDecoration(labelText: 'space_album_folder_name_label'.t(context: context)),
+          onFieldSubmitted: (value) => Navigator.of(context).pop(value.trim()),
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const Key('space-album-folder-name-cancel'),
+          onPressed: () => Navigator.of(context).pop(null),
+          child: Text('cancel'.t(context: context)),
+        ),
+        TextButton(
+          key: const Key('space-album-folder-name-confirm'),
+          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
+          child: Text(widget.confirmLabel),
+        ),
+      ],
+    );
+  }
+}
+
+/// Confirms folder deletion — mirrors `space_detail.page.dart`'s `_deleteSpace` shape exactly
+/// (same AlertDialog + Cancel/error-coloured-delete `TextButton` layout), the established pattern
+/// for a destructive action among the other space pages.
+Future<bool> _confirmDeleteFolder(BuildContext context, SpaceAlbumFolder folder) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text('space_album_folder_delete'.t(context: ctx)),
+      content: Text('space_album_folder_delete_confirm'.t(context: ctx, args: {'name': folder.name})),
+      actions: [
+        TextButton(
+          key: const Key('space-album-folder-delete-cancel'),
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: Text('cancel'.t(context: ctx)),
+        ),
+        TextButton(
+          key: const Key('space-album-folder-delete-confirm'),
+          onPressed: () => Navigator.of(ctx).pop(true),
+          style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.error),
+          child: Text('delete'.t(context: ctx)),
+        ),
+      ],
+    ),
+  );
+  return confirmed == true;
 }
 
 // ---------------------------------------------------------------------------
@@ -393,6 +615,9 @@ class _LevelGrid extends StatelessWidget {
     required this.onUnlink,
     required this.onMove,
     required this.onAlbumTap,
+    required this.onRenameFolder,
+    required this.onMoveFolder,
+    required this.onDeleteFolder,
   });
 
   /// This level's folders, already sorted.
@@ -411,6 +636,9 @@ class _LevelGrid extends StatelessWidget {
   final void Function(String albumId) onUnlink;
   final void Function(SpaceAlbum album) onMove;
   final void Function(String albumId) onAlbumTap;
+  final void Function(SpaceAlbumFolder folder) onRenameFolder;
+  final void Function(SpaceAlbumFolder folder) onMoveFolder;
+  final void Function(SpaceAlbumFolder folder) onDeleteFolder;
 
   @override
   Widget build(BuildContext context) {
@@ -430,6 +658,9 @@ class _LevelGrid extends StatelessWidget {
                   previewAlbums: folderPreviewAlbums(allFolders, allAlbums, folder.id),
                   canEdit: canEdit,
                   onTap: () => onFolderTap(folder),
+                  onRename: () => onRenameFolder(folder),
+                  onMove: () => onMoveFolder(folder),
+                  onDelete: () => onDeleteFolder(folder),
                 );
               }, childCount: folders.length),
             ),
