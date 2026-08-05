@@ -9,6 +9,7 @@ import 'package:immich_mobile/presentation/widgets/spaces/space_album_kebab.widg
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/background_sync.provider.dart';
+import 'package:immich_mobile/presentation/widgets/spaces/space_album_empty_state.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album_actions.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
@@ -187,6 +188,9 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
           .spaceAlbum(spaceId: widget.spaceId, albumId: widget.albumId, groupBy: groupBy, temporalScope: scope),
       child: Timeline(
         withGroupingPill: true,
+        // Without this an empty album opens on a blank screen, which reads as a failed load.
+        // Viewers get the same illustration without the call to action they cannot act on.
+        emptyWidget: SpaceAlbumEmptyState(onAddPhotos: widget.canEdit ? _addPhotos : null),
         appBar: SpaceAlbumAppBar(
           canEdit: widget.canEdit,
           album: album,
