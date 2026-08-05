@@ -153,6 +153,29 @@ describe('SharedSpaceAlbumFolderSync', () => {
     expect(result.map((r) => r.folderId)).not.toContain(folder.id);
   });
 
+  // M-4 — the privacy gate must scope to spaces the caller is actually a MEMBER of, not merely
+  // "is a member of at least one space anywhere". V-02/V-04/V-07 above all use a user who is a
+  // member of NO space, so a mis-implementation like `EXISTS (SELECT 1 FROM shared_space_member
+  // WHERE userId = X)` (any space, uncorrelated to the folder's own space) would fail those tests
+  // too — a member of zero spaces fails that check regardless. Giving the member a SECOND space
+  // they do NOT belong to is what actually distinguishes "scoped to my spaces" from "member of
+  // any space": only the correct (per-space) gate excludes the other space's folder here.
+  it('M-4: a member of one space does not see another space\'s folders via getUpserts', async () => {
+    const { ctx, db, sut } = syncSetup();
+    const { user: owner } = await ctx.newUser();
+    const { user: member } = await ctx.newUser();
+    const { space: mine } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: mine.id, userId: member.id, role: SharedSpaceRole.Viewer });
+    const { space: other } = await ctx.newSharedSpace({ createdById: owner.id });
+    const myFolder = await newFolder(db, mine.id, 'Trips');
+    const otherFolder = await newFolder(db, other.id, 'Secret');
+
+    const result: any[] = await Array.fromAsync(sut.getUpserts({ userId: member.id, nowId: NOW_ID }));
+
+    expect(result.map((r) => r.id)).toContain(myFolder.id);
+    expect(result.map((r) => r.id)).not.toContain(otherFolder.id);
+  });
+
   // V-05
   it('V-05: backfills a space folders for a member, and not another space', async () => {
     const { ctx, db, sut } = syncSetup();

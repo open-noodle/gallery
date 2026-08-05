@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'dart:convert';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
@@ -8,9 +10,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/locales.dart';
+import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
 import 'package:immich_mobile/domain/models/space_album_folder.model.dart';
+import 'package:immich_mobile/domain/models/store.model.dart';
+import 'package:immich_mobile/domain/services/asset.service.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/utils/background_sync.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
@@ -20,14 +25,17 @@ import 'package:immich_mobile/infrastructure/repositories/settings.repository.da
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/pages/library/spaces/collection_sort.dart';
 import 'package:immich_mobile/pages/library/spaces/space_albums.page.dart';
+import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_album_folder_card.widget.dart';
 import 'package:immich_mobile/providers/background_sync.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album_actions.dart';
 import 'package:immich_mobile/repositories/drift_album_api_repository.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:openapi/api.dart' show ApiException;
 
 import '../../test_utils.dart';
 import '../../widget_tester_extensions.dart';
@@ -61,6 +69,10 @@ class MockDriftAlbumApiRepository extends Mock implements DriftAlbumApiRepositor
 /// assert the exact arguments a given action was called with.
 class MockSpaceAlbumActions extends Mock implements SpaceAlbumActions {}
 
+/// I-2 fixture — a folder card's recursive count/preview needs the whole space's asset service
+/// resolved, not just this level's.
+class MockAssetService extends Mock implements AssetService {}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -73,6 +85,7 @@ SpaceAlbum _album({
   int assetCount = 0,
   bool showInTimeline = true,
   String? folderId,
+  String? thumbnailAssetId,
   DateTime? linkedAt,
   DateTime? updatedAt,
   DateTime? createdAt,
@@ -82,9 +95,22 @@ SpaceAlbum _album({
   assetCount: assetCount,
   showInTimeline: showInTimeline,
   folderId: folderId,
+  thumbnailAssetId: thumbnailAssetId,
   linkedAt: linkedAt ?? DateTime.utc(2026, 1, 1),
   updatedAt: updatedAt ?? DateTime.utc(2026, 1, 1),
   createdAt: createdAt ?? DateTime.utc(2026, 1, 1),
+);
+
+/// I-2 fixture — a resolvable remote asset for a folder-card cover tile.
+RemoteAsset _remoteAsset({required String id}) => RemoteAsset(
+  id: id,
+  checksum: 'checksum-$id',
+  ownerId: 'owner-1',
+  name: '$id.jpg',
+  type: AssetType.image,
+  createdAt: DateTime(2024, 1, 1),
+  updatedAt: DateTime(2024, 1, 1),
+  isEdited: false,
 );
 
 /// Task 10 (U-*) test fixture — positional (id, name), matching the plan's brief verbatim.
@@ -190,6 +216,16 @@ Future<RootStackRouter> pumpPageWithFolderStream(
   unawaited(router.push(SpaceAlbumsRoute(spaceId: spaceId, canEdit: canEdit, folderId: folderId)));
   await tester.pumpAndSettle();
   return router;
+}
+
+/// `ImmichToast` schedules a 3s fluttertoast Timer outside the frame scheduler, so a plain
+/// `pumpAndSettle()` leaves it pending and teardown fails with "A Timer is still pending". Pump
+/// past its lifetime instead of dropping the toast from the widget (mirrors
+/// `space_edit_sheet_test.dart`'s identical helper).
+Future<void> settleToast(WidgetTester tester) async {
+  await tester.pumpAndSettle();
+  await tester.pump(const Duration(seconds: 4));
+  await tester.pumpAndSettle();
 }
 
 /// The visually-first card among [ids] (top-left-most in reading order),
@@ -538,6 +574,35 @@ void main() {
     }
   });
 
+  // I-1 — regression: flattenForSearch returns raw (name-ascending, per watchLinkedAlbums)
+  // server order; the search branch used to pass that order straight to the grid, silently
+  // discarding the user's chosen sort for the duration of the query. The three sort tests above
+  // all run with an EMPTY query, and U-09 below only asserts presence/absence with a query
+  // active, never order — so this is the one test that actually pins ORDER while searching.
+  testWidgets('I-1: a search query still respects the active sort order', (tester) async {
+    final albums = [
+      _album(id: 'a1', name: 'Beach A', assetCount: 5),
+      _album(id: 'a2', name: 'Beach B', assetCount: 50),
+    ];
+
+    await SettingsRepository.instance.write(SettingsKey.spaceAlbumsSortMode, SpaceAlbumSortMode.photoCount);
+    await SettingsRepository.instance.write(SettingsKey.spaceAlbumsIsReverse, false);
+
+    await pumpPage(tester, folders: const [], albums: albums);
+
+    // No query: photoCount desc -> Beach B (50) sorts before Beach A (5).
+    expect(_firstCardByPosition(tester, ['a1', 'a2']), 'a2');
+
+    await tester.enterText(find.byKey(const Key('space-albums-search-field')), 'beach');
+    await tester.pumpAndSettle();
+
+    // Both still match "beach" — the active sort must still put Beach B first, not the
+    // name-ascending order flattenForSearch returns on its own.
+    expect(find.byKey(const Key('space-album-card-a1')), findsOneWidget);
+    expect(find.byKey(const Key('space-album-card-a2')), findsOneWidget);
+    expect(_firstCardByPosition(tester, ['a1', 'a2']), 'a2');
+  });
+
   // ---------------------------------------------------------------------
   // Regression: search + sort chrome doesn't affect role gating
   // ---------------------------------------------------------------------
@@ -653,6 +718,45 @@ void main() {
 
     expect(find.byKey(const Key('space-album-folder-card-menu')), findsNothing);
     expect(find.byKey(const Key('space-albums-new-folder-action')), findsNothing);
+  });
+
+  // I-2 — regression: `_LevelGrid`'s `allFolders`/`allAlbums` must be the WHOLE space's folders
+  // and albums, not just the current level's (`folders`/`sortedAlbums`), because
+  // recursiveAlbumCount/folderPreviewAlbums need the full subtree. A folder holding only a
+  // SUBFOLDER (no direct albums of its own) is the fixture that actually distinguishes the two:
+  // at the root level, `contents.albums` is empty (the one album lives inside 'day1'), so passing
+  // level-only data would show "0 albums" and the empty-folder glyph instead of the real count
+  // and cover — while every OTHER existing test in this file uses a flat folder (album directly
+  // inside it), which happens to read the same whether `allAlbums` is level-only or whole-space.
+  testWidgets('U-12/I-2: a folder holding only a subfolder shows the whole-subtree count and cover, not level-only', (
+    tester,
+  ) async {
+    final mockService = MockAssetService();
+    when(() => mockService.getRemoteAsset('thumb-1')).thenAnswer((_) async => _remoteAsset(id: 'thumb-1'));
+    await Store.put(StoreKey.serverEndpoint, 'http://localhost:3000');
+    addTearDown(() => Store.clear());
+
+    await pumpPage(
+      tester,
+      folders: [
+        folder('trips', 'Trips'),
+        folder('day1', 'Day 1', parentId: 'trips'),
+      ],
+      albums: [_album(id: 'a1', name: 'Rome', folderId: 'day1', thumbnailAssetId: 'thumb-1')],
+      overrides: [assetServiceProvider.overrideWithValue(mockService)],
+    );
+    // The FutureBuilder resolves the mocked (already-completed) Future asynchronously; a
+    // follow-up pump lets it rebuild with the real Thumbnail.
+    await tester.pump();
+
+    final cardFinder = find.byKey(const Key('space-album-folder-card-trips'));
+    expect(cardFinder, findsOneWidget);
+    // Count: the album lives one level deeper (inside 'day1'), so a level-only read of this
+    // level's contents would be empty and render "0 albums".
+    expect(find.descendant(of: cardFinder, matching: find.textContaining('1')), findsOneWidget);
+    // Cover: a real Thumbnail renders, not the empty-folder fallback glyph.
+    expect(find.descendant(of: cardFinder, matching: find.byType(Thumbnail)), findsOneWidget);
+    expect(find.descendant(of: cardFinder, matching: find.byIcon(Icons.folder_outlined)), findsNothing);
   });
 
   testWidgets('U-09: a query hides folders and shows space-wide hits with paths', (tester) async {
@@ -1058,5 +1162,92 @@ void main() {
     await tester.pumpAndSettle();
 
     verifyNever(() => actions.deleteFolder(any(), any()));
+  });
+
+  // ---------------------------------------------------------------------
+  // M-5 — folder-mutation failures map to the specific space_album_folder_name_taken /
+  // depth_exceeded / limit_reached keys when the server's error identifies one of those known
+  // failure classes, instead of always showing the action's generic error toast.
+  // ---------------------------------------------------------------------
+
+  String apiErrorBody(String message) => jsonEncode({'statusCode': 400, 'message': message, 'error': 'Bad Request'});
+
+  testWidgets('M-5: a duplicate-name failure on New folder shows the specific error, not the generic one', (
+    tester,
+  ) async {
+    final actions = MockSpaceAlbumActions();
+    when(
+      () => actions.createFolder(any(), any(), parentId: any(named: 'parentId')),
+    ).thenThrow(ApiException(400, apiErrorBody('A folder with that name already exists here')));
+
+    await pumpPage(
+      tester,
+      folders: const [],
+      albums: const [],
+      overrides: [spaceAlbumActionsProvider.overrideWithValue(actions)],
+    );
+
+    await tester.tap(find.byKey(const Key('space-albums-new-folder-action')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('space-album-folder-name-field')), 'Trips');
+    await tester.tap(find.byKey(const Key('space-album-folder-name-confirm')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('A folder with that name already exists here'), findsOneWidget);
+    expect(find.text("Couldn't create folder"), findsNothing);
+
+    await settleToast(tester);
+  });
+
+  testWidgets('M-5: a depth-exceeded failure on Move folder shows the specific error, not the generic one', (
+    tester,
+  ) async {
+    final actions = MockSpaceAlbumActions();
+    when(
+      () => actions.moveFolder(any(), any(), any()),
+    ).thenThrow(ApiException(400, apiErrorBody('Folder nesting is limited to 10 levels (this would be 11)')));
+
+    await pumpPage(
+      tester,
+      folders: [folder('trips', 'Trips'), folder('other', 'Other')],
+      albums: const [],
+      overrides: [spaceAlbumActionsProvider.overrideWithValue(actions)],
+    );
+
+    await tester.tap(_folderMenuFinder('trips'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('space-album-folder-card-move')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('folder-option-other')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Folders can only be nested 10 levels deep'), findsOneWidget);
+
+    await settleToast(tester);
+  });
+
+  testWidgets('M-5: an unrecognized failure still falls back to the generic per-action error', (tester) async {
+    final actions = MockSpaceAlbumActions();
+    when(
+      () => actions.renameFolder(any(), any(), any()),
+    ).thenThrow(ApiException(500, apiErrorBody('Internal server error')));
+
+    await pumpPage(
+      tester,
+      folders: [folder('trips', 'Trips')],
+      albums: const [],
+      overrides: [spaceAlbumActionsProvider.overrideWithValue(actions)],
+    );
+
+    await tester.tap(_folderMenuFinder('trips'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('space-album-folder-card-rename')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('space-album-folder-name-confirm')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unable to rename folder'), findsOneWidget);
+
+    await settleToast(tester);
   });
 }

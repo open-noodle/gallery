@@ -108,15 +108,17 @@ export const SYNC_TYPES_ORDER = [
   SyncRequestType.SharedSpaceLibrariesV1,
   SyncRequestType.LibraryAssetsV1,
   SyncRequestType.LibraryAssetExifsV1,
-  // Shared-space album sync (Phase 2A). Order: album metadata + link first
-  // (so mobile can build the album list before asset rows start streaming),
-  // then membership rows (album_asset join), then asset blobs and exif.
+  // Shared-space album sync (Phase 2A). Order: album metadata + folders first (folders have no
+  // dependency on the link rows, and landing them first means the album-link rows arrive already
+  // knowing their folder, instead of rendering flat at the root for one frame and then re-nesting
+  // once the folder catches up), then link rows (so mobile can build the album list before asset
+  // rows start streaming), then membership rows (album_asset join), then asset blobs and exif.
   SyncRequestType.SharedSpaceAlbumsV1,
+  SyncRequestType.SharedSpaceAlbumFoldersV1,
   SyncRequestType.SharedSpaceAlbumLinksV1,
   // #1041: hidden rows key off (spaceId, albumId) like the link row above, so it belongs
   // immediately after the link stream — before any asset-bearing stream, same reasoning.
   SyncRequestType.SharedSpaceAlbumHiddensV1,
-  SyncRequestType.SharedSpaceAlbumFoldersV1,
   SyncRequestType.SharedSpaceAlbumToAssetsV1,
   SyncRequestType.SharedSpaceAlbumAssetsV1,
   SyncRequestType.SharedSpaceAlbumAssetExifsV1,
@@ -279,12 +281,12 @@ export class SyncService extends BaseService {
         this.syncSharedSpaceLibrariesV1(options, response, checkpointMap, session.id),
       // Shared-space album sync handlers (Phase 2A).
       [SyncRequestType.SharedSpaceAlbumsV1]: () => this.syncSharedSpaceAlbumsV1(options, response, checkpointMap),
+      [SyncRequestType.SharedSpaceAlbumFoldersV1]: () =>
+        this.syncSharedSpaceAlbumFoldersV1(options, response, checkpointMap, session.id),
       [SyncRequestType.SharedSpaceAlbumLinksV1]: () =>
         this.syncSharedSpaceAlbumLinksV1(options, response, checkpointMap, session.id),
       [SyncRequestType.SharedSpaceAlbumHiddensV1]: () =>
         this.syncSharedSpaceAlbumHiddensV1(options, response, checkpointMap, session.id),
-      [SyncRequestType.SharedSpaceAlbumFoldersV1]: () =>
-        this.syncSharedSpaceAlbumFoldersV1(options, response, checkpointMap, session.id),
       [SyncRequestType.SharedSpaceAlbumToAssetsV1]: () =>
         this.syncSharedSpaceAlbumToAssetsV1(options, response, checkpointMap, session.id),
       [SyncRequestType.SharedSpaceAlbumAssetsV1]: () =>
