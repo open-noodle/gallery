@@ -17,6 +17,7 @@ import { authManager } from '$lib/managers/auth-manager.svelte';
 import { eventManager } from '$lib/managers/event-manager.svelte';
 import SpaceLinkAlbumModal from '$lib/modals/SpaceLinkAlbumModal.svelte';
 import { spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
+import { writeDragPayload, type DragPayload } from '$lib/utils/space-album-folder-dnd';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
 import SpaceAlbumsPage from './+page.svelte';
@@ -45,6 +46,12 @@ vi.mock('@immich/ui', async (importOriginal) => {
     toastManager: { primary: vi.fn(), success: vi.fn(), warning: vi.fn() },
   };
 });
+
+// The drag-and-drop suite asserts handleError was called on a failed move — mocking it here
+// (rather than relying on the real implementation's toastManager.danger call, which the
+// @immich/ui mock above doesn't stub) makes that assertable directly.
+const { handleErrorMock } = vi.hoisted(() => ({ handleErrorMock: vi.fn() }));
+vi.mock('$lib/utils/handle-error', () => ({ handleError: handleErrorMock }));
 
 const BASE_SPACE: SharedSpaceResponseDto = {
   id: 'space-1',
@@ -156,6 +163,33 @@ function renderPage(
     component: SpaceAlbumsPage,
     componentProps: props,
   });
+}
+
+/**
+ * Builds a fake DataTransfer carrying `payload`, then fires dragover followed by drop on the
+ * folder card for `targetFolderId`. space-album-folder-card's data-testid is shared across every
+ * rendered card, so the target is matched via its data-folder-id attribute instead. dragover
+ * fires first because that's what a real browser requires before drop can fire at all — jsdom's
+ * fireEvent.drop doesn't enforce that, but firing both keeps the sequence realistic and exercises
+ * the card's dragover handler too, not just its drop handler.
+ */
+async function dropOnFolder(payload: DragPayload, targetFolderId: string) {
+  const store = new Map<string, string>();
+  const dataTransfer = {
+    setData: (type: string, value: string) => store.set(type, value),
+    getData: (type: string) => store.get(type) ?? '',
+    types: [...store.keys()],
+  } as unknown as DataTransfer;
+  writeDragPayload(dataTransfer, payload);
+
+  const cards = await screen.findAllByTestId('space-album-folder-card');
+  const card = cards.find((element) => element.dataset.folderId === targetFolderId);
+  if (!card) {
+    throw new Error(`dropOnFolder: no rendered folder card for target "${targetFolderId}"`);
+  }
+
+  await fireEvent.dragOver(card, { dataTransfer });
+  await fireEvent.drop(card, { dataTransfer });
 }
 
 describe('Space albums page', () => {
@@ -734,6 +768,196 @@ describe('Space albums page', () => {
       expect(screen.getByTestId('space-album-folder-breadcrumb')).toHaveTextContent('Trips');
       expect(screen.getByText('Rome')).toBeInTheDocument();
       expect(screen.queryByText('Venice')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('drag and drop', () => {
+    // W-12
+    it('W-12: dropping an album on a folder calls the move endpoint', async () => {
+      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
+        folders: [makeFolder('trips', 'Trips')],
+      });
+
+      await dropOnFolder({ kind: 'album', id: 'a1' }, 'trips');
+
+      await waitFor(() =>
+        expect(sdkMock.setSharedSpaceAlbumFolder).toHaveBeenCalledWith(
+          expect.objectContaining({ albumId: 'a1', sharedSpaceAlbumFolderMoveAlbumDto: { folderId: 'trips' } }),
+        ),
+      );
+    });
+
+    // W-12, folder variant: dropping a folder onto another folder calls the folder-move endpoint.
+    it('W-12: dropping a folder on another folder calls the folder move endpoint', async () => {
+      renderPage([], SharedSpaceRole.Editor, {
+        folders: [makeFolder('trips', 'Trips'), makeFolder('family', 'Family')],
+      });
+
+      await dropOnFolder({ kind: 'folder', id: 'trips' }, 'family');
+
+      await waitFor(() =>
+        expect(sdkMock.updateSharedSpaceAlbumFolder).toHaveBeenCalledWith({
+          id: 'space-1',
+          folderId: 'trips',
+          sharedSpaceAlbumFolderUpdateDto: { parentId: 'family' },
+        }),
+      );
+    });
+
+    // W-13: a folder cannot be dropped onto its own descendant. Standing inside "Trips" so its
+    // children actually render as folder cards to drop onto — at the space root, "2026" and
+    // "Italy" are nested under "Trips" and never appear in the grid at all.
+    it('W-13: fires no request for a folder dropped onto its own descendant, and proves the handler ran via a legal drop in the same view', async () => {
+      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'italy' })], SharedSpaceRole.Editor, {
+        folders: [
+          makeFolder('trips', 'Trips'),
+          makeFolder('y2026', '2026', 'trips'),
+          makeFolder('italy', 'Italy', 'trips'),
+        ],
+        folderParam: 'trips',
+      });
+
+      // Invalid: "y2026" is a descendant of "trips" — dropping trips onto it must be a no-op.
+      await dropOnFolder({ kind: 'folder', id: 'trips' }, 'y2026');
+      expect(sdkMock.setSharedSpaceAlbumFolder).not.toHaveBeenCalled();
+      expect(sdkMock.updateSharedSpaceAlbumFolder).not.toHaveBeenCalled();
+
+      // Prove the drop handler actually ran (rather than the event never reaching it at all): a
+      // legal drop in the very same view — moving Rome from Italy into 2026 — does fire a request.
+      await dropOnFolder({ kind: 'album', id: 'a1' }, 'y2026');
+      await waitFor(() =>
+        expect(sdkMock.setSharedSpaceAlbumFolder).toHaveBeenCalledWith(
+          expect.objectContaining({ albumId: 'a1', sharedSpaceAlbumFolderMoveAlbumDto: { folderId: 'y2026' } }),
+        ),
+      );
+    });
+
+    // W-14: dropping onto the parent it already has is a no-op, so no request should fire.
+    it('W-14: fires no request for an album dropped onto the folder it already sits in, and proves the handler ran via a legal drop in the same view', async () => {
+      renderPage(
+        [makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' }), makeAlbum({ id: 'a2', albumName: 'Venice' })],
+        SharedSpaceRole.Editor,
+        { folders: [makeFolder('trips', 'Trips')] },
+      );
+
+      // Invalid: a1 already sits in "trips".
+      await dropOnFolder({ kind: 'album', id: 'a1' }, 'trips');
+      expect(sdkMock.setSharedSpaceAlbumFolder).not.toHaveBeenCalled();
+
+      // Prove the handler ran: a2, which does NOT already sit in "trips", legally drops there.
+      await dropOnFolder({ kind: 'album', id: 'a2' }, 'trips');
+      await waitFor(() =>
+        expect(sdkMock.setSharedSpaceAlbumFolder).toHaveBeenCalledWith(
+          expect.objectContaining({ albumId: 'a2', sharedSpaceAlbumFolderMoveAlbumDto: { folderId: 'trips' } }),
+        ),
+      );
+    });
+
+    // W-14, folder variant: dropping a folder onto the parent it already has is also a no-op.
+    // Rendered at the space root (not inside "trips") so "trips" itself — the target — actually
+    // renders as a folder card; "y2026" being dragged is a synthesized payload, not something
+    // read off the DOM, so it need not be visible itself.
+    it('W-14: fires no request for a folder dropped onto the parent it already has', async () => {
+      renderPage([], SharedSpaceRole.Editor, {
+        folders: [makeFolder('trips', 'Trips'), makeFolder('y2026', '2026', 'trips')],
+      });
+
+      await dropOnFolder({ kind: 'folder', id: 'y2026' }, 'trips');
+
+      expect(sdkMock.setSharedSpaceAlbumFolder).not.toHaveBeenCalled();
+      expect(sdkMock.updateSharedSpaceAlbumFolder).not.toHaveBeenCalled();
+    });
+
+    // W-15
+    it('W-15: rolls the optimistic move back and toasts when the request fails', async () => {
+      sdkMock.setSharedSpaceAlbumFolder.mockRejectedValueOnce(new Error('boom'));
+      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
+        folders: [makeFolder('trips', 'Trips')],
+      });
+      await screen.findByTestId('space-album-folder-card');
+
+      // The reload triggered by the failed move ALSO fails on its albums half. Without this, the
+      // reload's own (successful) re-fetch of the never-actually-changed server state would make
+      // "Rome still at the root" true even if the manual rollback assignment were deleted —
+      // isolating that failure is what makes the assertion below actually exercise the rollback.
+      sdkMock.getSharedSpaceAlbums.mockRejectedValueOnce(new Error('network error'));
+
+      await dropOnFolder({ kind: 'album', id: 'a1' }, 'trips');
+
+      // The request was actually attempted (proves the optimistic-apply branch ran)...
+      await waitFor(() =>
+        expect(sdkMock.setSharedSpaceAlbumFolder).toHaveBeenCalledWith(
+          expect.objectContaining({ albumId: 'a1', sharedSpaceAlbumFolderMoveAlbumDto: { folderId: 'trips' } }),
+        ),
+      );
+      await waitFor(() => expect(handleErrorMock).toHaveBeenCalled());
+      // ...but rolled back: still visible at the root, where it started, not stranded in "trips".
+      expect(screen.getByText('Rome')).toBeInTheDocument();
+    });
+
+    // W-15, folder variant: the same optimistic-apply-then-rollback behaviour applies to a
+    // failed folder move, not just an album move.
+    it('W-15: rolls back a failed folder move and toasts', async () => {
+      sdkMock.updateSharedSpaceAlbumFolder.mockRejectedValueOnce(new Error('boom'));
+      renderPage([], SharedSpaceRole.Editor, {
+        folders: [makeFolder('trips', 'Trips'), makeFolder('family', 'Family')],
+      });
+      await screen.findAllByTestId('space-album-folder-card');
+
+      // Isolates the manual rollback from reload()'s own re-fetch, exactly as the album variant
+      // above does — without this, reload's successful (unrelated) refetch of the
+      // never-actually-changed server state would make "still at the root" true regardless of
+      // whether the rollback assignment itself ran.
+      sdkMock.getSharedSpaceAlbumFolders.mockRejectedValueOnce(new Error('network error'));
+
+      await dropOnFolder({ kind: 'folder', id: 'trips' }, 'family');
+
+      await waitFor(() =>
+        expect(sdkMock.updateSharedSpaceAlbumFolder).toHaveBeenCalledWith({
+          id: 'space-1',
+          folderId: 'trips',
+          sharedSpaceAlbumFolderUpdateDto: { parentId: 'family' },
+        }),
+      );
+      await waitFor(() => expect(handleErrorMock).toHaveBeenCalled());
+      // Rolled back: "Trips" is still a root-level folder card, not moved under "Family".
+      expect(screen.getByText('Trips')).toBeInTheDocument();
+    });
+
+    // W-19: the folder was deleted by another editor between our render and this drop. Same
+    // failure path as any other rejection — rollback plus toast, then it vanishes on reload.
+    it('W-19: handles a drop onto a folder deleted server-side', async () => {
+      sdkMock.setSharedSpaceAlbumFolder.mockRejectedValueOnce(new Error('Folder not found'));
+      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor, {
+        folders: [makeFolder('trips', 'Trips')],
+      });
+      await screen.findByTestId('space-album-folder-card');
+
+      // The reload triggered by the failed move: the folders half discovers the target is gone
+      // (W-19's actual scenario) — queued AFTER the initial render so it doesn't also swallow the
+      // mount-time fetch. The albums half is made to fail too, isolating the manual rollback from
+      // reload()'s own re-fetch (see the W-15 comment above for why that distinction matters).
+      sdkMock.getSharedSpaceAlbumFolders.mockResolvedValueOnce([]);
+      sdkMock.getSharedSpaceAlbums.mockRejectedValueOnce(new Error('network error'));
+
+      await dropOnFolder({ kind: 'album', id: 'a1' }, 'trips');
+
+      await waitFor(() => expect(handleErrorMock).toHaveBeenCalled());
+      expect(screen.getByText('Rome')).toBeInTheDocument();
+      // The stale folder disappears from the grid once the reload lands.
+      await waitFor(() => expect(screen.queryByTestId('space-album-folder-card')).not.toBeInTheDocument());
+    });
+
+    it('viewer cannot drag: the album card is not draggable', () => {
+      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Viewer);
+
+      expect(screen.getByTestId('space-album-card')).toHaveAttribute('draggable', 'false');
+    });
+
+    it('viewer cannot drag: the folder card is not draggable', async () => {
+      renderPage([], SharedSpaceRole.Viewer, { folders: [makeFolder('trips', 'Trips')] });
+
+      expect(await screen.findByTestId('space-album-folder-card')).toHaveAttribute('draggable', 'false');
     });
   });
 

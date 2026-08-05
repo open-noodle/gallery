@@ -1,6 +1,12 @@
-import type { SharedSpaceAlbumFolderDto } from '@immich/sdk';
-import { screen } from '@testing-library/svelte';
+import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
+import { fireEvent, screen } from '@testing-library/svelte';
 import SpaceAlbumFolderCard from '$lib/components/spaces/space-album-folder-card.svelte';
+import {
+  getActiveDragPayload,
+  readDragPayload,
+  setActiveDragPayload,
+  writeDragPayload,
+} from '$lib/utils/space-album-folder-dnd';
 import { renderWithTooltips } from '$tests/helpers';
 
 const folder = {
@@ -13,6 +19,20 @@ const folder = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 } as SharedSpaceAlbumFolderDto;
 
+const otherFolder = { ...folder, id: 'family', name: 'Family' };
+
+const album = (id: string, folderId: string | null = null) =>
+  ({ id, albumName: id, folderId }) as SharedSpaceLinkedAlbumDto;
+
+const makeDataTransfer = () => {
+  const store = new Map<string, string>();
+  return {
+    setData: (type: string, value: string) => store.set(type, value),
+    getData: (type: string) => store.get(type) ?? '',
+    types: [...store.keys()],
+  } as unknown as DataTransfer;
+};
+
 const defaults = {
   folder,
   albumCount: 12,
@@ -24,6 +44,10 @@ describe('SpaceAlbumFolderCard', () => {
   // $t() returns RAW KEYS in web unit tests — assert on keys, never on English.
   beforeEach(() => {
     vi.clearAllMocks();
+    // getActiveDragPayload is bare module state (no clearMocks equivalent resets it) — a payload
+    // left active by one test would otherwise let a later dragover test "accept" a drop it never
+    // actually simulated dragging.
+    setActiveDragPayload(null);
   });
 
   it('renders the folder name', () => {
@@ -68,5 +92,96 @@ describe('SpaceAlbumFolderCard', () => {
     renderWithTooltips(SpaceAlbumFolderCard, defaults);
 
     expect(screen.getByTestId('space-album-folder-card-count')).toHaveTextContent('space_album_folder_albums_count');
+  });
+
+  it('dragstart writes the folder payload onto the DataTransfer and the active-drag slot', async () => {
+    const { container } = renderWithTooltips(SpaceAlbumFolderCard, defaults);
+    const card = container.querySelector('[data-testid="space-album-folder-card"]')!;
+    const dataTransfer = makeDataTransfer();
+
+    expect(getActiveDragPayload()).toBeNull();
+
+    await fireEvent.dragStart(card, { dataTransfer });
+
+    expect(readDragPayload(dataTransfer)).toEqual({ kind: 'folder', id: folder.id });
+    expect(getActiveDragPayload()).toEqual({ kind: 'folder', id: folder.id });
+
+    await fireEvent.dragEnd(card);
+
+    expect(getActiveDragPayload()).toBeNull();
+  });
+
+  describe('as a drop target', () => {
+    // dragover/dragenter see the DataTransfer in the browser's "protected mode" (getData()
+    // returns '' there in real Chrome/Firefox), so the card reads the payload for its dragover
+    // check off the module-level active-drag slot instead of the DataTransfer — this is what
+    // setActiveDragPayload simulates here.
+    it('does not preventDefault or highlight when no drag is active', async () => {
+      const { container } = renderWithTooltips(SpaceAlbumFolderCard, {
+        ...defaults,
+        folders: [folder, otherFolder],
+        albums: [album('a1')],
+      });
+      const card = container.querySelector('[data-testid="space-album-folder-card"]')!;
+
+      const notPrevented = await fireEvent.dragOver(card);
+
+      expect(notPrevented).toBe(true); // preventDefault was NOT called
+      expect(card).not.toHaveClass('ring-2');
+    });
+
+    it('does not preventDefault or highlight for an illegal target (dropping a folder on itself)', async () => {
+      const { container } = renderWithTooltips(SpaceAlbumFolderCard, {
+        ...defaults,
+        folders: [folder, otherFolder],
+        albums: [],
+      });
+      const card = container.querySelector('[data-testid="space-album-folder-card"]')!;
+
+      setActiveDragPayload({ kind: 'folder', id: folder.id });
+      const notPrevented = await fireEvent.dragOver(card);
+
+      expect(notPrevented).toBe(true);
+      expect(card).not.toHaveClass('ring-2');
+    });
+
+    it('a viewer never accepts a drop, even for an otherwise legal target', async () => {
+      const { container } = renderWithTooltips(SpaceAlbumFolderCard, {
+        ...defaults,
+        canManage: false,
+        folders: [folder, otherFolder],
+        albums: [album('a1')],
+      });
+      const card = container.querySelector('[data-testid="space-album-folder-card"]')!;
+
+      setActiveDragPayload({ kind: 'album', id: 'a1' });
+      const notPrevented = await fireEvent.dragOver(card);
+
+      expect(notPrevented).toBe(true);
+      expect(card).not.toHaveClass('ring-2');
+    });
+
+    it('preventDefaults and highlights for a legal target, and calls onDropItem on drop', async () => {
+      const onDropItem = vi.fn();
+      const { container } = renderWithTooltips(SpaceAlbumFolderCard, {
+        ...defaults,
+        folders: [folder, otherFolder],
+        albums: [album('a1')],
+        onDropItem,
+      });
+      const card = container.querySelector('[data-testid="space-album-folder-card"]')!;
+
+      setActiveDragPayload({ kind: 'album', id: 'a1' });
+      const notPrevented = await fireEvent.dragOver(card);
+
+      expect(notPrevented).toBe(false); // preventDefault WAS called
+      expect(card).toHaveClass('ring-2');
+
+      const dataTransfer = makeDataTransfer();
+      writeDragPayload(dataTransfer, { kind: 'album', id: 'a1' });
+      await fireEvent.drop(card, { dataTransfer });
+
+      expect(onDropItem).toHaveBeenCalledWith({ kind: 'album', id: 'a1' }, folder.id);
+    });
   });
 });

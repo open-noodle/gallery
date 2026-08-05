@@ -15,6 +15,7 @@
   import { Route } from '$lib/route';
   import { handleError } from '$lib/utils/handle-error';
   import { createAlbum } from '$lib/utils/album-utils';
+  import { canDrop, type DragPayload } from '$lib/utils/space-album-folder-dnd';
   import { getFolderPath } from '$lib/utils/space-album-folders';
   import {
     getAlbumTimelineHidePreview,
@@ -23,6 +24,7 @@
     getSharedSpaceAlbumFolders,
     getSharedSpaceAlbums,
     linkAlbum,
+    setSharedSpaceAlbumFolder,
     SharedSpaceRole,
     unlinkAlbum,
     updateAlbumTimelineForMember,
@@ -360,6 +362,67 @@
       handleError(error, $t('space_album_folder_error_delete'));
     }
   }
+
+  // Shared by both entry points that move an album — a drag-and-drop and the card kebab's
+  // "Move to folder…" — so both get the same optimistic-apply-then-rollback behaviour.
+  async function moveAlbumToFolder(albumId: string, targetFolderId: string | null) {
+    const previous = albums;
+    albums = albums.map((a) => (a.id === albumId ? { ...a, folderId: targetFolderId } : a));
+    try {
+      await setSharedSpaceAlbumFolder({
+        id: space.id,
+        albumId,
+        sharedSpaceAlbumFolderMoveAlbumDto: { folderId: targetFolderId },
+      });
+      await reload();
+    } catch (error) {
+      albums = previous; // rollback
+      handleError(error, $t('space_album_folder_error_move'));
+      // Reload regardless: a "folder not found" failure means someone else deleted the target,
+      // and the stale folder must disappear from the grid (W-19).
+      await reload();
+    }
+  }
+
+  async function handleMoveAlbum(album: SharedSpaceLinkedAlbumDto) {
+    const result = await modalManager.show(SpaceAlbumFolderPickerModal, {
+      folders,
+      excludeFolderId: null,
+      currentFolderId: album.folderId ?? null,
+    });
+    if (!result) {
+      return;
+    }
+    await moveAlbumToFolder(album.id, result.folderId);
+  }
+
+  // The client-side canDrop guard means an illegal or pointless drop (dropping onto itself, a
+  // descendant, or the parent it already has) never fires a request at all.
+  async function handleDropItem(payload: DragPayload, targetFolderId: string | null) {
+    if (!canDrop(folders, albums, payload, targetFolderId)) {
+      return;
+    }
+
+    if (payload.kind === 'album') {
+      await moveAlbumToFolder(payload.id, targetFolderId);
+      return;
+    }
+
+    const previous = folders;
+    folders = folders.map((f) => (f.id === payload.id ? { ...f, parentId: targetFolderId } : f));
+    try {
+      await updateSharedSpaceAlbumFolder({
+        id: space.id,
+        folderId: payload.id,
+        sharedSpaceAlbumFolderUpdateDto: { parentId: targetFolderId },
+      });
+      await reload();
+    } catch (error) {
+      folders = previous; // rollback
+      handleError(error, $t('space_album_folder_error_move'));
+      await reload();
+    }
+  }
 </script>
 
 <div class="flex h-full flex-col">
@@ -407,7 +470,14 @@
     {#if folders.length > 0 && !isSearching}
       <!-- Search escapes the folder tree entirely (results are space-wide), so showing where we
            were would misrepresent where the results actually come from. -->
-      <SpaceAlbumFolderBreadcrumb path={folderPath} onNavigate={(id) => void navigateToFolder(id)} />
+      <SpaceAlbumFolderBreadcrumb
+        path={folderPath}
+        {folders}
+        {albums}
+        canManage={isEditor}
+        onNavigate={(id) => void navigateToFolder(id)}
+        onDropItem={handleDropItem}
+      />
     {/if}
     <SpaceAlbumsControls
       {groupIds}
@@ -431,10 +501,12 @@
         onUnlink={handleUnlink}
         onToggleTimeline={handleToggleTimeline}
         onToggleMyTimeline={handleToggleMyTimeline}
+        onMoveAlbum={handleMoveAlbum}
         onOpenFolder={(f) => void navigateToFolder(f.id)}
         onRenameFolder={handleRenameFolder}
         onMoveFolder={handleMoveFolder}
         onDeleteFolder={handleDeleteFolder}
+        onDropItem={handleDropItem}
       />
     </div>
   {/if}
