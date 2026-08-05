@@ -153,6 +153,19 @@ class SpaceAlbumsPage extends HookConsumerWidget {
     //    route change, popped or pushed: `onNewUrlState` (navigation_history_base.dart:48) calls
     //    `notifyListeners()` whenever the computed url/active-segments state differs from before
     //    — exactly "the visible route changed", confirmed against B's pop in this task's tests.
+    //
+    //    CAVEAT (task-2 review, Finding 1) — `navigationHistory` is URL-STRING based, so it can
+    //    silently no-op: `onNewUrlState` only notifies when `_urlState != newState`
+    //    (navigation_history_base.dart:52), and `UrlState.==` compares route SEGMENTS, which for
+    //    two stacked `SpaceAlbumsRoute`s sharing the SAME `folderId` (reachable today via
+    //    double-tapping a folder card — `SpaceAlbumsRoute` deliberately omits `_duplicateGuard`,
+    //    router.dart:167-172, since it's legitimately self-recursive with a DIFFERENT folderId on
+    //    a normal drill-down) are IDENTICAL before and after the covering instance pops. This
+    //    also means the whole mechanism currently leans on `SpaceAlbumsRouteArgs.==` including
+    //    `folderId` (router.gr.dart, generated — nothing enforces this; a generator change could
+    //    silently widen or narrow it). Rather than depend on that, `pollNextFrame` below is a
+    //    URL-string-independent safety net: it reads `stackData`/`isTopmost()` directly off a
+    //    scheduled frame, so it still catches the pop even when `navigationHistory` stays silent.
     final currentFolderId = folderId;
     // `useState`, not `useRef`: flipping this must itself be reactive so the `useEffect` below
     // — which only touches `context.router` once there's actually something to wait for — can
@@ -175,14 +188,52 @@ class SpaceAlbumsPage extends HookConsumerWidget {
     useEffect(() {
       if (!pendingSelfPop.value) return null;
       final navigationHistory = context.router.navigationHistory;
-      void onVisibleRouteChanged() {
+      var disposed = false;
+
+      // The ONLY place either call site below (the listener and the poll) may act — both funnel
+      // through here rather than calling `maybePop` directly (task-2 review, Finding 2):
+      // `StackRouter.maybePop` is async, and the listener/poll below aren't torn down until the
+      // NEXT rebuild processes `pendingSelfPop.value` flipping to false, so a second notification
+      // or scheduled frame landing before that rebuild lands must be a no-op, not a second pop
+      // that would take the route BELOW this page with it. Checking-then-clearing the flag
+      // SYNCHRONOUSLY, before `maybePop`'s first `await`, is what makes this safe: Dart has no
+      // preemption, so no second call from either source can observe the flag as still-true once
+      // the first one has cleared it, regardless of which of the two call sites gets there first.
+      void trySelfPop() {
+        if (disposed || !pendingSelfPop.value) return;
         if (!isTopmost()) return;
         pendingSelfPop.value = false;
-        unawaited(context.maybePop());
+        if (context.mounted) unawaited(context.maybePop());
+      }
+
+      void onVisibleRouteChanged() => trySelfPop();
+
+      // Safety net for Finding 1 above: reschedules itself one frame at a time for as long as a
+      // pop is pending, so it catches "became topmost" even on a frame where `navigationHistory`
+      // stayed silent. Deliberately does NOT force a frame (no `scheduleFrame()`): a covering
+      // page's pop is itself a Flutter-level exit TRANSITION that drives several frames on its
+      // own regardless of any auto_route notification, which is what actually lands this within
+      // that "one pop-transition frame" in practice — piggybacking on those is enough to catch
+      // Finding 1's edge case (confirmed by the identical-folderId test below), and forcing a
+      // frame on every tick while merely BURIED (not yet topmost, still waiting) would mean this
+      // page keeps demanding new frames for as long as it stays buried — unbounded, and in a test
+      // it means `pumpAndSettle()` never converges. Self-limiting either way: it stops
+      // rescheduling the moment `pendingSelfPop.value` goes false (popped, or the folder
+      // reappeared — see the `ref.listen` callback below).
+      void pollNextFrame() {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (disposed || !pendingSelfPop.value) return;
+          trySelfPop();
+          if (!disposed && pendingSelfPop.value) pollNextFrame();
+        });
       }
 
       navigationHistory.addListener(onVisibleRouteChanged);
-      return () => navigationHistory.removeListener(onVisibleRouteChanged);
+      pollNextFrame();
+      return () {
+        disposed = true;
+        navigationHistory.removeListener(onVisibleRouteChanged);
+      };
     }, [pendingSelfPop.value]);
 
     ref.listen<AsyncValue<List<SpaceAlbumFolder>>>(spaceAlbumFoldersProvider(spaceId), (previous, next) {
@@ -196,6 +247,12 @@ class SpaceAlbumsPage extends HookConsumerWidget {
         } else {
           pendingSelfPop.value = true;
         }
+      } else {
+        // Finding 3 (task-2 review): a transient false-vanish emission (folder momentarily
+        // missing, then present again in a later sync batch) must not leave a stale pending pop
+        // armed — otherwise this page would pop itself later, once it resurfaces, even though its
+        // folder is valid again.
+        pendingSelfPop.value = false;
       }
     });
 

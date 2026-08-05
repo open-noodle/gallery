@@ -218,19 +218,24 @@ Future<RootStackRouter> pumpPageWithFolderStream(
   return router;
 }
 
-/// U-11 stacked-pages regression harness — pushes [SpaceAlbumsPage] TWICE onto a real AutoRoute
-/// stack (root -> A(folderIdA) -> B(folderIdB)), mirroring the real drill-down flow where the
-/// route is pushed onto ITSELF for each nested folder level (see the class doc on
-/// [SpaceAlbumsPage]). Both pushed pages watch the SAME [spaceAlbumFoldersProvider] instance
-/// (same spaceId), so a single [folderStream] emission is delivered to BOTH pages' `ref.listen`
-/// subscriptions at once — the scenario [pumpPageWithFolderStream]'s single-page stack cannot
-/// exercise: whether a reacting page pops the correct (its OWN) route rather than always the
-/// topmost one.
+/// U-11 stacked-pages regression harness — pushes [SpaceAlbumsPage] onto a real AutoRoute stack
+/// ONCE PER ENTRY in [folderIds] (root -> folderIds[0] -> folderIds[1] -> ...), mirroring the
+/// real drill-down flow where the route is pushed onto ITSELF for each nested folder level (see
+/// the class doc on [SpaceAlbumsPage]). Every pushed page watches the SAME
+/// [spaceAlbumFoldersProvider] instance (same spaceId), so a single [folderStream] emission is
+/// delivered to ALL of their `ref.listen` subscriptions at once — the scenario
+/// [pumpPageWithFolderStream]'s single-page stack cannot exercise: whether a reacting page pops
+/// the correct (its OWN) route rather than always the topmost one, and (with 3+ entries) whether
+/// a self-pop cascades through exactly the right number of routes.
+///
+/// [folderIds] entries need not be distinct: two adjacent entries with the SAME id reproduce a
+/// double-tap on a folder card, which `SpaceAlbumsRoute` allows today (see router.dart:167-172 —
+/// no duplicate guard, since a normal drill-down legitimately re-pushes this route with a
+/// DIFFERENT folderId, and an args-aware guard distinguishing the two is a separate future task).
 Future<RootStackRouter> pumpStackedFolderPagesWithFolderStream(
   WidgetTester tester,
   Stream<List<SpaceAlbumFolder>> folderStream, {
-  required String folderIdA,
-  required String folderIdB,
+  required List<String> folderIds,
   List<SpaceAlbum> albums = const [],
   bool canEdit = true,
 }) async {
@@ -268,13 +273,13 @@ Future<RootStackRouter> pumpStackedFolderPagesWithFolderStream(
     ),
   );
   await tester.pump();
-  // NOT awaited — same reasoning as `pumpPageWithFolderStream` above: `push`'s Future only
-  // resolves once the pushed route is popped, and driving that pop (or in-place removal) via the
-  // folder stream is exactly what the caller does after this helper returns.
-  unawaited(router.push(SpaceAlbumsRoute(spaceId: spaceId, canEdit: canEdit, folderId: folderIdA)));
-  await tester.pumpAndSettle();
-  unawaited(router.push(SpaceAlbumsRoute(spaceId: spaceId, canEdit: canEdit, folderId: folderIdB)));
-  await tester.pumpAndSettle();
+  for (final folderId in folderIds) {
+    // NOT awaited — same reasoning as `pumpPageWithFolderStream` above: `push`'s Future only
+    // resolves once the pushed route is popped, and driving that pop (or self-pop) via the
+    // folder stream is exactly what the caller does after this helper returns.
+    unawaited(router.push(SpaceAlbumsRoute(spaceId: spaceId, canEdit: canEdit, folderId: folderId)));
+    await tester.pumpAndSettle();
+  }
   return router;
 }
 
@@ -901,8 +906,7 @@ void main() {
     final router = await pumpStackedFolderPagesWithFolderStream(
       tester,
       controller.stream,
-      folderIdA: 'folder-a',
-      folderIdB: 'folder-b',
+      folderIds: ['folder-a', 'folder-b'],
     );
 
     // First real emission: guarded by the "no prior data" check — must not react to the
@@ -951,8 +955,7 @@ void main() {
     final router = await pumpStackedFolderPagesWithFolderStream(
       tester,
       controller.stream,
-      folderIdA: 'folder-a',
-      folderIdB: 'folder-b',
+      folderIds: ['folder-a', 'folder-b'],
     );
 
     controller.add([folder('folder-a', 'Folder A'), folder('folder-b', 'Folder B', parentId: 'folder-a')]);
@@ -964,6 +967,122 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(router.stackData.length, 2); // harness + A
+    final topArgs = router.stackData.last.args as SpaceAlbumsRouteArgs;
+    expect(topArgs.folderId, 'folder-a');
+    expect(find.byType(SpaceAlbumsPage), findsOneWidget);
+  });
+
+  // Task-2 review, Finding 1 — `navigationHistory`'s notifyListeners is URL-STRING based
+  // (`onNewUrlState` only fires when the computed `UrlState` differs, and `UrlState.==` compares
+  // route segments). Two stacked `SpaceAlbumsRoute`s sharing the SAME folderId — reachable today
+  // via double-tapping a folder card, since `SpaceAlbumsRoute` deliberately omits the duplicate
+  // guard (router.dart:167-172) — produce IDENTICAL segments before and after the covering
+  // instance pops, so that channel alone would silently never notify. The fix adds a
+  // URL-string-independent poll as a safety net; this test is what actually exercises it (the
+  // two tests above never hit this gap, since their stacked pages always have DIFFERENT
+  // folderIds and so DO change the UrlState on every pop).
+  testWidgets('U-11 stacked: identical-folderId siblings (double-tap) still self-pop despite an unchanged UrlState', (
+    tester,
+  ) async {
+    final controller = StreamController<List<SpaceAlbumFolder>>();
+    addTearDown(controller.close);
+    final router = await pumpStackedFolderPagesWithFolderStream(
+      tester,
+      controller.stream,
+      folderIds: ['folder-x', 'folder-x'], // double-tap: A and A' both browse the SAME folder
+    );
+
+    controller.add([folder('folder-x', 'Folder X')]);
+    await tester.pumpAndSettle();
+    expect(router.stackData.length, 3); // harness + A + A'
+
+    // folder-x vanishes entirely: A' (topmost) pops immediately; A (buried) flags itself
+    // pending — and, on the UrlState channel alone, would never hear that A' actually popped.
+    controller.add(const []);
+    await tester.pumpAndSettle();
+
+    // A must still self-pop through to root — never settle as the visible dead page just
+    // because its own UrlState happens to read identically to A's before A' popped.
+    expect(router.stackData.length, 1); // harness root only
+    expect(find.byType(SpaceAlbumsPage), findsNothing);
+  });
+
+  // Task-2 review, Finding 2 — `StackRouter.maybePop` is async and the pending-pop
+  // listener/poll aren't torn down until the NEXT rebuild processes `pendingSelfPop` flipping to
+  // false, so a second notification/frame landing before that rebuild lands must be a no-op, not
+  // a second `maybePop()` that would take the route BELOW this page with it too. A root->A->B
+  // stack can't expose a double-pop even if one happened: its settled bottom is the root harness,
+  // where a stray extra pop is a no-op either way. This pins the OBSERVABLE outcome the guard
+  // exists to protect — self-pop lands on exactly one route (X survives) — on a stack where a
+  // double-pop would have a visible victim; needs a route BELOW the self-popping page for that.
+  testWidgets('U-11 stacked: a self-pop never doubles up and takes the route below it too', (tester) async {
+    final controller = StreamController<List<SpaceAlbumFolder>>();
+    addTearDown(controller.close);
+    final router = await pumpStackedFolderPagesWithFolderStream(
+      tester,
+      controller.stream,
+      folderIds: ['folder-x', 'folder-a', 'folder-b'], // root -> X -> A -> B
+    );
+
+    controller.add([
+      folder('folder-x', 'Folder X'),
+      folder('folder-a', 'Folder A', parentId: 'folder-x'),
+      folder('folder-b', 'Folder B', parentId: 'folder-a'),
+    ]);
+    await tester.pumpAndSettle();
+    expect(router.stackData.length, 4); // harness + X + A + B
+
+    // folder-a (A's own folder, buried under B) vanishes; X and B are unaffected.
+    controller.add([folder('folder-x', 'Folder X'), folder('folder-b', 'Folder B')]);
+    await tester.pumpAndSettle();
+    expect(router.stackData.length, 4); // nothing popped yet — A is still buried, now pending
+
+    // The user backs out of B. A must self-pop EXACTLY once, landing on X — not also take X
+    // with it via a redundant second `maybePop()` racing in the same notification window.
+    await router.maybePop();
+    await tester.pumpAndSettle();
+
+    expect(router.stackData.length, 2); // harness + X — A self-popped exactly once
+    final topArgs = router.stackData.last.args as SpaceAlbumsRouteArgs;
+    expect(topArgs.folderId, 'folder-x');
+    expect(find.byType(SpaceAlbumsPage), findsOneWidget);
+  });
+
+  // Task-2 review, Finding 3 — a transient false-vanish emission (the folder is momentarily
+  // missing from one sync batch, then present again in a later one) must not leave a stale
+  // pending self-pop armed: this page must stay put once it surfaces, not pop itself later for a
+  // folder that's valid again by the time anyone's looking.
+  testWidgets('U-11 stacked: a folder reappearing after a transient vanish clears the pending self-pop', (
+    tester,
+  ) async {
+    final controller = StreamController<List<SpaceAlbumFolder>>();
+    addTearDown(controller.close);
+    final router = await pumpStackedFolderPagesWithFolderStream(
+      tester,
+      controller.stream,
+      folderIds: ['folder-a', 'folder-b'],
+    );
+
+    controller.add([folder('folder-a', 'Folder A'), folder('folder-b', 'Folder B', parentId: 'folder-a')]);
+    await tester.pumpAndSettle();
+    expect(router.stackData.length, 3);
+
+    // folder-a transiently vanishes while A is buried...
+    controller.add([folder('folder-b', 'Folder B')]);
+    await tester.pumpAndSettle();
+    expect(router.stackData.length, 3); // still buried, now pending
+
+    // ...then reappears in a later sync batch, before A ever surfaces.
+    controller.add([folder('folder-a', 'Folder A'), folder('folder-b', 'Folder B', parentId: 'folder-a')]);
+    await tester.pumpAndSettle();
+    expect(router.stackData.length, 3); // unchanged
+
+    // The user backs out of B. A must now stay put — its folder is valid again, so the earlier
+    // pending flag must have been cleared rather than firing a stale self-pop.
+    await router.maybePop();
+    await tester.pumpAndSettle();
+
+    expect(router.stackData.length, 2); // harness + A — A stays visible
     final topArgs = router.stackData.last.args as SpaceAlbumsRouteArgs;
     expect(topArgs.folderId, 'folder-a');
     expect(find.byType(SpaceAlbumsPage), findsOneWidget);
