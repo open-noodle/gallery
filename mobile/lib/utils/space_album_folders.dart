@@ -33,8 +33,30 @@ List<SpaceAlbumFolder> _ancestors(Map<String, SpaceAlbumFolder> index, String fo
   return chain;
 }
 
-bool _isRoot(Map<String, SpaceAlbumFolder> index, SpaceAlbumFolder f) =>
-    f.parentId == null || f.parentId == f.id || !index.containsKey(f.parentId);
+/// A folder is a root when it has no parent, its parent is absent (not yet synced), or it is a
+/// member of a cycle — including the length-1 case, a self-reference. Cycle membership must be
+/// decided HERE, not patched after the fact: a folder hanging below a cycle member (not itself in
+/// the cycle) still needs to nest normally under it, and only classifying at construction time
+/// keeps that distinction intact.
+bool _isRoot(Map<String, SpaceAlbumFolder> index, SpaceAlbumFolder f) {
+  final parentId = f.parentId;
+  if (parentId == null || !index.containsKey(parentId)) return true;
+  return _isCycleMember(index, f);
+}
+
+/// True when walking the parent chain up from [f] eventually arrives back at [f] itself. Guarded
+/// with a `seen` set keyed by id, so any cycle length terminates the walk in at most
+/// `index.length` steps instead of looping.
+bool _isCycleMember(Map<String, SpaceAlbumFolder> index, SpaceAlbumFolder f) {
+  final seen = <String>{};
+  var current = index[f.parentId];
+  while (current != null && seen.add(current.id)) {
+    if (current.id == f.id) return true;
+    final parentId = current.parentId;
+    current = parentId == null ? null : index[parentId];
+  }
+  return false;
+}
 
 List<FolderNode> buildFolderTree(List<SpaceAlbumFolder> folders) {
   final index = _byId(folders);
@@ -50,22 +72,14 @@ List<FolderNode> buildFolderTree(List<SpaceAlbumFolder> folders) {
     }
   }
 
-  // A mutual cycle leaves nodes that are neither roots nor reachable from one. Promote them, or
-  // they vanish from the tree entirely — worse than showing them at the wrong level.
-  final reached = <String>{};
-  final stack = [...roots];
-  while (stack.isNotEmpty) {
-    final node = stack.removeLast();
-    if (!reached.add(node.folder.id)) continue;
-    stack.addAll(node.children);
-  }
-  for (final f in folders) {
-    if (!reached.contains(f.id)) {
-      roots.add(nodes[f.id]!);
-      reached.add(f.id);
-    }
-  }
-
+  // No unreachable-node promotion pass is needed here (there used to be one; it was removed —
+  // see the mobile Task 6 review). `_isRoot` now classifies every cycle member, including
+  // self-references, as a root at construction time. Every other folder's parent chain is
+  // therefore guaranteed to terminate at a root (null parent, a dangling parent, or a cycle
+  // member) within `folders.length` steps, so it gets attached under a real node instead of being
+  // orphaned. A regression that reintroduced an unreachable node would show up as a missing id in
+  // `buildFolderTree`'s output or a cycle in `.children` — both are asserted by the T-04 group in
+  // `space_album_folders_test.dart`.
   return roots;
 }
 
@@ -122,10 +136,31 @@ int recursiveAlbumCount(List<SpaceAlbumFolder> folders, List<SpaceAlbum> albums,
     _albumsInSubtree(folders, albums, folderId).length;
 
 List<SpaceAlbum> folderPreviewAlbums(List<SpaceAlbumFolder> folders, List<SpaceAlbum> albums, String folderId) {
-  // Sort FIRST, then take. Take-then-sort returns an arbitrary subset — the web implementation
-  // shipped that bug once and it is invisible unless the newest album sits late in the list.
-  final inSubtree = _albumsInSubtree(folders, albums, folderId)..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-  return inSubtree.take(_previewLimit).toList();
+  // Filter, then sort, then take — in that exact order.
+  //
+  // Filter: a null thumbnailAssetId means the album has no space-visible cover (it's empty, or
+  // its only asset isn't visible in this space). Emitting it renders a broken tile — the exact
+  // bug the server-side COALESCE prevents. This has to happen before the take: the take can only
+  // ever shrink what a caller later filters, never recover a good cover it already discarded, so
+  // filtering after the take can silently return an all-blank collage while good covers sit
+  // further down the list.
+  //
+  // Sort (after filtering) then take, never take then sort: take-then-sort returns an arbitrary
+  // subset — the web implementation shipped that bug once and it is invisible unless the newest
+  // album sits late in the list.
+  //
+  // The comparator also breaks ties on `id`: List.sort() is not guaranteed stable above ~32
+  // elements, so relying on input order to break `updatedAt` ties (e.g. a bulk import landing many
+  // albums in the same tick) could reshuffle the 4-item preview between rebuilds. Ordering fully
+  // by (updatedAt desc, id asc) makes the result independent of the sort algorithm's stability.
+  final withCovers = _albumsInSubtree(folders, albums, folderId).where((a) => a.thumbnailAssetId != null).toList()
+    ..sort(_byRecencyThenId);
+  return withCovers.take(_previewLimit).toList();
+}
+
+int _byRecencyThenId(SpaceAlbum a, SpaceAlbum b) {
+  final byDate = b.updatedAt.compareTo(a.updatedAt);
+  return byDate != 0 ? byDate : a.id.compareTo(b.id);
 }
 
 bool isDescendant(List<SpaceAlbumFolder> folders, String candidateId, String ancestorId) {

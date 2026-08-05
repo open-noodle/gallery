@@ -7,18 +7,38 @@ SpaceAlbumFolder folder(String id, String name, [String? parentId]) =>
     SpaceAlbumFolder(id: id, spaceId: 'space-1', parentId: parentId, name: name);
 
 // SpaceAlbum carries id, name, thumbnailAssetId, showInTimeline, assetCount, linkedAt, updatedAt,
-// plus the folderId Task 4 adds. Only id/name/folderId/updatedAt matter here; the rest are filled
-// with inert defaults so the constructor is satisfied.
-SpaceAlbum album(String id, String name, {String? folderId, DateTime? updatedAt}) => SpaceAlbum(
+// plus the folderId Task 4 adds. Only id/name/folderId/updatedAt/thumbnailAssetId matter here; the
+// rest are filled with inert defaults so the constructor is satisfied.
+//
+// `hasCover` defaults to true (a synthetic non-null thumbnailAssetId) so most fixtures behave like
+// a normal album with a cover; pass `hasCover: false` for the folderPreviewAlbums cover-filter
+// cases, which need a genuinely null thumbnailAssetId.
+SpaceAlbum album(String id, String name, {String? folderId, DateTime? updatedAt, bool hasCover = true}) => SpaceAlbum(
   id: id,
   name: name,
-  thumbnailAssetId: null,
+  thumbnailAssetId: hasCover ? 'thumb-$id' : null,
   showInTimeline: true,
   assetCount: 0,
   linkedAt: DateTime.utc(2026, 1, 1),
   updatedAt: updatedAt ?? DateTime.utc(2026, 1, 1),
   folderId: folderId,
 );
+
+/// Walks [nodes] depth-first, counting every visited node. Throws if the count ever exceeds
+/// [budget] (the known total folder count) — the only way that can happen is a cycle in
+/// `.children`. A plain recursive walk over a genuinely cyclic tree would recurse forever; this
+/// bounds it so a regression fails the test instead of hanging the run.
+int countTreeNodes(List<FolderNode> nodes, int budget, [int soFar = 0]) {
+  var count = soFar;
+  for (final node in nodes) {
+    count++;
+    if (count > budget) {
+      throw StateError('walked more than $budget nodes — the tree contains a cycle');
+    }
+    count = countTreeNodes(node.children, budget, count);
+  }
+  return count;
+}
 
 // Trips > 2026 > Italy, plus a sibling Family at the root.
 List<SpaceAlbumFolder> tripsTree() => [
@@ -53,9 +73,41 @@ void main() {
     });
 
     test('T-04: a mutual A<->B cycle keeps both folders and does not loop', () {
-      final tree = buildFolderTree([folder('a', 'A', 'b'), folder('b', 'B', 'a')]);
+      final folders = [folder('a', 'A', 'b'), folder('b', 'B', 'a')];
+      final tree = buildFolderTree(folders);
 
       expect(tree.map((n) => n.folder.id).toList()..sort(), ['a', 'b']);
+      // The flat top-level check above passes even if `.children` is cyclic (e.g. A.children ==
+      // [B] and B.children == [A], same object identities) — it says nothing about the shape
+      // below the top. This bounded walk is the assertion with teeth: it throws if the node count
+      // ever exceeds the known total, which is the only way a cycle in `.children` can happen.
+      expect(countTreeNodes(tree, folders.length), folders.length);
+      expect(tree.every((n) => n.children.isEmpty), isTrue);
+    });
+
+    test('T-04: a 3-cycle A->B->C->A keeps all three folders at the root and does not loop', () {
+      final folders = [folder('a', 'A', 'b'), folder('b', 'B', 'c'), folder('c', 'C', 'a')];
+      final tree = buildFolderTree(folders);
+
+      expect(tree.map((n) => n.folder.id).toList()..sort(), ['a', 'b', 'c']);
+      expect(countTreeNodes(tree, folders.length), folders.length);
+      expect(tree.every((n) => n.children.isEmpty), isTrue);
+    });
+
+    test('T-04: a folder hanging off a cycle member stays nested, not flattened to root', () {
+      // A->B->C->A, plus D whose parent is B (a cycle member, not the cycle itself).
+      final folders = [folder('a', 'A', 'b'), folder('b', 'B', 'c'), folder('c', 'C', 'a'), folder('d', 'D', 'b')];
+      final tree = buildFolderTree(folders);
+
+      expect(tree.map((n) => n.folder.id).toList()..sort(), ['a', 'b', 'c']);
+      expect(countTreeNodes(tree, folders.length), folders.length);
+
+      final nodeA = tree.firstWhere((n) => n.folder.id == 'a');
+      final nodeB = tree.firstWhere((n) => n.folder.id == 'b');
+      final nodeC = tree.firstWhere((n) => n.folder.id == 'c');
+      expect(nodeA.children, isEmpty);
+      expect(nodeB.children.map((n) => n.folder.id), ['d']);
+      expect(nodeC.children, isEmpty);
     });
   });
 
@@ -123,6 +175,52 @@ void main() {
 
     test('T-11: returns empty for an empty folder', () {
       expect(folderPreviewAlbums(tripsTree(), const [], 'family'), isEmpty);
+    });
+
+    test('T-10: drops cover-less albums before sorting and taking, keeping only ones with a cover', () {
+      final albums = [
+        // Cover-less, but the most recent — without the filter these would win the take instead
+        // of the covered albums below, and the folder would render an all-blank collage.
+        album('nc1', 'NoCover1', folderId: 'trips', hasCover: false, updatedAt: DateTime.utc(2026, 9, 1)),
+        album('nc2', 'NoCover2', folderId: 'trips', hasCover: false, updatedAt: DateTime.utc(2026, 8, 1)),
+        album('nc3', 'NoCover3', folderId: 'trips', hasCover: false, updatedAt: DateTime.utc(2026, 7, 1)),
+        album('nc4', 'NoCover4', folderId: 'trips', hasCover: false, updatedAt: DateTime.utc(2026, 6, 1)),
+        // Covered, older than the cover-less albums above, but these are the only valid preview
+        // candidates — a folder full of photos must never render a blank collage.
+        album('c1', 'Cover1', folderId: 'trips', updatedAt: DateTime.utc(2026, 1, 1)),
+        album('c2', 'Cover2', folderId: 'trips', updatedAt: DateTime.utc(2026, 2, 1)),
+        album('c3', 'Cover3', folderId: 'trips', updatedAt: DateTime.utc(2026, 3, 1)),
+        album('c4', 'Cover4', folderId: 'trips', updatedAt: DateTime.utc(2026, 4, 1)),
+      ];
+
+      expect(folderPreviewAlbums(tripsTree(), albums, 'trips').map((a) => a.id), ['c4', 'c3', 'c2', 'c1']);
+    });
+
+    test('T-10: ties on updatedAt break deterministically by id', () {
+      final tied = DateTime.utc(2026, 6, 1);
+      final albums = [
+        album('c', 'C', folderId: 'trips', updatedAt: tied),
+        album('a', 'A', folderId: 'trips', updatedAt: tied),
+        album('b', 'B', folderId: 'trips', updatedAt: tied),
+      ];
+
+      expect(folderPreviewAlbums(tripsTree(), albums, 'trips').map((a) => a.id), ['a', 'b', 'c']);
+    });
+
+    test('T-10: with many albums tied on updatedAt, the tiebreaker keeps the result deterministic', () {
+      // Comparator-defined ties (as opposed to relying on List.sort()'s stability) are correct
+      // regardless of list size, but this exercises the exact shape the reviewer flagged: a bulk
+      // import landing many albums with an identical updatedAt. Input order is deliberately the
+      // reverse of the expected output.
+      final tied = DateTime.utc(2026, 6, 1);
+      final albums = List.generate(
+        40,
+        (i) => album('id-${(39 - i).toString().padLeft(2, '0')}', 'Album $i', folderId: 'trips', updatedAt: tied),
+      );
+
+      final result = folderPreviewAlbums(tripsTree(), albums, 'trips').map((a) => a.id).toList();
+
+      expect(result, ['id-00', 'id-01', 'id-02', 'id-03']);
     });
   });
 
