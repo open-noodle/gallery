@@ -191,9 +191,14 @@ class SpaceAlbumsPage extends HookConsumerWidget {
 
     // "Topmost" = this page's own RouteData is the LAST entry in ITS OWN stack router's page
     // list. `stackData` (`List<RouteData> get stackData => ... _pages.map((e) => e.routeData)`)
-    // reflects only THIS controller's own pages — unlike `topRoute`/`current`, which drill into
-    // nested child routers — so it's true only for the visible top of THIS page's stack, exactly
-    // what U-02/U-03/U-11's existing tests already assert on via `router.stackData.last`.
+    // reflects only THIS controller's own pages — same scoping as `current`
+    // (`StackRouter.current => currentChild ?? routeData`, auto_route 11.1.0's
+    // routing_controller.dart:1126, where `currentChild => _pages.last.routeData`, :1129 — this
+    // matches how space_albums_duplicate_guard.dart already describes `router.current`). It's
+    // `topRoute` that drills into the topmost NESTED child router instead
+    // (`_topMostRouter(...).current`, :1185); `current` does not. So this getter is true only for
+    // the visible top of THIS page's stack, exactly what U-02/U-03/U-11's existing tests already
+    // assert on via `router.stackData.last`.
     bool isTopmost() {
       final stack = context.router.stackData;
       return stack.isNotEmpty && stack.last.matchId == context.routeData.matchId;
