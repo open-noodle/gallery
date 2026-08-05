@@ -207,6 +207,19 @@ void main() {
       );
       expect(types.where(albumTypes.contains).toSet(), declared);
     });
+
+    // H-05: a server that supports space albums but predates nestable folders. This is only
+    // reachable through a capability declaration that omits SharedSpaceAlbumFoldersV1 — the
+    // version-number fallback gates the whole _spaceAlbumSyncTypes group as one unit, so a bare
+    // version number can never express "albums yes, folders no".
+    test('H-05: a server declaring album support without folder support omits SharedSpaceAlbumFoldersV1', () async {
+      final types = await capturedRequestTypes(
+        const SemVer(major: 5, minor: 0, patch: 0),
+        supportedSyncTypes: {...albumTypes, 'AssetsV1'},
+      );
+      expect(types, isNot(contains('SharedSpaceAlbumFoldersV1')), reason: 'no folder stream requested');
+      expect(albumTypes.every(types.contains), isTrue, reason: 'the album streams still sync');
+    });
   });
 
   test('streamChanges stops processing stream when abort is called', () async {
