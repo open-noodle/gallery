@@ -137,7 +137,10 @@ class SyncApiRepository {
           // SyncRequestTypeSchema still 400s the WHOLE /sync/stream request on any
           // unrecognized type. This client-side version gate is therefore the ONLY
           // protection — every future gallery-fork-only request type MUST be gated the
-          // same way.
+          // same way. CAVEAT: that was true only until capability signalling shipped — see
+          // the M14 paragraph immediately below, which supersedes this instruction for any
+          // request type introduced afterward. Do NOT add a new type to
+          // _legacySpaceAlbumSyncTypes on the strength of this sentence alone.
           // M14 resolution: servers now DECLARE the request types they accept via
           // GET /server/features (syncRequestTypes), which the sync service passes in as
           // [supportedSyncTypes]. The declaration is authoritative in both directions — it

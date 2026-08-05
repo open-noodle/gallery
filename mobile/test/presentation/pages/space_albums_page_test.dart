@@ -1014,13 +1014,22 @@ void main() {
 
   // Task-2 review, Finding 1 — `navigationHistory`'s notifyListeners is URL-STRING based
   // (`onNewUrlState` only fires when the computed `UrlState` differs, and `UrlState.==` compares
-  // route segments). Two stacked `SpaceAlbumsRoute`s sharing the SAME folderId — reachable today
-  // via double-tapping a folder card, since `SpaceAlbumsRoute` deliberately omits the duplicate
-  // guard (router.dart:167-172) — produce IDENTICAL segments before and after the covering
-  // instance pops, so that channel alone would silently never notify. The fix adds a
-  // URL-string-independent poll as a safety net; this test is what actually exercises it (the
-  // two tests above never hit this gap, since their stacked pages always have DIFFERENT
-  // folderIds and so DO change the UrlState on every pop).
+  // route segments). Two stacked `SpaceAlbumsRoute`s sharing the SAME folderId produce IDENTICAL
+  // segments before and after the covering instance pops, so that channel alone would silently
+  // never notify. The fix adds a URL-string-independent poll as a safety net; this test is what
+  // actually exercises it (the two tests above never hit this gap, since their stacked pages
+  // always have DIFFERENT folderIds and so DO change the UrlState on every pop).
+  //
+  // UPDATE (Task 6) — identical-args stacking is now blocked in PRODUCTION by
+  // `SpaceAlbumsDuplicateGuard` (router.dart:179 — see space_albums_duplicate_guard.dart): a
+  // second tap arrives after the first tap's push has already landed (`StackRouter._push` awaits
+  // `_canNavigate` before calling `_addNewPage`, auto_route 11.1.0's routing_controller.dart:1363,
+  // so both land within the same event-loop turn), so `router.current.args.folderId ==
+  // pendingArgs.folderId` and the guard blocks the second push before this page ever stacks twice
+  // with the same folderId. This harness (`pumpStackedFolderPagesWithFolderStream`, above)
+  // deliberately builds its OWN router with NO guard at all on `SpaceAlbumsRoute`, so the
+  // identical-args self-pop case stays directly reachable here regardless of that production
+  // guard — this test is what keeps `pollNextFrame` honest.
   testWidgets('U-11 stacked: identical-folderId siblings (double-tap) still self-pop despite an unchanged UrlState', (
     tester,
   ) async {
