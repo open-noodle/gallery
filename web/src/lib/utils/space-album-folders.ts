@@ -137,8 +137,8 @@ export const getFolderPreviewAssetIds = (
     // A null cover means getLinkedAlbums found no space-visible asset. Emitting it would
     // render a broken tile, which is the exact bug the server-side COALESCE prevents.
     .filter((a) => a.albumThumbnailAssetId !== null)
-    .slice(0, FOLDER_PREVIEW_LIMIT)
     .sort((a, b) => recencyOf(b) - recencyOf(a))
+    .slice(0, FOLDER_PREVIEW_LIMIT)
     .map((a) => a.albumThumbnailAssetId as string);
 
 export const isDescendant = (

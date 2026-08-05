@@ -54,8 +54,8 @@ describe('space-album-folders', () => {
 
       expect(tree.map((n) => n.folder.id)).toEqual(['trips', 'family']);
       expect(tree[0].children.map((n) => n.folder.id)).toEqual(['y2026']);
-      // eslint-disable-next-line unicorn/better-dom-traversing -- FolderNode.children, not a DOM node
-      expect(tree[0].children[0].children.map((n) => n.folder.id)).toEqual(['italy']);
+      const [year2026] = tree[0].children;
+      expect(year2026.children.map((n) => n.folder.id)).toEqual(['italy']);
     });
 
     // U-02: the mid-flight-delete case. Another editor can delete a folder between our folder
@@ -159,8 +159,22 @@ describe('space-album-folders', () => {
         'asset-a2',
         'asset-a4',
         'asset-a3',
-        'asset-a1',
+        'asset-a5',
       ]);
+    });
+
+    // Discriminates sort-then-slice from slice-then-sort: the newest album is LAST in the
+    // input array. A slice-first implementation would drop it before ever comparing dates.
+    it('U-06: the newest album wins even when it is last in the input array', () => {
+      const albums = [
+        album('a1', 'One', 'trips', { endDate: '2020-01-01T00:00:00.000Z' }),
+        album('a2', 'Two', 'trips', { endDate: '2020-01-02T00:00:00.000Z' }),
+        album('a3', 'Three', 'trips', { endDate: '2020-01-03T00:00:00.000Z' }),
+        album('a4', 'Four', 'trips', { endDate: '2020-01-04T00:00:00.000Z' }),
+        album('a5', 'Five', 'trips', { endDate: '2026-01-01T00:00:00.000Z' }),
+      ];
+
+      expect(getFolderPreviewAssetIds(tripsTree(), albums, 'trips')[0]).toBe('asset-a5');
     });
 
     it('U-06: draws covers from anywhere in the subtree', () => {
@@ -232,8 +246,7 @@ describe('space-album-folders', () => {
 
     // U-11: an empty query means "search is inactive", not "match everything". The caller
     // uses a non-empty query as the signal to switch into flattened mode at all.
-    // eslint-disable-next-line unicorn/prefer-string-repeat -- literal whitespace fixture, not string building
-    it.each([['', '   ']])('U-11: returns nothing for a blank query (%p)', (query) => {
+    it.each([['', ' '.repeat(3)]])('U-11: returns nothing for a blank query (%p)', (query) => {
       expect(flattenForSearch(tripsTree(), [album('a1', 'Rome')], query)).toEqual([]);
     });
   });
