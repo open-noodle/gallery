@@ -451,13 +451,24 @@ describe('SpaceAlbumsList', () => {
     });
 
     // Finding: with no terminal {:else}, a level with zero folders and zero albums (root, before
-    // the caller's on-mount folder fetch resolves — every album here lives in a folder we don't
-    // know about yet) rendered nothing at all instead of some kind of feedback.
+    // the caller's on-mount folder fetch resolves) rendered nothing at all instead of some kind
+    // of feedback.
     it('renders a fallback instead of leaving the pane blank when nothing exists at the root level', () => {
+      render(SpaceAlbumsList, { spaceId: 's-1', albums: [], folders: [], canManage: false });
+
+      expect(screen.getByTestId('space-albums-loading')).toBeInTheDocument();
+    });
+
+    // T-08 (mirrored from mobile, see space-album-folders.ts): an album whose folderId names a
+    // folder we have not synced/fetched yet is shown at the root instead of hidden — this used to
+    // be indistinguishable from "nothing exists at this level" (the case above), which made the
+    // album vanish behind the loading fallback for as long as its folder stayed unknown.
+    it('shows an album at the root instead of the loading fallback when its folder is not loaded', () => {
       const albums = [makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'unknown-folder' })];
       render(SpaceAlbumsList, { spaceId: 's-1', albums, folders: [], canManage: false });
 
-      expect(screen.getByTestId('space-albums-loading')).toBeInTheDocument();
+      expect(screen.getByText('Rome')).toBeInTheDocument();
+      expect(screen.queryByTestId('space-albums-loading')).not.toBeInTheDocument();
     });
 
     // Finding: when the folders fetch has failed, we can't trust `contents.albums`' level-scoping
