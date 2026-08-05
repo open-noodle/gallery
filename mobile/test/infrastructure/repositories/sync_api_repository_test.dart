@@ -222,6 +222,96 @@ void main() {
     });
   });
 
+  // M-2 — a missing `_kResponseMap` entry doesn't throw: `_parseLines` logs "Unknown type" and
+  // `continue`s, so a new SyncEntityType silently never syncs at all, with everything else in the
+  // stream still processing green. No test exercised the three new SharedSpaceAlbumFolder* types
+  // through the actual parsing path (only through per-handler dispatch, one layer up), so a
+  // missing/wrong `_kResponseMap` entry for any of them would have gone unnoticed.
+  group('gallery-fork: SharedSpaceAlbumFolder response-map parsing', () {
+    test('SharedSpaceAlbumFolderV1 parses into SyncSharedSpaceAlbumFolderV1, not skipped as unknown', () async {
+      final received = <SyncEvent>[];
+      final streamChangesFuture = streamChanges(
+        (events, _, _) async => received.addAll(events),
+        const SemVer(major: 2, minor: 5, patch: 0),
+      );
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      responseStreamController.add(
+        utf8.encode(
+          _createJsonLine(SyncEntityType.sharedSpaceAlbumFolderV1.toString(), {
+            'id': 'folder-1',
+            'spaceId': 'space-1',
+            'parentId': null,
+            'name': 'Trips',
+            'createdAt': DateTime(2026, 6, 1).toIso8601String(),
+            'updatedAt': DateTime(2026, 6, 1).toIso8601String(),
+          }, 'folder-ack'),
+        ),
+      );
+
+      await responseStreamController.close();
+      await streamChangesFuture;
+
+      expect(received, hasLength(1));
+      expect(received.single.type, SyncEntityType.sharedSpaceAlbumFolderV1);
+      expect(received.single.data, isA<SyncSharedSpaceAlbumFolderV1>());
+      expect((received.single.data as SyncSharedSpaceAlbumFolderV1).name, 'Trips');
+    });
+
+    test('SharedSpaceAlbumFolderBackfillV1 parses into SyncSharedSpaceAlbumFolderV1 (same DTO as create)', () async {
+      final received = <SyncEvent>[];
+      final streamChangesFuture = streamChanges(
+        (events, _, _) async => received.addAll(events),
+        const SemVer(major: 2, minor: 5, patch: 0),
+      );
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      responseStreamController.add(
+        utf8.encode(
+          _createJsonLine(SyncEntityType.sharedSpaceAlbumFolderBackfillV1.toString(), {
+            'id': 'folder-2',
+            'spaceId': 'space-1',
+            'parentId': null,
+            'name': 'Backfilled',
+            'createdAt': DateTime(2026, 6, 1).toIso8601String(),
+            'updatedAt': DateTime(2026, 6, 1).toIso8601String(),
+          }, 'folder-backfill-ack'),
+        ),
+      );
+
+      await responseStreamController.close();
+      await streamChangesFuture;
+
+      expect(received, hasLength(1));
+      expect(received.single.data, isA<SyncSharedSpaceAlbumFolderV1>());
+    });
+
+    test('SharedSpaceAlbumFolderDeleteV1 parses into SyncSharedSpaceAlbumFolderDeleteV1, not skipped', () async {
+      final received = <SyncEvent>[];
+      final streamChangesFuture = streamChanges(
+        (events, _, _) async => received.addAll(events),
+        const SemVer(major: 2, minor: 5, patch: 0),
+      );
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      responseStreamController.add(
+        utf8.encode(
+          _createJsonLine(SyncEntityType.sharedSpaceAlbumFolderDeleteV1.toString(), {
+            'folderId': 'folder-3',
+          }, 'folder-delete-ack'),
+        ),
+      );
+
+      await responseStreamController.close();
+      await streamChangesFuture;
+
+      expect(received, hasLength(1));
+      expect(received.single.type, SyncEntityType.sharedSpaceAlbumFolderDeleteV1);
+      expect(received.single.data, isA<SyncSharedSpaceAlbumFolderDeleteV1>());
+      expect((received.single.data as SyncSharedSpaceAlbumFolderDeleteV1).folderId, 'folder-3');
+    });
+  });
+
   test('streamChanges stops processing stream when abort is called', () async {
     int onDataCallCount = 0;
     bool abortWasCalledInCallback = false;

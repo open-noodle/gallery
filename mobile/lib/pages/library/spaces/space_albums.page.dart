@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:collection/collection.dart';
@@ -24,6 +25,7 @@ import 'package:immich_mobile/utils/space_album_folders.dart';
 import 'package:immich_mobile/widgets/common/collection_sort_button.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
 import 'package:immich_mobile/widgets/common/search_field.dart';
+import 'package:openapi/api.dart' show ApiException;
 
 /// Space Albums list/manage page — Surface 2 of the Phase-2B design.
 ///
@@ -140,11 +142,11 @@ class SpaceAlbumsPage extends HookConsumerWidget {
         // Creates in the CURRENT folder, not always at the space root — `currentFolderId` is this
         // page instance's own `folderId`, i.e. wherever the user is browsing right now.
         await ref.read(spaceAlbumActionsProvider).createFolder(spaceId, name, parentId: currentFolderId);
-      } catch (_) {
+      } catch (error) {
         if (context.mounted) {
           ImmichToast.show(
             context: context,
-            msg: 'space_album_folder_error_create'.t(context: context),
+            msg: _folderErrorKey(error, 'space_album_folder_error_create').t(context: context),
             toastType: ToastType.error,
           );
         }
@@ -162,11 +164,11 @@ class SpaceAlbumsPage extends HookConsumerWidget {
       if (!context.mounted) return;
       try {
         await ref.read(spaceAlbumActionsProvider).renameFolder(spaceId, folder.id, name);
-      } catch (_) {
+      } catch (error) {
         if (context.mounted) {
           ImmichToast.show(
             context: context,
-            msg: 'space_album_folder_error_rename'.t(context: context),
+            msg: _folderErrorKey(error, 'space_album_folder_error_rename').t(context: context),
             toastType: ToastType.error,
           );
         }
@@ -191,11 +193,11 @@ class SpaceAlbumsPage extends HookConsumerWidget {
       if (!context.mounted) return;
       try {
         await ref.read(spaceAlbumActionsProvider).moveFolder(spaceId, folder.id, result.folderId);
-      } catch (_) {
+      } catch (error) {
         if (context.mounted) {
           ImmichToast.show(
             context: context,
-            msg: 'space_album_folder_error_move'.t(context: context),
+            msg: _folderErrorKey(error, 'space_album_folder_error_move').t(context: context),
             toastType: ToastType.error,
           );
         }
@@ -208,11 +210,11 @@ class SpaceAlbumsPage extends HookConsumerWidget {
       if (!context.mounted) return;
       try {
         await ref.read(spaceAlbumActionsProvider).deleteFolder(spaceId, folder.id);
-      } catch (_) {
+      } catch (error) {
         if (context.mounted) {
           ImmichToast.show(
             context: context,
-            msg: 'space_album_folder_error_delete'.t(context: context),
+            msg: _folderErrorKey(error, 'space_album_folder_error_delete').t(context: context),
             toastType: ToastType.error,
           );
         }
@@ -297,6 +299,17 @@ class SpaceAlbumsPage extends HookConsumerWidget {
             // U-09: a query escapes the folder tree entirely — folders are hidden and every
             // matching album in the SPACE (not just this level) is listed with its path.
             final hits = flattenForSearch(folders, albums, query.value);
+            // flattenForSearch returns raw server (watchLinkedAlbums) order — re-apply the active
+            // sort so a search doesn't silently discard the user's chosen ordering. Mirrors web's
+            // space-albums-list.svelte, which re-sorts its own search hits for the same reason.
+            final pathByAlbumId = {for (final hit in hits) hit.album.id: hit.path};
+            final sortedHitAlbums = filterAndSortSpaceAlbums(
+              hits.map((hit) => hit.album).toList(),
+              '',
+              sortConfig.sortMode,
+              sortConfig.isReverse,
+            );
+            final sortedHits = [for (final a in sortedHitAlbums) FolderSearchHit(a, pathByAlbumId[a.id] ?? const [])];
 
             return Column(
               children: [
@@ -304,7 +317,7 @@ class SpaceAlbumsPage extends HookConsumerWidget {
                   controller: queryController,
                   hasQuery: hasQuery,
                   onClear: queryController.clear,
-                  resultCount: hits.length,
+                  resultCount: sortedHits.length,
                   totalCount: albums.length,
                   query: trimmedQuery,
                   sortMode: sortConfig.sortMode,
@@ -314,10 +327,10 @@ class SpaceAlbumsPage extends HookConsumerWidget {
                 Expanded(
                   // U-13: keep the existing no-match state for the zero-hit case — tree-wide
                   // search must preserve this pre-existing behaviour, not regress to a blank grid.
-                  child: hits.isEmpty
+                  child: sortedHits.isEmpty
                       ? _NoMatch(key: const Key('space-albums-no-match'), query: query.value)
                       : _SearchResultsGrid(
-                          hits: hits,
+                          hits: sortedHits,
                           canEdit: canEdit,
                           onToggle: onToggle,
                           onUnlink: onUnlink,
@@ -410,6 +423,40 @@ List<SpaceAlbumFolder> _sortFolders(List<SpaceAlbumFolder> folders, bool isRever
       return c != 0 ? c : a.id.compareTo(b.id);
     });
   return isReverse ? sorted.reversed.toList() : sorted;
+}
+
+/// Maps a folder-mutation failure to one of the specific `space_album_folder_name_taken` /
+/// `space_album_folder_depth_exceeded` / `space_album_folder_limit_reached` keys when the
+/// server's error identifies one of those known failure classes, falling back to [fallbackKey]
+/// (the action's own generic `space_album_folder_error_*` key) otherwise.
+///
+/// The server has no machine-readable error code for these — [ApiException.message] is the raw
+/// decoded HTTP response body (typically NestJS's `{statusCode, message, error}` JSON) — so this
+/// matches on the `message` text `shared-space.service.ts` actually throws:
+///   - `createAlbumFolder`/`updateAlbumFolder`'s depth check: "Folder nesting is limited to N
+///     levels (this would be M)" (N = SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH).
+///   - `createAlbumFolder`'s count check: "A space is limited to N folders" (N =
+///     SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE).
+///   - `assertNoAlbumFolderNameConflict`: "A folder with that name already exists here".
+/// Both limits are live constants baked into the message, so this checks stable substrings
+/// rather than the exact (parameterized) text. Web does not perform this mapping — it shows the
+/// raw server message via `handleError` — so there is no web behaviour to mirror here; the three
+/// keys these substrings resolve to are the ones the web PR added but never wired up.
+String _folderErrorKey(Object error, String fallbackKey) {
+  if (error is! ApiException) return fallbackKey;
+  var message = error.message ?? '';
+  try {
+    final decoded = jsonDecode(message);
+    if (decoded is Map && decoded['message'] is String) {
+      message = decoded['message'] as String;
+    }
+  } catch (_) {
+    // Not JSON (e.g. a plain-text body) — match on the raw text as-is.
+  }
+  if (message.contains('nesting is limited to')) return 'space_album_folder_depth_exceeded';
+  if (message.contains('is limited to') && message.contains('folders')) return 'space_album_folder_limit_reached';
+  if (message.contains('already exists here')) return 'space_album_folder_name_taken';
+  return fallbackKey;
 }
 
 /// Prompts for a folder name via a simple text dialog — shared by "New folder" and "Rename".

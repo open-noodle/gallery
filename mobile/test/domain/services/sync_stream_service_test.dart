@@ -206,6 +206,9 @@ void main() {
     when(() => mockSyncStreamRepo.deleteSharedSpaceAlbumToAssetsV1(any())).thenAnswer(successHandler);
     when(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetsV1(any())).thenAnswer(successHandler);
     when(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetExifsV1(any())).thenAnswer(successHandler);
+    // Folder sync handlers — M-2 gap fill.
+    when(() => mockSyncStreamRepo.updateSharedSpaceAlbumFoldersV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.deleteSharedSpaceAlbumFoldersV1(any())).thenAnswer(successHandler);
     when(() => mockSyncMigrationRepo.v20260128CopyExifWidthHeightToAsset()).thenAnswer(successHandler);
 
     sut = SyncStreamService(
@@ -668,6 +671,28 @@ void main() {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumAssetExifBackfillV1]);
         verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetExifsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-exif-backfill-ack'])).called(1);
+      });
+
+      // M-2 — the three SharedSpaceAlbumFolder* dispatch arms had no coverage: Dart's switch
+      // exhaustiveness only proves each case is HANDLED, not that it calls the RIGHT handler, so
+      // swapping the delete arm to call the upsert handler would compile and every other test
+      // would still pass. Follows the exact pattern above (15/15 other SharedSpaceAlbum* types).
+      test('sharedSpaceAlbumFolderV1 → updateSharedSpaceAlbumFoldersV1', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumFolderV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumFoldersV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-album-folder-v1-ack'])).called(1);
+      });
+
+      test('sharedSpaceAlbumFolderBackfillV1 → updateSharedSpaceAlbumFoldersV1 (same handler as create)', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumFolderBackfillV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumFoldersV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-album-folder-backfill-ack'])).called(1);
+      });
+
+      test('sharedSpaceAlbumFolderDeleteV1 → deleteSharedSpaceAlbumFoldersV1', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumFolderDeleteV1]);
+        verify(() => mockSyncStreamRepo.deleteSharedSpaceAlbumFoldersV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-album-folder-delete-ack'])).called(1);
       });
     });
   });

@@ -270,9 +270,16 @@ void main() {
         INSERT INTO shared_space_entity (id, name, created_by_id)
         VALUES ('space-1', 'Family', 'user-1')
       """);
+      // show_in_timeline is seeded 0 — the OPPOSITE of its column default (1) — and added_by_id
+      // is seeded non-null: every value this test used to seed equalled its column default (or,
+      // for folder_id, was a brand-new nullable column that `isNull` can never fail to see), so a
+      // wrong columnTransformer that silently substituted defaults for every carried-over column
+      // passed unnoticed. space_id is asserted explicitly too: the row is looked up by album_id
+      // alone, but (space_id, album_id) is the table's actual primary key, so a corrupted
+      // space_id would still be found by this same query.
       await oldDb.customStatement("""
-        INSERT INTO shared_space_album_link_entity (space_id, album_id, show_in_timeline)
-        VALUES ('space-1', 'album-1', 1)
+        INSERT INTO shared_space_album_link_entity (space_id, album_id, show_in_timeline, added_by_id)
+        VALUES ('space-1', 'album-1', 0, 'user-1')
       """);
       await oldDb.close();
 
@@ -287,7 +294,10 @@ void main() {
           )
           .getSingle();
 
+      expect(row.data['space_id'], 'space-1');
       expect(row.data['album_id'], 'album-1');
+      expect(row.data['show_in_timeline'], 0);
+      expect(row.data['added_by_id'], 'user-1');
       expect(row.data['folder_id'], isNull);
       await migratedDb.close();
     });
