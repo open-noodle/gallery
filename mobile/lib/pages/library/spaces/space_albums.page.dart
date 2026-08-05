@@ -122,14 +122,80 @@ class SpaceAlbumsPage extends HookConsumerWidget {
     // react once the stream has ALREADY delivered a real emission (`previous` carried data):
     // the transition from "no data yet" into the very first batch must never pop, since sync
     // simply may not have delivered this folder's row yet (routine, not corrupt state).
+    //
+    // Folder drill-down pushes THIS SAME route onto itself (see the class doc above), so several
+    // instances of this page can be stacked at once, each with its own live `ref.listen`.
+    // Surgically removing a BURIED instance's own route in place is NOT safely expressible with
+    // auto_route 11.1.0: `AutoRoutePage.canUpdate` keys on the route NAME, not a per-push unique
+    // id, and since this route is deliberately self-recursive Flutter's declarative page-diff
+    // cannot tell two stacked instances apart — removing a non-topmost one crashes ("setState
+    // during build") and silently swaps mounted state between routes (see
+    // .superpowers/sdd/space-album-folders-review-fixes/task-2-report.md for the full trace).
+    //
+    // DEFERRED SELF-POP instead (binding controller decision, task-2-brief.md addendum):
+    //  - Topmost when the folder vanishes: pop immediately — a plain `context.maybePop()` on the
+    //    LAST entry is always unambiguous (there's no "which instance?" question for the tail).
+    //  - Buried: don't touch the stack now. Record a pending flag and wait for a notification
+    //    that the visible route changed, so we notice the instant the routes above us are gone
+    //    and we become the visible top ourselves — at which point we pop, before the user can
+    //    ever interact with the dead page. One pop-transition frame of the dead page is
+    //    acceptable; it settling as the visible page is not.
+    //
+    //    `StackRouter` (`RoutingController with ChangeNotifier`) is itself a `ChangeNotifier`,
+    //    but its OWN `notifyListeners()` does NOT fire for an ordinary pop: `onPopPage`
+    //    (routing_controller.dart:1252, called when Flutter's Navigator completes a pop) only
+    //    calls `navigationHistory.rebuildUrl()`, never `notifyAll()` — `notifyAll()` (which does
+    //    call `notifyListeners()` on the controller, routing_controller.dart:120) is only reached
+    //    from explicit stack-mutating calls like `removeRoute`/push, not from a plain pop.
+    //    `navigationHistory` (`StackRouter.navigationHistory`, routing_controller.dart:77 — a
+    //    public getter, shared with the whole router tree via `root.navigationHistory`) is
+    //    itself a *separate* `ChangeNotifier` and IS what actually notifies on every visible-
+    //    route change, popped or pushed: `onNewUrlState` (navigation_history_base.dart:48) calls
+    //    `notifyListeners()` whenever the computed url/active-segments state differs from before
+    //    — exactly "the visible route changed", confirmed against B's pop in this task's tests.
     final currentFolderId = folderId;
+    // `useState`, not `useRef`: flipping this must itself be reactive so the `useEffect` below
+    // — which only touches `context.router` once there's actually something to wait for — can
+    // gate on it. Some of this page's own tests (`pumpPage`'s single-widget harness, used by
+    // every non-navigation U-*/M-5 test) pump `SpaceAlbumsPage` directly with no `AutoRouter`
+    // ancestor at all; `context.router` throws in that setup, so it must never be touched merely
+    // because `folderId != null` — only once a folder has genuinely vanished while buried.
+    final pendingSelfPop = useState(false);
+
+    // "Topmost" = this page's own RouteData is the LAST entry in ITS OWN stack router's page
+    // list. `stackData` (`List<RouteData> get stackData => ... _pages.map((e) => e.routeData)`)
+    // reflects only THIS controller's own pages — unlike `topRoute`/`current`, which drill into
+    // nested child routers — so it's true only for the visible top of THIS page's stack, exactly
+    // what U-02/U-03/U-11's existing tests already assert on via `router.stackData.last`.
+    bool isTopmost() {
+      final stack = context.router.stackData;
+      return stack.isNotEmpty && stack.last.matchId == context.routeData.matchId;
+    }
+
+    useEffect(() {
+      if (!pendingSelfPop.value) return null;
+      final navigationHistory = context.router.navigationHistory;
+      void onVisibleRouteChanged() {
+        if (!isTopmost()) return;
+        pendingSelfPop.value = false;
+        unawaited(context.maybePop());
+      }
+
+      navigationHistory.addListener(onVisibleRouteChanged);
+      return () => navigationHistory.removeListener(onVisibleRouteChanged);
+    }, [pendingSelfPop.value]);
+
     ref.listen<AsyncValue<List<SpaceAlbumFolder>>>(spaceAlbumFoldersProvider(spaceId), (previous, next) {
       if (currentFolderId == null) return;
       if (previous?.valueOrNull == null) return;
       final list = next.valueOrNull;
       if (list == null) return;
       if (!list.any((f) => f.id == currentFolderId)) {
-        unawaited(context.maybePop());
+        if (isTopmost()) {
+          unawaited(context.maybePop());
+        } else {
+          pendingSelfPop.value = true;
+        }
       }
     });
 

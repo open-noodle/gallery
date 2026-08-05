@@ -218,6 +218,66 @@ Future<RootStackRouter> pumpPageWithFolderStream(
   return router;
 }
 
+/// U-11 stacked-pages regression harness — pushes [SpaceAlbumsPage] TWICE onto a real AutoRoute
+/// stack (root -> A(folderIdA) -> B(folderIdB)), mirroring the real drill-down flow where the
+/// route is pushed onto ITSELF for each nested folder level (see the class doc on
+/// [SpaceAlbumsPage]). Both pushed pages watch the SAME [spaceAlbumFoldersProvider] instance
+/// (same spaceId), so a single [folderStream] emission is delivered to BOTH pages' `ref.listen`
+/// subscriptions at once — the scenario [pumpPageWithFolderStream]'s single-page stack cannot
+/// exercise: whether a reacting page pops the correct (its OWN) route rather than always the
+/// topmost one.
+Future<RootStackRouter> pumpStackedFolderPagesWithFolderStream(
+  WidgetTester tester,
+  Stream<List<SpaceAlbumFolder>> folderStream, {
+  required String folderIdA,
+  required String folderIdB,
+  List<SpaceAlbum> albums = const [],
+  bool canEdit = true,
+}) async {
+  final router = RootStackRouter.build(
+    routes: [
+      AutoRoute(initial: true, page: PageInfo('SpaceAlbumsHarness', builder: (_) => const SizedBox.shrink())),
+      AutoRoute(page: SpaceAlbumsRoute.page),
+    ],
+  );
+
+  await tester.pumpWidget(
+    EasyLocalization(
+      supportedLocales: locales.values.toList(),
+      path: translationsPath,
+      startLocale: locales.values.first,
+      fallbackLocale: locales.values.first,
+      saveLocale: false,
+      useFallbackTranslations: true,
+      assetLoader: const CodegenLoader(),
+      child: ProviderScope(
+        overrides: [
+          spaceAlbumsProvider(spaceId).overrideWith((_) => Stream.value(albums)),
+          spaceAlbumFoldersProvider(spaceId).overrideWith((_) => folderStream),
+        ],
+        child: Builder(
+          builder: (context) => MaterialApp.router(
+            debugShowCheckedModeBanner: false,
+            routerConfig: router.config(),
+            localizationsDelegates: context.localizationDelegates,
+            supportedLocales: context.supportedLocales,
+            locale: context.locale,
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pump();
+  // NOT awaited — same reasoning as `pumpPageWithFolderStream` above: `push`'s Future only
+  // resolves once the pushed route is popped, and driving that pop (or in-place removal) via the
+  // folder stream is exactly what the caller does after this helper returns.
+  unawaited(router.push(SpaceAlbumsRoute(spaceId: spaceId, canEdit: canEdit, folderId: folderIdA)));
+  await tester.pumpAndSettle();
+  unawaited(router.push(SpaceAlbumsRoute(spaceId: spaceId, canEdit: canEdit, folderId: folderIdB)));
+  await tester.pumpAndSettle();
+  return router;
+}
+
 /// `ImmichToast` schedules a 3s fluttertoast Timer outside the frame scheduler, so a plain
 /// `pumpAndSettle()` leaves it pending and teardown fails with "A Timer is still pending". Pump
 /// past its lifetime instead of dropping the toast from the widget (mirrors
@@ -816,6 +876,97 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(SpaceAlbumsPage), findsNothing);
+  });
+
+  // U-11 stacked (deferred self-pop) — the wrong-victim-pop regression: folder drill-down
+  // pushes SpaceAlbumsRoute onto ITSELF, so a stack of root -> A(folder-a) -> B(folder-b) is a
+  // real, common shape. Every stacked page below the top keeps a LIVE `ref.listen` (Navigator's
+  // default `maintainState`), so when folder-a vanishes, page A's listener condition matches.
+  //
+  // Investigation (see .superpowers/sdd/space-album-folders-review-fixes/task-2-report.md)
+  // showed a buried page cannot safely splice its OWN route out of the stack in place:
+  // `AutoRoutePage.canUpdate` keys on the route NAME (not a per-push unique id), and since
+  // SpaceAlbumsRoute is deliberately self-recursive, Flutter's declarative page-diff can't
+  // tell A and B apart — surgical removal of a buried instance crashes ("setState during
+  // build") and silently swaps mounted state between routes. The binding controller decision
+  // (task-2-brief.md addendum) is DEFERRED SELF-POP instead: a buried page records a pending
+  // flag and leaves the stack untouched until it next becomes the visible top on its own (the
+  // routes above it popping), at which point it pops itself immediately — before the user can
+  // ever interact with the dead page.
+  testWidgets('U-11 stacked: a buried page whose folder vanishes stays put until topmost, then self-pops', (
+    tester,
+  ) async {
+    final controller = StreamController<List<SpaceAlbumFolder>>();
+    addTearDown(controller.close);
+    final router = await pumpStackedFolderPagesWithFolderStream(
+      tester,
+      controller.stream,
+      folderIdA: 'folder-a',
+      folderIdB: 'folder-b',
+    );
+
+    // First real emission: guarded by the "no prior data" check — must not react to the
+    // transition out of "no data yet" (sync simply may not have delivered the folders yet).
+    controller.add([folder('folder-a', 'Folder A'), folder('folder-b', 'Folder B', parentId: 'folder-a')]);
+    await tester.pumpAndSettle();
+    expect(router.stackData.length, 3); // harness + A + B
+
+    // folder-a (the BURIED page's folder) vanishes — e.g. another editor deleted it. A must
+    // NOT touch the stack yet: B — topmost, still valid — stays exactly where it is.
+    controller.add([folder('folder-b', 'Folder B')]);
+    await tester.pumpAndSettle();
+
+    // `router.stackData` (not `find.byType`) is the authoritative signal here: even at
+    // baseline, with nothing wrong, a covered/offstage page's widget subtree isn't
+    // independently discoverable via `find.byType` in this harness, while its RouteData
+    // persists in `stackData` regardless — so `stackData` is what actually proves "A's route
+    // is still in the stack, nothing was popped."
+    expect(router.stackData.length, 3); // nothing popped yet — A is still buried in the stack
+    final topArgs = router.stackData.last.args as SpaceAlbumsRouteArgs;
+    expect(topArgs.folderId, 'folder-b');
+    expect(
+      router.stackData.any(
+        (d) => d.args is SpaceAlbumsRouteArgs && (d.args as SpaceAlbumsRouteArgs).folderId == 'folder-a',
+      ),
+      isTrue,
+      reason: "A's route must still be in the stack, buried but untouched",
+    );
+    expect(find.byType(SpaceAlbumsPage), findsOneWidget); // B, the only currently-rendered page
+
+    // The user navigates back out of B — unrelated to A's dead folder. The moment A becomes
+    // the visible top, it must self-pop through to root immediately: A must never settle as
+    // the visible page.
+    await router.maybePop();
+    await tester.pumpAndSettle();
+
+    expect(router.stackData.length, 1); // harness root only
+    expect(find.byType(SpaceAlbumsPage), findsNothing);
+  });
+
+  testWidgets('U-11 stacked: the topmost page whose folder vanishes pops normally, revealing the page below', (
+    tester,
+  ) async {
+    final controller = StreamController<List<SpaceAlbumFolder>>();
+    addTearDown(controller.close);
+    final router = await pumpStackedFolderPagesWithFolderStream(
+      tester,
+      controller.stream,
+      folderIdA: 'folder-a',
+      folderIdB: 'folder-b',
+    );
+
+    controller.add([folder('folder-a', 'Folder A'), folder('folder-b', 'Folder B', parentId: 'folder-a')]);
+    await tester.pumpAndSettle();
+    expect(router.stackData.length, 3);
+
+    // folder-b (the TOPMOST page's folder) vanishes; folder-a survives.
+    controller.add([folder('folder-a', 'Folder A')]);
+    await tester.pumpAndSettle();
+
+    expect(router.stackData.length, 2); // harness + A
+    final topArgs = router.stackData.last.args as SpaceAlbumsRouteArgs;
+    expect(topArgs.folderId, 'folder-a');
+    expect(find.byType(SpaceAlbumsPage), findsOneWidget);
   });
 
   // T-08 (tree module) already guarantees this at the unit level; this re-verifies at the PAGE
