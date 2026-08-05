@@ -701,7 +701,7 @@ where
   "spaceId" = $1
   and "id" = $2
 for update
-rollback
+commit
 
 -- SharedSpaceRepository.moveAlbumFolderChecked
 begin
@@ -717,7 +717,7 @@ from
 where
   "spaceId" = $1
   and "id" = $2
-rollback
+commit
 
 -- SharedSpaceRepository.setAlbumLinkFolder
 update "shared_space_album"
