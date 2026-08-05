@@ -1549,6 +1549,7 @@ export class SharedSpaceRepository {
   // them, so a concurrently-committed move could in principle still slip a depth or name
   // violation past it. Only the cycle, which corrupts the tree structurally, is worth the
   // transaction-scoped re-check.
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, DummyValue.UUID, 'Trips'] })
   moveAlbumFolderChecked(
     spaceId: string,
     folderId: string,
