@@ -23,6 +23,7 @@ import 'package:immich_mobile/pages/library/spaces/space_albums.page.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_album_folder_card.widget.dart';
 import 'package:immich_mobile/providers/background_sync.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/space_album_actions.dart';
 import 'package:immich_mobile/repositories/drift_album_api_repository.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
@@ -51,6 +52,14 @@ class MockBackgroundSyncManager extends Mock implements BackgroundSyncManager {}
 /// "the mocked repo was never called" here instead of a loud crash. Overriding it with a mock sidesteps
 /// the real ApiService/NetworkRepository chain entirely.
 class MockDriftAlbumApiRepository extends Mock implements DriftAlbumApiRepository {}
+
+/// Folder-CRUD tests (New folder / Rename / Move / Delete) override `spaceAlbumActionsProvider`
+/// directly with a mock of the whole `SpaceAlbumActions` facade, rather than mocking its three
+/// sub-dependencies individually the way the album-move tests above do. This sidesteps the
+/// `driftAlbumApiRepositoryProvider` -> `apiServiceProvider` -> `NetworkRepository` trap entirely
+/// (nothing downstream of `spaceAlbumActionsProvider` is ever constructed) and lets each test
+/// assert the exact arguments a given action was called with.
+class MockSpaceAlbumActions extends Mock implements SpaceAlbumActions {}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -110,6 +119,7 @@ Future<void> pumpPage(
   required List<SpaceAlbum> albums,
   String? folderId,
   bool canEdit = true,
+  List<Override> overrides = const [],
 }) async {
   tester.view.devicePixelRatio = 3.0;
   tester.view.physicalSize = const Size(2400, 3600);
@@ -121,6 +131,7 @@ Future<void> pumpPage(
     overrides: [
       spaceAlbumsProvider(spaceId).overrideWith((_) => Stream.value(albums)),
       spaceAlbumFoldersProvider(spaceId).overrideWith((_) => Stream.value(folders)),
+      ...overrides,
     ],
   );
 }
@@ -193,6 +204,16 @@ String _firstCardByPosition(WidgetTester tester, List<String> ids) {
     });
   return sorted.first.key;
 }
+
+/// The ⋮ menu button for a SPECIFIC folder card. `SpaceAlbumFolderCard`'s own menu key
+/// (`space-album-folder-card-menu`, from Task 9) is NOT parameterized by folder id — it's the same
+/// literal key on every card — so `find.byKey` alone is ambiguous whenever more than one folder
+/// renders at once. Scoping through the card's own per-id key (`space-album-folder-card-<id>`)
+/// disambiguates.
+Finder _folderMenuFinder(String folderId) => find.descendant(
+  of: find.byKey(Key('space-album-folder-card-$folderId')),
+  matching: find.byKey(const Key('space-album-folder-card-menu')),
+);
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -381,6 +402,37 @@ void main() {
     expect(find.byKey(const Key('space-albums-no-match')), findsNothing);
     // No search/sort chrome when the space has zero linked albums
     expect(find.byKey(const Key('space-albums-search-field')), findsNothing);
+  });
+
+  // Regression: the folder-tree refactor dropped the top-level "space genuinely has zero albums"
+  // guard, so this exact transition (non-empty with an active query -> the last album vanishes)
+  // fell through to the no-match state instead. The two tests above only cover MOUNTING with an
+  // empty list / a non-matching query already typed -- neither exercises becoming empty WHILE a
+  // query is still active, which is the transition that actually regressed.
+  testWidgets('the last album disappearing mid-search shows the empty state, not the no-match state', (tester) async {
+    final controller = StreamController<List<SpaceAlbum>>();
+    addTearDown(controller.close);
+    controller.add([_album(id: 'it1', name: 'Italy Summer')]);
+
+    await tester.pumpConsumerWidget(
+      const SpaceAlbumsPage(spaceId: spaceId, canEdit: true),
+      overrides: [
+        spaceAlbumsProvider(spaceId).overrideWith((_) => controller.stream),
+        spaceAlbumFoldersProvider(spaceId).overrideWith((_) => Stream.value(const <SpaceAlbumFolder>[])),
+      ],
+    );
+
+    await tester.enterText(find.byKey(const Key('space-albums-search-field')), 'ita');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('space-album-card-it1')), findsOneWidget);
+
+    // The last linked album is unlinked elsewhere (another device/user) while this query is
+    // still active -- the query itself never changes.
+    controller.add(const []);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('space-albums-empty')), findsOneWidget);
+    expect(find.byKey(const Key('space-albums-no-match')), findsNothing);
   });
 
   // ---------------------------------------------------------------------
@@ -591,6 +643,16 @@ void main() {
 
     expect(find.byKey(const Key('space-album-folder-empty')), findsOneWidget);
     expect(find.byKey(const Key('space-albums-empty')), findsNothing);
+  });
+
+  // U-06 — the folder-card ⋮ half of this scenario is already covered at the widget level in
+  // `space_album_folder_card_test.dart`. The "no New folder action" half can only be tested HERE:
+  // it's an app-bar affordance the card test file has no way to see.
+  testWidgets('U-06: a viewer sees no folder ⋮ menu and no New folder action', (tester) async {
+    await pumpPage(tester, folders: [folder('trips', 'Trips')], albums: const [], canEdit: false);
+
+    expect(find.byKey(const Key('space-album-folder-card-menu')), findsNothing);
+    expect(find.byKey(const Key('space-albums-new-folder-action')), findsNothing);
   });
 
   testWidgets('U-09: a query hides folders and shows space-wide hits with paths', (tester) async {
@@ -822,5 +884,179 @@ void main() {
 
     verify(() => repo.setAlbumFolder(spaceId, 'a1', 'trips')).called(1);
     verify(() => syncMgr.syncRemote()).called(1);
+  });
+
+  // ---------------------------------------------------------------------
+  // Task 10 round 2 — folder CRUD: app-bar "New folder" and the folder
+  // card's ⋮ Rename / Move to folder… / Delete. Task 9's card already
+  // declares onRename/onMove/onDelete; this is where the page actually
+  // wires them (they were previously left null — a fully-enabled, fully
+  // dead ⋮ menu). Every `spaceAlbumActionsProvider` override here is a
+  // mock of the whole facade (see `MockSpaceAlbumActions` above), so each
+  // test pins the EXACT arguments the action was called with.
+  // ---------------------------------------------------------------------
+
+  testWidgets('New folder at the root creates it with parentId null', (tester) async {
+    final actions = MockSpaceAlbumActions();
+    when(() => actions.createFolder(any(), any(), parentId: any(named: 'parentId'))).thenAnswer((_) async {});
+
+    await pumpPage(
+      tester,
+      folders: const [],
+      albums: const [],
+      overrides: [spaceAlbumActionsProvider.overrideWithValue(actions)],
+    );
+
+    await tester.tap(find.byKey(const Key('space-albums-new-folder-action')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('space-album-folder-name-field')), 'Trips');
+    await tester.tap(find.byKey(const Key('space-album-folder-name-confirm')));
+    await tester.pumpAndSettle();
+
+    verify(() => actions.createFolder(spaceId, 'Trips', parentId: null)).called(1);
+  });
+
+  testWidgets('New folder while browsing inside a folder creates it as a child, not at the root', (tester) async {
+    final actions = MockSpaceAlbumActions();
+    when(() => actions.createFolder(any(), any(), parentId: any(named: 'parentId'))).thenAnswer((_) async {});
+
+    await pumpPage(
+      tester,
+      folders: [folder('trips', 'Trips')],
+      albums: const [],
+      folderId: 'trips',
+      overrides: [spaceAlbumActionsProvider.overrideWithValue(actions)],
+    );
+
+    await tester.tap(find.byKey(const Key('space-albums-new-folder-action')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('space-album-folder-name-field')), 'Rome');
+    await tester.tap(find.byKey(const Key('space-album-folder-name-confirm')));
+    await tester.pumpAndSettle();
+
+    verify(() => actions.createFolder(spaceId, 'Rome', parentId: 'trips')).called(1);
+  });
+
+  testWidgets('renaming a folder pre-fills the current name and calls renameFolder', (tester) async {
+    final actions = MockSpaceAlbumActions();
+    when(() => actions.renameFolder(any(), any(), any())).thenAnswer((_) async {});
+
+    await pumpPage(
+      tester,
+      folders: [folder('trips', 'Trips')],
+      albums: [album('a1', 'Rome')],
+      overrides: [spaceAlbumActionsProvider.overrideWithValue(actions)],
+    );
+
+    await tester.tap(_folderMenuFinder('trips'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('space-album-folder-card-rename')));
+    await tester.pumpAndSettle();
+
+    final field = tester.widget<TextFormField>(find.byKey(const Key('space-album-folder-name-field')));
+    expect(field.controller!.text, 'Trips');
+
+    await tester.enterText(find.byKey(const Key('space-album-folder-name-field')), 'Vacations');
+    await tester.tap(find.byKey(const Key('space-album-folder-name-confirm')));
+    await tester.pumpAndSettle();
+
+    verify(() => actions.renameFolder(spaceId, 'trips', 'Vacations')).called(1);
+  });
+
+  testWidgets('moving a folder excludes its own subtree from the picker and calls moveFolder', (tester) async {
+    final actions = MockSpaceAlbumActions();
+    when(() => actions.moveFolder(any(), any(), any())).thenAnswer((_) async {});
+
+    await pumpPage(
+      tester,
+      folders: [
+        folder('trips', 'Trips'),
+        folder('nested', 'Nested', parentId: 'trips'),
+        folder('other', 'Other'),
+      ],
+      albums: const [],
+      overrides: [spaceAlbumActionsProvider.overrideWithValue(actions)],
+    );
+
+    await tester.tap(_folderMenuFinder('trips'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('space-album-folder-card-move')));
+    await tester.pumpAndSettle();
+
+    // The picker renders every folder (disabled rows aren't hidden, just unselectable) — the
+    // moved folder itself and its descendant must be disabled; an unrelated sibling must not.
+    expect(tester.widget<ListTile>(find.byKey(const Key('folder-option-trips'))).enabled, isFalse);
+    expect(tester.widget<ListTile>(find.byKey(const Key('folder-option-nested'))).enabled, isFalse);
+    expect(tester.widget<ListTile>(find.byKey(const Key('folder-option-other'))).enabled, isTrue);
+
+    await tester.tap(find.byKey(const Key('folder-option-other')));
+    await tester.pumpAndSettle();
+
+    verify(() => actions.moveFolder(spaceId, 'trips', 'other')).called(1);
+  });
+
+  testWidgets('dismissing the folder move picker does not move the folder', (tester) async {
+    final actions = MockSpaceAlbumActions();
+
+    await pumpPage(
+      tester,
+      folders: [folder('trips', 'Trips'), folder('other', 'Other')],
+      albums: const [],
+      overrides: [spaceAlbumActionsProvider.overrideWithValue(actions)],
+    );
+
+    await tester.tap(_folderMenuFinder('trips'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('space-album-folder-card-move')));
+    await tester.pumpAndSettle();
+
+    // Tap the modal barrier (outside the sheet) to dismiss without picking.
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    verifyNever(() => actions.moveFolder(any(), any(), any()));
+  });
+
+  testWidgets('confirming folder deletion calls deleteFolder', (tester) async {
+    final actions = MockSpaceAlbumActions();
+    when(() => actions.deleteFolder(any(), any())).thenAnswer((_) async {});
+
+    await pumpPage(
+      tester,
+      folders: [folder('trips', 'Trips')],
+      albums: const [],
+      overrides: [spaceAlbumActionsProvider.overrideWithValue(actions)],
+    );
+
+    await tester.tap(_folderMenuFinder('trips'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('space-album-folder-card-delete')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('space-album-folder-delete-confirm')));
+    await tester.pumpAndSettle();
+
+    verify(() => actions.deleteFolder(spaceId, 'trips')).called(1);
+  });
+
+  testWidgets('cancelling the folder deletion confirmation does not call deleteFolder', (tester) async {
+    final actions = MockSpaceAlbumActions();
+
+    await pumpPage(
+      tester,
+      folders: [folder('trips', 'Trips')],
+      albums: const [],
+      overrides: [spaceAlbumActionsProvider.overrideWithValue(actions)],
+    );
+
+    await tester.tap(_folderMenuFinder('trips'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('space-album-folder-card-delete')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('space-album-folder-delete-cancel')));
+    await tester.pumpAndSettle();
+
+    verifyNever(() => actions.deleteFolder(any(), any()));
   });
 }
