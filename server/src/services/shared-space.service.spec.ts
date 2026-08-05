@@ -14149,34 +14149,13 @@ describe(SharedSpaceService.name, () => {
         expect(mocks.sharedSpace.getAlbumFolderById).not.toHaveBeenCalled();
       });
 
-      // A-03 / C-02: the write is an unconditional UPDATE, so repeating it or racing it is
-      // last-write-wins with no conflict detection. That is deliberate for placement metadata.
-      it('A-03: moving into the same folder again is idempotent', async () => {
-        const { auth, space } = setupAlbumFolderEditor(mocks);
-        const folder = albumFolderRow({ spaceId: space.id });
-        const albumId = newUuid();
-        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
-        mocks.sharedSpace.setAlbumLinkFolder.mockResolvedValue(true);
-
-        await sut.setAlbumFolder(auth, space.id, albumId, { folderId: folder.id } as any);
-        await sut.setAlbumFolder(auth, space.id, albumId, { folderId: folder.id } as any);
-
-        expect(mocks.sharedSpace.setAlbumLinkFolder).toHaveBeenCalledTimes(2);
-      });
-
-      // A-04: placement lives on the (spaceId, albumId) join row, so the update is scoped to
-      // this space and an album linked elsewhere keeps its other placement untouched.
-      it('A-04: scopes the write to this space only', async () => {
-        const { auth, space } = setupAlbumFolderEditor(mocks);
-        const folder = albumFolderRow({ spaceId: space.id });
-        const albumId = newUuid();
-        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
-        mocks.sharedSpace.setAlbumLinkFolder.mockResolvedValue(true);
-
-        await sut.setAlbumFolder(auth, space.id, albumId, { folderId: folder.id } as any);
-
-        expect(mocks.sharedSpace.setAlbumLinkFolder).toHaveBeenCalledWith(space.id, albumId, folder.id);
-      });
+      // A-03 / A-04 / C-02: the write is an unconditional UPDATE, so repeating it or racing it is
+      // last-write-wins with no conflict detection — deliberate for placement metadata. These were
+      // previously pinned by mocked unit tests that could not fail (Task 3 review): A-03 asserted
+      // only that setAlbumLinkFolder was CALLED twice, true of any non-throwing implementation, and
+      // A-04 was byte-identical to A-01's arrange/act/assert above. The real idempotency and
+      // per-space-scoping properties now live as medium tests against a real database in
+      // shared-space-album-folder.repository.spec.ts (A-03, A-04).
 
       // A-05: the cross-space invariant that PG14 cannot express as a composite FK. This test
       // and the medium test P-07 are the only things enforcing it.

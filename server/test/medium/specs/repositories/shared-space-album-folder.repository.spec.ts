@@ -632,6 +632,64 @@ describe('SharedSpaceRepository — album folder primitives', () => {
     expect(link.folderId).toBeNull();
   });
 
+  // A-03: setAlbumLinkFolder is an unconditional overwrite with no conflict detection, so
+  // repeating the exact same placement must be a true no-op — both calls return true and the
+  // link's final state is unchanged. (Replaces a mocked unit test in shared-space.service.spec.ts
+  // that only asserted the mock was CALLED twice, which cannot fail for any non-throwing stub.)
+  it('A-03: setAlbumLinkFolder is idempotent when repeated with the same folderId', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Rome' });
+    await ctx.database.insertInto('shared_space_album').values({ spaceId: space.id, albumId: album.id }).execute();
+
+    await expect(sut.setAlbumLinkFolder(space.id, album.id, trips.id)).resolves.toBe(true);
+    await expect(sut.setAlbumLinkFolder(space.id, album.id, trips.id)).resolves.toBe(true);
+
+    const link = await ctx.database
+      .selectFrom('shared_space_album')
+      .selectAll()
+      .where('albumId', '=', album.id)
+      .executeTakeFirstOrThrow();
+    expect(link.folderId).toBe(trips.id);
+  });
+
+  // A-04: placement lives on the (spaceId, albumId) join row, so linking the SAME album into a
+  // SECOND space and placing it there must not disturb its placement in the first space. (Replaces
+  // a mocked unit test in shared-space.service.spec.ts that was byte-identical to A-01's
+  // arrange/act/assert and so could not fail independently of it. No equivalent medium test
+  // already existed — every other cross-space fixture in this file exercises FOLDERS in two
+  // spaces, not the same ALBUM linked into two spaces.)
+  it('A-04: setAlbumLinkFolder scopes the write to the given space, leaving the placement in another space untouched', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const { space: otherSpace } = await ctx.newSharedSpace({ createdById: user.id });
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Rome' });
+    await ctx.database.insertInto('shared_space_album').values({ spaceId: space.id, albumId: album.id }).execute();
+    await ctx.database.insertInto('shared_space_album').values({ spaceId: otherSpace.id, albumId: album.id }).execute();
+
+    await expect(sut.setAlbumLinkFolder(space.id, album.id, trips.id)).resolves.toBe(true);
+
+    const otherLink = await ctx.database
+      .selectFrom('shared_space_album')
+      .selectAll()
+      .where('spaceId', '=', otherSpace.id)
+      .where('albumId', '=', album.id)
+      .executeTakeFirstOrThrow();
+    expect(otherLink.folderId).toBeNull();
+  });
+
   it('hasSiblingAlbumFolderName detects a case-insensitive collision and honours excludeId', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
@@ -943,9 +1001,51 @@ describe('album placement lifecycle', () => {
     expect(link.folderId).toBeNull();
   });
 
-  // C-03: delete-during-move. Whichever order the two land in, the album must never end up
-  // pointing at a folder row that no longer exists.
-  it('C-03: an album is never orphaned into a deleted folder', async () => {
+  // C-03 was previously one Promise.allSettled race between deleteAlbumFolderPromotingChildren
+  // and setAlbumLinkFolder (Task 3 review): both rejections were swallowed by allSettled, and the
+  // only substantive assertion sat inside an `if (link.folderId !== null)` branch that either
+  // outcome could make unreachable — so the test could pass without ever running its own
+  // assertion. Replaced by the two deterministic, sequenced orderings below, which is everything
+  // "whichever order the two land in" could mean once the race itself is removed.
+
+  // C-03(a): place the link in a NESTED folder, then delete that folder. deleteAlbumFolderPromotingChildren
+  // must repoint the link to the deleted folder's own parent — asserting against a real (non-null)
+  // parent id, rather than a root folder, is what makes this sensitive to the repoint UPDATE: a root
+  // folder's parent is null, which is also what Postgres's own ON DELETE SET NULL on
+  // shared_space_album.folderId would produce even if that UPDATE were removed entirely.
+  it("C-03a: setAlbumLinkFolder then deleteAlbumFolderPromotingChildren repoints the link to the folder's parent", async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const archive = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Archive',
+      createdById: user.id,
+    });
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: archive.id,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Rome' });
+    await ctx.database.insertInto('shared_space_album').values({ spaceId: space.id, albumId: album.id }).execute();
+
+    await expect(sut.setAlbumLinkFolder(space.id, album.id, trips.id)).resolves.toBe(true);
+    await expect(sut.deleteAlbumFolderPromotingChildren(space.id, trips.id)).resolves.toEqual({ outcome: 'ok' });
+
+    const link = await ctx.database
+      .selectFrom('shared_space_album')
+      .selectAll()
+      .where('albumId', '=', album.id)
+      .executeTakeFirstOrThrow();
+    expect(link.folderId).toBe(archive.id);
+  });
+
+  // C-03(b): the opposite order — delete the folder FIRST, then try to place the link there. The
+  // folder id no longer exists, so the UPDATE trips shared_space_album_folderId_fkey and must
+  // reject with a foreign-key violation (23503), not silently write a dangling folderId.
+  it('C-03b: setAlbumLinkFolder rejects with a foreign-key error when the folder was already deleted', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
     const folder = await sut.createAlbumFolder({
@@ -957,20 +1057,8 @@ describe('album placement lifecycle', () => {
     const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Rome' });
     await ctx.database.insertInto('shared_space_album').values({ spaceId: space.id, albumId: album.id }).execute();
 
-    await Promise.allSettled([
-      sut.deleteAlbumFolderPromotingChildren(space.id, folder.id),
-      sut.setAlbumLinkFolder(space.id, album.id, folder.id),
-    ]);
+    await expect(sut.deleteAlbumFolderPromotingChildren(space.id, folder.id)).resolves.toEqual({ outcome: 'ok' });
 
-    const link = await ctx.database
-      .selectFrom('shared_space_album')
-      .selectAll()
-      .where('albumId', '=', album.id)
-      .executeTakeFirstOrThrow();
-
-    if (link.folderId !== null) {
-      // If the placement survived, the folder it points at must still exist.
-      await expect(sut.getAlbumFolderById(space.id, link.folderId)).resolves.toBeDefined();
-    }
+    await expect(sut.setAlbumLinkFolder(space.id, album.id, folder.id)).rejects.toMatchObject({ code: '23503' });
   });
 });
