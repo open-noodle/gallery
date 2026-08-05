@@ -143,30 +143,56 @@ void main() {
       expect(albumTypes.every(types.contains), isTrue);
     });
 
-    test('M14: every SharedSpaceAlbum* SyncRequestType enum value is inside the version gate', () async {
+    test('M14: every legacy SharedSpaceAlbum* SyncRequestType is inside the version gate, and '
+        'SharedSpaceAlbumFoldersV1 never rides it', () async {
       // Guards the invariant the tests above only spot-check with the hardcoded `albumTypes`
       // list: derives the "must be gated" set from the generated SyncRequestType.values enum
       // itself, so a future fork-only SharedSpaceAlbum* type landing in the enum without being
       // added to the `serverVersion > SemVer(5, 0, 0)` gate in sync_api.repository.dart fails
       // here even if `albumTypes` above is never updated to match — the exact regression class
       // the mobile-1 gate exists to prevent (a whole-stream 400 outage on an older server).
+      //
+      // SharedSpaceAlbumFoldersV1 is deliberately excluded from `forkAlbumTypes`: it was
+      // introduced after M14 capability signalling shipped, so it must join only the
+      // declared-capability list, never the version-gate fallback (see H-05 below).
       final forkAlbumTypes = SyncRequestType.values
           .map((t) => t.toString())
-          .where((v) => v.startsWith('SharedSpaceAlbum'))
+          .where((v) => v.startsWith('SharedSpaceAlbum') && v != 'SharedSpaceAlbumFoldersV1')
           .toSet();
 
       final ungated = (await capturedRequestTypes(const SemVer(major: 5, minor: 0, patch: 0))).toSet();
       expect(
         ungated.intersection(forkAlbumTypes),
         isEmpty,
-        reason: 'every SharedSpaceAlbum* SyncRequestType must be inside the version gate',
+        reason: 'every legacy SharedSpaceAlbum* SyncRequestType must be inside the version gate',
       );
 
       final gated = (await capturedRequestTypes(const SemVer(major: 6, minor: 0, patch: 0))).toSet();
       expect(
         forkAlbumTypes.difference(gated),
         isEmpty,
-        reason: 'every SharedSpaceAlbum* SyncRequestType must be sent once the version gate is satisfied',
+        reason: 'every legacy SharedSpaceAlbum* SyncRequestType must be sent once the version gate is satisfied',
+      );
+      expect(
+        gated,
+        isNot(contains('SharedSpaceAlbumFoldersV1')),
+        reason: 'SharedSpaceAlbumFoldersV1 must never ride the version-gate fallback, even far above it',
+      );
+    });
+
+    test('v5.2.0 (shipped without capability signalling, has albums but not folders): fallback '
+        'excludes SharedSpaceAlbumFoldersV1', () async {
+      // Regression test for the fork-server outage: v5.2.0/v5.2.1/v5.2.2 accept the original
+      // five album types but do not declare syncRequestTypes, so supportedSyncTypes resolves
+      // null and this fallback fires. Sending SharedSpaceAlbumFoldersV1 here made these
+      // servers 400 the WHOLE /sync/stream request (unknown zod enum value), a total sync
+      // outage. The fallback must send only the five legacy types.
+      final types = await capturedRequestTypes(const SemVer(major: 5, minor: 2, patch: 0));
+      expect(albumTypes.every(types.contains), isTrue, reason: 'legacy album types still sync');
+      expect(
+        types,
+        isNot(contains('SharedSpaceAlbumFoldersV1')),
+        reason: 'no pre-declaration server can accept the folder type; it must never ride the fallback',
       );
     });
   });
@@ -208,10 +234,20 @@ void main() {
       expect(types.where(albumTypes.contains).toSet(), declared);
     });
 
+    test('a declaring server WITH folder support includes SharedSpaceAlbumFoldersV1', () async {
+      final types = await capturedRequestTypes(
+        const SemVer(major: 5, minor: 0, patch: 0),
+        supportedSyncTypes: {...albumTypes, 'SharedSpaceAlbumFoldersV1', 'AssetsV1'},
+      );
+      expect(types, contains('SharedSpaceAlbumFoldersV1'), reason: 'declared folder support opens the gate');
+      expect(albumTypes.every(types.contains), isTrue, reason: 'the album streams still sync');
+    });
+
     // H-05: a server that supports space albums but predates nestable folders. This is only
     // reachable through a capability declaration that omits SharedSpaceAlbumFoldersV1 — the
-    // version-number fallback gates the whole _spaceAlbumSyncTypes group as one unit, so a bare
-    // version number can never express "albums yes, folders no".
+    // version-number fallback sends only the five legacy types (see mobile-1's
+    // `_legacySpaceAlbumSyncTypes`), never SharedSpaceAlbumFoldersV1, so a bare version number
+    // can never express "albums yes, folders no"; only a capability declaration can.
     test('H-05: a server declaring album support without folder support omits SharedSpaceAlbumFoldersV1', () async {
       final types = await capturedRequestTypes(
         const SemVer(major: 5, minor: 0, patch: 0),
