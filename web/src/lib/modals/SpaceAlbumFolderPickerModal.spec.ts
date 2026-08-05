@@ -20,6 +20,12 @@ const folders = [
   folder('family', 'Family'),
 ];
 
+// Same drain as SpaceAlbumFolderNameModal.spec: this file mounts the same bits-ui-backed
+// FormModal and provably leaves the identical uncleared 24ms cleanup timer behind on unmount.
+afterEach(async () => {
+  await new Promise((resolve) => setTimeout(resolve, 500));
+});
+
 describe('SpaceAlbumFolderPickerModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();

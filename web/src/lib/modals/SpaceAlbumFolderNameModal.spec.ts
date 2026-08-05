@@ -2,6 +2,13 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import SpaceAlbumFolderNameModal from '$lib/modals/SpaceAlbumFolderNameModal.svelte';
 
+// Drain bits-ui Modal's deferred body-scroll-lock cleanup before happy-dom tears
+// down `document`. Otherwise CI can report an unhandled `document is not defined`
+// after all assertions in this file have passed.
+afterEach(async () => {
+  await new Promise((resolve) => setTimeout(resolve, 500));
+});
+
 describe('SpaceAlbumFolderNameModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
