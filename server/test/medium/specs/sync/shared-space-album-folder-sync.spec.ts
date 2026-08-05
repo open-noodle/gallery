@@ -160,7 +160,7 @@ describe('SharedSpaceAlbumFolderSync', () => {
   // too — a member of zero spaces fails that check regardless. Giving the member a SECOND space
   // they do NOT belong to is what actually distinguishes "scoped to my spaces" from "member of
   // any space": only the correct (per-space) gate excludes the other space's folder here.
-  it('M-4: a member of one space does not see another space\'s folders via getUpserts', async () => {
+  it("M-4: a member of one space does not see another space's folders via getUpserts", async () => {
     const { ctx, db, sut } = syncSetup();
     const { user: owner } = await ctx.newUser();
     const { user: member } = await ctx.newUser();
