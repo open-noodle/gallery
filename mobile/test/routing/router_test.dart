@@ -10,6 +10,7 @@ import 'package:immich_mobile/infrastructure/repositories/store.repository.dart'
 import 'package:immich_mobile/providers/gallery_permission.provider.dart';
 import 'package:immich_mobile/routing/duplicate_guard.dart';
 import 'package:immich_mobile/routing/router.dart';
+import 'package:immich_mobile/routing/space_albums_duplicate_guard.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:immich_mobile/services/auth.service.dart';
 import 'package:immich_mobile/services/local_auth.service.dart';
@@ -75,15 +76,20 @@ void main() {
         router.routes.firstWhere((route) => route.name == routeName).guards;
 
     // Drilling into a space album folder pushes SpaceAlbumsRoute onto SpaceAlbumsRoute with a
-    // different folderId. DuplicateGuard compares route NAMES only, ignoring args, so carrying
-    // it on this route makes every folder tap a silent no-op — a bug that shipped once and was
-    // only caught by hand on a simulator, because the page's widget tests always push this
-    // route onto a fresh stack and never onto itself.
+    // different folderId. Plain DuplicateGuard compares route NAMES only, ignoring args, so
+    // carrying it on this route makes every folder tap a silent no-op — a bug that shipped once
+    // and was only caught by hand on a simulator, because the page's widget tests always push
+    // this route onto a fresh stack and never onto itself.
     //
     // This asserts the BEHAVIOUR rather than the route table, so it stays honest whichever way
-    // the guard is fixed. (Making DuplicateGuard compare args is not a viable alternative:
-    // SpaceAlbumsRouteArgs carries callbacks, and closures are never equal across rebuilds,
-    // which would silently disable the guard for every route that has them.)
+    // the guard is fixed. SpaceAlbumsRoute now carries [SpaceAlbumsDuplicateGuard] instead of the
+    // plain [DuplicateGuard]: it compares `spaceId` + `folderId` off `resolver.route.args` /
+    // `router.current.args`, so a different folderId still pushes. Comparing `SpaceAlbumsRouteArgs`
+    // wholesale (its generated `==`) would have been fine too here — auto_route_generator's
+    // `route_info_builder.dart` filters `equatableParams` to `p is! FunctionParamConfig`, so the
+    // generated `==`/`hashCode` already EXCLUDE the callback fields (`onToggle`/`onUnlink`/
+    // `onLink`) — but the guard compares the two named fields directly rather than relying on
+    // that generated `==`, matching exactly what's asked: same spaceId AND same folderId.
     test('pushing SpaceAlbums onto itself with a different folderId is not blocked', () async {
       await router.push(SpaceAlbumsRoute(spaceId: 'space-1', canEdit: true)).timeout(_never, onTimeout: () => null);
       await router
@@ -94,12 +100,29 @@ void main() {
       expect((router.stack.last.routeData.args as SpaceAlbumsRouteArgs).folderId, 'trips');
     });
 
-    // The sibling space routes are NOT self-recursive, so they must keep the guard — this pins
-    // the exemption to the one route that needs it instead of letting it spread.
+    // The regression this guard exists for: two quick taps on "See all" (or a folder card) before
+    // the push animation starts must not stack two identical pages — back would otherwise
+    // traverse the duplicate. Same spaceId AND same folderId (both null here, i.e. the space
+    // root) is the "identical" case; a different folderId (above) must still push.
+    test('double-tapping the same SpaceAlbums destination does not push a duplicate', () async {
+      await router.push(SpaceAlbumsRoute(spaceId: 'space-1', canEdit: true)).timeout(_never, onTimeout: () => null);
+      await router.push(SpaceAlbumsRoute(spaceId: 'space-1', canEdit: true)).timeout(_never, onTimeout: () => null);
+
+      expect(router.stack.map((route) => route.name), ['SpaceAlbumsRoute']);
+    });
+
+    // The sibling space routes are NOT self-recursive, so they must keep the plain guard — this
+    // pins the exemption to the one route that needs args-aware duplicate detection instead of
+    // letting it spread.
     test('sibling space routes keep the DuplicateGuard', () {
       for (final name in ['SpacesRoute', 'SpaceDetailRoute', 'SpaceMembersRoute', 'SpaceAlbumDetailRoute']) {
         expect(guardsOf(name).whereType<DuplicateGuard>(), hasLength(1), reason: '$name should keep DuplicateGuard');
       }
+    });
+
+    test('SpaceAlbumsRoute carries the args-aware duplicate guard instead of the plain one', () {
+      expect(guardsOf('SpaceAlbumsRoute').whereType<SpaceAlbumsDuplicateGuard>(), hasLength(1));
+      expect(guardsOf('SpaceAlbumsRoute').whereType<DuplicateGuard>(), isEmpty);
     });
   });
 }
