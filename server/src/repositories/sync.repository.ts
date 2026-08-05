@@ -1587,6 +1587,7 @@ const SHARED_SPACE_ALBUM_SYNC_COLUMNS = [
   'shared_space_album.spaceId',
   'shared_space_album.albumId',
   'shared_space_album.showInTimeline',
+  'shared_space_album.folderId',
   'shared_space_album.addedById',
   'shared_space_album.createdAt',
   'shared_space_album.updatedAt',

@@ -16,6 +16,7 @@ class SyncSharedSpaceAlbumLinkV1 {
     required this.addedById,
     required this.albumId,
     required this.createdAt,
+    required this.folderId,
     required this.showInTimeline,
     required this.spaceId,
     required this.updatedAt,
@@ -29,6 +30,9 @@ class SyncSharedSpaceAlbumLinkV1 {
 
   /// Created at
   DateTime createdAt;
+
+  /// Album folder ID within the space, or null if at the space root
+  String? folderId;
 
   /// Whether this album appears in the space timeline
   bool showInTimeline;
@@ -44,6 +48,7 @@ class SyncSharedSpaceAlbumLinkV1 {
     other.addedById == addedById &&
     other.albumId == albumId &&
     other.createdAt == createdAt &&
+    other.folderId == folderId &&
     other.showInTimeline == showInTimeline &&
     other.spaceId == spaceId &&
     other.updatedAt == updatedAt;
@@ -54,12 +59,13 @@ class SyncSharedSpaceAlbumLinkV1 {
     (addedById == null ? 0 : addedById!.hashCode) +
     (albumId.hashCode) +
     (createdAt.hashCode) +
+    (folderId == null ? 0 : folderId!.hashCode) +
     (showInTimeline.hashCode) +
     (spaceId.hashCode) +
     (updatedAt.hashCode);
 
   @override
-  String toString() => 'SyncSharedSpaceAlbumLinkV1[addedById=$addedById, albumId=$albumId, createdAt=$createdAt, showInTimeline=$showInTimeline, spaceId=$spaceId, updatedAt=$updatedAt]';
+  String toString() => 'SyncSharedSpaceAlbumLinkV1[addedById=$addedById, albumId=$albumId, createdAt=$createdAt, folderId=$folderId, showInTimeline=$showInTimeline, spaceId=$spaceId, updatedAt=$updatedAt]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -72,6 +78,11 @@ class SyncSharedSpaceAlbumLinkV1 {
       json[r'createdAt'] = _isEpochMarker(r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$/')
         ? this.createdAt.millisecondsSinceEpoch
         : this.createdAt.toUtc().toIso8601String();
+    if (this.folderId != null) {
+      json[r'folderId'] = this.folderId;
+    } else {
+      json[r'folderId'] = null;
+    }
       json[r'showInTimeline'] = this.showInTimeline;
       json[r'spaceId'] = this.spaceId;
       json[r'updatedAt'] = _isEpochMarker(r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$/')
@@ -92,6 +103,7 @@ class SyncSharedSpaceAlbumLinkV1 {
         addedById: mapValueOfType<String>(json, r'addedById'),
         albumId: mapValueOfType<String>(json, r'albumId')!,
         createdAt: mapDateTime(json, r'createdAt', r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$/')!,
+        folderId: mapValueOfType<String>(json, r'folderId'),
         showInTimeline: mapValueOfType<bool>(json, r'showInTimeline')!,
         spaceId: mapValueOfType<String>(json, r'spaceId')!,
         updatedAt: mapDateTime(json, r'updatedAt', r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$/')!,
@@ -145,6 +157,7 @@ class SyncSharedSpaceAlbumLinkV1 {
     'addedById',
     'albumId',
     'createdAt',
+    'folderId',
     'showInTimeline',
     'spaceId',
     'updatedAt',

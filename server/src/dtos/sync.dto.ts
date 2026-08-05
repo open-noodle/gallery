@@ -563,6 +563,7 @@ const SyncSharedSpaceAlbumLinkV1Schema = z
     spaceId: z.string().describe('Shared space ID'),
     albumId: z.string().describe('Album ID'),
     showInTimeline: z.boolean().describe('Whether this album appears in the space timeline'),
+    folderId: z.string().nullable().describe('Album folder ID within the space, or null if at the space root'),
     addedById: z.string().nullable().describe('User who linked the album to the space'),
     createdAt: isoDatetimeToDate.describe('Created at'),
     updatedAt: isoDatetimeToDate.describe('Updated at'),
