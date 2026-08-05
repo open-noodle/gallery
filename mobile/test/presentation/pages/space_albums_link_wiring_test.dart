@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
+import 'package:immich_mobile/domain/models/space_album_folder.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
@@ -24,8 +25,11 @@ import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart
 import '../../test_utils.dart';
 import '../../widget_tester_extensions.dart';
 
+// Task 10 added a folders stream the page now watches unconditionally; every override list here
+// must supply one (an empty list) or the page throws resolving `driftProvider`.
 List<Override> _overrides({required String spaceId, required List<SpaceAlbum> albums}) => [
   spaceAlbumsProvider(spaceId).overrideWith((_) => Stream.value(albums)),
+  spaceAlbumFoldersProvider(spaceId).overrideWith((_) => Stream.value(const <SpaceAlbumFolder>[])),
 ];
 
 void main() {

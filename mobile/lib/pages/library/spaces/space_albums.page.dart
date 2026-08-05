@@ -1,42 +1,67 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
+import 'package:immich_mobile/domain/models/space_album_folder.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/pages/library/spaces/collection_sort.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
+import 'package:immich_mobile/presentation/widgets/spaces/space_album_folder_card.widget.dart';
+import 'package:immich_mobile/presentation/widgets/spaces/space_album_folder_picker.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/space_album_actions.dart';
 import 'package:immich_mobile/routing/router.dart';
+import 'package:immich_mobile/utils/space_album_folders.dart';
 import 'package:immich_mobile/widgets/common/collection_sort_button.dart';
+import 'package:immich_mobile/widgets/common/immich_toast.dart';
 import 'package:immich_mobile/widgets/common/search_field.dart';
 
 /// Space Albums list/manage page — Surface 2 of the Phase-2B design.
 ///
 /// Pushed via [SpaceAlbumsRoute(spaceId, canEdit)] (standard slide-right).
+/// [folderId] is optional: `null` is the space root, and tapping a folder
+/// card pushes the SAME route one level deeper with `folderId` set to that
+/// folder's id — so this page recurses into itself as the user browses the
+/// folder tree, and the system back button (including iOS edge-swipe-back)
+/// naturally returns to the parent level.
 ///
 /// Renders a 2-column grid of cards (cover + name + asset count + Hidden
-/// label), with:
-///  - Editor-only card ⋮ overflow (Show/Hide in timeline, Unlink) — stub
-///    callbacks [onToggle]/[onUnlink] (real mutations land in B6).
+/// label), with folder cards (Task 10) rendered above album cards at the
+/// current level:
+///  - Editor-only card ⋮ overflow (Show/Hide in timeline, Unlink, Move to
+///    folder…) — stub callbacks [onToggle]/[onUnlink] (real mutations land
+///    in B6); "Move to folder…" is wired directly against
+///    [spaceAlbumActionsProvider] since it doesn't need to be shared with
+///    the space-detail top sliver's own inline cards.
 ///  - Editor-only app-bar "＋ Link" action — stub callback [onLink] (link
 ///    picker lands in B5).
-///  - Centered empty state for an empty list.
+///  - Centered empty state for an empty list, and a folder-specific empty
+///    state (distinct — see [_FolderEmptyState]) for an empty folder.
 ///  - A search field + reversible `CollectionSortButton` (persisted via
 ///    [AppConfig.spaceAlbums] / [SettingsKey.spaceAlbumsSortMode] /
 ///    [SettingsKey.spaceAlbumsIsReverse]) and a distinct no-match state when
-///    a query filters out every linked album.
+///    a query filters out every linked album. A non-empty query flattens the
+///    search tree-wide (`flattenForSearch`): folders are hidden and every
+///    matching album in the space is listed with its folder path.
 ///
 /// Role-gated: affordances only shown when [canEdit] is true.
 @RoutePage()
 class SpaceAlbumsPage extends HookConsumerWidget {
   final String spaceId;
   final bool canEdit;
+
+  /// `null` is the space root. Set when this instance was pushed by tapping
+  /// a folder card one level up.
+  final String? folderId;
 
   /// Called when the editor taps "Show/Hide in timeline" for an album.
   /// No-op default in B3; B6 supplies the real mutation.
@@ -54,6 +79,7 @@ class SpaceAlbumsPage extends HookConsumerWidget {
     super.key,
     required this.spaceId,
     required this.canEdit,
+    this.folderId,
     void Function(String albumId)? onToggle,
     void Function(String albumId)? onUnlink,
     VoidCallback? onLink,
@@ -67,6 +93,7 @@ class SpaceAlbumsPage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final albumsAsync = ref.watch(spaceAlbumsProvider(spaceId));
+    final folders = ref.watch(spaceAlbumFoldersProvider(spaceId)).valueOrNull ?? const <SpaceAlbumFolder>[];
     final sortConfig = ref.watch(appConfigProvider.select((config) => config.spaceAlbums));
 
     final queryController = useTextEditingController();
@@ -77,9 +104,25 @@ class SpaceAlbumsPage extends HookConsumerWidget {
       return () => queryController.removeListener(listener);
     }, [queryController]);
 
+    // U-11: the folder we're browsing can vanish out from under us at any moment — an incoming
+    // sync, not just navigation — so pop reactively rather than only checking at mount. Only
+    // react once the stream has ALREADY delivered a real emission (`previous` carried data):
+    // the transition from "no data yet" into the very first batch must never pop, since sync
+    // simply may not have delivered this folder's row yet (routine, not corrupt state).
+    final currentFolderId = folderId;
+    ref.listen<AsyncValue<List<SpaceAlbumFolder>>>(spaceAlbumFoldersProvider(spaceId), (previous, next) {
+      if (currentFolderId == null) return;
+      if (previous?.valueOrNull == null) return;
+      final list = next.valueOrNull;
+      if (list == null) return;
+      if (!list.any((f) => f.id == currentFolderId)) {
+        unawaited(context.maybePop());
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('space_albums_page_title'.t(context: context)),
+        title: Text(_title(context, folders)),
         centerTitle: false,
         actions: [
           if (canEdit)
@@ -97,42 +140,130 @@ class SpaceAlbumsPage extends HookConsumerWidget {
           child: Text('space_albums_load_failed'.t(context: context, args: {'error': error.toString()})),
         ),
         data: (albums) {
-          if (albums.isEmpty) {
-            return _EmptyState(key: const Key('space-albums-empty'), canEdit: canEdit, onLink: onLink);
+          Future<void> moveAlbumToFolder(SpaceAlbum album) async {
+            final result = await showSpaceAlbumFolderPicker(
+              context,
+              folders: folders,
+              excludeFolderId: null,
+              currentFolderId: album.folderId,
+            );
+            // Both a dismissal and picking the root resolve `folderId: null` — only `picked`
+            // tells them apart. Branching on `folderId == null` alone would treat a dismissal
+            // as "move to the root".
+            if (!result.picked) return;
+            if (!context.mounted) return;
+            try {
+              await ref.read(spaceAlbumActionsProvider).moveAlbumToFolder(spaceId, album.id, result.folderId);
+            } catch (_) {
+              if (context.mounted) {
+                ImmichToast.show(
+                  context: context,
+                  msg: 'space_album_folder_error_move'.t(context: context),
+                  toastType: ToastType.error,
+                );
+              }
+            }
           }
 
           final trimmedQuery = query.value.trim();
-          final filtered = filterAndSortSpaceAlbums(albums, query.value, sortConfig.sortMode, sortConfig.isReverse);
+          final isSearching = trimmedQuery.isNotEmpty;
+          final hasQuery = query.value.isNotEmpty;
+
+          void onAlbumTap(String albumId) =>
+              context.pushRoute(SpaceAlbumDetailRoute(spaceId: spaceId, albumId: albumId, canEdit: canEdit));
+
+          Future<void> onSortChanged(SpaceAlbumSortMode mode, bool isReverse) async {
+            final settings = ref.read(settingsProvider);
+            await settings.write(SettingsKey.spaceAlbumsSortMode, mode);
+            await settings.write(SettingsKey.spaceAlbumsIsReverse, isReverse);
+          }
+
+          if (isSearching) {
+            // U-09: a query escapes the folder tree entirely — folders are hidden and every
+            // matching album in the SPACE (not just this level) is listed with its path.
+            final hits = flattenForSearch(folders, albums, query.value);
+
+            return Column(
+              children: [
+                _SearchAndSortBar(
+                  controller: queryController,
+                  hasQuery: hasQuery,
+                  onClear: queryController.clear,
+                  resultCount: hits.length,
+                  totalCount: albums.length,
+                  query: trimmedQuery,
+                  sortMode: sortConfig.sortMode,
+                  isReverse: sortConfig.isReverse,
+                  onSortChanged: onSortChanged,
+                ),
+                Expanded(
+                  // U-13: keep the existing no-match state for the zero-hit case — tree-wide
+                  // search must preserve this pre-existing behaviour, not regress to a blank grid.
+                  child: hits.isEmpty
+                      ? _NoMatch(key: const Key('space-albums-no-match'), query: query.value)
+                      : _SearchResultsGrid(
+                          hits: hits,
+                          canEdit: canEdit,
+                          onToggle: onToggle,
+                          onUnlink: onUnlink,
+                          onMove: moveAlbumToFolder,
+                          onTap: onAlbumTap,
+                        ),
+                ),
+              ],
+            );
+          }
+
+          // U-01/U-04/U-05: level view — only this level's folders and albums (T-08's fallback,
+          // via `folderContents`, already keeps a not-yet-synced album's parent from hiding it).
+          final contents = folderContents(folders, albums, currentFolderId);
+          final sortedFolders = _sortFolders(contents.folders, sortConfig.isReverse);
+          final sortedAlbums = filterAndSortSpaceAlbums(contents.albums, '', sortConfig.sortMode, sortConfig.isReverse);
+
+          if (sortedFolders.isEmpty && sortedAlbums.isEmpty) {
+            if (currentFolderId != null) {
+              // U-05: reusing the space-level empty state here would wrongly claim the space has
+              // no albums at all, when it only means THIS folder is empty.
+              return const _FolderEmptyState(key: Key('space-album-folder-empty'));
+            }
+            return _EmptyState(key: const Key('space-albums-empty'), canEdit: canEdit, onLink: onLink);
+          }
 
           return Column(
             children: [
               _SearchAndSortBar(
                 controller: queryController,
-                hasQuery: query.value.isNotEmpty,
+                hasQuery: hasQuery,
                 onClear: queryController.clear,
-                resultCount: filtered.length,
+                resultCount: sortedAlbums.length,
                 totalCount: albums.length,
                 query: trimmedQuery,
                 sortMode: sortConfig.sortMode,
                 isReverse: sortConfig.isReverse,
-                onSortChanged: (mode, isReverse) async {
-                  final settings = ref.read(settingsProvider);
-                  await settings.write(SettingsKey.spaceAlbumsSortMode, mode);
-                  await settings.write(SettingsKey.spaceAlbumsIsReverse, isReverse);
-                },
+                onSortChanged: onSortChanged,
               ),
               Expanded(
-                child: filtered.isEmpty
-                    ? _NoMatch(key: const Key('space-albums-no-match'), query: query.value)
-                    : _AlbumGrid(
-                        albums: filtered,
-                        canEdit: canEdit,
-                        onToggle: onToggle,
-                        onUnlink: onUnlink,
-                        onTap: (albumId) => context.pushRoute(
-                          SpaceAlbumDetailRoute(spaceId: spaceId, albumId: albumId, canEdit: canEdit),
-                        ),
-                      ),
+                child: _LevelGrid(
+                  folders: sortedFolders,
+                  albums: sortedAlbums,
+                  allFolders: folders,
+                  allAlbums: albums,
+                  canEdit: canEdit,
+                  onFolderTap: (folder) => context.pushRoute(
+                    SpaceAlbumsRoute(
+                      spaceId: spaceId,
+                      canEdit: canEdit,
+                      folderId: folder.id,
+                      onLink: onLink,
+                      onToggle: onToggle,
+                      onUnlink: onUnlink,
+                    ),
+                  ),
+                  onToggle: onToggle,
+                  onUnlink: onUnlink,
+                  onMove: moveAlbumToFolder,
+                  onAlbumTap: onAlbumTap,
+                ),
               ),
             ],
           );
@@ -140,6 +271,27 @@ class SpaceAlbumsPage extends HookConsumerWidget {
       ),
     );
   }
+
+  /// The folder's name at depth, the space name at the root (U-01..U-04). Falls back to the
+  /// space-level title when [folderId] is set but not (yet) present in [folders] — e.g. the very
+  /// first frame, before sync has delivered it — rather than showing nothing.
+  String _title(BuildContext context, List<SpaceAlbumFolder> folders) {
+    final id = folderId;
+    if (id == null) return 'space_albums_page_title'.t(context: context);
+    final folder = folders.firstWhereOrNull((f) => f.id == id);
+    return folder?.name ?? 'space_albums_page_title'.t(context: context);
+  }
+}
+
+/// Folders sort by NAME, honouring the current sort direction but ignoring the sort key —
+/// `assetCount` and `mostRecentPhoto` do not map onto a folder.
+List<SpaceAlbumFolder> _sortFolders(List<SpaceAlbumFolder> folders, bool isReverse) {
+  final sorted = [...folders]
+    ..sort((a, b) {
+      final c = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      return c != 0 ? c : a.id.compareTo(b.id);
+    });
+  return isReverse ? sorted.reversed.toList() : sorted;
 }
 
 // ---------------------------------------------------------------------------
@@ -218,44 +370,149 @@ class _SearchAndSortBar extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Album grid
+// Level grid — folders (Task 10) rendered above albums, each its own section
+// so folders always land in a strictly earlier row than any album (U-01).
 // ---------------------------------------------------------------------------
 
-class _AlbumGrid extends StatelessWidget {
-  const _AlbumGrid({
+const _gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
+  crossAxisCount: 2,
+  crossAxisSpacing: 12,
+  mainAxisSpacing: 16,
+  childAspectRatio: 0.75,
+);
+
+class _LevelGrid extends StatelessWidget {
+  const _LevelGrid({
+    required this.folders,
     required this.albums,
+    required this.allFolders,
+    required this.allAlbums,
+    required this.canEdit,
+    required this.onFolderTap,
+    required this.onToggle,
+    required this.onUnlink,
+    required this.onMove,
+    required this.onAlbumTap,
+  });
+
+  /// This level's folders, already sorted.
+  final List<SpaceAlbumFolder> folders;
+
+  /// This level's albums, already filtered + sorted.
+  final List<SpaceAlbum> albums;
+
+  /// The whole space's folders/albums — `recursiveAlbumCount`/`folderPreviewAlbums` need the
+  /// full subtree, not just this level.
+  final List<SpaceAlbumFolder> allFolders;
+  final List<SpaceAlbum> allAlbums;
+  final bool canEdit;
+  final void Function(SpaceAlbumFolder folder) onFolderTap;
+  final void Function(String albumId) onToggle;
+  final void Function(String albumId) onUnlink;
+  final void Function(SpaceAlbum album) onMove;
+  final void Function(String albumId) onAlbumTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      slivers: [
+        if (folders.isNotEmpty)
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, albums.isEmpty ? 16 : 0),
+            sliver: SliverGrid(
+              gridDelegate: _gridDelegate,
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final folder = folders[index];
+                return SpaceAlbumFolderCard(
+                  key: Key('space-album-folder-card-${folder.id}'),
+                  folder: folder,
+                  albumCount: recursiveAlbumCount(allFolders, allAlbums, folder.id),
+                  previewAlbums: folderPreviewAlbums(allFolders, allAlbums, folder.id),
+                  canEdit: canEdit,
+                  onTap: () => onFolderTap(folder),
+                );
+              }, childCount: folders.length),
+            ),
+          ),
+        if (albums.isNotEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            sliver: SliverGrid(
+              gridDelegate: _gridDelegate,
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final album = albums[index];
+                return _AlbumCard(
+                  key: Key('space-album-card-${album.id}'),
+                  album: album,
+                  canEdit: canEdit,
+                  onToggle: onToggle,
+                  onUnlink: onUnlink,
+                  onMove: onMove,
+                  onTap: onAlbumTap,
+                );
+              }, childCount: albums.length),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Search results grid — flattened tree-wide (U-09), each card with its path.
+// ---------------------------------------------------------------------------
+
+class _SearchResultsGrid extends StatelessWidget {
+  const _SearchResultsGrid({
+    required this.hits,
     required this.canEdit,
     required this.onToggle,
     required this.onUnlink,
+    required this.onMove,
     required this.onTap,
   });
 
-  final List<SpaceAlbum> albums;
+  final List<FolderSearchHit> hits;
   final bool canEdit;
   final void Function(String albumId) onToggle;
   final void Function(String albumId) onUnlink;
+  final void Function(SpaceAlbum album) onMove;
   final void Function(String albumId) onTap;
 
   @override
   Widget build(BuildContext context) {
     return GridView.builder(
       padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 16,
-        childAspectRatio: 0.75,
-      ),
-      itemCount: albums.length,
+      gridDelegate: _gridDelegate,
+      itemCount: hits.length,
       itemBuilder: (context, index) {
-        final album = albums[index];
-        return _AlbumCard(
-          key: Key('space-album-card-${album.id}'),
-          album: album,
-          canEdit: canEdit,
-          onToggle: onToggle,
-          onUnlink: onUnlink,
-          onTap: onTap,
+        final hit = hits[index];
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: _AlbumCard(
+                key: Key('space-album-card-${hit.album.id}'),
+                album: hit.album,
+                canEdit: canEdit,
+                onToggle: onToggle,
+                onUnlink: onUnlink,
+                onMove: onMove,
+                onTap: onTap,
+              ),
+            ),
+            if (hit.path.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(left: 4, top: 2),
+                child: Text(
+                  hit.path.join(' › '),
+                  key: Key('space-album-search-path-${hit.album.id}'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurfaceVariant),
+                ),
+              ),
+          ],
         );
       },
     );
@@ -273,6 +530,7 @@ class _AlbumCard extends ConsumerWidget {
     required this.canEdit,
     required this.onToggle,
     required this.onUnlink,
+    required this.onMove,
     required this.onTap,
   });
 
@@ -280,6 +538,7 @@ class _AlbumCard extends ConsumerWidget {
   final bool canEdit;
   final void Function(String albumId) onToggle;
   final void Function(String albumId) onUnlink;
+  final void Function(SpaceAlbum album) onMove;
   final void Function(String albumId) onTap;
 
   Widget _buildFallback(ColorScheme cs) {
@@ -385,6 +644,8 @@ class _AlbumCard extends ConsumerWidget {
                           onToggle(album.id);
                         case _CardAction.unlink:
                           onUnlink(album.id);
+                        case _CardAction.move:
+                          onMove(album);
                       }
                     },
                     itemBuilder: (ctx) => [
@@ -400,6 +661,10 @@ class _AlbumCard extends ConsumerWidget {
                         value: _CardAction.unlink,
                         child: Text('space_album_unlink_from_space'.t(context: ctx)),
                       ),
+                      PopupMenuItem(
+                        value: _CardAction.move,
+                        child: Text('space_album_folder_move'.t(context: ctx)),
+                      ),
                     ],
                   ),
                 ),
@@ -411,10 +676,10 @@ class _AlbumCard extends ConsumerWidget {
   }
 }
 
-enum _CardAction { toggle, unlink }
+enum _CardAction { toggle, unlink, move }
 
 // ---------------------------------------------------------------------------
-// Empty state
+// Empty states
 // ---------------------------------------------------------------------------
 
 class _EmptyState extends StatelessWidget {
@@ -447,6 +712,34 @@ class _EmptyState extends StatelessWidget {
               label: Text('space_albums_empty_editor_cta'.t(context: context)),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// U-05: a folder that has no subfolders and no albums directly inside it. Distinct from
+/// [_EmptyState] — that one wrongly implies the whole SPACE has nothing linked, when it only
+/// means THIS folder is empty (the rest of the tree may be full).
+class _FolderEmptyState extends StatelessWidget {
+  const _FolderEmptyState({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.folder_open_outlined,
+            size: 64,
+            color: context.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'space_album_folder_empty'.t(context: context),
+            style: context.textTheme.titleMedium?.copyWith(color: context.colorScheme.onSurfaceVariant),
+          ),
         ],
       ),
     );
