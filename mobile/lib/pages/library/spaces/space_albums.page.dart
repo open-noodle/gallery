@@ -158,15 +158,28 @@ class SpaceAlbumsPage extends HookConsumerWidget {
     //    CAVEAT (task-2 review, Finding 1) — `navigationHistory` is URL-STRING based, so it can
     //    silently no-op: `onNewUrlState` only notifies when `_urlState != newState`
     //    (navigation_history_base.dart:52), and `UrlState.==` compares route SEGMENTS, which for
-    //    two stacked `SpaceAlbumsRoute`s sharing the SAME `folderId` (reachable today via
-    //    double-tapping a folder card — `SpaceAlbumsRoute` deliberately omits `_duplicateGuard`,
-    //    router.dart:167-172, since it's legitimately self-recursive with a DIFFERENT folderId on
-    //    a normal drill-down) are IDENTICAL before and after the covering instance pops. This
-    //    also means the whole mechanism currently leans on `SpaceAlbumsRouteArgs.==` including
-    //    `folderId` (router.gr.dart, generated — nothing enforces this; a generator change could
-    //    silently widen or narrow it). Rather than depend on that, `pollNextFrame` below is a
-    //    URL-string-independent safety net: it reads `stackData`/`isTopmost()` directly off a
-    //    scheduled frame, so it still catches the pop even when `navigationHistory` stays silent.
+    //    two stacked `SpaceAlbumsRoute`s sharing the SAME `folderId` are IDENTICAL before and
+    //    after the covering instance pops. This also means the whole mechanism currently leans on
+    //    `SpaceAlbumsRouteArgs.==` including `folderId` (router.gr.dart, generated — nothing
+    //    enforces this; a generator change could silently widen or narrow it). Rather than depend
+    //    on that, `pollNextFrame` below is a URL-string-independent safety net: it reads
+    //    `stackData`/`isTopmost()` directly off a scheduled frame, so it still catches the pop
+    //    even when `navigationHistory` stays silent.
+    //
+    //    UPDATE (Task 6) — identical-args stacking (same `spaceId` AND `folderId`) is now blocked
+    //    in PRODUCTION: `SpaceAlbumsRoute` carries `SpaceAlbumsDuplicateGuard`, an args-aware guard
+    //    wired at router.dart:179 (`SpacesRoute`/`SpaceDetailRoute`/`SpaceMembersRoute` — the
+    //    routes that keep the plain `_duplicateGuard` — are the ones at router.dart:167-169 now;
+    //    `SpaceAlbumsRoute` is no longer among them). `pollNextFrame` below is UNCHANGED and stays
+    //    exactly as load-bearing as before: this self-pop mechanism must never come to depend on
+    //    that guard existing or staying wired — deleting the poll because "the guard already
+    //    prevents this" would silently reopen the buried-self-pop bug commit e2e7ef6f6c4 fixed, the
+    //    moment anything ever changes how pushes reach this route. The identical-`folderId`
+    //    scenario itself stays directly exercised in tests regardless of the production guard: the
+    //    U-11 stacked-pages harness (`pumpStackedFolderPagesWithFolderStream`,
+    //    space_albums_page_test.dart) deliberately builds its OWN router with no guard at all on
+    //    `SpaceAlbumsRoute`, so double-tap-onto-itself stays reachable in test even though
+    //    `AppRouter` now blocks it at the push site.
     final currentFolderId = folderId;
     // `useState`, not `useRef`: flipping this must itself be reactive so the `useEffect` below
     // — which only touches `context.router` once there's actually something to wait for — can
