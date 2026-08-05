@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ComboBoxOption } from '$lib/components/shared-components/Combobox.svelte';
   import SettingCombobox from './SettingCombobox.svelte';
+  import SidebarSettings from './sidebar-settings.svelte';
   import SettingsLanguageSelector from '$lib/components/shared-components/settings/SettingsLanguageSelector.svelte';
   import { fallbackLocale, locales } from '$lib/constants';
   import {
@@ -88,6 +89,8 @@
           onSelect={(combobox) => handleLocaleChange(combobox?.value)}
         />
       {/if}
+
+      <SidebarSettings />
 
       <Field label={$t('display_original_photos')} description={$t('display_original_photos_setting_description')}>
         <Switch bind:checked={$alwaysLoadOriginalFile} />
