@@ -15,6 +15,7 @@ typedef $$SharedSpaceAlbumLinkEntityTableCreateCompanionBuilder =
       required String spaceId,
       required String albumId,
       i0.Value<bool> showInTimeline,
+      i0.Value<String?> folderId,
       i0.Value<String?> addedById,
       i0.Value<DateTime> createdAt,
       i0.Value<DateTime> updatedAt,
@@ -24,6 +25,7 @@ typedef $$SharedSpaceAlbumLinkEntityTableUpdateCompanionBuilder =
       i0.Value<String> spaceId,
       i0.Value<String> albumId,
       i0.Value<bool> showInTimeline,
+      i0.Value<String?> folderId,
       i0.Value<String?> addedById,
       i0.Value<DateTime> createdAt,
       i0.Value<DateTime> updatedAt,
@@ -85,6 +87,11 @@ class $$SharedSpaceAlbumLinkEntityTableFilterComposer
 
   i0.ColumnFilters<bool> get showInTimeline => $composableBuilder(
     column: $table.showInTimeline,
+    builder: (column) => i0.ColumnFilters(column),
+  );
+
+  i0.ColumnFilters<String> get folderId => $composableBuilder(
+    column: $table.folderId,
     builder: (column) => i0.ColumnFilters(column),
   );
 
@@ -151,6 +158,11 @@ class $$SharedSpaceAlbumLinkEntityTableOrderingComposer
     builder: (column) => i0.ColumnOrderings(column),
   );
 
+  i0.ColumnOrderings<String> get folderId => $composableBuilder(
+    column: $table.folderId,
+    builder: (column) => i0.ColumnOrderings(column),
+  );
+
   i0.ColumnOrderings<String> get addedById => $composableBuilder(
     column: $table.addedById,
     builder: (column) => i0.ColumnOrderings(column),
@@ -212,6 +224,9 @@ class $$SharedSpaceAlbumLinkEntityTableAnnotationComposer
     column: $table.showInTimeline,
     builder: (column) => column,
   );
+
+  i0.GeneratedColumn<String> get folderId =>
+      $composableBuilder(column: $table.folderId, builder: (column) => column);
 
   i0.GeneratedColumn<String> get addedById =>
       $composableBuilder(column: $table.addedById, builder: (column) => column);
@@ -296,6 +311,7 @@ class $$SharedSpaceAlbumLinkEntityTableTableManager
                 i0.Value<String> spaceId = const i0.Value.absent(),
                 i0.Value<String> albumId = const i0.Value.absent(),
                 i0.Value<bool> showInTimeline = const i0.Value.absent(),
+                i0.Value<String?> folderId = const i0.Value.absent(),
                 i0.Value<String?> addedById = const i0.Value.absent(),
                 i0.Value<DateTime> createdAt = const i0.Value.absent(),
                 i0.Value<DateTime> updatedAt = const i0.Value.absent(),
@@ -303,6 +319,7 @@ class $$SharedSpaceAlbumLinkEntityTableTableManager
                 spaceId: spaceId,
                 albumId: albumId,
                 showInTimeline: showInTimeline,
+                folderId: folderId,
                 addedById: addedById,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -312,6 +329,7 @@ class $$SharedSpaceAlbumLinkEntityTableTableManager
                 required String spaceId,
                 required String albumId,
                 i0.Value<bool> showInTimeline = const i0.Value.absent(),
+                i0.Value<String?> folderId = const i0.Value.absent(),
                 i0.Value<String?> addedById = const i0.Value.absent(),
                 i0.Value<DateTime> createdAt = const i0.Value.absent(),
                 i0.Value<DateTime> updatedAt = const i0.Value.absent(),
@@ -319,6 +337,7 @@ class $$SharedSpaceAlbumLinkEntityTableTableManager
                 spaceId: spaceId,
                 albumId: albumId,
                 showInTimeline: showInTimeline,
+                folderId: folderId,
                 addedById: addedById,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -449,6 +468,17 @@ class $SharedSpaceAlbumLinkEntityTable extends i2.SharedSpaceAlbumLinkEntity
     ),
     defaultValue: const i3.Constant(true),
   );
+  static const i0.VerificationMeta _folderIdMeta = const i0.VerificationMeta(
+    'folderId',
+  );
+  @override
+  late final i0.GeneratedColumn<String> folderId = i0.GeneratedColumn<String>(
+    'folder_id',
+    aliasedName,
+    true,
+    type: i0.DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const i0.VerificationMeta _addedByIdMeta = const i0.VerificationMeta(
     'addedById',
   );
@@ -491,6 +521,7 @@ class $SharedSpaceAlbumLinkEntityTable extends i2.SharedSpaceAlbumLinkEntity
     spaceId,
     albumId,
     showInTimeline,
+    folderId,
     addedById,
     createdAt,
     updatedAt,
@@ -530,6 +561,12 @@ class $SharedSpaceAlbumLinkEntityTable extends i2.SharedSpaceAlbumLinkEntity
           data['show_in_timeline']!,
           _showInTimelineMeta,
         ),
+      );
+    }
+    if (data.containsKey('folder_id')) {
+      context.handle(
+        _folderIdMeta,
+        folderId.isAcceptableOrUnknown(data['folder_id']!, _folderIdMeta),
       );
     }
     if (data.containsKey('added_by_id')) {
@@ -574,6 +611,10 @@ class $SharedSpaceAlbumLinkEntityTable extends i2.SharedSpaceAlbumLinkEntity
         i0.DriftSqlType.bool,
         data['${effectivePrefix}show_in_timeline'],
       )!,
+      folderId: attachedDatabase.typeMapping.read(
+        i0.DriftSqlType.string,
+        data['${effectivePrefix}folder_id'],
+      ),
       addedById: attachedDatabase.typeMapping.read(
         i0.DriftSqlType.string,
         data['${effectivePrefix}added_by_id'],
@@ -605,6 +646,7 @@ class SharedSpaceAlbumLinkEntityData extends i0.DataClass
   final String spaceId;
   final String albumId;
   final bool showInTimeline;
+  final String? folderId;
   final String? addedById;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -612,6 +654,7 @@ class SharedSpaceAlbumLinkEntityData extends i0.DataClass
     required this.spaceId,
     required this.albumId,
     required this.showInTimeline,
+    this.folderId,
     this.addedById,
     required this.createdAt,
     required this.updatedAt,
@@ -622,6 +665,9 @@ class SharedSpaceAlbumLinkEntityData extends i0.DataClass
     map['space_id'] = i0.Variable<String>(spaceId);
     map['album_id'] = i0.Variable<String>(albumId);
     map['show_in_timeline'] = i0.Variable<bool>(showInTimeline);
+    if (!nullToAbsent || folderId != null) {
+      map['folder_id'] = i0.Variable<String>(folderId);
+    }
     if (!nullToAbsent || addedById != null) {
       map['added_by_id'] = i0.Variable<String>(addedById);
     }
@@ -639,6 +685,7 @@ class SharedSpaceAlbumLinkEntityData extends i0.DataClass
       spaceId: serializer.fromJson<String>(json['spaceId']),
       albumId: serializer.fromJson<String>(json['albumId']),
       showInTimeline: serializer.fromJson<bool>(json['showInTimeline']),
+      folderId: serializer.fromJson<String?>(json['folderId']),
       addedById: serializer.fromJson<String?>(json['addedById']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -651,6 +698,7 @@ class SharedSpaceAlbumLinkEntityData extends i0.DataClass
       'spaceId': serializer.toJson<String>(spaceId),
       'albumId': serializer.toJson<String>(albumId),
       'showInTimeline': serializer.toJson<bool>(showInTimeline),
+      'folderId': serializer.toJson<String?>(folderId),
       'addedById': serializer.toJson<String?>(addedById),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -661,6 +709,7 @@ class SharedSpaceAlbumLinkEntityData extends i0.DataClass
     String? spaceId,
     String? albumId,
     bool? showInTimeline,
+    i0.Value<String?> folderId = const i0.Value.absent(),
     i0.Value<String?> addedById = const i0.Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -668,6 +717,7 @@ class SharedSpaceAlbumLinkEntityData extends i0.DataClass
     spaceId: spaceId ?? this.spaceId,
     albumId: albumId ?? this.albumId,
     showInTimeline: showInTimeline ?? this.showInTimeline,
+    folderId: folderId.present ? folderId.value : this.folderId,
     addedById: addedById.present ? addedById.value : this.addedById,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -681,6 +731,7 @@ class SharedSpaceAlbumLinkEntityData extends i0.DataClass
       showInTimeline: data.showInTimeline.present
           ? data.showInTimeline.value
           : this.showInTimeline,
+      folderId: data.folderId.present ? data.folderId.value : this.folderId,
       addedById: data.addedById.present ? data.addedById.value : this.addedById,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -693,6 +744,7 @@ class SharedSpaceAlbumLinkEntityData extends i0.DataClass
           ..write('spaceId: $spaceId, ')
           ..write('albumId: $albumId, ')
           ..write('showInTimeline: $showInTimeline, ')
+          ..write('folderId: $folderId, ')
           ..write('addedById: $addedById, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -705,6 +757,7 @@ class SharedSpaceAlbumLinkEntityData extends i0.DataClass
     spaceId,
     albumId,
     showInTimeline,
+    folderId,
     addedById,
     createdAt,
     updatedAt,
@@ -716,6 +769,7 @@ class SharedSpaceAlbumLinkEntityData extends i0.DataClass
           other.spaceId == this.spaceId &&
           other.albumId == this.albumId &&
           other.showInTimeline == this.showInTimeline &&
+          other.folderId == this.folderId &&
           other.addedById == this.addedById &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -726,6 +780,7 @@ class SharedSpaceAlbumLinkEntityCompanion
   final i0.Value<String> spaceId;
   final i0.Value<String> albumId;
   final i0.Value<bool> showInTimeline;
+  final i0.Value<String?> folderId;
   final i0.Value<String?> addedById;
   final i0.Value<DateTime> createdAt;
   final i0.Value<DateTime> updatedAt;
@@ -733,6 +788,7 @@ class SharedSpaceAlbumLinkEntityCompanion
     this.spaceId = const i0.Value.absent(),
     this.albumId = const i0.Value.absent(),
     this.showInTimeline = const i0.Value.absent(),
+    this.folderId = const i0.Value.absent(),
     this.addedById = const i0.Value.absent(),
     this.createdAt = const i0.Value.absent(),
     this.updatedAt = const i0.Value.absent(),
@@ -741,6 +797,7 @@ class SharedSpaceAlbumLinkEntityCompanion
     required String spaceId,
     required String albumId,
     this.showInTimeline = const i0.Value.absent(),
+    this.folderId = const i0.Value.absent(),
     this.addedById = const i0.Value.absent(),
     this.createdAt = const i0.Value.absent(),
     this.updatedAt = const i0.Value.absent(),
@@ -750,6 +807,7 @@ class SharedSpaceAlbumLinkEntityCompanion
     i0.Expression<String>? spaceId,
     i0.Expression<String>? albumId,
     i0.Expression<bool>? showInTimeline,
+    i0.Expression<String>? folderId,
     i0.Expression<String>? addedById,
     i0.Expression<DateTime>? createdAt,
     i0.Expression<DateTime>? updatedAt,
@@ -758,6 +816,7 @@ class SharedSpaceAlbumLinkEntityCompanion
       if (spaceId != null) 'space_id': spaceId,
       if (albumId != null) 'album_id': albumId,
       if (showInTimeline != null) 'show_in_timeline': showInTimeline,
+      if (folderId != null) 'folder_id': folderId,
       if (addedById != null) 'added_by_id': addedById,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -768,6 +827,7 @@ class SharedSpaceAlbumLinkEntityCompanion
     i0.Value<String>? spaceId,
     i0.Value<String>? albumId,
     i0.Value<bool>? showInTimeline,
+    i0.Value<String?>? folderId,
     i0.Value<String?>? addedById,
     i0.Value<DateTime>? createdAt,
     i0.Value<DateTime>? updatedAt,
@@ -776,6 +836,7 @@ class SharedSpaceAlbumLinkEntityCompanion
       spaceId: spaceId ?? this.spaceId,
       albumId: albumId ?? this.albumId,
       showInTimeline: showInTimeline ?? this.showInTimeline,
+      folderId: folderId ?? this.folderId,
       addedById: addedById ?? this.addedById,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -793,6 +854,9 @@ class SharedSpaceAlbumLinkEntityCompanion
     }
     if (showInTimeline.present) {
       map['show_in_timeline'] = i0.Variable<bool>(showInTimeline.value);
+    }
+    if (folderId.present) {
+      map['folder_id'] = i0.Variable<String>(folderId.value);
     }
     if (addedById.present) {
       map['added_by_id'] = i0.Variable<String>(addedById.value);
@@ -812,6 +876,7 @@ class SharedSpaceAlbumLinkEntityCompanion
           ..write('spaceId: $spaceId, ')
           ..write('albumId: $albumId, ')
           ..write('showInTimeline: $showInTimeline, ')
+          ..write('folderId: $folderId, ')
           ..write('addedById: $addedById, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')

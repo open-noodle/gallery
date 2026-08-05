@@ -30,6 +30,7 @@ import 'package:immich_mobile/infrastructure/entities/settings.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_album.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_album_asset.entity.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_album_folder.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_album_link.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_asset.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_library.entity.dart';
@@ -73,6 +74,7 @@ import 'package:sqlite_async/sqlite_async.dart';
     SharedSpaceAlbumEntity,
     SharedSpaceAlbumLinkEntity,
     SharedSpaceAlbumAssetEntity,
+    SharedSpaceAlbumFolderEntity,
     MemoryEntity,
     MemoryAssetEntity,
     StackEntity,
@@ -136,7 +138,7 @@ class Drift extends $Drift {
   }
 
   @override
-  int get schemaVersion => 36;
+  int get schemaVersion => 37;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -376,6 +378,17 @@ class Drift extends $Drift {
                 await m.createIndex(v36.idxSharedSpaceAlbumLinkAlbumSpace);
                 await m.createIndex(v36.idxSharedSpaceAlbumAssetAlbum);
                 await m.createIndex(v36.idxSharedSpaceAlbumAssetAssetAlbum);
+              },
+              from36To37: (m, v37) async {
+                // Album folders (Drift v37). Create the new table, then add the nullable
+                // folderId column to the existing link table. The link table is rebuilt by
+                // TableMigration, so every existing row must survive with folderId null —
+                // see the R-07 migration test.
+                await m.create(v37.sharedSpaceAlbumFolderEntity);
+                await m.createIndex(v37.idxSharedSpaceAlbumFolderSpace);
+                await m.alterTable(
+                  TableMigration(v37.sharedSpaceAlbumLinkEntity, newColumns: [v37.sharedSpaceAlbumLinkEntity.folderId]),
+                );
               },
             ),
           ),

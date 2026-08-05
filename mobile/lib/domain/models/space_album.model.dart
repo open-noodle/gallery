@@ -10,6 +10,7 @@ class SpaceAlbum {
   final String name;
   final String? thumbnailAssetId;
   final bool showInTimeline;
+  final String? folderId;
   final int assetCount;
   final DateTime linkedAt;
   final DateTime updatedAt;
@@ -19,6 +20,7 @@ class SpaceAlbum {
     required this.name,
     this.thumbnailAssetId,
     required this.showInTimeline,
+    this.folderId,
     this.assetCount = 0,
     required this.linkedAt,
     required this.updatedAt,
