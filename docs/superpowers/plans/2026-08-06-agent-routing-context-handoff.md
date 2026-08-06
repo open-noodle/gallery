@@ -1092,13 +1092,30 @@ Phase 1 shipped in 9 commits, `a297a4b187a..97a0e6269b7`. Final state: **1875/18
 
 The final whole-branch review returned **ship with follow-ups**: 0 Critical, 0 Important, 6 Minor. Five were fixed in one wave (`97a0e6269b7`) and re-verified by independent mutation. Two were parked, both because the fix would move code the design spec deliberately placed — a decision that is not the reviewer's or the implementer's to make.
 
-### Parked — delivery placement (needs a human decision)
+### Resolved — delivery placement
 
-**P1 — a queued block can strand onto the _next_ turn.** `deliverAs: 'nextTurn'` pushes onto the SDK's `_pendingNextTurnMessages`, drained only by the next `prompt()`. Between delivery (`pi-runtime.mjs:~1360`) and `prompt()` (`~1450`) two paths abandon the turn without prompting: `session.subscribe(...)` throwing, and `compactGalleryToolTranscript` throwing. The session is not disposed in either case, so the block lands on the user's _next_ message — where its "the request immediately above" preamble is false, and the model receives a confident router diagnosis of a different request, with user authority. Needs an error path, is non-destructive, and self-heals after one turn. The approval-resume path uses `continue()`, which would not drain it either.
+Both parked findings were the same question, and it was resolved by moving delivery. **Option C
+shipped** in `876e9ccb5dc`: the block is now queued inside the prompt chain, after
+`compactGalleryToolTranscript` and immediately before `entry.session.prompt()`. See design spec §6.
 
-**P2 — the placement itself may be wrong.** Moving delivery _inside_ the existing strict `try` would need no hoist, would keep `entry.inFlight` up for free rather than re-taking it, and would keep `entry.abortActiveStream` bound across the delivery await. As shipped, `abortActiveStream` is unbound across that await, so a `disposeSession` racing delivery no longer aborts; the generator then prompts a disposed session and yields a runner-error (bounded — the `finally` has already cleared `inFlight`).
+**What was wrong.** `deliverAs: 'nextTurn'` is drained only by `session.prompt()`, but delivery ran
+~100 lines earlier — ahead of two paths that abandon the turn without prompting (`session.subscribe`
+throwing, `compactGalleryToolTranscript` throwing). Neither disposes the session, so a queued block
+could survive to the user's **next** message, where the "the request immediately above" preamble is
+false and the model receives a confident router diagnosis of a different request, with user
+authority. Moving delivery after both paths removes that, and also lands after
+`entry.abortActiveStream` is rebound, closing the second finding.
 
-Both point at the same question: should delivery sit after the `finally` (as §6 specifies) or inside the strict `try`? Inside-the-try placement would also shrink P1's window. **No test currently pins the placement either way** — verified by moving the block inside the `try` and observing the suite stay green.
+**A correction to an earlier revision of this section.** It claimed that inside-the-`try` placement
+"would also shrink" the stranding window. That was wrong, and backwards: inside the `try` is
+_earlier_ in execution, so it widens the window. Only moving _later_ — after both abandon paths —
+fixes the failure mode. Recorded because the erroneous claim was committed and could have sent the
+next reader the wrong way.
+
+**Nothing had pinned the placement.** That is how the gap survived two reviews. It is now pinned by
+two tests: one asserting compaction runs before delivery and delivery before the prompt, and one
+asserting an abandoned turn queues nothing. Both were mutation-verified — reverting the placement
+reds the second, reordering against compaction reds the first.
 
 ### Deferred minors
 

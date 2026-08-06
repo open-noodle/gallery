@@ -262,44 +262,87 @@ Tag style matches the SDK's own convention (`<available_skills>`).
 
 ## 6. Runtime wiring
 
-In `pi-runtime.mjs`, at the existing fall-through after
-`if (dispatch.handled) { yield* strictEvents; return; }` (line 1318), immediately below the comment
-"Not handled by a strict/hybrid workflow: fall through to provider orchestration" (line 1337):
+In `pi-runtime.mjs`, the block is queued **immediately before the `prompt()` that drains it** — inside
+the prompt chain, after `compactGalleryToolTranscript` and before `entry.session.prompt(promptText)`:
 
 ```js
-// Best-effort: routing context is an optimisation, never a precondition for the turn.
-try {
-  const contextBlock = formatRoutingContext(dispatch.routingContext);
-  if (contextBlock && entry.session.sendCustomMessage) {
-    await entry.session.sendCustomMessage(
-      { customType: 'gallery_routing_context', content: contextBlock, display: false },
-      { deliverAs: 'nextTurn' },
-    );
-  }
-} catch (error) {
-  log.warn?.(JSON.stringify({ msg: 'routing_context_injection_failed', gallerySessionId }));
-}
+promptPromise = Promise.resolve().then(async () => {
+  compactGalleryToolTranscript(entry.session);
+  await deliverRoutingContext();
+  return entry.session.prompt(promptText);
+});
 ```
 
-The log call follows the existing house style at `pi-runtime.mjs:913` — a JSON string, not
-pino-style object logging. `log` defaults to `console` (`pi-runtime.mjs:1076`) and is already in
-scope at this site, so `log.warn?.` resolves without new plumbing. The error message itself is
-deliberately not logged verbatim, since a sanitised reason can contain user text.
+where `deliverRoutingContext` is a generator-scope helper:
 
-Placed before the open turn is submitted via `entry.session.prompt(promptText)`
-(`pi-runtime.mjs:1423`).
+```js
+const deliverRoutingContext = async () => {
+  // Best-effort: routing context is an optimisation, never a precondition for the turn.
+  try {
+    const contextBlock = formatRoutingContext(handoffRoutingContext);
+    if (contextBlock && entry.session.sendCustomMessage) {
+      await entry.session.sendCustomMessage(
+        { customType: 'gallery_routing_context', content: contextBlock, display: false },
+        { deliverAs: 'nextTurn' },
+      );
+    }
+  } catch {
+    try {
+      log.warn?.(JSON.stringify({ msg: 'routing_context_injection_failed', gallerySessionId }));
+    } catch {
+      // Observability logging must never break the turn.
+    }
+  }
+};
+```
 
-Two deliberate defences, because this feature must never be able to break a turn that would
+### Why this placement, and not the fall-through
+
+An earlier revision of this spec queued the block at the strict fall-through, ~100 lines before the
+prompt. That was wrong. `deliverAs: 'nextTurn'` is drained **only** by `session.prompt()`
+(`agent-session.js:772-775`), and two paths in between abandon the turn without prompting —
+`session.subscribe(...)` throwing, and `compactGalleryToolTranscript` throwing. Neither disposes the
+session, so a block queued earlier could survive to the user's **next** message, where the
+"the request immediately above" preamble is false and the model receives a confident router
+diagnosis of a different request, carrying user authority.
+
+Queuing after both abandon paths removes that entirely. Two secondary benefits: `entry.inFlight` is
+already up, and `entry.abortActiveStream` has been rebound (`~:1459`), so a `disposeSession` racing
+delivery aborts cleanly — at the old site the abort handler was unbound across the await.
+
+Note also that moving the delivery _earlier_ (inside the strict `try`) would have made the stranding
+window **wider**, not narrower. Earlier queuing is strictly worse for this failure mode.
+
+### Both catch blocks bind no error
+
+Neither `catch` binds its error. That is not stylistic: a sanitised reason can contain user text, so
+the raw failure is structurally unloggable here rather than merely undisciplined. The log call
+follows the house style at `pi-runtime.mjs:913` — a JSON string, not pino-style object logging — and
+is itself wrapped, since a throwing logger must not re-break the turn from inside the handler meant
+to prevent that. `log` defaults to `console` (`pi-runtime.mjs:1076`).
+
+Three deliberate defences, because this feature must never be able to break a turn that would
 otherwise have worked:
 
 - **`sendCustomMessage` existence guard**, consistent with the defensive-optional-method style
   already used for `session.abort` / `session.bindExtensions`.
-- **`try`/`catch` around the whole block.** A formatter bug or a rejected `sendCustomMessage` must
+- **`try`/`catch` around the whole helper.** A formatter bug or a rejected `sendCustomMessage` must
   degrade to "no routing context" and let the open turn proceed, not surface as a runner error. The
-  agent's behaviour without the block is exactly today's behaviour, so failing open is strictly
-  safe.
+  agent's behaviour without the block is exactly today's behaviour, so failing open is strictly safe.
+  Verified by execution at the final placement: forcing `formatRoutingContext` to throw produced 32
+  swallowed throws across the suite and zero `runner-error` events.
+- **The helper is the sole `sendCustomMessage` call site** in `pi-runtime.mjs`, and it is local to
+  `sendMessage`. The approval-resume path (`resumeSession` / `routeApproval`) therefore cannot
+  deliver a block structurally, not merely by convention.
 
-There is a **second** `if (dispatch.handled)` at `pi-runtime.mjs:1573`, on the approval-resume path
+The hoisted `let handoffRoutingContext;` and the helper both live at generator scope, because the
+`dispatch` value is block-scoped to the strict `try` while the call site sits outside it. A
+consequence is that the helper is _reachable_ on turns with no MCP gateway — but
+`handoffRoutingContext` has exactly one assignment site, lexically inside `if (entry.mcpGateway)`, so
+on those turns it is `undefined` and `formatRoutingContext` returns `null`. The no-gateway path is
+structurally unable to deliver.
+
+There is a **second** `if (dispatch.handled)` at `pi-runtime.mjs:~1573`, on the approval-resume path
 fed by `routeApproval`. It is **not** changed: `routeApproval` carries no `routingContext` (§4), and
 its fall-through resumes an in-flight provider turn rather than starting a fresh one.
 
