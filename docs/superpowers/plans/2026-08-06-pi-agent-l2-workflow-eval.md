@@ -62,6 +62,23 @@ Two behaviours that are easy to get wrong:
 1. **`gatePlanResult` treats any non-`success` status as `failed`** (`plan-gate.mjs:51`). Only `create_recent_trip_album` translates `approval-required` into the `approval_required` arm, and it does so at `strict-workflows.mjs:323` _before_ gating. For every other workflow in the slice, an `approval-required` plan result yields `failed`.
 2. **`createWorkflowRegistry()` with no classifier falls back to `createRegexClassifier`** (`registry.mjs:203`) — a deterministic, model-free classifier. Driver tests use it for prompts the regex matches, and an explicit stub only when forcing a kind the regex would not pick.
 
+3. **Registry declaration order decides ties, and a bare `rename X to Y` belongs to `rename_person`, not albums.** Verified by running the real regex classifier:
+
+   | Prompt                                 | Routes to                  | `parseSlots`                                                                                                   |
+   | -------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------- |
+   | `rename Japan to Japan 2026`           | **`rename_person`**        | `{ personRef: 'Japan', newName: 'Japan 2026' }`                                                                |
+   | `rename the album Japan to Japan 2026` | `rename_or_describe_album` | `{ albumRef: 'album Japan' }` ← the ref keeps the word "album" and will not match a seeded album named `Japan` |
+   | `rename my Japan album to Japan 2026`  | `rename_or_describe_album` | `{ albumRef: 'Japan' }` ✅                                                                                     |
+
+   **Use the `rename my <name> album to <new>` form throughout.** The other two look right and are
+   wrong — the first routes to a different workflow entirely, the second produces an album ref that
+   never matches. The ordering rationale is documented at `registry.mjs:41-80`.
+
+   Also verified: `create an album for my recent trip to Japan` → `create_recent_trip_album`
+   (`{ albumName: 'Japan Trip', placeHint: 'Japan' }`); `clean up duplicates` → `cleanup_duplicates`;
+   `what is the weather like today?`, `thanks!`, and `make an album of the best shots from my recent
+trip` all → `kind: 'none'`.
+
 ## File structure
 
 | File                                             | Responsibility                                                                             |
@@ -70,7 +87,7 @@ Two behaviours that are easy to get wrong:
 | `agent-runner/eval/fixtures/fake-mcp-client.mjs` | Answers every tool the L2 slice calls, from the dataset; records calls; injects overrides. |
 | `agent-runner/eval/drivers/l2-workflow.mjs`      | Wires registry + dispatcher + fake client; builds the decision object.                     |
 | `agent-runner/eval/scenarios/l2-workflow.mjs`    | Scenario data. No logic.                                                                   |
-| `agent-runner/eval/score.mjs` (modify)           | Gains `toolSequence` / `planOps` / `noPlan` assertions.                                    |
+| `agent-runner/eval/score.mjs` (modify)           | Gains `toolSequence` / `planOps` / `noPlan` plus the unconditional raw-asset-id check.     |
 | `agent-runner/eval/run.mjs` (modify)             | `--layer L2` selection.                                                                    |
 
 ---
@@ -352,7 +369,7 @@ Expected: PASS, 11 tests.
 pnpm --dir /Users/pierre/dev/gallery-worktrees/pi-agent-main/agent-runner test 2>&1 | tail -12
 ```
 
-Expected: `pass 1793` (1782 existing + 11 new), `fail 0`.
+Expected: `fail 0`, with 11 more tests than the previous run (1782 existing + 11 new).
 
 - [ ] **Step 8: Commit**
 
@@ -382,7 +399,7 @@ at all."
 **Interfaces:**
 
 - Consumes: nothing from Task 1.
-- Produces: `classificationPass` honouring `expect.toolSequence` (exact ordered array), `expect.planOps` (subset by `type`), `expect.noPlan` (boolean). `classificationPass` is exported for testing.
+- Produces: `classificationPass` honouring `expect.toolSequence` (exact ordered array), `expect.planOps` (subset by `type`), `expect.noPlan` (boolean), plus an unconditional failure on `decision.rawAssetIdLeak`. All four are evaluated BEFORE the `kind === "none"` short-circuit. `classificationPass` is exported for testing.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -431,6 +448,36 @@ describe('classificationPass — toolSequence', () => {
   it('supports asserting no tool calls at all', () => {
     const decision = { kind: 'none', toolSequence: [] };
     assert.equal(classificationPass(decision, { kind: 'none', toolSequence: [] }), true);
+  });
+
+  // The check above passes trivially if the new logic sits after the
+  // `kind === 'none'` short-circuit, so this is the test that actually pins
+  // placement. It MUST fail if the checks are added in the wrong place.
+  it('fails a kind:none scenario that nonetheless called tools', () => {
+    const decision = { kind: 'none', toolSequence: ['listAlbums'] };
+    assert.equal(classificationPass(decision, { kind: 'none', toolSequence: [] }), false);
+  });
+
+  it('fails a kind:none scenario that nonetheless proposed a plan', () => {
+    const decision = { kind: 'none', planProposed: true, planId: 'plan-1' };
+    assert.equal(classificationPass(decision, { kind: 'none', noPlan: true }), false);
+  });
+});
+
+describe('classificationPass — the raw-asset-id invariant is not opt-in', () => {
+  it('fails a decision carrying a leak even when the scenario asserts nothing about it', () => {
+    const decision = { ...base, rawAssetIdLeak: 'proposeAlbumOperations.operations[0].assetIds' };
+    assert.equal(classificationPass(decision, { kind: base.kind }), false);
+  });
+
+  it('fails a negative scenario carrying a leak', () => {
+    const decision = { kind: 'none', rawAssetIdLeak: 'proposeAlbumOperations.assetIds' };
+    assert.equal(classificationPass(decision, { kind: 'none' }), false);
+  });
+
+  it('passes when there is no leak', () => {
+    const decision = { ...base, rawAssetIdLeak: null };
+    assert.equal(classificationPass(decision, { kind: base.kind }), true);
   });
 });
 
@@ -495,25 +542,42 @@ node --test 'eval/score.test.mjs'
 
 Expected: FAIL — `SyntaxError: The requested module './score.mjs' does not provide an export named 'classificationPass'`. That is the correct red.
 
-- [ ] **Step 3: Export `classificationPass` and add the three keys**
+- [ ] **Step 3: Export `classificationPass` and add the four checks**
 
-In `agent-runner/eval/score.mjs`, change `const classificationPass = (decision, expect) => {` to `export const classificationPass = (decision, expect) => {`, and insert the three checks immediately before the closing `return true;` of that function:
+In `agent-runner/eval/score.mjs`, change `const classificationPass = (decision, expect) => {` to `export const classificationPass = (decision, expect) => {`.
+
+**Placement is load-bearing.** `classificationPass` short-circuits on line 23:
 
 ```js
-// L2: exact, ordered tool-call sequence. Order-sensitive and length-sensitive
-// — this is what catches a redundant read call that a subset check would miss.
+if (decision.kind === 'none') return true; // negative assertion: "none" is the whole check
+```
+
+Anything added _after_ that line is dead for every negative scenario — a `kind: 'none'` scenario asserting `toolSequence: []` would pass no matter how many tools actually ran. So the new checks go **immediately before** that early return, right after the `kinds.includes(...)` guard:
+
+```js
+// The L2 checks run BEFORE the kind==='none' short-circuit: a negative scenario
+// still has to prove that no tools ran and no plan was proposed, which is the
+// entire point of asserting it.
+
+// The no-raw-asset-IDs invariant. Deliberately NOT opt-in — Gallery prunes
+// `assetIds` from provider-facing planning schemas, so a leak is a regression
+// no matter what the scenario asked about.
+if (decision.rawAssetIdLeak) return false;
+
+// Exact, ordered tool-call sequence. Order- and length-sensitive: this is what
+// catches a redundant read call that a subset check would miss.
 if (expect.toolSequence !== undefined) {
   const got = decision.toolSequence ?? [];
   if (got.length !== expect.toolSequence.length) return false;
   if (got.some((name, i) => name !== expect.toolSequence[i])) return false;
 }
-// L2: subset match on operation `type`. Extra ops do not fail, so a scenario
+// Subset match on operation `type`. Extra ops do not fail, so a scenario
 // asserts only what it cares about.
 if (expect.planOps !== undefined) {
   const types = new Set((decision.planOps ?? []).map((op) => op?.type));
   if (expect.planOps.some((type) => !types.has(type))) return false;
 }
-// L2: assert nothing was proposed (handoff / failed / needs_input arms).
+// Assert nothing was proposed (handoff / failed / needs_input / negative arms).
 if (expect.noPlan === true && (decision.planProposed === true || decision.planId)) return false;
 ```
 
@@ -524,7 +588,7 @@ cd /Users/pierre/dev/gallery-worktrees/pi-agent-main/agent-runner
 node --test 'eval/score.test.mjs'
 ```
 
-Expected: PASS, 14 tests.
+Expected: PASS, 19 tests.
 
 - [ ] **Step 5: Confirm L1 is untouched**
 
@@ -604,7 +668,7 @@ const stubClassifier = (kind, slots = {}) => ({
 describe('L2 driver — planned arm', () => {
   it('routes, calls the real tools in order, and reports the plan', async () => {
     const driver = createL2Driver();
-    const decision = await driver.classify('rename Japan to Japan 2026');
+    const decision = await driver.classify('rename my Japan album to Japan 2026');
 
     assert.equal(decision.kind, 'rename_or_describe_album');
     assert.deepEqual(decision.toolSequence, ['listAlbums', 'proposeAlbumOperations']);
@@ -623,7 +687,7 @@ describe('L2 driver — planned arm', () => {
 describe('L2 driver — needs_input arm', () => {
   it('asks instead of guessing when two albums share a name', async () => {
     const driver = createL2Driver();
-    const decision = await driver.classify('rename Summer to Summer 2026');
+    const decision = await driver.classify('rename my Summer album to Summer 2026');
 
     assert.equal(decision.outcomeStatus, 'needs_input');
     assert.equal(decision.planProposed, false);
@@ -634,7 +698,7 @@ describe('L2 driver — needs_input arm', () => {
 
   it('asks when no album matches', async () => {
     const driver = createL2Driver();
-    const decision = await driver.classify('rename Atlantis to Atlantis 2026');
+    const decision = await driver.classify('rename my Atlantis album to Atlantis 2026');
 
     assert.equal(decision.outcomeStatus, 'needs_input');
     assert.equal(decision.planProposed, false);
@@ -644,7 +708,7 @@ describe('L2 driver — needs_input arm', () => {
 describe('L2 driver — failed arm', () => {
   it('reports failure with no success language when the plan tool throws', async () => {
     const driver = createL2Driver({ overrides: { proposeAlbumOperations: new Error('planning exploded') } });
-    const decision = await driver.classify('rename Japan to Japan 2026');
+    const decision = await driver.classify('rename my Japan album to Japan 2026');
 
     assert.equal(decision.outcomeStatus, 'failed');
     assert.equal(decision.planProposed, false);
@@ -653,7 +717,7 @@ describe('L2 driver — failed arm', () => {
 
   it('treats a plan result with no plan id as failed, not planned', async () => {
     const driver = createL2Driver({ overrides: { proposeAlbumOperations: { status: 'success' } } });
-    const decision = await driver.classify('rename Japan to Japan 2026');
+    const decision = await driver.classify('rename my Japan album to Japan 2026');
 
     assert.equal(decision.outcomeStatus, 'failed');
     assert.equal(decision.planId, null);
@@ -707,8 +771,8 @@ describe('L2 driver — negatives', () => {
 describe('L2 driver — isolation', () => {
   it('does not leak recorded calls between classify() invocations', async () => {
     const driver = createL2Driver();
-    await driver.classify('rename Japan to Japan 2026');
-    const second = await driver.classify('rename Japan to Japan 2026');
+    await driver.classify('rename my Japan album to Japan 2026');
+    const second = await driver.classify('rename my Japan album to Japan 2026');
     assert.deepEqual(second.toolSequence, ['listAlbums', 'proposeAlbumOperations']);
   });
 });
@@ -752,7 +816,7 @@ describe('L2 driver — the invariant is wired into every plan scenario', () => 
         },
       },
     });
-    const decision = await driver.classify('rename Japan to Japan 2026');
+    const decision = await driver.classify('rename my Japan album to Japan 2026');
     assert.match(decision.rawAssetIdLeak ?? '', /assetIds/);
   });
 });
@@ -919,7 +983,7 @@ cd /Users/pierre/dev/gallery-worktrees/pi-agent-main/agent-runner
 node --test 'eval/drivers/l2-workflow.test.mjs'
 ```
 
-Expected: PASS. If the `rename Japan to Japan 2026` prompt does not route via the regex fast-path, read `RENAME_PATTERN` at `src/strict-workflows/workflows/rename-or-describe-album.mjs:22` and adjust the prompt to a canonical form — do **not** loosen the production regex to fit the test.
+Expected: PASS. If the `rename my Japan album to Japan 2026` prompt does not route via the regex fast-path, read `RENAME_PATTERN` at `src/strict-workflows/workflows/rename-or-describe-album.mjs:22` and adjust the prompt to a canonical form — do **not** loosen the production regex to fit the test.
 
 - [ ] **Step 5: Commit**
 
@@ -962,14 +1026,17 @@ Append to `agent-runner/eval/drivers/l2-workflow.test.mjs`:
 describe('L2 driver — multi-turn', () => {
   it('accumulates the tool sequence across turns', async () => {
     const driver = createL2Driver();
-    const decision = await driver.converse(['rename Summer to Summer 2026', 'rename Japan to Japan 2026']);
+    const decision = await driver.converse([
+      'rename my Summer album to Summer 2026',
+      'rename my Japan album to Japan 2026',
+    ]);
     assert.deepEqual(decision.toolSequence, ['listAlbums', 'listAlbums', 'proposeAlbumOperations']);
   });
 
   it('starts each converse() with a clean pending store', async () => {
     const driver = createL2Driver();
-    await driver.converse(['rename Summer to Summer 2026']);
-    const decision = await driver.converse(['rename Japan to Japan 2026']);
+    await driver.converse(['rename my Summer album to Summer 2026']);
+    const decision = await driver.converse(['rename my Japan album to Japan 2026']);
     assert.deepEqual(decision.toolSequence, ['listAlbums', 'proposeAlbumOperations']);
     assert.equal(decision.outcomeStatus, 'planned');
   });
@@ -1295,7 +1362,7 @@ export default [
   {
     id: 'l2.rename.planned',
     category: 'execution',
-    prompt: 'rename Japan to Japan 2026',
+    prompt: 'rename my Japan album to Japan 2026',
     expect: {
       kind: 'rename_or_describe_album',
       toolSequence: ['listAlbums', 'proposeAlbumOperations'],
@@ -1307,7 +1374,7 @@ export default [
   {
     id: 'l2.rename.ambiguous.needs-input',
     category: 'execution',
-    prompt: 'rename Summer to Summer 2026',
+    prompt: 'rename my Summer album to Summer 2026',
     expect: {
       kind: 'rename_or_describe_album',
       toolSequence: ['listAlbums'],
@@ -1319,7 +1386,7 @@ export default [
   {
     id: 'l2.rename.missing.needs-input',
     category: 'execution',
-    prompt: 'rename Atlantis to Atlantis 2026',
+    prompt: 'rename my Atlantis album to Atlantis 2026',
     expect: {
       kind: 'rename_or_describe_album',
       toolSequence: ['listAlbums'],
