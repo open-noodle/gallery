@@ -1,8 +1,8 @@
 <p align="center"> 
   <br/>  
   <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=License&logoColor=000000&labelColor=ececec" alt="License: AGPLv3"></a>
-  <a href="https://discord.immich.app">
-    <img src="https://img.shields.io/discord/979116623879368755.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" alt="Discord"/>
+  <a href="https://discord.gg/cxBfbuxyG4">
+    <img src="https://img.shields.io/discord/1480633426376921239.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" alt="Discord"/>
   </a>
   <br/>  
   <br/>   
@@ -13,8 +13,8 @@
 </p>
 <h3 align="center">حل إدارة الصور والفيديو عالي الأداء مستضاف ذاتيًا</h3>
 <br/>
-<a href="https://immich.app">
-<img src="../design/immich-screenshots.png" title="Main Screenshot">
+<a href="https://opennoodle.de">
+<img src="../design/gallery-screenshot.webp" title="Main Screenshot">
 </a>
 <br/>
 <p align="center">
@@ -47,36 +47,18 @@
 >
 
 > [!NOTE]
-> يمكنك العثور على الوثائق الرئيسية، بما في ذلك أدلة التثبيت، على https://immich.app/
+> يمكنك العثور على الوثائق الرئيسية، بما في ذلك أدلة التثبيت، على https://opennoodle.de/
 
 ## روابط
 
-- [الوثائق الرسمية](https://docs.immich.app/)
-- [مقدمة](https://docs.immich.app/overview/introduction)
-- [تعليمات التحميل](https://docs.immich.app/install/requirements)
-- [خريطة الطريق](https://immich.app/roadmap)
+- [الوثائق الرسمية](https://docs.opennoodle.de/)
+- [مقدمة](https://docs.opennoodle.de/overview/quick-start)
+- [تعليمات التحميل](https://docs.opennoodle.de/install/requirements)
+- [خريطة الطريق](https://opennoodle.de/roadmap)
 - [تجريبي](#تجريبي)
 - [سمات](#سمات)
-- [الترجمات](https://docs.immich.app/developer/translations)
-- [قواعد المساهمة](https://docs.immich.app/overview/support-the-project)
-
-## تجريبي
-
-يمكنك الوصول إلى العرض التوضيحي على الويب على
-https://demo.immich.app
-
-بالنسبة لتطبيق الهاتف المحمول، يمكنك استخدام 
-`https://demo.immich.app` 
-ل `نقطة نهاية الخادم`
-
-```bash title="Demo Credential"
-تفاصيل تسجيل  الدخول
-email: demo@immich.app
-password: demo
-```
-
-## نشاط المساهمة
-![Activities](https://repobeats.axiom.co/api/embed/9e86d9dc3ddd137161f2f6d2e758d7863b1789cb.svg "Repobeats analytics image")
+- [الترجمات](https://docs.opennoodle.de/developer/translations)
+- [قواعد المساهمة](https://docs.opennoodle.de/overview/support-the-project)
 
 ## سمات
 
@@ -111,19 +93,3 @@ password: demo
 | Offline support                              | Yes    | No  |
 | Read-only gallery                            | Yes    | Yes |
 | Stacked Photos                               | Yes    | Yes |
-
-## المساهمين
-
-<a href="https://github.com/alextran1502/immich/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=immich-app/immich" width="100%"/>
-</a>
-
-## Star History
-
-<a href="https://star-history.com/#immich-app/immich&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=immich-app/immich&type=Date" width="100%" />
- </picture>
-</a>

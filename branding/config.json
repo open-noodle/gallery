@@ -13,6 +13,11 @@
     "releases_url": "https://github.com/open-noodle/gallery/releases"
   },
 
+  "discord": {
+    "url": "https://discord.gg/cxBfbuxyG4",
+    "server_id": "1480633426376921239"
+  },
+
   "upstream": {
     "name": "Immich",
     "version": "3.1.0",
@@ -53,7 +58,7 @@
 
   "docs": {
     "title": "Noodle Gallery",
-    "url": "https://docs.noodle.gallery"
+    "url": "https://docs.opennoodle.de"
   },
 
   "upstream_name": "Immich",

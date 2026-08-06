@@ -1,8 +1,8 @@
 <p align="center"> 
   <br/>  
   <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=License&logoColor=000000&labelColor=ececec" alt="Giấy phép: AGPLv3"></a>
-  <a href="https://discord.immich.app">
-    <img src="https://img.shields.io/discord/979116623879368755.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" alt="Discord"/>
+  <a href="https://discord.gg/cxBfbuxyG4">
+    <img src="https://img.shields.io/discord/1480633426376921239.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" alt="Discord"/>
   </a>
   <br/>  
   <br/>   
@@ -13,8 +13,8 @@
 </p>
 <h3 align="center">Giải pháp quản lý ảnh và video tự lưu trữ hiệu suất cao</h3>
 <br/>
-<a href="https://immich.app">
-<img src="../design/immich-screenshots.png" title="Ảnh chụp màn hình chính">
+<a href="https://opennoodle.de">
+<img src="../design/gallery-screenshot.webp" title="Ảnh chụp màn hình chính">
 </a>
 <br/>
 <p align="center">
@@ -51,28 +51,22 @@
 >
 
 > [!NOTE]
-> Bạn có thể tìm thấy tài liệu chính, bao gồm hướng dẫn cài đặt, tại https://immich.app/.
+> Bạn có thể tìm thấy tài liệu chính, bao gồm hướng dẫn cài đặt, tại https://opennoodle.de/.
 
 ## Liên kết
 
-- [Tài liệu](https://docs.immich.app)
-- [Giới thiệu](https://docs.immich.app/overview/introduction)
-- [Cài đặt](https://docs.immich.app/install/requirements)
-- [Lộ trình](https://immich.app/roadmap)
+- [Tài liệu](https://docs.opennoodle.de)
+- [Giới thiệu](https://docs.opennoodle.de/overview/quick-start)
+- [Cài đặt](https://docs.opennoodle.de/install/requirements)
+- [Lộ trình](https://opennoodle.de/roadmap)
 - [Demo](#demo)
 - [Tính năng](#Tính-năng)
-- [Dịch thuật](https://docs.immich.app/developer/translations)
-- [Đóng góp](https://docs.immich.app/overview/support-the-project)
+- [Dịch thuật](https://docs.opennoodle.de/developer/translations)
+- [Đóng góp](https://docs.opennoodle.de/overview/support-the-project)
 
 ## Demo
 
-Truy cập bản demo [tại đây](https://demo.immich.app). Đối với ứng dụng di động, bạn có thể sử dụng `https://demo.immich.app` cho `Server Endpoint URL`
-
-### Thông tin đăng nhập
-
-| Email           | Mật khẩu |
-| --------------- | -------- |
-| demo@immich.app | demo     |
+Truy cập bản demo [tại đây](https://demo.opennoodle.de). Đối với ứng dụng di động, bạn có thể sử dụng `https://demo.opennoodle.de` cho `Server Endpoint URL`
 
 ## Tính năng
 
@@ -109,28 +103,4 @@ Truy cập bản demo [tại đây](https://demo.immich.app). Đối với ứng
 
 ## Dịch thuật
 
-Đọc thêm về dịch thuật [tại đây](https://docs.immich.app/developer/translations).
-
-<a href="https://hosted.weblate.org/engage/immich/">
-<img src="https://hosted.weblate.org/widget/immich/immich/multi-auto.svg" alt="Tình trạng dịch thuật" />
-</a>
-
-## Hoạt động của repository
-
-![Hoạt động](https://repobeats.axiom.co/api/embed/9e86d9dc3ddd137161f2f6d2e758d7863b1789cb.svg "Hình ảnh phân tích Repobeats")
-
-## Lịch sử Đánh dấu sao
-
-<a href="https://star-history.com/#immich-app/immich&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=Date" />
-   <img alt="Biểu đồ Lịch sử Đánh dấu" src="https://api.star-history.com/svg?repos=immich-app/immich&type=Date" width="100%" />
- </picture>
-</a>
-
-## Người đóng góp
-
-<a href="https://github.com/alextran1502/immich/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=immich-app/immich" width="100%"/>
-</a>
+Đọc thêm về dịch thuật [tại đây](https://docs.opennoodle.de/developer/translations).
