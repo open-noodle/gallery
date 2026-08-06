@@ -2,7 +2,7 @@
   <br/>
   <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=License&logoColor=000000&labelColor=ececec" alt="License: AGPLv3"></a>
   <a href="https://discord.gg/cxBfbuxyG4">
-    <img src="https://img.shields.io/discord/979116623879368755.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" alt="Discord"/>
+    <img src="https://img.shields.io/discord/1480633426376921239.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" alt="Discord"/>
   </a>
   <br/>
   <br/>
@@ -22,11 +22,14 @@
 </h4>
 <br/>
 
+<p align="center">
+  <a href="https://demo.opennoodle.de">
+    <img src="design/gallery-screenshot.webp" width="100%" alt="The Noodle Gallery photo timeline, with Shared Spaces in the sidebar, the filter panel open, and generated trip memories across the top">
+  </a>
+</p>
+
 > [!NOTE]
 > This is a **community fork** of [Immich](https://github.com/immich-app/immich) with additional features and improvements. Currently based on **Immich v3.1.0**. We regularly sync with upstream to stay up to date. See [What's Different](#whats-different-from-upstream-immich) below.
-
-> [!TIP]
-> **Noodle Gallery mobile apps are out!** Back up your photos and browse your library on the go. [Download on the App Store](https://apps.apple.com/il/app/noodle-gallery/id6761776289) · [Get it on Google Play](https://play.google.com/store/apps/details?id=de.opennoodle.gallery)
 
 > [!TIP]
 > **Already running Immich?** Switching to Gallery is a three-line config change — two image names in your `docker-compose.yml` and `IMMICH_VERSION=v5` in your `.env`. Your library and database are fully compatible. See the [install guide](https://opennoodle.de/install/#migrate-from-immich).
@@ -41,57 +44,56 @@ Gallery is a friendly fork that **rebases onto every upstream Immich release**, 
 
 Immich's face recognition is account-scoped — the same person shows up as a separate entry in your library, your partner's, and every shared album you both touch.
 
-- **[Global People](https://opennoodle.de/features/global-people)** — identity-aware people, filters, and search results dedupe across your personal library and every timeline-enabled Shared Space you can access, without ever crossing a permission boundary you weren't already on the right side of. Naming, merging, and birthdays stay scoped to where they were entered, while the identity layer underneath connects what is provably the same person.
+- **[Global People](https://opennoodle.de/features/global-people)** — people, filters, and search results dedupe across your library and every Shared Space you can access, without crossing a permission boundary. Naming and merging stay scoped to where they were entered.
 
 ### Sharing and collaboration
 
 Partner Sharing is all-or-nothing and albums belong to whoever made them — there's no combined family timeline, no activity log, and no way to bulk-share tens of thousands of photos by hand.
 
-- **[Shared Spaces](https://opennoodle.de/features/shared-spaces)** — multi-owner collaborative timelines with Owner / Editor / Viewer roles, cross-contributor face recognition, per-member timeline integration, last-visit tracking, and a per-space activity log. Photos are linked by reference at zero extra storage cost, each contributor keeps their own library, and there's full web + mobile parity. ([Docs](https://docs.opennoodle.de/features/shared-spaces))
-- **[Spaces Filtering](https://opennoodle.de/features/spaces-filtering)** — the full filter suite (date, people, location, camera, tags) scoped to a single Space, not just the main library.
-- **[User Groups](https://opennoodle.de/features/user-groups)** — named, color-coded groups for one-click sharing; pick a whole circle when inviting to a Space or sharing an album instead of selecting people one at a time. ([Docs](https://docs.opennoodle.de/features/user-groups))
-- **[Bulk Add to Spaces](https://opennoodle.de/features/bulk-add)** — add hundreds of thousands of photos to a Space with one click, processed in the background so the UI never blocks.
+- **[Shared Spaces](https://opennoodle.de/features/shared-spaces)** — multi-owner collaborative timelines with Owner / Editor / Viewer roles, cross-contributor face recognition, and a per-space activity log. Photos are linked by reference at zero extra storage cost, and each contributor keeps their own library. ([Docs](https://docs.opennoodle.de/features/shared-spaces))
+- **[Spaces Filtering](https://opennoodle.de/features/spaces-filtering)** — the full filter suite (date, people, location, camera, tags) scoped to a single Space.
+- **[User Groups](https://opennoodle.de/features/user-groups)** — named, color-coded groups so you can share with a whole circle at once. ([Docs](https://docs.opennoodle.de/features/user-groups))
+- **[Bulk Add to Spaces](https://opennoodle.de/features/bulk-add)** — add hundreds of thousands of photos to a Space in one click, processed in the background.
 
 ### Search and discovery
 
 Each page has its own search bar with no keyboard-first global entry point, smart-search results can't be sorted or threshold-tuned, filters operate in isolation, and the map has no filter panel of its own.
 
-- **[Timeline Grouping](https://opennoodle.de/features/timeline-grouping)** — a Years / Months / All switcher on every timeline (Photos, Spaces, Albums, People, Map). Tap a year or month card to zoom into that period without restricting the query, and your scroll position is preserved when you switch back — find a photo fast even in a decades-deep library.
-- **[Inline Search Filters](https://opennoodle.de/features/inline-search-filters)** — type structured filters (people, tags, dates, locations, ratings, media type, favorites, cameras, album gaps) straight into the search bar with live suggestions before you press Enter, committing to shareable URL state.
-- **[Global Search](https://opennoodle.de/features/global-search)** — <kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>K</kbd> is the main search surface, routing the top result back into Photos and Spaces while still searching people, places, tags, albums, commands, and settings pages in parallel. ([Docs](https://docs.opennoodle.de/features/search-palette))
-- **[Search Palette](https://opennoodle.de/features/search-palette)** — the keyboard-first command palette behind global search. [Prefix shortcuts](https://opennoodle.de/features/search-scope-prefixes) (`@` people, `#` tags, `/` albums & spaces, `>` commands) scope to one kind of result, and [context-aware page commands](https://opennoodle.de/features/page-commands) expose rename / share / add-member / delete on the album or space you're viewing — with a two-step inline confirm before anything destructive fires. ([Docs](https://docs.opennoodle.de/features/search-palette))
-- **[Search Sorting & Relevance](https://opennoodle.de/features/search-sorting)** — sort smart-search results by relevance, newest, or oldest, with date-grouped infinite scroll and a tunable similarity threshold so combined text + filter searches stop returning noise.
-- **[Interdependent Filtering](https://opennoodle.de/features/dynamic-filters)** — every filter narrows every other filter. Select a country and only see the cameras, people, and tags that exist in those photos — no dead-end combinations. ([Docs](https://docs.opennoodle.de/features/dynamic-filter-suggestions))
-- **[Smart Search & Contextual Filters](https://opennoodle.de/features/smart-search-filters)** — full-text and CLIP search inside Spaces, with filter suggestions that adapt to your current selection.
-- **[Map Filtering](https://opennoodle.de/features/map-filtering)** — the full filter panel from Photos and Spaces, now on the Map view, with markers updating in real time and space-aware suggestions. ([Docs](https://docs.opennoodle.de/features/map-filtering))
+- **[Timeline Grouping](https://opennoodle.de/features/timeline-grouping)** — a Years / Months / All switcher on every timeline. Zoom into a period without restricting the query, and keep your scroll position when you switch back.
+- **[Inline Search Filters](https://opennoodle.de/features/inline-search-filters)** — type structured filters (people, tags, dates, locations, ratings, cameras) straight into the search bar, with live suggestions and shareable URL state.
+- **[Global Search](https://opennoodle.de/features/global-search)** — <kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>K</kbd> searches people, places, tags, albums, commands, and settings in parallel. ([Docs](https://docs.opennoodle.de/features/search-palette))
+- **[Search Palette](https://opennoodle.de/features/search-palette)** — the command palette behind it, with [prefix shortcuts](https://opennoodle.de/features/search-scope-prefixes) (`@` people, `#` tags, `/` albums, `>` commands) and [page commands](https://opennoodle.de/features/page-commands) for rename / share / delete. ([Docs](https://docs.opennoodle.de/features/search-palette))
+- **[Search Sorting & Relevance](https://opennoodle.de/features/search-sorting)** — sort by relevance, newest, or oldest, with a tunable similarity threshold.
+- **[Interdependent Filtering](https://opennoodle.de/features/dynamic-filters)** — every filter narrows every other filter, so there are no dead-end combinations. ([Docs](https://docs.opennoodle.de/features/dynamic-filter-suggestions))
+- **[Smart Search & Contextual Filters](https://opennoodle.de/features/smart-search-filters)** — full-text and CLIP search inside Spaces, with filter suggestions that adapt to your selection.
+- **[Map Filtering](https://opennoodle.de/features/map-filtering)** — the full filter panel on the Map view, with markers updating in real time. ([Docs](https://docs.opennoodle.de/features/map-filtering))
 
 ### AI and automation
 
 Immich's AI surface is focused on faces and basic CLIP search — pets aren't detected, memories show only "On This Day", there's no automated clutter suppression, and duplicate detection misses re-encoded videos.
 
-- **[Auto-Classification](https://opennoodle.de/features/auto-classification)** — define what clutter looks like (screenshots, memes, receipts) and Gallery tags and optionally archives matching photos automatically using CLIP, each category with its own similarity threshold. Per-user, and runs on the same pipeline as smart search. ([Docs](https://docs.opennoodle.de/features/auto-classification))
-- **[Memories Archive](https://opennoodle.de/features/memories-archive)** — a dedicated Memories page for retained generated memories, with local search, an All/Saved filter, and admin controls for how long generated memories are kept. ([Docs](https://docs.opennoodle.de/features/memories))
-- **[Smarter Memories](https://opennoodle.de/features/smarter-memories)** — server-side rules supplement "On This Day" with recent-trip recaps (detected from location clusters outside your baseline) and birthday memories that adapt to each person's photo history, with titles and subtitles rendered on web and mobile. ([Docs](https://docs.opennoodle.de/features/memories))
-- **[Pet Detection](https://opennoodle.de/features/pet-detection)** — YOLO11 detects dogs, cats, birds, and other animals and surfaces them alongside people; browse by individual pet, toggle pets per space, and pick from three model sizes. ([Docs](https://docs.opennoodle.de/features/pet-detection))
-- **[Video Duplicate Detection](https://opennoodle.de/features/video-duplicate-detection)** — extends upstream's photo dedup to videos by averaging CLIP embeddings across sampled frames, catching duplicates even after re-encoding, resizing, or format conversion. ([Docs](https://docs.opennoodle.de/features/video-duplicate-detection))
+- **[Auto-Classification](https://opennoodle.de/features/auto-classification)** — define what clutter looks like (screenshots, memes, receipts) and Gallery tags and optionally archives it automatically, each category with its own threshold. ([Docs](https://docs.opennoodle.de/features/auto-classification))
+- **[Memories Archive](https://opennoodle.de/features/memories-archive)** — a dedicated Memories page with search, an All/Saved filter, and retention controls. ([Docs](https://docs.opennoodle.de/features/memories))
+- **[Smarter Memories](https://opennoodle.de/features/smarter-memories)** — recent-trip recaps detected from location clusters, plus birthday memories that adapt to each person's photo history. ([Docs](https://docs.opennoodle.de/features/memories))
+- **[Pet Detection](https://opennoodle.de/features/pet-detection)** — YOLO11 detects dogs, cats, birds, and other animals and surfaces them alongside people. ([Docs](https://docs.opennoodle.de/features/pet-detection))
+- **[Video Duplicate Detection](https://opennoodle.de/features/video-duplicate-detection)** — averages CLIP embeddings across sampled frames, catching duplicate videos even after re-encoding or resizing. ([Docs](https://docs.opennoodle.de/features/video-duplicate-detection))
 
 ### Media management and migration
 
 Trimming a video means exporting to an external tool, moving from Google Photos needs CLI scripts, storage is local disk or external libraries with no native S3 backend, and a large existing library can't be linked into a shared collection.
 
-- **[Image Editing](https://opennoodle.de/features/image-editing)** — non-destructive rotation and cropping from the asset viewer (keyboard shortcuts `[` / `]`), batch rotate across a selection, and automatic thumbnail refresh; originals are always preserved and full 360° rotations auto-revert. ([Docs](https://docs.opennoodle.de/features/editing))
-- **[Video Trimming](https://opennoodle.de/features/video-trimming)** — cut clips in the browser with a timeline scrubber. FFmpeg stream copy means instant, lossless results, and you can re-trim or restore the original at any time. ([Docs](https://docs.opennoodle.de/features/editing))
-- **[Connected Libraries](https://opennoodle.de/features/connected-libraries)** — link external photo libraries to Shared Spaces so thousands of existing photos appear instantly, with no file duplication and originals left untouched. ([Docs](https://docs.opennoodle.de/features/libraries))
-- **[Google Photos Import](https://opennoodle.de/features/google-photos-import)** — a guided in-browser wizard for Google Takeout archives that preserves dates, GPS coordinates, descriptions, favorite/archived status, and album structure (including `.supplemental-metadata.json` sidecars) — no CLI required. ([Docs](https://docs.opennoodle.de/features/google-photos-import))
-- **[S3-Compatible Storage](https://opennoodle.de/features/s3-storage)** — store media on any S3-compatible backend (AWS S3, MinIO, Cloudflare R2, Backblaze B2, Wasabi). Disk and S3 run simultaneously, with `redirect` or `proxy` delivery modes and a built-in [storage migration](https://docs.opennoodle.de/features/storage-migration) tool to move files in either direction with resume and rollback. ([Docs](https://docs.opennoodle.de/features/s3-storage))
+- **[Image Editing](https://opennoodle.de/features/image-editing)** — non-destructive rotation and cropping from the asset viewer, plus batch rotate. Originals are always preserved. ([Docs](https://docs.opennoodle.de/features/editing))
+- **[Video Trimming](https://opennoodle.de/features/video-trimming)** — cut clips in the browser. FFmpeg stream copy makes it instant and lossless, and you can restore the original at any time. ([Docs](https://docs.opennoodle.de/features/editing))
+- **[Connected Libraries](https://opennoodle.de/features/connected-libraries)** — link external photo libraries into Shared Spaces with no file duplication and originals left untouched. ([Docs](https://docs.opennoodle.de/features/libraries))
+- **[Google Photos Import](https://opennoodle.de/features/google-photos-import)** — a guided in-browser wizard for Takeout archives that preserves dates, GPS, descriptions, and album structure. No CLI required. ([Docs](https://docs.opennoodle.de/features/google-photos-import))
+- **[S3-Compatible Storage](https://opennoodle.de/features/s3-storage)** — store media on any S3-compatible backend (AWS S3, MinIO, Cloudflare R2, Backblaze B2, Wasabi), with a built-in [migration tool](https://docs.opennoodle.de/features/storage-migration) that resumes and rolls back. ([Docs](https://docs.opennoodle.de/features/s3-storage))
 
 ### Mobile
 
 Filtering the timeline in the Immich mobile app means switching to a separate tab and losing your scroll position, and advanced surfaces sit deeper in the app or aren't there at all.
 
-- **[Photos Filtering on Mobile](https://opennoodle.de/features/mobile-photos-filtering)** — a three-snap bottom sheet on the Photos tab filters the timeline by people, places, tags, dates, rating, and media type without ever leaving the grid.
-- **[Noodle Gallery for iPhone](https://opennoodle.de/features/ios-app)** — a native iOS app on the [App Store](https://apps.apple.com/il/app/noodle-gallery/id6761776289) with background camera backup, on-device CLIP search, the map view, and a Shared Spaces preview, all talking directly to your own server. ([Docs](https://docs.opennoodle.de/features/mobile-app))
-- **[Noodle Gallery for Android](https://opennoodle.de/features/android-app)** — the same native app, live on [Google Play](https://play.google.com/store/apps/details?id=de.opennoodle.gallery) with background camera backup, on-device CLIP search, the map, and Shared Spaces. ([Docs](https://docs.opennoodle.de/features/mobile-app))
+- **[Photos Filtering on Mobile](https://opennoodle.de/features/mobile-photos-filtering)** — a bottom sheet filters the timeline by people, places, tags, dates, rating, and media type without leaving the grid.
+- **[iPhone](https://opennoodle.de/features/ios-app)** and **[Android](https://opennoodle.de/features/android-app)** — native apps on the [App Store](https://apps.apple.com/us/app/noodle-gallery/id6761776289) and [Google Play](https://play.google.com/store/apps/details?id=de.opennoodle.gallery), with background camera backup, on-device CLIP search, the map, and Shared Spaces — all talking directly to your own server. ([Docs](https://docs.opennoodle.de/features/mobile-app))
 
 ### Operations
 
@@ -235,11 +237,7 @@ That's it. To switch back to upstream Immich later, flip the two image names bac
 
 ## Translations
 
-Read more about translations [here](https://docs.immich.app/developer/translations).
-
-<a href="https://hosted.weblate.org/engage/immich/">
-<img src="https://hosted.weblate.org/widget/immich/immich/multi-auto.svg" alt="Translation status" />
-</a>
+Gallery inherits upstream Immich's translations through every rebase. Fork-specific strings are translated in this repo — see the [translations guide](https://docs.opennoodle.de/developer/translations) if you'd like to help.
 
 ## Docker Images
 
@@ -299,10 +297,10 @@ The repo is a `pnpm` workspace monorepo — server (NestJS), web (SvelteKit), mo
 4. **Start the dev stack**
 
    ```bash
-   make dev
+   mise dev
    ```
 
-   This brings up Postgres, Redis, the ML service, the server (with hot reload), and the web UI on http://localhost:2283. The first run downloads ML models and builds containers, so give it a few minutes.
+   This brings up Postgres, Redis, the ML service, the server (with hot reload), and the web UI on http://localhost:2283. The first run downloads ML models and builds containers, so give it a few minutes. Stop it with `mise dev-down`.
 
 ### Running Tests and Checks Before You Push
 
@@ -315,17 +313,19 @@ cd server && pnpm check         # TypeScript type check
 cd web && pnpm test             # unit tests
 cd web && pnpm check            # svelte-check + tsc
 
-# All modules from the repo root
-make check-all                  # type checks everywhere
-make format-all                 # prettier --write
+# Translation files, from the repo root
+pnpm format                     # prettier --check i18n/
+pnpm format:fix                 # prettier --write i18n/
 ```
 
 CI runs lint, type checks, unit tests, and e2e tests on every PR. If you're touching server controllers or repositories, regenerate the OpenAPI clients and SQL query files:
 
 ```bash
-make open-api                   # regenerates TS SDK + Dart client
-make sql                        # regenerates SQL query docs (needs DB running)
+mise open-api                   # regenerates TS SDK + Dart client
+mise sql                        # regenerates SQL query docs (needs DB running)
 ```
+
+`mise tasks` lists everything else available.
 
 ### Opening a Pull Request
 
@@ -334,8 +334,14 @@ make sql                        # regenerates SQL query docs (needs DB running)
 - Include a short description of what changed and why, plus screenshots or screen recordings for UI work.
 - Make sure CI is green before requesting review.
 
+## How Gallery is Built
+
+Gallery is developed with heavy assistance from AI coding tools (Claude Code and Codex), with humans leading the ideas, testing, and debugging. We say so openly because it shaped how the project was built.
+
+What we'd rather be judged on is the result. There's a [live demo](https://demo.opennoodle.de) you can click through without installing anything, unit and e2e suites run on every pull request, and all of it is open source — read the code and decide for yourself.
+
 ## Acknowledgements
 
-This software is developed with strong assistance from AI (Codex/Claude Code) and with humans leading the ideas, testing, and debugging. We say this openly because it shaped how the project was built. If you are not happy with AI-developed code, this software is not for you. The acknowledgement below is equally important: this would not exist without [Immich](https://github.com/immich-app/immich), largely written by hand.
+Gallery would not exist without [Immich](https://github.com/immich-app/immich), largely written by hand, and the work of everyone who built it. We rebase onto every upstream release, so the foundation Gallery stands on keeps coming from that project.
 
-See [CLAUDE.md](CLAUDE.md) for a deeper tour of the codebase architecture and common commands.
+See [AGENTS.md](AGENTS.md) for a deeper tour of the codebase architecture and common commands.
