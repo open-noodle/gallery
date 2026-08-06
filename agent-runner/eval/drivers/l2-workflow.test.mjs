@@ -218,6 +218,122 @@ describe('L2 driver — the invariant is wired into every plan scenario', () => 
   });
 });
 
+describe('L2 driver — multi-turn', () => {
+  it('accumulates the tool sequence across turns', async () => {
+    const driver = createL2Driver();
+    const decision = await driver.converse([
+      'rename my Summer album to Summer 2026',
+      'rename my Japan album to Japan 2026',
+    ]);
+    assert.deepEqual(decision.toolSequence, ['listAlbums', 'listAlbums', 'proposeAlbumOperations']);
+  });
+
+  it('starts each converse() with a clean pending store', async () => {
+    const driver = createL2Driver();
+    await driver.converse(['rename my Summer album to Summer 2026']);
+    const decision = await driver.converse(['rename my Japan album to Japan 2026']);
+    assert.deepEqual(decision.toolSequence, ['listAlbums', 'proposeAlbumOperations']);
+    assert.equal(decision.outcomeStatus, 'planned');
+  });
+});
+
+describe('L2 driver — approval', () => {
+  const approvalOverrides = {
+    proposeAlbumFromSelection: { status: 'approval-required', toolCall: { id: 'tool-call-1' } },
+  };
+
+  it('reaches the approval_required arm and proposes nothing yet', async () => {
+    const driver = createL2Driver({ overrides: approvalOverrides });
+    const decision = await driver.classify('create an album for my recent trip to Japan');
+
+    assert.equal(decision.outcomeStatus, 'approval_required');
+    assert.equal(decision.planProposed, false);
+  });
+
+  it('an approved decision resumes the workflow', async () => {
+    const driver = createL2Driver({ overrides: approvalOverrides });
+    const decision = await driver.converse(['create an album for my recent trip to Japan', { approve: true }]);
+
+    assert.notEqual(decision.outcomeStatus, 'approval_required');
+  });
+
+  it('a denied decision proposes nothing', async () => {
+    const driver = createL2Driver({ overrides: approvalOverrides });
+    const decision = await driver.converse(['create an album for my recent trip to Japan', { approve: false }]);
+
+    assert.equal(decision.planProposed, false);
+    assert.equal(decision.planId, null);
+  });
+
+  it('a mismatched toolCallId is not treated as a denial', async () => {
+    const driver = createL2Driver({ overrides: approvalOverrides });
+    const decision = await driver.converse([
+      'create an album for my recent trip to Japan',
+      { approve: true, toolCallId: 'not-the-pending-one' },
+    ]);
+
+    assert.equal(decision.handled, false, 'a mismatched approval must fall through, not resolve the workflow');
+  });
+
+  it('approval-required with no usable toolCallId fails rather than hanging', async () => {
+    const driver = createL2Driver({
+      overrides: { proposeAlbumFromSelection: { status: 'approval-required' } },
+    });
+    const decision = await driver.classify('create an album for my recent trip to Japan');
+
+    assert.equal(decision.outcomeStatus, 'failed');
+    assert.equal(decision.planProposed, false);
+  });
+});
+
+describe('L2 driver — continuation expiry', () => {
+  // Pending choices expire after 10 minutes:
+  // `nowMs - pending.createdAtMs > ttlMs` (candidate-disambiguation.mjs:103).
+  // A constant clock can never reach that, so a turn may advance it.
+  it('expires a pending continuation once the TTL has passed', async () => {
+    const driver = createL2Driver({
+      overrides: {
+        findTripCandidates: {
+          status: 'success',
+          recommendation: { action: 'ask_user', reason: 'Two candidate trips are equally likely.' },
+          candidates: [
+            { dedupeKey: 'trip:a', label: 'Tokyo', confidence: 'medium' },
+            { dedupeKey: 'trip:b', label: 'Kyoto', confidence: 'medium' },
+          ],
+        },
+      },
+    });
+
+    const decision = await driver.converse([
+      'create an album for my recent trip to Japan',
+      { advanceMs: 11 * 60 * 1000 },
+      'the first one',
+    ]);
+
+    assert.equal(decision.planProposed, false);
+    assert.match(decision.text ?? '', /expired/i);
+  });
+
+  it('resolves the continuation when the follow-up is prompt', async () => {
+    const driver = createL2Driver({
+      overrides: {
+        findTripCandidates: {
+          status: 'success',
+          recommendation: { action: 'ask_user', reason: 'Two candidate trips are equally likely.' },
+          candidates: [
+            { dedupeKey: 'trip:a', label: 'Tokyo', confidence: 'medium' },
+            { dedupeKey: 'trip:b', label: 'Kyoto', confidence: 'medium' },
+          ],
+        },
+      },
+    });
+
+    const decision = await driver.converse(['create an album for my recent trip to Japan', 'the first one']);
+
+    assert.doesNotMatch(decision.text ?? '', /expired/i);
+  });
+});
+
 describe('L2 driver — copy helpers', () => {
   const summary = { label: 'Portugal', dateRange: 'May 3–12', albumName: 'Portugal Trip', assetCount: 84 };
 

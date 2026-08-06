@@ -100,10 +100,16 @@ export const createL2Driver = ({
     let pending;
     let handled = false;
 
+    // Turns may advance the clock so TTL-dependent arms (continuation expiry)
+    // are reachable. `now` is read more than once per turn by the dispatcher, so
+    // an auto-incrementing clock would be unpredictable — advance it explicitly.
+    let clockOffsetMs = 0;
+    const sessionNow = () => now() + clockOffsetMs;
+
     const dispatcher = createWorkflowDispatcher({
       registry,
       buildClient: () => client,
-      now,
+      now: sessionNow,
       copyMode,
       observe: (event) => observed.push(event),
     });
@@ -118,6 +124,10 @@ export const createL2Driver = ({
     };
 
     for (const turn of turns) {
+      if (turn && typeof turn === 'object' && typeof turn.advanceMs === 'number') {
+        clockOffsetMs += turn.advanceMs;
+        continue;
+      }
       if (typeof turn === 'string') {
         ({ handled } = await dispatcher.routeTurn({ prompt: turn, ...common }));
         continue;
