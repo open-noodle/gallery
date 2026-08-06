@@ -21,6 +21,8 @@
 - **Fail open.** A formatter throw or a rejected `sendCustomMessage` must degrade to "no routing context" and let the turn proceed. This feature must never break a turn that would otherwise work.
 - **Never synthesize claims about which tools ran.** Forward `reason` verbatim (after sanitising); invent nothing.
 - **Log style:** `log.warn?.(JSON.stringify({ msg: '...', gallerySessionId }))`, matching `pi-runtime.mjs:913`. Never log the raw error — a reason can contain user text.
+- **`agent-runner` has no linter.** No eslint/biome config, no `lint` script. A bare `catch {}` and an ignored rest-destructure binding are both fine; do not "fix" them to satisfy a rule that isn't enforced here.
+- **Reuse the existing test helpers.** Both test files already have harnesses (`fakeRegistry`/`capture` in `dispatcher.test.mjs`; `createFakeDependencies`/`collect`/`createMessageRequest`/`createMcpGateway`/`createStrictWorkflowFetch` in `pi-runtime.test.mjs`). Do not add parallel ones.
 - **No `Co-Authored-By` trailers in commits.**
 
 ---
@@ -313,7 +315,43 @@ it('collapses a multi-line reason onto the stop_reason line', () => {
 
 Run: `node --test src/strict-workflows/routing-context.test.mjs` — Expected: PASS, 8 tests.
 
-- [ ] **Step 13: Commit**
+- [ ] **Step 13: Test the sanitiser directly**
+
+`sanitizeReason` and `MAX_REASON_CODE_POINTS` are exported, so pin them directly rather than only through `formatRoutingContext`. Add a second `describe` block:
+
+```js
+describe('sanitizeReason', () => {
+  it('returns an empty string for every non-string input', () => {
+    for (const input of [null, undefined, 42, {}, [], true]) {
+      assert.equal(sanitizeReason(input), '', `input=${JSON.stringify(input)}`);
+    }
+  });
+
+  it('applies strip, collapse and truncate in that order', () => {
+    assert.equal(sanitizeReason('  a  <b>  c  '), 'a b c');
+    assert.equal(
+      sanitizeReason(`${' '.repeat(50)}${'x'.repeat(MAX_REASON_CODE_POINTS)}`),
+      'x'.repeat(MAX_REASON_CODE_POINTS),
+    );
+  });
+});
+```
+
+The second assertion is the order check: 50 leading spaces plus exactly 500 `x` must survive intact. Truncating _before_ collapsing would spend 50 of the 500 on whitespace and lose 50 `x`, so this fails if the order is wrong.
+
+Update the import at the top of the file:
+
+```js
+import { formatRoutingContext, MAX_REASON_CODE_POINTS, sanitizeReason } from './routing-context.mjs';
+```
+
+- [ ] **Step 14: Run and confirm green**
+
+Run: `node --test src/strict-workflows/routing-context.test.mjs` — Expected: PASS, 10 tests.
+
+To prove the order test can fail: temporarily move the truncate step before the collapse in `sanitizeReason`, re-run, observe red, revert.
+
+- [ ] **Step 15: Commit**
 
 ```bash
 git add agent-runner/src/strict-workflows/routing-context.test.mjs
@@ -613,47 +651,92 @@ git commit -m "feat(agent): forward strict-workflow routing context on handoff, 
 - Consumes: `formatRoutingContext` (Task 1); `dispatch.routingContext` (Task 2).
 - Produces: an `entry.session.sendCustomMessage({ customType: 'gallery_routing_context', content, display: false }, { deliverAs: 'nextTurn' })` call before the open turn's `prompt()`.
 
-**Scoping constraint — read before editing.** `const dispatch` is declared **inside** the `try` at `:1303`, so it is **out of scope** at the fall-through comment on `:1337`. The context must be hoisted into a `let` declared before the `try`. Dropping the spec's illustrative snippet in verbatim will not compile.
+### Two constraints you must read before editing
+
+**1. `dispatch` is out of scope at the fall-through.** `const dispatch` is declared **inside** the `try` at `:1303`, so it is not visible at the fall-through comment on `:1337`. The context must be hoisted into a `let` declared before the `try`. The design doc's illustrative snippet reads `dispatch.routingContext` at the fall-through; that will not compile.
+
+**2. There is no way to stub the dispatcher.** `createPiRuntime` accepts only `{ sdk, ai, fetch, now, routerMode, copyMode, log }` (`pi-runtime.mjs:1061-1077`) and builds its dispatcher internally from the real registry at `:1241`. You **cannot** inject a fake `routeTurn`. Handoffs must be produced through the **real** dispatcher.
+
+The cheapest real handoff is the `slots_unparsed` exit: classify as `create_recent_trip_album` with empty slots. The real `parseSlots` requires `albumName` **or** `placeHint`, so `{}` returns null — and that exit is reached **before** any MCP call, so the test needs no tool traffic at all.
+
+**Existing helpers in `pi-runtime.test.mjs` — reuse these exact names:**
+
+| Helper                                     | Line   | Returns / use                      |
+| ------------------------------------------ | ------ | ---------------------------------- |
+| `createFakeDependencies({ mcpToolNames })` | `:101` | `{ sdk, ai, calls, session }`      |
+| `createMessageRequest(overrides)`          | `:93`  | request object for `sendMessage`   |
+| `createMcpGateway(overrides)`              | `:53`  | gateway for `createSessionBody`    |
+| `collect(stream)`                          | `:312` | drains an event stream to an array |
+| `createStrictWorkflowFetch(opts)`          | `:341` | `{ calls, fetchImplementation }`   |
+
+The entry point is `runtime.sendMessage(createMessageRequest({...}))`, **not** `runtime.prompt(...)`. `calls.prompts` records open-agent turns. `ai.classifyIntent` returns `{ workflow, slots, confidence }` — the field is `workflow`, **not** `kind`.
+
+The default fake `session` has **no** `sendCustomMessage`, which is itself the fail-open baseline (Step 8).
 
 - [ ] **Step 1: Write the failing delivery test**
 
-The existing fake session in `pi-runtime.test.mjs` (`:142`) has no `sendCustomMessage`, so add one to the fake plus a `calls.customMessages = []` counter alongside `calls.prompts`. Then append a test in the same style as the existing strict-dispatch tests:
+Append to the strict-dispatch `describe` block in `agent-runner/src/pi-runtime.test.mjs`:
 
 ```js
-it('delivers routing context to the open agent before the open turn starts', async () => {
-  const { runtime, calls, session } = createRuntimeHarness({
-    routeTurn: async () => ({
-      handled: false,
-      routingContext: {
-        workflowKind: 'create_recent_trip_album',
-        stage: 'declined',
-        reason: 'Source "the best shots" is subjective and cannot be resolved from metadata alone.',
-      },
-    }),
+it('delivers routing context to the open agent when slot parsing fails', async () => {
+  const { sdk, ai, calls, session } = createFakeDependencies({
+    mcpToolNames: ['mcp_gallery_findTripCandidates'],
   });
+  // Real workflow kind, slots the real parseSlots rejects (needs albumName OR
+  // placeHint) → the slots_unparsed exit, reached before any MCP call.
+  ai.classifyIntent = async () => ({
+    workflow: 'create_recent_trip_album',
+    slots: {},
+    confidence: 'high',
+  });
+
+  const customMessages = [];
+  session.sendCustomMessage = async (message, options) => {
+    // Capture how many open turns had started, to assert ordering for real.
+    customMessages.push({ message, options, promptsSoFar: calls.prompts.length });
+  };
+
+  const mcpCalls = [];
+  const fetchImplementation = async (url, init) => {
+    mcpCalls.push({ url: String(url), body: JSON.parse(init.body) });
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: {} }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const runtime = createPiRuntime({ sdk, ai, fetch: fetchImplementation });
   await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
 
-  await drain(runtime.prompt({ gallerySessionId: createSessionBody().gallerySessionId, text: 'best shots' }));
+  await collect(
+    runtime.sendMessage(
+      createMessageRequest({
+        content: { blocks: [{ type: 'text', text: 'make an album for my recent trip' }] },
+      }),
+    ),
+  );
 
-  assert.equal(calls.customMessages.length, 1);
-  assert.equal(calls.customMessages[0].message.customType, 'gallery_routing_context');
-  assert.equal(calls.customMessages[0].message.display, false);
-  assert.equal(calls.customMessages[0].options.deliverAs, 'nextTurn');
-  assert.match(calls.customMessages[0].message.content, /^router_matched: Create recent trip album$/m);
-  // Ordering matters: the block must be queued BEFORE the prompt that consumes it.
-  assert.ok(calls.customMessages[0].seq < calls.prompts.at(-1).seq);
+  assert.equal(customMessages.length, 1);
+  assert.equal(customMessages[0].message.customType, 'gallery_routing_context');
+  assert.equal(customMessages[0].message.display, false);
+  assert.equal(customMessages[0].options.deliverAs, 'nextTurn');
+  assert.match(customMessages[0].message.content, /^router_matched: Create recent trip album$/m);
+  assert.match(customMessages[0].message.content, /^note: The router matched this request/m);
+  // Queued BEFORE the open turn that consumes it.
+  assert.equal(customMessages[0].promptsSoFar, 0);
+  assert.equal(calls.prompts.length, 1);
+  // The slots_unparsed exit precedes any tool call.
+  assert.equal(mcpCalls.length, 0);
 });
 ```
 
-Adapt `createRuntimeHarness` / `drain` to whatever the file's existing helpers are named — reuse them, do not add parallel harnesses. Record a monotonic `seq` on both `customMessages` and `prompts` pushes so the ordering assertion is real rather than incidental.
-
-- [ ] **Step 2: Run and confirm it fails**
+- [ ] **Step 2: Run and confirm it fails for the right reason**
 
 ```bash
 cd agent-runner && node --test src/pi-runtime.test.mjs
 ```
 
-Expected: FAIL — `calls.customMessages.length` is `0`.
+Expected: FAIL — `customMessages.length` is `0`, because nothing calls `sendCustomMessage` yet. Confirm the failure is that assertion and **not** a module-resolution or helper-name error.
 
 - [ ] **Step 3: Implement the hoist and the delivery**
 
@@ -663,11 +746,11 @@ Add to the import block at the top of `pi-runtime.mjs`:
 import { formatRoutingContext } from './strict-workflows/routing-context.mjs';
 ```
 
-Hoist the context out of the try, then deliver after the `finally`:
+Then hoist the context out of the `try` and deliver it after the `finally`:
 
 ```js
-// Hoisted: `dispatch` is block-scoped to the try below, and the delivery
-// has to happen after the finally has released the strict-stream state.
+// Hoisted: `dispatch` is block-scoped to the try below, and delivery has
+// to happen after the finally has released the strict-stream state.
 let handoffRoutingContext;
 try {
   const dispatch = await entry.dispatcher.routeTurn({
@@ -700,6 +783,8 @@ try {
 entry.inFlight = true;
 ```
 
+`agent-runner` has **no** eslint/biome config and no `lint` script, so the bare `catch {}` and the `_ignored` destructure in Task 2 are both fine as written. Do not "fix" them.
+
 - [ ] **Step 4: Run and confirm green**
 
 Run: `node --test src/pi-runtime.test.mjs` — Expected: PASS.
@@ -711,43 +796,96 @@ git add agent-runner/src/pi-runtime.mjs agent-runner/src/pi-runtime.test.mjs
 git commit -m "feat(agent): deliver routing context to the open agent on strict-workflow handoff"
 ```
 
-- [ ] **Step 6: Write the failing non-delivery and fail-open tests**
+- [ ] **Step 6: Write the two non-delivery tests**
 
 ```js
-it('sends no routing context when the strict layer handled the turn', async () => {
-  const { runtime, calls } = createRuntimeHarness({ routeTurn: async () => ({ handled: true }) });
+it('sends no routing context when the router matches nothing', async () => {
+  const { sdk, ai, calls, session } = createFakeDependencies({
+    mcpToolNames: ['mcp_gallery_searchAssets'],
+  });
+  // Default classifyIntent already returns { workflow: 'none' } — no override.
+  const customMessages = [];
+  session.sendCustomMessage = async (message, options) => customMessages.push({ message, options });
+
+  const runtime = createPiRuntime({ sdk, ai });
   await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
 
-  await drain(runtime.prompt({ gallerySessionId: createSessionBody().gallerySessionId, text: 'rename it' }));
+  await collect(
+    runtime.sendMessage(
+      createMessageRequest({ content: { blocks: [{ type: 'text', text: 'what is the weather in Berlin' }] } }),
+    ),
+  );
 
-  assert.equal(calls.customMessages.length, 0);
-  assert.equal(calls.prompts.length, 0);
-});
-
-it('sends no routing context when the router matched nothing', async () => {
-  const { runtime, calls } = createRuntimeHarness({ routeTurn: async () => ({ handled: false }) });
-  await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
-
-  await drain(runtime.prompt({ gallerySessionId: createSessionBody().gallerySessionId, text: 'hello there' }));
-
-  assert.equal(calls.customMessages.length, 0);
+  assert.equal(customMessages.length, 0);
   assert.equal(calls.prompts.length, 1);
 });
 
-it('still runs the open turn when sendCustomMessage rejects', async () => {
-  const { runtime, calls, session } = createRuntimeHarness({
-    routeTurn: async () => ({
-      handled: false,
-      routingContext: { workflowKind: 'create_recent_trip_album', stage: 'declined', reason: 'Nope.' },
-    }),
+it('sends no routing context when a strict workflow handled the turn', async () => {
+  const { sdk, ai, calls, session } = createFakeDependencies({
+    mcpToolNames: ['mcp_gallery_findTripCandidates', 'mcp_gallery_proposeAlbumFromSelection'],
   });
+  ai.classifyIntent = async () => ({
+    workflow: 'create_recent_trip_album',
+    slots: { placeHint: 'Japan' },
+    confidence: 'high',
+  });
+  const customMessages = [];
+  session.sendCustomMessage = async (message, options) => customMessages.push({ message, options });
+
+  const { fetchImplementation } = createStrictWorkflowFetch({
+    candidates: [makeStrictTripCandidate({ placeLabels: ['Kyoto, Japan'] })],
+    recommendation: {
+      action: 'use_top_candidate',
+      candidateDedupeKey: 'trip:usa:new-york:2026-05-03:2026-05-12',
+      reason: 'The only readable trip candidate is high confidence.',
+    },
+    expectedAlbumName: 'Japan Trip',
+    placeHint: 'Japan',
+  });
+
+  const runtime = createPiRuntime({ sdk, ai, fetch: fetchImplementation });
+  await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
+
+  const events = await collect(
+    runtime.sendMessage(
+      createMessageRequest({
+        content: { blocks: [{ type: 'text', text: 'put my Japan trip from last week into an album' }] },
+      }),
+    ),
+  );
+
+  // Strict layer handled it: no open turn, and therefore no routing context.
+  assert.equal(calls.prompts.length, 0);
+  assert.equal(customMessages.length, 0);
+  assert.equal(events.at(-1).type, 'assistant-message-completed');
+});
+```
+
+The second test mirrors the known-good "recall" test already in this file (`:1084`); copy its `createStrictWorkflowFetch` arguments verbatim if they have drifted from the block above.
+
+- [ ] **Step 7: Run and confirm they pass**
+
+Run: `node --test src/pi-runtime.test.mjs` — Expected: PASS.
+
+- [ ] **Step 8: Write the two fail-open tests**
+
+```js
+it('still runs the open turn when sendCustomMessage rejects', async () => {
+  const { sdk, ai, calls, session } = createFakeDependencies({
+    mcpToolNames: ['mcp_gallery_findTripCandidates'],
+  });
+  ai.classifyIntent = async () => ({ workflow: 'create_recent_trip_album', slots: {}, confidence: 'high' });
   session.sendCustomMessage = async () => {
     throw new Error('queue full');
   };
+
+  const runtime = createPiRuntime({ sdk, ai });
   await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
 
-  const events = await drain(
-    runtime.prompt({ gallerySessionId: createSessionBody().gallerySessionId, text: 'best shots' }),
+  const events = await collect(
+    runtime.sendMessage(
+      createMessageRequest({ content: { blocks: [{ type: 'text', text: 'make an album for my recent trip' }] } }),
+    ),
   );
 
   assert.equal(calls.prompts.length, 1);
@@ -758,17 +896,21 @@ it('still runs the open turn when sendCustomMessage rejects', async () => {
 });
 
 it('still runs the open turn when the session has no sendCustomMessage', async () => {
-  const { runtime, calls, session } = createRuntimeHarness({
-    routeTurn: async () => ({
-      handled: false,
-      routingContext: { workflowKind: 'create_recent_trip_album', stage: 'declined', reason: 'Nope.' },
-    }),
+  // The default fake session deliberately has no sendCustomMessage — this is
+  // the older-SDK / missing-method path.
+  const { sdk, ai, calls, session } = createFakeDependencies({
+    mcpToolNames: ['mcp_gallery_findTripCandidates'],
   });
-  delete session.sendCustomMessage;
+  assert.equal(session.sendCustomMessage, undefined);
+  ai.classifyIntent = async () => ({ workflow: 'create_recent_trip_album', slots: {}, confidence: 'high' });
+
+  const runtime = createPiRuntime({ sdk, ai });
   await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
 
-  const events = await drain(
-    runtime.prompt({ gallerySessionId: createSessionBody().gallerySessionId, text: 'best shots' }),
+  const events = await collect(
+    runtime.sendMessage(
+      createMessageRequest({ content: { blocks: [{ type: 'text', text: 'make an album for my recent trip' }] } }),
+    ),
   );
 
   assert.equal(calls.prompts.length, 1);
@@ -779,46 +921,41 @@ it('still runs the open turn when the session has no sendCustomMessage', async (
 });
 ```
 
-- [ ] **Step 7: Run and confirm they pass**
+- [ ] **Step 9: Run, then prove the reject test can fail**
 
 Run: `node --test src/pi-runtime.test.mjs` — Expected: PASS.
 
-To prove the reject test can fail: temporarily remove the `try`/`catch` added in Step 3, re-run, observe a `runner-error` surface, then restore it.
+Then temporarily delete the `try`/`catch` you added in Step 3 (keeping the body), re-run, and **observe the reject test go red** with a `runner-error` event. Restore the `try`/`catch`.
 
-- [ ] **Step 8: Write the failing per-turn-scoping test**
+This is the only way to know the fail-open guard is real. There is deliberately **no** separate "formatRoutingContext throws" test: the formatter is imported directly rather than injected, and it is written to be total, so there is no honest way to force it to throw from here. The same `catch` block covers both, and this test exercises it.
 
-This one asserts the property the whole mechanism rests on — the SDK clears its queue each turn, so a note is never re-delivered.
+- [ ] **Step 10: Write the one-block-per-turn test**
 
 ```js
-it('queues one block per handoff turn and never re-delivers the previous one', async () => {
-  let turn = 0;
-  const { runtime, calls } = createRuntimeHarness({
-    routeTurn: async () => {
-      turn += 1;
-      return {
-        handled: false,
-        routingContext: {
-          workflowKind: 'create_recent_trip_album',
-          stage: 'declined',
-          reason: `Blocked on turn ${turn}.`,
-        },
-      };
-    },
+it('queues exactly one routing-context block per handoff turn', async () => {
+  const { sdk, ai, calls, session } = createFakeDependencies({
+    mcpToolNames: ['mcp_gallery_findTripCandidates'],
   });
-  const { gallerySessionId } = createSessionBody();
+  ai.classifyIntent = async () => ({ workflow: 'create_recent_trip_album', slots: {}, confidence: 'high' });
+  const customMessages = [];
+  session.sendCustomMessage = async (message, options) => customMessages.push({ message, options });
+
+  const runtime = createPiRuntime({ sdk, ai });
   await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
 
-  await drain(runtime.prompt({ gallerySessionId, text: 'first' }));
-  await drain(runtime.prompt({ gallerySessionId, text: 'second' }));
+  for (const text of ['make an album for my recent trip', 'make an album for my recent trip']) {
+    await collect(runtime.sendMessage(createMessageRequest({ content: { blocks: [{ type: 'text', text }] } })));
+  }
 
-  assert.equal(calls.customMessages.length, 2);
-  assert.match(calls.customMessages[0].message.content, /Blocked on turn 1\./);
-  assert.match(calls.customMessages[1].message.content, /Blocked on turn 2\./);
-  assert.doesNotMatch(calls.customMessages[1].message.content, /turn 1/);
+  // One per handoff turn — not zero, and not accumulating.
+  assert.equal(customMessages.length, 2);
+  assert.equal(calls.prompts.length, 2);
 });
 ```
 
-- [ ] **Step 9: Run, then run the full suite and commit**
+This asserts the property **we** own: one `sendCustomMessage` per handoff turn. It deliberately does **not** claim to verify that the SDK clears its queue between turns — the fake session records calls and has no queue, so any such assertion here would pass no matter what the SDK did. The queue-clear is SDK behaviour, evidenced in `agent-session.js:772-775` and cited in the design doc; it is not ours to test.
+
+- [ ] **Step 11: Run the full suite and commit**
 
 ```bash
 cd agent-runner && node --test src/pi-runtime.test.mjs && pnpm test 2>&1 | tail -20
@@ -828,7 +965,7 @@ Expected: PASS, and the full suite green with no regressions.
 
 ```bash
 git add agent-runner/src/pi-runtime.test.mjs
-git commit -m "test(agent): routing-context delivery is per-turn and fails open"
+git commit -m "test(agent): routing-context delivery is per-turn, ordered, and fails open"
 ```
 
 ---
@@ -837,33 +974,49 @@ git commit -m "test(agent): routing-context delivery is per-turn and fails open"
 
 **Files:** none modified — this task only runs and records.
 
-- [ ] **Step 1: Full suite**
+- [ ] **Step 1: Full unit suite**
 
 ```bash
 cd agent-runner && pnpm test 2>&1 | tail -30
 ```
 
-Expected: all tests pass. Record the count; it should exceed the pre-change 1845 by the number of tests added above.
+Expected: all tests pass. Record the count; it should exceed the pre-change 1845 by the number of tests added in Tasks 1-3.
 
-- [ ] **Step 2: L1 eval — assert no regression**
+- [ ] **Step 2: L2 eval — no regression**
 
-```bash
-cd agent-runner && pnpm eval -- --diff 2>&1 | tail -30
-```
-
-Expected: no regression against `baseline.json`. L1 sits at 0.998 overall and Phase 1 must not move it — nothing in Task 1-3 touches classification. **If L1 moves at all, stop and investigate**; it means the dispatcher change altered routing rather than only its return value.
-
-- [ ] **Step 3: L2 eval — assert no regression**
+L2 needs **no model and no server** (`eval/config.mjs`: "L2 (fake MCP, regex routing, no model)"), so this always runs.
 
 ```bash
-cd agent-runner && pnpm eval:l2 -- --diff 2>&1 | tail -30
+cd agent-runner && node eval/run.mjs --layer L2 --diff 2>&1 | tail -30
 ```
 
-Expected: 6/6, exit 0, no diff against `baseline.l2.json`. L2 asserts `handled` and outcome status, neither of which Phase 1 changes.
+Expected: 6/6, exit 0, no diff against `baseline.l2.json`. Phase 1 changes neither `handled` nor outcome status, which is all L2 asserts.
+
+Invoked directly rather than through `pnpm eval:l2 -- --diff` to avoid any ambiguity in argument forwarding.
+
+- [ ] **Step 3: L1 eval — no regression, IF the local model is up**
+
+**Prerequisite:** L1 builds the real classifier against a local OpenAI-compatible server, default `http://127.0.0.1:8080/v1` (`eval/config.mjs`, `EVAL_LLAMA_URL`). Without it this step cannot run — a connection error is **not** a regression.
+
+Check first:
+
+```bash
+curl -sf http://127.0.0.1:8080/v1/models >/dev/null && echo UP || echo DOWN
+```
+
+If UP:
+
+```bash
+cd agent-runner && node eval/run.mjs --diff 2>&1 | tail -30
+```
+
+Expected: no regression against `baseline.json` (currently 0.998 overall). Nothing in Tasks 1-3 touches classification, so **L1 must not move at all**. If it does, stop and investigate: it means the dispatcher change altered routing rather than only its return value.
+
+If DOWN: record that L1 was not verified locally and say so explicitly in the Step 4 report. Do not claim it passed.
 
 - [ ] **Step 4: Report**
 
-State the three results plainly, with the actual output. If any is red, do not proceed to Phase 2.
+State each result plainly, with the actual command output. Name any step that was skipped and why. If anything is red, do not proceed to Phase 2.
 
 ---
 
@@ -895,9 +1048,18 @@ This also interacts with the standing gap from the design's §10: `agent-runner`
 
 **Spec coverage.** §3 injection mechanism → Task 3. §4 dispatcher contract, including the `routeApproval` discard and null-`reason` tolerance → Task 2. §5 block format, sanitiser order, code-point truncation, reason-less form, all three binding rules → Task 1. §6 runtime wiring, both defences → Task 3. §7 all 34 listed tests → distributed across Tasks 1-3 and gated by Task 4. §8 Phase 2 → **blocked, decision required** (documented above rather than papered over). §9 non-goals → nothing in Tasks 1-4 touches decline conditions, the behavior prompt, the tool catalogue, or CI.
 
-**Type consistency.** `formatRoutingContext` / `sanitizeReason` / `MAX_REASON_CODE_POINTS` are named identically in Task 1's implementation, Task 1's tests, and Task 3's import. The `routingContext` shape `{ workflowKind, stage, reason }` is identical in Task 1's consumed-interface block, Task 2's produced values, and Task 3's test fixtures. `stage` is only ever `'declined'` or `'slots_unparsed'`.
+**Type consistency.** `formatRoutingContext` / `sanitizeReason` / `MAX_REASON_CODE_POINTS` are named identically in Task 1's implementation, Task 1's tests, and Task 3's import. The `routingContext` shape `{ workflowKind, stage, reason }` is identical in Task 1's consumed-interface block, Task 2's produced values, and Task 3's test fixtures. `stage` is only ever `'declined'` or `'slots_unparsed'`. `ai.classifyIntent` returns `{ workflow, slots, confidence }` — `workflow`, never `kind` — in every Task 3 test.
 
 **Deviations from the spec, deliberate:**
 
 1. **The `dispatch` hoist** (Task 3). The spec's §6 snippet reads `dispatch.routingContext` at the fall-through, but `const dispatch` is try-scoped at `:1303` and out of scope by `:1337`. The plan hoists into `let handoffRoutingContext`. The spec's snippet was illustrative; this is the compiling form.
-2. **`catch` without binding the error** (Task 3). The spec's sample bound `error` but the house log style takes no error argument, and the constraint forbids logging it verbatim. Binding an unused variable would trip lint.
+2. **`catch` without binding the error** (Task 3). The spec's sample bound `error`, but the house log style takes no error argument and the constraint forbids logging it verbatim. `agent-runner` has no linter, so a bare `catch {}` is fine.
+3. **No "`formatRoutingContext` throws" test**, despite §7 listing one. The formatter is imported directly rather than injected, and is written to be total, so there is no honest way to force it to throw from the runtime. The same `catch` block is exercised by the `sendCustomMessage`-rejects test. Stated rather than faked.
+4. **The `stage: 'declined'` path is verified at the dispatcher layer only** (Task 2), not again at the runtime layer. Task 3 drives handoffs through `slots_unparsed`, which needs no MCP traffic. The runtime only branches on the context being present or absent, so re-driving the other stage through a live workflow would add setup without adding coverage.
+
+**Corrections applied after reviewing this plan against the codebase.** All four were plan bugs, not spec bugs:
+
+1. **Task 3's test API was fabricated.** The first draft used `createRuntimeHarness({ routeTurn })`, `drain(...)` and `runtime.prompt({...})`. None exist. Rewritten against the real surface: `createFakeDependencies({ mcpToolNames }) → { sdk, ai, calls, session }`, `collect(...)`, `runtime.sendMessage(createMessageRequest({...}))`.
+2. **The dispatcher cannot be stubbed.** `createPiRuntime` takes only `{ sdk, ai, fetch, now, routerMode, copyMode, log }` and builds its dispatcher internally at `:1241`, so no fake `routeTurn` is injectable. Task 3 now produces real handoffs via `ai.classifyIntent` and the real `parseSlots` null exit.
+3. **A test that could not fail.** The first draft's per-turn test asserted the previous turn's block was "never re-delivered" — but the fake session merely records calls and has no queue, so the assertion held regardless of behaviour. Reframed to the property this code actually owns: exactly one `sendCustomMessage` per handoff turn. The SDK's queue-clear is cited from `agent-session.js:772-775`, not re-tested here.
+4. **L1 eval was treated as unconditionally runnable.** It needs a local OpenAI-compatible server (`EVAL_LLAMA_URL`, default `127.0.0.1:8080/v1`). Task 4 Step 3 now probes for it first and requires the report to say so explicitly when it was not verified. L2 needs no model and stays unconditional.
