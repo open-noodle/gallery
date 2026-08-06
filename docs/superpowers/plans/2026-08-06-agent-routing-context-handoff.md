@@ -1081,3 +1081,35 @@ This also interacts with the standing gap from the design's §10: `agent-runner`
 2. **The dispatcher cannot be stubbed.** `createPiRuntime` takes only `{ sdk, ai, fetch, now, routerMode, copyMode, log }` and builds its dispatcher internally at `:1241`, so no fake `routeTurn` is injectable. Task 3 now produces real handoffs via `ai.classifyIntent` and the real `parseSlots` null exit.
 3. **A test that could not fail.** The first draft's per-turn test asserted the previous turn's block was "never re-delivered" — but the fake session merely records calls and has no queue, so the assertion held regardless of behaviour. Reframed to the property this code actually owns: exactly one `sendCustomMessage` per handoff turn. The SDK's queue-clear is cited from `agent-session.js:772-775`, not re-tested here.
 4. **L1 eval was treated as unconditionally runnable.** It needs a local OpenAI-compatible server (`EVAL_LLAMA_URL`, default `127.0.0.1:8080/v1`). Task 4 Step 3 now probes for it first and requires the report to say so explicitly when it was not verified. L2 needs no model and stays unconditional.
+
+---
+
+## Outcome and follow-ups
+
+Phase 1 shipped in 9 commits, `a297a4b187a..97a0e6269b7`. Final state: **1875/1875** unit tests pass (from 1845 pre-feature), **L2 eval 6/6, 100%, +0.0pp** against `baseline.l2.json`, exit 0.
+
+**L1 eval was NOT run.** It requires a local OpenAI-compatible server (`EVAL_LLAMA_URL`, default `127.0.0.1:8080/v1`), which was down. Its 0.998 baseline is untouched on disk. L1 is unverified, not passing — nothing in Tasks 1-3 touches classification, but that remains an argument, not evidence.
+
+The final whole-branch review returned **ship with follow-ups**: 0 Critical, 0 Important, 6 Minor. Five were fixed in one wave (`97a0e6269b7`) and re-verified by independent mutation. Two were parked, both because the fix would move code the design spec deliberately placed — a decision that is not the reviewer's or the implementer's to make.
+
+### Parked — delivery placement (needs a human decision)
+
+**P1 — a queued block can strand onto the _next_ turn.** `deliverAs: 'nextTurn'` pushes onto the SDK's `_pendingNextTurnMessages`, drained only by the next `prompt()`. Between delivery (`pi-runtime.mjs:~1360`) and `prompt()` (`~1450`) two paths abandon the turn without prompting: `session.subscribe(...)` throwing, and `compactGalleryToolTranscript` throwing. The session is not disposed in either case, so the block lands on the user's _next_ message — where its "the request immediately above" preamble is false, and the model receives a confident router diagnosis of a different request, with user authority. Needs an error path, is non-destructive, and self-heals after one turn. The approval-resume path uses `continue()`, which would not drain it either.
+
+**P2 — the placement itself may be wrong.** Moving delivery _inside_ the existing strict `try` would need no hoist, would keep `entry.inFlight` up for free rather than re-taking it, and would keep `entry.abortActiveStream` bound across the delivery await. As shipped, `abortActiveStream` is unbound across that await, so a `disposeSession` racing delivery no longer aborts; the generator then prompts a disposed session and yields a runner-error (bounded — the `finally` has already cleared `inFlight`).
+
+Both point at the same question: should delivery sit after the `finally` (as §6 specifies) or inside the strict `try`? Inside-the-try placement would also shrink P1's window. **No test currently pins the placement either way** — verified by moving the block inside the `try` and observing the suite stay green.
+
+### Deferred minors
+
+- The `declined` exit — the one carrying a non-null `reason`, where `sanitizeReason` matters — has no end-to-end runtime test; dispatcher and formatter unit coverage only. Adjudicated ship-OK: the runtime does not branch on `stage`, and no production code reads it.
+- A test comment in `pi-runtime.test.mjs` says "all 101 tests" and predates this wave's own additions. Cosmetic staleness.
+- `routingContext.stage` is set but never read by production code. Kept as diagnostic signal and documented as such at all three sites; Phase 2 may consume it.
+
+### Out of scope, pre-existing — worth its own ticket
+
+On the not-handled exits, `strictEvents` is discarded (`pi-runtime.mjs:~1322-1326` yields it only when `handled`). So the `workflow-state-update` that `setPending(undefined)` emits via `withDurableSetPending` on a **continuation** handoff never reaches the server, leaving a stale persisted `pendingWorkflow`. This feature's "resumed continuation declines" test walks straight past it.
+
+### Phase 2 remains blocked
+
+Unchanged from §8: the L2 driver constructs no agent session, and the injection it would A/B lives in `pi-runtime.mjs`, which L2 does not exercise. Options A/B/C stand as written.
