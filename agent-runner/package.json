@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node --watch src/server.mjs",
     "start": "node src/server.mjs",
-    "test": "node --test 'src/**/*.test.mjs'",
+    "test": "node --test '{src,eval}/**/*.test.mjs'",
     "eval": "node --env-file-if-exists=.env eval/run.mjs",
     "eval:l3": "node --env-file-if-exists=.env eval/run.mjs --layer L3"
   },
