@@ -1300,8 +1300,19 @@ export const createPiRuntime = ({
           emit: (event) => strictEvents.push(event),
           log,
         });
-        // Hoisted: `dispatch` is block-scoped to the try below, and delivery has
-        // to happen after the finally has released the strict-stream state.
+        // Hoisted: `dispatch` is block-scoped to the try below. Delivery does
+        // NOT structurally need to happen after the finally — placing it
+        // inside this try would need no hoist at all, and would keep
+        // `entry.inFlight` up "for free" across the delivery await. Placement
+        // after the finally is a deliberate choice from the design doc (§6),
+        // and the hoist is what that choice requires.
+        //
+        // Known, bounded consequence of that placement: `entry.abortActiveStream`
+        // is unbound (cleared by the finally below) across the awaited delivery.
+        // A `disposeSession` racing that window has nothing to abort, but the
+        // outcome is still a runner-error, not a hang or silent corruption —
+        // and by then the finally has already cleared `entry.inFlight`, so
+        // there is no dangling in-flight state left over either.
         let handoffRoutingContext;
         try {
           const dispatch = await entry.dispatcher.routeTurn({

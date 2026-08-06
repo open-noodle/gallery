@@ -185,7 +185,18 @@ export const createWorkflowDispatcher = ({
         return {
           handled: false,
           routingContext: {
-            workflowKind: wf.kind,
+            // `wf?.kind ?? null`, matching the sibling `observeOutcome` call
+            // above (`:121`): no caller can reach this branch with a null `wf`
+            // today, but unlike `observeOutcome` this branch did not touch `wf`
+            // before routingContext existed, so an undefined `wf` here would
+            // turn a fall-through into a TypeError instead of degrading. The
+            // formatter already returns `null` for a falsy `workflowKind`, so a
+            // null here renders as "no block", not a broken one.
+            workflowKind: wf?.kind ?? null,
+            // Diagnostic-only: genuine signal for a future (Phase 2) consumer.
+            // `formatRoutingContext` (routing-context.mjs) deliberately never
+            // reads this field when deciding how to render — do not assume it
+            // does.
             stage: 'declined',
             reason: outcome?.reason ?? null,
           },
@@ -273,6 +284,8 @@ export const createWorkflowDispatcher = ({
       // still worth forwarding — only the details were unusable.
       return {
         handled: false,
+        // Diagnostic-only: see the comment on the `stage: 'declined'` site
+        // above — `stage` is never read by the formatter.
         routingContext: { workflowKind: decision.kind, stage: 'slots_unparsed', reason: null },
       };
     }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createWorkflowDispatcher } from './dispatcher.mjs';
+import { formatRoutingContext } from './routing-context.mjs';
 
 const fakeRegistry = (workflow) => ({
   classify: (prompt) =>
@@ -531,6 +532,39 @@ describe('workflow dispatcher', () => {
       stage: 'declined',
       reason: null,
     });
+  });
+
+  it('degrades to a null workflowKind, not a throw, when the matched workflow carries no `kind`', async () => {
+    // Mirrors the sibling `observeOutcome` guard (`wf?.kind ?? null`, :121):
+    // the handoff_open/default branch (:195) reads `wf?.kind ?? null` too, so a
+    // workflow object missing `kind` — a registry/manifest drift, not something
+    // that can happen via `getWorkflow`'s own kind-keyed lookup for a REAL
+    // dispatch, but exactly the shape a stale registry entry could hand back —
+    // degrades the field to `null` rather than reading `.kind` off nothing and
+    // throwing. `fakeRegistry` here keys `getWorkflow` on `workflow.kind` itself
+    // (undefined), so `decision.kind` and the lookup both resolve to `undefined`
+    // and `wf` stays a real, truthy object throughout — it is `wf.kind` alone
+    // that is missing.
+    const workflow = {
+      // No `kind` field, deliberately.
+      match: (p) => (p.includes('recent trip') ? { slots: {} } : undefined),
+      parseSlots: (s) => s,
+      run: async () => ({ status: 'handoff_open', reason: 'missing-kind workflow object' }),
+    };
+    const sink = capture();
+    const dispatcher = createWorkflowDispatcher({ registry: fakeRegistry(workflow), buildClient: () => ({}) });
+
+    const result = await dispatcher.routeTurn({ prompt: 'make an album for my recent trip', ...sink });
+
+    assert.equal(result.handled, false);
+    assert.deepEqual(result.routingContext, {
+      workflowKind: null,
+      stage: 'declined',
+      reason: 'missing-kind workflow object',
+    });
+    // End-to-end, not assumed: a null workflowKind must render as "no block",
+    // exactly like the fully-absent-context case, never a broken block.
+    assert.equal(formatRoutingContext(result.routingContext), null);
   });
 });
 
