@@ -1090,7 +1090,21 @@ Phase 1 shipped in 13 commits, `a297a4b187a..4526cd1fa77` (including the Option 
 Final state: **1879/1879** unit tests pass (from 1845 pre-feature), **L2 eval 6/6, 100%, +0.0pp**
 against `baseline.l2.json`, exit 0.
 
-**L1 eval was NOT run.** It requires a local OpenAI-compatible server (`EVAL_LLAMA_URL`, default `127.0.0.1:8080/v1`), which was down. Its 0.998 baseline is untouched on disk. L1 is unverified, not passing — nothing in Tasks 1-3 touches classification, but that remains an argument, not evidence.
+**L1 eval: RUN AND CLEAN.** Verified 2026-08-06 against the baseline's own model (`Qwen3-Coder-Next-Q8_0`, official 4-shard GGUF) at `EVAL_RUNS=3` — the same setting the baseline was recorded at:
+
+|                                 | pre-Phase-1 (`a297a4b187a`) | HEAD              |
+| ------------------------------- | --------------------------- | ----------------- |
+| overall                         | 99% (224/226)               | 99% (**225/226**) |
+| `neg.unsup.delete`              | fails                       | fails (identical) |
+| `copy.trip.italy.no-exclusions` | fails (33%)                 | passes            |
+
+**Phase 1 introduced no L1 regressions.** The one failure at HEAD fails identically before the change, and reports `via=regex` — the deterministic fast-path, no model involved, so neither Phase 1 nor a model difference can explain it. It is a pre-existing contradiction in the branch: the scenario asserts deletion is unsupported while `delete_album` exists in `WORKFLOW_MANIFEST` and its regex matches "delete the Family album". Both landed in the same squashed transplant commit (`503f2d203ee`), so git cannot date them relative to each other.
+
+`copy.trip.italy.no-exclusions` is the known-flaky scenario — `baseline.json` itself records it at 67%. It is LLM-generated prose scored by substring match, so it varies run to run; HEAD passing it is variance, not improvement.
+
+`baseline.json` was NOT re-recorded. Doing so would silence the `neg.unsup.delete` false regression, but would also bake in whatever the flaky copy scenario happened to score. Worth doing deliberately, not as a side effect of this verification.
+
+This confirms empirically what was already true structurally: L1 exercises `classifier.mjs`, `manifest.mjs`, `registry.mjs` and `copy.mjs` — all byte-for-byte unchanged by Phase 1 — plus `createPiClassifyIntent` (line 112) and `createPiPolishCopy` (line 173), while the nearest Phase 1 edit to `pi-runtime.mjs` is at line 1286.
 
 The final whole-branch review returned **ship with follow-ups**: 0 Critical, 0 Important, 6 Minor. Five were fixed in one wave (`97a0e6269b7`) and re-verified by independent mutation. Two were parked, both because the fix would move code the design spec deliberately placed — a decision that is not the reviewer's or the implementer's to make.
 
