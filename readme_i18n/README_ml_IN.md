@@ -1,20 +1,20 @@
 <p align="center"> 
   <br/>
   <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=License&logoColor=000000&labelColor=ececec" alt="License: AGPLv3"></a>
-  <a href="https://discord.immich.app">
-    <img src="https://img.shields.io/discord/979116623879368755.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" alt="Discord"/>
+  <a href="https://discord.gg/cxBfbuxyG4">
+    <img src="https://img.shields.io/discord/1480633426376921239.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" alt="Discord"/>
   </a>
   <br/>
   <br/>
 </p>
 
 <p align="center">
-<img src="../design/immich-logo-stacked-light.svg" width="300" title="Immich">
+<img src="../design/gallery-logo-stacked-light.svg" width="300" title="Noodle Gallery">
 </p>
 <h3 align="center">ഫോട്ടോകളും വീഡിയോകളും കൈകാര്യം ചെയ്യുന്നതിനുള്ള ഉയർന്ന കാര്യക്ഷമതയുള്ള സെൽഫ്-ഹോസ്റ്റഡ് ആപ്ലിക്കേഷൻ</h3>
 <br/>
-<a href="https://immich.app">
-<img src="../design/immich-screenshots.png" title="പ്രധാന സ്ക്രീൻഷോട്ട്">
+<a href="https://opennoodle.de">
+<img src="../design/gallery-screenshot.webp" title="പ്രധാന സ്ക്രീൻഷോട്ട്">
 </a>
 <br/>
 
@@ -41,33 +41,30 @@
 </p>
 
 
+> [!NOTE]
+> This is a **community fork** of [Immich](https://github.com/immich-app/immich) with additional features. For Docker images, migration instructions and the full list of changes, see the [main README](../README.md).
+
 > [!WARNING]
 > ⚠️ നിങ്ങളുടെ വിലയേറിയ ഫോട്ടോകൾക്കും വീഡിയോകൾക്കും എല്ലായ്പ്പോഴും [3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) ബാക്കപ്പ് പ്ലാൻ പിന്തുടരുക!
 > 
 
 > [!NOTE]
-> ഇൻസ്റ്റാളേഷൻ ഗൈഡുകൾ ഉൾപ്പെടെയുള്ള പ്രധാന ഡോക്യുമെന്റേഷൻ https://immich.app/ എന്ന വെബ്സൈറ്റിൽ നിങ്ങൾക്ക് കണ്ടെത്താം.
+> ഇൻസ്റ്റാളേഷൻ ഗൈഡുകൾ ഉൾപ്പെടെയുള്ള പ്രധാന ഡോക്യുമെന്റേഷൻ https://opennoodle.de/ എന്ന വെബ്സൈറ്റിൽ നിങ്ങൾക്ക് കണ്ടെത്താം.
 
 ## ലിങ്കുകൾ
 
-- [ഡോക്യുമെന്റേഷൻ](https://docs.immich.app/)
-- [വിവരങ്ങൾ](https://docs.immich.app/overview/introduction)
-- [ഇൻസ്റ്റാളേഷൻ](https://docs.immich.app/install/requirements)
-- [റോഡ്മാപ്പ്](https://immich.app/roadmap)
+- [ഡോക്യുമെന്റേഷൻ](https://docs.opennoodle.de/)
+- [വിവരങ്ങൾ](https://docs.opennoodle.de/overview/quick-start)
+- [ഇൻസ്റ്റാളേഷൻ](https://docs.opennoodle.de/install/requirements)
+- [റോഡ്മാപ്പ്](https://opennoodle.de/roadmap)
 - [ഡെമോ](#ഡെമോ)
 - [സവിശേഷതകൾ](#സവിശേഷതകൾ)
-- [വിവർത്തനങ്ങൾ](https://docs.immich.app/developer/translations)
-- [സംഭാവന നൽകൽ](https://docs.immich.app/overview/support-the-project)
+- [വിവർത്തനങ്ങൾ](https://docs.opennoodle.de/developer/translations)
+- [സംഭാവന നൽകൽ](https://docs.opennoodle.de/overview/support-the-project)
 
 ## ഡെമോ
 
-ഡെമോ വെബ്സൈറ്റ് [ഇവിടെ](https://demo.immich.app) ആക്സസ് ചെയ്യാം. മൊബൈൽ ആപ്പിന്റെ ഡെമോ കാണാൻ ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്ത ശേഷം, `Server Endpoint URL` എന്ന സെറ്റിങ്ങിൽ നിങ്ങൾക്ക് `https://demo.immich.app` ഉപയോഗിക്കാം.
-
-### ലോഗിൻ വിവരങ്ങൾ
-
-| ഇമെയിൽ          | പാസ്‌വേഡ് |
-| --------------- | -------- |
-| demo@immich.app | demo     |
+ഡെമോ വെബ്സൈറ്റ് [ഇവിടെ](https://demo.opennoodle.de) ആക്സസ് ചെയ്യാം. മൊബൈൽ ആപ്പിന്റെ ഡെമോ കാണാൻ ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്ത ശേഷം, `Server Endpoint URL` എന്ന സെറ്റിങ്ങിൽ നിങ്ങൾക്ക് `https://demo.opennoodle.de` ഉപയോഗിക്കാം.
 
 ## സവിശേഷതകൾ
 
@@ -106,28 +103,4 @@
 
 ## വിവർത്തനങ്ങൾ
 
-വിവർത്തനങ്ങളെക്കുറിച്ച് കൂടുതൽ [ഇവിടെ](https://docs.immich.app/developer/translations) വായിക്കാം.
-
-<a href="https://hosted.weblate.org/engage/immich/">
-<img src="https://hosted.weblate.org/widget/immich/immich/multi-auto.svg" alt="Translation status" />
-</a>
-
-## റെപ്പോസിറ്ററി പ്രവർത്തനം
-
-![Activities](https://repobeats.axiom.co/api/embed/9e86d9dc3ddd137161f2f6d2e758d7863b1789cb.svg "Repobeats analytics image")
-
-## സ്റ്റാർ ചരിത്രം
-
-<a href="https://star-history.com/#immich-app/immich&type=date&legend=top-left">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=immich-app/immich&type=date" width="100%" />
-  </picture>
-</a>
-
-## സംഭാവന ചെയ്തവർ
-
-<a href="https://github.com/immich-app/immich/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=immich-app/immich" width="100%"/>
-</a>
+വിവർത്തനങ്ങളെക്കുറിച്ച് കൂടുതൽ [ഇവിടെ](https://docs.opennoodle.de/developer/translations) വായിക്കാം.
