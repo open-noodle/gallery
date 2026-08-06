@@ -114,6 +114,10 @@ export const evalScenario = async (driver, sc, defaultRuns) => {
         outcomeStatus: decision.outcomeStatus,
         outcomeCount: decision.outcomeCount,
         turnsWithOutcome: decision.turnsWithOutcome,
+        // L2-only: undefined on L1/L3 (neither driver sets them), so the
+        // scorecard's failure rendering must degrade cleanly when absent.
+        toolSequence: decision.toolSequence,
+        planOps: decision.planOps,
       };
     }
     attempts++;
@@ -193,10 +197,20 @@ export const renderScorecard = (agg, results, meta) => {
         d.planProposed === undefined
           ? ''
           : ` planProposed=${d.planProposed} outcome=${d.outcomeStatus ?? '—'} outcomeCount=${d.outcomeCount ?? '—'} turnsWithOutcome=${d.turnsWithOutcome ?? '—'}`;
+      // L2-only: L1/L3 never set toolSequence/planOps, so both stay blank there —
+      // this must degrade cleanly rather than printing the literal word
+      // "undefined". toolSequence prints whenever the layer observed one at all
+      // (including an empty array, which is itself diagnostic for a negative
+      // scenario); planOps only prints when it actually carries operations.
+      const toolBit = d.toolSequence === undefined ? '' : ` toolSequence=${JSON.stringify(d.toolSequence)}`;
+      const planOpsBit =
+        Array.isArray(d.planOps) && d.planOps.length > 0
+          ? ` planOps=${JSON.stringify(d.planOps.map((op) => op?.type ?? op))}`
+          : '';
       const got =
         f.category === 'copy'
           ? JSON.stringify(d.text)
-          : `kind=${d.kind} via=${d.via} parsedSlots=${JSON.stringify(d.parsedSlots)}${planBit}`;
+          : `kind=${d.kind} via=${d.via} parsedSlots=${JSON.stringify(d.parsedSlots)}${planBit}${toolBit}${planOpsBit}`;
       lines.push(`- \`${f.id}\` (${pct(f.score)} < ${pct(f.threshold)}) — "${f.prompt ?? f.id}"`);
       lines.push(`  - expect: ${showExpect(f.expect)}`);
       lines.push(`  - got: ${got}`);

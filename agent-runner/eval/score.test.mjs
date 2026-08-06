@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { classificationPass } from './score.mjs';
+import { aggregate, classificationPass, renderScorecard } from './score.mjs';
 
 const base = { kind: 'rename_or_describe_album', parsedSlots: { albumRef: 'Japan' } };
 
@@ -121,5 +121,79 @@ describe('classificationPass — existing keys still work', () => {
   it('still fails on the wrong kind', () => {
     const decision = { ...base, toolSequence: [] };
     assert.equal(classificationPass(decision, { kind: 'delete_album', toolSequence: [] }), false);
+  });
+});
+
+describe('renderScorecard — failure detail rendering', () => {
+  // Regression coverage: the "got:" line used to omit toolSequence/planOps
+  // entirely, so a failing L2 scenario gave no clue what actually ran — the
+  // operator had to reach for a standalone driver call to see it. See the L2
+  // Task 6 regression probe.
+  it('shows the actual toolSequence and planOps for a failing L2-shaped result', () => {
+    const results = [
+      {
+        id: 'l2.rename.planned',
+        category: 'execution',
+        prompt: 'rename my Japan album to Japan 2026',
+        score: 0,
+        passed: false,
+        threshold: 1,
+        detail: {
+          kind: 'rename_or_describe_album',
+          via: 'regex',
+          parsedSlots: undefined,
+          planProposed: true,
+          outcomeStatus: 'planned',
+          toolSequence: ['listAlbums', 'listAlbums', 'proposeAlbumOperations'],
+          planOps: [{ type: 'album.updateDetails' }],
+        },
+        expect: { kind: 'rename_or_describe_album', toolSequence: ['listAlbums', 'proposeAlbumOperations'] },
+      },
+    ];
+    const agg = aggregate(results);
+    const card = renderScorecard(agg, results, {
+      model: 'l2-fake-mcp',
+      baseUrl: 'in-memory',
+      routerMode: 'regex',
+      runs: 1,
+      layer: 'L2',
+    });
+    assert.match(card, /toolSequence=\["listAlbums","listAlbums","proposeAlbumOperations"\]/);
+    assert.match(card, /planOps=\["album\.updateDetails"\]/);
+  });
+
+  it('renders an L1-shaped failure (no toolSequence/planOps) without either key, and without printing "undefined"', () => {
+    const results = [
+      {
+        id: 'recall.trip.greece',
+        category: 'recall',
+        prompt: 'make an album from my Greece trip',
+        score: 0,
+        passed: false,
+        threshold: 0.6,
+        // Mirrors createL1Driver's decision shape exactly: only
+        // { kind, via, confidence, slots, parsedSlots } — no planProposed,
+        // outcomeStatus, toolSequence, or planOps keys at all.
+        detail: {
+          kind: 'none',
+          via: 'llm',
+          confidence: 0.4,
+          slots: {},
+          parsedSlots: null,
+        },
+        expect: { kind: 'create_recent_trip_album', slotsSurvive: true },
+      },
+    ];
+    const agg = aggregate(results);
+    const card = renderScorecard(agg, results, {
+      model: 'local-model',
+      baseUrl: 'http://127.0.0.1:8080',
+      routerMode: 'hybrid',
+      runs: 3,
+      layer: 'L1',
+    });
+    assert.ok(!card.includes('toolSequence'), 'L1 failure must not print a toolSequence field at all');
+    assert.ok(!card.includes('planOps'), 'L1 failure must not print a planOps field at all');
+    assert.ok(!card.includes('undefined'), 'a missing field must degrade to nothing, never the literal "undefined"');
   });
 });
