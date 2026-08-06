@@ -7,6 +7,9 @@
 //   EVAL_ROUTER_MODE  regex | llm | hybrid (default hybrid)
 //   EVAL_RUNS         repeats per LLM scenario for pass-rate (default 3)
 //
+// L2 (fake MCP, regex routing, no model) — only used with `--layer L2`:
+//   EVAL_L2_RUNS         repeats per L2 scenario (default 1 — deterministic fake MCP)
+//
 // L3 (live Gallery /agent/* API, read-only) — only used with `--layer L3`:
 //   GALLERY_URL          Gallery API base (default local dev stack)
 //   GALLERY_API_KEY      x-api-key auth (preferred for headless runs)
@@ -25,6 +28,10 @@ export default {
   },
   routerMode: process.env.EVAL_ROUTER_MODE ?? 'hybrid',
   runs: Number(process.env.EVAL_RUNS ?? 3),
+
+  l2: {
+    runs: Number(process.env.EVAL_L2_RUNS ?? 1),
+  },
 
   gallery: {
     baseUrl: process.env.GALLERY_URL ?? 'http://localhost:2283/api',

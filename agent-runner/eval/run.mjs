@@ -14,8 +14,10 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import config from './config.mjs';
 import l1Scenarios from './scenarios/index.mjs';
+import l2Scenarios from './scenarios/l2-workflow.mjs';
 import l3Scenarios from './scenarios/l3-readonly.mjs';
 import { createL1Driver } from './drivers/l1-component.mjs';
+import { createL2Driver } from './drivers/l2-workflow.mjs';
 import { createL3Driver } from './drivers/l3-session.mjs';
 import { evalScenario, aggregate, renderScorecard, diffBaseline, toBaseline } from './score.mjs';
 
@@ -32,17 +34,20 @@ const filter = opt('filter');
 const routerMode = opt('mode', config.routerMode);
 const log = (...m) => process.stderr.write(`${m.join(' ')}\n`);
 
-if (layer !== 'L1' && layer !== 'L3') {
-  log(`Unknown --layer "${layer}". Use L1 (default) or L3.`);
+if (layer !== 'L1' && layer !== 'L2' && layer !== 'L3') {
+  log(`Unknown --layer "${layer}". Use L1 (default), L2, or L3.`);
   process.exit(2);
 }
 
-const allScenarios = layer === 'L3' ? l3Scenarios : l1Scenarios;
+const allScenarios = layer === 'L3' ? l3Scenarios : layer === 'L2' ? l2Scenarios : l1Scenarios;
 const selected = filter
   ? allScenarios.filter((s) => s.id.includes(filter) || s.category === filter)
   : allScenarios;
-const runs = Number(opt('runs', layer === 'L3' ? config.l3.runs : config.runs));
-const baselinePath = join(here, layer === 'L3' ? 'baseline.l3.json' : 'baseline.json');
+const runs = Number(opt('runs', layer === 'L3' ? config.l3.runs : layer === 'L2' ? config.l2.runs : config.runs));
+const baselinePath = join(
+  here,
+  layer === 'L3' ? 'baseline.l3.json' : layer === 'L2' ? 'baseline.l2.json' : 'baseline.json',
+);
 
 const checkLlamaConnectivity = async () => {
   try {
@@ -80,6 +85,13 @@ const buildDriver = async () => {
       `L3 preflight OK · model=${info.model} · preset=${info.permissionPreset} · approval=${info.approvalMode} (read-only)`,
     );
     return { driver, meta: { model: driver.model, baseUrl: driver.baseUrl, routerMode: 'server', runs, layer: 'L3' } };
+  }
+
+  if (layer === 'L2') {
+    // L2 needs no model: the regex fast-path routes the scenarios and the fake
+    // MCP client answers every tool.
+    const driver = createL2Driver();
+    return { driver, meta: { model: driver.model, baseUrl: driver.baseUrl, routerMode: 'regex', runs, layer: 'L2' } };
   }
 
   await checkLlamaConnectivity();
@@ -135,7 +147,7 @@ const main = async () => {
       const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
       process.stdout.write(`${diffBaseline(agg, baseline)}\n`);
     } else {
-      log(`No ${layer === 'L3' ? 'baseline.l3.json' : 'baseline.json'} yet; run with --accept to create one.`);
+      log(`No ${baselinePath.split('/').pop()} yet; run with --accept to create one.`);
     }
   }
   if (flag('accept')) {

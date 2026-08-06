@@ -8,6 +8,7 @@
     "start": "node src/server.mjs",
     "test": "node --test '{src,eval}/**/*.test.mjs'",
     "eval": "node --env-file-if-exists=.env eval/run.mjs",
+    "eval:l2": "node --env-file-if-exists=.env eval/run.mjs --layer L2",
     "eval:l3": "node --env-file-if-exists=.env eval/run.mjs --layer L3"
   },
   "dependencies": {
