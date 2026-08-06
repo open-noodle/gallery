@@ -1287,6 +1287,46 @@ export const createPiRuntime = ({
       seedPendingWorkflow(entry, workflowState);
       const promptText = textPromptFromContent(content);
 
+      // Hoisted out of the strict block below: `dispatch` — and therefore its
+      // routing context — is block-scoped to the try in there, while the block is
+      // delivered much later, immediately before the prompt that drains it, well
+      // past the end of that block.
+      let handoffRoutingContext;
+      // Queued as late as possible — immediately before the prompt that drains it.
+      // `deliverAs: 'nextTurn'` is drained ONLY by session.prompt(), so queuing
+      // earlier risks stranding the block onto the NEXT user turn if this turn is
+      // abandoned before prompting (subscribe() or compactGalleryToolTranscript()
+      // throwing). Callers must therefore invoke this after both of those.
+      //
+      // By that point `entry.abortActiveStream` is bound to the open-turn abort
+      // handler again, so a `disposeSession` racing the delivery await still has
+      // something to abort.
+      //
+      // A turn with no strict routing (no MCP gateway, or the router matched
+      // nothing) leaves `handoffRoutingContext` undefined, for which
+      // `formatRoutingContext` returns null — so this is then a no-op.
+      const deliverRoutingContext = async () => {
+        // Best-effort: routing context is an optimisation, never a precondition for
+        // the turn. Failing open leaves exactly today's behaviour.
+        try {
+          const contextBlock = formatRoutingContext(handoffRoutingContext);
+          if (contextBlock && entry.session.sendCustomMessage) {
+            await entry.session.sendCustomMessage(
+              { customType: 'gallery_routing_context', content: contextBlock, display: false },
+              { deliverAs: 'nextTurn' },
+            );
+          }
+        } catch {
+          // Deliberately binds no error: a reason can contain user text, so the
+          // raw failure is structurally unloggable here, not merely undisciplined.
+          try {
+            log.warn?.(JSON.stringify({ msg: 'routing_context_injection_failed', gallerySessionId }));
+          } catch {
+            // Observability logging must never break the turn.
+          }
+        }
+      };
+
       if (entry.mcpGateway) {
         const strictAbortController = new AbortController();
         const abortStrictStream = () => {
@@ -1300,20 +1340,6 @@ export const createPiRuntime = ({
           emit: (event) => strictEvents.push(event),
           log,
         });
-        // Hoisted: `dispatch` is block-scoped to the try below. Delivery does
-        // NOT structurally need to happen after the finally — placing it
-        // inside this try would need no hoist at all, and would keep
-        // `entry.inFlight` up "for free" across the delivery await. Placement
-        // after the finally is a deliberate choice from the design doc (§6),
-        // and the hoist is what that choice requires.
-        //
-        // Known, bounded consequence of that placement: `entry.abortActiveStream`
-        // is unbound (cleared by the finally below) across the awaited delivery.
-        // A `disposeSession` racing that window has nothing to abort, but the
-        // outcome is still a runner-error, not a hang or silent corruption —
-        // and by then the finally has already cleared `entry.inFlight`, so
-        // there is no dangling in-flight state left over either.
-        let handoffRoutingContext;
         try {
           const dispatch = await entry.dispatcher.routeTurn({
             prompt: promptText,
@@ -1350,30 +1376,10 @@ export const createPiRuntime = ({
           }
           entry.inFlight = false;
         }
-        // Not handled by a strict/hybrid workflow: fall through to provider orchestration.
-        // Retaken BEFORE the awaited delivery below: leaving the guard down across
-        // an await would let a concurrent sendMessage for this session slip past
-        // the `entry.inFlight` check and start a second stream.
+        // Not handled by a strict/hybrid workflow: the strict `finally` above has
+        // cleared the guard, so retake it before falling through to provider
+        // orchestration below.
         entry.inFlight = true;
-        // Best-effort: routing context is an optimisation, never a precondition for
-        // the turn. Failing open leaves exactly today's behaviour.
-        try {
-          const contextBlock = formatRoutingContext(handoffRoutingContext);
-          if (contextBlock && entry.session.sendCustomMessage) {
-            await entry.session.sendCustomMessage(
-              { customType: 'gallery_routing_context', content: contextBlock, display: false },
-              { deliverAs: 'nextTurn' },
-            );
-          }
-        } catch {
-          // Deliberately binds no error: a reason can contain user text, so the
-          // raw failure is structurally unloggable here, not merely undisciplined.
-          try {
-            log.warn?.(JSON.stringify({ msg: 'routing_context_injection_failed', gallerySessionId }));
-          } catch {
-            // Observability logging must never break the turn.
-          }
-        }
       }
 
       let sequence = 0;
@@ -1456,8 +1462,9 @@ export const createPiRuntime = ({
 
       try {
         promptPromise = Promise.resolve()
-          .then(() => {
+          .then(async () => {
             compactGalleryToolTranscript(entry.session);
+            await deliverRoutingContext();
             return entry.session.prompt(promptText);
           })
           .then(() => {

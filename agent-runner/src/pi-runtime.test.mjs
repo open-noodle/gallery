@@ -1231,6 +1231,100 @@ describe('pi runtime adapter', () => {
     assert.equal(mcpCalls.length, 0);
   });
 
+  it('queues the routing context after transcript compaction and immediately before the prompt', async () => {
+    const { sdk, ai, calls, session } = createFakeDependencies({
+      mcpToolNames: ['mcp_gallery_findTripCandidates'],
+    });
+    ai.classifyIntent = async () => ({ workflow: 'create_recent_trip_album', slots: {}, confidence: 'high' });
+
+    // Ordering probe: a prior tool result that `compactGalleryToolTranscript`
+    // provably rewrites. A legacy searchAssets payload with nested asset items is
+    // compacted regardless of size (`containsLegacySearchAssetPayload`), which
+    // drops `assets` and stamps `compacted: true` onto the block's text. Reading
+    // that text at delivery time therefore says whether compaction has already
+    // run, and compaction is the only thing in the turn that rewrites it — so the
+    // probe genuinely distinguishes the two orders rather than holding either way.
+    const leakedAssetId = '55555555-5555-4555-8555-555555555555';
+    const transcriptBlock = {
+      type: 'text',
+      text: JSON.stringify({
+        status: 'success',
+        toolCall: { id: '00000000-0000-4000-8000-000000000333', toolName: 'searchAssets', status: 'completed' },
+        assets: { items: [{ id: leakedAssetId, city: 'Kyoto' }] },
+      }),
+    };
+    session.messages.push({ role: 'tool', content: [transcriptBlock] });
+
+    const deliveries = [];
+    session.sendCustomMessage = async () => {
+      deliveries.push({ promptsSoFar: calls.prompts.length, transcriptText: transcriptBlock.text });
+    };
+
+    const runtime = createPiRuntime({ sdk, ai });
+    await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
+
+    await collect(
+      runtime.sendMessage(
+        createMessageRequest({
+          content: { blocks: [{ type: 'text', text: 'put my Japan trip from last week into an album' }] },
+        }),
+      ),
+    );
+
+    assert.equal(deliveries.length, 1);
+    // Before the prompt: `deliverAs: 'nextTurn'` is drained by prompt() alone, so
+    // a block queued after it would sit until the user's NEXT message.
+    assert.equal(deliveries[0].promptsSoFar, 0);
+    assert.equal(calls.prompts.length, 1);
+    // After compaction: the probe block had already been rewritten when delivery
+    // ran. Queuing before `compactGalleryToolTranscript` observes the raw payload
+    // here instead, and both of these lines fail.
+    assert.equal(JSON.parse(deliveries[0].transcriptText).compacted, true);
+    assert.equal(deliveries[0].transcriptText.includes(leakedAssetId), false);
+  });
+
+  it('queues no routing context when the turn is abandoned before prompting', async () => {
+    const { sdk, ai, calls, session } = createFakeDependencies({
+      mcpToolNames: ['mcp_gallery_findTripCandidates'],
+    });
+    let classifyCalls = 0;
+    ai.classifyIntent = async () => {
+      classifyCalls += 1;
+      return { workflow: 'create_recent_trip_album', slots: {}, confidence: 'high' };
+    };
+    // Subscription setup fails AFTER the router has produced a handoff diagnosis,
+    // so the turn is abandoned without ever calling prompt() — and `deliverAs:
+    // 'nextTurn'` is drained ONLY by prompt(). The session is not disposed here, so
+    // a block queued before this point survives onto the user's NEXT message, where
+    // its "the request immediately above" preamble names the wrong request.
+    session.subscribe = () => {
+      throw new Error('subscribe failed');
+    };
+    const customMessages = [];
+    session.sendCustomMessage = async (message, options) => customMessages.push({ message, options });
+
+    const runtime = createPiRuntime({ sdk, ai });
+    await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
+
+    await assert.rejects(
+      () =>
+        collect(
+          runtime.sendMessage(
+            createMessageRequest({
+              content: { blocks: [{ type: 'text', text: 'put my Japan trip from last week into an album' }] },
+            }),
+          ),
+        ),
+      /subscribe failed/,
+    );
+
+    // Guards the vacuous reading of this test: with no handoff diagnosis there
+    // would be nothing to queue at any placement.
+    assert.equal(classifyCalls, 1);
+    assert.deepEqual(customMessages, []);
+    assert.equal(calls.prompts.length, 0);
+  });
+
   it('sends no routing context when the router matches nothing', async () => {
     const { sdk, ai, calls, session } = createFakeDependencies({
       mcpToolNames: ['mcp_gallery_searchAssets'],
@@ -1333,12 +1427,12 @@ describe('pi runtime adapter', () => {
     // `runner-error` assertion above would also hold if the stream produced no
     // events at all.
     //
-    // This does NOT pin delivery's placement outside the strict try. Moving the
-    // whole delivery block inside the strict try leaves this assertion (and all
-    // 101 tests) green: the delivery's own inner try/catch swallows the
-    // sendCustomMessage rejection before the outer strict catch ever sees it, so
-    // the turn still completes either way. Block placement is not currently
-    // pinned by any test.
+    // This does NOT pin delivery's placement: the delivery's own inner try/catch
+    // swallows the sendCustomMessage rejection before any outer catch sees it, so
+    // the turn completes wherever delivery runs. Placement is pinned by the two
+    // tests above — "after transcript compaction and immediately before the prompt"
+    // and "no routing context when the turn is abandoned before prompting" — not
+    // here.
     assert.equal(events.at(-1).type, 'assistant-message-completed');
     assert.deepEqual(
       warns.filter((line) => line.includes('routing_context_injection_failed')),
@@ -1410,9 +1504,12 @@ describe('pi runtime adapter', () => {
       mcpToolNames: ['mcp_gallery_findTripCandidates'],
     });
     ai.classifyIntent = async () => ({ workflow: 'create_recent_trip_album', slots: {}, confidence: 'high' });
-    // Park the turn inside the awaited delivery — exactly the window the strict
-    // `finally` opens by clearing entry.inFlight. Delivery must not hand a
-    // concurrent pull a way past the `already has an active message stream` guard.
+    // Park the turn inside the awaited delivery. That await now sits in the prompt
+    // chain rather than the generator body, so the guard it must not drop is the
+    // `entry.inFlight` retake that follows the strict `finally` — deleting that
+    // retake still turns this test red, so the premise still bites. Delivery must
+    // not hand a concurrent pull a way past the `already has an active message
+    // stream` guard.
     const entered = createDeferred();
     const release = createDeferred();
     session.sendCustomMessage = async () => {
