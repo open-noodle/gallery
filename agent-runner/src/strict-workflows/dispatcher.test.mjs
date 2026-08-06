@@ -398,6 +398,140 @@ describe('workflow dispatcher', () => {
     assert.match(sink.events.at(-1).content.blocks[0].text, /denied/i);
     assert.equal(sink.pending, undefined);
   });
+
+  it('forwards routing context when a workflow declines to open orchestration', async () => {
+    const workflow = {
+      kind: 'create_recent_trip_album',
+      flow: 'strict',
+      match: (p) => (p.includes('recent trip') ? { slots: { albumName: 'USA Trip' } } : undefined),
+      parseSlots: (s) => s,
+      run: async () => ({
+        status: 'handoff_open',
+        reason: 'Source "the best shots" is subjective and cannot be resolved from metadata alone.',
+      }),
+    };
+    const sink = capture();
+    const dispatcher = createWorkflowDispatcher({ registry: fakeRegistry(workflow), buildClient: () => ({}) });
+
+    const result = await dispatcher.routeTurn({
+      prompt: 'make an album of the best shots from my recent trip',
+      ...sink,
+    });
+
+    assert.equal(result.handled, false);
+    assert.deepEqual(result.routingContext, {
+      workflowKind: 'create_recent_trip_album',
+      stage: 'declined',
+      reason: 'Source "the best shots" is subjective and cannot be resolved from metadata alone.',
+    });
+  });
+
+  it('forwards routing context when slot parsing fails', async () => {
+    const workflow = {
+      kind: 'create_recent_trip_album',
+      flow: 'strict',
+      match: () => ({ slots: {} }),
+      parseSlots: () => null,
+      run: async () => {
+        throw new Error('run must not be reached when parseSlots returns null');
+      },
+    };
+    const sink = capture();
+    const dispatcher = createWorkflowDispatcher({ registry: fakeRegistry(workflow), buildClient: () => ({}) });
+
+    const result = await dispatcher.routeTurn({ prompt: 'make an album for my recent trip', ...sink });
+
+    assert.equal(result.handled, false);
+    assert.deepEqual(result.routingContext, {
+      workflowKind: 'create_recent_trip_album',
+      stage: 'slots_unparsed',
+      reason: null,
+    });
+  });
+
+  it('forwards no routing context when the router matches nothing', async () => {
+    const sink = capture();
+    const dispatcher = createWorkflowDispatcher({
+      registry: fakeRegistry(plannedWorkflow),
+      buildClient: () => ({}),
+    });
+
+    const result = await dispatcher.routeTurn({ prompt: 'what is the weather in Berlin', ...sink });
+
+    assert.equal(result.handled, false);
+    assert.equal('routingContext' in result, false);
+  });
+
+  it('never forwards routing context from the approval path, even on handoff', async () => {
+    const workflow = {
+      kind: 'create_recent_trip_album',
+      flow: 'strict',
+      match: () => ({ slots: {} }),
+      parseSlots: (s) => s,
+      run: async () => ({ status: 'approval_required', toolCallId: 'call-1', continuation: { step: 'plan' } }),
+      resumeApproval: async () => ({ status: 'handoff_open', reason: 'Cannot finish after approval.' }),
+    };
+    const sink = capture();
+    const dispatcher = createWorkflowDispatcher({ registry: fakeRegistry(workflow), buildClient: () => ({}) });
+
+    await dispatcher.routeTurn({ prompt: 'make an album for my recent trip', ...sink });
+    const result = await dispatcher.routeApproval({
+      toolCallId: 'call-1',
+      approvalDecision: 'approved',
+      toolResult: { status: 'success' },
+      ...sink,
+    });
+
+    assert.equal(result.handled, false);
+    assert.equal('routingContext' in result, false);
+  });
+
+  it('forwards routing context when a resumed continuation declines', async () => {
+    const workflow = {
+      kind: 'create_recent_trip_album',
+      flow: 'strict',
+      match: () => ({ slots: {} }),
+      parseSlots: (s) => s,
+      run: async ({ candidate }) =>
+        candidate
+          ? { status: 'handoff_open', reason: 'That candidate has no bounded window.' }
+          : { status: 'needs_input', text: 'Which trip?', continuation: { kind: 'sel', candidates: ['a'] } },
+      resumeContinuation: ({ prompt }) => ({ status: 'matched', ctx: { candidate: { id: prompt } } }),
+    };
+    const sink = capture();
+    const dispatcher = createWorkflowDispatcher({ registry: fakeRegistry(workflow), buildClient: () => ({}) });
+
+    await dispatcher.routeTurn({ prompt: 'make an album for my recent trip', ...sink });
+    const result = await dispatcher.routeTurn({ prompt: 'the first one', ...sink });
+
+    assert.equal(result.handled, false);
+    assert.deepEqual(result.routingContext, {
+      workflowKind: 'create_recent_trip_album',
+      stage: 'declined',
+      reason: 'That candidate has no bounded window.',
+    });
+  });
+
+  it('tolerates an unrecognised outcome status with no reason', async () => {
+    const workflow = {
+      kind: 'create_recent_trip_album',
+      flow: 'strict',
+      match: () => ({ slots: {} }),
+      parseSlots: (s) => s,
+      run: async () => ({ status: 'something_unexpected' }),
+    };
+    const sink = capture();
+    const dispatcher = createWorkflowDispatcher({ registry: fakeRegistry(workflow), buildClient: () => ({}) });
+
+    const result = await dispatcher.routeTurn({ prompt: 'make an album for my recent trip', ...sink });
+
+    assert.equal(result.handled, false);
+    assert.deepEqual(result.routingContext, {
+      workflowKind: 'create_recent_trip_album',
+      stage: 'declined',
+      reason: null,
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

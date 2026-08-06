@@ -178,7 +178,18 @@ export const createWorkflowDispatcher = ({
       default: {
         observeOutcome({ outcome, wf, fellBackToOpen: true });
         setPending(undefined);
-        return { handled: false };
+        // `reason` MUST tolerate null: this branch is `case 'handoff_open': default:`
+        // and the switch reads `outcome?.status`, so an undefined outcome or an
+        // unrecognised status lands here without passing through the
+        // `handoffOpen({ reason })` constructor that types reason as required.
+        return {
+          handled: false,
+          routingContext: {
+            workflowKind: wf.kind,
+            stage: 'declined',
+            reason: outcome?.reason ?? null,
+          },
+        };
       }
     }
   };
@@ -258,7 +269,12 @@ export const createWorkflowDispatcher = ({
     const wf = registry.getWorkflow(decision.kind);
     const slots = wf.parseSlots(decision.slots, prompt);
     if (slots == null) {
-      return { handled: false }; // falls through to open orchestration
+      // Falls through to open orchestration, but the classifier's finding is
+      // still worth forwarding — only the details were unusable.
+      return {
+        handled: false,
+        routingContext: { workflowKind: decision.kind, stage: 'slots_unparsed', reason: null },
+      };
     }
 
     const outcome = await wf.run({ client: buildClient(), slots, signal, nowMs });
@@ -299,7 +315,11 @@ export const createWorkflowDispatcher = ({
       approvedPlanResult: toolResult,
       signal,
     });
-    return handleOutcome({
+    // `handleOutcome` is shared with routeTurn, so it attaches routingContext on
+    // the handoff branch. The approval path must NOT carry it: a routing note
+    // about a workflow that just resumed an approval is meaningless, and leaving
+    // the field here would invite a future caller to deliver one.
+    const { routingContext: _ignored, ...result } = await handleOutcome({
       outcome,
       wf,
       emit,
@@ -309,6 +329,7 @@ export const createWorkflowDispatcher = ({
       completedEvent,
       approvalEvent,
     });
+    return result;
   };
 
   return { routeTurn, routeApproval };
