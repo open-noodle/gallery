@@ -1,20 +1,20 @@
 <p align="center"> 
   <br/>  
-  <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=License&logoColor=000000&labelColor=ececec" alt="Лиценз: MIT"></a>
-  <a href="https://discord.immich.app">
-    <img src="https://img.shields.io/discord/979116623879368755.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" alt="Discord"/>
+  <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=License&logoColor=000000&labelColor=ececec" alt="Лиценз: AGPL-3.0"></a>
+  <a href="https://discord.gg/cxBfbuxyG4">
+    <img src="https://img.shields.io/discord/1480633426376921239.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" alt="Discord"/>
   </a>
   <br/>  
   <br/>   
 </p>
 
 <p align="center">
-<img src="../design/immich-logo-stacked-light.svg" width="300" title="Вход с персонализиран URL">
+<img src="../design/gallery-logo-stacked-light.svg" width="300" title="Вход с персонализиран URL">
 </p>
 <h3 align="center">Високопроизводително самостоятелно хоствано решение за управление на снимки и видеа</h3>
 <br/>
-<a href="https://immich.app">
-<img src="../design/immich-screenshots.png" title="Основна снимка на екрана">
+<a href="https://opennoodle.de">
+<img src="../design/gallery-screenshot.webp" title="Основна снимка на екрана">
 </a>
 <br/>
 <p align="center">
@@ -39,33 +39,30 @@
   <a href="README_th_TH.md">ภาษาไทย</a>
 </p>
 
+> [!NOTE]
+> This is a **community fork** of [Immich](https://github.com/immich-app/immich) with additional features. For Docker images, migration instructions and the full list of changes, see the [main README](../README.md).
+
 > [!WARNING]
 > ⚠️ Винаги следвайте [плана за резервно копие 3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) за вашите ценни снимки и видеа!
 >
 
 > [!NOTE]
-> Основната документация, включително ръководства за инсталиране, е на [https://immich.app/](https://immich.app/).
+> Основната документация, включително ръководства за инсталиране, е на [https://opennoodle.de/](https://opennoodle.de/).
 
 ## Връзки
 
-- [Документация](https://docs.immich.app)
-- [За проекта](https://docs.immich.app/overview/introduction)
-- [Инсталиране](https://docs.immich.app/install/requirements)
-- [Пътна карта](https://immich.app/roadmap)
+- [Документация](https://docs.opennoodle.de)
+- [За проекта](https://docs.opennoodle.de/overview/quick-start)
+- [Инсталиране](https://docs.opennoodle.de/install/requirements)
+- [Пътна карта](https://opennoodle.de/roadmap)
 - [Демо](#демо)
 - [Функции](#функции)
-- [Преводи](https://docs.immich.app/developer/translations)
-- [Принос към проекта](https://docs.immich.app/overview/support-the-project)
+- [Преводи](https://docs.opennoodle.de/developer/translations)
+- [Принос към проекта](https://docs.opennoodle.de/overview/support-the-project)
 
 ## Демо
 
-Достъп до демото [тук](https://demo.immich.app). За мобилното приложение използвайте `https://demo.immich.app` като `Server Endpoint URL`.
-
-### Данни за вход
-
-| Имейл           | Парола |
-| --------------- | ------ |
-| demo@immich.app | demo   |
+Достъп до демото [тук](https://demo.opennoodle.de). За мобилното приложение използвайте `https://demo.opennoodle.de` като `Server Endpoint URL`.
 
 ## Функции
 
@@ -104,28 +101,4 @@
 
 ## Преводи
 
-Повече за преводите [тук](https://docs.immich.app/developer/translations).
-
-<a href="https://hosted.weblate.org/engage/immich/">
-<img src="https://hosted.weblate.org/widget/immich/immich/multi-auto.svg" alt="Translation status" />
-</a>
-
-## Активност в хранилището
-
-![Activities](https://repobeats.axiom.co/api/embed/9e86d9dc3ddd137161f2f6d2e758d7863b1789cb.svg "Repobeats analytics image")
-
-## История на звездите
-
-<a href="https://star-history.com/#immich-app/immich&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=immich-app/immich&type=Date" width="100%" />
- </picture>
-</a>
-
-## Сътрудници
-
-<a href="https://github.com/immich-app/immich/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=immich-app/immich" width="100%"/>
-</a>
+Повече за преводите [тук](https://docs.opennoodle.de/developer/translations).
