@@ -124,11 +124,19 @@ turns: [
   'create an album from my recent trip to Japan', // string  -> routeTurn
   { approve: true }, // object  -> routeApproval, approvalDecision 'approved'
   { approve: false }, //         -> routeApproval, approvalDecision 'denied'
+  { advanceMs: 11 * 60 * 1000 }, //         -> advances the session clock only
 ];
 ```
 
 The driver reads `toolCallId` from the pending approval state, so scenarios never hard-code one.
 A string turn is exactly L3's semantics, so any existing string-only `turns` array keeps working.
+
+`{ advanceMs }` exists because continuation expiry is time-dependent: `resolvePendingChoice`
+expires a continuation when `nowMs - pending.createdAtMs > ttlMs`, with a 10-minute default
+(`candidate-disambiguation.mjs:103`). A fixed clock can never reach that, and an auto-incrementing
+one would be unpredictable because the dispatcher reads `now()` more than once per turn (once for
+`nowMs`, again for the `latencyMs` in the router-decision event). Advancing the clock explicitly as
+its own turn keeps determinism and makes the expiry arm reachable.
 
 **Pending state is per-scenario.** `classify` and `converse` each construct a fresh store and a
 fresh fake client. State must never leak between scenarios — that would make results
