@@ -17,9 +17,35 @@ const slotMatches = (parsed, expected) => {
   return true;
 };
 
-const classificationPass = (decision, expect) => {
+export const classificationPass = (decision, expect) => {
   const kinds = expect.anyKind ?? [expect.kind];
   if (!kinds.includes(decision.kind)) return false;
+
+  // The L2 checks run BEFORE the kind==='none' short-circuit: a negative scenario
+  // still has to prove that no tools ran and no plan was proposed, which is the
+  // entire point of asserting it.
+
+  // The no-raw-asset-IDs invariant. Deliberately NOT opt-in — Gallery prunes
+  // `assetIds` from provider-facing planning schemas, so a leak is a regression
+  // no matter what the scenario asked about.
+  if (decision.rawAssetIdLeak) return false;
+
+  // Exact, ordered tool-call sequence. Order- and length-sensitive: this is what
+  // catches a redundant read call that a subset check would miss.
+  if (expect.toolSequence !== undefined) {
+    const got = decision.toolSequence ?? [];
+    if (got.length !== expect.toolSequence.length) return false;
+    if (got.some((name, i) => name !== expect.toolSequence[i])) return false;
+  }
+  // Subset match on operation `type`. Extra ops do not fail, so a scenario
+  // asserts only what it cares about.
+  if (expect.planOps !== undefined) {
+    const types = new Set((decision.planOps ?? []).map((op) => op?.type));
+    if (expect.planOps.some((type) => !types.has(type))) return false;
+  }
+  // Assert nothing was proposed (handoff / failed / needs_input / negative arms).
+  if (expect.noPlan === true && (decision.planProposed === true || decision.planId)) return false;
+
   if (decision.kind === 'none') return true; // negative assertion: "none" is the whole check
   if (expect.slotsSurvive && decision.parsedSlots === null) return false;
   if (expect.slots && !slotMatches(decision.parsedSlots, expect.slots)) return false;
