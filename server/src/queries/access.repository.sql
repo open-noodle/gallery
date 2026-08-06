@@ -158,6 +158,18 @@ where
     "asset"."visibility" = 'timeline'
     or "asset"."visibility" = 'hidden'
   )
+  and (
+    "asset"."visibility" != 'locked'
+    and not exists (
+      select
+        1 as "locked"
+      from
+        "asset" as "still"
+      where
+        "still"."livePhotoVideoId" = "asset"."id"
+        and "still"."visibility" = 'locked'
+    )
+  )
   and "asset"."id" in ($2)
 
 -- AccessRepository.asset.checkSpaceAccess

@@ -127,7 +127,7 @@ The copy step (1) is needed because:
 
 **`pnpm migrations:run`** uses `sql-tools` which hardcodes `allowUnorderedMigrations: false`. This works on fresh databases (CI, initial setup) but will fail on an existing database that already has upstream migrations applied. For existing databases, the server handles migrations automatically on startup via `DatabaseRepository.runMigrations()`.
 
-**Adding new fork migrations:** Create new migration files in `server/src/schema/migrations-gallery/` with a timestamp that doesn't collide with existing migrations. Use round timestamps (e.g., `1775000000000`) for easy identification.
+**Adding new fork migrations:** Create new migration files in `server/src/schema/migrations-gallery/` with a timestamp that doesn't collide with existing migrations. Keep the **same 13-digit millisecond-epoch width** every other migration uses, and make it unique by **embedding the issue number in the digits** rather than picking a round number: take the current epoch's leading digits, follow them with the issue number, and zero-pad to 13 — e.g. `1785869000000` for issue #869 (`1785` + `869` + `000000`), which is still a valid timestamp near the time of writing. A round `1785000000000` is what *every* branch reaches for, so two fork branches in flight at once pick the same one and only discover it when they merge. Kysely keys migrations by filename and sorts lexicographically; `allowUnorderedMigrations: true` handles interleaving with upstream either way.
 
 ## Architecture
 

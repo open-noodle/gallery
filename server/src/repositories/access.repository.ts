@@ -253,24 +253,35 @@ class AssetAccess {
       return new Set<string>();
     }
 
-    return this.db
-      .selectFrom('partner')
-      .innerJoin('user as sharedBy', (join) =>
-        join.onRef('sharedBy.id', '=', 'partner.sharedById').on('sharedBy.deletedAt', 'is', null),
-      )
-      .innerJoin('asset', (join) => join.onRef('asset.ownerId', '=', 'sharedBy.id').on('asset.deletedAt', 'is', null))
-      .select('asset.id')
-      .where('partner.sharedWithId', '=', userId)
-      .where((eb) =>
-        eb.or([
-          eb('asset.visibility', '=', sql.lit(AssetVisibility.Timeline)),
-          eb('asset.visibility', '=', sql.lit(AssetVisibility.Hidden)),
-        ]),
-      )
-
-      .where('asset.id', 'in', [...assetIds])
-      .execute()
-      .then((assets) => new Set(assets.map((asset) => asset.id)));
+    return (
+      this.db
+        .selectFrom('partner')
+        .innerJoin('user as sharedBy', (join) =>
+          join.onRef('sharedBy.id', '=', 'partner.sharedById').on('sharedBy.deletedAt', 'is', null),
+        )
+        .innerJoin('asset', (join) => join.onRef('asset.ownerId', '=', 'sharedBy.id').on('asset.deletedAt', 'is', null))
+        .select('asset.id')
+        .where('partner.sharedWithId', '=', userId)
+        .where((eb) =>
+          eb.or([
+            eb('asset.visibility', '=', sql.lit(AssetVisibility.Timeline)),
+            eb('asset.visibility', '=', sql.lit(AssetVisibility.Hidden)),
+          ]),
+        )
+        // Fork (#869 follow-up): `Hidden` is on the partner allow-list precisely so a partner can play the
+        // motion half of a live photo — and the motion row keeps `hidden` when its still is moved to the
+        // Locked Folder, so without this the partner arm hands back a locked live photo's video, thumbnail
+        // and EXIF after the owner locked it. That breaks the invariant pinned in
+        // access-space-visibility.repository.spec.ts ("Locked is blocked by BOTH arms — the only
+        // truly-private tier, and it never leaks through the union" — utils/access.ts unions owner, album,
+        // partner and space for AssetRead/AssetView/AssetDownload). The `visibility != locked` conjunct
+        // inside isNotLockedAsset is redundant against the Timeline|Hidden gate above; it is kept so every
+        // Locked Folder gate in the codebase reads identically and survives a change to that allow-list.
+        .where((eb) => isNotLockedAsset(eb))
+        .where('asset.id', 'in', [...assetIds])
+        .execute()
+        .then((assets) => new Set(assets.map((asset) => asset.id)))
+    );
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })

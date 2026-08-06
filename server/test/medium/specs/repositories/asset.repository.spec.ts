@@ -134,6 +134,20 @@ beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
 
+const seedLivePhotoMotion = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  ownerId: string,
+  stillVisibility: AssetVisibility,
+) => {
+  const { asset: motion } = await ctx.newAsset({
+    ownerId,
+    type: AssetType.Video,
+    visibility: AssetVisibility.Hidden,
+  });
+  await ctx.newAsset({ ownerId, visibility: stillVisibility, livePhotoVideoId: motion.id });
+  return motion;
+};
+
 describe(AssetRepository.name, () => {
   describe('getTimeBuckets', () => {
     it('defaults to month grouping when bucketSize is omitted', async () => {
@@ -2348,6 +2362,44 @@ describe(AssetRepository.name, () => {
       await ctx.newAsset({ ownerId: user.id });
 
       await expect(sut.getExternalAssetIds(user.id)).resolves.toEqual(new Set());
+    });
+  });
+
+  // #869 follow-up: the same explicit-`visibility=hidden` hole the timeline bucket had. Locking a live
+  // photo writes `visibility = locked` on the still only, so the motion row still answers to `hidden`
+  // and got counted into the totals shown to a session that had never entered the PIN.
+  describe('getStatistics — locked live photo motion half', () => {
+    it('does not count the motion half of a locked live photo in non-elevated hidden statistics', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await seedLivePhotoMotion(ctx, user.id, AssetVisibility.Locked);
+
+      const stats = await sut.getStatistics(user.id, { visibility: AssetVisibility.Hidden });
+
+      expect(stats[AssetType.Video]).toBe(0);
+    });
+
+    it('counts it once the session is elevated', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await seedLivePhotoMotion(ctx, user.id, AssetVisibility.Locked);
+
+      const stats = await sut.getStatistics(user.id, {
+        visibility: AssetVisibility.Hidden,
+        hasElevatedPermission: true,
+      });
+
+      expect(stats[AssetType.Video]).toBe(1);
+    });
+
+    it('regression: still counts the motion half of an unlocked live photo', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await seedLivePhotoMotion(ctx, user.id, AssetVisibility.Timeline);
+
+      const stats = await sut.getStatistics(user.id, { visibility: AssetVisibility.Hidden });
+
+      expect(stats[AssetType.Video]).toBe(1);
     });
   });
 });

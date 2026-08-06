@@ -33,17 +33,21 @@ const setup = (db?: Kysely<DB>) => {
 };
 
 /**
- * #869 follow-up: the motion video of a live photo whose still sits in the Locked Folder. Locking
+ * #869 follow-up: the motion video of a live photo, with its still at `stillVisibility`. Locking
  * writes `visibility = locked` on the still only — the motion row keeps the `hidden` visibility it
  * was given when the pair was linked.
  */
-const newLockedLivePhoto = async (ctx: ReturnType<typeof setup>['ctx'], ownerId: string) => {
+const newLivePhotoMotion = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  ownerId: string,
+  stillVisibility: AssetVisibility,
+) => {
   const { asset: motion } = await ctx.newAsset({
     ownerId,
     type: AssetType.Video,
     visibility: AssetVisibility.Hidden,
   });
-  await ctx.newAsset({ ownerId, visibility: AssetVisibility.Locked, livePhotoVideoId: motion.id });
+  await ctx.newAsset({ ownerId, visibility: stillVisibility, livePhotoVideoId: motion.id });
   await ctx.newAssetFile({
     assetId: motion.id,
     type: AssetFileType.Thumbnail,
@@ -455,7 +459,7 @@ describe(AssetService.name, () => {
       it('refuses the motion thumbnail to a session that is not elevated', async () => {
         const { sut, ctx } = setup();
         const { user } = await ctx.newUser();
-        const motion = await newLockedLivePhoto(ctx, user.id);
+        const motion = await newLivePhotoMotion(ctx, user.id, AssetVisibility.Locked);
 
         const auth = factory.auth({ user: { id: user.id } });
 
@@ -467,9 +471,24 @@ describe(AssetService.name, () => {
       it('serves the motion thumbnail to an elevated session', async () => {
         const { sut, ctx } = setup();
         const { user } = await ctx.newUser();
-        const motion = await newLockedLivePhoto(ctx, user.id);
+        const motion = await newLivePhotoMotion(ctx, user.id, AssetVisibility.Locked);
 
         const auth = factory.auth({ user: { id: user.id }, session: { hasElevatedPermission: true } });
+        const result = await sut.viewThumbnail(auth, motion.id, { size: AssetMediaSize.THUMBNAIL });
+
+        expect((result as ImmichFileResponse).path).toBe('/motion/thumbnail.jpg');
+      });
+
+      // The regression guard with the widest blast radius in this change: checkOwnerAccess is the gate
+      // every live-photo thumbnail and /video/playback request passes through, so an `isNotLockedAsset`
+      // that over-matched would stop EVERY live photo in the app from playing. Without this case, the
+      // two above still pass when the pairing gate is applied to all paired motion videos.
+      it('serves the motion thumbnail of an unlocked live photo to a session that is not elevated', async () => {
+        const { sut, ctx } = setup();
+        const { user } = await ctx.newUser();
+        const motion = await newLivePhotoMotion(ctx, user.id, AssetVisibility.Timeline);
+
+        const auth = factory.auth({ user: { id: user.id } });
         const result = await sut.viewThumbnail(auth, motion.id, { size: AssetMediaSize.THUMBNAIL });
 
         expect((result as ImmichFileResponse).path).toBe('/motion/thumbnail.jpg');

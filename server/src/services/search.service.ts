@@ -195,7 +195,7 @@ export class SearchService extends BaseService {
       {
         ...resolvedDto,
         checksum,
-        visibility: dto.visibility ?? (auth.session?.hasElevatedPermission ? undefined : 'not-locked'),
+        ...this.lockedFolderScope(auth, dto.visibility),
         userIds,
         orderDirection: dto.order ?? AssetOrder.Desc,
       },
@@ -228,7 +228,7 @@ export class SearchService extends BaseService {
 
     return await this.searchRepository.searchStatistics({
       ...resolvedDto,
-      visibility: dto.visibility ?? (auth.session?.hasElevatedPermission ? undefined : 'not-locked'),
+      ...this.lockedFolderScope(auth, dto.visibility),
       userIds,
     });
   }
@@ -258,7 +258,7 @@ export class SearchService extends BaseService {
     const items = await this.searchRepository.searchRandom(dto.size || 250, {
       ...resolvedDto,
       userIds,
-      visibility: dto.visibility ?? (auth.session?.hasElevatedPermission ? undefined : 'not-locked'),
+      ...this.lockedFolderScope(auth, dto.visibility),
     });
     return items.map((item) => mapAsset(item, { auth }));
   }
@@ -287,7 +287,7 @@ export class SearchService extends BaseService {
     const resolvedDto = await this.resolveScopedPersonFilters(auth, { ...dto, timelineSpaceIds });
     const items = await this.searchRepository.searchLargeAssets(dto.size || 250, {
       ...resolvedDto,
-      visibility: dto.visibility ?? (auth.session?.hasElevatedPermission ? undefined : 'not-locked'),
+      ...this.lockedFolderScope(auth, dto.visibility),
       userIds,
     });
     return items.map((item) => mapAsset(item, { auth }));
@@ -568,8 +568,8 @@ export class SearchService extends BaseService {
     const visibility = 'visibility' in dto ? dto.visibility : undefined;
     // Annotate so the 'not-locked' literal is preserved through the generic
     // resolveScopedPersonFilters inference (no contextual type widens it to string).
-    const resolvedVisibility: AssetVisibility | 'not-locked' | undefined =
-      visibility ?? (auth.session?.hasElevatedPermission ? undefined : 'not-locked');
+    const { visibility: resolvedVisibility, hasElevatedPermission }: ReturnType<typeof this.lockedFolderScope> =
+      this.lockedFolderScope(auth, visibility);
     const resolvedOptions = await this.resolveScopedPersonFilters(auth, {
       ...dto,
       timelineSpaceIds,
@@ -582,6 +582,7 @@ export class SearchService extends BaseService {
       embedding,
       maxDistance: machineLearning.clip.maxDistance,
       visibility: resolvedVisibility,
+      hasElevatedPermission,
     });
 
     if (options.includeOrder) {
@@ -593,6 +594,26 @@ export class SearchService extends BaseService {
       embeddingSource,
       encodeMs,
       timelineSpaceCount: timelineSpaceIds?.length ?? 0,
+    };
+  }
+
+  /**
+   * #869 follow-up: the Locked Folder scope for a search, as two values that must travel together.
+   *
+   * `visibility` keeps the existing resolution — an explicit DTO value wins, otherwise a session that
+   * has not entered the PIN is scoped to `'not-locked'`. `hasElevatedPermission` rides along because
+   * that explicit DTO value can be `hidden`, which is what the motion half of a locked live photo
+   * carries; `searchAssetBuilderLegacy` uses the pair to re-apply the live-photo pairing gate in
+   * exactly that case.
+   *
+   * Both are derived from `auth`, never from the DTO, and every call site spreads this AFTER the
+   * request object so a client-supplied `hasElevatedPermission` can never reach the builder.
+   */
+  private lockedFolderScope(auth: AuthDto, visibility?: AssetVisibility) {
+    const hasElevatedPermission = auth.session?.hasElevatedPermission ?? false;
+    return {
+      visibility: visibility ?? (hasElevatedPermission ? undefined : ('not-locked' as const)),
+      hasElevatedPermission,
     };
   }
 

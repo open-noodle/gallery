@@ -169,8 +169,23 @@ export function withDefaultVisibility<O>(qb: SelectQueryBuilder<DB, 'asset', O>)
  * when the pair was linked. A plain `visibility != locked` gate therefore let the motion half of a
  * locked live photo through, so it stayed in search results and its thumbnail stayed readable
  * without an elevated session. A motion video counts as locked for as long as its still is.
+ *
+ * Both helpers reference `asset.id` / `asset.visibility`, so **`asset` must be in the calling query's
+ * scope**. That precondition is a convention, not a type constraint: TypeScript accepts an
+ * `ExpressionBuilder` with a narrower scope for both the plain `ExpressionBuilder<DB, keyof DB>` and
+ * the generic signature below, so a call from a query with no `asset` joined in compiles and only
+ * fails at runtime. Verified, not assumed — don't spend another round trying to tighten it.
+ *
+ * The generic parameters exist for one reason: `ExpressionBuilder` is invariant in its DB parameter,
+ * so a caller that aliases a join and thereby widens `DB` (`user as sharedBy` in
+ * `checkPartnerAccess`) cannot pass its builder to an `ExpressionBuilder<DB, keyof DB>` parameter at
+ * all. `DBX extends DB` accepts those. The bodies stay written against the concrete
+ * `LockedGateBuilder` so Kysely still typechecks the correlated subquery — a fully generic body
+ * cannot resolve the `asset as still` alias.
  */
-const stillIsLocked = (eb: ExpressionBuilder<DB, keyof DB>) =>
+type LockedGateBuilder = ExpressionBuilder<DB, keyof DB>;
+
+const stillIsLocked = (eb: LockedGateBuilder) =>
   eb.exists(
     eb
       .selectFrom('asset as still')
@@ -179,8 +194,11 @@ const stillIsLocked = (eb: ExpressionBuilder<DB, keyof DB>) =>
       .where('still.visibility', '=', sql.lit(AssetVisibility.Locked)),
   );
 
-export function isLockedAsset(eb: ExpressionBuilder<DB, keyof DB>): Expression<SqlBool> {
-  return eb.or([eb('asset.visibility', '=', sql.lit(AssetVisibility.Locked)), stillIsLocked(eb)]);
+export function isLockedAsset<DBX extends DB, TB extends keyof DBX>(
+  eb: ExpressionBuilder<DBX, TB | 'asset'>,
+): Expression<SqlBool> {
+  const builder = eb as unknown as LockedGateBuilder;
+  return builder.or([builder('asset.visibility', '=', sql.lit(AssetVisibility.Locked)), stillIsLocked(builder)]);
 }
 
 /**
@@ -192,8 +210,14 @@ export function isLockedAsset(eb: ExpressionBuilder<DB, keyof DB>): Expression<S
  *
  * Usage: `.where((eb) => isNotLockedAsset(eb))` in place of `.where('asset.visibility', '!=', Locked)`.
  */
-export function isNotLockedAsset(eb: ExpressionBuilder<DB, keyof DB>): Expression<SqlBool> {
-  return eb.and([eb('asset.visibility', '!=', sql.lit(AssetVisibility.Locked)), eb.not(stillIsLocked(eb))]);
+export function isNotLockedAsset<DBX extends DB, TB extends keyof DBX>(
+  eb: ExpressionBuilder<DBX, TB | 'asset'>,
+): Expression<SqlBool> {
+  const builder = eb as unknown as LockedGateBuilder;
+  return builder.and([
+    builder('asset.visibility', '!=', sql.lit(AssetVisibility.Locked)),
+    builder.not(stillIsLocked(builder)),
+  ]);
 }
 
 /**
@@ -856,6 +880,15 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
           }
         }
       })
+      // #869 follow-up: `'not-locked'` above is what the services resolve for a session that has not
+      // entered the PIN — but `visibility` is a client-settable DTO field, and passing `hidden`
+      // explicitly takes the other branch instead. `hidden` is exactly what the motion half of a locked
+      // live photo carries, so that one value reopens the leak the 'not-locked' branch closes. Only
+      // Hidden can: Timeline/Archive never match a motion row, and Locked already requires elevation at
+      // the service layer. Fails closed — an options object with no `hasElevatedPermission` gets gated.
+      .$if(options.visibility === AssetVisibility.Hidden && !options.hasElevatedPermission, (qb) =>
+        qb.where((eb) => isNotLockedAsset(eb)),
+      )
       .$if(!!options.forceEmptyResult, (qb) => qb.where(sql<SqlBool>`false`))
       .$if(!!options.albumIds && options.albumIds.length > 0, (qb) =>
         inAlbums(qb, options.albumIds!, options.timelineSpaceIds),

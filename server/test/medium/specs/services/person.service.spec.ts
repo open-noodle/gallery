@@ -158,17 +158,21 @@ const setupRecognition = (db?: Kysely<DB>) => {
 };
 
 /**
- * #869 follow-up: the motion video of a live photo whose still sits in the Locked Folder. Locking
+ * #869 follow-up: the motion video of a live photo, with its still at `stillVisibility`. Locking
  * writes `visibility = locked` on the still only — the motion row keeps the `hidden` visibility it
  * was given when the pair was linked.
  */
-const seedLockedLivePhotoMotion = async (ctx: ReturnType<typeof setup>['ctx'], ownerId: string) => {
+const seedLivePhotoMotion = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  ownerId: string,
+  stillVisibility: AssetVisibility,
+) => {
   const { asset: motion } = await ctx.newAsset({
     ownerId,
     type: AssetType.Video,
     visibility: AssetVisibility.Hidden,
   });
-  await ctx.newAsset({ ownerId, visibility: AssetVisibility.Locked, livePhotoVideoId: motion.id });
+  await ctx.newAsset({ ownerId, visibility: stillVisibility, livePhotoVideoId: motion.id });
   return motion;
 };
 
@@ -2105,7 +2109,7 @@ describe(PersonService.name, () => {
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Motion Mona' });
       const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      const motion = await seedLockedLivePhotoMotion(ctx, user.id);
+      const motion = await seedLivePhotoMotion(ctx, user.id, AssetVisibility.Locked);
       await ctx.newAssetFace({ assetId: timelineAsset.id, personId: person.id });
       await ctx.newAssetFace({ assetId: motion.id, personId: person.id });
 
@@ -2117,10 +2121,25 @@ describe(PersonService.name, () => {
       expect(result.faces.map((face) => face.assetId)).toEqual([timelineAsset.id]);
     });
 
+    it('keeps a face on the motion half of an unlocked live photo in the picker', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Motion Mona' });
+      const motion = await seedLivePhotoMotion(ctx, user.id, AssetVisibility.Timeline);
+      await ctx.newAssetFace({ assetId: motion.id, personId: person.id });
+
+      const result = await sut.getFacesForPicker(factory.auth({ user: { id: user.id } }), person.id, {
+        page: 1,
+        size: 50,
+      });
+
+      expect(result.faces.map((face) => face.assetId)).toEqual([motion.id]);
+    });
+
     it('refuses a thumbnail cropped from the motion half while the session is not elevated', async () => {
       const { sut, ctx } = setup();
       const { user } = await ctx.newUser();
-      const motion = await seedLockedLivePhotoMotion(ctx, user.id);
+      const motion = await seedLivePhotoMotion(ctx, user.id, AssetVisibility.Locked);
       const { person } = await ctx.newPerson({
         ownerId: user.id,
         name: 'Motion Mona',

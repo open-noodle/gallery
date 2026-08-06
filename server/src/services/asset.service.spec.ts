@@ -61,7 +61,10 @@ describe(AssetService.name, () => {
       const auth = AuthFactory.create();
       mocks.asset.getStatistics.mockResolvedValue(stats);
       await expect(sut.getStatistics(auth, { visibility: AssetVisibility.Timeline })).resolves.toEqual(statResponse);
-      expect(mocks.asset.getStatistics).toHaveBeenCalledWith(auth.user.id, { visibility: AssetVisibility.Timeline });
+      expect(mocks.asset.getStatistics).toHaveBeenCalledWith(auth.user.id, {
+        visibility: AssetVisibility.Timeline,
+        hasElevatedPermission: false,
+      });
     });
 
     it('should get the statistics for a user for archived assets', async () => {
@@ -70,6 +73,7 @@ describe(AssetService.name, () => {
       await expect(sut.getStatistics(auth, { visibility: AssetVisibility.Archive })).resolves.toEqual(statResponse);
       expect(mocks.asset.getStatistics).toHaveBeenCalledWith(auth.user.id, {
         visibility: AssetVisibility.Archive,
+        hasElevatedPermission: false,
       });
     });
 
@@ -77,14 +81,32 @@ describe(AssetService.name, () => {
       const auth = AuthFactory.create();
       mocks.asset.getStatistics.mockResolvedValue(stats);
       await expect(sut.getStatistics(auth, { isFavorite: true })).resolves.toEqual(statResponse);
-      expect(mocks.asset.getStatistics).toHaveBeenCalledWith(auth.user.id, { isFavorite: true });
+      expect(mocks.asset.getStatistics).toHaveBeenCalledWith(auth.user.id, {
+        isFavorite: true,
+        hasElevatedPermission: false,
+      });
     });
 
     it('should get the statistics for a user for all assets', async () => {
       const auth = AuthFactory.create();
       mocks.asset.getStatistics.mockResolvedValue(stats);
       await expect(sut.getStatistics(auth, {})).resolves.toEqual(statResponse);
-      expect(mocks.asset.getStatistics).toHaveBeenCalledWith(auth.user.id, {});
+      expect(mocks.asset.getStatistics).toHaveBeenCalledWith(auth.user.id, { hasElevatedPermission: false });
+    });
+
+    // #869 follow-up: the elevation flag is what lets getStatistics tell "my hidden assets" apart from
+    // "the motion half of a live photo I have locked". It must be derived from the session, never echoed
+    // from the DTO — this pins that an elevated session actually reaches the repository as elevated.
+    it('should pass the elevated session through to the repository', async () => {
+      const auth = factory.auth({ session: { hasElevatedPermission: true } });
+      mocks.asset.getStatistics.mockResolvedValue(stats);
+
+      await expect(sut.getStatistics(auth, { visibility: AssetVisibility.Hidden })).resolves.toEqual(statResponse);
+
+      expect(mocks.asset.getStatistics).toHaveBeenCalledWith(auth.user.id, {
+        visibility: AssetVisibility.Hidden,
+        hasElevatedPermission: true,
+      });
     });
 
     it('should require elevated permission for locked assets', async () => {

@@ -121,7 +121,17 @@ export class TimelineService extends BaseService {
 
     const scopedOptions = await this.resolveScopedPersonFilters(auth, { ...options, timelineSpaceIds });
 
-    return { ...scopedOptions, bucketSize: dto.bucketSize ?? TimeBucketSize.Month, userIds, albumSpaceIds };
+    return {
+      ...scopedOptions,
+      bucketSize: dto.bucketSize ?? TimeBucketSize.Month,
+      userIds,
+      albumSpaceIds,
+      // #869 follow-up: derived from the session, and deliberately written AFTER the `...scopedOptions`
+      // spread — `options` is the rest of the request DTO, so setting it last is what guarantees a
+      // client cannot supply its own value. Consumed by withTimeBucketAssetFilters to keep the motion
+      // half of a locked live photo out of an explicit `visibility=hidden` bucket.
+      hasElevatedPermission: auth.session?.hasElevatedPermission ?? false,
+    };
   }
 
   private async resolveScopedPersonFilters(auth: AuthDto, options: TimeBucketOptions): Promise<TimeBucketOptions> {

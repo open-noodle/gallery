@@ -195,8 +195,25 @@ type BaseAssetSearchOptions = SearchDateOptions &
  */
 export type AssetSearchVisibility = AssetVisibility | 'not-locked' | 'timeline-or-archive';
 
+/**
+ * How a query scopes the Locked Folder. `visibility` is the resolved filter — a concrete value
+ * matches exactly that visibility, `'not-locked'` excludes the Locked Folder (including the motion
+ * half of a locked live photo), `undefined` filters nothing.
+ *
+ * #869 follow-up: services resolve `'not-locked'` for a session that has not entered the PIN, but a
+ * caller can pass `visibility=hidden` explicitly and bypass that resolution — and `hidden` is exactly
+ * what the motion half of a locked live photo carries. `hasElevatedPermission` is what lets the
+ * builder re-apply the pairing gate in that case. It is **server-derived from `auth`, never taken
+ * from a DTO**, and omitting it fails closed (the gate applies).
+ */
+type LockedFolderScopeOptions = {
+  visibility?: AssetSearchVisibility;
+  hasElevatedPermission?: boolean;
+};
+
 export type AssetSearchOptions = Omit<BaseAssetSearchOptions, 'visibility'> &
-  SearchRelationOptions & { visibility?: AssetSearchVisibility };
+  SearchRelationOptions &
+  LockedFolderScopeOptions;
 
 export type AssetSearchBuilderOptions = Omit<AssetSearchOptions, 'orderDirection'>;
 
@@ -226,7 +243,8 @@ export type SmartSearchOptions = SearchDateOptions &
   SearchAlbumOptions &
   SearchOcrOptions &
   SearchSpaceOptions &
-  SearchOrderOptions & { visibility?: AssetVisibility | 'not-locked' };
+  SearchOrderOptions &
+  LockedFolderScopeOptions;
 
 export type SmartSearchFacetsOptions = Omit<SmartSearchOptions, 'orderDirection'>;
 

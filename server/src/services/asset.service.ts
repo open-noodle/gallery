@@ -68,7 +68,12 @@ export class AssetService extends BaseService {
       requireElevatedPermission(auth);
     }
 
-    const stats = await this.assetRepository.getStatistics(auth.user.id, dto);
+    // #869 follow-up: `hasElevatedPermission` last, after the DTO spread — see the field's doc comment
+    // on AssetStatsOptions. Keeps a locked live photo's motion half out of a `visibility=hidden` count.
+    const stats = await this.assetRepository.getStatistics(auth.user.id, {
+      ...dto,
+      hasElevatedPermission: auth.session?.hasElevatedPermission ?? false,
+    });
     return mapStats(stats);
   }
 

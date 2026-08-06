@@ -8,7 +8,7 @@
  * Each test seeds a clean context so there is no shared-state cross-contamination.
  */
 import { Kysely } from 'kysely';
-import { AssetVisibility, SharedSpaceRole } from 'src/enum';
+import { AssetType, AssetVisibility, SharedSpaceRole } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
@@ -649,6 +649,51 @@ describe('checkSharedSpaceAccess (PersonRead) — visibility widening (rbac-7)',
 });
 
 // ---------------------------------------------------------------------------
+// checkUnlockedThumbnailAccess — live photo pairing (#869 follow-up)
+//
+// The person thumbnail is a crop of ONE photo: the representative face's asset. #897 gated it on
+// `asset.visibility != locked`, which the motion half of a locked live photo passes — it keeps
+// `hidden` when its still is locked. person.service refuses the locked case (covered there, where the
+// BadRequestException lands before the storage backend is touched); the ALLOWED case is pinned here
+// instead, because serving the file needs a storage backend the service medium spec does not wire.
+// ---------------------------------------------------------------------------
+
+const seedRepresentativeFaceOnMotion = async (stillVisibility: AssetVisibility) => {
+  const { ctx, accessRepo } = setup();
+  const { user } = await ctx.newUser();
+  const { asset: motion } = await ctx.newAsset({
+    ownerId: user.id,
+    type: AssetType.Video,
+    visibility: AssetVisibility.Hidden,
+  });
+  await ctx.newAsset({ ownerId: user.id, visibility: stillVisibility, livePhotoVideoId: motion.id });
+
+  const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Motion Mona' });
+  const { result: faceId } = await ctx.newAssetFace({ assetId: motion.id, personId: person.id });
+  await ctx.database.updateTable('person').set({ faceAssetId: faceId }).where('id', '=', person.id).execute();
+
+  return { accessRepo, person };
+};
+
+describe('checkUnlockedThumbnailAccess — live photo pairing (#869)', () => {
+  it('refuses a representative face on the motion half of a LOCKED live photo', async () => {
+    const { accessRepo, person } = await seedRepresentativeFaceOnMotion(AssetVisibility.Locked);
+
+    const result = await accessRepo.person.checkUnlockedThumbnailAccess(new Set([person.id]));
+
+    expect(result.has(person.id)).toBe(false);
+  });
+
+  it('allows a representative face on the motion half of an UNLOCKED live photo', async () => {
+    const { accessRepo, person } = await seedRepresentativeFaceOnMotion(AssetVisibility.Timeline);
+
+    const result = await accessRepo.person.checkUnlockedThumbnailAccess(new Set([person.id]));
+
+    expect(result.has(person.id)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // C6 investigation resolved SAFE/CONSISTENT: the partner arm (checkPartnerAccess — grants
 // Timeline + Hidden, upstream behaviour) and the space arm (checkSpaceAccess — grants Timeline +
 // Archive, per the space visibility gate) are two independent grants unioned at the
@@ -674,6 +719,29 @@ const seedPartnerAndSpaceAsset = async (visibility: AssetVisibility) => {
   await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
   return { accessRepo, partner, asset };
+};
+
+/**
+ * #869 follow-up: the live-photo shape the four visibility cases above cannot express. A live photo is
+ * two asset rows and locking writes `visibility = locked` on the STILL only — the motion video keeps
+ * the `hidden` it was given when the pair was linked. `Hidden` is on the partner allow-list precisely
+ * so a partner can play a live photo, so the motion half of a locked live photo is `Hidden` on the one
+ * arm that grants `Hidden`.
+ */
+const seedPartnerLivePhoto = async (stillVisibility: AssetVisibility) => {
+  const { ctx, accessRepo } = setup();
+  const { user: owner } = await ctx.newUser();
+  const { user: partner } = await ctx.newUser();
+  await ctx.newPartner({ sharedById: owner.id, sharedWithId: partner.id });
+
+  const { asset: motion } = await ctx.newAsset({
+    ownerId: owner.id,
+    type: AssetType.Video,
+    visibility: AssetVisibility.Hidden,
+  });
+  await ctx.newAsset({ ownerId: owner.id, visibility: stillVisibility, livePhotoVideoId: motion.id });
+
+  return { accessRepo, partner, motion };
 };
 
 // ---------------------------------------------------------------------------
@@ -941,5 +1009,27 @@ describe('C6 partner × space-linked visibility invariant', () => {
 
     expect(partnerResult.has(asset.id)).toBe(true);
     expect(spaceResult.has(asset.id)).toBe(true);
+  });
+
+  // #869 follow-up: the four cases above seed a directly-locked asset, so the live-photo shape slipped
+  // past the invariant they pin — the motion half of a locked live photo is `Hidden`, and the partner
+  // arm grants `Hidden`. Locked has to stay blocked on BOTH arms for the pairing too, or a partner
+  // keeps the owner's locked video, its thumbnail and its EXIF after the owner locked the photo.
+  it('blocks the motion half of a LOCKED live photo on the partner arm', async () => {
+    const { accessRepo, partner, motion } = await seedPartnerLivePhoto(AssetVisibility.Locked);
+
+    const partnerResult = await accessRepo.asset.checkPartnerAccess(partner.id, new Set([motion.id]));
+
+    expect(partnerResult.has(motion.id)).toBe(false);
+  });
+
+  // The other half of the gate: partners must keep playing ordinary live photos. Without this, making
+  // every paired motion video inaccessible would pass the test above.
+  it('still grants the motion half of an UNLOCKED live photo on the partner arm', async () => {
+    const { accessRepo, partner, motion } = await seedPartnerLivePhoto(AssetVisibility.Timeline);
+
+    const partnerResult = await accessRepo.asset.checkPartnerAccess(partner.id, new Set([motion.id]));
+
+    expect(partnerResult.has(motion.id)).toBe(true);
   });
 });

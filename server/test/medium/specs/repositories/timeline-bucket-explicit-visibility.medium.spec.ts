@@ -432,3 +432,68 @@ describe('timeline bucket explicit-visibility — albumId arm', () => {
     expect(ids.has(s.archive)).toBe(true);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATH 5: #869 — the motion half of a locked live photo, on the caller's OWN timeline
+//
+// Unlike the four paths above this is not a cross-member leak: it is the owner's own timeline, which
+// legitimately shows their own Hidden rows. A live photo is two asset rows and locking writes
+// `visibility = locked` on the STILL only — the motion video keeps the `hidden` it was given when the
+// pair was linked. So `visibility=hidden` matched it, and a session that never entered the PIN could
+// enumerate a locked live photo's id, capture date and EXIF (city/GPS) straight out of the bucket.
+// The thumbnail was already refused by checkOwnerAccess, so this is a metadata surface — but it is
+// metadata about the Locked Folder, which is the thing the folder exists to hide.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const seedOwnLivePhoto = async (ctx: ReturnType<typeof setup>['ctx'], stillVisibility: AssetVisibility) => {
+  const { user } = await ctx.newUser();
+  const motion = await makeBucketAsset(ctx, user.id, AssetVisibility.Hidden);
+  await ctx.newAsset({ ownerId: user.id, visibility: stillVisibility, livePhotoVideoId: motion });
+  return { user, motion };
+};
+
+describe('timeline bucket explicit-visibility — locked live photo motion half (#869)', () => {
+  it('omits the motion half of a LOCKED live photo from a non-elevated visibility=hidden bucket', async () => {
+    const { assetRepo, ctx } = setup();
+    const { user, motion } = await seedOwnLivePhoto(ctx, AssetVisibility.Locked);
+
+    const opts: TimeBucketOptions = {
+      userIds: [user.id],
+      visibility: AssetVisibility.Hidden,
+      bucketSize: TimeBucketSize.Year,
+    };
+
+    expect(countBuckets(await assetRepo.getTimeBuckets(opts))).toBe(0);
+    const ids = await bucketAssetIds(assetRepo, BUCKET, opts, user.id);
+    expect(ids.has(motion)).toBe(false);
+  });
+
+  it('returns the motion half of a locked live photo once the session is elevated', async () => {
+    const { assetRepo, ctx } = setup();
+    const { user, motion } = await seedOwnLivePhoto(ctx, AssetVisibility.Locked);
+
+    const opts: TimeBucketOptions = {
+      userIds: [user.id],
+      visibility: AssetVisibility.Hidden,
+      bucketSize: TimeBucketSize.Year,
+      hasElevatedPermission: true,
+    };
+
+    const ids = await bucketAssetIds(assetRepo, BUCKET, opts, user.id);
+    expect(ids.has(motion)).toBe(true);
+  });
+
+  it('regression: the motion half of an UNLOCKED live photo stays in the visibility=hidden bucket', async () => {
+    const { assetRepo, ctx } = setup();
+    const { user, motion } = await seedOwnLivePhoto(ctx, AssetVisibility.Timeline);
+
+    const opts: TimeBucketOptions = {
+      userIds: [user.id],
+      visibility: AssetVisibility.Hidden,
+      bucketSize: TimeBucketSize.Year,
+    };
+
+    const ids = await bucketAssetIds(assetRepo, BUCKET, opts, user.id);
+    expect(ids.has(motion)).toBe(true);
+  });
+});

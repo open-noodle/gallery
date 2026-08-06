@@ -1934,5 +1934,41 @@ describe(SearchRepository.name, () => {
 
       expect(items.map(({ id }) => id)).toContain(motion.id);
     });
+
+    // The tag scope is the surface the original report named alongside people ("when I search for
+    // images with this person's name or tags"). A user cannot tag a motion video by hand — it is
+    // hidden — but auto-classification tags it on the same race that leaves it with a CLIP embedding:
+    // the jobs run while the .mov is still a standalone Timeline asset, before the .heic links it.
+    it('omits a tag attached only to the motion half of a locked live photo', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { motion } = await newLivePhoto(ctx, user.id, AssetVisibility.Locked);
+
+      const [motionTag] = await upsertTags(ctx.get(TagRepository), {
+        userId: user.id,
+        tags: ['MotionLockedTag'],
+      });
+      await ctx.newTagAsset({ tagIds: [motionTag.id], assetIds: [motion.id] });
+
+      const tags = await sut.getAccessibleTags([user.id], { visibility: 'not-locked' });
+
+      expect(tags.map((tag) => tag.value)).not.toContain('MotionLockedTag');
+    });
+
+    it('keeps a tag on the motion half of an unlocked live photo', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { motion } = await newLivePhoto(ctx, user.id, AssetVisibility.Timeline);
+
+      const [motionTag] = await upsertTags(ctx.get(TagRepository), {
+        userId: user.id,
+        tags: ['MotionUnlockedTag'],
+      });
+      await ctx.newTagAsset({ tagIds: [motionTag.id], assetIds: [motion.id] });
+
+      const tags = await sut.getAccessibleTags([user.id], { visibility: 'not-locked' });
+
+      expect(tags.map((tag) => tag.value)).toContain('MotionUnlockedTag');
+    });
   });
 });

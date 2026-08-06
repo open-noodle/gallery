@@ -854,6 +854,10 @@ describe(SearchService.name, () => {
           callerId: authStub.user1.user.id,
           maxDistance: 0,
           visibility: 'not-locked',
+          // #869 follow-up: travels with `visibility` so the builder can re-apply the live-photo
+          // pairing gate when a caller passes visibility=hidden explicitly instead of taking the
+          // 'not-locked' resolution above. Derived from the session, never from the DTO.
+          hasElevatedPermission: false,
         },
       );
     });

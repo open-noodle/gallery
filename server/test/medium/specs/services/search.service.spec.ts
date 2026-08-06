@@ -451,6 +451,17 @@ describe(SearchService.name, () => {
       expect(result.countries).not.toContain('Vaultland');
     });
 
+    it('keeps the location of the motion half of an unlocked live photo in filter suggestions', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { motion } = await seedLivePhoto(ctx, user.id, AssetVisibility.Timeline);
+      await ctx.newExif({ assetId: motion.id, country: 'Openland' });
+
+      const result = await sut.getFilterSuggestions(factory.auth({ user: { id: user.id } }), {});
+
+      expect(result.countries).toContain('Openland');
+    });
+
     it('omits a person backed only by the motion half from a non-elevated person search', async () => {
       const { sut, ctx } = setup();
       const { user } = await ctx.newUser();
@@ -471,6 +482,59 @@ describe(SearchService.name, () => {
       await ctx.newAssetFace({ assetId: motion.id, personId: person.id });
 
       const result = await sut.searchPerson(elevated(user.id), { name: 'Mona' });
+
+      expect(result.map((person) => person.name)).toEqual(['Motion Mona']);
+    });
+
+    // The services resolve `visibility: 'not-locked'` for a non-elevated session, but `visibility` is
+    // a client-settable DTO field and `hidden` is precisely what the motion half carries — so passing
+    // it explicitly took the `asset.visibility = <requested>` branch and walked straight past the
+    // 'not-locked' gate, EXIF and all. Only `hidden` can do this; Locked already requires elevation.
+    it('omits the motion half from a non-elevated search that asks for visibility=hidden explicitly', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { motion } = await seedLivePhoto(ctx, user.id, AssetVisibility.Locked);
+
+      const { assets } = await sut.searchMetadata(factory.auth({ user: { id: user.id } }), {
+        visibility: AssetVisibility.Hidden,
+      });
+
+      expect(assets.items.map(({ id }) => id)).not.toContain(motion.id);
+    });
+
+    it('returns the motion half to an elevated search that asks for visibility=hidden explicitly', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { motion } = await seedLivePhoto(ctx, user.id, AssetVisibility.Locked);
+
+      const { assets } = await sut.searchMetadata(elevated(user.id), { visibility: AssetVisibility.Hidden });
+
+      expect(assets.items.map(({ id }) => id)).toContain(motion.id);
+    });
+
+    it('keeps an unlocked live photo’s motion half in an explicit visibility=hidden search', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { motion } = await seedLivePhoto(ctx, user.id, AssetVisibility.Timeline);
+
+      const { assets } = await sut.searchMetadata(factory.auth({ user: { id: user.id } }), {
+        visibility: AssetVisibility.Hidden,
+      });
+
+      expect(assets.items.map(({ id }) => id)).toContain(motion.id);
+    });
+
+    // The `locked` and `not-locked` arms of visibleFaceOnAsset have to stay exact complements for
+    // #897's "backed ONLY by the Locked Folder" logic. Applying the pairing gate to every paired
+    // motion video would drop this person too, and the two cases above would not notice.
+    it('keeps a person backed only by the motion half of an unlocked live photo searchable', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { motion } = await seedLivePhoto(ctx, user.id, AssetVisibility.Timeline);
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Motion Mona' });
+      await ctx.newAssetFace({ assetId: motion.id, personId: person.id });
+
+      const result = await sut.searchPerson(factory.auth({ user: { id: user.id } }), { name: 'Mona' });
 
       expect(result.map((person) => person.name)).toEqual(['Motion Mona']);
     });
