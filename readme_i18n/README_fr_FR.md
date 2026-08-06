@@ -1,8 +1,8 @@
 <p align="center"> 
   <br/>  
   <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=License&logoColor=000000&labelColor=ececec" alt="License: AGPLv3"></a>
-  <a href="https://discord.immich.app">
-    <img src="https://img.shields.io/discord/979116623879368755.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" atl="Discord"/>
+  <a href="https://discord.gg/cxBfbuxyG4">
+    <img src="https://img.shields.io/discord/1480633426376921239.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" atl="Discord"/>
   </a>
   <br/>  
   <br/>   
@@ -11,10 +11,10 @@
 <p align="center">
 <img src="../design/gallery-logo-stacked-light.svg" width="300" title="Login With Custom URL">
 </p>
-<h3 align="center">Immich - Solution de sauvegarde performante et auto-hébergée de photos et de vidéos</h3>
+<h3 align="center">Noodle Gallery - Solution de sauvegarde performante et auto-hébergée de photos et de vidéos</h3>
 <br/>
-<a href="https://immich.app">
-<img src="../design/immich-screenshots.png" title="Main Screenshot">
+<a href="https://opennoodle.de">
+<img src="../design/gallery-screenshot.webp" title="Main Screenshot">
 </a>
 <br/>
 <p align="center">
@@ -47,32 +47,18 @@
 >
 
 > [!NOTE]
-> Vous pouvez trouver la documentation principale ainsi que les guides d'installation sur https://immich.app/.
+> Vous pouvez trouver la documentation principale ainsi que les guides d'installation sur https://opennoodle.de/.
 
 ## Sommaire
 
-- [Documentation](https://docs.immich.app/)
-- [Introduction](https://docs.immich.app/overview/introduction)
-- [Installation](https://docs.immich.app/install/requirements)
-- [Feuille de route](https://immich.app/roadmap)
+- [Documentation](https://docs.opennoodle.de/)
+- [Introduction](https://docs.opennoodle.de/overview/quick-start)
+- [Installation](https://docs.opennoodle.de/install/requirements)
+- [Feuille de route](https://opennoodle.de/roadmap)
 - [Démo](#démo)
 - [Fonctionnalités](#fonctionnalités)
-- [Traductions](https://docs.immich.app/developer/translations)
-- [Contribution](https://docs.immich.app/overview/support-the-project)
-
-## Démo
-
-Vous pouvez accéder à la démo en ligne sur https://demo.immich.app. Pour l'application mobile, vous pouvez utiliser `https://demo.immich.app` dans le champ `URL du point d'accès au serveur`
-
-```bash title="Identifiants pour la démo"
-Les identifiants
-email: demo@immich.app
-mot de passe: demo
-```
-
-## Activités
-
-![Activités](https://repobeats.axiom.co/api/embed/9e86d9dc3ddd137161f2f6d2e758d7863b1789cb.svg "Image des statistiques Repobeats")
+- [Traductions](https://docs.opennoodle.de/developer/translations)
+- [Contribution](https://docs.opennoodle.de/overview/support-the-project)
 
 ## Fonctionnalités
 
@@ -106,20 +92,3 @@ mot de passe: demo
 | Support hors-ligne                                               | Oui    | Non |
 | Gallerie en lecture seule                                        | Oui    | Oui |
 | Empilage de photos                                               | Oui    | Oui |
-
-
-## Contributeurs
-
-<a href="https://github.com/alextran1502/immich/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=immich-app/immich" width="100%"/>
-</a>
-
-## Historique des favoris
-
-<a href="https://star-history.com/#immich-app/immich&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=immich-app/immich&type=Date" width="100%" />
- </picture>
-</a>
