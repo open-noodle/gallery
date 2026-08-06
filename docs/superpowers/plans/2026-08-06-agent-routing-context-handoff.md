@@ -659,6 +659,17 @@ git commit -m "feat(agent): forward strict-workflow routing context on handoff, 
 
 The cheapest real handoff is the `slots_unparsed` exit: classify as `create_recent_trip_album` with empty slots. The real `parseSlots` requires `albumName` **or** `placeHint`, so `{}` returns null — and that exit is reached **before** any MCP call, so the test needs no tool traffic at all.
 
+**The prompt text must miss the regex fast-path, or the injected classifier is never consulted.** The runtime defaults to `routerMode: 'hybrid'`, which tries the regex matcher first and only calls `ai.classifyIntent` when regex returns `kind: 'none'`. Verified against the real registry:
+
+| Prompt                                           | `classify()`                                                                    | `parseSlots`                | Reaches injected classifier?                        |
+| ------------------------------------------------ | ------------------------------------------------------------------------------- | --------------------------- | --------------------------------------------------- |
+| `make an album for my recent trip`               | `kind: create_recent_trip_album, via: regex`, slots `{albumName:'Recent Trip'}` | `{albumName:'Recent Trip'}` | **No** — regex wins, workflow runs, `handled: true` |
+| `put my Japan trip from last week into an album` | `kind: 'none', via: regex`                                                      | n/a                         | **Yes**                                             |
+
+So every test below uses `put my Japan trip from last week into an album`. Do not "simplify" it to a phrase containing _recent trip_ — that hands the turn to the regex matcher and the test silently stops testing anything.
+
+Note the same prompt appears in Step 6's handled-turn test with `slots: { placeHint: 'Japan' }`, where `parseSlots` accepts and the workflow runs to completion. Same prompt, different injected slots, deliberately opposite outcomes.
+
 **Existing helpers in `pi-runtime.test.mjs` — reuse these exact names:**
 
 | Helper                                     | Line   | Returns / use                      |
@@ -711,7 +722,7 @@ it('delivers routing context to the open agent when slot parsing fails', async (
   await collect(
     runtime.sendMessage(
       createMessageRequest({
-        content: { blocks: [{ type: 'text', text: 'make an album for my recent trip' }] },
+        content: { blocks: [{ type: 'text', text: 'put my Japan trip from last week into an album' }] },
       }),
     ),
   );
@@ -884,7 +895,9 @@ it('still runs the open turn when sendCustomMessage rejects', async () => {
 
   const events = await collect(
     runtime.sendMessage(
-      createMessageRequest({ content: { blocks: [{ type: 'text', text: 'make an album for my recent trip' }] } }),
+      createMessageRequest({
+        content: { blocks: [{ type: 'text', text: 'put my Japan trip from last week into an album' }] },
+      }),
     ),
   );
 
@@ -909,7 +922,9 @@ it('still runs the open turn when the session has no sendCustomMessage', async (
 
   const events = await collect(
     runtime.sendMessage(
-      createMessageRequest({ content: { blocks: [{ type: 'text', text: 'make an album for my recent trip' }] } }),
+      createMessageRequest({
+        content: { blocks: [{ type: 'text', text: 'put my Japan trip from last week into an album' }] },
+      }),
     ),
   );
 
@@ -943,7 +958,10 @@ it('queues exactly one routing-context block per handoff turn', async () => {
   const runtime = createPiRuntime({ sdk, ai });
   await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
 
-  for (const text of ['make an album for my recent trip', 'make an album for my recent trip']) {
+  for (const text of [
+    'put my Japan trip from last week into an album',
+    'put my Japan trip from last week into an album',
+  ]) {
     await collect(runtime.sendMessage(createMessageRequest({ content: { blocks: [{ type: 'text', text }] } })));
   }
 
