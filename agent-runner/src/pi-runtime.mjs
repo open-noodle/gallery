@@ -1340,6 +1340,10 @@ export const createPiRuntime = ({
           entry.inFlight = false;
         }
         // Not handled by a strict/hybrid workflow: fall through to provider orchestration.
+        // Retaken BEFORE the awaited delivery below: leaving the guard down across
+        // an await would let a concurrent sendMessage for this session slip past
+        // the `entry.inFlight` check and start a second stream.
+        entry.inFlight = true;
         // Best-effort: routing context is an optimisation, never a precondition for
         // the turn. Failing open leaves exactly today's behaviour.
         try {
@@ -1351,9 +1355,14 @@ export const createPiRuntime = ({
             );
           }
         } catch {
-          log.warn?.(JSON.stringify({ msg: 'routing_context_injection_failed', gallerySessionId }));
+          // Deliberately binds no error: a reason can contain user text, so the
+          // raw failure is structurally unloggable here, not merely undisciplined.
+          try {
+            log.warn?.(JSON.stringify({ msg: 'routing_context_injection_failed', gallerySessionId }));
+          } catch {
+            // Observability logging must never break the turn.
+          }
         }
-        entry.inFlight = true;
       }
 
       let sequence = 0;
