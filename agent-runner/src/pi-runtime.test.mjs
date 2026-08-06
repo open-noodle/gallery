@@ -1231,6 +1231,144 @@ describe('pi runtime adapter', () => {
     assert.equal(mcpCalls.length, 0);
   });
 
+  it('sends no routing context when the router matches nothing', async () => {
+    const { sdk, ai, calls, session } = createFakeDependencies({
+      mcpToolNames: ['mcp_gallery_searchAssets'],
+    });
+    // Default classifyIntent already returns { workflow: 'none' } — no override.
+    const customMessages = [];
+    session.sendCustomMessage = async (message, options) => customMessages.push({ message, options });
+
+    const runtime = createPiRuntime({ sdk, ai });
+    await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
+
+    await collect(
+      runtime.sendMessage(
+        createMessageRequest({ content: { blocks: [{ type: 'text', text: 'what is the weather in Berlin' }] } }),
+      ),
+    );
+
+    assert.equal(customMessages.length, 0);
+    assert.equal(calls.prompts.length, 1);
+  });
+
+  it('sends no routing context when a strict workflow handled the turn', async () => {
+    const { sdk, ai, calls, session } = createFakeDependencies({
+      mcpToolNames: ['mcp_gallery_findTripCandidates', 'mcp_gallery_proposeAlbumFromSelection'],
+    });
+    ai.classifyIntent = async () => ({
+      workflow: 'create_recent_trip_album',
+      slots: { placeHint: 'Japan' },
+      confidence: 'high',
+    });
+    const customMessages = [];
+    session.sendCustomMessage = async (message, options) => customMessages.push({ message, options });
+
+    const { fetchImplementation } = createStrictWorkflowFetch({
+      candidates: [makeStrictTripCandidate({ placeLabels: ['Kyoto, Japan'] })],
+      recommendation: {
+        action: 'use_top_candidate',
+        candidateDedupeKey: 'trip:usa:new-york:2026-05-03:2026-05-12',
+        reason: 'The only readable trip candidate is high confidence.',
+      },
+      expectedAlbumName: 'Japan Trip',
+      placeHint: 'Japan',
+    });
+
+    const runtime = createPiRuntime({ sdk, ai, fetch: fetchImplementation });
+    await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
+
+    const events = await collect(
+      runtime.sendMessage(
+        createMessageRequest({
+          content: { blocks: [{ type: 'text', text: 'put my Japan trip from last week into an album' }] },
+        }),
+      ),
+    );
+
+    // Strict layer handled it: no open turn, and therefore no routing context.
+    assert.equal(calls.prompts.length, 0);
+    assert.equal(customMessages.length, 0);
+    assert.equal(events.at(-1).type, 'assistant-message-completed');
+  });
+
+  it('still runs the open turn when sendCustomMessage rejects', async () => {
+    const { sdk, ai, calls, session } = createFakeDependencies({
+      mcpToolNames: ['mcp_gallery_findTripCandidates'],
+    });
+    ai.classifyIntent = async () => ({ workflow: 'create_recent_trip_album', slots: {}, confidence: 'high' });
+    session.sendCustomMessage = async () => {
+      throw new Error('queue full');
+    };
+
+    const runtime = createPiRuntime({ sdk, ai });
+    await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
+
+    const events = await collect(
+      runtime.sendMessage(
+        createMessageRequest({
+          content: { blocks: [{ type: 'text', text: 'put my Japan trip from last week into an album' }] },
+        }),
+      ),
+    );
+
+    assert.equal(calls.prompts.length, 1);
+    assert.equal(
+      events.some((event) => event.type === 'runner-error'),
+      false,
+    );
+  });
+
+  it('still runs the open turn when the session has no sendCustomMessage', async () => {
+    // The default fake session deliberately has no sendCustomMessage — this is
+    // the older-SDK / missing-method path.
+    const { sdk, ai, calls, session } = createFakeDependencies({
+      mcpToolNames: ['mcp_gallery_findTripCandidates'],
+    });
+    assert.equal(session.sendCustomMessage, undefined);
+    ai.classifyIntent = async () => ({ workflow: 'create_recent_trip_album', slots: {}, confidence: 'high' });
+
+    const runtime = createPiRuntime({ sdk, ai });
+    await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
+
+    const events = await collect(
+      runtime.sendMessage(
+        createMessageRequest({
+          content: { blocks: [{ type: 'text', text: 'put my Japan trip from last week into an album' }] },
+        }),
+      ),
+    );
+
+    assert.equal(calls.prompts.length, 1);
+    assert.equal(
+      events.some((event) => event.type === 'runner-error'),
+      false,
+    );
+  });
+
+  it('queues exactly one routing-context block per handoff turn', async () => {
+    const { sdk, ai, calls, session } = createFakeDependencies({
+      mcpToolNames: ['mcp_gallery_findTripCandidates'],
+    });
+    ai.classifyIntent = async () => ({ workflow: 'create_recent_trip_album', slots: {}, confidence: 'high' });
+    const customMessages = [];
+    session.sendCustomMessage = async (message, options) => customMessages.push({ message, options });
+
+    const runtime = createPiRuntime({ sdk, ai });
+    await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
+
+    for (const text of [
+      'put my Japan trip from last week into an album',
+      'put my Japan trip from last week into an album',
+    ]) {
+      await collect(runtime.sendMessage(createMessageRequest({ content: { blocks: [{ type: 'text', text }] } })));
+    }
+
+    // One per handoff turn — not zero, and not accumulating.
+    assert.equal(customMessages.length, 2);
+    assert.equal(calls.prompts.length, 2);
+  });
+
   it('keeps a strict handled Pi runner session usable for a later open prompt', async () => {
     const { sdk, ai, calls } = createFakeDependencies({
       mcpToolNames: ['mcp_gallery_findTripCandidates', 'mcp_gallery_proposeAlbumFromSelection'],
