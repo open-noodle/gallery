@@ -12,11 +12,11 @@ See the design: `docs/superpowers/specs/2026-05-29-pi-agent-smoke-eval-harness-d
 
 The numbers are **stack depth** — how much of the real system each layer drives:
 
-| Layer | aka | drives | needs |
-| --- | --- | --- | --- |
-| **L1** | component | the classifier + copy adapters | a local model only — no Gallery, no DB |
-| **L2** | workflow | the dispatcher + workflow `run()` with a *fake* MCP client | agent-runner code + model (no DB) — _not built yet_ |
-| **L3** | live | the real Gallery `/agent/*` API end-to-end, read-only | Gallery server + DB + runner + model |
+| Layer  | aka       | drives                                                     | needs                                                    |
+| ------ | --------- | ---------------------------------------------------------- | -------------------------------------------------------- |
+| **L1** | component | the classifier + copy adapters                             | a local model only — no Gallery, no DB                   |
+| **L2** | workflow  | the dispatcher + workflow `run()` with a _fake_ MCP client | agent-runner code only — no Gallery, no DB, **no model** |
+| **L3** | live      | the real Gallery `/agent/*` API end-to-end, read-only      | Gallery server + DB + runner + model                     |
 
 L1 is the daily driver (fast, runs anywhere). L3 (`--layer L3`) is the periodic
 "does it actually work against the running service" check.
@@ -53,6 +53,29 @@ friendly. (Not in CI yet — it needs a local model.)
 - Categories: `recall` (right workflow + slots survive `parseSlots`),
   `negatives` (questions/chatter/unsupported → `none`), `slots` (exact normalized
   slot values), `copy` (polish preserves facts + review framing).
+
+## L2 — workflow execution (fake MCP, no DB, no model)
+
+`--layer L2` drives the real dispatcher and the real workflow `run()` against a
+seeded in-memory MCP client (`eval/fixtures/`). It asserts what L1 cannot: the
+**exact ordered tool sequence** a workflow issues, the **plan operations** it
+proposes, and which **outcome arm** it lands in — plus a global invariant that no
+plan call ever carries raw asset ids.
+
+```bash
+pnpm eval:l2                       # or: pnpm eval -- --layer L2
+pnpm eval -- --layer L2 --diff     # vs eval/baseline.l2.json
+```
+
+Scenario keys beyond the L1 set: `toolSequence` (exact, ordered),
+`planOps` (subset match on operation `type`), `noPlan`, and `outcomeStatus`.
+`planOps` is only populated for the `proposeAlbumOperations` family — the
+selection-based plan tools pass a handle and let the server derive operations,
+so those scenarios assert `toolSequence` and `outcomeStatus` instead.
+
+L2 is deterministic: a fixed clock, a frozen dataset, and regex routing. Scenarios
+run once with a threshold of 1, so any failure is a real regression rather than
+model variance.
 
 ## Adding scenarios
 
@@ -104,13 +127,13 @@ most-populated album so plan scenarios resolve a real target.
 
 Config (all env-overridable, see `config.mjs`):
 
-| var | meaning |
-| --- | --- |
-| `GALLERY_URL` | API base (default `http://localhost:2283/api`) |
-| `GALLERY_API_KEY` \| `GALLERY_TOKEN` \| `GALLERY_EMAIL`+`GALLERY_PASSWORD` | auth (pick one) |
-| `GALLERY_CREDENTIAL_ID` | reuse an existing agent provider credential |
-| `GALLERY_MODEL_URL` | else: a **server-reachable** model URL to create a credential for |
-| `GALLERY_MODEL` | override the session model id |
+| var                                                                        | meaning                                                           |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `GALLERY_URL`                                                              | API base (default `http://localhost:2283/api`)                    |
+| `GALLERY_API_KEY` \| `GALLERY_TOKEN` \| `GALLERY_EMAIL`+`GALLERY_PASSWORD` | auth (pick one)                                                   |
+| `GALLERY_CREDENTIAL_ID`                                                    | reuse an existing agent provider credential                       |
+| `GALLERY_MODEL_URL`                                                        | else: a **server-reachable** model URL to create a credential for |
+| `GALLERY_MODEL`                                                            | override the session model id                                     |
 
 Requirements: the target instance must have the agent feature, an agent **runner
 built from this branch** (so the strict router emits the observability events),

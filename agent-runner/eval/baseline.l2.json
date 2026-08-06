@@ -1,0 +1,16 @@
+{
+  "model": "l2-fake-mcp",
+  "overall": 1,
+  "byCategory": {
+    "execution": 1,
+    "negatives": 1
+  },
+  "scenarioScores": {
+    "l2.rename.planned": 1,
+    "l2.rename.ambiguous.needs-input": 1,
+    "l2.rename.missing.needs-input": 1,
+    "l2.trip.planned": 1,
+    "l2.negatives.question": 1,
+    "l2.negatives.chatter": 1
+  }
+}
