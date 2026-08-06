@@ -32,9 +32,6 @@
 > This is a **community fork** of [Immich](https://github.com/immich-app/immich) with additional features and improvements. Currently based on **Immich v3.1.0**. We regularly sync with upstream to stay up to date. See [What's Different](#whats-different-from-upstream-immich) below.
 
 > [!TIP]
-> **Noodle Gallery mobile apps are out!** Back up your photos and browse your library on the go. [Download on the App Store](https://apps.apple.com/us/app/noodle-gallery/id6761776289) · [Get it on Google Play](https://play.google.com/store/apps/details?id=de.opennoodle.gallery)
-
-> [!TIP]
 > **Already running Immich?** Switching to Gallery is a three-line config change — two image names in your `docker-compose.yml` and `IMMICH_VERSION=v5` in your `.env`. Your library and database are fully compatible. See the [install guide](https://opennoodle.de/install/#migrate-from-immich).
 >
 > **Not for you?** A one-command [switch-back script](https://docs.opennoodle.de/guides/switch-back-to-immich) cleans up Gallery-specific tables and columns and puts you back on upstream Immich. Your photos and videos never move.
