@@ -1,8 +1,8 @@
 <p align="center"> 
   <br/>  
   <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=License&logoColor=000000&labelColor=ececec" alt="License: AGPLv3"></a>
-  <a href="https://discord.immich.app">
-    <img src="https://img.shields.io/discord/979116623879368755.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" atl="Discord"/>
+  <a href="https://discord.gg/cxBfbuxyG4">
+    <img src="https://img.shields.io/discord/1480633426376921239.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" atl="Discord"/>
   </a>
   <br/>  
   <br/>   
@@ -13,11 +13,11 @@
 </p>
 <h3 align="center">高性能的照片和视频自托管解决方案</h3>
 <p align="center">  
-请注意: 此 README 不是由 Immich 团队维护, 而是依靠贡献者来更新的，这意味着它可能并不会被及时更新。感谢理解。
+请注意: 此 README 不是由 Noodle Gallery 团队维护, 而是依靠贡献者来更新的，这意味着它可能并不会被及时更新。感谢理解。
 </p>
 <br/>
-<a href="https://immich.app">
-<img src="../design/immich-screenshots.png" title="界面截图">
+<a href="https://opennoodle.de">
+<img src="../design/gallery-screenshot.webp" title="界面截图">
 </a>
 <br/>
 <p align="center">
@@ -53,28 +53,22 @@
 >
 
 > [!NOTE]
-> 完整的项目文档以及安装教程请参见：<https://immich.app/>。
+> 完整的项目文档以及安装教程请参见：<https://opennoodle.de/>。
 
 ## 目录
 
-- [官方文档](https://docs.immich.app)
-- [项目总览](https://docs.immich.app/overview/introduction)
-- [安装教程](https://docs.immich.app/install/requirements)
-- [路线图](https://immich.app/roadmap)
+- [官方文档](https://docs.opennoodle.de)
+- [项目总览](https://docs.opennoodle.de/overview/quick-start)
+- [安装教程](https://docs.opennoodle.de/install/requirements)
+- [路线图](https://opennoodle.de/roadmap)
 - [在线演示](#示例)
 - [功能特性](#功能特性)
-- [多语言](https://docs.immich.app/developer/translations)
-- [贡献者](https://docs.immich.app/overview/support-the-project)
+- [多语言](https://docs.opennoodle.de/developer/translations)
+- [贡献者](https://docs.opennoodle.de/overview/support-the-project)
 
 ## 示例
 
-您可以在[此处](https://demo.immich.app)访问在线演示网站。在移动端，您可以使用 `https://demo.immich.app` 作为 `服务终端链接`
-
-### 登录认证信息
-
-| 邮箱            | 密码     |
-| --------------- | -------- |
-| demo@immich.app | demo     |
+您可以在[此处](https://demo.opennoodle.de)访问在线演示网站。在移动端，您可以使用 `https://demo.opennoodle.de` 作为 `服务终端链接`
 
 ## 功能特性
 
@@ -113,28 +107,4 @@
 
 ## 多语言
 
-关于翻译的更多信息请参见[此处](https://docs.immich.app/developer/translations)。
-
-<a href="https://hosted.weblate.org/engage/immich/">
-<img src="https://hosted.weblate.org/widget/immich/immich/multi-auto.svg" alt="翻译进度" />
-</a>
-
-## 活跃度
-
-![活跃度](https://repobeats.axiom.co/api/embed/9e86d9dc3ddd137161f2f6d2e758d7863b1789cb.svg "Repobeats analytics image")
-
-## Star增长曲线
-
-<a href="https://star-history.com/#immich-app/immich&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=immich-app/immich&type=Date" width="100%" />
- </picture>
-</a>
-
-## 贡献者
-
-<a href="https://github.com/alextran1502/immich/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=immich-app/immich" width="100%"/>
-</a>
+关于翻译的更多信息请参见[此处](https://docs.opennoodle.de/developer/translations)。

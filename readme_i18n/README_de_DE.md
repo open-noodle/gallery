@@ -1,8 +1,8 @@
 <p align="center"> 
   <br/>  
-  <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=License&logoColor=000000&labelColor=ececec" alt="Lizenz: MIT"></a>
-  <a href="https://discord.immich.app">
-    <img src="https://img.shields.io/discord/979116623879368755.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" alt="Discord"/>
+  <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=License&logoColor=000000&labelColor=ececec" alt="Lizenz: AGPL-3.0"></a>
+  <a href="https://discord.gg/cxBfbuxyG4">
+    <img src="https://img.shields.io/discord/1480633426376921239.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" alt="Discord"/>
   </a>
   <br/>  
   <br/>   
@@ -11,10 +11,10 @@
 <p align="center">
 <img src="../design/gallery-logo-stacked-light.svg" width="300" title="Login mit eigener URL">
 </p>
-<h3 align="center">Immich - Hoch performante, selbst gehostete Backup-Lösung für Fotos und Videos</h3>
+<h3 align="center">Noodle Gallery - Hoch performante, selbst gehostete Backup-Lösung für Fotos und Videos</h3>
 <br/>
-<a href="https://immich.app">
-<img src="../design/immich-screenshots.png" title="Haupt-Screenshot">
+<a href="https://opennoodle.de">
+<img src="../design/gallery-screenshot.webp" title="Haupt-Screenshot">
 </a>
 <br/>
 <p align="center">
@@ -48,29 +48,23 @@
 >
 
 > [!NOTE]
-> Die Hauptdokumentation, einschließlich der Installationsanleitungen, befinden sich unter https://immich.app/.
+> Die Hauptdokumentation, einschließlich der Installationsanleitungen, befinden sich unter https://opennoodle.de/.
 
 
 ## Inhalt
 
-- [Offizielle Dokumentation](https://docs.immich.app)
-- [Über Immich](https://docs.immich.app/overview/introduction)
-- [Installation](https://docs.immich.app/install/requirements)
-- [Roadmap](https://immich.app/roadmap)
+- [Offizielle Dokumentation](https://docs.opennoodle.de)
+- [Über Noodle Gallery](https://docs.opennoodle.de/overview/quick-start)
+- [Installation](https://docs.opennoodle.de/install/requirements)
+- [Roadmap](https://opennoodle.de/roadmap)
 - [Demo](#demo)
 - [Funktionen](#funktionen)
-- [Übersetzungen](https://docs.immich.app/developer/translations)
-- [Beitragsrichtlinien](https://docs.immich.app/overview/support-the-project)
+- [Übersetzungen](https://docs.opennoodle.de/developer/translations)
+- [Beitragsrichtlinien](https://docs.opennoodle.de/overview/support-the-project)
 
 ## Demo
 
-Die Web-Demo kannst Du unter https://demo.immich.app finden. Für die Smartphone-App kannst Du `https://demo.immich.app` als `Server Endpoint URL` angeben.
-
-### Login Daten
-
-| Email           | Password |
-| --------------- | -------- |
-| demo@immich.app | demo     |
+Die Web-Demo kannst Du unter https://demo.opennoodle.de finden. Für die Smartphone-App kannst Du `https://demo.opennoodle.de` als `Server Endpoint URL` angeben.
 
 ## Funktionen
 
@@ -110,28 +104,4 @@ Die Web-Demo kannst Du unter https://demo.immich.app finden. Für die Smartphone
 
 ## Übersetzungen
 
-Mehr zum Thema Übersetzungen kannst du [hier](https://docs.immich.app/developer/translations) erfahren.
-
-<a href="https://hosted.weblate.org/engage/immich/">
-<img src="https://hosted.weblate.org/widget/immich/immich/multi-auto.svg" alt="Translation status" />
-</a>
-
-## Repository-Aktivität
-
-![Activities](https://repobeats.axiom.co/api/embed/9e86d9dc3ddd137161f2f6d2e758d7863b1789cb.svg "Repobeats analytics image")
-
-## Github Sterne
-
-<a href="https://star-history.com/#immich-app/immich&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=immich-app/immich&type=Date" width="100%" />
- </picture>
-</a>
-
-## Mitwirkende
-
-<a href="https://github.com/alextran1502/immich/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=immich-app/immich" width="100%"/>
-</a>
+Mehr zum Thema Übersetzungen kannst du [hier](https://docs.opennoodle.de/developer/translations) erfahren.
