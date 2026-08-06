@@ -1,8 +1,8 @@
 <p align="center"> 
   <br/>  
   <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=License&logoColor=000000&labelColor=ececec" alt="License: AGPLv3"></a>
-  <a href="https://discord.immich.app">
-    <img src="https://img.shields.io/discord/979116623879368755.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" atl="Discord"/>
+  <a href="https://discord.gg/cxBfbuxyG4">
+    <img src="https://img.shields.io/discord/1480633426376921239.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" atl="Discord"/>
   </a>
   <br/>  
   <br/>   
@@ -11,10 +11,10 @@
 <p align="center">
 <img src="../design/gallery-logo-stacked-light.svg" width="300" title="Login With Custom URL">
 </p>
-<h3 align="center">Immich - Yüksek performanslı, kendine ait barındırılan fotoğraf ve video yedekleme çözümü</h3>
+<h3 align="center">Noodle Gallery - Yüksek performanslı, kendine ait barındırılan fotoğraf ve video yedekleme çözümü</h3>
 <br/>
-<a href="https://immich.app">
-<img src="../design/immich-screenshots.png" title="Main Screenshot">
+<a href="https://opennoodle.de">
+<img src="../design/gallery-screenshot.webp" title="Main Screenshot">
 </a>
 <br/>
 <p align="center">
@@ -47,53 +47,15 @@
 > 
 
 > [!NOTE]
-> Kurulum dahil olmak üzere resmi belgeleri https://immich.app/ adresinde bulabilirsiniz.
+> Kurulum dahil olmak üzere resmi belgeleri https://opennoodle.de/ adresinde bulabilirsiniz.
 
 ## Bağlantılar
 
-- [Resmi Belgeler](https://docs.immich.app/)
-- [Giriş](https://docs.immich.app/overview/introduction)
-- [Kurulum](https://docs.immich.app/install/requirements)
-- [Yol Haritası](https://immich.app/roadmap)
+- [Resmi Belgeler](https://docs.opennoodle.de/)
+- [Giriş](https://docs.opennoodle.de/overview/quick-start)
+- [Kurulum](https://docs.opennoodle.de/install/requirements)
+- [Yol Haritası](https://opennoodle.de/roadmap)
 - [Demo](#demo)
 - [Özellikler](#özellikler)
-- [Çeviriler](https://docs.immich.app/developer/translations)
-- [Katkı Sağlama Rehberi](https://docs.immich.app/overview/support-the-project)
-
-## Demo
-
-Web demo adresi: https://demo.immich.app. Mobil uygulama için `Server Endpoint URL` olarak `https://demo.immich.app` adresini kullanabilirsiniz.
-
-```bash title="Demo Bilgileri"
-Giriş bilgileri:
-email: demo@immich.app
-password: demo
-```
-
-# Özellikler
-
-| Özellikler                                          | Mobile | Web  |
-| ----------------------------------------------------| ------ | ---  |
-| Videoları ve fotoğrafları yükleme ve görüntüleme    | Evet   | Evet |
-| Uygulama açıldığında otomatik yedekleme             | Evet   | N/A  |
-| Yedekleme için seçilebilir albüm(ler)               | Evet   | N/A  |
-| Fotoğrafları ve videoları yerel cihaza yükleme      | Evet   | Evet |
-| Çoklu kullanıcı desteği                             | Evet   | Evet |
-| Albüm ve paylaşılan albümler                        | Evet   | Evet |
-| Silinebilir/sürüklenebilir kaydırma çubuğu          | Evet   | Evet |
-| RAW (HEIC, HEIF, DNG, Apple ProRaw) format desteği  | Evet   | Evet |
-| Metadata'ya uygun görüntüleme (EXIF, map)           | Evet   | Evet |
-| Metadata, objects, faces ve CLIP'e göre arama       | Evet   | Evet |
-| Yönetimsel işlevler (kullanıcı yönetimi)            | Hayır  | Evet |
-| Arka planda yedekleme                               | Evet   | N/A  |
-| Sanal kaydırma                                      | Evet   | Evet |
-| OAuth desteği                                       | Evet   | Evet |
-| API anahtarları                                     | N/A    | Evet |
-| LivePhoto yedekleme ve oynatma                      | iOS    | Evet |
-| Kullanıcı tanımlı depolama yapısı                   | Evet   | Evet |
-| Herkese açık paylaşım                               | Hayır  | Evet |
-| Arşiv ve Favoriler                                  | Evet   | Evet |
-| Dünya haritası                                      | Hayır  | Evet |
-| Partner paylaşımı                                   | Evet   | Evet |
-| Yüz tanıma ve kümeleme                              | Hayır  | Evet |
-| Çevrimdışı destek                                   | Evet   | Hayır|
+- [Çeviriler](https://docs.opennoodle.de/developer/translations)
+- [Katkı Sağlama Rehberi](https://docs.opennoodle.de/overview/support-the-project)
