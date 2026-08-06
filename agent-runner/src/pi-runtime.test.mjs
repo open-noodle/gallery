@@ -1292,6 +1292,13 @@ describe('pi runtime adapter', () => {
     assert.equal(events.at(-1).type, 'assistant-message-completed');
   });
 
+  // Design spec §7 also lists "`formatRoutingContext` throws → open turn still
+  // proceeds". That case is deliberately not exercised as its own test:
+  // `formatRoutingContext` is a static import, not an injected dependency, so
+  // nothing here can make it throw without stubbing behind the import system;
+  // and behaviourally it would hit the exact same catch as the
+  // sendCustomMessage-rejects case below, so a separate test would pin nothing
+  // this one doesn't already.
   it('still runs the open turn when sendCustomMessage rejects', async () => {
     const { sdk, ai, calls, session } = createFakeDependencies({
       mcpToolNames: ['mcp_gallery_findTripCandidates'],
@@ -1321,9 +1328,17 @@ describe('pi runtime adapter', () => {
       events.some((event) => event.type === 'runner-error'),
       false,
     );
-    // The turn completed, not merely "did not error": the likelier mutation
-    // (delivery inside the strict try) converts the rejection to a runner-error
-    // and returns early, which this catches.
+    // Pins that the turn actually completed (an assistant-message-completed
+    // event was emitted), not merely "no runner-error event was seen" — the
+    // `runner-error` assertion above would also hold if the stream produced no
+    // events at all.
+    //
+    // This does NOT pin delivery's placement outside the strict try. Moving the
+    // whole delivery block inside the strict try leaves this assertion (and all
+    // 101 tests) green: the delivery's own inner try/catch swallows the
+    // sendCustomMessage rejection before the outer strict catch ever sees it, so
+    // the turn still completes either way. Block placement is not currently
+    // pinned by any test.
     assert.equal(events.at(-1).type, 'assistant-message-completed');
     assert.deepEqual(
       warns.filter((line) => line.includes('routing_context_injection_failed')),
@@ -1638,6 +1653,44 @@ describe('pi runtime adapter', () => {
     assert.equal(calls.continues, 0);
     assert.equal(mcpCalls.map((call) => call.body.params.name).join(','), 'findTripCandidates,proposeAlbumFromSelection');
     assert.match(events.at(-1).content.blocks[0].text, /Review the plan before applying it/);
+  });
+
+  it('never calls sendCustomMessage from the approval-resume path', async () => {
+    // Design spec §6: `resumeSession`'s own `if (dispatch.handled)`
+    // (`pi-runtime.mjs:~1600`, fed by `dispatcher.routeApproval`) is deliberately
+    // left unwired to routing-context delivery — `routeApproval` never carries a
+    // `routingContext` (dispatcher.mjs discards it on the approval path), and
+    // resuming an in-flight approval is not "falling through to open
+    // orchestration". Same setup as "resumes an approved production strict
+    // recent-trip plan without provider prompting" above, plus a
+    // sendCustomMessage spy to pin the absence of any delivery call.
+    const { sdk, ai, calls, session } = createFakeDependencies({
+      mcpToolNames: ['mcp_gallery_findTripCandidates', 'mcp_gallery_proposeAlbumFromSelection'],
+    });
+    const { fetchImplementation } = createStrictWorkflowFetch({
+      planResponse: {
+        status: 'approval-required',
+        toolCall: { id: '00000000-0000-4000-8000-000000000999' },
+      },
+    });
+    const customMessages = [];
+    session.sendCustomMessage = async (message, options) => customMessages.push({ message, options });
+
+    const runtime = createPiRuntime({ sdk, ai, fetch: fetchImplementation });
+    await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
+
+    await collect(runtime.sendMessage(createMessageRequest({ content: { blocks: [{ type: 'text', text: 'Create an album for my recent trip to USA' }] } })));
+    const events = await collect(runtime.resumeSession({
+      runnerSessionId: 'pi-00000000-0000-4000-8000-000000000100',
+      gallerySessionId: '00000000-0000-4000-8000-000000000100',
+      toolCallId: '00000000-0000-4000-8000-000000000999',
+      approvalDecision: 'approved',
+      toolResult: { status: 'success', plan: { id: strictTripPlanId } },
+    }));
+
+    assert.equal(calls.prompts.length, 0);
+    assert.match(events.at(-1).content.blocks[0].text, /Review the plan before applying it/);
+    assert.equal(customMessages.length, 0);
   });
 
   it('pauses again when an approved strict recent-trip resume unexpectedly needs approval', async () => {
