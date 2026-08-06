@@ -263,6 +263,14 @@ describe('L2 driver — approval', () => {
 
     assert.equal(decision.planProposed, false);
     assert.equal(decision.planId, null);
+    // planProposed/planId alone cannot tell a genuine denial from the approval
+    // gate silently letting the denial through: resumeApproval's default
+    // toolResult ({ status: 'success' }, no planId) also lands on `failed` with
+    // planProposed:false/planId:null (see dispatcher.mjs's approval-required
+    // resumeApproval path). The denial copy is the one signal that discriminates
+    // the two — it is only emitted from the `approvalDecision !== 'approved'`
+    // branch (dispatcher.mjs:288-292), never from a resumed/failed plan.
+    assert.match(decision.text ?? '', /approval was denied/i);
   });
 
   it('a mismatched toolCallId is not treated as a denial', async () => {
