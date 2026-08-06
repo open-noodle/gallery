@@ -1,20 +1,20 @@
 <p align="center">
   <br/>
   <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=License&logoColor=000000&labelColor=ececec" alt="License: AGPLv3"></a>
-  <a href="https://discord.immich.app">
-    <img src="https://img.shields.io/discord/979116623879368755.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" alt="Discord"/>
+  <a href="https://discord.gg/cxBfbuxyG4">
+    <img src="https://img.shields.io/discord/1480633426376921239.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" alt="Discord"/>
   </a>
   <br/>
   <br/>
 </p>
 
 <p align="center">
-<img src="/design/gallery-logo-stacked-light.svg" width="300" title="Login With Custom URL">
+<img src="../design/gallery-logo-stacked-light.svg" width="300" title="Login With Custom URL">
 </p>
 <h3 align="center">Високопродуктивне рішення для управління фото та відео на власному хостингу</h3>
 <br/>
-<a href="https://immich.app">
-<img src="/design/immich-screenshots.png" title="Головний скріншот">
+<a href="https://opennoodle.de">
+<img src="../design/gallery-screenshot.webp" title="Головний скріншот">
 </a>
 <br/>
 
@@ -49,28 +49,22 @@
 >
 
 > [!NOTE]
-> Основну документацію, зокрема посібники зі встановлення, можна знайти за адресою https://immich.app/.
+> Основну документацію, зокрема посібники зі встановлення, можна знайти за адресою https://opennoodle.de/.
 
 ## Посилання
 
-- [Документація](https://docs.immich.app)
-- [Про проєкт](https://docs.immich.app/overview/introduction)
-- [Встановлення](https://docs.immich.app/install/requirements)
-- [Дорожня карта](https://immich.app/roadmap)
+- [Документація](https://docs.opennoodle.de)
+- [Про проєкт](https://docs.opennoodle.de/overview/quick-start)
+- [Встановлення](https://docs.opennoodle.de/install/requirements)
+- [Дорожня карта](https://opennoodle.de/roadmap)
 - [Демо](#демо)
 - [Функції](#функції)
-- [Переклади](https://docs.immich.app/developer/translations)
-- [Гід для розробки проєкту](https://docs.immich.app/overview/support-the-project)
+- [Переклади](https://docs.opennoodle.de/developer/translations)
+- [Гід для розробки проєкту](https://docs.opennoodle.de/overview/support-the-project)
 
 ## Демо
 
-Доступ до демо-версії [тут](https://demo.immich.app). Для мобільного застосунку ви можете використовувати `https://demo.immich.app` в якості `Server Endpoint URL`.
-
-### Облікові дані для входу
-
-| Електронна пошта | Пароль |
-| ---------------- | ------ |
-| demo@immich.app  | demo   |
+Доступ до демо-версії [тут](https://demo.opennoodle.de). Для мобільного застосунку ви можете використовувати `https://demo.opennoodle.de` в якості `Server Endpoint URL`.
 
 ## Функції
 
@@ -109,28 +103,4 @@
 
 ## Переклади
 
-Більше про переклади [тут](https://docs.immich.app/developer/translations).
-
-<a href="https://hosted.weblate.org/engage/immich/">
-<img src="https://hosted.weblate.org/widget/immich/immich/multi-auto.svg" alt="Статус перекладів" />
-</a>
-
-## Активність репозиторію
-
-![Діяльність](https://repobeats.axiom.co/api/embed/9e86d9dc3ddd137161f2f6d2e758d7863b1789cb.svg "Зображення аналітики Repobeats")
-
-## Історія зірок
-
-<a href="https://star-history.com/#immich-app/immich&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=immich-app/immich&type=Date" width="100%" />
- </picture>
-</a>
-
-## Автори
-
-<a href="https://github.com/alextran1502/immich/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=immich-app/immich" width="100%"/>
-</a>
+Більше про переклади [тут](https://docs.opennoodle.de/developer/translations).
