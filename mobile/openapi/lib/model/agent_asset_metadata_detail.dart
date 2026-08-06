@@ -11,33 +11,31 @@
 part of openapi.api;
 
 
-class AgentAssetMetadataDetail {
-  /// Instantiate a new enum with the provided [value].
-  const AgentAssetMetadataDetail._(this.value);
+enum AgentAssetMetadataDetail {
+  basic._(r'basic'),
+  descriptive._(r'descriptive'),
+  technical._(r'technical'),
+  allSafe._(r'allSafe'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentAssetMetadataDetail._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const basic = AgentAssetMetadataDetail._(r'basic');
-  static const descriptive = AgentAssetMetadataDetail._(r'descriptive');
-  static const technical = AgentAssetMetadataDetail._(r'technical');
-  static const allSafe = AgentAssetMetadataDetail._(r'allSafe');
-
-  /// List of all possible values in this [enum][AgentAssetMetadataDetail].
-  static const values = <AgentAssetMetadataDetail>[
-    basic,
-    descriptive,
-    technical,
-    allSafe,
-  ];
-
+  /// Returns the instance of [AgentAssetMetadataDetail] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentAssetMetadataDetail? fromJson(dynamic value) => AgentAssetMetadataDetailTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentAssetMetadataDetail]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentAssetMetadataDetail> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentAssetMetadataDetail>[];
     if (json is List && json.isNotEmpty) {
@@ -59,9 +57,11 @@ class AgentAssetMetadataDetailTypeTransformer {
 
   const AgentAssetMetadataDetailTypeTransformer._();
 
-  String encode(AgentAssetMetadataDetail data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentAssetMetadataDetail data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentAssetMetadataDetail.
+  /// Returns the instance of [AgentAssetMetadataDetail] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -70,6 +70,9 @@ class AgentAssetMetadataDetailTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentAssetMetadataDetail? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentAssetMetadataDetail) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'basic': return AgentAssetMetadataDetail.basic;
@@ -85,7 +88,7 @@ class AgentAssetMetadataDetailTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentAssetMetadataDetailTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentAssetMetadataDetailTypeTransformer? _instance;
 }
 

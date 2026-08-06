@@ -73,7 +73,7 @@ class AgentAlbumSummary {
     if (this.albumThumbnailAssetId != null) {
       json[r'albumThumbnailAssetId'] = this.albumThumbnailAssetId;
     } else {
-    //  json[r'albumThumbnailAssetId'] = null;
+      json[r'albumThumbnailAssetId'] = null;
     }
       json[r'assetCount'] = this.assetCount;
       json[r'description'] = this.description;
@@ -82,7 +82,7 @@ class AgentAlbumSummary {
         ? this.endDate!.millisecondsSinceEpoch
         : this.endDate!.toUtc().toIso8601String();
     } else {
-    //  json[r'endDate'] = null;
+      json[r'endDate'] = null;
     }
       json[r'id'] = this.id;
       json[r'ownerId'] = this.ownerId;
@@ -91,7 +91,7 @@ class AgentAlbumSummary {
         ? this.startDate!.millisecondsSinceEpoch
         : this.startDate!.toUtc().toIso8601String();
     } else {
-    //  json[r'startDate'] = null;
+      json[r'startDate'] = null;
     }
     return json;
   }

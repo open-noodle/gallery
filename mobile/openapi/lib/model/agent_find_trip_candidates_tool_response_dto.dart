@@ -146,27 +146,28 @@ class AgentFindTripCandidatesToolResponseDto {
 }
 
 
-class AgentFindTripCandidatesToolResponseDtoStatusEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentFindTripCandidatesToolResponseDtoStatusEnum._(this.value);
+enum AgentFindTripCandidatesToolResponseDtoStatusEnum {
+  success._(r'success'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentFindTripCandidatesToolResponseDtoStatusEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const success = AgentFindTripCandidatesToolResponseDtoStatusEnum._(r'success');
-
-  /// List of all possible values in this [enum][AgentFindTripCandidatesToolResponseDtoStatusEnum].
-  static const values = <AgentFindTripCandidatesToolResponseDtoStatusEnum>[
-    success,
-  ];
-
+  /// Returns the instance of [AgentFindTripCandidatesToolResponseDtoStatusEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentFindTripCandidatesToolResponseDtoStatusEnum? fromJson(dynamic value) => AgentFindTripCandidatesToolResponseDtoStatusEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentFindTripCandidatesToolResponseDtoStatusEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentFindTripCandidatesToolResponseDtoStatusEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentFindTripCandidatesToolResponseDtoStatusEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -188,9 +189,10 @@ class AgentFindTripCandidatesToolResponseDtoStatusEnumTypeTransformer {
 
   const AgentFindTripCandidatesToolResponseDtoStatusEnumTypeTransformer._();
 
-  String encode(AgentFindTripCandidatesToolResponseDtoStatusEnum data) => data.value;
+  String encode(AgentFindTripCandidatesToolResponseDtoStatusEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentFindTripCandidatesToolResponseDtoStatusEnum.
+  /// Returns the instance of [AgentFindTripCandidatesToolResponseDtoStatusEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -199,6 +201,9 @@ class AgentFindTripCandidatesToolResponseDtoStatusEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentFindTripCandidatesToolResponseDtoStatusEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentFindTripCandidatesToolResponseDtoStatusEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'success': return AgentFindTripCandidatesToolResponseDtoStatusEnum.success;
@@ -211,7 +216,7 @@ class AgentFindTripCandidatesToolResponseDtoStatusEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentFindTripCandidatesToolResponseDtoStatusEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentFindTripCandidatesToolResponseDtoStatusEnumTypeTransformer? _instance;
 }
 

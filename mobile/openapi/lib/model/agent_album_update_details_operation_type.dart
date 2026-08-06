@@ -11,27 +11,28 @@
 part of openapi.api;
 
 
-class AgentAlbumUpdateDetailsOperationType {
-  /// Instantiate a new enum with the provided [value].
-  const AgentAlbumUpdateDetailsOperationType._(this.value);
+enum AgentAlbumUpdateDetailsOperationType {
+  albumPeriodUpdateDetails._(r'album.updateDetails'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentAlbumUpdateDetailsOperationType._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const albumPeriodUpdateDetails = AgentAlbumUpdateDetailsOperationType._(r'album.updateDetails');
-
-  /// List of all possible values in this [enum][AgentAlbumUpdateDetailsOperationType].
-  static const values = <AgentAlbumUpdateDetailsOperationType>[
-    albumPeriodUpdateDetails,
-  ];
-
+  /// Returns the instance of [AgentAlbumUpdateDetailsOperationType] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentAlbumUpdateDetailsOperationType? fromJson(dynamic value) => AgentAlbumUpdateDetailsOperationTypeTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentAlbumUpdateDetailsOperationType]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentAlbumUpdateDetailsOperationType> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentAlbumUpdateDetailsOperationType>[];
     if (json is List && json.isNotEmpty) {
@@ -53,9 +54,11 @@ class AgentAlbumUpdateDetailsOperationTypeTypeTransformer {
 
   const AgentAlbumUpdateDetailsOperationTypeTypeTransformer._();
 
-  String encode(AgentAlbumUpdateDetailsOperationType data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentAlbumUpdateDetailsOperationType data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentAlbumUpdateDetailsOperationType.
+  /// Returns the instance of [AgentAlbumUpdateDetailsOperationType] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -64,6 +67,9 @@ class AgentAlbumUpdateDetailsOperationTypeTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentAlbumUpdateDetailsOperationType? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentAlbumUpdateDetailsOperationType) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'album.updateDetails': return AgentAlbumUpdateDetailsOperationType.albumPeriodUpdateDetails;
@@ -76,7 +82,7 @@ class AgentAlbumUpdateDetailsOperationTypeTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentAlbumUpdateDetailsOperationTypeTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentAlbumUpdateDetailsOperationTypeTypeTransformer? _instance;
 }
 

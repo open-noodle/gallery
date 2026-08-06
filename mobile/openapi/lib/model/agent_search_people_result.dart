@@ -58,7 +58,7 @@ class AgentSearchPeopleResult {
     if (this.thumbnailAssetId != null) {
       json[r'thumbnailAssetId'] = this.thumbnailAssetId;
     } else {
-    //  json[r'thumbnailAssetId'] = null;
+      json[r'thumbnailAssetId'] = null;
     }
       json[r'choices'] = this.choices;
     return json;
@@ -134,27 +134,28 @@ class AgentSearchPeopleResult {
 }
 
 
-class AgentSearchPeopleResultStatusEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentSearchPeopleResultStatusEnum._(this.value);
+enum AgentSearchPeopleResultStatusEnum {
+  ambiguous._(r'ambiguous'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentSearchPeopleResultStatusEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const ambiguous = AgentSearchPeopleResultStatusEnum._(r'ambiguous');
-
-  /// List of all possible values in this [enum][AgentSearchPeopleResultStatusEnum].
-  static const values = <AgentSearchPeopleResultStatusEnum>[
-    ambiguous,
-  ];
-
+  /// Returns the instance of [AgentSearchPeopleResultStatusEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentSearchPeopleResultStatusEnum? fromJson(dynamic value) => AgentSearchPeopleResultStatusEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentSearchPeopleResultStatusEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentSearchPeopleResultStatusEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentSearchPeopleResultStatusEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -176,9 +177,10 @@ class AgentSearchPeopleResultStatusEnumTypeTransformer {
 
   const AgentSearchPeopleResultStatusEnumTypeTransformer._();
 
-  String encode(AgentSearchPeopleResultStatusEnum data) => data.value;
+  String encode(AgentSearchPeopleResultStatusEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentSearchPeopleResultStatusEnum.
+  /// Returns the instance of [AgentSearchPeopleResultStatusEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -187,6 +189,9 @@ class AgentSearchPeopleResultStatusEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentSearchPeopleResultStatusEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentSearchPeopleResultStatusEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'ambiguous': return AgentSearchPeopleResultStatusEnum.ambiguous;
@@ -199,7 +204,7 @@ class AgentSearchPeopleResultStatusEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentSearchPeopleResultStatusEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentSearchPeopleResultStatusEnumTypeTransformer? _instance;
 }
 

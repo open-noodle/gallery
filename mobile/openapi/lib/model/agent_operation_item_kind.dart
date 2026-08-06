@@ -11,35 +11,32 @@
 part of openapi.api;
 
 
-class AgentOperationItemKind {
-  /// Instantiate a new enum with the provided [value].
-  const AgentOperationItemKind._(this.value);
+enum AgentOperationItemKind {
+  asset._(r'asset'),
+  album._(r'album'),
+  space._(r'space'),
+  person._(r'person'),
+  tag._(r'tag'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentOperationItemKind._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const asset = AgentOperationItemKind._(r'asset');
-  static const album = AgentOperationItemKind._(r'album');
-  static const space = AgentOperationItemKind._(r'space');
-  static const person = AgentOperationItemKind._(r'person');
-  static const tag = AgentOperationItemKind._(r'tag');
-
-  /// List of all possible values in this [enum][AgentOperationItemKind].
-  static const values = <AgentOperationItemKind>[
-    asset,
-    album,
-    space,
-    person,
-    tag,
-  ];
-
+  /// Returns the instance of [AgentOperationItemKind] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentOperationItemKind? fromJson(dynamic value) => AgentOperationItemKindTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentOperationItemKind]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentOperationItemKind> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentOperationItemKind>[];
     if (json is List && json.isNotEmpty) {
@@ -61,9 +58,11 @@ class AgentOperationItemKindTypeTransformer {
 
   const AgentOperationItemKindTypeTransformer._();
 
-  String encode(AgentOperationItemKind data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentOperationItemKind data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentOperationItemKind.
+  /// Returns the instance of [AgentOperationItemKind] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -72,6 +71,9 @@ class AgentOperationItemKindTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentOperationItemKind? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentOperationItemKind) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'asset': return AgentOperationItemKind.asset;
@@ -88,7 +90,7 @@ class AgentOperationItemKindTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentOperationItemKindTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentOperationItemKindTypeTransformer? _instance;
 }
 

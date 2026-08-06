@@ -114,27 +114,28 @@ class AgentReadAlbumToolDeniedResponse {
 }
 
 
-class AgentReadAlbumToolDeniedResponseStatusEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentReadAlbumToolDeniedResponseStatusEnum._(this.value);
+enum AgentReadAlbumToolDeniedResponseStatusEnum {
+  denied._(r'denied'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentReadAlbumToolDeniedResponseStatusEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const denied = AgentReadAlbumToolDeniedResponseStatusEnum._(r'denied');
-
-  /// List of all possible values in this [enum][AgentReadAlbumToolDeniedResponseStatusEnum].
-  static const values = <AgentReadAlbumToolDeniedResponseStatusEnum>[
-    denied,
-  ];
-
+  /// Returns the instance of [AgentReadAlbumToolDeniedResponseStatusEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentReadAlbumToolDeniedResponseStatusEnum? fromJson(dynamic value) => AgentReadAlbumToolDeniedResponseStatusEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentReadAlbumToolDeniedResponseStatusEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentReadAlbumToolDeniedResponseStatusEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentReadAlbumToolDeniedResponseStatusEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -156,9 +157,10 @@ class AgentReadAlbumToolDeniedResponseStatusEnumTypeTransformer {
 
   const AgentReadAlbumToolDeniedResponseStatusEnumTypeTransformer._();
 
-  String encode(AgentReadAlbumToolDeniedResponseStatusEnum data) => data.value;
+  String encode(AgentReadAlbumToolDeniedResponseStatusEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentReadAlbumToolDeniedResponseStatusEnum.
+  /// Returns the instance of [AgentReadAlbumToolDeniedResponseStatusEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -167,6 +169,9 @@ class AgentReadAlbumToolDeniedResponseStatusEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentReadAlbumToolDeniedResponseStatusEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentReadAlbumToolDeniedResponseStatusEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'denied': return AgentReadAlbumToolDeniedResponseStatusEnum.denied;
@@ -179,7 +184,7 @@ class AgentReadAlbumToolDeniedResponseStatusEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentReadAlbumToolDeniedResponseStatusEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentReadAlbumToolDeniedResponseStatusEnumTypeTransformer? _instance;
 }
 

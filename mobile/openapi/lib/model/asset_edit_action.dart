@@ -16,6 +16,7 @@ enum AssetEditAction {
   rotate._(r'rotate'),
   mirror._(r'mirror'),
   trim._(r'trim'),
+  adjust._(r'adjust'),
   ;
 
   /// Instantiate a new enum with the provided value.
@@ -79,6 +80,7 @@ class AssetEditActionTypeTransformer {
         case r'rotate': return AssetEditAction.rotate;
         case r'mirror': return AssetEditAction.mirror;
         case r'trim': return AssetEditAction.trim;
+        case r'adjust': return AssetEditAction.adjust;
         default:
           if (!allowNull) {
             throw ArgumentError('Unknown enum value to decode: $data');

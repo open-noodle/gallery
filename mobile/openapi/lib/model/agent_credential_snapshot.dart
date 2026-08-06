@@ -60,12 +60,12 @@ class AgentCredentialSnapshot {
     if (this.baseUrl != null) {
       json[r'baseUrl'] = this.baseUrl;
     } else {
-    //  json[r'baseUrl'] = null;
+      json[r'baseUrl'] = null;
     }
     if (this.defaultModel != null) {
       json[r'defaultModel'] = this.defaultModel;
     } else {
-    //  json[r'defaultModel'] = null;
+      json[r'defaultModel'] = null;
     }
       json[r'id'] = this.id;
       json[r'label'] = this.label;

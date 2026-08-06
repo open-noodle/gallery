@@ -136,37 +136,33 @@ class AgentProposeAlbumOperationsDtoOperationsInnerOneOf19Payload {
 }
 
 
-class AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum._(this.value);
+enum AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum {
+  strongDecrease._(r'strong_decrease'),
+  moderateDecrease._(r'moderate_decrease'),
+  slightDecrease._(r'slight_decrease'),
+  slightIncrease._(r'slight_increase'),
+  moderateIncrease._(r'moderate_increase'),
+  strongIncrease._(r'strong_increase'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const strongDecrease = AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum._(r'strong_decrease');
-  static const moderateDecrease = AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum._(r'moderate_decrease');
-  static const slightDecrease = AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum._(r'slight_decrease');
-  static const slightIncrease = AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum._(r'slight_increase');
-  static const moderateIncrease = AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum._(r'moderate_increase');
-  static const strongIncrease = AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum._(r'strong_increase');
-
-  /// List of all possible values in this [enum][AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum].
-  static const values = <AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum>[
-    strongDecrease,
-    moderateDecrease,
-    slightDecrease,
-    slightIncrease,
-    moderateIncrease,
-    strongIncrease,
-  ];
-
+  /// Returns the instance of [AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum? fromJson(dynamic value) => AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -188,9 +184,10 @@ class AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnumT
 
   const AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnumTypeTransformer._();
 
-  String encode(AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum data) => data.value;
+  String encode(AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum.
+  /// Returns the instance of [AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -199,6 +196,9 @@ class AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnumT
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'strong_decrease': return AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnum.strongDecrease;
@@ -216,43 +216,39 @@ class AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnumT
     return null;
   }
 
-  /// Singleton [AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadBrightnessEnumTypeTransformer? _instance;
 }
 
 
 
-class AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum._(this.value);
+enum AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum {
+  strongDecrease._(r'strong_decrease'),
+  moderateDecrease._(r'moderate_decrease'),
+  slightDecrease._(r'slight_decrease'),
+  slightIncrease._(r'slight_increase'),
+  moderateIncrease._(r'moderate_increase'),
+  strongIncrease._(r'strong_increase'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const strongDecrease = AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum._(r'strong_decrease');
-  static const moderateDecrease = AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum._(r'moderate_decrease');
-  static const slightDecrease = AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum._(r'slight_decrease');
-  static const slightIncrease = AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum._(r'slight_increase');
-  static const moderateIncrease = AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum._(r'moderate_increase');
-  static const strongIncrease = AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum._(r'strong_increase');
-
-  /// List of all possible values in this [enum][AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum].
-  static const values = <AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum>[
-    strongDecrease,
-    moderateDecrease,
-    slightDecrease,
-    slightIncrease,
-    moderateIncrease,
-    strongIncrease,
-  ];
-
+  /// Returns the instance of [AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum? fromJson(dynamic value) => AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -274,9 +270,10 @@ class AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnumTyp
 
   const AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnumTypeTransformer._();
 
-  String encode(AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum data) => data.value;
+  String encode(AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum.
+  /// Returns the instance of [AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -285,6 +282,9 @@ class AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnumTyp
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'strong_decrease': return AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnum.strongDecrease;
@@ -302,43 +302,39 @@ class AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnumTyp
     return null;
   }
 
-  /// Singleton [AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadContrastEnumTypeTransformer? _instance;
 }
 
 
 
-class AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum._(this.value);
+enum AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum {
+  strongDecrease._(r'strong_decrease'),
+  moderateDecrease._(r'moderate_decrease'),
+  slightDecrease._(r'slight_decrease'),
+  slightIncrease._(r'slight_increase'),
+  moderateIncrease._(r'moderate_increase'),
+  strongIncrease._(r'strong_increase'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const strongDecrease = AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum._(r'strong_decrease');
-  static const moderateDecrease = AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum._(r'moderate_decrease');
-  static const slightDecrease = AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum._(r'slight_decrease');
-  static const slightIncrease = AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum._(r'slight_increase');
-  static const moderateIncrease = AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum._(r'moderate_increase');
-  static const strongIncrease = AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum._(r'strong_increase');
-
-  /// List of all possible values in this [enum][AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum].
-  static const values = <AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum>[
-    strongDecrease,
-    moderateDecrease,
-    slightDecrease,
-    slightIncrease,
-    moderateIncrease,
-    strongIncrease,
-  ];
-
+  /// Returns the instance of [AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum? fromJson(dynamic value) => AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -360,9 +356,10 @@ class AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnumT
 
   const AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnumTypeTransformer._();
 
-  String encode(AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum data) => data.value;
+  String encode(AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum.
+  /// Returns the instance of [AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -371,6 +368,9 @@ class AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnumT
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'strong_decrease': return AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnum.strongDecrease;
@@ -388,7 +388,7 @@ class AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnumT
     return null;
   }
 
-  /// Singleton [AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentProposeAlbumOperationsDtoOperationsInnerOneOf19PayloadSaturationEnumTypeTransformer? _instance;
 }
 

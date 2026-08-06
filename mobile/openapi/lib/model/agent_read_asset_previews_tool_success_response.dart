@@ -122,27 +122,28 @@ class AgentReadAssetPreviewsToolSuccessResponse {
 }
 
 
-class AgentReadAssetPreviewsToolSuccessResponseStatusEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentReadAssetPreviewsToolSuccessResponseStatusEnum._(this.value);
+enum AgentReadAssetPreviewsToolSuccessResponseStatusEnum {
+  success._(r'success'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentReadAssetPreviewsToolSuccessResponseStatusEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const success = AgentReadAssetPreviewsToolSuccessResponseStatusEnum._(r'success');
-
-  /// List of all possible values in this [enum][AgentReadAssetPreviewsToolSuccessResponseStatusEnum].
-  static const values = <AgentReadAssetPreviewsToolSuccessResponseStatusEnum>[
-    success,
-  ];
-
+  /// Returns the instance of [AgentReadAssetPreviewsToolSuccessResponseStatusEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentReadAssetPreviewsToolSuccessResponseStatusEnum? fromJson(dynamic value) => AgentReadAssetPreviewsToolSuccessResponseStatusEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentReadAssetPreviewsToolSuccessResponseStatusEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentReadAssetPreviewsToolSuccessResponseStatusEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentReadAssetPreviewsToolSuccessResponseStatusEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -164,9 +165,10 @@ class AgentReadAssetPreviewsToolSuccessResponseStatusEnumTypeTransformer {
 
   const AgentReadAssetPreviewsToolSuccessResponseStatusEnumTypeTransformer._();
 
-  String encode(AgentReadAssetPreviewsToolSuccessResponseStatusEnum data) => data.value;
+  String encode(AgentReadAssetPreviewsToolSuccessResponseStatusEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentReadAssetPreviewsToolSuccessResponseStatusEnum.
+  /// Returns the instance of [AgentReadAssetPreviewsToolSuccessResponseStatusEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -175,6 +177,9 @@ class AgentReadAssetPreviewsToolSuccessResponseStatusEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentReadAssetPreviewsToolSuccessResponseStatusEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentReadAssetPreviewsToolSuccessResponseStatusEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'success': return AgentReadAssetPreviewsToolSuccessResponseStatusEnum.success;
@@ -187,7 +192,7 @@ class AgentReadAssetPreviewsToolSuccessResponseStatusEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentReadAssetPreviewsToolSuccessResponseStatusEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentReadAssetPreviewsToolSuccessResponseStatusEnumTypeTransformer? _instance;
 }
 

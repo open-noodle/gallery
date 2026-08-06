@@ -116,27 +116,28 @@ class AgentOperationItemSelectionOneOf2 {
 }
 
 
-class AgentOperationItemSelectionOneOf2ModeEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentOperationItemSelectionOneOf2ModeEnum._(this.value);
+enum AgentOperationItemSelectionOneOf2ModeEnum {
+  only._(r'only'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentOperationItemSelectionOneOf2ModeEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const only = AgentOperationItemSelectionOneOf2ModeEnum._(r'only');
-
-  /// List of all possible values in this [enum][AgentOperationItemSelectionOneOf2ModeEnum].
-  static const values = <AgentOperationItemSelectionOneOf2ModeEnum>[
-    only,
-  ];
-
+  /// Returns the instance of [AgentOperationItemSelectionOneOf2ModeEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentOperationItemSelectionOneOf2ModeEnum? fromJson(dynamic value) => AgentOperationItemSelectionOneOf2ModeEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentOperationItemSelectionOneOf2ModeEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentOperationItemSelectionOneOf2ModeEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentOperationItemSelectionOneOf2ModeEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -158,9 +159,10 @@ class AgentOperationItemSelectionOneOf2ModeEnumTypeTransformer {
 
   const AgentOperationItemSelectionOneOf2ModeEnumTypeTransformer._();
 
-  String encode(AgentOperationItemSelectionOneOf2ModeEnum data) => data.value;
+  String encode(AgentOperationItemSelectionOneOf2ModeEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentOperationItemSelectionOneOf2ModeEnum.
+  /// Returns the instance of [AgentOperationItemSelectionOneOf2ModeEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -169,6 +171,9 @@ class AgentOperationItemSelectionOneOf2ModeEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentOperationItemSelectionOneOf2ModeEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentOperationItemSelectionOneOf2ModeEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'only': return AgentOperationItemSelectionOneOf2ModeEnum.only;
@@ -181,7 +186,7 @@ class AgentOperationItemSelectionOneOf2ModeEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentOperationItemSelectionOneOf2ModeEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentOperationItemSelectionOneOf2ModeEnumTypeTransformer? _instance;
 }
 

@@ -98,27 +98,28 @@ class AgentProposeAlbumOperationsDtoOperationsInnerOneOf23Payload {
 }
 
 
-class AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum._(this.value);
+enum AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum {
+  locked._(r'locked'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const locked = AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum._(r'locked');
-
-  /// List of all possible values in this [enum][AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum].
-  static const values = <AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum>[
-    locked,
-  ];
-
+  /// Returns the instance of [AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum? fromJson(dynamic value) => AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -140,9 +141,10 @@ class AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnumT
 
   const AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnumTypeTransformer._();
 
-  String encode(AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum data) => data.value;
+  String encode(AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum.
+  /// Returns the instance of [AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -151,6 +153,9 @@ class AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnumT
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'locked': return AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnum.locked;
@@ -163,7 +168,7 @@ class AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnumT
     return null;
   }
 
-  /// Singleton [AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentProposeAlbumOperationsDtoOperationsInnerOneOf23PayloadVisibilityEnumTypeTransformer? _instance;
 }
 

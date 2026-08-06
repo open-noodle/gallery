@@ -53,7 +53,7 @@ class AgentSearchPeopleMatchedResult {
     if (this.thumbnailAssetId != null) {
       json[r'thumbnailAssetId'] = this.thumbnailAssetId;
     } else {
-    //  json[r'thumbnailAssetId'] = null;
+      json[r'thumbnailAssetId'] = null;
     }
     return json;
   }
@@ -126,27 +126,28 @@ class AgentSearchPeopleMatchedResult {
 }
 
 
-class AgentSearchPeopleMatchedResultStatusEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentSearchPeopleMatchedResultStatusEnum._(this.value);
+enum AgentSearchPeopleMatchedResultStatusEnum {
+  matched._(r'matched'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentSearchPeopleMatchedResultStatusEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const matched = AgentSearchPeopleMatchedResultStatusEnum._(r'matched');
-
-  /// List of all possible values in this [enum][AgentSearchPeopleMatchedResultStatusEnum].
-  static const values = <AgentSearchPeopleMatchedResultStatusEnum>[
-    matched,
-  ];
-
+  /// Returns the instance of [AgentSearchPeopleMatchedResultStatusEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentSearchPeopleMatchedResultStatusEnum? fromJson(dynamic value) => AgentSearchPeopleMatchedResultStatusEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentSearchPeopleMatchedResultStatusEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentSearchPeopleMatchedResultStatusEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentSearchPeopleMatchedResultStatusEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -168,9 +169,10 @@ class AgentSearchPeopleMatchedResultStatusEnumTypeTransformer {
 
   const AgentSearchPeopleMatchedResultStatusEnumTypeTransformer._();
 
-  String encode(AgentSearchPeopleMatchedResultStatusEnum data) => data.value;
+  String encode(AgentSearchPeopleMatchedResultStatusEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentSearchPeopleMatchedResultStatusEnum.
+  /// Returns the instance of [AgentSearchPeopleMatchedResultStatusEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -179,6 +181,9 @@ class AgentSearchPeopleMatchedResultStatusEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentSearchPeopleMatchedResultStatusEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentSearchPeopleMatchedResultStatusEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'matched': return AgentSearchPeopleMatchedResultStatusEnum.matched;
@@ -191,7 +196,7 @@ class AgentSearchPeopleMatchedResultStatusEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentSearchPeopleMatchedResultStatusEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentSearchPeopleMatchedResultStatusEnumTypeTransformer? _instance;
 }
 

@@ -11,29 +11,29 @@
 part of openapi.api;
 
 
-class AgentAssignableSharedSpaceMemberRole {
-  /// Instantiate a new enum with the provided [value].
-  const AgentAssignableSharedSpaceMemberRole._(this.value);
+enum AgentAssignableSharedSpaceMemberRole {
+  editor._(r'editor'),
+  viewer._(r'viewer'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentAssignableSharedSpaceMemberRole._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const editor = AgentAssignableSharedSpaceMemberRole._(r'editor');
-  static const viewer = AgentAssignableSharedSpaceMemberRole._(r'viewer');
-
-  /// List of all possible values in this [enum][AgentAssignableSharedSpaceMemberRole].
-  static const values = <AgentAssignableSharedSpaceMemberRole>[
-    editor,
-    viewer,
-  ];
-
+  /// Returns the instance of [AgentAssignableSharedSpaceMemberRole] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentAssignableSharedSpaceMemberRole? fromJson(dynamic value) => AgentAssignableSharedSpaceMemberRoleTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentAssignableSharedSpaceMemberRole]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentAssignableSharedSpaceMemberRole> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentAssignableSharedSpaceMemberRole>[];
     if (json is List && json.isNotEmpty) {
@@ -55,9 +55,11 @@ class AgentAssignableSharedSpaceMemberRoleTypeTransformer {
 
   const AgentAssignableSharedSpaceMemberRoleTypeTransformer._();
 
-  String encode(AgentAssignableSharedSpaceMemberRole data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentAssignableSharedSpaceMemberRole data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentAssignableSharedSpaceMemberRole.
+  /// Returns the instance of [AgentAssignableSharedSpaceMemberRole] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -66,6 +68,9 @@ class AgentAssignableSharedSpaceMemberRoleTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentAssignableSharedSpaceMemberRole? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentAssignableSharedSpaceMemberRole) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'editor': return AgentAssignableSharedSpaceMemberRole.editor;
@@ -79,7 +84,7 @@ class AgentAssignableSharedSpaceMemberRoleTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentAssignableSharedSpaceMemberRoleTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentAssignableSharedSpaceMemberRoleTypeTransformer? _instance;
 }
 

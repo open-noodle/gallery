@@ -11,27 +11,28 @@
 part of openapi.api;
 
 
-class AgentMessageToolCallBlockType {
-  /// Instantiate a new enum with the provided [value].
-  const AgentMessageToolCallBlockType._(this.value);
+enum AgentMessageToolCallBlockType {
+  toolCall._(r'tool-call'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentMessageToolCallBlockType._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const toolCall = AgentMessageToolCallBlockType._(r'tool-call');
-
-  /// List of all possible values in this [enum][AgentMessageToolCallBlockType].
-  static const values = <AgentMessageToolCallBlockType>[
-    toolCall,
-  ];
-
+  /// Returns the instance of [AgentMessageToolCallBlockType] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentMessageToolCallBlockType? fromJson(dynamic value) => AgentMessageToolCallBlockTypeTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentMessageToolCallBlockType]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentMessageToolCallBlockType> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentMessageToolCallBlockType>[];
     if (json is List && json.isNotEmpty) {
@@ -53,9 +54,11 @@ class AgentMessageToolCallBlockTypeTypeTransformer {
 
   const AgentMessageToolCallBlockTypeTypeTransformer._();
 
-  String encode(AgentMessageToolCallBlockType data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentMessageToolCallBlockType data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentMessageToolCallBlockType.
+  /// Returns the instance of [AgentMessageToolCallBlockType] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -64,6 +67,9 @@ class AgentMessageToolCallBlockTypeTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentMessageToolCallBlockType? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentMessageToolCallBlockType) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'tool-call': return AgentMessageToolCallBlockType.toolCall;
@@ -76,7 +82,7 @@ class AgentMessageToolCallBlockTypeTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentMessageToolCallBlockTypeTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentMessageToolCallBlockTypeTypeTransformer? _instance;
 }
 

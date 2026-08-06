@@ -117,7 +117,7 @@ class AgentSessionResponseDto {
         ? this.endedAt!.millisecondsSinceEpoch
         : this.endedAt!.toUtc().toIso8601String();
     } else {
-    //  json[r'endedAt'] = null;
+      json[r'endedAt'] = null;
     }
       json[r'id'] = this.id;
       json[r'initialContextSnapshot'] = this.initialContextSnapshot;
@@ -127,22 +127,22 @@ class AgentSessionResponseDto {
     if (this.providerCredentialId != null) {
       json[r'providerCredentialId'] = this.providerCredentialId;
     } else {
-    //  json[r'providerCredentialId'] = null;
+      json[r'providerCredentialId'] = null;
     }
     if (this.runnerCapabilitiesSnapshot != null) {
       json[r'runnerCapabilitiesSnapshot'] = this.runnerCapabilitiesSnapshot;
     } else {
-    //  json[r'runnerCapabilitiesSnapshot'] = null;
+      json[r'runnerCapabilitiesSnapshot'] = null;
     }
     if (this.runnerEndpoint != null) {
       json[r'runnerEndpoint'] = this.runnerEndpoint;
     } else {
-    //  json[r'runnerEndpoint'] = null;
+      json[r'runnerEndpoint'] = null;
     }
     if (this.runnerSessionId != null) {
       json[r'runnerSessionId'] = this.runnerSessionId;
     } else {
-    //  json[r'runnerSessionId'] = null;
+      json[r'runnerSessionId'] = null;
     }
       json[r'status'] = this.status;
     if (this.title.isPresent) {

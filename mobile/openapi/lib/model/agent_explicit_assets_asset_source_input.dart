@@ -108,27 +108,28 @@ class AgentExplicitAssetsAssetSourceInput {
 }
 
 
-class AgentExplicitAssetsAssetSourceInputKindEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentExplicitAssetsAssetSourceInputKindEnum._(this.value);
+enum AgentExplicitAssetsAssetSourceInputKindEnum {
+  explicitAssets._(r'explicitAssets'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentExplicitAssetsAssetSourceInputKindEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const explicitAssets = AgentExplicitAssetsAssetSourceInputKindEnum._(r'explicitAssets');
-
-  /// List of all possible values in this [enum][AgentExplicitAssetsAssetSourceInputKindEnum].
-  static const values = <AgentExplicitAssetsAssetSourceInputKindEnum>[
-    explicitAssets,
-  ];
-
+  /// Returns the instance of [AgentExplicitAssetsAssetSourceInputKindEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentExplicitAssetsAssetSourceInputKindEnum? fromJson(dynamic value) => AgentExplicitAssetsAssetSourceInputKindEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentExplicitAssetsAssetSourceInputKindEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentExplicitAssetsAssetSourceInputKindEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentExplicitAssetsAssetSourceInputKindEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -150,9 +151,10 @@ class AgentExplicitAssetsAssetSourceInputKindEnumTypeTransformer {
 
   const AgentExplicitAssetsAssetSourceInputKindEnumTypeTransformer._();
 
-  String encode(AgentExplicitAssetsAssetSourceInputKindEnum data) => data.value;
+  String encode(AgentExplicitAssetsAssetSourceInputKindEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentExplicitAssetsAssetSourceInputKindEnum.
+  /// Returns the instance of [AgentExplicitAssetsAssetSourceInputKindEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -161,6 +163,9 @@ class AgentExplicitAssetsAssetSourceInputKindEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentExplicitAssetsAssetSourceInputKindEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentExplicitAssetsAssetSourceInputKindEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'explicitAssets': return AgentExplicitAssetsAssetSourceInputKindEnum.explicitAssets;
@@ -173,7 +178,7 @@ class AgentExplicitAssetsAssetSourceInputKindEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentExplicitAssetsAssetSourceInputKindEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentExplicitAssetsAssetSourceInputKindEnumTypeTransformer? _instance;
 }
 

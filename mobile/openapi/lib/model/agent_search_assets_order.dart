@@ -11,31 +11,30 @@
 part of openapi.api;
 
 
-class AgentSearchAssetsOrder {
-  /// Instantiate a new enum with the provided [value].
-  const AgentSearchAssetsOrder._(this.value);
+enum AgentSearchAssetsOrder {
+  asc._(r'asc'),
+  desc._(r'desc'),
+  relevance._(r'relevance'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentSearchAssetsOrder._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const asc = AgentSearchAssetsOrder._(r'asc');
-  static const desc = AgentSearchAssetsOrder._(r'desc');
-  static const relevance = AgentSearchAssetsOrder._(r'relevance');
-
-  /// List of all possible values in this [enum][AgentSearchAssetsOrder].
-  static const values = <AgentSearchAssetsOrder>[
-    asc,
-    desc,
-    relevance,
-  ];
-
+  /// Returns the instance of [AgentSearchAssetsOrder] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentSearchAssetsOrder? fromJson(dynamic value) => AgentSearchAssetsOrderTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentSearchAssetsOrder]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentSearchAssetsOrder> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentSearchAssetsOrder>[];
     if (json is List && json.isNotEmpty) {
@@ -57,9 +56,11 @@ class AgentSearchAssetsOrderTypeTransformer {
 
   const AgentSearchAssetsOrderTypeTransformer._();
 
-  String encode(AgentSearchAssetsOrder data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentSearchAssetsOrder data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentSearchAssetsOrder.
+  /// Returns the instance of [AgentSearchAssetsOrder] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -68,6 +69,9 @@ class AgentSearchAssetsOrderTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentSearchAssetsOrder? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentSearchAssetsOrder) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'asc': return AgentSearchAssetsOrder.asc;
@@ -82,7 +86,7 @@ class AgentSearchAssetsOrderTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentSearchAssetsOrderTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentSearchAssetsOrderTypeTransformer? _instance;
 }
 

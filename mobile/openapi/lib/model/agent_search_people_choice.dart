@@ -47,7 +47,7 @@ class AgentSearchPeopleChoice {
     if (this.thumbnailAssetId != null) {
       json[r'thumbnailAssetId'] = this.thumbnailAssetId;
     } else {
-    //  json[r'thumbnailAssetId'] = null;
+      json[r'thumbnailAssetId'] = null;
     }
     return json;
   }

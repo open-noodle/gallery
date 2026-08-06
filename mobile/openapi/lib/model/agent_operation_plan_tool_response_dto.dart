@@ -50,14 +50,14 @@ class AgentOperationPlanToolResponseDto {
     if (this.plan != null) {
       json[r'plan'] = this.plan;
     } else {
-    //  json[r'plan'] = null;
+      json[r'plan'] = null;
     }
       json[r'status'] = this.status;
       json[r'summary'] = this.summary;
     if (this.toolCall != null) {
       json[r'toolCall'] = this.toolCall;
     } else {
-    //  json[r'toolCall'] = null;
+      json[r'toolCall'] = null;
     }
     return json;
   }
@@ -130,27 +130,28 @@ class AgentOperationPlanToolResponseDto {
 }
 
 
-class AgentOperationPlanToolResponseDtoStatusEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentOperationPlanToolResponseDtoStatusEnum._(this.value);
+enum AgentOperationPlanToolResponseDtoStatusEnum {
+  success._(r'success'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentOperationPlanToolResponseDtoStatusEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const success = AgentOperationPlanToolResponseDtoStatusEnum._(r'success');
-
-  /// List of all possible values in this [enum][AgentOperationPlanToolResponseDtoStatusEnum].
-  static const values = <AgentOperationPlanToolResponseDtoStatusEnum>[
-    success,
-  ];
-
+  /// Returns the instance of [AgentOperationPlanToolResponseDtoStatusEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentOperationPlanToolResponseDtoStatusEnum? fromJson(dynamic value) => AgentOperationPlanToolResponseDtoStatusEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentOperationPlanToolResponseDtoStatusEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentOperationPlanToolResponseDtoStatusEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentOperationPlanToolResponseDtoStatusEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -172,9 +173,10 @@ class AgentOperationPlanToolResponseDtoStatusEnumTypeTransformer {
 
   const AgentOperationPlanToolResponseDtoStatusEnumTypeTransformer._();
 
-  String encode(AgentOperationPlanToolResponseDtoStatusEnum data) => data.value;
+  String encode(AgentOperationPlanToolResponseDtoStatusEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentOperationPlanToolResponseDtoStatusEnum.
+  /// Returns the instance of [AgentOperationPlanToolResponseDtoStatusEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -183,6 +185,9 @@ class AgentOperationPlanToolResponseDtoStatusEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentOperationPlanToolResponseDtoStatusEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentOperationPlanToolResponseDtoStatusEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'success': return AgentOperationPlanToolResponseDtoStatusEnum.success;
@@ -195,7 +200,7 @@ class AgentOperationPlanToolResponseDtoStatusEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentOperationPlanToolResponseDtoStatusEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentOperationPlanToolResponseDtoStatusEnumTypeTransformer? _instance;
 }
 

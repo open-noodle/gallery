@@ -46,7 +46,7 @@ class AgentOperationResponseDtoReviewMetadataAssetMetadataFieldsInnerPreviousVal
     if (this.value != null) {
       json[r'value'] = this.value;
     } else {
-    //  json[r'value'] = null;
+      json[r'value'] = null;
     }
       json[r'valueKind'] = this.valueKind;
     return json;

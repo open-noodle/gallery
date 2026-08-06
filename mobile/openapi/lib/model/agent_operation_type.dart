@@ -11,95 +11,62 @@
 part of openapi.api;
 
 
-class AgentOperationType {
-  /// Instantiate a new enum with the provided [value].
-  const AgentOperationType._(this.value);
+enum AgentOperationType {
+  albumPeriodCreate._(r'album.create'),
+  albumPeriodAddAssets._(r'album.addAssets'),
+  albumPeriodRemoveAssets._(r'album.removeAssets'),
+  albumPeriodUpdateDetails._(r'album.updateDetails'),
+  albumPeriodSetCover._(r'album.setCover'),
+  albumPeriodAddUsers._(r'album.addUsers'),
+  albumPeriodRemoveUsers._(r'album.removeUsers'),
+  albumPeriodUpdateUserRole._(r'album.updateUserRole'),
+  albumPeriodDelete._(r'album.delete'),
+  spacePeriodCreate._(r'space.create'),
+  spacePeriodAddAssets._(r'space.addAssets'),
+  spacePeriodRemoveAssets._(r'space.removeAssets'),
+  spacePeriodUpdateDetails._(r'space.updateDetails'),
+  spacePeriodAddMembers._(r'space.addMembers'),
+  spacePeriodRemoveMembers._(r'space.removeMembers'),
+  spacePeriodUpdateMemberRole._(r'space.updateMemberRole'),
+  spacePeriodDelete._(r'space.delete'),
+  assetPeriodRotate._(r'asset.rotate'),
+  assetPeriodCrop._(r'asset.crop'),
+  assetPeriodAdjust._(r'asset.adjust'),
+  assetPeriodFlip._(r'asset.flip'),
+  assetPeriodStack._(r'asset.stack'),
+  assetPeriodUnstack._(r'asset.unstack'),
+  assetPeriodSetFavorite._(r'asset.setFavorite'),
+  assetPeriodSetArchive._(r'asset.setArchive'),
+  assetPeriodSetVisibility._(r'asset.setVisibility'),
+  assetPeriodUpdateMetadata._(r'asset.updateMetadata'),
+  assetPeriodAddTag._(r'asset.addTag'),
+  assetPeriodRemoveTag._(r'asset.removeTag'),
+  assetPeriodTrash._(r'asset.trash'),
+  assetPeriodRestore._(r'asset.restore'),
+  shareLinkPeriodCreate._(r'shareLink.create'),
+  shareLinkPeriodCreateAlbum._(r'shareLink.createAlbum'),
+  personPeriodUpdate._(r'person.update'),
+  personPeriodMerge._(r'person.merge'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentOperationType._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const albumPeriodCreate = AgentOperationType._(r'album.create');
-  static const albumPeriodAddAssets = AgentOperationType._(r'album.addAssets');
-  static const albumPeriodRemoveAssets = AgentOperationType._(r'album.removeAssets');
-  static const albumPeriodUpdateDetails = AgentOperationType._(r'album.updateDetails');
-  static const albumPeriodSetCover = AgentOperationType._(r'album.setCover');
-  static const albumPeriodAddUsers = AgentOperationType._(r'album.addUsers');
-  static const albumPeriodRemoveUsers = AgentOperationType._(r'album.removeUsers');
-  static const albumPeriodUpdateUserRole = AgentOperationType._(r'album.updateUserRole');
-  static const albumPeriodDelete = AgentOperationType._(r'album.delete');
-  static const spacePeriodCreate = AgentOperationType._(r'space.create');
-  static const spacePeriodAddAssets = AgentOperationType._(r'space.addAssets');
-  static const spacePeriodRemoveAssets = AgentOperationType._(r'space.removeAssets');
-  static const spacePeriodUpdateDetails = AgentOperationType._(r'space.updateDetails');
-  static const spacePeriodAddMembers = AgentOperationType._(r'space.addMembers');
-  static const spacePeriodRemoveMembers = AgentOperationType._(r'space.removeMembers');
-  static const spacePeriodUpdateMemberRole = AgentOperationType._(r'space.updateMemberRole');
-  static const spacePeriodDelete = AgentOperationType._(r'space.delete');
-  static const assetPeriodRotate = AgentOperationType._(r'asset.rotate');
-  static const assetPeriodCrop = AgentOperationType._(r'asset.crop');
-  static const assetPeriodAdjust = AgentOperationType._(r'asset.adjust');
-  static const assetPeriodFlip = AgentOperationType._(r'asset.flip');
-  static const assetPeriodStack = AgentOperationType._(r'asset.stack');
-  static const assetPeriodUnstack = AgentOperationType._(r'asset.unstack');
-  static const assetPeriodSetFavorite = AgentOperationType._(r'asset.setFavorite');
-  static const assetPeriodSetArchive = AgentOperationType._(r'asset.setArchive');
-  static const assetPeriodSetVisibility = AgentOperationType._(r'asset.setVisibility');
-  static const assetPeriodUpdateMetadata = AgentOperationType._(r'asset.updateMetadata');
-  static const assetPeriodAddTag = AgentOperationType._(r'asset.addTag');
-  static const assetPeriodRemoveTag = AgentOperationType._(r'asset.removeTag');
-  static const assetPeriodTrash = AgentOperationType._(r'asset.trash');
-  static const assetPeriodRestore = AgentOperationType._(r'asset.restore');
-  static const shareLinkPeriodCreate = AgentOperationType._(r'shareLink.create');
-  static const shareLinkPeriodCreateAlbum = AgentOperationType._(r'shareLink.createAlbum');
-  static const personPeriodUpdate = AgentOperationType._(r'person.update');
-  static const personPeriodMerge = AgentOperationType._(r'person.merge');
-
-  /// List of all possible values in this [enum][AgentOperationType].
-  static const values = <AgentOperationType>[
-    albumPeriodCreate,
-    albumPeriodAddAssets,
-    albumPeriodRemoveAssets,
-    albumPeriodUpdateDetails,
-    albumPeriodSetCover,
-    albumPeriodAddUsers,
-    albumPeriodRemoveUsers,
-    albumPeriodUpdateUserRole,
-    albumPeriodDelete,
-    spacePeriodCreate,
-    spacePeriodAddAssets,
-    spacePeriodRemoveAssets,
-    spacePeriodUpdateDetails,
-    spacePeriodAddMembers,
-    spacePeriodRemoveMembers,
-    spacePeriodUpdateMemberRole,
-    spacePeriodDelete,
-    assetPeriodRotate,
-    assetPeriodCrop,
-    assetPeriodAdjust,
-    assetPeriodFlip,
-    assetPeriodStack,
-    assetPeriodUnstack,
-    assetPeriodSetFavorite,
-    assetPeriodSetArchive,
-    assetPeriodSetVisibility,
-    assetPeriodUpdateMetadata,
-    assetPeriodAddTag,
-    assetPeriodRemoveTag,
-    assetPeriodTrash,
-    assetPeriodRestore,
-    shareLinkPeriodCreate,
-    shareLinkPeriodCreateAlbum,
-    personPeriodUpdate,
-    personPeriodMerge,
-  ];
-
+  /// Returns the instance of [AgentOperationType] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentOperationType? fromJson(dynamic value) => AgentOperationTypeTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentOperationType]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentOperationType> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentOperationType>[];
     if (json is List && json.isNotEmpty) {
@@ -121,9 +88,11 @@ class AgentOperationTypeTypeTransformer {
 
   const AgentOperationTypeTypeTransformer._();
 
-  String encode(AgentOperationType data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentOperationType data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentOperationType.
+  /// Returns the instance of [AgentOperationType] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -132,6 +101,9 @@ class AgentOperationTypeTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentOperationType? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentOperationType) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'album.create': return AgentOperationType.albumPeriodCreate;
@@ -178,7 +150,7 @@ class AgentOperationTypeTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentOperationTypeTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentOperationTypeTypeTransformer? _instance;
 }
 

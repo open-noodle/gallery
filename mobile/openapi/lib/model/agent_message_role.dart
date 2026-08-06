@@ -11,33 +11,31 @@
 part of openapi.api;
 
 
-class AgentMessageRole {
-  /// Instantiate a new enum with the provided [value].
-  const AgentMessageRole._(this.value);
+enum AgentMessageRole {
+  user._(r'user'),
+  assistant._(r'assistant'),
+  system._(r'system'),
+  tool._(r'tool'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentMessageRole._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const user = AgentMessageRole._(r'user');
-  static const assistant = AgentMessageRole._(r'assistant');
-  static const system = AgentMessageRole._(r'system');
-  static const tool = AgentMessageRole._(r'tool');
-
-  /// List of all possible values in this [enum][AgentMessageRole].
-  static const values = <AgentMessageRole>[
-    user,
-    assistant,
-    system,
-    tool,
-  ];
-
+  /// Returns the instance of [AgentMessageRole] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentMessageRole? fromJson(dynamic value) => AgentMessageRoleTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentMessageRole]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentMessageRole> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentMessageRole>[];
     if (json is List && json.isNotEmpty) {
@@ -59,9 +57,11 @@ class AgentMessageRoleTypeTransformer {
 
   const AgentMessageRoleTypeTransformer._();
 
-  String encode(AgentMessageRole data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentMessageRole data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentMessageRole.
+  /// Returns the instance of [AgentMessageRole] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -70,6 +70,9 @@ class AgentMessageRoleTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentMessageRole? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentMessageRole) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'user': return AgentMessageRole.user;
@@ -85,7 +88,7 @@ class AgentMessageRoleTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentMessageRoleTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentMessageRoleTypeTransformer? _instance;
 }
 

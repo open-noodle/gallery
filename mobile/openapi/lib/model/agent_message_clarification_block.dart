@@ -138,39 +138,34 @@ class AgentMessageClarificationBlock {
 }
 
 
-class AgentMessageClarificationBlockKindEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentMessageClarificationBlockKindEnum._(this.value);
+enum AgentMessageClarificationBlockKindEnum {
+  person._(r'person'),
+  tag._(r'tag'),
+  album._(r'album'),
+  space._(r'space'),
+  cameraMake._(r'cameraMake'),
+  cameraModel._(r'cameraModel'),
+  lensModel._(r'lensModel'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentMessageClarificationBlockKindEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const person = AgentMessageClarificationBlockKindEnum._(r'person');
-  static const tag = AgentMessageClarificationBlockKindEnum._(r'tag');
-  static const album = AgentMessageClarificationBlockKindEnum._(r'album');
-  static const space = AgentMessageClarificationBlockKindEnum._(r'space');
-  static const cameraMake = AgentMessageClarificationBlockKindEnum._(r'cameraMake');
-  static const cameraModel = AgentMessageClarificationBlockKindEnum._(r'cameraModel');
-  static const lensModel = AgentMessageClarificationBlockKindEnum._(r'lensModel');
-
-  /// List of all possible values in this [enum][AgentMessageClarificationBlockKindEnum].
-  static const values = <AgentMessageClarificationBlockKindEnum>[
-    person,
-    tag,
-    album,
-    space,
-    cameraMake,
-    cameraModel,
-    lensModel,
-  ];
-
+  /// Returns the instance of [AgentMessageClarificationBlockKindEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentMessageClarificationBlockKindEnum? fromJson(dynamic value) => AgentMessageClarificationBlockKindEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentMessageClarificationBlockKindEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentMessageClarificationBlockKindEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentMessageClarificationBlockKindEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -192,9 +187,10 @@ class AgentMessageClarificationBlockKindEnumTypeTransformer {
 
   const AgentMessageClarificationBlockKindEnumTypeTransformer._();
 
-  String encode(AgentMessageClarificationBlockKindEnum data) => data.value;
+  String encode(AgentMessageClarificationBlockKindEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentMessageClarificationBlockKindEnum.
+  /// Returns the instance of [AgentMessageClarificationBlockKindEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -203,6 +199,9 @@ class AgentMessageClarificationBlockKindEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentMessageClarificationBlockKindEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentMessageClarificationBlockKindEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'person': return AgentMessageClarificationBlockKindEnum.person;
@@ -221,7 +220,7 @@ class AgentMessageClarificationBlockKindEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentMessageClarificationBlockKindEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentMessageClarificationBlockKindEnumTypeTransformer? _instance;
 }
 

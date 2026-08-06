@@ -114,27 +114,28 @@ class AgentSearchAssetsToolDeniedResponse {
 }
 
 
-class AgentSearchAssetsToolDeniedResponseStatusEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentSearchAssetsToolDeniedResponseStatusEnum._(this.value);
+enum AgentSearchAssetsToolDeniedResponseStatusEnum {
+  denied._(r'denied'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentSearchAssetsToolDeniedResponseStatusEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const denied = AgentSearchAssetsToolDeniedResponseStatusEnum._(r'denied');
-
-  /// List of all possible values in this [enum][AgentSearchAssetsToolDeniedResponseStatusEnum].
-  static const values = <AgentSearchAssetsToolDeniedResponseStatusEnum>[
-    denied,
-  ];
-
+  /// Returns the instance of [AgentSearchAssetsToolDeniedResponseStatusEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentSearchAssetsToolDeniedResponseStatusEnum? fromJson(dynamic value) => AgentSearchAssetsToolDeniedResponseStatusEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentSearchAssetsToolDeniedResponseStatusEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentSearchAssetsToolDeniedResponseStatusEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentSearchAssetsToolDeniedResponseStatusEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -156,9 +157,10 @@ class AgentSearchAssetsToolDeniedResponseStatusEnumTypeTransformer {
 
   const AgentSearchAssetsToolDeniedResponseStatusEnumTypeTransformer._();
 
-  String encode(AgentSearchAssetsToolDeniedResponseStatusEnum data) => data.value;
+  String encode(AgentSearchAssetsToolDeniedResponseStatusEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentSearchAssetsToolDeniedResponseStatusEnum.
+  /// Returns the instance of [AgentSearchAssetsToolDeniedResponseStatusEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -167,6 +169,9 @@ class AgentSearchAssetsToolDeniedResponseStatusEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentSearchAssetsToolDeniedResponseStatusEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentSearchAssetsToolDeniedResponseStatusEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'denied': return AgentSearchAssetsToolDeniedResponseStatusEnum.denied;
@@ -179,7 +184,7 @@ class AgentSearchAssetsToolDeniedResponseStatusEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentSearchAssetsToolDeniedResponseStatusEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentSearchAssetsToolDeniedResponseStatusEnumTypeTransformer? _instance;
 }
 

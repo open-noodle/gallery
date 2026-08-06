@@ -11,33 +11,31 @@
 part of openapi.api;
 
 
-class AgentToolDataClass {
-  /// Instantiate a new enum with the provided [value].
-  const AgentToolDataClass._(this.value);
+enum AgentToolDataClass {
+  metadata._(r'metadata'),
+  previews._(r'previews'),
+  originals._(r'originals'),
+  plan._(r'plan'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentToolDataClass._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const metadata = AgentToolDataClass._(r'metadata');
-  static const previews = AgentToolDataClass._(r'previews');
-  static const originals = AgentToolDataClass._(r'originals');
-  static const plan = AgentToolDataClass._(r'plan');
-
-  /// List of all possible values in this [enum][AgentToolDataClass].
-  static const values = <AgentToolDataClass>[
-    metadata,
-    previews,
-    originals,
-    plan,
-  ];
-
+  /// Returns the instance of [AgentToolDataClass] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentToolDataClass? fromJson(dynamic value) => AgentToolDataClassTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentToolDataClass]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentToolDataClass> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentToolDataClass>[];
     if (json is List && json.isNotEmpty) {
@@ -59,9 +57,11 @@ class AgentToolDataClassTypeTransformer {
 
   const AgentToolDataClassTypeTransformer._();
 
-  String encode(AgentToolDataClass data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentToolDataClass data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentToolDataClass.
+  /// Returns the instance of [AgentToolDataClass] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -70,6 +70,9 @@ class AgentToolDataClassTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentToolDataClass? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentToolDataClass) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'metadata': return AgentToolDataClass.metadata;
@@ -85,7 +88,7 @@ class AgentToolDataClassTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentToolDataClassTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentToolDataClassTypeTransformer? _instance;
 }
 

@@ -75,7 +75,7 @@ class AgentProviderCredentialResponseDto {
     if (this.baseUrl != null) {
       json[r'baseUrl'] = this.baseUrl;
     } else {
-    //  json[r'baseUrl'] = null;
+      json[r'baseUrl'] = null;
     }
       json[r'createdAt'] = _isEpochMarker(r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$/')
         ? this.createdAt.millisecondsSinceEpoch
@@ -83,7 +83,7 @@ class AgentProviderCredentialResponseDto {
     if (this.defaultModel != null) {
       json[r'defaultModel'] = this.defaultModel;
     } else {
-    //  json[r'defaultModel'] = null;
+      json[r'defaultModel'] = null;
     }
       json[r'id'] = this.id;
       json[r'label'] = this.label;
@@ -92,7 +92,7 @@ class AgentProviderCredentialResponseDto {
         ? this.lastUsedAt!.millisecondsSinceEpoch
         : this.lastUsedAt!.toUtc().toIso8601String();
     } else {
-    //  json[r'lastUsedAt'] = null;
+      json[r'lastUsedAt'] = null;
     }
       json[r'models'] = this.models;
       json[r'providerType'] = this.providerType;
@@ -182,31 +182,30 @@ class AgentProviderCredentialResponseDto {
 }
 
 
-class AgentProviderCredentialResponseDtoProviderTypeEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentProviderCredentialResponseDtoProviderTypeEnum._(this.value);
+enum AgentProviderCredentialResponseDtoProviderTypeEnum {
+  openai._(r'openai'),
+  anthropic._(r'anthropic'),
+  openaiCompatible._(r'openai-compatible'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentProviderCredentialResponseDtoProviderTypeEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const openai = AgentProviderCredentialResponseDtoProviderTypeEnum._(r'openai');
-  static const anthropic = AgentProviderCredentialResponseDtoProviderTypeEnum._(r'anthropic');
-  static const openaiCompatible = AgentProviderCredentialResponseDtoProviderTypeEnum._(r'openai-compatible');
-
-  /// List of all possible values in this [enum][AgentProviderCredentialResponseDtoProviderTypeEnum].
-  static const values = <AgentProviderCredentialResponseDtoProviderTypeEnum>[
-    openai,
-    anthropic,
-    openaiCompatible,
-  ];
-
+  /// Returns the instance of [AgentProviderCredentialResponseDtoProviderTypeEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentProviderCredentialResponseDtoProviderTypeEnum? fromJson(dynamic value) => AgentProviderCredentialResponseDtoProviderTypeEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentProviderCredentialResponseDtoProviderTypeEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentProviderCredentialResponseDtoProviderTypeEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentProviderCredentialResponseDtoProviderTypeEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -228,9 +227,10 @@ class AgentProviderCredentialResponseDtoProviderTypeEnumTypeTransformer {
 
   const AgentProviderCredentialResponseDtoProviderTypeEnumTypeTransformer._();
 
-  String encode(AgentProviderCredentialResponseDtoProviderTypeEnum data) => data.value;
+  String encode(AgentProviderCredentialResponseDtoProviderTypeEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentProviderCredentialResponseDtoProviderTypeEnum.
+  /// Returns the instance of [AgentProviderCredentialResponseDtoProviderTypeEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -239,6 +239,9 @@ class AgentProviderCredentialResponseDtoProviderTypeEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentProviderCredentialResponseDtoProviderTypeEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentProviderCredentialResponseDtoProviderTypeEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'openai': return AgentProviderCredentialResponseDtoProviderTypeEnum.openai;
@@ -253,7 +256,7 @@ class AgentProviderCredentialResponseDtoProviderTypeEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentProviderCredentialResponseDtoProviderTypeEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentProviderCredentialResponseDtoProviderTypeEnumTypeTransformer? _instance;
 }
 

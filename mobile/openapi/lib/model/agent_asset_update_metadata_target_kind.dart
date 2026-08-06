@@ -11,27 +11,28 @@
 part of openapi.api;
 
 
-class AgentAssetUpdateMetadataTargetKind {
-  /// Instantiate a new enum with the provided [value].
-  const AgentAssetUpdateMetadataTargetKind._(this.value);
+enum AgentAssetUpdateMetadataTargetKind {
+  assetBatch._(r'asset_batch'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentAssetUpdateMetadataTargetKind._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const assetBatch = AgentAssetUpdateMetadataTargetKind._(r'asset_batch');
-
-  /// List of all possible values in this [enum][AgentAssetUpdateMetadataTargetKind].
-  static const values = <AgentAssetUpdateMetadataTargetKind>[
-    assetBatch,
-  ];
-
+  /// Returns the instance of [AgentAssetUpdateMetadataTargetKind] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentAssetUpdateMetadataTargetKind? fromJson(dynamic value) => AgentAssetUpdateMetadataTargetKindTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentAssetUpdateMetadataTargetKind]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentAssetUpdateMetadataTargetKind> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentAssetUpdateMetadataTargetKind>[];
     if (json is List && json.isNotEmpty) {
@@ -53,9 +54,11 @@ class AgentAssetUpdateMetadataTargetKindTypeTransformer {
 
   const AgentAssetUpdateMetadataTargetKindTypeTransformer._();
 
-  String encode(AgentAssetUpdateMetadataTargetKind data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentAssetUpdateMetadataTargetKind data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentAssetUpdateMetadataTargetKind.
+  /// Returns the instance of [AgentAssetUpdateMetadataTargetKind] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -64,6 +67,9 @@ class AgentAssetUpdateMetadataTargetKindTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentAssetUpdateMetadataTargetKind? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentAssetUpdateMetadataTargetKind) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'asset_batch': return AgentAssetUpdateMetadataTargetKind.assetBatch;
@@ -76,7 +82,7 @@ class AgentAssetUpdateMetadataTargetKindTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentAssetUpdateMetadataTargetKindTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentAssetUpdateMetadataTargetKindTypeTransformer? _instance;
 }
 

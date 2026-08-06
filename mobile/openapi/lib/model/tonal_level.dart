@@ -11,37 +11,33 @@
 part of openapi.api;
 
 /// Signed adjustment level
-class TonalLevel {
-  /// Instantiate a new enum with the provided [value].
-  const TonalLevel._(this.value);
+enum TonalLevel {
+  strongDecrease._(r'strong_decrease'),
+  moderateDecrease._(r'moderate_decrease'),
+  slightDecrease._(r'slight_decrease'),
+  slightIncrease._(r'slight_increase'),
+  moderateIncrease._(r'moderate_increase'),
+  strongIncrease._(r'strong_increase'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const TonalLevel._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const strongDecrease = TonalLevel._(r'strong_decrease');
-  static const moderateDecrease = TonalLevel._(r'moderate_decrease');
-  static const slightDecrease = TonalLevel._(r'slight_decrease');
-  static const slightIncrease = TonalLevel._(r'slight_increase');
-  static const moderateIncrease = TonalLevel._(r'moderate_increase');
-  static const strongIncrease = TonalLevel._(r'strong_increase');
-
-  /// List of all possible values in this [enum][TonalLevel].
-  static const values = <TonalLevel>[
-    strongDecrease,
-    moderateDecrease,
-    slightDecrease,
-    slightIncrease,
-    moderateIncrease,
-    strongIncrease,
-  ];
-
+  /// Returns the instance of [TonalLevel] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static TonalLevel? fromJson(dynamic value) => TonalLevelTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [TonalLevel]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<TonalLevel> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <TonalLevel>[];
     if (json is List && json.isNotEmpty) {
@@ -63,9 +59,11 @@ class TonalLevelTypeTransformer {
 
   const TonalLevelTypeTransformer._();
 
-  String encode(TonalLevel data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(TonalLevel data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a TonalLevel.
+  /// Returns the instance of [TonalLevel] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -74,6 +72,9 @@ class TonalLevelTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   TonalLevel? decode(dynamic data, {bool allowNull = true}) {
+    if (data is TonalLevel) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'strong_decrease': return TonalLevel.strongDecrease;
@@ -91,7 +92,7 @@ class TonalLevelTypeTransformer {
     return null;
   }
 
-  /// Singleton [TonalLevelTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static TonalLevelTypeTransformer? _instance;
 }
 

@@ -11,29 +11,29 @@
 part of openapi.api;
 
 
-class AgentTripCandidateNonAutoRecommendationAction {
-  /// Instantiate a new enum with the provided [value].
-  const AgentTripCandidateNonAutoRecommendationAction._(this.value);
+enum AgentTripCandidateNonAutoRecommendationAction {
+  askUser._(r'ask_user'),
+  none._(r'none'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentTripCandidateNonAutoRecommendationAction._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const askUser = AgentTripCandidateNonAutoRecommendationAction._(r'ask_user');
-  static const none = AgentTripCandidateNonAutoRecommendationAction._(r'none');
-
-  /// List of all possible values in this [enum][AgentTripCandidateNonAutoRecommendationAction].
-  static const values = <AgentTripCandidateNonAutoRecommendationAction>[
-    askUser,
-    none,
-  ];
-
+  /// Returns the instance of [AgentTripCandidateNonAutoRecommendationAction] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentTripCandidateNonAutoRecommendationAction? fromJson(dynamic value) => AgentTripCandidateNonAutoRecommendationActionTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentTripCandidateNonAutoRecommendationAction]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentTripCandidateNonAutoRecommendationAction> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentTripCandidateNonAutoRecommendationAction>[];
     if (json is List && json.isNotEmpty) {
@@ -55,9 +55,11 @@ class AgentTripCandidateNonAutoRecommendationActionTypeTransformer {
 
   const AgentTripCandidateNonAutoRecommendationActionTypeTransformer._();
 
-  String encode(AgentTripCandidateNonAutoRecommendationAction data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentTripCandidateNonAutoRecommendationAction data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentTripCandidateNonAutoRecommendationAction.
+  /// Returns the instance of [AgentTripCandidateNonAutoRecommendationAction] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -66,6 +68,9 @@ class AgentTripCandidateNonAutoRecommendationActionTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentTripCandidateNonAutoRecommendationAction? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentTripCandidateNonAutoRecommendationAction) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'ask_user': return AgentTripCandidateNonAutoRecommendationAction.askUser;
@@ -79,7 +84,7 @@ class AgentTripCandidateNonAutoRecommendationActionTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentTripCandidateNonAutoRecommendationActionTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentTripCandidateNonAutoRecommendationActionTypeTransformer? _instance;
 }
 

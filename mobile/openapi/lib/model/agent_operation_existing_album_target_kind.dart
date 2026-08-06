@@ -11,27 +11,28 @@
 part of openapi.api;
 
 
-class AgentOperationExistingAlbumTargetKind {
-  /// Instantiate a new enum with the provided [value].
-  const AgentOperationExistingAlbumTargetKind._(this.value);
+enum AgentOperationExistingAlbumTargetKind {
+  existingAlbum._(r'existing_album'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentOperationExistingAlbumTargetKind._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const existingAlbum = AgentOperationExistingAlbumTargetKind._(r'existing_album');
-
-  /// List of all possible values in this [enum][AgentOperationExistingAlbumTargetKind].
-  static const values = <AgentOperationExistingAlbumTargetKind>[
-    existingAlbum,
-  ];
-
+  /// Returns the instance of [AgentOperationExistingAlbumTargetKind] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentOperationExistingAlbumTargetKind? fromJson(dynamic value) => AgentOperationExistingAlbumTargetKindTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentOperationExistingAlbumTargetKind]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentOperationExistingAlbumTargetKind> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentOperationExistingAlbumTargetKind>[];
     if (json is List && json.isNotEmpty) {
@@ -53,9 +54,11 @@ class AgentOperationExistingAlbumTargetKindTypeTransformer {
 
   const AgentOperationExistingAlbumTargetKindTypeTransformer._();
 
-  String encode(AgentOperationExistingAlbumTargetKind data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentOperationExistingAlbumTargetKind data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentOperationExistingAlbumTargetKind.
+  /// Returns the instance of [AgentOperationExistingAlbumTargetKind] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -64,6 +67,9 @@ class AgentOperationExistingAlbumTargetKindTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentOperationExistingAlbumTargetKind? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentOperationExistingAlbumTargetKind) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'existing_album': return AgentOperationExistingAlbumTargetKind.existingAlbum;
@@ -76,7 +82,7 @@ class AgentOperationExistingAlbumTargetKindTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentOperationExistingAlbumTargetKindTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentOperationExistingAlbumTargetKindTypeTransformer? _instance;
 }
 

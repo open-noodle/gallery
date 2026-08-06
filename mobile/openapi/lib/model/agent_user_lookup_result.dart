@@ -55,18 +55,18 @@ class AgentUserLookupResult {
     if (this.avatarColor != null) {
       json[r'avatarColor'] = this.avatarColor;
     } else {
-    //  json[r'avatarColor'] = null;
+      json[r'avatarColor'] = null;
     }
     if (this.email != null) {
       json[r'email'] = this.email;
     } else {
-    //  json[r'email'] = null;
+      json[r'email'] = null;
     }
       json[r'name'] = this.name;
     if (this.profileImagePath != null) {
       json[r'profileImagePath'] = this.profileImagePath;
     } else {
-    //  json[r'profileImagePath'] = null;
+      json[r'profileImagePath'] = null;
     }
       json[r'userId'] = this.userId;
     return json;

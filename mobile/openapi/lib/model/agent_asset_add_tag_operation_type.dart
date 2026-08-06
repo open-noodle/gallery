@@ -11,27 +11,28 @@
 part of openapi.api;
 
 
-class AgentAssetAddTagOperationType {
-  /// Instantiate a new enum with the provided [value].
-  const AgentAssetAddTagOperationType._(this.value);
+enum AgentAssetAddTagOperationType {
+  assetPeriodAddTag._(r'asset.addTag'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentAssetAddTagOperationType._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const assetPeriodAddTag = AgentAssetAddTagOperationType._(r'asset.addTag');
-
-  /// List of all possible values in this [enum][AgentAssetAddTagOperationType].
-  static const values = <AgentAssetAddTagOperationType>[
-    assetPeriodAddTag,
-  ];
-
+  /// Returns the instance of [AgentAssetAddTagOperationType] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentAssetAddTagOperationType? fromJson(dynamic value) => AgentAssetAddTagOperationTypeTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentAssetAddTagOperationType]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentAssetAddTagOperationType> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentAssetAddTagOperationType>[];
     if (json is List && json.isNotEmpty) {
@@ -53,9 +54,11 @@ class AgentAssetAddTagOperationTypeTypeTransformer {
 
   const AgentAssetAddTagOperationTypeTypeTransformer._();
 
-  String encode(AgentAssetAddTagOperationType data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentAssetAddTagOperationType data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentAssetAddTagOperationType.
+  /// Returns the instance of [AgentAssetAddTagOperationType] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -64,6 +67,9 @@ class AgentAssetAddTagOperationTypeTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentAssetAddTagOperationType? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentAssetAddTagOperationType) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'asset.addTag': return AgentAssetAddTagOperationType.assetPeriodAddTag;
@@ -76,7 +82,7 @@ class AgentAssetAddTagOperationTypeTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentAssetAddTagOperationTypeTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentAssetAddTagOperationTypeTypeTransformer? _instance;
 }
 

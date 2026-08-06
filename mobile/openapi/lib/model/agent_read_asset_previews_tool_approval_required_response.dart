@@ -106,27 +106,28 @@ class AgentReadAssetPreviewsToolApprovalRequiredResponse {
 }
 
 
-class AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum._(this.value);
+enum AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum {
+  approvalRequired._(r'approval-required'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const approvalRequired = AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum._(r'approval-required');
-
-  /// List of all possible values in this [enum][AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum].
-  static const values = <AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum>[
-    approvalRequired,
-  ];
-
+  /// Returns the instance of [AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum? fromJson(dynamic value) => AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -148,9 +149,10 @@ class AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnumTypeTransforme
 
   const AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnumTypeTransformer._();
 
-  String encode(AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum data) => data.value;
+  String encode(AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum.
+  /// Returns the instance of [AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -159,6 +161,9 @@ class AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnumTypeTransforme
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'approval-required': return AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnum.approvalRequired;
@@ -171,7 +176,7 @@ class AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnumTypeTransforme
     return null;
   }
 
-  /// Singleton [AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentReadAssetPreviewsToolApprovalRequiredResponseStatusEnumTypeTransformer? _instance;
 }
 

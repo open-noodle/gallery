@@ -11,27 +11,28 @@
 part of openapi.api;
 
 
-class AgentShareLinkCreateAlbumOperationType {
-  /// Instantiate a new enum with the provided [value].
-  const AgentShareLinkCreateAlbumOperationType._(this.value);
+enum AgentShareLinkCreateAlbumOperationType {
+  shareLinkPeriodCreateAlbum._(r'shareLink.createAlbum'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentShareLinkCreateAlbumOperationType._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const shareLinkPeriodCreateAlbum = AgentShareLinkCreateAlbumOperationType._(r'shareLink.createAlbum');
-
-  /// List of all possible values in this [enum][AgentShareLinkCreateAlbumOperationType].
-  static const values = <AgentShareLinkCreateAlbumOperationType>[
-    shareLinkPeriodCreateAlbum,
-  ];
-
+  /// Returns the instance of [AgentShareLinkCreateAlbumOperationType] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentShareLinkCreateAlbumOperationType? fromJson(dynamic value) => AgentShareLinkCreateAlbumOperationTypeTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentShareLinkCreateAlbumOperationType]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentShareLinkCreateAlbumOperationType> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentShareLinkCreateAlbumOperationType>[];
     if (json is List && json.isNotEmpty) {
@@ -53,9 +54,11 @@ class AgentShareLinkCreateAlbumOperationTypeTypeTransformer {
 
   const AgentShareLinkCreateAlbumOperationTypeTypeTransformer._();
 
-  String encode(AgentShareLinkCreateAlbumOperationType data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentShareLinkCreateAlbumOperationType data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentShareLinkCreateAlbumOperationType.
+  /// Returns the instance of [AgentShareLinkCreateAlbumOperationType] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -64,6 +67,9 @@ class AgentShareLinkCreateAlbumOperationTypeTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentShareLinkCreateAlbumOperationType? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentShareLinkCreateAlbumOperationType) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'shareLink.createAlbum': return AgentShareLinkCreateAlbumOperationType.shareLinkPeriodCreateAlbum;
@@ -76,7 +82,7 @@ class AgentShareLinkCreateAlbumOperationTypeTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentShareLinkCreateAlbumOperationTypeTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentShareLinkCreateAlbumOperationTypeTypeTransformer? _instance;
 }
 

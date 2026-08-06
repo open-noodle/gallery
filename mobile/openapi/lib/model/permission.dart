@@ -22,6 +22,14 @@ enum Permission {
   apiKeyPeriodRead._(r'apiKey.read'),
   apiKeyPeriodUpdate._(r'apiKey.update'),
   apiKeyPeriodDelete._(r'apiKey.delete'),
+  agentCredentialPeriodCreate._(r'agentCredential.create'),
+  agentCredentialPeriodRead._(r'agentCredential.read'),
+  agentCredentialPeriodUpdate._(r'agentCredential.update'),
+  agentCredentialPeriodDelete._(r'agentCredential.delete'),
+  agentRunnerPeriodRead._(r'agentRunner.read'),
+  agentSessionPeriodCreate._(r'agentSession.create'),
+  agentSessionPeriodRead._(r'agentSession.read'),
+  agentSessionPeriodUpdate._(r'agentSession.update'),
   assetPeriodRead._(r'asset.read'),
   assetPeriodUpdate._(r'asset.update'),
   assetPeriodDelete._(r'asset.delete'),
@@ -255,6 +263,14 @@ class PermissionTypeTransformer {
         case r'apiKey.read': return Permission.apiKeyPeriodRead;
         case r'apiKey.update': return Permission.apiKeyPeriodUpdate;
         case r'apiKey.delete': return Permission.apiKeyPeriodDelete;
+        case r'agentCredential.create': return Permission.agentCredentialPeriodCreate;
+        case r'agentCredential.read': return Permission.agentCredentialPeriodRead;
+        case r'agentCredential.update': return Permission.agentCredentialPeriodUpdate;
+        case r'agentCredential.delete': return Permission.agentCredentialPeriodDelete;
+        case r'agentRunner.read': return Permission.agentRunnerPeriodRead;
+        case r'agentSession.create': return Permission.agentSessionPeriodCreate;
+        case r'agentSession.read': return Permission.agentSessionPeriodRead;
+        case r'agentSession.update': return Permission.agentSessionPeriodUpdate;
         case r'asset.read': return Permission.assetPeriodRead;
         case r'asset.update': return Permission.assetPeriodUpdate;
         case r'asset.delete': return Permission.assetPeriodDelete;

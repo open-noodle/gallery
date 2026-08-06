@@ -70,14 +70,14 @@ class AgentMessageResponseDto {
     if (this.providerMessageId != null) {
       json[r'providerMessageId'] = this.providerMessageId;
     } else {
-    //  json[r'providerMessageId'] = null;
+      json[r'providerMessageId'] = null;
     }
       json[r'role'] = this.role;
       json[r'sessionId'] = this.sessionId;
     if (this.toolCallId != null) {
       json[r'toolCallId'] = this.toolCallId;
     } else {
-    //  json[r'toolCallId'] = null;
+      json[r'toolCallId'] = null;
     }
     return json;
   }

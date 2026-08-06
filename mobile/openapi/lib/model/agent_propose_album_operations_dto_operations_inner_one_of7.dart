@@ -232,27 +232,28 @@ class AgentProposeAlbumOperationsDtoOperationsInnerOneOf7 {
 }
 
 
-class AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum._(this.value);
+enum AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum {
+  spacePeriodRemoveAssets._(r'space.removeAssets'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const spacePeriodRemoveAssets = AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum._(r'space.removeAssets');
-
-  /// List of all possible values in this [enum][AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum].
-  static const values = <AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum>[
-    spacePeriodRemoveAssets,
-  ];
-
+  /// Returns the instance of [AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum? fromJson(dynamic value) => AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -274,9 +275,10 @@ class AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnumTypeTransformer
 
   const AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnumTypeTransformer._();
 
-  String encode(AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum data) => data.value;
+  String encode(AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum.
+  /// Returns the instance of [AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -285,6 +287,9 @@ class AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnumTypeTransformer
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'space.removeAssets': return AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnum.spacePeriodRemoveAssets;
@@ -297,7 +302,7 @@ class AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnumTypeTransformer
     return null;
   }
 
-  /// Singleton [AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentProposeAlbumOperationsDtoOperationsInnerOneOf7TypeEnumTypeTransformer? _instance;
 }
 

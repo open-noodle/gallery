@@ -11,27 +11,28 @@
 part of openapi.api;
 
 
-class AgentAlbumRemoveAssetsOperationType {
-  /// Instantiate a new enum with the provided [value].
-  const AgentAlbumRemoveAssetsOperationType._(this.value);
+enum AgentAlbumRemoveAssetsOperationType {
+  albumPeriodRemoveAssets._(r'album.removeAssets'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentAlbumRemoveAssetsOperationType._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const albumPeriodRemoveAssets = AgentAlbumRemoveAssetsOperationType._(r'album.removeAssets');
-
-  /// List of all possible values in this [enum][AgentAlbumRemoveAssetsOperationType].
-  static const values = <AgentAlbumRemoveAssetsOperationType>[
-    albumPeriodRemoveAssets,
-  ];
-
+  /// Returns the instance of [AgentAlbumRemoveAssetsOperationType] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentAlbumRemoveAssetsOperationType? fromJson(dynamic value) => AgentAlbumRemoveAssetsOperationTypeTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentAlbumRemoveAssetsOperationType]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentAlbumRemoveAssetsOperationType> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentAlbumRemoveAssetsOperationType>[];
     if (json is List && json.isNotEmpty) {
@@ -53,9 +54,11 @@ class AgentAlbumRemoveAssetsOperationTypeTypeTransformer {
 
   const AgentAlbumRemoveAssetsOperationTypeTypeTransformer._();
 
-  String encode(AgentAlbumRemoveAssetsOperationType data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentAlbumRemoveAssetsOperationType data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentAlbumRemoveAssetsOperationType.
+  /// Returns the instance of [AgentAlbumRemoveAssetsOperationType] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -64,6 +67,9 @@ class AgentAlbumRemoveAssetsOperationTypeTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentAlbumRemoveAssetsOperationType? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentAlbumRemoveAssetsOperationType) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'album.removeAssets': return AgentAlbumRemoveAssetsOperationType.albumPeriodRemoveAssets;
@@ -76,7 +82,7 @@ class AgentAlbumRemoveAssetsOperationTypeTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentAlbumRemoveAssetsOperationTypeTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentAlbumRemoveAssetsOperationTypeTypeTransformer? _instance;
 }
 

@@ -122,27 +122,28 @@ class AgentReadAssetOriginalsToolSuccessResponse {
 }
 
 
-class AgentReadAssetOriginalsToolSuccessResponseStatusEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentReadAssetOriginalsToolSuccessResponseStatusEnum._(this.value);
+enum AgentReadAssetOriginalsToolSuccessResponseStatusEnum {
+  success._(r'success'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentReadAssetOriginalsToolSuccessResponseStatusEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const success = AgentReadAssetOriginalsToolSuccessResponseStatusEnum._(r'success');
-
-  /// List of all possible values in this [enum][AgentReadAssetOriginalsToolSuccessResponseStatusEnum].
-  static const values = <AgentReadAssetOriginalsToolSuccessResponseStatusEnum>[
-    success,
-  ];
-
+  /// Returns the instance of [AgentReadAssetOriginalsToolSuccessResponseStatusEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentReadAssetOriginalsToolSuccessResponseStatusEnum? fromJson(dynamic value) => AgentReadAssetOriginalsToolSuccessResponseStatusEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentReadAssetOriginalsToolSuccessResponseStatusEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentReadAssetOriginalsToolSuccessResponseStatusEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentReadAssetOriginalsToolSuccessResponseStatusEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -164,9 +165,10 @@ class AgentReadAssetOriginalsToolSuccessResponseStatusEnumTypeTransformer {
 
   const AgentReadAssetOriginalsToolSuccessResponseStatusEnumTypeTransformer._();
 
-  String encode(AgentReadAssetOriginalsToolSuccessResponseStatusEnum data) => data.value;
+  String encode(AgentReadAssetOriginalsToolSuccessResponseStatusEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentReadAssetOriginalsToolSuccessResponseStatusEnum.
+  /// Returns the instance of [AgentReadAssetOriginalsToolSuccessResponseStatusEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -175,6 +177,9 @@ class AgentReadAssetOriginalsToolSuccessResponseStatusEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentReadAssetOriginalsToolSuccessResponseStatusEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentReadAssetOriginalsToolSuccessResponseStatusEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'success': return AgentReadAssetOriginalsToolSuccessResponseStatusEnum.success;
@@ -187,7 +192,7 @@ class AgentReadAssetOriginalsToolSuccessResponseStatusEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentReadAssetOriginalsToolSuccessResponseStatusEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentReadAssetOriginalsToolSuccessResponseStatusEnumTypeTransformer? _instance;
 }
 

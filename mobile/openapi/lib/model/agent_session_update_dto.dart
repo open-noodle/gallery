@@ -35,7 +35,7 @@ class AgentSessionUpdateDto {
     if (this.title != null) {
       json[r'title'] = this.title;
     } else {
-    //  json[r'title'] = null;
+      json[r'title'] = null;
     }
     return json;
   }

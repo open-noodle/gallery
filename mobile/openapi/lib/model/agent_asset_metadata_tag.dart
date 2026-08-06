@@ -45,7 +45,7 @@ class AgentAssetMetadataTag {
     if (this.color != null) {
       json[r'color'] = this.color;
     } else {
-    //  json[r'color'] = null;
+      json[r'color'] = null;
     }
       json[r'id'] = this.id;
       json[r'value'] = this.value;

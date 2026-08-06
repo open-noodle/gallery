@@ -58,7 +58,7 @@ class AgentOperationResponseDtoReviewMetadataAssetMetadataFieldsInner {
     if (this.proposedValue != null) {
       json[r'proposedValue'] = this.proposedValue;
     } else {
-    //  json[r'proposedValue'] = null;
+      json[r'proposedValue'] = null;
     }
       json[r'proposedValueKind'] = this.proposedValueKind;
     return json;

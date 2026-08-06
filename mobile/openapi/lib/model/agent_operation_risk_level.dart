@@ -11,31 +11,30 @@
 part of openapi.api;
 
 
-class AgentOperationRiskLevel {
-  /// Instantiate a new enum with the provided [value].
-  const AgentOperationRiskLevel._(this.value);
+enum AgentOperationRiskLevel {
+  low._(r'low'),
+  medium._(r'medium'),
+  high._(r'high'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentOperationRiskLevel._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const low = AgentOperationRiskLevel._(r'low');
-  static const medium = AgentOperationRiskLevel._(r'medium');
-  static const high = AgentOperationRiskLevel._(r'high');
-
-  /// List of all possible values in this [enum][AgentOperationRiskLevel].
-  static const values = <AgentOperationRiskLevel>[
-    low,
-    medium,
-    high,
-  ];
-
+  /// Returns the instance of [AgentOperationRiskLevel] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentOperationRiskLevel? fromJson(dynamic value) => AgentOperationRiskLevelTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentOperationRiskLevel]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentOperationRiskLevel> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentOperationRiskLevel>[];
     if (json is List && json.isNotEmpty) {
@@ -57,9 +56,11 @@ class AgentOperationRiskLevelTypeTransformer {
 
   const AgentOperationRiskLevelTypeTransformer._();
 
-  String encode(AgentOperationRiskLevel data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentOperationRiskLevel data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentOperationRiskLevel.
+  /// Returns the instance of [AgentOperationRiskLevel] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -68,6 +69,9 @@ class AgentOperationRiskLevelTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentOperationRiskLevel? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentOperationRiskLevel) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'low': return AgentOperationRiskLevel.low;
@@ -82,7 +86,7 @@ class AgentOperationRiskLevelTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentOperationRiskLevelTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentOperationRiskLevelTypeTransformer? _instance;
 }
 

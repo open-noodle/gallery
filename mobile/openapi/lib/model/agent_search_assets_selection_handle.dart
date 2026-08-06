@@ -63,7 +63,7 @@ class AgentSearchAssetsSelectionHandle {
     if (this.sourceToolCallId != null) {
       json[r'sourceToolCallId'] = this.sourceToolCallId;
     } else {
-    //  json[r'sourceToolCallId'] = null;
+      json[r'sourceToolCallId'] = null;
     }
     return json;
   }

@@ -106,27 +106,28 @@ class AgentListDuplicateGroupsToolApprovalRequiredResponse {
 }
 
 
-class AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum._(this.value);
+enum AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum {
+  approvalRequired._(r'approval-required'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const approvalRequired = AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum._(r'approval-required');
-
-  /// List of all possible values in this [enum][AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum].
-  static const values = <AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum>[
-    approvalRequired,
-  ];
-
+  /// Returns the instance of [AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum? fromJson(dynamic value) => AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -148,9 +149,10 @@ class AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnumTypeTransfor
 
   const AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnumTypeTransformer._();
 
-  String encode(AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum data) => data.value;
+  String encode(AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum.
+  /// Returns the instance of [AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -159,6 +161,9 @@ class AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnumTypeTransfor
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'approval-required': return AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnum.approvalRequired;
@@ -171,7 +176,7 @@ class AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnumTypeTransfor
     return null;
   }
 
-  /// Singleton [AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentListDuplicateGroupsToolApprovalRequiredResponseStatusEnumTypeTransformer? _instance;
 }
 

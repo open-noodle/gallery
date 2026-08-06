@@ -122,27 +122,28 @@ class AgentListAlbumsToolSuccessResponse {
 }
 
 
-class AgentListAlbumsToolSuccessResponseStatusEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentListAlbumsToolSuccessResponseStatusEnum._(this.value);
+enum AgentListAlbumsToolSuccessResponseStatusEnum {
+  success._(r'success'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentListAlbumsToolSuccessResponseStatusEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const success = AgentListAlbumsToolSuccessResponseStatusEnum._(r'success');
-
-  /// List of all possible values in this [enum][AgentListAlbumsToolSuccessResponseStatusEnum].
-  static const values = <AgentListAlbumsToolSuccessResponseStatusEnum>[
-    success,
-  ];
-
+  /// Returns the instance of [AgentListAlbumsToolSuccessResponseStatusEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentListAlbumsToolSuccessResponseStatusEnum? fromJson(dynamic value) => AgentListAlbumsToolSuccessResponseStatusEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentListAlbumsToolSuccessResponseStatusEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentListAlbumsToolSuccessResponseStatusEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentListAlbumsToolSuccessResponseStatusEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -164,9 +165,10 @@ class AgentListAlbumsToolSuccessResponseStatusEnumTypeTransformer {
 
   const AgentListAlbumsToolSuccessResponseStatusEnumTypeTransformer._();
 
-  String encode(AgentListAlbumsToolSuccessResponseStatusEnum data) => data.value;
+  String encode(AgentListAlbumsToolSuccessResponseStatusEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentListAlbumsToolSuccessResponseStatusEnum.
+  /// Returns the instance of [AgentListAlbumsToolSuccessResponseStatusEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -175,6 +177,9 @@ class AgentListAlbumsToolSuccessResponseStatusEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentListAlbumsToolSuccessResponseStatusEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentListAlbumsToolSuccessResponseStatusEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'success': return AgentListAlbumsToolSuccessResponseStatusEnum.success;
@@ -187,7 +192,7 @@ class AgentListAlbumsToolSuccessResponseStatusEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentListAlbumsToolSuccessResponseStatusEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentListAlbumsToolSuccessResponseStatusEnumTypeTransformer? _instance;
 }
 

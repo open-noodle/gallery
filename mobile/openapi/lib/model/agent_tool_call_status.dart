@@ -11,37 +11,33 @@
 part of openapi.api;
 
 
-class AgentToolCallStatus {
-  /// Instantiate a new enum with the provided [value].
-  const AgentToolCallStatus._(this.value);
+enum AgentToolCallStatus {
+  pendingApproval._(r'pending_approval'),
+  approved._(r'approved'),
+  executing._(r'executing'),
+  denied._(r'denied'),
+  completed._(r'completed'),
+  failed._(r'failed'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentToolCallStatus._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const pendingApproval = AgentToolCallStatus._(r'pending_approval');
-  static const approved = AgentToolCallStatus._(r'approved');
-  static const executing = AgentToolCallStatus._(r'executing');
-  static const denied = AgentToolCallStatus._(r'denied');
-  static const completed = AgentToolCallStatus._(r'completed');
-  static const failed = AgentToolCallStatus._(r'failed');
-
-  /// List of all possible values in this [enum][AgentToolCallStatus].
-  static const values = <AgentToolCallStatus>[
-    pendingApproval,
-    approved,
-    executing,
-    denied,
-    completed,
-    failed,
-  ];
-
+  /// Returns the instance of [AgentToolCallStatus] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentToolCallStatus? fromJson(dynamic value) => AgentToolCallStatusTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentToolCallStatus]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentToolCallStatus> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentToolCallStatus>[];
     if (json is List && json.isNotEmpty) {
@@ -63,9 +59,11 @@ class AgentToolCallStatusTypeTransformer {
 
   const AgentToolCallStatusTypeTransformer._();
 
-  String encode(AgentToolCallStatus data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentToolCallStatus data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentToolCallStatus.
+  /// Returns the instance of [AgentToolCallStatus] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -74,6 +72,9 @@ class AgentToolCallStatusTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentToolCallStatus? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentToolCallStatus) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'pending_approval': return AgentToolCallStatus.pendingApproval;
@@ -91,7 +92,7 @@ class AgentToolCallStatusTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentToolCallStatusTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentToolCallStatusTypeTransformer? _instance;
 }
 

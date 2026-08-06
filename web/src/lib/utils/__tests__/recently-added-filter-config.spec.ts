@@ -1,4 +1,10 @@
-import { AssetTypeEnum, getFilterSuggestions, getSearchSuggestions, searchSmartFacets, Type } from '@immich/sdk';
+import {
+  AssetTypeEnum,
+  getFilterSuggestions,
+  getSearchSuggestions,
+  searchSmartFacets,
+  Type5 as Type,
+} from '@immich/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFilterState } from '$lib/components/filter-panel/filter-panel';
 import { buildRecentlyAddedFilterConfig } from '$lib/utils/recently-added-filter-config';

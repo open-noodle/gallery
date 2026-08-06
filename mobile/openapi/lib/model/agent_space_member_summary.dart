@@ -55,13 +55,13 @@ class AgentSpaceMemberSummary {
     if (this.avatarColor != null) {
       json[r'avatarColor'] = this.avatarColor;
     } else {
-    //  json[r'avatarColor'] = null;
+      json[r'avatarColor'] = null;
     }
       json[r'name'] = this.name;
     if (this.profileImagePath != null) {
       json[r'profileImagePath'] = this.profileImagePath;
     } else {
-    //  json[r'profileImagePath'] = null;
+      json[r'profileImagePath'] = null;
     }
       json[r'role'] = this.role;
       json[r'userId'] = this.userId;

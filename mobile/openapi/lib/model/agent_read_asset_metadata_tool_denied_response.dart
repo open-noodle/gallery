@@ -114,27 +114,28 @@ class AgentReadAssetMetadataToolDeniedResponse {
 }
 
 
-class AgentReadAssetMetadataToolDeniedResponseStatusEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentReadAssetMetadataToolDeniedResponseStatusEnum._(this.value);
+enum AgentReadAssetMetadataToolDeniedResponseStatusEnum {
+  denied._(r'denied'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentReadAssetMetadataToolDeniedResponseStatusEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const denied = AgentReadAssetMetadataToolDeniedResponseStatusEnum._(r'denied');
-
-  /// List of all possible values in this [enum][AgentReadAssetMetadataToolDeniedResponseStatusEnum].
-  static const values = <AgentReadAssetMetadataToolDeniedResponseStatusEnum>[
-    denied,
-  ];
-
+  /// Returns the instance of [AgentReadAssetMetadataToolDeniedResponseStatusEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentReadAssetMetadataToolDeniedResponseStatusEnum? fromJson(dynamic value) => AgentReadAssetMetadataToolDeniedResponseStatusEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentReadAssetMetadataToolDeniedResponseStatusEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentReadAssetMetadataToolDeniedResponseStatusEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentReadAssetMetadataToolDeniedResponseStatusEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -156,9 +157,10 @@ class AgentReadAssetMetadataToolDeniedResponseStatusEnumTypeTransformer {
 
   const AgentReadAssetMetadataToolDeniedResponseStatusEnumTypeTransformer._();
 
-  String encode(AgentReadAssetMetadataToolDeniedResponseStatusEnum data) => data.value;
+  String encode(AgentReadAssetMetadataToolDeniedResponseStatusEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentReadAssetMetadataToolDeniedResponseStatusEnum.
+  /// Returns the instance of [AgentReadAssetMetadataToolDeniedResponseStatusEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -167,6 +169,9 @@ class AgentReadAssetMetadataToolDeniedResponseStatusEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentReadAssetMetadataToolDeniedResponseStatusEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentReadAssetMetadataToolDeniedResponseStatusEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'denied': return AgentReadAssetMetadataToolDeniedResponseStatusEnum.denied;
@@ -179,7 +184,7 @@ class AgentReadAssetMetadataToolDeniedResponseStatusEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentReadAssetMetadataToolDeniedResponseStatusEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentReadAssetMetadataToolDeniedResponseStatusEnumTypeTransformer? _instance;
 }
 

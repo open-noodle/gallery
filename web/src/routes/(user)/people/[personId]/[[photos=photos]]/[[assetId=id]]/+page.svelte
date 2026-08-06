@@ -75,7 +75,7 @@
     ignoreSpacePersonFaceSuggestion,
     mergePerson,
     searchPerson,
-    Type2 as ScopedPersonProfileType,
+    Type6 as ScopedPersonProfileType,
     type BulkIdResponseDto,
     type PersonFaceResponseDto,
     type PersonFaceSuggestionResponseDto,

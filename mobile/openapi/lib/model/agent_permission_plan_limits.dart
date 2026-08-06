@@ -91,7 +91,7 @@ class AgentPermissionPlanLimits {
     if (this.expiresInMinutes != null) {
       json[r'expiresInMinutes'] = this.expiresInMinutes;
     } else {
-    //  json[r'expiresInMinutes'] = null;
+      json[r'expiresInMinutes'] = null;
     }
       json[r'maxAssetsPerSession'] = this.maxAssetsPerSession;
       json[r'maxAssetsPerToolCall'] = this.maxAssetsPerToolCall;

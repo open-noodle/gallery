@@ -64,13 +64,13 @@ class AgentToolResultSize {
     if (this.estimatedBytes != null) {
       json[r'estimatedBytes'] = this.estimatedBytes;
     } else {
-    //  json[r'estimatedBytes'] = null;
+      json[r'estimatedBytes'] = null;
     }
       json[r'hasMore'] = this.hasMore;
     if (this.nextPage != null) {
       json[r'nextPage'] = this.nextPage;
     } else {
-    //  json[r'nextPage'] = null;
+      json[r'nextPage'] = null;
     }
       json[r'omittedFields'] = this.omittedFields;
       json[r'returnedItems'] = this.returnedItems;

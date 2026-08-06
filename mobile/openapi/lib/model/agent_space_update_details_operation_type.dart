@@ -11,27 +11,28 @@
 part of openapi.api;
 
 
-class AgentSpaceUpdateDetailsOperationType {
-  /// Instantiate a new enum with the provided [value].
-  const AgentSpaceUpdateDetailsOperationType._(this.value);
+enum AgentSpaceUpdateDetailsOperationType {
+  spacePeriodUpdateDetails._(r'space.updateDetails'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentSpaceUpdateDetailsOperationType._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const spacePeriodUpdateDetails = AgentSpaceUpdateDetailsOperationType._(r'space.updateDetails');
-
-  /// List of all possible values in this [enum][AgentSpaceUpdateDetailsOperationType].
-  static const values = <AgentSpaceUpdateDetailsOperationType>[
-    spacePeriodUpdateDetails,
-  ];
-
+  /// Returns the instance of [AgentSpaceUpdateDetailsOperationType] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentSpaceUpdateDetailsOperationType? fromJson(dynamic value) => AgentSpaceUpdateDetailsOperationTypeTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentSpaceUpdateDetailsOperationType]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentSpaceUpdateDetailsOperationType> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentSpaceUpdateDetailsOperationType>[];
     if (json is List && json.isNotEmpty) {
@@ -53,9 +54,11 @@ class AgentSpaceUpdateDetailsOperationTypeTypeTransformer {
 
   const AgentSpaceUpdateDetailsOperationTypeTypeTransformer._();
 
-  String encode(AgentSpaceUpdateDetailsOperationType data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentSpaceUpdateDetailsOperationType data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentSpaceUpdateDetailsOperationType.
+  /// Returns the instance of [AgentSpaceUpdateDetailsOperationType] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -64,6 +67,9 @@ class AgentSpaceUpdateDetailsOperationTypeTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentSpaceUpdateDetailsOperationType? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentSpaceUpdateDetailsOperationType) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'space.updateDetails': return AgentSpaceUpdateDetailsOperationType.spacePeriodUpdateDetails;
@@ -76,7 +82,7 @@ class AgentSpaceUpdateDetailsOperationTypeTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentSpaceUpdateDetailsOperationTypeTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentSpaceUpdateDetailsOperationTypeTypeTransformer? _instance;
 }
 

@@ -132,7 +132,7 @@ class AgentOperationResponseDto {
     if (this.error != null) {
       json[r'error'] = this.error;
     } else {
-    //  json[r'error'] = null;
+      json[r'error'] = null;
     }
       json[r'id'] = this.id;
       json[r'payload'] = this.payload;
@@ -140,7 +140,7 @@ class AgentOperationResponseDto {
     if (this.result != null) {
       json[r'result'] = this.result;
     } else {
-    //  json[r'result'] = null;
+      json[r'result'] = null;
     }
     if (this.reviewMetadata.isPresent) {
       final value = this.reviewMetadata.value;
@@ -152,13 +152,13 @@ class AgentOperationResponseDto {
     if (this.targetId != null) {
       json[r'targetId'] = this.targetId;
     } else {
-    //  json[r'targetId'] = null;
+      json[r'targetId'] = null;
     }
       json[r'targetKind'] = this.targetKind;
     if (this.temporaryTargetId != null) {
       json[r'temporaryTargetId'] = this.temporaryTargetId;
     } else {
-    //  json[r'temporaryTargetId'] = null;
+      json[r'temporaryTargetId'] = null;
     }
       json[r'type'] = this.type;
       json[r'updatedAt'] = _isEpochMarker(r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$/')

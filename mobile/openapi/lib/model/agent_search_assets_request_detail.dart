@@ -11,33 +11,31 @@
 part of openapi.api;
 
 
-class AgentSearchAssetsRequestDetail {
-  /// Instantiate a new enum with the provided [value].
-  const AgentSearchAssetsRequestDetail._(this.value);
+enum AgentSearchAssetsRequestDetail {
+  ids._(r'ids'),
+  handle._(r'handle'),
+  summary._(r'summary'),
+  metadata._(r'metadata'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentSearchAssetsRequestDetail._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const ids = AgentSearchAssetsRequestDetail._(r'ids');
-  static const handle = AgentSearchAssetsRequestDetail._(r'handle');
-  static const summary = AgentSearchAssetsRequestDetail._(r'summary');
-  static const metadata = AgentSearchAssetsRequestDetail._(r'metadata');
-
-  /// List of all possible values in this [enum][AgentSearchAssetsRequestDetail].
-  static const values = <AgentSearchAssetsRequestDetail>[
-    ids,
-    handle,
-    summary,
-    metadata,
-  ];
-
+  /// Returns the instance of [AgentSearchAssetsRequestDetail] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentSearchAssetsRequestDetail? fromJson(dynamic value) => AgentSearchAssetsRequestDetailTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentSearchAssetsRequestDetail]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentSearchAssetsRequestDetail> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentSearchAssetsRequestDetail>[];
     if (json is List && json.isNotEmpty) {
@@ -59,9 +57,11 @@ class AgentSearchAssetsRequestDetailTypeTransformer {
 
   const AgentSearchAssetsRequestDetailTypeTransformer._();
 
-  String encode(AgentSearchAssetsRequestDetail data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentSearchAssetsRequestDetail data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentSearchAssetsRequestDetail.
+  /// Returns the instance of [AgentSearchAssetsRequestDetail] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -70,6 +70,9 @@ class AgentSearchAssetsRequestDetailTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentSearchAssetsRequestDetail? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentSearchAssetsRequestDetail) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'ids': return AgentSearchAssetsRequestDetail.ids;
@@ -85,7 +88,7 @@ class AgentSearchAssetsRequestDetailTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentSearchAssetsRequestDetailTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentSearchAssetsRequestDetailTypeTransformer? _instance;
 }
 

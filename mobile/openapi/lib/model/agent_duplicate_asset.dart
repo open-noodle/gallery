@@ -81,7 +81,7 @@ class AgentDuplicateAsset {
     if (this.height != null) {
       json[r'height'] = this.height;
     } else {
-    //  json[r'height'] = null;
+      json[r'height'] = null;
     }
       json[r'id'] = this.id;
       json[r'isFavorite'] = this.isFavorite;
@@ -89,17 +89,17 @@ class AgentDuplicateAsset {
     if (this.rating != null) {
       json[r'rating'] = this.rating;
     } else {
-    //  json[r'rating'] = null;
+      json[r'rating'] = null;
     }
     if (this.sharpness != null) {
       json[r'sharpness'] = this.sharpness;
     } else {
-    //  json[r'sharpness'] = null;
+      json[r'sharpness'] = null;
     }
     if (this.width != null) {
       json[r'width'] = this.width;
     } else {
-    //  json[r'width'] = null;
+      json[r'width'] = null;
     }
     return json;
   }

@@ -11,43 +11,36 @@
 part of openapi.api;
 
 
-class AgentSessionStatus {
-  /// Instantiate a new enum with the provided [value].
-  const AgentSessionStatus._(this.value);
+enum AgentSessionStatus {
+  created._(r'created'),
+  running._(r'running'),
+  waitingForToolApproval._(r'waiting_for_tool_approval'),
+  waitingForPlanReview._(r'waiting_for_plan_review'),
+  applying._(r'applying'),
+  completed._(r'completed'),
+  cancelled._(r'cancelled'),
+  interrupted._(r'interrupted'),
+  failed._(r'failed'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentSessionStatus._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const created = AgentSessionStatus._(r'created');
-  static const running = AgentSessionStatus._(r'running');
-  static const waitingForToolApproval = AgentSessionStatus._(r'waiting_for_tool_approval');
-  static const waitingForPlanReview = AgentSessionStatus._(r'waiting_for_plan_review');
-  static const applying = AgentSessionStatus._(r'applying');
-  static const completed = AgentSessionStatus._(r'completed');
-  static const cancelled = AgentSessionStatus._(r'cancelled');
-  static const interrupted = AgentSessionStatus._(r'interrupted');
-  static const failed = AgentSessionStatus._(r'failed');
-
-  /// List of all possible values in this [enum][AgentSessionStatus].
-  static const values = <AgentSessionStatus>[
-    created,
-    running,
-    waitingForToolApproval,
-    waitingForPlanReview,
-    applying,
-    completed,
-    cancelled,
-    interrupted,
-    failed,
-  ];
-
+  /// Returns the instance of [AgentSessionStatus] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentSessionStatus? fromJson(dynamic value) => AgentSessionStatusTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentSessionStatus]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentSessionStatus> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentSessionStatus>[];
     if (json is List && json.isNotEmpty) {
@@ -69,9 +62,11 @@ class AgentSessionStatusTypeTransformer {
 
   const AgentSessionStatusTypeTransformer._();
 
-  String encode(AgentSessionStatus data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentSessionStatus data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentSessionStatus.
+  /// Returns the instance of [AgentSessionStatus] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -80,6 +75,9 @@ class AgentSessionStatusTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentSessionStatus? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentSessionStatus) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'created': return AgentSessionStatus.created;
@@ -100,7 +98,7 @@ class AgentSessionStatusTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentSessionStatusTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentSessionStatusTypeTransformer? _instance;
 }
 

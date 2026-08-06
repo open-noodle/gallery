@@ -55,7 +55,7 @@ class AgentRunnerCapabilitiesDto {
     if (this.protocolVersion != null) {
       json[r'protocolVersion'] = this.protocolVersion;
     } else {
-    //  json[r'protocolVersion'] = null;
+      json[r'protocolVersion'] = null;
     }
       json[r'streaming'] = this.streaming;
       json[r'tools'] = this.tools;

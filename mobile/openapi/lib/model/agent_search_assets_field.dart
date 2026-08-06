@@ -11,43 +11,36 @@
 part of openapi.api;
 
 
-class AgentSearchAssetsField {
-  /// Instantiate a new enum with the provided [value].
-  const AgentSearchAssetsField._(this.value);
+enum AgentSearchAssetsField {
+  type._(r'type'),
+  dates._(r'dates'),
+  location._(r'location'),
+  camera._(r'camera'),
+  tags._(r'tags'),
+  rating._(r'rating'),
+  filename._(r'filename'),
+  favorite._(r'favorite'),
+  visibility._(r'visibility'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentSearchAssetsField._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const type = AgentSearchAssetsField._(r'type');
-  static const dates = AgentSearchAssetsField._(r'dates');
-  static const location = AgentSearchAssetsField._(r'location');
-  static const camera = AgentSearchAssetsField._(r'camera');
-  static const tags = AgentSearchAssetsField._(r'tags');
-  static const rating = AgentSearchAssetsField._(r'rating');
-  static const filename = AgentSearchAssetsField._(r'filename');
-  static const favorite = AgentSearchAssetsField._(r'favorite');
-  static const visibility = AgentSearchAssetsField._(r'visibility');
-
-  /// List of all possible values in this [enum][AgentSearchAssetsField].
-  static const values = <AgentSearchAssetsField>[
-    type,
-    dates,
-    location,
-    camera,
-    tags,
-    rating,
-    filename,
-    favorite,
-    visibility,
-  ];
-
+  /// Returns the instance of [AgentSearchAssetsField] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentSearchAssetsField? fromJson(dynamic value) => AgentSearchAssetsFieldTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentSearchAssetsField]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentSearchAssetsField> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentSearchAssetsField>[];
     if (json is List && json.isNotEmpty) {
@@ -69,9 +62,11 @@ class AgentSearchAssetsFieldTypeTransformer {
 
   const AgentSearchAssetsFieldTypeTransformer._();
 
-  String encode(AgentSearchAssetsField data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentSearchAssetsField data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentSearchAssetsField.
+  /// Returns the instance of [AgentSearchAssetsField] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -80,6 +75,9 @@ class AgentSearchAssetsFieldTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentSearchAssetsField? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentSearchAssetsField) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'type': return AgentSearchAssetsField.type;
@@ -100,7 +98,7 @@ class AgentSearchAssetsFieldTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentSearchAssetsFieldTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentSearchAssetsFieldTypeTransformer? _instance;
 }
 

@@ -11,29 +11,29 @@
 part of openapi.api;
 
 
-class AgentSessionActivityEventSource {
-  /// Instantiate a new enum with the provided [value].
-  const AgentSessionActivityEventSource._(this.value);
+enum AgentSessionActivityEventSource {
+  server._(r'server'),
+  runner._(r'runner'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentSessionActivityEventSource._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const server = AgentSessionActivityEventSource._(r'server');
-  static const runner = AgentSessionActivityEventSource._(r'runner');
-
-  /// List of all possible values in this [enum][AgentSessionActivityEventSource].
-  static const values = <AgentSessionActivityEventSource>[
-    server,
-    runner,
-  ];
-
+  /// Returns the instance of [AgentSessionActivityEventSource] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentSessionActivityEventSource? fromJson(dynamic value) => AgentSessionActivityEventSourceTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentSessionActivityEventSource]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentSessionActivityEventSource> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentSessionActivityEventSource>[];
     if (json is List && json.isNotEmpty) {
@@ -55,9 +55,11 @@ class AgentSessionActivityEventSourceTypeTransformer {
 
   const AgentSessionActivityEventSourceTypeTransformer._();
 
-  String encode(AgentSessionActivityEventSource data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentSessionActivityEventSource data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentSessionActivityEventSource.
+  /// Returns the instance of [AgentSessionActivityEventSource] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -66,6 +68,9 @@ class AgentSessionActivityEventSourceTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentSessionActivityEventSource? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentSessionActivityEventSource) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'server': return AgentSessionActivityEventSource.server;
@@ -79,7 +84,7 @@ class AgentSessionActivityEventSourceTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentSessionActivityEventSourceTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentSessionActivityEventSourceTypeTransformer? _instance;
 }
 

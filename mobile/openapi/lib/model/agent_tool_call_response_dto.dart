@@ -111,7 +111,7 @@ class AgentToolCallResponseDto {
     if (this.approvalDecision != null) {
       json[r'approvalDecision'] = this.approvalDecision;
     } else {
-    //  json[r'approvalDecision'] = null;
+      json[r'approvalDecision'] = null;
     }
       json[r'assetCount'] = this.assetCount;
     if (this.completedAt != null) {
@@ -119,20 +119,20 @@ class AgentToolCallResponseDto {
         ? this.completedAt!.millisecondsSinceEpoch
         : this.completedAt!.toUtc().toIso8601String();
     } else {
-    //  json[r'completedAt'] = null;
+      json[r'completedAt'] = null;
     }
       json[r'dataClass'] = this.dataClass;
     if (this.error != null) {
       json[r'error'] = this.error;
     } else {
-    //  json[r'error'] = null;
+      json[r'error'] = null;
     }
       json[r'id'] = this.id;
       json[r'requestSummary'] = this.requestSummary;
     if (this.responseSummary != null) {
       json[r'responseSummary'] = this.responseSummary;
     } else {
-    //  json[r'responseSummary'] = null;
+      json[r'responseSummary'] = null;
     }
     if (this.resultSize.isPresent) {
       final value = this.resultSize.value;

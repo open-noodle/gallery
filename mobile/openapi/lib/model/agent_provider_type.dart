@@ -11,31 +11,30 @@
 part of openapi.api;
 
 
-class AgentProviderType {
-  /// Instantiate a new enum with the provided [value].
-  const AgentProviderType._(this.value);
+enum AgentProviderType {
+  openai._(r'openai'),
+  anthropic._(r'anthropic'),
+  openaiCompatible._(r'openai-compatible'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentProviderType._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const openai = AgentProviderType._(r'openai');
-  static const anthropic = AgentProviderType._(r'anthropic');
-  static const openaiCompatible = AgentProviderType._(r'openai-compatible');
-
-  /// List of all possible values in this [enum][AgentProviderType].
-  static const values = <AgentProviderType>[
-    openai,
-    anthropic,
-    openaiCompatible,
-  ];
-
+  /// Returns the instance of [AgentProviderType] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentProviderType? fromJson(dynamic value) => AgentProviderTypeTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentProviderType]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentProviderType> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentProviderType>[];
     if (json is List && json.isNotEmpty) {
@@ -57,9 +56,11 @@ class AgentProviderTypeTypeTransformer {
 
   const AgentProviderTypeTypeTransformer._();
 
-  String encode(AgentProviderType data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentProviderType data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentProviderType.
+  /// Returns the instance of [AgentProviderType] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -68,6 +69,9 @@ class AgentProviderTypeTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentProviderType? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentProviderType) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'openai': return AgentProviderType.openai;
@@ -82,7 +86,7 @@ class AgentProviderTypeTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentProviderTypeTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentProviderTypeTypeTransformer? _instance;
 }
 

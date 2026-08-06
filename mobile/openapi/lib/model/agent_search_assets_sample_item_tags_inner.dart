@@ -40,7 +40,7 @@ class AgentSearchAssetsSampleItemTagsInner {
     if (this.color != null) {
       json[r'color'] = this.color;
     } else {
-    //  json[r'color'] = null;
+      json[r'color'] = null;
     }
       json[r'value'] = this.value;
     return json;

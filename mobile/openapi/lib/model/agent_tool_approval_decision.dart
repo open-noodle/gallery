@@ -11,29 +11,29 @@
 part of openapi.api;
 
 
-class AgentToolApprovalDecision {
-  /// Instantiate a new enum with the provided [value].
-  const AgentToolApprovalDecision._(this.value);
+enum AgentToolApprovalDecision {
+  approved._(r'approved'),
+  denied._(r'denied'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentToolApprovalDecision._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const approved = AgentToolApprovalDecision._(r'approved');
-  static const denied = AgentToolApprovalDecision._(r'denied');
-
-  /// List of all possible values in this [enum][AgentToolApprovalDecision].
-  static const values = <AgentToolApprovalDecision>[
-    approved,
-    denied,
-  ];
-
+  /// Returns the instance of [AgentToolApprovalDecision] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentToolApprovalDecision? fromJson(dynamic value) => AgentToolApprovalDecisionTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentToolApprovalDecision]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentToolApprovalDecision> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentToolApprovalDecision>[];
     if (json is List && json.isNotEmpty) {
@@ -55,9 +55,11 @@ class AgentToolApprovalDecisionTypeTransformer {
 
   const AgentToolApprovalDecisionTypeTransformer._();
 
-  String encode(AgentToolApprovalDecision data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentToolApprovalDecision data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentToolApprovalDecision.
+  /// Returns the instance of [AgentToolApprovalDecision] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -66,6 +68,9 @@ class AgentToolApprovalDecisionTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentToolApprovalDecision? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentToolApprovalDecision) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'approved': return AgentToolApprovalDecision.approved;
@@ -79,7 +84,7 @@ class AgentToolApprovalDecisionTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentToolApprovalDecisionTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentToolApprovalDecisionTypeTransformer? _instance;
 }
 

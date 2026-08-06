@@ -11,33 +11,31 @@
 part of openapi.api;
 
 
-class AgentOperationStatus {
-  /// Instantiate a new enum with the provided [value].
-  const AgentOperationStatus._(this.value);
+enum AgentOperationStatus {
+  proposed._(r'proposed'),
+  applied._(r'applied'),
+  skipped._(r'skipped'),
+  failed._(r'failed'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentOperationStatus._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const proposed = AgentOperationStatus._(r'proposed');
-  static const applied = AgentOperationStatus._(r'applied');
-  static const skipped = AgentOperationStatus._(r'skipped');
-  static const failed = AgentOperationStatus._(r'failed');
-
-  /// List of all possible values in this [enum][AgentOperationStatus].
-  static const values = <AgentOperationStatus>[
-    proposed,
-    applied,
-    skipped,
-    failed,
-  ];
-
+  /// Returns the instance of [AgentOperationStatus] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentOperationStatus? fromJson(dynamic value) => AgentOperationStatusTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentOperationStatus]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentOperationStatus> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentOperationStatus>[];
     if (json is List && json.isNotEmpty) {
@@ -59,9 +57,11 @@ class AgentOperationStatusTypeTransformer {
 
   const AgentOperationStatusTypeTransformer._();
 
-  String encode(AgentOperationStatus data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentOperationStatus data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentOperationStatus.
+  /// Returns the instance of [AgentOperationStatus] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -70,6 +70,9 @@ class AgentOperationStatusTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentOperationStatus? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentOperationStatus) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'proposed': return AgentOperationStatus.proposed;
@@ -85,7 +88,7 @@ class AgentOperationStatusTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentOperationStatusTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentOperationStatusTypeTransformer? _instance;
 }
 

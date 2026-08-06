@@ -11,27 +11,28 @@
 part of openapi.api;
 
 
-class AgentAssetTrashOperationType {
-  /// Instantiate a new enum with the provided [value].
-  const AgentAssetTrashOperationType._(this.value);
+enum AgentAssetTrashOperationType {
+  assetPeriodTrash._(r'asset.trash'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentAssetTrashOperationType._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const assetPeriodTrash = AgentAssetTrashOperationType._(r'asset.trash');
-
-  /// List of all possible values in this [enum][AgentAssetTrashOperationType].
-  static const values = <AgentAssetTrashOperationType>[
-    assetPeriodTrash,
-  ];
-
+  /// Returns the instance of [AgentAssetTrashOperationType] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentAssetTrashOperationType? fromJson(dynamic value) => AgentAssetTrashOperationTypeTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentAssetTrashOperationType]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentAssetTrashOperationType> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentAssetTrashOperationType>[];
     if (json is List && json.isNotEmpty) {
@@ -53,9 +54,11 @@ class AgentAssetTrashOperationTypeTypeTransformer {
 
   const AgentAssetTrashOperationTypeTypeTransformer._();
 
-  String encode(AgentAssetTrashOperationType data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentAssetTrashOperationType data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentAssetTrashOperationType.
+  /// Returns the instance of [AgentAssetTrashOperationType] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -64,6 +67,9 @@ class AgentAssetTrashOperationTypeTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentAssetTrashOperationType? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentAssetTrashOperationType) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'asset.trash': return AgentAssetTrashOperationType.assetPeriodTrash;
@@ -76,7 +82,7 @@ class AgentAssetTrashOperationTypeTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentAssetTrashOperationTypeTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentAssetTrashOperationTypeTypeTransformer? _instance;
 }
 

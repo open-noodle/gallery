@@ -11,45 +11,37 @@
 part of openapi.api;
 
 
-class AgentAssetMetadataField {
-  /// Instantiate a new enum with the provided [value].
-  const AgentAssetMetadataField._(this.value);
+enum AgentAssetMetadataField {
+  type._(r'type'),
+  dates._(r'dates'),
+  location._(r'location'),
+  camera._(r'camera'),
+  tags._(r'tags'),
+  rating._(r'rating'),
+  filename._(r'filename'),
+  favorite._(r'favorite'),
+  visibility._(r'visibility'),
+  quality._(r'quality'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentAssetMetadataField._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const type = AgentAssetMetadataField._(r'type');
-  static const dates = AgentAssetMetadataField._(r'dates');
-  static const location = AgentAssetMetadataField._(r'location');
-  static const camera = AgentAssetMetadataField._(r'camera');
-  static const tags = AgentAssetMetadataField._(r'tags');
-  static const rating = AgentAssetMetadataField._(r'rating');
-  static const filename = AgentAssetMetadataField._(r'filename');
-  static const favorite = AgentAssetMetadataField._(r'favorite');
-  static const visibility = AgentAssetMetadataField._(r'visibility');
-  static const quality = AgentAssetMetadataField._(r'quality');
-
-  /// List of all possible values in this [enum][AgentAssetMetadataField].
-  static const values = <AgentAssetMetadataField>[
-    type,
-    dates,
-    location,
-    camera,
-    tags,
-    rating,
-    filename,
-    favorite,
-    visibility,
-    quality,
-  ];
-
+  /// Returns the instance of [AgentAssetMetadataField] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentAssetMetadataField? fromJson(dynamic value) => AgentAssetMetadataFieldTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentAssetMetadataField]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentAssetMetadataField> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentAssetMetadataField>[];
     if (json is List && json.isNotEmpty) {
@@ -71,9 +63,11 @@ class AgentAssetMetadataFieldTypeTransformer {
 
   const AgentAssetMetadataFieldTypeTransformer._();
 
-  String encode(AgentAssetMetadataField data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentAssetMetadataField data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentAssetMetadataField.
+  /// Returns the instance of [AgentAssetMetadataField] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -82,6 +76,9 @@ class AgentAssetMetadataFieldTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentAssetMetadataField? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentAssetMetadataField) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'type': return AgentAssetMetadataField.type;
@@ -103,7 +100,7 @@ class AgentAssetMetadataFieldTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentAssetMetadataFieldTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentAssetMetadataFieldTypeTransformer? _instance;
 }
 

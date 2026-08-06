@@ -58,22 +58,22 @@ class AgentAssetMetadataQuality {
     if (this.brightness != null) {
       json[r'brightness'] = this.brightness;
     } else {
-    //  json[r'brightness'] = null;
+      json[r'brightness'] = null;
     }
     if (this.exposure != null) {
       json[r'exposure'] = this.exposure;
     } else {
-    //  json[r'exposure'] = null;
+      json[r'exposure'] = null;
     }
     if (this.quality != null) {
       json[r'quality'] = this.quality;
     } else {
-    //  json[r'quality'] = null;
+      json[r'quality'] = null;
     }
     if (this.sharpness != null) {
       json[r'sharpness'] = this.sharpness;
     } else {
-    //  json[r'sharpness'] = null;
+      json[r'sharpness'] = null;
     }
     return json;
   }

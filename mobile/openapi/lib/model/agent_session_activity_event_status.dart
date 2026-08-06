@@ -11,33 +11,31 @@
 part of openapi.api;
 
 
-class AgentSessionActivityEventStatus {
-  /// Instantiate a new enum with the provided [value].
-  const AgentSessionActivityEventStatus._(this.value);
+enum AgentSessionActivityEventStatus {
+  running._(r'running'),
+  completed._(r'completed'),
+  failed._(r'failed'),
+  skipped._(r'skipped'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentSessionActivityEventStatus._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const running = AgentSessionActivityEventStatus._(r'running');
-  static const completed = AgentSessionActivityEventStatus._(r'completed');
-  static const failed = AgentSessionActivityEventStatus._(r'failed');
-  static const skipped = AgentSessionActivityEventStatus._(r'skipped');
-
-  /// List of all possible values in this [enum][AgentSessionActivityEventStatus].
-  static const values = <AgentSessionActivityEventStatus>[
-    running,
-    completed,
-    failed,
-    skipped,
-  ];
-
+  /// Returns the instance of [AgentSessionActivityEventStatus] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentSessionActivityEventStatus? fromJson(dynamic value) => AgentSessionActivityEventStatusTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentSessionActivityEventStatus]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentSessionActivityEventStatus> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentSessionActivityEventStatus>[];
     if (json is List && json.isNotEmpty) {
@@ -59,9 +57,11 @@ class AgentSessionActivityEventStatusTypeTransformer {
 
   const AgentSessionActivityEventStatusTypeTransformer._();
 
-  String encode(AgentSessionActivityEventStatus data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentSessionActivityEventStatus data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentSessionActivityEventStatus.
+  /// Returns the instance of [AgentSessionActivityEventStatus] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -70,6 +70,9 @@ class AgentSessionActivityEventStatusTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentSessionActivityEventStatus? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentSessionActivityEventStatus) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'running': return AgentSessionActivityEventStatus.running;
@@ -85,7 +88,7 @@ class AgentSessionActivityEventStatusTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentSessionActivityEventStatusTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentSessionActivityEventStatusTypeTransformer? _instance;
 }
 

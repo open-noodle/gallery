@@ -11,77 +11,53 @@
 part of openapi.api;
 
 
-class AgentToolName {
-  /// Instantiate a new enum with the provided [value].
-  const AgentToolName._(this.value);
+enum AgentToolName {
+  searchAssets._(r'searchAssets'),
+  findTripCandidates._(r'findTripCandidates'),
+  readSelectionMetadata._(r'readSelectionMetadata'),
+  curateSelection._(r'curateSelection'),
+  resolveAssetSearchFilters._(r'resolveAssetSearchFilters'),
+  resolveLocation._(r'resolveLocation'),
+  searchPeople._(r'searchPeople'),
+  readAssetMetadata._(r'readAssetMetadata'),
+  readAssetPreviews._(r'readAssetPreviews'),
+  readAssetOriginals._(r'readAssetOriginals'),
+  listAlbums._(r'listAlbums'),
+  readAlbum._(r'readAlbum'),
+  listSpaces._(r'listSpaces'),
+  listDuplicateGroups._(r'listDuplicateGroups'),
+  readSpace._(r'readSpace'),
+  searchUsers._(r'searchUsers'),
+  proposeAlbumOperations._(r'proposeAlbumOperations'),
+  proposeAlbumFromSearch._(r'proposeAlbumFromSearch'),
+  proposeAlbumFromSelection._(r'proposeAlbumFromSelection'),
+  proposeAddAssetsToAlbumFromSearch._(r'proposeAddAssetsToAlbumFromSearch'),
+  proposeSpaceFromSearch._(r'proposeSpaceFromSearch'),
+  proposeAddAssetsToSpaceFromSearch._(r'proposeAddAssetsToSpaceFromSearch'),
+  proposeAssetBatchFromSearch._(r'proposeAssetBatchFromSearch'),
+  proposeAssetBatchFromSelection._(r'proposeAssetBatchFromSelection'),
+  reviseProposedOperations._(r'reviseProposedOperations'),
+  summarizePlan._(r'summarizePlan'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentToolName._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const searchAssets = AgentToolName._(r'searchAssets');
-  static const findTripCandidates = AgentToolName._(r'findTripCandidates');
-  static const readSelectionMetadata = AgentToolName._(r'readSelectionMetadata');
-  static const curateSelection = AgentToolName._(r'curateSelection');
-  static const resolveAssetSearchFilters = AgentToolName._(r'resolveAssetSearchFilters');
-  static const resolveLocation = AgentToolName._(r'resolveLocation');
-  static const searchPeople = AgentToolName._(r'searchPeople');
-  static const readAssetMetadata = AgentToolName._(r'readAssetMetadata');
-  static const readAssetPreviews = AgentToolName._(r'readAssetPreviews');
-  static const readAssetOriginals = AgentToolName._(r'readAssetOriginals');
-  static const listAlbums = AgentToolName._(r'listAlbums');
-  static const readAlbum = AgentToolName._(r'readAlbum');
-  static const listSpaces = AgentToolName._(r'listSpaces');
-  static const listDuplicateGroups = AgentToolName._(r'listDuplicateGroups');
-  static const readSpace = AgentToolName._(r'readSpace');
-  static const searchUsers = AgentToolName._(r'searchUsers');
-  static const proposeAlbumOperations = AgentToolName._(r'proposeAlbumOperations');
-  static const proposeAlbumFromSearch = AgentToolName._(r'proposeAlbumFromSearch');
-  static const proposeAlbumFromSelection = AgentToolName._(r'proposeAlbumFromSelection');
-  static const proposeAddAssetsToAlbumFromSearch = AgentToolName._(r'proposeAddAssetsToAlbumFromSearch');
-  static const proposeSpaceFromSearch = AgentToolName._(r'proposeSpaceFromSearch');
-  static const proposeAddAssetsToSpaceFromSearch = AgentToolName._(r'proposeAddAssetsToSpaceFromSearch');
-  static const proposeAssetBatchFromSearch = AgentToolName._(r'proposeAssetBatchFromSearch');
-  static const proposeAssetBatchFromSelection = AgentToolName._(r'proposeAssetBatchFromSelection');
-  static const reviseProposedOperations = AgentToolName._(r'reviseProposedOperations');
-  static const summarizePlan = AgentToolName._(r'summarizePlan');
-
-  /// List of all possible values in this [enum][AgentToolName].
-  static const values = <AgentToolName>[
-    searchAssets,
-    findTripCandidates,
-    readSelectionMetadata,
-    curateSelection,
-    resolveAssetSearchFilters,
-    resolveLocation,
-    searchPeople,
-    readAssetMetadata,
-    readAssetPreviews,
-    readAssetOriginals,
-    listAlbums,
-    readAlbum,
-    listSpaces,
-    listDuplicateGroups,
-    readSpace,
-    searchUsers,
-    proposeAlbumOperations,
-    proposeAlbumFromSearch,
-    proposeAlbumFromSelection,
-    proposeAddAssetsToAlbumFromSearch,
-    proposeSpaceFromSearch,
-    proposeAddAssetsToSpaceFromSearch,
-    proposeAssetBatchFromSearch,
-    proposeAssetBatchFromSelection,
-    reviseProposedOperations,
-    summarizePlan,
-  ];
-
+  /// Returns the instance of [AgentToolName] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentToolName? fromJson(dynamic value) => AgentToolNameTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentToolName]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentToolName> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentToolName>[];
     if (json is List && json.isNotEmpty) {
@@ -103,9 +79,11 @@ class AgentToolNameTypeTransformer {
 
   const AgentToolNameTypeTransformer._();
 
-  String encode(AgentToolName data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentToolName data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentToolName.
+  /// Returns the instance of [AgentToolName] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -114,6 +92,9 @@ class AgentToolNameTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentToolName? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentToolName) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'searchAssets': return AgentToolName.searchAssets;
@@ -151,7 +132,7 @@ class AgentToolNameTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentToolNameTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentToolNameTypeTransformer? _instance;
 }
 

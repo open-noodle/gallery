@@ -11,29 +11,29 @@
 part of openapi.api;
 
 
-class AgentDeclarativeNameMatch {
-  /// Instantiate a new enum with the provided [value].
-  const AgentDeclarativeNameMatch._(this.value);
+enum AgentDeclarativeNameMatch {
+  any._(r'any'),
+  all._(r'all'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentDeclarativeNameMatch._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const any = AgentDeclarativeNameMatch._(r'any');
-  static const all = AgentDeclarativeNameMatch._(r'all');
-
-  /// List of all possible values in this [enum][AgentDeclarativeNameMatch].
-  static const values = <AgentDeclarativeNameMatch>[
-    any,
-    all,
-  ];
-
+  /// Returns the instance of [AgentDeclarativeNameMatch] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentDeclarativeNameMatch? fromJson(dynamic value) => AgentDeclarativeNameMatchTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentDeclarativeNameMatch]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentDeclarativeNameMatch> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentDeclarativeNameMatch>[];
     if (json is List && json.isNotEmpty) {
@@ -55,9 +55,11 @@ class AgentDeclarativeNameMatchTypeTransformer {
 
   const AgentDeclarativeNameMatchTypeTransformer._();
 
-  String encode(AgentDeclarativeNameMatch data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentDeclarativeNameMatch data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentDeclarativeNameMatch.
+  /// Returns the instance of [AgentDeclarativeNameMatch] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -66,6 +68,9 @@ class AgentDeclarativeNameMatchTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentDeclarativeNameMatch? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentDeclarativeNameMatch) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'any': return AgentDeclarativeNameMatch.any;
@@ -79,7 +84,7 @@ class AgentDeclarativeNameMatchTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentDeclarativeNameMatchTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentDeclarativeNameMatchTypeTransformer? _instance;
 }
 

@@ -11,27 +11,28 @@
 part of openapi.api;
 
 
-class AgentSpaceCreateOperationType {
-  /// Instantiate a new enum with the provided [value].
-  const AgentSpaceCreateOperationType._(this.value);
+enum AgentSpaceCreateOperationType {
+  spacePeriodCreate._(r'space.create'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentSpaceCreateOperationType._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const spacePeriodCreate = AgentSpaceCreateOperationType._(r'space.create');
-
-  /// List of all possible values in this [enum][AgentSpaceCreateOperationType].
-  static const values = <AgentSpaceCreateOperationType>[
-    spacePeriodCreate,
-  ];
-
+  /// Returns the instance of [AgentSpaceCreateOperationType] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentSpaceCreateOperationType? fromJson(dynamic value) => AgentSpaceCreateOperationTypeTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentSpaceCreateOperationType]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentSpaceCreateOperationType> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentSpaceCreateOperationType>[];
     if (json is List && json.isNotEmpty) {
@@ -53,9 +54,11 @@ class AgentSpaceCreateOperationTypeTypeTransformer {
 
   const AgentSpaceCreateOperationTypeTypeTransformer._();
 
-  String encode(AgentSpaceCreateOperationType data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentSpaceCreateOperationType data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentSpaceCreateOperationType.
+  /// Returns the instance of [AgentSpaceCreateOperationType] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -64,6 +67,9 @@ class AgentSpaceCreateOperationTypeTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentSpaceCreateOperationType? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentSpaceCreateOperationType) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'space.create': return AgentSpaceCreateOperationType.spacePeriodCreate;
@@ -76,7 +82,7 @@ class AgentSpaceCreateOperationTypeTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentSpaceCreateOperationTypeTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentSpaceCreateOperationTypeTypeTransformer? _instance;
 }
 

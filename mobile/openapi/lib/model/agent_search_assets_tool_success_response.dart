@@ -120,7 +120,7 @@ class AgentSearchAssetsToolSuccessResponse {
     if (this.nextPage != null) {
       json[r'nextPage'] = this.nextPage;
     } else {
-    //  json[r'nextPage'] = null;
+      json[r'nextPage'] = null;
     }
       json[r'resultSize'] = this.resultSize;
       json[r'returnedCount'] = this.returnedCount;
@@ -220,27 +220,28 @@ class AgentSearchAssetsToolSuccessResponse {
 }
 
 
-class AgentSearchAssetsToolSuccessResponseStatusEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentSearchAssetsToolSuccessResponseStatusEnum._(this.value);
+enum AgentSearchAssetsToolSuccessResponseStatusEnum {
+  success._(r'success'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentSearchAssetsToolSuccessResponseStatusEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const success = AgentSearchAssetsToolSuccessResponseStatusEnum._(r'success');
-
-  /// List of all possible values in this [enum][AgentSearchAssetsToolSuccessResponseStatusEnum].
-  static const values = <AgentSearchAssetsToolSuccessResponseStatusEnum>[
-    success,
-  ];
-
+  /// Returns the instance of [AgentSearchAssetsToolSuccessResponseStatusEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentSearchAssetsToolSuccessResponseStatusEnum? fromJson(dynamic value) => AgentSearchAssetsToolSuccessResponseStatusEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentSearchAssetsToolSuccessResponseStatusEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentSearchAssetsToolSuccessResponseStatusEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentSearchAssetsToolSuccessResponseStatusEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -262,9 +263,10 @@ class AgentSearchAssetsToolSuccessResponseStatusEnumTypeTransformer {
 
   const AgentSearchAssetsToolSuccessResponseStatusEnumTypeTransformer._();
 
-  String encode(AgentSearchAssetsToolSuccessResponseStatusEnum data) => data.value;
+  String encode(AgentSearchAssetsToolSuccessResponseStatusEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentSearchAssetsToolSuccessResponseStatusEnum.
+  /// Returns the instance of [AgentSearchAssetsToolSuccessResponseStatusEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -273,6 +275,9 @@ class AgentSearchAssetsToolSuccessResponseStatusEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentSearchAssetsToolSuccessResponseStatusEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentSearchAssetsToolSuccessResponseStatusEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'success': return AgentSearchAssetsToolSuccessResponseStatusEnum.success;
@@ -285,7 +290,7 @@ class AgentSearchAssetsToolSuccessResponseStatusEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentSearchAssetsToolSuccessResponseStatusEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentSearchAssetsToolSuccessResponseStatusEnumTypeTransformer? _instance;
 }
 

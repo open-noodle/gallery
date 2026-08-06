@@ -11,27 +11,28 @@
 part of openapi.api;
 
 
-class AgentAssetSetVisibilityOperationType {
-  /// Instantiate a new enum with the provided [value].
-  const AgentAssetSetVisibilityOperationType._(this.value);
+enum AgentAssetSetVisibilityOperationType {
+  assetPeriodSetVisibility._(r'asset.setVisibility'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentAssetSetVisibilityOperationType._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const assetPeriodSetVisibility = AgentAssetSetVisibilityOperationType._(r'asset.setVisibility');
-
-  /// List of all possible values in this [enum][AgentAssetSetVisibilityOperationType].
-  static const values = <AgentAssetSetVisibilityOperationType>[
-    assetPeriodSetVisibility,
-  ];
-
+  /// Returns the instance of [AgentAssetSetVisibilityOperationType] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentAssetSetVisibilityOperationType? fromJson(dynamic value) => AgentAssetSetVisibilityOperationTypeTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentAssetSetVisibilityOperationType]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentAssetSetVisibilityOperationType> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentAssetSetVisibilityOperationType>[];
     if (json is List && json.isNotEmpty) {
@@ -53,9 +54,11 @@ class AgentAssetSetVisibilityOperationTypeTypeTransformer {
 
   const AgentAssetSetVisibilityOperationTypeTypeTransformer._();
 
-  String encode(AgentAssetSetVisibilityOperationType data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentAssetSetVisibilityOperationType data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentAssetSetVisibilityOperationType.
+  /// Returns the instance of [AgentAssetSetVisibilityOperationType] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -64,6 +67,9 @@ class AgentAssetSetVisibilityOperationTypeTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentAssetSetVisibilityOperationType? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentAssetSetVisibilityOperationType) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'asset.setVisibility': return AgentAssetSetVisibilityOperationType.assetPeriodSetVisibility;
@@ -76,7 +82,7 @@ class AgentAssetSetVisibilityOperationTypeTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentAssetSetVisibilityOperationTypeTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentAssetSetVisibilityOperationTypeTypeTransformer? _instance;
 }
 

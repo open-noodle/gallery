@@ -11,33 +11,31 @@
 part of openapi.api;
 
 
-class AgentApprovalMode {
-  /// Instantiate a new enum with the provided [value].
-  const AgentApprovalMode._(this.value);
+enum AgentApprovalMode {
+  strict._(r'strict'),
+  askOnEscalation._(r'ask-on-escalation'),
+  planOnly._(r'plan-only'),
+  dangerouslySkipPermissions._(r'dangerously-skip-permissions'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentApprovalMode._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const strict = AgentApprovalMode._(r'strict');
-  static const askOnEscalation = AgentApprovalMode._(r'ask-on-escalation');
-  static const planOnly = AgentApprovalMode._(r'plan-only');
-  static const dangerouslySkipPermissions = AgentApprovalMode._(r'dangerously-skip-permissions');
-
-  /// List of all possible values in this [enum][AgentApprovalMode].
-  static const values = <AgentApprovalMode>[
-    strict,
-    askOnEscalation,
-    planOnly,
-    dangerouslySkipPermissions,
-  ];
-
+  /// Returns the instance of [AgentApprovalMode] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentApprovalMode? fromJson(dynamic value) => AgentApprovalModeTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentApprovalMode]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentApprovalMode> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentApprovalMode>[];
     if (json is List && json.isNotEmpty) {
@@ -59,9 +57,11 @@ class AgentApprovalModeTypeTransformer {
 
   const AgentApprovalModeTypeTransformer._();
 
-  String encode(AgentApprovalMode data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentApprovalMode data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentApprovalMode.
+  /// Returns the instance of [AgentApprovalMode] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -70,6 +70,9 @@ class AgentApprovalModeTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentApprovalMode? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentApprovalMode) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'strict': return AgentApprovalMode.strict;
@@ -85,7 +88,7 @@ class AgentApprovalModeTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentApprovalModeTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentApprovalModeTypeTransformer? _instance;
 }
 

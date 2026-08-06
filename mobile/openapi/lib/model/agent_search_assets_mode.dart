@@ -11,35 +11,32 @@
 part of openapi.api;
 
 
-class AgentSearchAssetsMode {
-  /// Instantiate a new enum with the provided [value].
-  const AgentSearchAssetsMode._(this.value);
+enum AgentSearchAssetsMode {
+  metadata._(r'metadata'),
+  smart._(r'smart'),
+  description._(r'description'),
+  ocr._(r'ocr'),
+  filename._(r'filename'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentSearchAssetsMode._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const metadata = AgentSearchAssetsMode._(r'metadata');
-  static const smart = AgentSearchAssetsMode._(r'smart');
-  static const description = AgentSearchAssetsMode._(r'description');
-  static const ocr = AgentSearchAssetsMode._(r'ocr');
-  static const filename = AgentSearchAssetsMode._(r'filename');
-
-  /// List of all possible values in this [enum][AgentSearchAssetsMode].
-  static const values = <AgentSearchAssetsMode>[
-    metadata,
-    smart,
-    description,
-    ocr,
-    filename,
-  ];
-
+  /// Returns the instance of [AgentSearchAssetsMode] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentSearchAssetsMode? fromJson(dynamic value) => AgentSearchAssetsModeTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentSearchAssetsMode]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentSearchAssetsMode> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentSearchAssetsMode>[];
     if (json is List && json.isNotEmpty) {
@@ -61,9 +58,11 @@ class AgentSearchAssetsModeTypeTransformer {
 
   const AgentSearchAssetsModeTypeTransformer._();
 
-  String encode(AgentSearchAssetsMode data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentSearchAssetsMode data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentSearchAssetsMode.
+  /// Returns the instance of [AgentSearchAssetsMode] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -72,6 +71,9 @@ class AgentSearchAssetsModeTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentSearchAssetsMode? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentSearchAssetsMode) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'metadata': return AgentSearchAssetsMode.metadata;
@@ -88,7 +90,7 @@ class AgentSearchAssetsModeTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentSearchAssetsModeTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentSearchAssetsModeTypeTransformer? _instance;
 }
 

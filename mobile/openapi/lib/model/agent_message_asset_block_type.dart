@@ -11,27 +11,28 @@
 part of openapi.api;
 
 
-class AgentMessageAssetBlockType {
-  /// Instantiate a new enum with the provided [value].
-  const AgentMessageAssetBlockType._(this.value);
+enum AgentMessageAssetBlockType {
+  asset._(r'asset'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentMessageAssetBlockType._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const asset = AgentMessageAssetBlockType._(r'asset');
-
-  /// List of all possible values in this [enum][AgentMessageAssetBlockType].
-  static const values = <AgentMessageAssetBlockType>[
-    asset,
-  ];
-
+  /// Returns the instance of [AgentMessageAssetBlockType] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentMessageAssetBlockType? fromJson(dynamic value) => AgentMessageAssetBlockTypeTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentMessageAssetBlockType]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentMessageAssetBlockType> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentMessageAssetBlockType>[];
     if (json is List && json.isNotEmpty) {
@@ -53,9 +54,11 @@ class AgentMessageAssetBlockTypeTypeTransformer {
 
   const AgentMessageAssetBlockTypeTypeTransformer._();
 
-  String encode(AgentMessageAssetBlockType data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentMessageAssetBlockType data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentMessageAssetBlockType.
+  /// Returns the instance of [AgentMessageAssetBlockType] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -64,6 +67,9 @@ class AgentMessageAssetBlockTypeTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentMessageAssetBlockType? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentMessageAssetBlockType) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'asset': return AgentMessageAssetBlockType.asset;
@@ -76,7 +82,7 @@ class AgentMessageAssetBlockTypeTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentMessageAssetBlockTypeTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentMessageAssetBlockTypeTypeTransformer? _instance;
 }
 

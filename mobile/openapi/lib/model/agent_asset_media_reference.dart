@@ -66,14 +66,14 @@ class AgentAssetMediaReference {
     if (this.height != null) {
       json[r'height'] = this.height;
     } else {
-    //  json[r'height'] = null;
+      json[r'height'] = null;
     }
       json[r'mediaUrl'] = this.mediaUrl;
       json[r'mimeType'] = this.mimeType;
     if (this.width != null) {
       json[r'width'] = this.width;
     } else {
-    //  json[r'width'] = null;
+      json[r'width'] = null;
     }
     return json;
   }

@@ -196,27 +196,28 @@ class AgentSearchAssetSourceInput {
 }
 
 
-class AgentSearchAssetSourceInputKindEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentSearchAssetSourceInputKindEnum._(this.value);
+enum AgentSearchAssetSourceInputKindEnum {
+  search._(r'search'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentSearchAssetSourceInputKindEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const search = AgentSearchAssetSourceInputKindEnum._(r'search');
-
-  /// List of all possible values in this [enum][AgentSearchAssetSourceInputKindEnum].
-  static const values = <AgentSearchAssetSourceInputKindEnum>[
-    search,
-  ];
-
+  /// Returns the instance of [AgentSearchAssetSourceInputKindEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentSearchAssetSourceInputKindEnum? fromJson(dynamic value) => AgentSearchAssetSourceInputKindEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentSearchAssetSourceInputKindEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentSearchAssetSourceInputKindEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentSearchAssetSourceInputKindEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -238,9 +239,10 @@ class AgentSearchAssetSourceInputKindEnumTypeTransformer {
 
   const AgentSearchAssetSourceInputKindEnumTypeTransformer._();
 
-  String encode(AgentSearchAssetSourceInputKindEnum data) => data.value;
+  String encode(AgentSearchAssetSourceInputKindEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentSearchAssetSourceInputKindEnum.
+  /// Returns the instance of [AgentSearchAssetSourceInputKindEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -249,6 +251,9 @@ class AgentSearchAssetSourceInputKindEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentSearchAssetSourceInputKindEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentSearchAssetSourceInputKindEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'search': return AgentSearchAssetSourceInputKindEnum.search;
@@ -261,35 +266,35 @@ class AgentSearchAssetSourceInputKindEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentSearchAssetSourceInputKindEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentSearchAssetSourceInputKindEnumTypeTransformer? _instance;
 }
 
 
 
-class AgentSearchAssetSourceInputMaterializationEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentSearchAssetSourceInputMaterializationEnum._(this.value);
+enum AgentSearchAssetSourceInputMaterializationEnum {
+  boundedPage._(r'bounded-page'),
+  allMatchesWithLimit._(r'all-matches-with-limit'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentSearchAssetSourceInputMaterializationEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const boundedPage = AgentSearchAssetSourceInputMaterializationEnum._(r'bounded-page');
-  static const allMatchesWithLimit = AgentSearchAssetSourceInputMaterializationEnum._(r'all-matches-with-limit');
-
-  /// List of all possible values in this [enum][AgentSearchAssetSourceInputMaterializationEnum].
-  static const values = <AgentSearchAssetSourceInputMaterializationEnum>[
-    boundedPage,
-    allMatchesWithLimit,
-  ];
-
+  /// Returns the instance of [AgentSearchAssetSourceInputMaterializationEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentSearchAssetSourceInputMaterializationEnum? fromJson(dynamic value) => AgentSearchAssetSourceInputMaterializationEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentSearchAssetSourceInputMaterializationEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentSearchAssetSourceInputMaterializationEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentSearchAssetSourceInputMaterializationEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -311,9 +316,10 @@ class AgentSearchAssetSourceInputMaterializationEnumTypeTransformer {
 
   const AgentSearchAssetSourceInputMaterializationEnumTypeTransformer._();
 
-  String encode(AgentSearchAssetSourceInputMaterializationEnum data) => data.value;
+  String encode(AgentSearchAssetSourceInputMaterializationEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentSearchAssetSourceInputMaterializationEnum.
+  /// Returns the instance of [AgentSearchAssetSourceInputMaterializationEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -322,6 +328,9 @@ class AgentSearchAssetSourceInputMaterializationEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentSearchAssetSourceInputMaterializationEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentSearchAssetSourceInputMaterializationEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'bounded-page': return AgentSearchAssetSourceInputMaterializationEnum.boundedPage;
@@ -335,41 +344,38 @@ class AgentSearchAssetSourceInputMaterializationEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentSearchAssetSourceInputMaterializationEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentSearchAssetSourceInputMaterializationEnumTypeTransformer? _instance;
 }
 
 
 
-class AgentSearchAssetSourceInputModeEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentSearchAssetSourceInputModeEnum._(this.value);
+enum AgentSearchAssetSourceInputModeEnum {
+  metadata._(r'metadata'),
+  smart._(r'smart'),
+  description._(r'description'),
+  ocr._(r'ocr'),
+  filename._(r'filename'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentSearchAssetSourceInputModeEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const metadata = AgentSearchAssetSourceInputModeEnum._(r'metadata');
-  static const smart = AgentSearchAssetSourceInputModeEnum._(r'smart');
-  static const description = AgentSearchAssetSourceInputModeEnum._(r'description');
-  static const ocr = AgentSearchAssetSourceInputModeEnum._(r'ocr');
-  static const filename = AgentSearchAssetSourceInputModeEnum._(r'filename');
-
-  /// List of all possible values in this [enum][AgentSearchAssetSourceInputModeEnum].
-  static const values = <AgentSearchAssetSourceInputModeEnum>[
-    metadata,
-    smart,
-    description,
-    ocr,
-    filename,
-  ];
-
+  /// Returns the instance of [AgentSearchAssetSourceInputModeEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentSearchAssetSourceInputModeEnum? fromJson(dynamic value) => AgentSearchAssetSourceInputModeEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentSearchAssetSourceInputModeEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentSearchAssetSourceInputModeEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentSearchAssetSourceInputModeEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -391,9 +397,10 @@ class AgentSearchAssetSourceInputModeEnumTypeTransformer {
 
   const AgentSearchAssetSourceInputModeEnumTypeTransformer._();
 
-  String encode(AgentSearchAssetSourceInputModeEnum data) => data.value;
+  String encode(AgentSearchAssetSourceInputModeEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentSearchAssetSourceInputModeEnum.
+  /// Returns the instance of [AgentSearchAssetSourceInputModeEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -402,6 +409,9 @@ class AgentSearchAssetSourceInputModeEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentSearchAssetSourceInputModeEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentSearchAssetSourceInputModeEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'metadata': return AgentSearchAssetSourceInputModeEnum.metadata;
@@ -418,37 +428,36 @@ class AgentSearchAssetSourceInputModeEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentSearchAssetSourceInputModeEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentSearchAssetSourceInputModeEnumTypeTransformer? _instance;
 }
 
 
 
-class AgentSearchAssetSourceInputOrderEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentSearchAssetSourceInputOrderEnum._(this.value);
+enum AgentSearchAssetSourceInputOrderEnum {
+  asc._(r'asc'),
+  desc._(r'desc'),
+  relevance._(r'relevance'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentSearchAssetSourceInputOrderEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const asc = AgentSearchAssetSourceInputOrderEnum._(r'asc');
-  static const desc = AgentSearchAssetSourceInputOrderEnum._(r'desc');
-  static const relevance = AgentSearchAssetSourceInputOrderEnum._(r'relevance');
-
-  /// List of all possible values in this [enum][AgentSearchAssetSourceInputOrderEnum].
-  static const values = <AgentSearchAssetSourceInputOrderEnum>[
-    asc,
-    desc,
-    relevance,
-  ];
-
+  /// Returns the instance of [AgentSearchAssetSourceInputOrderEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentSearchAssetSourceInputOrderEnum? fromJson(dynamic value) => AgentSearchAssetSourceInputOrderEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentSearchAssetSourceInputOrderEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentSearchAssetSourceInputOrderEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentSearchAssetSourceInputOrderEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -470,9 +479,10 @@ class AgentSearchAssetSourceInputOrderEnumTypeTransformer {
 
   const AgentSearchAssetSourceInputOrderEnumTypeTransformer._();
 
-  String encode(AgentSearchAssetSourceInputOrderEnum data) => data.value;
+  String encode(AgentSearchAssetSourceInputOrderEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentSearchAssetSourceInputOrderEnum.
+  /// Returns the instance of [AgentSearchAssetSourceInputOrderEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -481,6 +491,9 @@ class AgentSearchAssetSourceInputOrderEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentSearchAssetSourceInputOrderEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentSearchAssetSourceInputOrderEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'asc': return AgentSearchAssetSourceInputOrderEnum.asc;
@@ -495,7 +508,7 @@ class AgentSearchAssetSourceInputOrderEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentSearchAssetSourceInputOrderEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentSearchAssetSourceInputOrderEnumTypeTransformer? _instance;
 }
 

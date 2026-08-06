@@ -11,35 +11,32 @@
 part of openapi.api;
 
 /// Agent runner availability reason
-class AgentRunnerStatusReason {
-  /// Instantiate a new enum with the provided [value].
-  const AgentRunnerStatusReason._(this.value);
+enum AgentRunnerStatusReason {
+  notConfigured._(r'not-configured'),
+  healthy._(r'healthy'),
+  unhealthy._(r'unhealthy'),
+  timeout._(r'timeout'),
+  invalidResponse._(r'invalid-response'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentRunnerStatusReason._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const notConfigured = AgentRunnerStatusReason._(r'not-configured');
-  static const healthy = AgentRunnerStatusReason._(r'healthy');
-  static const unhealthy = AgentRunnerStatusReason._(r'unhealthy');
-  static const timeout = AgentRunnerStatusReason._(r'timeout');
-  static const invalidResponse = AgentRunnerStatusReason._(r'invalid-response');
-
-  /// List of all possible values in this [enum][AgentRunnerStatusReason].
-  static const values = <AgentRunnerStatusReason>[
-    notConfigured,
-    healthy,
-    unhealthy,
-    timeout,
-    invalidResponse,
-  ];
-
+  /// Returns the instance of [AgentRunnerStatusReason] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentRunnerStatusReason? fromJson(dynamic value) => AgentRunnerStatusReasonTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentRunnerStatusReason]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentRunnerStatusReason> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentRunnerStatusReason>[];
     if (json is List && json.isNotEmpty) {
@@ -61,9 +58,11 @@ class AgentRunnerStatusReasonTypeTransformer {
 
   const AgentRunnerStatusReasonTypeTransformer._();
 
-  String encode(AgentRunnerStatusReason data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentRunnerStatusReason data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentRunnerStatusReason.
+  /// Returns the instance of [AgentRunnerStatusReason] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -72,6 +71,9 @@ class AgentRunnerStatusReasonTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentRunnerStatusReason? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentRunnerStatusReason) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'not-configured': return AgentRunnerStatusReason.notConfigured;
@@ -88,7 +90,7 @@ class AgentRunnerStatusReasonTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentRunnerStatusReasonTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentRunnerStatusReasonTypeTransformer? _instance;
 }
 

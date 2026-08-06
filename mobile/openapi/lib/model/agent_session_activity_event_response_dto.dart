@@ -70,7 +70,7 @@ class AgentSessionActivityEventResponseDto {
     if (this.counts != null) {
       json[r'counts'] = this.counts;
     } else {
-    //  json[r'counts'] = null;
+      json[r'counts'] = null;
     }
       json[r'createdAt'] = _isEpochMarker(r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$/')
         ? this.createdAt.millisecondsSinceEpoch
@@ -83,7 +83,7 @@ class AgentSessionActivityEventResponseDto {
     if (this.summary != null) {
       json[r'summary'] = this.summary;
     } else {
-    //  json[r'summary'] = null;
+      json[r'summary'] = null;
     }
     return json;
   }
@@ -164,43 +164,36 @@ class AgentSessionActivityEventResponseDto {
 }
 
 
-class AgentSessionActivityEventResponseDtoKindEnum {
-  /// Instantiate a new enum with the provided [value].
-  const AgentSessionActivityEventResponseDtoKindEnum._(this.value);
+enum AgentSessionActivityEventResponseDtoKindEnum {
+  startProcessing._(r'start-processing'),
+  planComposing._(r'plan-composing'),
+  applyProgress._(r'apply-progress'),
+  runnerRecovery._(r'runner-recovery'),
+  strictRouterDecision._(r'strict_router_decision'),
+  strictWorkflowOutcome._(r'strict_workflow_outcome'),
+  strictSuccessGateBlock._(r'strict_success_gate_block'),
+  strictContinuation._(r'strict_continuation'),
+  unknown._(r'unknown'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentSessionActivityEventResponseDtoKindEnum._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const startProcessing = AgentSessionActivityEventResponseDtoKindEnum._(r'start-processing');
-  static const planComposing = AgentSessionActivityEventResponseDtoKindEnum._(r'plan-composing');
-  static const applyProgress = AgentSessionActivityEventResponseDtoKindEnum._(r'apply-progress');
-  static const runnerRecovery = AgentSessionActivityEventResponseDtoKindEnum._(r'runner-recovery');
-  static const strictRouterDecision = AgentSessionActivityEventResponseDtoKindEnum._(r'strict_router_decision');
-  static const strictWorkflowOutcome = AgentSessionActivityEventResponseDtoKindEnum._(r'strict_workflow_outcome');
-  static const strictSuccessGateBlock = AgentSessionActivityEventResponseDtoKindEnum._(r'strict_success_gate_block');
-  static const strictContinuation = AgentSessionActivityEventResponseDtoKindEnum._(r'strict_continuation');
-  static const unknown = AgentSessionActivityEventResponseDtoKindEnum._(r'unknown');
-
-  /// List of all possible values in this [enum][AgentSessionActivityEventResponseDtoKindEnum].
-  static const values = <AgentSessionActivityEventResponseDtoKindEnum>[
-    startProcessing,
-    planComposing,
-    applyProgress,
-    runnerRecovery,
-    strictRouterDecision,
-    strictWorkflowOutcome,
-    strictSuccessGateBlock,
-    strictContinuation,
-    unknown,
-  ];
-
+  /// Returns the instance of [AgentSessionActivityEventResponseDtoKindEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentSessionActivityEventResponseDtoKindEnum? fromJson(dynamic value) => AgentSessionActivityEventResponseDtoKindEnumTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentSessionActivityEventResponseDtoKindEnum]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentSessionActivityEventResponseDtoKindEnum> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentSessionActivityEventResponseDtoKindEnum>[];
     if (json is List && json.isNotEmpty) {
@@ -222,9 +215,10 @@ class AgentSessionActivityEventResponseDtoKindEnumTypeTransformer {
 
   const AgentSessionActivityEventResponseDtoKindEnumTypeTransformer._();
 
-  String encode(AgentSessionActivityEventResponseDtoKindEnum data) => data.value;
+  String encode(AgentSessionActivityEventResponseDtoKindEnum data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentSessionActivityEventResponseDtoKindEnum.
+  /// Returns the instance of [AgentSessionActivityEventResponseDtoKindEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -233,6 +227,9 @@ class AgentSessionActivityEventResponseDtoKindEnumTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentSessionActivityEventResponseDtoKindEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentSessionActivityEventResponseDtoKindEnum) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'start-processing': return AgentSessionActivityEventResponseDtoKindEnum.startProcessing;
@@ -253,7 +250,7 @@ class AgentSessionActivityEventResponseDtoKindEnumTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentSessionActivityEventResponseDtoKindEnumTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentSessionActivityEventResponseDtoKindEnumTypeTransformer? _instance;
 }
 

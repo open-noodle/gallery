@@ -107,7 +107,7 @@ class AgentSpaceDetail {
     if (this.description != null) {
       json[r'description'] = this.description;
     } else {
-    //  json[r'description'] = null;
+      json[r'description'] = null;
     }
       json[r'id'] = this.id;
       json[r'memberCount'] = this.memberCount;
@@ -117,7 +117,7 @@ class AgentSpaceDetail {
     if (this.thumbnailAssetId != null) {
       json[r'thumbnailAssetId'] = this.thumbnailAssetId;
     } else {
-    //  json[r'thumbnailAssetId'] = null;
+      json[r'thumbnailAssetId'] = null;
     }
     return json;
   }

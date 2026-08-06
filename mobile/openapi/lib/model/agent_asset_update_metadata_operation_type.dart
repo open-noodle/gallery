@@ -11,27 +11,28 @@
 part of openapi.api;
 
 
-class AgentAssetUpdateMetadataOperationType {
-  /// Instantiate a new enum with the provided [value].
-  const AgentAssetUpdateMetadataOperationType._(this.value);
+enum AgentAssetUpdateMetadataOperationType {
+  assetPeriodUpdateMetadata._(r'asset.updateMetadata'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const AgentAssetUpdateMetadataOperationType._(this._value);
 
   /// The underlying value of this enum member.
-  final String value;
+  final String _value;
 
   @override
-  String toString() => value;
+  String toString() => _value;
 
-  String toJson() => value;
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
 
-  static const assetPeriodUpdateMetadata = AgentAssetUpdateMetadataOperationType._(r'asset.updateMetadata');
-
-  /// List of all possible values in this [enum][AgentAssetUpdateMetadataOperationType].
-  static const values = <AgentAssetUpdateMetadataOperationType>[
-    assetPeriodUpdateMetadata,
-  ];
-
+  /// Returns the instance of [AgentAssetUpdateMetadataOperationType] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
   static AgentAssetUpdateMetadataOperationType? fromJson(dynamic value) => AgentAssetUpdateMetadataOperationTypeTypeTransformer().decode(value);
 
+  /// Returns a [List] containing instances of [AgentAssetUpdateMetadataOperationType]
+  /// that were successfully decoded from the passed [JSON][json].
   static List<AgentAssetUpdateMetadataOperationType> listFromJson(dynamic json, {bool growable = false,}) {
     final result = <AgentAssetUpdateMetadataOperationType>[];
     if (json is List && json.isNotEmpty) {
@@ -53,9 +54,11 @@ class AgentAssetUpdateMetadataOperationTypeTypeTransformer {
 
   const AgentAssetUpdateMetadataOperationTypeTypeTransformer._();
 
-  String encode(AgentAssetUpdateMetadataOperationType data) => data.value;
+  /// Encodes this enum as a value suitable for JSON.
+  String encode(AgentAssetUpdateMetadataOperationType data) => data._value;
 
-  /// Decodes a [dynamic value][data] to a AgentAssetUpdateMetadataOperationType.
+  /// Returns the instance of [AgentAssetUpdateMetadataOperationType] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
   /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
@@ -64,6 +67,9 @@ class AgentAssetUpdateMetadataOperationTypeTypeTransformer {
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
   AgentAssetUpdateMetadataOperationType? decode(dynamic data, {bool allowNull = true}) {
+    if (data is AgentAssetUpdateMetadataOperationType) {
+      return data;
+    }
     if (data != null) {
       switch (data) {
         case r'asset.updateMetadata': return AgentAssetUpdateMetadataOperationType.assetPeriodUpdateMetadata;
@@ -76,7 +82,7 @@ class AgentAssetUpdateMetadataOperationTypeTypeTransformer {
     return null;
   }
 
-  /// Singleton [AgentAssetUpdateMetadataOperationTypeTypeTransformer] instance.
+  /// The singleton instance of this transformer.
   static AgentAssetUpdateMetadataOperationTypeTypeTransformer? _instance;
 }
 
