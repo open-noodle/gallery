@@ -1301,7 +1301,11 @@ describe('pi runtime adapter', () => {
       throw new Error('queue full');
     };
 
-    const runtime = createPiRuntime({ sdk, ai });
+    // The warn spy is what makes this test distinguish "the rejection was
+    // swallowed by our catch" from "sendCustomMessage was never called at all" —
+    // without it, deleting the whole delivery block leaves this test green.
+    const warns = [];
+    const runtime = createPiRuntime({ sdk, ai, log: { warn: (line) => warns.push(line) } });
     await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
 
     const events = await collect(
@@ -1316,6 +1320,14 @@ describe('pi runtime adapter', () => {
     assert.equal(
       events.some((event) => event.type === 'runner-error'),
       false,
+    );
+    // The turn completed, not merely "did not error": the likelier mutation
+    // (delivery inside the strict try) converts the rejection to a runner-error
+    // and returns early, which this catches.
+    assert.equal(events.at(-1).type, 'assistant-message-completed');
+    assert.deepEqual(
+      warns.filter((line) => line.includes('routing_context_injection_failed')),
+      [JSON.stringify({ msg: 'routing_context_injection_failed', gallerySessionId: createSessionBody().gallerySessionId })],
     );
   });
 
@@ -1328,7 +1340,8 @@ describe('pi runtime adapter', () => {
     assert.equal(session.sendCustomMessage, undefined);
     ai.classifyIntent = async () => ({ workflow: 'create_recent_trip_album', slots: {}, confidence: 'high' });
 
-    const runtime = createPiRuntime({ sdk, ai });
+    const warns = [];
+    const runtime = createPiRuntime({ sdk, ai, log: { warn: (line) => warns.push(line) } });
     await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
 
     const events = await collect(
@@ -1343,6 +1356,14 @@ describe('pi runtime adapter', () => {
     assert.equal(
       events.some((event) => event.type === 'runner-error'),
       false,
+    );
+    assert.equal(events.at(-1).type, 'assistant-message-completed');
+    // Silence is the assertion: the existence guard must SKIP delivery, not call
+    // through and swallow a TypeError. Dropping `&& entry.session.sendCustomMessage`
+    // makes this line fail.
+    assert.deepEqual(
+      warns.filter((line) => line.includes('routing_context_injection_failed')),
+      [],
     );
   });
 
@@ -1367,6 +1388,55 @@ describe('pi runtime adapter', () => {
     // One per handoff turn — not zero, and not accumulating.
     assert.equal(customMessages.length, 2);
     assert.equal(calls.prompts.length, 2);
+  });
+
+  it('keeps the overlap guard up across the awaited routing-context delivery', async () => {
+    const { sdk, ai, calls, session } = createFakeDependencies({
+      mcpToolNames: ['mcp_gallery_findTripCandidates'],
+    });
+    ai.classifyIntent = async () => ({ workflow: 'create_recent_trip_album', slots: {}, confidence: 'high' });
+    // Park the turn inside the awaited delivery — exactly the window the strict
+    // `finally` opens by clearing entry.inFlight. Delivery must not hand a
+    // concurrent pull a way past the `already has an active message stream` guard.
+    const entered = createDeferred();
+    const release = createDeferred();
+    session.sendCustomMessage = async () => {
+      entered.resolve();
+      await release.promise;
+    };
+
+    const runtime = createPiRuntime({ sdk, ai });
+    await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
+
+    const firstTurn = collect(
+      runtime.sendMessage(
+        createMessageRequest({
+          content: { blocks: [{ type: 'text', text: 'put my Japan trip from last week into an album' }] },
+        }),
+      ),
+    );
+    await withTimeout(entered.promise);
+
+    // Bounded so that a guard that is DOWN fails as a mismatched rejection
+    // rather than hanging the suite.
+    await assert.rejects(
+      withTimeout(
+        collect(
+          runtime.sendMessage(
+            createMessageRequest({
+              messageId: '00000000-0000-4000-8000-000000000202',
+              content: { blocks: [{ type: 'text', text: 'and how many albums do I have' }] },
+            }),
+          ),
+        ),
+      ),
+      /already has an active message stream/,
+    );
+
+    release.resolve();
+    const events = await withTimeout(firstTurn, 1000);
+    assert.equal(calls.prompts.length, 1);
+    assert.equal(events.at(-1).type, 'assistant-message-completed');
   });
 
   it('keeps a strict handled Pi runner session usable for a later open prompt', async () => {
