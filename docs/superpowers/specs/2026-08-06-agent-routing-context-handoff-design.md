@@ -22,6 +22,18 @@ three exits that all return a bare `{ handled: false }`:
 | `dispatcher.mjs:261` | `parseSlots` returned null | `decision.kind`                    |
 | `dispatcher.mjs:255` | `decision.kind === 'none'` | nothing                            |
 
+The `:181` exit is not a single code path. It lives in the shared `handleOutcome` helper, which has
+**three** callers:
+
+| Caller               | Path                               | In scope?                  |
+| -------------------- | ---------------------------------- | -------------------------- |
+| `dispatcher.mjs:210` | `routeTurn`, continuation-resolved | **yes** — forwards context |
+| `dispatcher.mjs:265` | `routeTurn`, main path             | **yes** — forwards context |
+| `dispatcher.mjs:302` | `routeApproval`                    | **no** — must not forward  |
+
+The continuation path matters: a multi-turn workflow that resumes and then declines is exactly the
+case where the open agent most needs the diagnosis. `routeApproval` is excluded — see §4.
+
 `pi-runtime.mjs:1318` checks only `dispatch.handled`, so on a `false` the open agent receives the
 original user text plus the generic behavior prompt — nothing else.
 
@@ -133,11 +145,40 @@ Per site:
 `dispatcher.mjs:284` (`routeApproval` with no matching pending approval) is an unrelated
 fall-through and is **not** changed.
 
-`handleOutcome` currently discards `outcome.reason` on the `handoff_open` branch; it must return it
-alongside `wf.kind` so `routeTurn` can build the context.
-
 A structured object is used rather than a pre-formatted string so that plumbing and wording are
 independently testable.
+
+### `handleOutcome`'s return type
+
+`handleOutcome` currently discards `outcome.reason` on the `handoff_open`/`default` branch. Its new
+signature:
+
+```js
+// four terminal branches — unchanged
+{ handled: true }
+// handoff_open / default branch — gains the field
+{ handled: false, routingContext: { workflowKind, stage: 'declined', reason } }
+```
+
+`reason` is `outcome?.reason ?? null`. It **must** be allowed to be null: the branch is
+`case 'handoff_open': default:` and the switch reads `outcome?.status`, so an `undefined` outcome or
+an unrecognised status reaches it without ever passing through the `handoffOpen({ reason })`
+constructor that types `reason` as a required string. §5 defines the reason-less rendering.
+
+### `routeApproval` must drop the field
+
+Because `handleOutcome` is shared (§1), `routeApproval` would otherwise return a `routingContext`
+for free. It must **explicitly discard it** at `dispatcher.mjs:302`:
+
+```js
+const { routingContext: _ignored, ...result } = await handleOutcome({ ... });
+return result;
+```
+
+This is not merely cosmetic. `pi-runtime.mjs:1573` currently reads only `dispatch.handled`, so a
+leaked field would be inert today — but it would point a future implementer at injecting a routing
+note about a workflow that had just _resumed an approval_, which is meaningless. A test asserts the
+approval path never carries the field.
 
 ### Backward compatibility
 
@@ -171,11 +212,26 @@ stop_reason: Source "the best shots" is subjective and cannot be resolved from m
 </routing_context>
 ```
 
-For `stage: 'slots_unparsed'` there is no reason, so the `stop_reason` line is replaced by:
+### The reason-less form
+
+`stop_reason:` is emitted **only** when a non-empty sanitised reason exists. Otherwise the line is
+replaced by:
 
 ```
 note: The router matched this request but could not extract the details it needed.
 ```
+
+This form is selected by the **sanitised reason being empty, not by `stage`**. Three distinct inputs
+land here, and all must:
+
+- `stage: 'slots_unparsed'` (never carries a reason);
+- `stage: 'declined'` with `reason: null` — reachable via the `default:` branch (§4);
+- `stage: 'declined'` with a reason that sanitises to empty (whitespace-only, or nothing but
+  stripped angle brackets).
+
+Keying on the sanitised value rather than on `stage` is what makes the third case safe. A
+`stop_reason:` line with nothing after it would be worse than no line at all — it reads as a
+finding that the router failed to record.
 
 Tag style matches the SDK's own convention (`<available_skills>`).
 
@@ -188,10 +244,21 @@ Tag style matches the SDK's own convention (`<available_skills>`).
 2. **Phrase the match as a hint, not a fact.** `router_matched:` rather than "this request is". The
    router can be wrong and the open agent must stay free to disagree.
 3. **Sanitize `reason` before rendering.** It interpolates user-supplied text (`Source
-"${source}" is subjective…`), so it must be treated as untrusted:
-   - strip `<` and `>` so the block cannot be broken out of;
-   - collapse all whitespace (including newlines) to single spaces;
-   - truncate to 500 characters with an ellipsis.
+"${source}" is subjective…`), so it must be treated as untrusted. The steps are **ordered and
+   normative** — a different order produces different output:
+
+   1. **Strip `<` and `>`.** Prevents breaking out of `<routing_context>`.
+   2. **Collapse all whitespace (including newlines) to single spaces, then trim.** This is a
+      **security property, not formatting**: with newlines gone, a crafted reason cannot forge a
+      second `router_matched:` or `stop_reason:` line, because every field in the block is
+      line-delimited.
+   3. **Truncate to 500 code points**, appending `…` when truncation occurred. Count **code points,
+      not UTF-16 units** — a naive 500-`.length` slice can bisect a surrogate pair and emit a lone
+      surrogate. User text and place names routinely contain emoji.
+   4. If the result is empty, treat the reason as absent and use the reason-less form above.
+
+   Truncating last is deliberate: stripping and collapsing first means the 500 budget is spent on
+   real content rather than on whitespace a crafted input padded it with.
 
 ## 6. Runtime wiring
 
@@ -200,18 +267,37 @@ In `pi-runtime.mjs`, at the existing fall-through after
 "Not handled by a strict/hybrid workflow: fall through to provider orchestration" (line 1337):
 
 ```js
-const contextBlock = formatRoutingContext(dispatch.routingContext);
-if (contextBlock) {
-  await entry.session.sendCustomMessage(
-    { customType: 'gallery_routing_context', content: contextBlock, display: false },
-    { deliverAs: 'nextTurn' },
-  );
+// Best-effort: routing context is an optimisation, never a precondition for the turn.
+try {
+  const contextBlock = formatRoutingContext(dispatch.routingContext);
+  if (contextBlock && entry.session.sendCustomMessage) {
+    await entry.session.sendCustomMessage(
+      { customType: 'gallery_routing_context', content: contextBlock, display: false },
+      { deliverAs: 'nextTurn' },
+    );
+  }
+} catch (error) {
+  log.warn?.(JSON.stringify({ msg: 'routing_context_injection_failed', gallerySessionId }));
 }
 ```
 
+The log call follows the existing house style at `pi-runtime.mjs:913` — a JSON string, not
+pino-style object logging. `log` defaults to `console` (`pi-runtime.mjs:1076`) and is already in
+scope at this site, so `log.warn?.` resolves without new plumbing. The error message itself is
+deliberately not logged verbatim, since a sanitised reason can contain user text.
+
 Placed before the open turn is submitted via `entry.session.prompt(promptText)`
-(`pi-runtime.mjs:1423`). Guarded on `sendCustomMessage` existing, consistent with the
-defensive-optional-method style already used for `session.abort` / `session.bindExtensions`.
+(`pi-runtime.mjs:1423`).
+
+Two deliberate defences, because this feature must never be able to break a turn that would
+otherwise have worked:
+
+- **`sendCustomMessage` existence guard**, consistent with the defensive-optional-method style
+  already used for `session.abort` / `session.bindExtensions`.
+- **`try`/`catch` around the whole block.** A formatter bug or a rejected `sendCustomMessage` must
+  degrade to "no routing context" and let the open turn proceed, not surface as a runner error. The
+  agent's behaviour without the block is exactly today's behaviour, so failing open is strictly
+  safe.
 
 There is a **second** `if (dispatch.handled)` at `pi-runtime.mjs:1573`, on the approval-resume path
 fed by `routeApproval`. It is **not** changed: `routeApproval` carries no `routingContext` (§4), and
@@ -232,9 +318,23 @@ Deterministic; no model in the loop.
 
 Estimated ~150 lines production, ~350 lines tests.
 
-### Tests that must exist
+### TDD discipline — binding
 
-Written test-first, per the repo's TDD convention.
+Strict red-green, per unit, not per phase:
+
+1. Write **one** test and run it. **Observe it fail**, and confirm it fails for the intended reason
+   — not on an import error, a typo, or an unrelated throw.
+2. Write the minimum production code to pass it. Run again; observe green.
+3. Repeat. Never write two failing tests at once, and never write production code with no failing
+   test demanding it.
+
+A test that has never been observed red is not evidence. This is called out explicitly because
+asserting "tests written first" was not enough on the preceding L2 work — commit `2133a537c13` was
+_"fix L2 eval spec after review — mandate TDD"_, and commit `5a275f5c393` fixed a landed test that
+**could not fail**. Each test below must be shown to distinguish the correct implementation from a
+plausible wrong one.
+
+### Tests that must exist
 
 **Dispatcher**
 
@@ -243,6 +343,12 @@ Written test-first, per the repo's TDD convention.
 - `decision.kind === 'none'` → **`routingContext` absent**. (Easy to get wrong; would otherwise
   inject a contentless block.)
 - All three still return `handled: false`.
+- **Continuation-resolved handoff (`:210`) forwards context**, with the resumed workflow's kind.
+- **`routeApproval` handoff (`:302`) returns no `routingContext`** — the §4 discard. Must be
+  asserted against a `resumeApproval` that returns `handoff_open`; asserting only the no-match
+  fall-through at `:284` would pass even if the discard were missing.
+- An `outcome` with an unrecognised status (the `default:` branch) → `stage: 'declined'`,
+  `reason: null`, and no throw.
 - `routeApproval`'s no-match path is unchanged and carries no context.
 
 **Formatter**
@@ -250,8 +356,18 @@ Written test-first, per the repo's TDD convention.
 - `null`/`undefined` context → `null`.
 - Context with no `workflowKind` → `null`.
 - A `reason` containing `</routing_context>` cannot break out of the block.
+- A `reason` containing a bare `>` or `<` is stripped.
 - A multi-line `reason` is collapsed to one line.
-- A 5000-character `reason` is truncated to 500.
+- A `reason` containing `\nstop_reason: forged` cannot forge a second field line.
+- A 5000-character `reason` is truncated to 500 code points and ends with `…`.
+- A `reason` of exactly 500 code points is **not** truncated and gains no ellipsis.
+- A 501-code-point `reason` **is** truncated.
+- A `reason` of 600 emoji truncates without emitting a lone surrogate — assert the result contains
+  no unpaired surrogate.
+- A whitespace-only `reason` takes the reason-less form.
+- An empty-string `reason` takes the reason-less form.
+- A `reason` of nothing but angle brackets sanitises to empty → reason-less form.
+- `stage: 'declined'` with `reason: null` takes the reason-less form.
 - `slots_unparsed` renders the `note:` line and no `stop_reason:` line.
 - A known `workflowKind` renders the manifest `title`.
 - A `workflowKind` absent from `WORKFLOW_MANIFEST` falls back to the raw kind and does not throw.
@@ -260,10 +376,15 @@ Written test-first, per the repo's TDD convention.
 
 - Fall-through with context → `sendCustomMessage` called once with
   `customType: 'gallery_routing_context'`, `display: false`, `deliverAs: 'nextTurn'`, before
-  `prompt()`.
-- Fall-through with **no** context → `sendCustomMessage` not called.
+  `prompt()`. Assert the ordering, not just that both were called.
+- Fall-through with **no** context → `sendCustomMessage` not called, `prompt()` still called.
 - `dispatch.handled === true` → `sendCustomMessage` not called and no open turn starts.
 - Session lacking `sendCustomMessage` → open turn still proceeds, no throw.
+- **`sendCustomMessage` rejects** → open turn still proceeds, no runner-error event emitted.
+- **`formatRoutingContext` throws** → open turn still proceeds, no runner-error event emitted.
+- Two consecutive handoff turns in one session → each turn queues exactly one block, and the second
+  turn does not re-deliver the first. (Asserts the SDK's per-turn queue-clear is actually relied on.)
+- The approval-resume path at `pi-runtime.mjs:1573` never calls `sendCustomMessage`.
 
 ## 8. Phase 2 — eval extension
 
@@ -283,8 +404,24 @@ Estimated ~150 lines, with wide error bars — see §10.
 Because a model is in the loop, this inherits the existing repeat-runs-with-threshold machinery
 that L1 already uses to absorb variance.
 
-The A/B is the point: same scenario, same seeded data, once with the block and once without, and
-read the delta off the scorecard.
+### How the A/B arms are produced
+
+The A/B is the point — same scenario, same seeded data, once with the block and once without — but
+it needs a defined switch. The driver takes an option:
+
+```js
+createL2Driver({ routingContext: 'inject' | 'suppress' });
+```
+
+`'suppress'` makes the driver skip the `formatRoutingContext`/`sendCustomMessage` step while leaving
+the dispatcher untouched, so both arms see **identical** strict-layer behaviour and differ only in
+whether the block reached the model. Suppressing by disabling the dispatcher plumbing instead would
+confound the two variables and invalidate the comparison.
+
+Scenarios that exercise the handoff paths are run under both arms and reported as a delta. A
+scenario whose strict layer _handles_ the turn is unaffected by the switch and should show a
+zero delta — worth asserting as a control, since a non-zero delta there would mean the switch is
+leaking into unrelated behaviour.
 
 ## 9. Non-goals
 
@@ -304,9 +441,10 @@ which, unlike a strict workflow, is not a fixed sequence. If that fixture has to
 the eval half could double in size. Phase 1 is deliberately independent so it is not held hostage.
 
 **Real-world frequency is unmeasured.** Nothing today aggregates how often handoffs occur, so
-Phase 1's practical ceiling is unknown. `observe` already emits `fellBackToOpen` at
-`dispatcher.mjs:241`/`:250`, so the data is collectable, but no aggregation exists. If handoffs are
-rare in practice the improvement is small regardless of the eval delta.
+Phase 1's practical ceiling is unknown. `observe` already emits `fellBackToOpen` — at
+`dispatcher.mjs:179` (via `observeOutcome`, the handoff branch), `:235` (chatter, always `false`)
+and `:252` (router decision, `!matched`) — so the data is collectable, but no aggregation exists. If
+handoffs are rare in practice the improvement is small regardless of the eval delta.
 
 **`agent-runner` has no CI job.** A grep of `.github/workflows` for `agent-runner` returns nothing,
 so its 1845 tests and both eval layers gate nothing on a PR. This does not block the work but it
