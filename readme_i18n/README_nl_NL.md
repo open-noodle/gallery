@@ -1,8 +1,8 @@
 <p align="center"> 
   <br/>  
   <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=License&logoColor=000000&labelColor=ececec" alt="License: AGPLv3"></a>
-  <a href="https://discord.immich.app">
-    <img src="https://img.shields.io/discord/979116623879368755.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" atl="Discord"/>
+  <a href="https://discord.gg/cxBfbuxyG4">
+    <img src="https://img.shields.io/discord/1480633426376921239.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" atl="Discord"/>
   </a>
   <br/>  
   <br/>   
@@ -11,10 +11,10 @@
 <p align="center">
 <img src="../design/gallery-logo-stacked-light.svg" width="300" title="Login met aangepaste URL">
 </p>
-<h3 align="center">Immich - Hoogwaardige, self-hosted back-up oplossing voor foto's en video's</h3>
+<h3 align="center">Noodle Gallery - Hoogwaardige, self-hosted back-up oplossing voor foto's en video's</h3>
 <br/>
-<a href="https://immich.app">
-<img src="../design/immich-screenshots.png" title="Main Screenshot">
+<a href="https://opennoodle.de">
+<img src="../design/gallery-screenshot.webp" title="Main Screenshot">
 </a>
 <br/>
 <p align="center">
@@ -47,82 +47,23 @@
 >
 
 > [!NOTE]
-> De belangrijkste documentatie, inclusief installatie handleidingen, zijn te vinden op https://immich.app/.
+> De belangrijkste documentatie, inclusief installatie handleidingen, zijn te vinden op https://opennoodle.de/.
 
 ## Inhoud
 
-- [Officiële documentatie](https://docs.immich.app/)
-- [Introductie](https://docs.immich.app/overview/introduction)
-- [Installatie](https://docs.immich.app/install/requirements)
-- [Toekomstplannen](https://immich.app/roadmap)
+- [Officiële documentatie](https://docs.opennoodle.de/)
+- [Introductie](https://docs.opennoodle.de/overview/quick-start)
+- [Installatie](https://docs.opennoodle.de/install/requirements)
+- [Toekomstplannen](https://opennoodle.de/roadmap)
 - [Demo](#demo)
 - [Functies](#functies)
-- [Vertalingen](https://docs.immich.app/developer/translations)
-- [Richtlijnen voor bijdragen](https://docs.immich.app/overview/support-the-project)
+- [Vertalingen](https://docs.opennoodle.de/developer/translations)
+- [Richtlijnen voor bijdragen](https://docs.opennoodle.de/overview/support-the-project)
 
 ## Demo
 
-Je kunt de demo [hier](https://demo.immich.app/) bekijken. Voor de mobiele app kun je gebruik maken van `https://demo.immich.app` voor de `Server Endpoint URL`.
-
-### Login gegevens
-
-| Email           | Wachtwoord |
-| --------------- | ---------- |
-| demo@immich.app | demo       |
-
-# Functies
-
-| Functies                                            | Mobiel | Web |
-|-----------------------------------------------------|--------|-----|
-| Upload en bekijk video's en foto's                  | Ja     | Ja  |
-| Automatische back-up wanneer de app wordt geopend   | Ja     | NVT |
-| Duplicatie van bestanden voorkomen                  | Ja     | Ja  |
-| Selectieve album(s) voor back-up                    | Ja     | NVT |
-| Download foto's en video's naar een lokaal apparaat | Ja     | Ja  |
-| Ondersteuning voor meerdere gebruikers              | Ja     | Ja  |
-| Album en gedeelde albums                            | Ja     | Ja  |
-| Versleepbare scroll balk                            | Ja     | Ja  |
-| Ondersteuning voor het RAW formaat                  | Ja     | Ja  |
-| Metagegevensweergave (EXIF, kaart)                  | Ja     | Ja  |
-| Zoek op metagegevens, objecten, gezichten en CLIP   | Ja     | Ja  |
-| Administratieve functies (gebruikersbeheer)         | Nee    | Ja  |
-| Back-up op de achtergrond                           | Ja     | NVT |
-| Virtueel scrollen                                   | Ja     | Ja  |
-| OAuth-ondersteuning                                 | Ja     | Ja  |
-| API-sleutels                                        | NVT    | Ja  |
-| LivePhoto-back-up en weergave                       | iOS    | Ja  |
-| Ondersteuning 360 Graden foto weergave              | Nee    | Ja  |
-| Door de gebruiker gedefinieerde opslagstructuur     | Ja     | Ja  |
-| Openbaar delen                                      | Nee    | Ja  |
-| Archief en Favorieten                               | Ja     | Ja  |
-| Wereldkaart                                         | Ja     | Ja  |
-| Delen met partner                                   | Ja     | Ja  |
-| Gezichtsherkenning en groepering                    | Ja     | Ja  |
-| Herinneringen (x jaar geleden)                      | Ja     | Ja  |
-| Offline-ondersteuning                               | Ja     | Nee |
-| Alleen-lezen galerij                                | Ja     | Ja  |
-| Gestapelde foto's                                   | Ja     | Ja  |
+Je kunt de demo [hier](https://demo.opennoodle.de/) bekijken. Voor de mobiele app kun je gebruik maken van `https://demo.opennoodle.de` voor de `Server Endpoint URL`.
 
 ## Vertalingen
 
-Je kunt [hier](https://docs.immich.app/developer/translations) meer over vertalingen lezen.
-
-## Repository activiteit
-
-![Activities](https://repobeats.axiom.co/api/embed/9e86d9dc3ddd137161f2f6d2e758d7863b1789cb.svg "Repobeats analytics image")
-
-## Ster geschiedenis
-
-<a href="https://star-history.com/#immich-app/immich&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=immich-app/immich&type=Date" width="100%" />
- </picture>
-</a>
-
-## Contributie-leden
-
-<a href="https://github.com/alextran1502/immich/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=immich-app/immich" width="100%"/>
-</a>
+Je kunt [hier](https://docs.opennoodle.de/developer/translations) meer over vertalingen lezen.
