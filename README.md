@@ -297,10 +297,10 @@ The repo is a `pnpm` workspace monorepo — server (NestJS), web (SvelteKit), mo
 4. **Start the dev stack**
 
    ```bash
-   make dev
+   mise dev
    ```
 
-   This brings up Postgres, Redis, the ML service, the server (with hot reload), and the web UI on http://localhost:2283. The first run downloads ML models and builds containers, so give it a few minutes.
+   This brings up Postgres, Redis, the ML service, the server (with hot reload), and the web UI on http://localhost:2283. The first run downloads ML models and builds containers, so give it a few minutes. Stop it with `mise dev-down`.
 
 ### Running Tests and Checks Before You Push
 
@@ -313,17 +313,19 @@ cd server && pnpm check         # TypeScript type check
 cd web && pnpm test             # unit tests
 cd web && pnpm check            # svelte-check + tsc
 
-# All modules from the repo root
-make check-all                  # type checks everywhere
-make format-all                 # prettier --write
+# Translation files, from the repo root
+pnpm format                     # prettier --check i18n/
+pnpm format:fix                 # prettier --write i18n/
 ```
 
 CI runs lint, type checks, unit tests, and e2e tests on every PR. If you're touching server controllers or repositories, regenerate the OpenAPI clients and SQL query files:
 
 ```bash
-make open-api                   # regenerates TS SDK + Dart client
-make sql                        # regenerates SQL query docs (needs DB running)
+mise open-api                   # regenerates TS SDK + Dart client
+mise sql                        # regenerates SQL query docs (needs DB running)
 ```
+
+`mise tasks` lists everything else available.
 
 ### Opening a Pull Request
 
@@ -342,4 +344,4 @@ What we'd rather be judged on is the result. There's a [live demo](https://demo.
 
 Gallery would not exist without [Immich](https://github.com/immich-app/immich), largely written by hand, and the work of everyone who built it. We rebase onto every upstream release, so the foundation Gallery stands on keeps coming from that project.
 
-See [CLAUDE.md](CLAUDE.md) for a deeper tour of the codebase architecture and common commands.
+See [AGENTS.md](AGENTS.md) for a deeper tour of the codebase architecture and common commands.
