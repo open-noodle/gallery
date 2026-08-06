@@ -17,6 +17,7 @@ import { createIntentClassifier } from './strict-workflows/classifier.mjs';
 import { createWorkflowDispatcher } from './strict-workflows/dispatcher.mjs';
 import { WORKFLOW_MANIFEST } from './strict-workflows/manifest.mjs';
 import { createWorkflowRegistry } from './strict-workflows/registry.mjs';
+import { formatRoutingContext } from './strict-workflows/routing-context.mjs';
 
 const protocolVersion = '2026-05-14';
 const runnerBehaviorPrompt = [
@@ -1299,6 +1300,9 @@ export const createPiRuntime = ({
           emit: (event) => strictEvents.push(event),
           log,
         });
+        // Hoisted: `dispatch` is block-scoped to the try below, and delivery has
+        // to happen after the finally has released the strict-stream state.
+        let handoffRoutingContext;
         try {
           const dispatch = await entry.dispatcher.routeTurn({
             prompt: promptText,
@@ -1319,6 +1323,7 @@ export const createPiRuntime = ({
             yield* strictEvents;
             return;
           }
+          handoffRoutingContext = dispatch.routingContext;
         } catch (error) {
           yield {
             type: 'runner-error',
@@ -1335,6 +1340,19 @@ export const createPiRuntime = ({
           entry.inFlight = false;
         }
         // Not handled by a strict/hybrid workflow: fall through to provider orchestration.
+        // Best-effort: routing context is an optimisation, never a precondition for
+        // the turn. Failing open leaves exactly today's behaviour.
+        try {
+          const contextBlock = formatRoutingContext(handoffRoutingContext);
+          if (contextBlock && entry.session.sendCustomMessage) {
+            await entry.session.sendCustomMessage(
+              { customType: 'gallery_routing_context', content: contextBlock, display: false },
+              { deliverAs: 'nextTurn' },
+            );
+          }
+        } catch {
+          log.warn?.(JSON.stringify({ msg: 'routing_context_injection_failed', gallerySessionId }));
+        }
         entry.inFlight = true;
       }
 
