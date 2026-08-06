@@ -12,11 +12,11 @@
 #
 #   2. Portainer resolves relative host paths against its OWN container's working
 #      directory (/data/compose/<id>/), not against the host. UPLOAD_LOCATION and
-#      DB_DATA_LOCATION must therefore be ABSOLUTE paths. The app template
-#      defaults them to /opt/noodle-gallery/*; do not change those to relative
-#      paths — on Linux the stack will still start, but the photo library and
-#      database end up inside Portainer's own data volume and are lost when
-#      Portainer is reinstalled.
+#      DB_DATA_LOCATION must therefore be ABSOLUTE paths. The template defaults
+#      them under /portainer/Files/AppData/Config/noodle-gallery/; do not change
+#      those to relative paths — on Linux the stack will still start, but the
+#      photo library and database end up inside Portainer's own data volume and
+#      are lost when Portainer is reinstalled.
 #
 # Keep the image pins here in sync with docker/docker-compose.yml on each release.
 
