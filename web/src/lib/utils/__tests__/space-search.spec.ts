@@ -1,4 +1,4 @@
-import { AssetOrder, AssetTypeEnum, Type } from '@immich/sdk';
+import { AssetOrder, AssetTypeEnum, Type5 as Type } from '@immich/sdk';
 import { describe, expect, it } from 'vitest';
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 import {

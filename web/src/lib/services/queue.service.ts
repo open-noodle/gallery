@@ -21,6 +21,7 @@ import {
   mdiFileJpgBox,
   mdiFileXmlBox,
   mdiFolderMove,
+  mdiImageCheckOutline,
   mdiImageSearch,
   mdiLibraryShelves,
   mdiOcr,
@@ -263,6 +264,11 @@ export const asQueueItem = ($t: MessageFormatter, queue: { name: QueueName }): Q
       icon: mdiOcr,
       title: $t('admin.machine_learning_ocr'),
       subtitle: $t('admin.ocr_job_description'),
+    },
+    [QueueName.ImageQuality]: {
+      icon: mdiImageCheckOutline,
+      title: $t('admin.machine_learning_image_quality'),
+      subtitle: $t('admin.image_quality_job_description'),
     },
     [QueueName.PetDetection]: {
       icon: mdiPaw,

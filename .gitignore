@@ -54,3 +54,5 @@ vite.config.js.timestamp-*
 .worktrees
 .codex
 .superpowers
+agent-runner/.pi-runtime/
+.superpowers/

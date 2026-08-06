@@ -159,6 +159,9 @@ export const ORIENTATION_TO_SHARP_ROTATION: Record<ExifOrientation, SharpRotatio
 export const endpointTags: Record<ApiTag, string> = {
   [ApiTag.Activities]: 'An activity is a like or a comment made by a user on an asset or album.',
   [ApiTag.Albums]: 'An album is a collection of assets that can be shared with other users or via shared links.',
+  [ApiTag.AgentCredentials]: 'AI agent provider credential management',
+  [ApiTag.AgentRunner]: 'AI agent runner health and capability status',
+  [ApiTag.AgentSessions]: 'AI agent session management',
   [ApiTag.ApiKeys]: 'An api key can be used to programmatically access the Immich API.',
   [ApiTag.Assets]: 'An asset is an image or video that has been uploaded to Immich.',
   [ApiTag.Authentication]: 'Endpoints related to user authentication, including OAuth.',

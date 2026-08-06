@@ -6,6 +6,7 @@ export enum AssetEditAction {
   Rotate = 'rotate',
   Mirror = 'mirror',
   Trim = 'trim',
+  Adjust = 'adjust',
 }
 
 export const AssetEditActionSchema = z
@@ -19,6 +20,35 @@ export enum MirrorAxis {
 }
 
 const MirrorAxisSchema = z.enum(['horizontal', 'vertical']).describe('Axis to mirror along').meta({ id: 'MirrorAxis' });
+
+export enum TonalLevel {
+  StrongDecrease = 'strong_decrease',
+  ModerateDecrease = 'moderate_decrease',
+  SlightDecrease = 'slight_decrease',
+  SlightIncrease = 'slight_increase',
+  ModerateIncrease = 'moderate_increase',
+  StrongIncrease = 'strong_increase',
+}
+
+const TonalLevelSchema = z.enum(TonalLevel).describe('Signed adjustment level').meta({ id: 'TonalLevel' });
+
+const AdjustParametersSchema = z
+  .object({
+    brightness: TonalLevelSchema.optional().describe('Brightness adjustment level'),
+    contrast: TonalLevelSchema.optional().describe('Contrast adjustment level'),
+    saturation: TonalLevelSchema.optional().describe('Saturation adjustment level'),
+    autoEnhance: z.boolean().optional().describe('Auto-enhance (contrast stretch)'),
+  })
+  .superRefine((p, ctx) => {
+    const manual = [p.brightness, p.contrast, p.saturation].filter((v) => v !== undefined);
+    if (p.autoEnhance === undefined && manual.length === 0) {
+      ctx.addIssue({ code: 'custom', message: 'At least one adjustment is required' });
+    }
+    if (p.autoEnhance && manual.length > 0) {
+      ctx.addIssue({ code: 'custom', message: 'autoEnhance cannot be combined with manual adjustments' });
+    }
+  })
+  .meta({ id: 'AdjustParameters' });
 
 const CropParametersSchema = z
   .object({
@@ -63,19 +93,30 @@ const __AssetEditActionItemSchema = z.discriminatedUnion('action', [
   z.object({ action: AssetEditActionSchema.extract(['Rotate']), parameters: RotateParametersSchema }),
   z.object({ action: AssetEditActionSchema.extract(['Mirror']), parameters: MirrorParametersSchema }),
   z.object({ action: AssetEditActionSchema.extract(['Trim']), parameters: TrimParametersSchema }),
+  z.object({ action: AssetEditActionSchema.extract(['Adjust']), parameters: AdjustParametersSchema }),
 ]);
 
 const AssetEditParametersSchema = z
-  .union([CropParametersSchema, RotateParametersSchema, MirrorParametersSchema, TrimParametersSchema], {
-    error: getExpectedKeysByActionMessage,
-  })
-  .describe('List of edit actions to apply (crop, rotate, mirror, or trim)');
+  .union(
+    [
+      CropParametersSchema,
+      RotateParametersSchema,
+      MirrorParametersSchema,
+      TrimParametersSchema,
+      AdjustParametersSchema,
+    ],
+    {
+      error: getExpectedKeysByActionMessage,
+    },
+  )
+  .describe('List of edit actions to apply (crop, rotate, mirror, trim, or adjust)');
 
 const actionParameterMap = {
   [AssetEditAction.Crop]: CropParametersSchema,
   [AssetEditAction.Rotate]: RotateParametersSchema,
   [AssetEditAction.Mirror]: MirrorParametersSchema,
   [AssetEditAction.Trim]: TrimParametersSchema,
+  [AssetEditAction.Adjust]: AdjustParametersSchema,
 } as const;
 
 const actionParameterKeys = {
@@ -83,6 +124,7 @@ const actionParameterKeys = {
   [AssetEditAction.Rotate]: Object.keys(RotateParametersSchema.shape),
   [AssetEditAction.Mirror]: Object.keys(MirrorParametersSchema.shape),
   [AssetEditAction.Trim]: ['startTime', 'endTime'],
+  [AssetEditAction.Adjust]: ['brightness', 'contrast', 'saturation', 'autoEnhance'],
 } as const;
 
 function getExpectedKeysByActionMessage(): string {
@@ -149,10 +191,16 @@ const AssetEditsResponseSchema = z
   })
   .meta({ id: 'AssetEditsResponseDto' });
 
+const AssetEditPreviewQuerySchema = z
+  .object({ size: z.enum(['thumbnail', 'preview']).default('preview') })
+  .meta({ id: 'AssetEditPreviewQueryDto' });
+
 export class AssetEditActionItemResponseDto extends createZodDto(AssetEditActionItemResponseSchema) {}
 export class AssetEditsCreateDto extends createZodDto(AssetEditsCreateSchema) {}
 export class AssetEditsResponseDto extends createZodDto(AssetEditsResponseSchema) {}
+export class AssetEditPreviewQueryDto extends createZodDto(AssetEditPreviewQuerySchema) {}
 export type CropParameters = z.infer<typeof CropParametersSchema>;
 export type TrimParameters = z.infer<typeof TrimParametersSchema>;
 export type RotateParameters = z.infer<typeof RotateParametersSchema>;
 export type MirrorParameters = z.infer<typeof MirrorParametersSchema>;
+export type AdjustParameters = z.infer<typeof AdjustParametersSchema>;

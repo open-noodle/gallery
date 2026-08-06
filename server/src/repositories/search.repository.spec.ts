@@ -763,6 +763,37 @@ describe(SearchRepository.name, () => {
     });
   });
 
+  describe('searchAssetBuilder quality threshold semantics', () => {
+    it('joins asset_quality and applies maximum quality predicates', () => {
+      const sql = buildAssetSearchSql({ maxSharpness: 30, maxBrightness: 25, maxQuality: 40 });
+
+      expect(sql).toContain('"asset_quality"');
+      expect(sql).toMatch(/"asset_quality"\."sharpness"\s*<=\s*\$\d+/i);
+      expect(sql).toMatch(/"asset_quality"\."brightness"\s*<=\s*\$\d+/i);
+      expect(sql).toMatch(/"asset_quality"\."quality"\s*<=\s*\$\d+/i);
+    });
+  });
+
+  describe('searchAssetBuilder album match semantics', () => {
+    it('keeps albumIds as all-match by default', () => {
+      const sql = buildAssetSearchSql({
+        albumIds: ['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'],
+      });
+
+      expect(sql).toMatch(/having\s+count\(distinct\s+"albumId"\)/i);
+    });
+
+    it('uses any-match album filtering when albumMatchAny is true', () => {
+      const sql = buildAssetSearchSql({
+        albumIds: ['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'],
+        albumMatchAny: true,
+      });
+
+      expect(sql).toMatch(/"albumId"\s*=\s*any\(\$\d+::uuid\[\]\)/i);
+      expect(sql).not.toMatch(/having\s+count\(distinct\s+"albumId"\)/i);
+    });
+  });
+
   describe('searchAssetBuilder people semantics', () => {
     it('uses AND semantics for space person filters by default', () => {
       const sql = buildAssetSearchSql({

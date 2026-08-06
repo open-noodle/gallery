@@ -76,6 +76,196 @@ export enum SharedSpaceRole {
   Viewer = 'viewer',
 }
 
+export enum AgentProviderType {
+  OpenAI = 'openai',
+  Anthropic = 'anthropic',
+  OpenAICompatible = 'openai-compatible',
+}
+
+export enum AgentApprovalMode {
+  Strict = 'strict',
+  AskOnEscalation = 'ask-on-escalation',
+  PlanOnly = 'plan-only',
+  DangerouslySkipPermissions = 'dangerously-skip-permissions',
+}
+
+export enum AgentPermissionPreset {
+  Careful = 'careful',
+  VisualOrganizer = 'visual-organizer',
+  LocalPowerUser = 'local-power-user',
+  Custom = 'custom',
+}
+
+export enum AgentMessageRole {
+  User = 'user',
+  Assistant = 'assistant',
+  System = 'system',
+  Tool = 'tool',
+}
+
+export enum AgentToolName {
+  SearchAssets = 'searchAssets',
+  FindTripCandidates = 'findTripCandidates',
+  ReadSelectionMetadata = 'readSelectionMetadata',
+  CurateSelection = 'curateSelection',
+  ResolveAssetSearchFilters = 'resolveAssetSearchFilters',
+  ResolveLocation = 'resolveLocation',
+  SearchPeople = 'searchPeople',
+  ReadAssetMetadata = 'readAssetMetadata',
+  ReadAssetPreviews = 'readAssetPreviews',
+  ReadAssetOriginals = 'readAssetOriginals',
+  ListAlbums = 'listAlbums',
+  ReadAlbum = 'readAlbum',
+  ListSpaces = 'listSpaces',
+  ListDuplicateGroups = 'listDuplicateGroups',
+  ReadSpace = 'readSpace',
+  SearchUsers = 'searchUsers',
+  ProposeAlbumOperations = 'proposeAlbumOperations',
+  ProposeAlbumFromSearch = 'proposeAlbumFromSearch',
+  ProposeAlbumFromSelection = 'proposeAlbumFromSelection',
+  ProposeAddAssetsToAlbumFromSearch = 'proposeAddAssetsToAlbumFromSearch',
+  ProposeSpaceFromSearch = 'proposeSpaceFromSearch',
+  ProposeAddAssetsToSpaceFromSearch = 'proposeAddAssetsToSpaceFromSearch',
+  ProposeAssetBatchFromSearch = 'proposeAssetBatchFromSearch',
+  ProposeAssetBatchFromSelection = 'proposeAssetBatchFromSelection',
+  ReviseProposedOperations = 'reviseProposedOperations',
+  SummarizePlan = 'summarizePlan',
+}
+
+export enum AgentToolCallStatus {
+  PendingApproval = 'pending_approval',
+  Approved = 'approved',
+  Executing = 'executing',
+  Denied = 'denied',
+  Completed = 'completed',
+  Failed = 'failed',
+}
+
+export enum AgentToolApprovalDecision {
+  Approved = 'approved',
+  Denied = 'denied',
+}
+
+export enum AgentToolDataClass {
+  Metadata = 'metadata',
+  Previews = 'previews',
+  Originals = 'originals',
+  Plan = 'plan',
+}
+
+export enum AgentOperationPlanStatus {
+  Proposed = 'proposed',
+  Superseded = 'superseded',
+  Applied = 'applied',
+  Cancelled = 'cancelled',
+}
+
+export enum AgentOperationApplyStatus {
+  Applied = 'applied',
+  PartiallyApplied = 'partially_applied',
+  Failed = 'failed',
+}
+
+export enum AgentOperationType {
+  AlbumCreate = 'album.create',
+  AlbumAddAssets = 'album.addAssets',
+  AlbumRemoveAssets = 'album.removeAssets',
+  AlbumUpdateDetails = 'album.updateDetails',
+  AlbumSetCover = 'album.setCover',
+  AlbumAddUsers = 'album.addUsers',
+  AlbumRemoveUsers = 'album.removeUsers',
+  AlbumUpdateUserRole = 'album.updateUserRole',
+  AlbumDelete = 'album.delete',
+  SpaceCreate = 'space.create',
+  SpaceAddAssets = 'space.addAssets',
+  SpaceRemoveAssets = 'space.removeAssets',
+  SpaceUpdateDetails = 'space.updateDetails',
+  SpaceAddMembers = 'space.addMembers',
+  SpaceRemoveMembers = 'space.removeMembers',
+  SpaceUpdateMemberRole = 'space.updateMemberRole',
+  SpaceDelete = 'space.delete',
+  AssetRotate = 'asset.rotate',
+  AssetCrop = 'asset.crop',
+  AssetAdjust = 'asset.adjust',
+  AssetFlip = 'asset.flip',
+  AssetStack = 'asset.stack',
+  AssetUnstack = 'asset.unstack',
+  AssetSetFavorite = 'asset.setFavorite',
+  AssetSetArchive = 'asset.setArchive',
+  AssetSetVisibility = 'asset.setVisibility',
+  AssetUpdateMetadata = 'asset.updateMetadata',
+  AssetAddTag = 'asset.addTag',
+  AssetRemoveTag = 'asset.removeTag',
+  AssetTrash = 'asset.trash',
+  AssetRestore = 'asset.restore',
+  ShareLinkCreate = 'shareLink.create',
+  ShareLinkCreateAlbum = 'shareLink.createAlbum',
+  PersonUpdate = 'person.update',
+  PersonMerge = 'person.merge',
+}
+
+export enum AgentOperationTargetKind {
+  NewAlbum = 'new_album',
+  ExistingAlbum = 'existing_album',
+  NewSpace = 'new_space',
+  ExistingSpace = 'existing_space',
+  AssetBatch = 'asset_batch',
+  ImageEditBatch = 'image_edit_batch',
+  Person = 'person',
+}
+
+export enum AgentOperationRiskLevel {
+  Low = 'low',
+  Medium = 'medium',
+  High = 'high',
+}
+
+export enum AgentOperationStatus {
+  Proposed = 'proposed',
+  Applied = 'applied',
+  Skipped = 'skipped',
+  Failed = 'failed',
+}
+
+export enum AgentSessionStatus {
+  Created = 'created',
+  Running = 'running',
+  WaitingForToolApproval = 'waiting_for_tool_approval',
+  WaitingForPlanReview = 'waiting_for_plan_review',
+  Applying = 'applying',
+  Completed = 'completed',
+  Cancelled = 'cancelled',
+  Interrupted = 'interrupted',
+  Failed = 'failed',
+}
+
+export enum AgentSessionActivityEventKind {
+  StartProcessing = 'start-processing',
+  PlanComposing = 'plan-composing',
+  ApplyProgress = 'apply-progress',
+  RunnerRecovery = 'runner-recovery',
+  // Strict/hybrid workflow observability (Slice 6). These are debug/audit-only
+  // activity events emitted by the runner's strict dispatcher. They are NOT user
+  // chat and are never projected into the assistant message transcript.
+  StrictRouterDecision = 'strict_router_decision',
+  StrictWorkflowOutcome = 'strict_workflow_outcome',
+  StrictSuccessGateBlock = 'strict_success_gate_block',
+  StrictContinuation = 'strict_continuation',
+  Unknown = 'unknown',
+}
+
+export enum AgentSessionActivityEventStatus {
+  Running = 'running',
+  Completed = 'completed',
+  Failed = 'failed',
+  Skipped = 'skipped',
+}
+
+export enum AgentSessionActivityEventSource {
+  Server = 'server',
+  Runner = 'runner',
+}
+
 export enum SharedSpaceActivityType {
   AssetAdd = 'asset_add',
   AssetRemove = 'asset_remove',
@@ -153,6 +343,16 @@ export enum Permission {
   ApiKeyRead = 'apiKey.read',
   ApiKeyUpdate = 'apiKey.update',
   ApiKeyDelete = 'apiKey.delete',
+
+  AgentCredentialCreate = 'agentCredential.create',
+  AgentCredentialRead = 'agentCredential.read',
+  AgentCredentialUpdate = 'agentCredential.update',
+  AgentCredentialDelete = 'agentCredential.delete',
+  AgentRunnerRead = 'agentRunner.read',
+
+  AgentSessionCreate = 'agentSession.create',
+  AgentSessionRead = 'agentSession.read',
+  AgentSessionUpdate = 'agentSession.update',
 
   // ASSET_CREATE = 'asset.create',
   AssetRead = 'asset.read',
@@ -877,6 +1077,7 @@ export enum QueueName {
   BackupDatabase = 'backupDatabase',
   Ocr = 'ocr',
   PetDetection = 'petDetection',
+  ImageQuality = 'imageQuality',
   Workflow = 'workflow',
   IntegrityCheck = 'integrityCheck',
   Editor = 'editor',
@@ -985,6 +1186,10 @@ export enum JobName {
   // Pet Detection
   PetDetectionQueueAll = 'PetDetectionQueueAll',
   PetDetection = 'PetDetection',
+
+  // Image Quality
+  ImageQualityQueueAll = 'ImageQualityQueueAll',
+  ImageQuality = 'ImageQuality',
 
   // Workflow
   WorkflowAssetTrigger = 'WorkflowAssetTrigger',
@@ -1376,6 +1581,9 @@ export enum CronJob {
 export enum ApiTag {
   Activities = 'Activities',
   Albums = 'Albums',
+  AgentCredentials = 'Agent credentials',
+  AgentRunner = 'Agent runner',
+  AgentSessions = 'Agent sessions',
   ApiKeys = 'API keys',
   Authentication = 'Authentication',
   AuthenticationAdmin = 'Authentication (admin)',

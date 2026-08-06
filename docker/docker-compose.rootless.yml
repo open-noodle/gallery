@@ -12,7 +12,7 @@ name: immich
 services:
   immich-server:
     container_name: immich_server
-    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    image: ghcr.io/open-noodle/gallery-server:${IMMICH_VERSION:-release}
     # extends:
     #   file: hwaccel.transcoding.yml
     #   service: cpu # set to one of [nvenc, quicksync, rkmpp, vaapi, vaapi-wsl] for accelerated transcoding
@@ -32,9 +32,24 @@ services:
     depends_on:
       - redis
       - database
+      - agent-runner
     restart: always
     healthcheck:
       disable: false
+
+  agent-runner:
+    container_name: gallery_agent_runner
+    image: ghcr.io/open-noodle/gallery-server:${IMMICH_VERSION:-release}
+    command: ['agent-runner']
+    user: '1000:1000'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4477
+    restart: always
 
   immich-machine-learning:
     container_name: immich_machine_learning

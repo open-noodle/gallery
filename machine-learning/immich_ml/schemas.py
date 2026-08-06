@@ -29,6 +29,7 @@ class BoundingBox(TypedDict):
 
 class ModelTask(StrEnum):
     FACIAL_RECOGNITION = "facial-recognition"
+    IMAGE_QUALITY = "image-quality"
     PET_DETECTION = "pet-detection"
     SEARCH = "clip"
     OCR = "ocr"

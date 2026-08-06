@@ -7,11 +7,14 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { AgentMessageResponseDto } from 'src/dtos/agent-message.dto';
+import { AgentSessionActivityEventResponseDto } from 'src/dtos/agent-session-activity-event.dto';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { NotificationDto } from 'src/dtos/notification.dto';
 import { ReleaseEventV1, ServerVersionResponseDto } from 'src/dtos/server.dto';
 import { SyncAssetEditV1, SyncAssetExifV1, SyncAssetV2 } from 'src/dtos/sync.dto';
+import { AgentOperationApplyStatus } from 'src/enum';
 import { AppRestartEvent, ArgsOf, EventRepository } from 'src/repositories/event.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { handlePromiseError } from 'src/utils/misc';
@@ -27,6 +30,54 @@ export const serverEvents = [
   'HlsSessionEnd',
 ] as const;
 export type ServerEvents = (typeof serverEvents)[number];
+
+export type AgentSessionClientEvent =
+  | {
+      type: 'assistant-message-delta';
+      sessionId: string;
+      delta: string;
+      sequence: number;
+      createdAt: string;
+    }
+  | {
+      type: 'assistant-message-created';
+      sessionId: string;
+      message: AgentMessageResponseDto;
+      createdAt: string;
+    }
+  | {
+      type: 'runner-error';
+      sessionId: string;
+      message: string;
+      createdAt: string;
+    }
+  | {
+      type: 'tool-approval-needed';
+      sessionId: string;
+      toolCallId: string;
+      createdAt: string;
+    }
+  | {
+      type: 'operation-plan-ready';
+      sessionId: string;
+      planId: string;
+      revision: number;
+    }
+  | {
+      type: 'operation-plan-applied';
+      sessionId: string;
+      planId: string;
+      status: AgentOperationApplyStatus;
+      appliedCount: number;
+      skippedCount: number;
+      failedCount: number;
+    }
+  | {
+      type: 'activity';
+      sessionId: string;
+      event: AgentSessionActivityEventResponseDto;
+      createdAt: string;
+    };
 
 export interface ClientEventMap {
   on_upload_success: [AssetResponseDto];
@@ -44,6 +95,7 @@ export interface ClientEventMap {
   on_new_release: [ReleaseEventV1];
   on_notification: [NotificationDto];
   on_session_delete: [string];
+  on_agent_session_event: [AgentSessionClientEvent];
 
   AssetUploadReadyV2: [{ asset: SyncAssetV2; exif: SyncAssetExifV1 }];
   AppRestartV1: [AppRestartEvent];

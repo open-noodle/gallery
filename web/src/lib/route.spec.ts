@@ -6,6 +6,12 @@ import { OpenQueryParam } from '$lib/constants';
 import { Route } from '$lib/route';
 
 describe('Route', () => {
+  describe(Route.assistant.name, () => {
+    it('should link to the assistant page', () => {
+      expect(Route.assistant()).toBe('/assistant');
+    });
+  });
+
   describe(Route.login.name, () => {
     it('should encode continue', () => {
       expect(Route.login({ continue: '/some/path?with=query', autoLaunch: 1 })).toBe(

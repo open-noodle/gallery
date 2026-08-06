@@ -1,4 +1,11 @@
 import { ActivityController } from 'src/controllers/activity.controller';
+import { AgentMessageController } from 'src/controllers/agent-message.controller';
+import { AgentOperationPlanController } from 'src/controllers/agent-operation-plan.controller';
+import { AgentProviderCredentialController } from 'src/controllers/agent-provider-credential.controller';
+import { AgentRunnerMcpController } from 'src/controllers/agent-runner-mcp.controller';
+import { AgentRunnerController } from 'src/controllers/agent-runner.controller';
+import { AgentSessionController } from 'src/controllers/agent-session.controller';
+import { AgentToolController } from 'src/controllers/agent-tool.controller';
 import { AlbumController } from 'src/controllers/album.controller';
 import { ApiKeyController } from 'src/controllers/api-key.controller';
 import { AppController } from 'src/controllers/app.controller';
@@ -51,6 +58,13 @@ import { WorkflowController } from 'src/controllers/workflow.controller';
 export const controllers = [
   ApiKeyController,
   ActivityController,
+  AgentMessageController,
+  AgentOperationPlanController,
+  AgentProviderCredentialController,
+  AgentRunnerController,
+  AgentRunnerMcpController,
+  AgentSessionController,
+  AgentToolController,
   AlbumController,
   AppController,
   AssetController,

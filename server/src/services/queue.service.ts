@@ -260,6 +260,10 @@ export class QueueService extends BaseService {
         return this.jobRepository.queue({ name: JobName.OcrQueueAll, data: { force } });
       }
 
+      case QueueName.ImageQuality: {
+        return this.jobRepository.queue({ name: JobName.ImageQualityQueueAll, data: { force } });
+      }
+
       case QueueName.PetDetection: {
         return this.jobRepository.queue({ name: JobName.PetDetectionQueueAll, data: { force } });
       }

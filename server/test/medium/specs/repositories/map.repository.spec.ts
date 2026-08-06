@@ -336,4 +336,109 @@ describe(MapRepository.name, () => {
       expect(ids).not.toContain(hidden.id);
     });
   });
+
+  describe('searchPlaces', () => {
+    // Insert geodata_places rows with a unique suffix to avoid collisions with other test runs.
+    const suffix = `_test_${Date.now()}`;
+
+    beforeAll(async () => {
+      await defaultDatabase
+        .insertInto('geodata_places')
+        .values([
+          {
+            id: 100_000_001,
+            name: `Paris${suffix}`,
+            longitude: 2.3522,
+            latitude: 48.8566,
+            countryCode: 'FR',
+            admin1Code: null,
+            admin2Code: null,
+            admin1Name: `Ile-de-France${suffix}`,
+            admin2Name: null,
+            alternateNames: null,
+            modificationDate: '2024-01-01',
+          },
+          {
+            id: 100_000_002,
+            name: `Paris${suffix}`,
+            longitude: -95.5555,
+            latitude: 33.6609,
+            countryCode: 'US',
+            admin1Code: null,
+            admin2Code: null,
+            admin1Name: `Texas${suffix}`,
+            admin2Name: null,
+            alternateNames: null,
+            modificationDate: '2024-01-01',
+          },
+          {
+            id: 100_000_003,
+            name: `Tokyo${suffix}`,
+            longitude: 139.6503,
+            latitude: 35.6762,
+            countryCode: 'JP',
+            admin1Code: null,
+            admin2Code: null,
+            admin1Name: `Tokyo${suffix}`,
+            admin2Name: null,
+            alternateNames: null,
+            modificationDate: '2024-01-01',
+          },
+          {
+            id: 100_000_004,
+            name: `Zürich${suffix}`,
+            longitude: 8.5417,
+            latitude: 47.3769,
+            countryCode: 'CH',
+            admin1Code: null,
+            admin2Code: null,
+            admin1Name: `Zurich${suffix}`,
+            admin2Name: null,
+            alternateNames: null,
+            modificationDate: '2024-01-01',
+          },
+        ])
+        .execute();
+    });
+
+    afterAll(async () => {
+      await defaultDatabase
+        .deleteFrom('geodata_places')
+        .where('id', 'in', [100_000_001, 100_000_002, 100_000_003, 100_000_004])
+        .execute();
+    });
+
+    it('searchPlaces("Paris") returns both Paris rows ordered by similarity desc then name length asc', async () => {
+      const { sut } = setup();
+      const results = await sut.searchPlaces(`Paris${suffix}`);
+      const names = results.map((r) => r.name);
+      expect(names.length).toBeGreaterThanOrEqual(2);
+      // both Paris rows should be present
+      expect(names.filter((n) => n === `Paris${suffix}`)).toHaveLength(2);
+      // similarity should be non-increasing
+      for (let i = 1; i < results.length; i++) {
+        expect(results[i - 1].similarity).toBeGreaterThanOrEqual(results[i].similarity);
+      }
+    });
+
+    it('searchPlaces("Tokyo") returns the Tokyo row', async () => {
+      const { sut } = setup();
+      const results = await sut.searchPlaces(`Tokyo${suffix}`);
+      expect(results.length).toBeGreaterThanOrEqual(1);
+      expect(results[0].name).toBe(`Tokyo${suffix}`);
+    });
+
+    it('searchPlaces("zurich") matches Zürich via f_unaccent (umlaut stripped, case-folded)', async () => {
+      const { sut } = setup();
+      const results = await sut.searchPlaces(`zurich${suffix}`);
+      expect(results.length).toBeGreaterThanOrEqual(1);
+      expect(results[0].name).toBe(`Zürich${suffix}`);
+    });
+
+    it('searchPlaces("zzzqqq") returns empty array', async () => {
+      const { sut } = setup();
+      const results = await sut.searchPlaces('zzzqqq_nomatch_xyz');
+      expect(results).toHaveLength(0);
+    });
+  });
 });

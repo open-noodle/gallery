@@ -23,4 +23,7 @@ export class AssetJobStatusTable {
 
   @Column({ type: 'timestamp with time zone', nullable: true })
   classifiedAt!: Timestamp | null;
+
+  @Column({ type: 'timestamp with time zone', nullable: true })
+  qualityScoredAt!: Timestamp | null;
 }

@@ -18,6 +18,7 @@ export enum ModelTask {
   SEARCH = 'clip',
   OCR = 'ocr',
   PET_DETECTION = 'pet-detection',
+  IMAGE_QUALITY = 'image-quality',
 }
 
 export enum ModelType {
@@ -92,8 +93,17 @@ export type PetDetectionRequest = {
   };
 };
 
+export type ImageQuality = { sharpness: number; exposure: number; brightness: number; quality: number };
+export type ImageQualityResponse = { [ModelTask.IMAGE_QUALITY]: ImageQuality } & VisualResponse;
+export type ImageQualityRequest = { [ModelTask.IMAGE_QUALITY]: { [ModelType.VISUAL]: ModelOptions } };
+
 export type MachineLearningRequest =
-  ClipVisualRequest | ClipTextualRequest | FacialRecognitionRequest | OcrRequest | PetDetectionRequest;
+  | ClipVisualRequest
+  | ClipTextualRequest
+  | FacialRecognitionRequest
+  | OcrRequest
+  | PetDetectionRequest
+  | ImageQualityRequest;
 export type TextEncodingOptions = ModelOptions & { language?: string };
 
 @Injectable()
@@ -319,6 +329,14 @@ export class MachineLearningRepository {
       imageWidth: response.imageWidth,
       pets: response[ModelTask.PET_DETECTION],
     };
+  }
+
+  async analyzeAssetQuality(imagePath: string): Promise<ImageQuality> {
+    const request: ImageQualityRequest = {
+      [ModelTask.IMAGE_QUALITY]: { [ModelType.VISUAL]: { modelName: 'image-quality' } },
+    };
+    const response = await this.predict<ImageQualityResponse>({ imagePath }, request);
+    return response[ModelTask.IMAGE_QUALITY];
   }
 
   private async getFormData(payload: ModelPayload, config: MachineLearningRequest): Promise<FormData> {

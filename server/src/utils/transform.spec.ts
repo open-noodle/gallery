@@ -1,6 +1,6 @@
-import { AssetEditAction, AssetEditActionItem, MirrorAxis } from 'src/dtos/editing.dto';
+import { AssetEditAction, AssetEditActionItem, MirrorAxis, TonalLevel } from 'src/dtos/editing.dto';
 import { AssetOcrResponseDto } from 'src/dtos/ocr.dto';
-import { transformFaceBoundingBox, transformOcrBoundingBox } from 'src/utils/transform';
+import { getOutputDimensions, transformFaceBoundingBox, transformOcrBoundingBox } from 'src/utils/transform';
 import { describe, expect, it } from 'vitest';
 
 describe('transformFaceBoundingBox', () => {
@@ -316,5 +316,36 @@ describe('transformOcrBoundingBox', () => {
       expect(result.textScore).toBe(baseOcr.textScore);
       expect(result.text).toBe(baseOcr.text);
     });
+  });
+});
+
+describe('adjust is geometrically inert', () => {
+  const adjust = { action: AssetEditAction.Adjust, parameters: { brightness: TonalLevel.ModerateIncrease } } as const;
+
+  it('getOutputDimensions ignores adjust', () => {
+    const dims = { width: 800, height: 600 };
+    expect(getOutputDimensions([adjust], dims)).toEqual(dims);
+  });
+
+  it('mixed [crop, adjust, rotate] equals [crop, rotate] geometry', () => {
+    const dims = { width: 800, height: 600 };
+    const crop = { action: AssetEditAction.Crop, parameters: { x: 10, y: 20, width: 400, height: 300 } } as const;
+    const rotate = { action: AssetEditAction.Rotate, parameters: { angle: 90 } } as const;
+    expect(getOutputDimensions([crop, adjust, rotate], dims)).toEqual(getOutputDimensions([crop, rotate], dims));
+  });
+
+  it('transformFaceBoundingBox is unchanged by an adjust edit', () => {
+    const box = {
+      boundingBoxX1: 10,
+      boundingBoxY1: 20,
+      boundingBoxX2: 110,
+      boundingBoxY2: 220,
+      imageWidth: 800,
+      imageHeight: 600,
+    };
+    const rotate = { action: AssetEditAction.Rotate, parameters: { angle: 90 } } as const;
+    const withAdjust = transformFaceBoundingBox(box, [rotate, adjust], { width: 800, height: 600 });
+    const without = transformFaceBoundingBox(box, [rotate], { width: 800, height: 600 });
+    expect(withAdjust).toEqual(without);
   });
 });

@@ -701,6 +701,16 @@ where
   "shared_space_member"."spaceId" in ($1)
   and "shared_space_member"."userId" = $2
 
+-- AccessRepository.sharedSpace.checkRoleAccess
+select
+  "shared_space_member"."spaceId"
+from
+  "shared_space_member"
+where
+  "shared_space_member"."spaceId" in ($1)
+  and "shared_space_member"."userId" = $2
+  and "shared_space_member"."role" in ($3, $4, $5)
+
 -- AccessRepository.partner.checkUpdateAccess
 select
   "partner"."sharedById"

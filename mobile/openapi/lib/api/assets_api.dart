@@ -1241,6 +1241,76 @@ class AssetsApi {
     return null;
   }
 
+  /// Preview edits without saving
+  ///
+  /// Render an image with the given edit actions applied, without persisting them.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [AssetEditsCreateDto] assetEditsCreateDto (required):
+  ///
+  /// * [String] size:
+  Future<Response> previewAssetEditsWithHttpInfo(String id, AssetEditsCreateDto assetEditsCreateDto, { String? size, Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/assets/{id}/edits/preview'
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody = assetEditsCreateDto;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    if (size != null) {
+      queryParams.addAll(_queryParams('', 'size', size));
+    }
+
+    const contentTypes = <String>['application/json'];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'POST',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Preview edits without saving
+  ///
+  /// Render an image with the given edit actions applied, without persisting them.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [AssetEditsCreateDto] assetEditsCreateDto (required):
+  ///
+  /// * [String] size:
+  Future<MultipartFile?> previewAssetEdits(String id, AssetEditsCreateDto assetEditsCreateDto, { String? size, Future<void>? abortTrigger, }) async {
+    final response = await previewAssetEditsWithHttpInfo(id, assetEditsCreateDto, size: size, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'MultipartFile',) as MultipartFile;
+    
+    }
+    return null;
+  }
+
   /// Remove edits from an existing asset
   ///
   /// Removes all edit actions (crop, rotate, mirror) associated with the specified asset.

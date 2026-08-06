@@ -1,4 +1,4 @@
-import { Type, type PersonResponseDto } from '@immich/sdk';
+import { Type5 as Type, type PersonResponseDto } from '@immich/sdk';
 import { Route } from '$lib/route';
 import { createUrl, getPeopleThumbnailUrl } from '$lib/utils';
 

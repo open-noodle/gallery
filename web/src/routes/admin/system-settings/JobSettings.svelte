@@ -26,6 +26,7 @@
     QueueName.Migration,
     QueueName.Ocr,
     QueueName.PetDetection,
+    QueueName.ImageQuality,
     QueueName.Classification,
   ];
 
@@ -52,6 +53,7 @@
     [QueueName.BackupDatabase]: $t('admin.backup_database'),
     [QueueName.Ocr]: $t('admin.machine_learning_ocr'),
     [QueueName.PetDetection]: $t('admin.machine_learning_pet_detection'),
+    [QueueName.ImageQuality]: $t('admin.machine_learning_image_quality'),
     [QueueName.Workflow]: $t('workflows'),
     [QueueName.Editor]: $t('editor'),
     [QueueName.IntegrityCheck]: $t('integrity_checks'),

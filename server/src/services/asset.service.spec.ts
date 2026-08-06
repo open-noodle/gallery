@@ -1,13 +1,15 @@
-import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import path from 'node:path';
 import { Readable } from 'node:stream';
+import { AssetMediaSize } from 'src/dtos/asset-media.dto';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto';
 import { AssetJobName, AssetStatsResponseDto } from 'src/dtos/asset.dto';
-import { AssetEditAction } from 'src/dtos/editing.dto';
+import { AssetEditAction, TonalLevel } from 'src/dtos/editing.dto';
 import { AssetFileType, AssetMetadataKey, AssetStatus, AssetType, AssetVisibility, JobName, JobStatus } from 'src/enum';
 import { AssetStats } from 'src/repositories/asset.repository';
 import { AssetService } from 'src/services/asset.service';
+import { ImmichStreamResponse } from 'src/utils/file';
 import { AssetFactory } from 'test/factories/asset.factory';
 import { AuthFactory } from 'test/factories/auth.factory';
 import { authStub } from 'test/fixtures/auth.stub';
@@ -3099,6 +3101,78 @@ describe(AssetService.name, () => {
       await sut.removeAssetEdits(authStub.admin, asset.id);
 
       expect(mocks.asset.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('previewAssetEdits', () => {
+    const editsDto = {
+      edits: [{ action: AssetEditAction.Adjust, parameters: { brightness: TonalLevel.ModerateIncrease } }],
+    };
+
+    it('requires AssetRead access', async () => {
+      // By default, all access checks return empty sets → BadRequestException
+      await expect(
+        sut.previewAssetEdits(authStub.admin, 'asset-1', editsDto, AssetMediaSize.THUMBNAIL),
+      ).rejects.toThrow();
+    });
+
+    it('rejects a non-image asset', async () => {
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.asset.getById.mockResolvedValue({ id: 'asset-1', type: AssetType.Video } as any);
+      await expect(
+        sut.previewAssetEdits(authStub.admin, 'asset-1', editsDto, AssetMediaSize.THUMBNAIL),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('throws NotFound when asset does not exist', async () => {
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.asset.getById.mockResolvedValue(void 0);
+      await expect(
+        sut.previewAssetEdits(authStub.admin, 'asset-1', editsDto, AssetMediaSize.THUMBNAIL),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws NotFound when no base media file exists', async () => {
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.asset.getById.mockResolvedValue({ id: 'asset-1', type: AssetType.Image } as any);
+      mocks.asset.getForThumbnail.mockResolvedValue({ path: null } as any);
+      await expect(
+        sut.previewAssetEdits(authStub.admin, 'asset-1', editsDto, AssetMediaSize.THUMBNAIL),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('renders the proposed edits over the sized base image and persists nothing', async () => {
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.asset.getById.mockResolvedValue({ id: 'asset-1', type: AssetType.Image } as any);
+      mocks.asset.getForThumbnail.mockResolvedValue({
+        path: '/thumbs/a.webp',
+        originalPath: '/o.jpg',
+        originalFileName: 'o.jpg',
+      } as any);
+      mocks.storage.readFile.mockResolvedValue(Buffer.from('src'));
+      mocks.media.renderEditedImage.mockResolvedValue(Buffer.from('rendered'));
+
+      const res = await sut.previewAssetEdits(authStub.admin, 'asset-1', editsDto, AssetMediaSize.THUMBNAIL);
+
+      expect(mocks.asset.getForThumbnail).toHaveBeenCalledWith('asset-1', AssetFileType.Thumbnail, false);
+      expect(mocks.storage.readFile).toHaveBeenCalledWith('/thumbs/a.webp');
+      expect(mocks.media.renderEditedImage).toHaveBeenCalledWith(Buffer.from('src'), editsDto.edits);
+      // Persists nothing — no edit-write method called
+      expect(mocks.assetEdit.replaceAll).not.toHaveBeenCalled();
+      expect(res).toBeInstanceOf(ImmichStreamResponse);
+      expect(res.contentType).toBe('image/jpeg');
+    });
+
+    it('requests the preview file type when size is PREVIEW', async () => {
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.asset.getById.mockResolvedValue({ id: 'asset-1', type: AssetType.Image } as any);
+      mocks.asset.getForThumbnail.mockResolvedValue({ path: '/p.webp' } as any);
+      mocks.storage.readFile.mockResolvedValue(Buffer.from('src'));
+      mocks.media.renderEditedImage.mockResolvedValue(Buffer.from('r'));
+
+      await sut.previewAssetEdits(authStub.admin, 'asset-1', editsDto, AssetMediaSize.PREVIEW);
+
+      expect(mocks.asset.getForThumbnail).toHaveBeenCalledWith('asset-1', AssetFileType.Preview, false);
     });
   });
 });

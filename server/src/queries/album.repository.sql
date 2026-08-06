@@ -462,6 +462,167 @@ where
   )
   and "album"."deletedAt" is null
 
+-- AlbumRepository.getAgentAlbums
+select
+  "album"."id",
+  "album"."albumName",
+  "album"."description",
+  (
+    select
+      "album_user"."userId"
+    from
+      "album_user"
+    where
+      "album_user"."albumId" = "album"."id"
+      and "album_user"."role" = $1
+    limit
+      1
+  ) as "ownerId",
+  case
+    when exists (
+      select
+        1
+      from
+        "album_asset" as "thumbnail_album_asset"
+        inner join "asset" as "thumbnail_asset" on "thumbnail_asset"."id" = "thumbnail_album_asset"."assetId"
+      where
+        "thumbnail_album_asset"."albumId" = "album"."id"
+        and "thumbnail_album_asset"."assetId" = "album"."albumThumbnailAssetId"
+        and "thumbnail_asset"."deletedAt" is null
+        and "thumbnail_asset"."isOffline" = false
+        and "thumbnail_asset"."visibility" in ($2, $3)
+    ) then "album"."albumThumbnailAssetId"
+    else null
+  end as "albumThumbnailAssetId",
+  coalesce("metadata"."assetCount", 0)::int as "assetCount",
+  "metadata"."startDate" as "startDate",
+  "metadata"."endDate" as "endDate"
+from
+  "album"
+  left join (
+    select
+      "album_asset"."albumId" as "albumId",
+      count("album_asset"."assetId")::int as "assetCount",
+      min(
+        ("asset"."localDateTime" AT TIME ZONE 'UTC'::text)::date
+      ) as "startDate",
+      max(
+        ("asset"."localDateTime" AT TIME ZONE 'UTC'::text)::date
+      ) as "endDate"
+    from
+      "album_asset"
+      inner join "asset" on "asset"."id" = "album_asset"."assetId"
+    where
+      "asset"."deletedAt" is null
+      and "asset"."isOffline" = $4
+      and "asset"."visibility" in ($5, $6)
+    group by
+      "album_asset"."albumId"
+  ) as "metadata" on "metadata"."albumId" = "album"."id"
+where
+  "album"."deletedAt" is null
+  and (
+    exists (
+      select
+      from
+        "album_user"
+      where
+        "album_user"."albumId" = "album"."id"
+        and "album_user"."role" = $7
+        and "album_user"."userId" = $8
+    )
+    or exists (
+      select
+      from
+        "album_user"
+      where
+        "album_user"."albumId" = "album"."id"
+        and "album_user"."userId" = $9
+    )
+  )
+order by
+  "album"."createdAt" desc
+
+-- AlbumRepository.getAgentAlbumById
+select
+  "album"."id",
+  "album"."albumName",
+  "album"."description",
+  (
+    select
+      "album_user"."userId"
+    from
+      "album_user"
+    where
+      "album_user"."albumId" = "album"."id"
+      and "album_user"."role" = $1
+    limit
+      1
+  ) as "ownerId",
+  case
+    when exists (
+      select
+        1
+      from
+        "album_asset" as "thumbnail_album_asset"
+        inner join "asset" as "thumbnail_asset" on "thumbnail_asset"."id" = "thumbnail_album_asset"."assetId"
+      where
+        "thumbnail_album_asset"."albumId" = "album"."id"
+        and "thumbnail_album_asset"."assetId" = "album"."albumThumbnailAssetId"
+        and "thumbnail_asset"."deletedAt" is null
+        and "thumbnail_asset"."isOffline" = false
+        and "thumbnail_asset"."visibility" in ($2, $3)
+    ) then "album"."albumThumbnailAssetId"
+    else null
+  end as "albumThumbnailAssetId",
+  coalesce("metadata"."assetCount", 0)::int as "assetCount",
+  "metadata"."startDate" as "startDate",
+  "metadata"."endDate" as "endDate"
+from
+  "album"
+  left join (
+    select
+      "album_asset"."albumId" as "albumId",
+      count("album_asset"."assetId")::int as "assetCount",
+      min(
+        ("asset"."localDateTime" AT TIME ZONE 'UTC'::text)::date
+      ) as "startDate",
+      max(
+        ("asset"."localDateTime" AT TIME ZONE 'UTC'::text)::date
+      ) as "endDate"
+    from
+      "album_asset"
+      inner join "asset" on "asset"."id" = "album_asset"."assetId"
+    where
+      "asset"."deletedAt" is null
+      and "asset"."isOffline" = $4
+      and "asset"."visibility" in ($5, $6)
+    group by
+      "album_asset"."albumId"
+  ) as "metadata" on "metadata"."albumId" = "album"."id"
+where
+  "album"."id" = $7
+  and "album"."deletedAt" is null
+  and (
+    exists (
+      select
+      from
+        "album_user"
+      where
+        "album_user"."albumId" = "album"."id"
+        and "album_user"."role" = $8
+        and "album_user"."userId" = $9
+    )
+    or exists (
+      select
+      from
+        "album_user"
+      where
+        "album_user"."albumId" = "album"."id"
+        and "album_user"."userId" = $10
+    )
+  )
+
 -- AlbumRepository.getAllIds
 select
   "album"."id"

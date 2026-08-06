@@ -13,6 +13,14 @@ import {
   UserAvatarColor,
   UserStatus,
 } from 'src/enum';
+import { AgentMessageTable } from 'src/schema/tables/agent-message.table';
+import { AgentOperationPlanTable } from 'src/schema/tables/agent-operation-plan.table';
+import { AgentOperationTable } from 'src/schema/tables/agent-operation.table';
+import { AgentProviderCredentialTable } from 'src/schema/tables/agent-provider-credential.table';
+import { AgentSelectionHandleTable } from 'src/schema/tables/agent-selection-handle.table';
+import { AgentSessionActivityEventTable } from 'src/schema/tables/agent-session-activity-event.table';
+import { AgentSessionTable } from 'src/schema/tables/agent-session.table';
+import { AgentToolCallTable } from 'src/schema/tables/agent-tool-call.table';
 import { AlbumTable } from 'src/schema/tables/album.table';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table';
 import { AssetTable } from 'src/schema/tables/asset.table';
@@ -81,6 +89,15 @@ export type ApiKey = {
   updatedAt: Date;
   permissions: Permission[];
 };
+
+export type AgentProviderCredential = Selectable<AgentProviderCredentialTable>;
+export type AgentMessage = Selectable<AgentMessageTable>;
+export type AgentSession = Selectable<AgentSessionTable>;
+export type AgentSessionActivityEvent = Selectable<AgentSessionActivityEventTable>;
+export type AgentSelectionHandle = Selectable<AgentSelectionHandleTable>;
+export type AgentToolCall = Selectable<AgentToolCallTable>;
+export type AgentOperationPlan = Selectable<AgentOperationPlanTable>;
+export type AgentOperation = Selectable<AgentOperationTable>;
 
 export type Tag = {
   id: string;
@@ -516,6 +533,95 @@ export const columns = {
   ],
   tag: ['tag.id', 'tag.value', 'tag.createdAt', 'tag.updatedAt', 'tag.color', 'tag.parentId'],
   apiKey: ['id', 'name', 'userId', 'createdAt', 'updatedAt', 'permissions'],
+  agentProviderCredential: [
+    'id',
+    'userId',
+    'providerType',
+    'label',
+    'baseUrl',
+    'encryptedSecret',
+    'secretVersion',
+    'models',
+    'defaultModel',
+    'lastUsedAt',
+    'createdAt',
+    'updatedAt',
+    'updateId',
+  ],
+  agentMessage: ['id', 'sessionId', 'role', 'content', 'providerMessageId', 'toolCallId', 'createdAt'],
+  agentOperationPlan: ['id', 'sessionId', 'revision', 'status', 'summary', 'createdAt', 'updatedAt'],
+  agentOperation: [
+    'id',
+    'planId',
+    'type',
+    'position',
+    'summary',
+    'targetKind',
+    'targetId',
+    'temporaryTargetId',
+    'assetIds',
+    'payload',
+    'dependencyIds',
+    'riskLevel',
+    'enabled',
+    'status',
+    'result',
+    'error',
+    'createdAt',
+    'updatedAt',
+  ],
+  agentToolCall: [
+    'id',
+    'sessionId',
+    'toolName',
+    'status',
+    'approvalDecision',
+    'requestSummary',
+    'responseSummary',
+    'redactedRequestMetadata',
+    'redactedResponseMetadata',
+    'dataClass',
+    'assetCount',
+    'albumCount',
+    'providerSnapshot',
+    'startedAt',
+    'completedAt',
+    'error',
+  ],
+  agentSession: [
+    'id',
+    'userId',
+    'providerCredentialId',
+    'credentialSnapshot',
+    'modelSnapshot',
+    'permissionPreset',
+    'permissionPlanSnapshot',
+    'approvalMode',
+    'runnerEndpoint',
+    'runnerSessionId',
+    'runnerCapabilitiesSnapshot',
+    'workflowState',
+    'status',
+    'initialContextSnapshot',
+    'title',
+    'createdAt',
+    'updatedAt',
+    'endedAt',
+    'updateId',
+  ],
+  agentSessionActivityEvent: ['id', 'sessionId', 'kind', 'status', 'source', 'summary', 'counts', 'createdAt'],
+  agentSelectionHandle: [
+    'id',
+    'sessionId',
+    'userId',
+    'sourceToolCallId',
+    'assetIds',
+    'assetCount',
+    'sampleAssetIds',
+    'expiresAt',
+    'createdAt',
+    'updateId',
+  ],
   notification: ['id', 'createdAt', 'level', 'type', 'title', 'description', 'data', 'readAt'],
   pluginMethod: [
     'plugin_method.name',

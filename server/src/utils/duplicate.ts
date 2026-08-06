@@ -11,6 +11,30 @@ export const getExifCount = (asset: AssetResponseDto): number => {
   return Object.values(asset.exifInfo ?? {}).filter(Boolean).length;
 };
 
+export interface DuplicateMetadataAccessors<T> {
+  getFileSizeInByte: (asset: T) => number | null | undefined;
+  getExifCount: (asset: T) => number | null | undefined;
+}
+
+export const suggestDuplicateByMetadata = <T>(
+  assets: T[],
+  { getFileSizeInByte, getExifCount }: DuplicateMetadataAccessors<T>,
+): T | undefined => {
+  if (assets.length === 0) {
+    return undefined;
+  }
+
+  let duplicateAssets = [...assets].toSorted((a, b) => (getFileSizeInByte(a) ?? 0) - (getFileSizeInByte(b) ?? 0));
+  const largestFileSize = getFileSizeInByte(duplicateAssets.at(-1)!) ?? 0;
+  duplicateAssets = duplicateAssets.filter((asset) => (getFileSizeInByte(asset) ?? 0) === largestFileSize);
+
+  if (duplicateAssets.length >= 2) {
+    duplicateAssets = duplicateAssets.toSorted((a, b) => (getExifCount(a) ?? 0) - (getExifCount(b) ?? 0));
+  }
+
+  return duplicateAssets.at(-1);
+};
+
 /**
  * Suggests the best duplicate asset to keep from a list of duplicates.
  * This is a direct port of the client logic from web/src/lib/utils/duplicate-utils.ts
@@ -23,28 +47,10 @@ export const getExifCount = (asset: AssetResponseDto): number => {
  * @returns The best asset to keep, or undefined if empty list
  */
 export const suggestDuplicate = (assets: AssetResponseDto[]): AssetResponseDto | undefined => {
-  if (assets.length === 0) {
-    return undefined;
-  }
-
-  // Sort by file size ascending (smallest first)
-  let duplicateAssets = [...assets].toSorted(
-    (a, b) => (a.exifInfo?.fileSizeInByte ?? 0) - (b.exifInfo?.fileSizeInByte ?? 0),
-  );
-
-  // Get the largest file size (last element after sorting)
-  const largestFileSize = duplicateAssets.at(-1)?.exifInfo?.fileSizeInByte ?? 0;
-
-  // Filter to keep only assets with the largest file size
-  duplicateAssets = duplicateAssets.filter((asset) => (asset.exifInfo?.fileSizeInByte ?? 0) === largestFileSize);
-
-  // If there are multiple assets with the same file size, sort by EXIF count
-  if (duplicateAssets.length >= 2) {
-    duplicateAssets = duplicateAssets.toSorted((a, b) => getExifCount(a) - getExifCount(b));
-  }
-
-  // Return the last asset (highest EXIF count among highest file size)
-  return duplicateAssets.at(-1);
+  return suggestDuplicateByMetadata(assets, {
+    getFileSizeInByte: (asset) => asset.exifInfo?.fileSizeInByte,
+    getExifCount,
+  });
 };
 
 /**

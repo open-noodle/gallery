@@ -9,6 +9,12 @@ export const envData: EnvData = {
   logFormat: LogFormat.Console,
 
   buildMetadata: {},
+
+  agent: {
+    runnerHealthTimeoutMs: 2000,
+    runnerMessageStreamTimeoutMs: 300_000,
+  },
+
   bull: {
     config: {
       connection: {},

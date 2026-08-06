@@ -14,10 +14,11 @@ import { InjectKysely } from 'nestjs-kysely';
 import { columns } from 'src/database';
 import { Chunked, ChunkedArray, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators';
 import { AlbumUserCreateDto, MapAlbumDto } from 'src/dtos/album.dto';
-import { AlbumUserRole } from 'src/enum';
+import { AlbumUserRole, AssetVisibility } from 'src/enum';
 import { DB } from 'src/schema';
 import { AlbumTable } from 'src/schema/tables/album.table';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table';
+import { AgentAlbumDetail, AgentAlbumSummary } from 'src/types/agent-tool.types';
 import { asUuid, dummy, withDefaultVisibility } from 'src/utils/database';
 import { accessibleSpaceAlbums, spaceVisibilityGate } from 'src/utils/shared-space-album-scope';
 
@@ -32,6 +33,19 @@ export interface AlbumAssetCount {
 export interface AlbumInfoOptions {
   withAssets: boolean;
 }
+
+const agentVisibleAlbumAssetVisibilities = [AssetVisibility.Timeline, AssetVisibility.Archive];
+
+const withAgentAlbumThumbnail = sql<string | null>`case when exists (
+  select 1
+  from "album_asset" as "thumbnail_album_asset"
+  inner join "asset" as "thumbnail_asset" on "thumbnail_asset"."id" = "thumbnail_album_asset"."assetId"
+  where "thumbnail_album_asset"."albumId" = "album"."id"
+    and "thumbnail_album_asset"."assetId" = "album"."albumThumbnailAssetId"
+    and "thumbnail_asset"."deletedAt" is null
+    and "thumbnail_asset"."isOffline" = false
+    and "thumbnail_asset"."visibility" in (${AssetVisibility.Timeline}, ${AssetVisibility.Archive})
+) then "album"."albumThumbnailAssetId" else null end`.as('albumThumbnailAssetId');
 
 const withAlbumUsers = (authUserId?: string) => (eb: ExpressionBuilder<DB, 'album'>) =>
   jsonArrayFrom(
@@ -82,6 +96,10 @@ const isAlbumOwned = (ownerId: string) => (eb: ExpressionBuilder<DB, 'album'>) =
       .where('album_user.role', '=', AlbumUserRole.Owner)
       .where('album_user.userId', '=', ownerId),
   );
+
+const albumOwnerId = () =>
+  sql<string>`(select "album_user"."userId" from "album_user"
+     where "album_user"."albumId" = "album"."id" and "album_user"."role" = ${AlbumUserRole.Owner} limit 1)`;
 
 @Injectable()
 export class AlbumRepository {
@@ -419,6 +437,119 @@ export class AlbumRepository {
       )
       .where('album.deletedAt', 'is', null)
       .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getAgentAlbums(userId: string): Promise<AgentAlbumSummary[]> {
+    return this.db
+      .selectFrom('album')
+      .leftJoin(
+        (eb) =>
+          eb
+            .selectFrom('album_asset')
+            .innerJoin('asset', 'asset.id', 'album_asset.assetId')
+            .where('asset.deletedAt', 'is', null)
+            .where('asset.isOffline', '=', false)
+            .where('asset.visibility', 'in', agentVisibleAlbumAssetVisibilities)
+            .select('album_asset.albumId as albumId')
+            .select((eb) => sql<number>`${eb.fn.count('album_asset.assetId')}::int`.as('assetCount'))
+            .select((eb) =>
+              eb.fn.min(sql<Date>`("asset"."localDateTime" AT TIME ZONE 'UTC'::text)::date`).as('startDate'),
+            )
+            .select((eb) =>
+              eb.fn.max(sql<Date>`("asset"."localDateTime" AT TIME ZONE 'UTC'::text)::date`).as('endDate'),
+            )
+            .groupBy('album_asset.albumId')
+            .as('metadata'),
+        (join) => join.onRef('metadata.albumId', '=', 'album.id'),
+      )
+      .select(['album.id', 'album.albumName', 'album.description'])
+      .select(albumOwnerId().as('ownerId'))
+      .select(withAgentAlbumThumbnail)
+      .select((eb) => sql<number>`coalesce(${eb.ref('metadata.assetCount')}, 0)::int`.as('assetCount'))
+      .select(['metadata.startDate as startDate', 'metadata.endDate as endDate'])
+      .where('album.deletedAt', 'is', null)
+      .where((eb) =>
+        eb.or([
+          isAlbumOwned(userId)(eb),
+          eb.exists(
+            eb
+              .selectFrom('album_user')
+              .whereRef('album_user.albumId', '=', 'album.id')
+              .where('album_user.userId', '=', userId),
+          ),
+        ]),
+      )
+      .orderBy('album.createdAt', 'desc')
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async getAgentAlbumById(userId: string, albumId: string): Promise<AgentAlbumDetail | null> {
+    const album = await this.db
+      .selectFrom('album')
+      .leftJoin(
+        (eb) =>
+          eb
+            .selectFrom('album_asset')
+            .innerJoin('asset', 'asset.id', 'album_asset.assetId')
+            .where('asset.deletedAt', 'is', null)
+            .where('asset.isOffline', '=', false)
+            .where('asset.visibility', 'in', agentVisibleAlbumAssetVisibilities)
+            .select('album_asset.albumId as albumId')
+            .select((eb) => sql<number>`${eb.fn.count('album_asset.assetId')}::int`.as('assetCount'))
+            .select((eb) =>
+              eb.fn.min(sql<Date>`("asset"."localDateTime" AT TIME ZONE 'UTC'::text)::date`).as('startDate'),
+            )
+            .select((eb) =>
+              eb.fn.max(sql<Date>`("asset"."localDateTime" AT TIME ZONE 'UTC'::text)::date`).as('endDate'),
+            )
+            .groupBy('album_asset.albumId')
+            .as('metadata'),
+        (join) => join.onRef('metadata.albumId', '=', 'album.id'),
+      )
+      .select(['album.id', 'album.albumName', 'album.description'])
+      .select(albumOwnerId().as('ownerId'))
+      .select(withAgentAlbumThumbnail)
+      .select((eb) => sql<number>`coalesce(${eb.ref('metadata.assetCount')}, 0)::int`.as('assetCount'))
+      .select(['metadata.startDate as startDate', 'metadata.endDate as endDate'])
+      .where('album.id', '=', albumId)
+      .where('album.deletedAt', 'is', null)
+      .where((eb) =>
+        eb.or([
+          isAlbumOwned(userId)(eb),
+          eb.exists(
+            eb
+              .selectFrom('album_user')
+              .whereRef('album_user.albumId', '=', 'album.id')
+              .where('album_user.userId', '=', userId),
+          ),
+        ]),
+      )
+      .executeTakeFirst();
+
+    if (!album) {
+      return null;
+    }
+
+    const assets = await this.db
+      .selectFrom('album_asset')
+      .innerJoin('asset', 'asset.id', 'album_asset.assetId')
+      .select('album_asset.assetId')
+      .where('album_asset.albumId', '=', albumId)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', '=', false)
+      .where('asset.visibility', 'in', agentVisibleAlbumAssetVisibilities)
+      .orderBy('album_asset.createdAt', 'asc')
+      .execute();
+
+    const albumUsers = await this.db
+      .selectFrom('album_user')
+      .select(['album_user.userId', 'album_user.role'])
+      .where('album_user.albumId', '=', albumId)
+      .execute();
+
+    return { ...album, assetIds: assets.map(({ assetId }) => assetId), albumUsers };
   }
 
   @GenerateSql({ params: [DummyValue.UUID, { isOwned: true, isShared: true }] })

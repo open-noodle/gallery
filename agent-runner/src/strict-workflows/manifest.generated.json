@@ -1,0 +1,1565 @@
+[
+  {
+    "kind": "create_recent_trip_album",
+    "flow": "strict",
+    "title": "Create recent trip album",
+    "classifierDescription": "User wants a new album built from a recent trip, vacation, getaway, holiday, or road trip — detected from photo date/location metadata. A place + a travel word (trip/vacation/getaway/holiday) signals this even without the word \"trip\".",
+    "positiveExamples": [
+      "Create an album for my recent trip to USA",
+      "Make an album for my recent trip",
+      "Put my Japan trip from last week into an album",
+      "Make an album from our recent getaway to the coast"
+    ],
+    "negativeExamples": [
+      "Add my recent trip photos to Family",
+      "How many photos are in my recent trip album?",
+      "Pick the best photos from my recent trip"
+    ],
+    "slots": {
+      "albumName": {
+        "type": "string",
+        "required": false,
+        "description": "Explicit album name if the user gave one."
+      },
+      "placeHint": {
+        "type": "string",
+        "required": false,
+        "description": "Place text to bias trip detection."
+      }
+    },
+    "requiredReadTools": [
+      "findTripCandidates"
+    ],
+    "planTool": "proposeAlbumFromSelection",
+    "supportsContinuation": true,
+    "matrixRow": {
+      "capability": "Create recent trip album",
+      "tier": "Solid now",
+      "workflowOrBoundary": "`create_recent_trip_album` handles recent-trip detection, candidate choice, and album plan creation from the handle."
+    }
+  },
+  {
+    "kind": "rename_or_describe_album",
+    "flow": "strict",
+    "title": "Rename or describe album",
+    "classifierDescription": "User wants to rename an existing album and/or change its description, leaving its assets unchanged.",
+    "positiveExamples": [
+      "Rename this album to Berlin Weekend",
+      "Rename the Family album to Family 2026 and add a description",
+      "Change the description on my Italy album"
+    ],
+    "negativeExamples": [
+      "Add my newest photos to the Family album",
+      "Delete the Family album",
+      "Create an album for my recent trip"
+    ],
+    "slots": {
+      "albumRef": {
+        "type": "string",
+        "required": true,
+        "description": "How the user referred to the album."
+      },
+      "newName": {
+        "type": "string",
+        "required": false,
+        "description": "New album title, if renaming."
+      },
+      "description": {
+        "type": "string",
+        "required": false,
+        "description": "New description, if setting one."
+      }
+    },
+    "requiredReadTools": [
+      "listAlbums"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Rename or describe album",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Direct album-detail update plan; preserve unspecified fields."
+    }
+  },
+  {
+    "kind": "delete_album",
+    "flow": "strict",
+    "title": "Delete an album",
+    "classifierDescription": "User wants to delete (remove/get rid of) an existing album container. The album is deleted but all photos stay in the library. DECLINES photo-deletion intents (\"delete the photos in X album\") and space deletion (\"delete the X space\" → delete_space).",
+    "positiveExamples": [
+      "Delete the Beach album",
+      "Remove the Trip album",
+      "Get rid of the Family album"
+    ],
+    "negativeExamples": [
+      "Delete the photos in the Beach album",
+      "Delete the Beach album photos",
+      "Delete the Family space",
+      "Trash my 2024 screenshots"
+    ],
+    "slots": {
+      "albumRef": {
+        "type": "string",
+        "required": true,
+        "description": "How the user referred to the album."
+      }
+    },
+    "requiredReadTools": [
+      "listAlbums"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": true,
+    "matrixRow": {
+      "capability": "Delete an album",
+      "tier": "Solid now",
+      "workflowOrBoundary": "`delete_album` resolves the album by name (durable disambiguation for duplicate names) and proposes an `album.delete` plan. Photos stay in the library — only the container is removed. `deleteContainers` write-scope required."
+    }
+  },
+  {
+    "kind": "delete_space",
+    "flow": "strict",
+    "title": "Delete a space",
+    "classifierDescription": "User wants to delete (remove/get rid of) an existing shared space container. The space and its membership are removed; photos stay in members' libraries. DECLINES photo-deletion intents (\"delete the photos in X space\"), \"in/from\" frames, and album deletion (\"delete the X album\" → delete_album).",
+    "positiveExamples": [
+      "Delete the Family space",
+      "Remove the Trip space",
+      "Get rid of the Beach space"
+    ],
+    "negativeExamples": [
+      "Delete the photos in the Family space",
+      "Delete the Family space photos",
+      "Delete the Family album",
+      "Trash my 2024 screenshots"
+    ],
+    "slots": {
+      "spaceRef": {
+        "type": "string",
+        "required": true,
+        "description": "How the user referred to the space."
+      }
+    },
+    "requiredReadTools": [
+      "listSpaces"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": true,
+    "matrixRow": {
+      "capability": "Delete a space",
+      "tier": "Solid now",
+      "workflowOrBoundary": "`delete_space` resolves the space by name (durable disambiguation for duplicate names) and proposes a `space.delete` plan. The shared space and its membership are removed; photos stay in members' libraries. Server enforces owner-level permission (`SharedSpaceDelete`); workflow proposes regardless (propose-only; server is the backstop). `deleteContainers` write-scope required."
+    }
+  },
+  {
+    "kind": "set_album_cover",
+    "flow": "strict",
+    "title": "Set album cover",
+    "classifierDescription": "User wants to set the cover photo of an existing album to a specific photo identified by position (first, last, or Nth).",
+    "positiveExamples": [
+      "Set the cover of the Family album to the first photo",
+      "Make the Family album cover the 3rd photo",
+      "Set the cover of my Italy album to the last photo"
+    ],
+    "negativeExamples": [
+      "Pick a better cover for the Family album",
+      "Change the cover photo on my Italy album",
+      "Rename the Family album to Family 2026"
+    ],
+    "slots": {
+      "albumRef": {
+        "type": "string",
+        "required": true,
+        "description": "The album whose cover to set."
+      },
+      "coverRef": {
+        "type": "string",
+        "required": true,
+        "description": "Which photo becomes the cover (first/last/Nth)."
+      }
+    },
+    "requiredReadTools": [
+      "listAlbums",
+      "readAlbum"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Set album cover",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves the album + an explicit photo position; Gallery owns the album.setCover plan (cover rides in the asset selection)."
+    }
+  },
+  {
+    "kind": "add_photos_to_album",
+    "flow": "hybrid",
+    "title": "Add photos to existing album",
+    "classifierDescription": "User wants to add a metadata-describable set of photos to an existing album.",
+    "positiveExamples": [
+      "Add my newest 20 photos to Family",
+      "Add my Berlin photos from last weekend to the Trips album"
+    ],
+    "negativeExamples": [
+      "Add the good ones to Family",
+      "Create a new album from my Berlin photos"
+    ],
+    "slots": {
+      "albumRef": {
+        "type": "string",
+        "required": true,
+        "description": "Target album the user named."
+      },
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos to add."
+      }
+    },
+    "requiredReadTools": [
+      "listAlbums",
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Add photos to existing album",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves the source; Gallery owns album lookup, duplicate-safe add, and plan creation."
+    }
+  },
+  {
+    "kind": "move_photos_between_albums",
+    "flow": "hybrid",
+    "title": "Move photos between albums",
+    "classifierDescription": "User wants to MOVE a metadata-describable set of photos out of one album and into another (remove from album A, add to album B) in a single step. Requires both a source album (\"from X\") and a destination album (\"to Y\").",
+    "positiveExamples": [
+      "Move my newest 20 photos from Drafts to Keepers",
+      "Move my 2024 photos from the Trips album to the Italy album",
+      "Move my Berlin photos from Drafts to Berlin Weekend"
+    ],
+    "negativeExamples": [
+      "Add my newest 20 photos to Keepers",
+      "Remove my newest 20 photos from Drafts",
+      "Move the best ones from Drafts to Keepers"
+    ],
+    "slots": {
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos to move."
+      },
+      "fromAlbumRef": {
+        "type": "string",
+        "required": true,
+        "description": "The album to move photos out of."
+      },
+      "toAlbumRef": {
+        "type": "string",
+        "required": true,
+        "description": "The album to move photos into."
+      }
+    },
+    "requiredReadTools": [
+      "listAlbums",
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Move photos between albums",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves the source + both albums; Gallery owns the compound album.removeAssets + album.addAssets plan (requires both from and to; same-album declines)."
+    }
+  },
+  {
+    "kind": "remove_photos_from_album",
+    "flow": "hybrid",
+    "title": "Remove photos from album",
+    "classifierDescription": "User wants to remove a metadata-describable set of photos from an existing album (the inverse of adding) — not a member removal, an out-of-favorites, or a tag removal.",
+    "positiveExamples": [
+      "Remove my newest 20 photos from Family",
+      "Take my newest 20 photos out of the Trips album",
+      "Remove my 2024 photos from the Italy album"
+    ],
+    "negativeExamples": [
+      "Remove the Travel tag from my newest 20",
+      "Remove Bob from the Family space",
+      "Add my newest 20 photos to Family"
+    ],
+    "slots": {
+      "albumRef": {
+        "type": "string",
+        "required": true,
+        "description": "The album to remove photos from."
+      },
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos to remove."
+      }
+    },
+    "requiredReadTools": [
+      "listAlbums",
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Remove photos from album",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves the album and source; Gallery owns the album.removeAssets plan from the handle (never an empty removal)."
+    }
+  },
+  {
+    "kind": "manage_space_assets",
+    "flow": "hybrid",
+    "title": "Add or remove photos in a space",
+    "classifierDescription": "User wants to add or remove a metadata-describable set of PHOTOS in a shared space (not members). Requires both a \"space\" target and a photo source.",
+    "positiveExamples": [
+      "Add my newest 20 photos to the Family space",
+      "Remove my screenshots from the Family space",
+      "Put my 2024 photos into the Trips space"
+    ],
+    "negativeExamples": [
+      "Add Alex to the Family space",
+      "Add my newest 20 photos to Family",
+      "Add my newest 20 photos to the Trips album"
+    ],
+    "slots": {
+      "action": {
+        "type": "string",
+        "required": true,
+        "description": "add or remove."
+      },
+      "spaceRef": {
+        "type": "string",
+        "required": true,
+        "description": "How the user referred to the space."
+      },
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos."
+      }
+    },
+    "requiredReadTools": [
+      "listSpaces",
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAddAssetsToSpaceFromSearch",
+    "supportsContinuation": true,
+    "matrixRow": {
+      "capability": "Add/remove photos in a space",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves the space and source; Gallery owns the space add (from-search) / remove (space.removeAssets) plan from the handle. Durable space disambiguation: ambiguous space gets a storable candidate list."
+    }
+  },
+  {
+    "kind": "archive_assets",
+    "flow": "hybrid",
+    "title": "Archive or unarchive photos",
+    "classifierDescription": "User wants to archive or unarchive a metadata-describable set of photos (recency/date/type bound) or a named entity (people, place, tag, camera, rating, favorites).",
+    "positiveExamples": [
+      "Archive my newest 50 photos",
+      "Unarchive my last 10 photos",
+      "Move my 2024 videos out of the archive",
+      "Archive my Berlin photos"
+    ],
+    "negativeExamples": [
+      "Archive the best photos from last weekend",
+      "Archive the Family album",
+      "Add my newest 20 photos to Family"
+    ],
+    "slots": {
+      "archived": {
+        "type": "boolean",
+        "required": false,
+        "description": "true to archive, false to unarchive (default archive)."
+      },
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos to (un)archive."
+      }
+    },
+    "requiredReadTools": [
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAssetBatchFromSelection",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Archive assets",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves a recency/date/type source; Gallery owns the batch archive plan from the handle."
+    }
+  },
+  {
+    "kind": "cleanup_duplicates",
+    "flow": "hybrid",
+    "title": "Clean up duplicate photos",
+    "classifierDescription": "User wants to find and remove near-duplicate photos, keeping the best of each group (reversible Trash).",
+    "positiveExamples": [
+      "Clean up my duplicate photos",
+      "Find and remove duplicates",
+      "Trash duplicate photos",
+      "Dedupe my library"
+    ],
+    "negativeExamples": [
+      "Trash my newest 20 photos",
+      "Delete the Family album",
+      "Find my best photos"
+    ],
+    "slots": {},
+    "requiredReadTools": [
+      "listDuplicateGroups"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Duplicate cleanup",
+      "tier": "Solid now",
+      "flow": "Hybrid"
+    }
+  },
+  {
+    "kind": "visual_cleanup",
+    "flow": "hybrid",
+    "title": "Visual cleanup",
+    "classifierDescription": "User wants to trash a bounded set of objectively low-quality photos using precomputed quality scores: blurry/out-of-focus, dark/underexposed, or low-quality photos. This is not plain trash, duplicate cleanup, or subjective taste such as ugly/best/good photos.",
+    "positiveExamples": [
+      "Trash my blurry photos from last week",
+      "Delete dark photos from my recent uploads",
+      "Clean up low-quality photos from last month"
+    ],
+    "negativeExamples": [
+      "Trash my newest 20 photos",
+      "Trash duplicate photos",
+      "Delete the ugly ones",
+      "Find my best photos"
+    ],
+    "slots": {
+      "qualityMetric": {
+        "type": "string",
+        "required": true,
+        "description": "Quality metric to filter by: sharpness, brightness, or quality."
+      },
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata-bounded source after removing the quality adjective."
+      }
+    },
+    "requiredReadTools": [
+      "resolveAssetSearchFilters",
+      "searchAssets",
+      "curateSelection"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Visual cleanup",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves a bounded source, derives a quality-filtered handle, and Gallery owns the reviewable asset.trash plan from that handle."
+    }
+  },
+  {
+    "kind": "trash_assets",
+    "flow": "hybrid",
+    "title": "Trash photos (recoverable)",
+    "classifierDescription": "User wants to move a metadata-describable set of photos to the recoverable Trash (trash/delete/bin a recency/date/type or named-entity source). Reversible; album/space deletion, duplicate cleanup, objective quality cleanup, and subjective sources are out of scope.",
+    "positiveExamples": [
+      "Trash my newest 20 photos",
+      "Delete my 2024 screenshots",
+      "Move my newest 50 photos to the trash",
+      "Bin my videos from last weekend"
+    ],
+    "negativeExamples": [
+      "Delete the Family album",
+      "Remove my newest 20 from the Italy album",
+      "Remove the Travel tag from my newest 20",
+      "Trash my blurry photos",
+      "Trash the best ones"
+    ],
+    "slots": {
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos to trash."
+      }
+    },
+    "requiredReadTools": [
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Trash photos",
+      "tier": "Solid now",
+      "flow": "Hybrid"
+    }
+  },
+  {
+    "kind": "share_assets",
+    "flow": "hybrid",
+    "title": "Share photos as a link",
+    "classifierDescription": "User wants to create an outward-facing share link for a metadata-describable set of photos. Optional: expiry (\"expires in N days\"), password (\"with password X\"), or \"hide metadata\". OUTWARD-FACING / High risk / propose-only — the createSharedLinks write-scope defaults false in every preset so no link is ever created during tests or evals.",
+    "positiveExamples": [
+      "share these photos as a link",
+      "create a share link for my newest 20",
+      "make a shareable link for these, expires in 7 days",
+      "share my newest 10 with password hunter2"
+    ],
+    "negativeExamples": [
+      "trash my newest 20 photos",
+      "archive my newest 50 photos",
+      "share the album",
+      "add my newest 20 photos to Family"
+    ],
+    "slots": {
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos to share."
+      },
+      "expiryDays": {
+        "type": "number",
+        "required": false,
+        "description": "How many days until the link expires (e.g. 7 for \"expires in 7 days\")."
+      },
+      "password": {
+        "type": "string",
+        "required": false,
+        "description": "Optional link password."
+      },
+      "showMetadata": {
+        "type": "boolean",
+        "required": false,
+        "description": "false to hide EXIF/location metadata on the share page (default: show)."
+      }
+    },
+    "requiredReadTools": [
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Share links",
+      "tier": "Solid now",
+      "workflowOrBoundary": "`share_assets` resolves a bounded source and proposes a shareLink.create op (High risk; outward-facing; createSharedLinks write-scope defaults false in every preset — propose-only path; no link is ever created in tests or evals)."
+    }
+  },
+  {
+    "kind": "share_album",
+    "flow": "hybrid",
+    "title": "Share album as a link",
+    "classifierDescription": "User wants to create an outward-facing share link for a NAMED ALBUM (not for individual photos). The prompt must reference a specific album by name and contain the word \"album\". OUTWARD-FACING / High risk / propose-only — the createSharedLinks write-scope defaults false in every preset so no link is ever created during tests or evals.",
+    "positiveExamples": [
+      "share the Family album as a link",
+      "create a public share link for the Italy album",
+      "make a shareable link for the Trips album",
+      "generate a share link for the Family album, expires in 7 days"
+    ],
+    "negativeExamples": [
+      "share these photos as a link",
+      "create a share link for my newest 20",
+      "share my newest 10 with password hunter2",
+      "trash my newest 20 photos"
+    ],
+    "slots": {
+      "albumRef": {
+        "type": "string",
+        "required": true,
+        "description": "How the user referred to the album (e.g. \"Family album\" or \"Trips\")."
+      },
+      "expiryDays": {
+        "type": "number",
+        "required": false,
+        "description": "How many days until the link expires."
+      },
+      "password": {
+        "type": "string",
+        "required": false,
+        "description": "Optional link password."
+      },
+      "showMetadata": {
+        "type": "boolean",
+        "required": false,
+        "description": "false to hide EXIF/location metadata on the share page (default: show)."
+      }
+    },
+    "requiredReadTools": [
+      "listAlbums"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Album share links",
+      "tier": "Solid now",
+      "workflowOrBoundary": "`share_album` resolves a named album and proposes a shareLink.createAlbum op (High risk; outward-facing; createSharedLinks write-scope defaults false in every preset — propose-only path; no link is ever created in tests or evals)."
+    }
+  },
+  {
+    "kind": "restore_assets",
+    "flow": "hybrid",
+    "title": "Restore photos from Trash",
+    "classifierDescription": "User wants to restore (untrash/recover/bring back) a metadata-describable set of photos from the Trash back to their library. The source is always resolved within the Trash. Reversible; non-destructive; album/space deletion and subjective sources are out of scope.",
+    "positiveExamples": [
+      "Restore my newest 20 from trash",
+      "Recover the photos I just trashed",
+      "Get my photos back from the trash",
+      "Untrash these photos"
+    ],
+    "negativeExamples": [
+      "Trash my newest 20 photos",
+      "Delete my 2024 screenshots",
+      "Remove the Travel tag from my newest 20",
+      "Archive my newest 20"
+    ],
+    "slots": {
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the trashed photos to restore."
+      }
+    },
+    "requiredReadTools": [
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Restore from trash",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves a bounded trashed-asset source (isTrashed:true injected automatically); Gallery owns the Low-risk, reversible asset.restore plan."
+    }
+  },
+  {
+    "kind": "favorite_assets",
+    "flow": "hybrid",
+    "title": "Favorite or unfavorite photos",
+    "classifierDescription": "User wants to favorite or unfavorite a metadata-describable set of photos or a named entity (people, place, tag, camera, rating, favorites).",
+    "positiveExamples": [
+      "Favorite my newest 10 photos",
+      "Unfavorite my last 5 photos",
+      "Like my newest 20 photos",
+      "Favorite my 5-star photos"
+    ],
+    "negativeExamples": [
+      "Favorite the best 3 photos from last weekend",
+      "Favorite the Family album",
+      "Add the good ones to Family"
+    ],
+    "slots": {
+      "favorite": {
+        "type": "boolean",
+        "required": false,
+        "description": "true to favorite, false to unfavorite (default favorite)."
+      },
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos to (un)favorite."
+      }
+    },
+    "requiredReadTools": [
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAssetBatchFromSelection",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Mark favorites",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves a recency/date/type source; Gallery owns the batch favorite plan from the handle."
+    }
+  },
+  {
+    "kind": "tag_assets",
+    "flow": "hybrid",
+    "title": "Tag photos (add)",
+    "classifierDescription": "User wants to add a tag to a metadata-describable set of photos (add-only; no tag removal) or a named entity (people, place, tag, camera, rating, favorites).",
+    "positiveExamples": [
+      "Tag my newest 20 photos as Travel",
+      "Add the tag Spring Break to my newest 50 photos",
+      "Add the Travel tag to my last 10 photos",
+      "Tag photos of Alex as Family"
+    ],
+    "negativeExamples": [
+      "Remove the Travel tag from my newest 20",
+      "Tag the best ones as Travel",
+      "Add my newest 20 photos to the Travel album"
+    ],
+    "slots": {
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos to tag."
+      },
+      "tagName": {
+        "type": "string",
+        "required": true,
+        "description": "Tag name to add."
+      }
+    },
+    "requiredReadTools": [
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAssetBatchFromSelection",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Add or remove tags",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Add-only; Pi resolves the source; Gallery owns the batch tag-add plan from the handle."
+    }
+  },
+  {
+    "kind": "untag_assets",
+    "flow": "hybrid",
+    "title": "Untag photos (remove)",
+    "classifierDescription": "User wants to remove an existing tag from a metadata-describable set of photos or a named entity (remove-only; the add arm is tag_assets).",
+    "positiveExamples": [
+      "Remove the Travel tag from my newest 20",
+      "Remove tag Spring Break from my last 50 photos",
+      "Untag my newest 20 as Travel",
+      "Untag the Berlin photos from Work"
+    ],
+    "negativeExamples": [
+      "Add the Travel tag to my newest 20",
+      "Remove my newest 20 from the Italy album",
+      "Remove Bob from the Family space"
+    ],
+    "slots": {
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos to untag."
+      },
+      "tagName": {
+        "type": "string",
+        "required": false,
+        "description": "Tag name to remove (optional for untag phrasing; run asks if missing)."
+      }
+    },
+    "requiredReadTools": [
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Add or remove tags",
+      "tier": "Solid now",
+      "flow": "Hybrid"
+    }
+  },
+  {
+    "kind": "update_asset_metadata",
+    "flow": "hybrid",
+    "title": "Edit photo metadata",
+    "classifierDescription": "User wants to edit metadata (description/caption, star rating, capture date, time zone, or GPS location — by place name or explicit lat+lng) on a metadata-describable set of LOOSE photos — not an album or a space.",
+    "positiveExamples": [
+      "Set the description on my newest 20 photos to Berlin weekend",
+      "Rate my newest 12 photos five stars",
+      "Set the timezone on my newest 20 photos to Europe/Berlin",
+      "Set the location on my newest 20 to Paris"
+    ],
+    "negativeExamples": [
+      "Set the description on the Family album to Summer 2026",
+      "Set the description on the Trips space to Our adventures",
+      "Set Paris as the album cover"
+    ],
+    "slots": {
+      "field": {
+        "type": "string",
+        "required": true,
+        "description": "description, rating, timeZone, location, or date."
+      },
+      "value": {
+        "type": "string",
+        "required": false,
+        "description": "New value (text, 1-5 or clear for rating, IANA zone, ISO date)."
+      },
+      "placeName": {
+        "type": "string",
+        "required": false,
+        "description": "Place name for a location edit (resolved to lat/lng via resolveLocation)."
+      },
+      "latitude": {
+        "type": "number",
+        "required": false,
+        "description": "Latitude for a location edit (with longitude)."
+      },
+      "longitude": {
+        "type": "number",
+        "required": false,
+        "description": "Longitude for a location edit (with latitude)."
+      },
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos to edit."
+      }
+    },
+    "requiredReadTools": [
+      "resolveAssetSearchFilters",
+      "searchAssets",
+      "resolveLocation"
+    ],
+    "planTool": "proposeAssetBatchFromSelection",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Batch asset metadata edits",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves a loose-asset source and the field/value; Gallery owns the batch metadata-update plan from the handle."
+    }
+  },
+  {
+    "kind": "rotate_assets",
+    "flow": "hybrid",
+    "title": "Rotate photos",
+    "classifierDescription": "User wants to rotate a metadata-describable set of photos by an EXPLICIT angle (90, 180, or 270 degrees, clockwise or counterclockwise).",
+    "positiveExamples": [
+      "Rotate my newest 20 photos 90 clockwise",
+      "Flip my newest 5 photos upside down",
+      "Rotate my 2024 photos 180"
+    ],
+    "negativeExamples": [
+      "Rotate the sideways photos clockwise",
+      "Rotate the best ones 90 clockwise",
+      "Rotate my newest 20 photos 45 clockwise"
+    ],
+    "slots": {
+      "angle": {
+        "type": "number",
+        "required": true,
+        "description": "Rotation angle: 90, 180, or 270."
+      },
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos to rotate."
+      }
+    },
+    "requiredReadTools": [
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAssetBatchFromSelection",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Rotate assets",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves the source + explicit angle; Gallery owns the batch rotate plan from the handle."
+    }
+  },
+  {
+    "kind": "crop_assets",
+    "flow": "hybrid",
+    "title": "Crop photos (explicit geometry)",
+    "classifierDescription": "User wants to crop a photo to EXPLICIT pixel geometry (x, y, width, height supplied in the prompt). Comma form \"crop this photo to 100,100,800,600\" or labeled form \"crop to x=N y=N w=N h=N\". No geometry → asks for x/y/width/height; never guesses coordinates.",
+    "positiveExamples": [
+      "crop this photo to 100,100,800,600",
+      "crop to x=10 y=20 w=300 h=400",
+      "crop my newest photo to x=0 y=0 width=1920 height=1080"
+    ],
+    "negativeExamples": [
+      "crop this photo",
+      "crop my newest 20 photos",
+      "rotate my newest 20 photos 90 clockwise"
+    ],
+    "slots": {
+      "x": {
+        "type": "number",
+        "required": true,
+        "description": "Left edge of the crop rectangle (pixels, >= 0)."
+      },
+      "y": {
+        "type": "number",
+        "required": true,
+        "description": "Top edge of the crop rectangle (pixels, >= 0)."
+      },
+      "width": {
+        "type": "number",
+        "required": true,
+        "description": "Width of the crop rectangle (pixels, >= 1)."
+      },
+      "height": {
+        "type": "number",
+        "required": true,
+        "description": "Height of the crop rectangle (pixels, >= 1)."
+      },
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photo to crop."
+      }
+    },
+    "requiredReadTools": [
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAssetBatchFromSelection",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Crop assets",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves the source + explicit geometry (x/y/width/height); Gallery owns the batch asset.crop plan from the handle. No-geometry → asks for coordinates; never guesses."
+    }
+  },
+  {
+    "kind": "adjust_assets",
+    "flow": "hybrid",
+    "title": "Adjust photo look (brightness/contrast/saturation/auto-enhance)",
+    "classifierDescription": "User wants to adjust the look of a metadata-describable set of photos — brightness, contrast, saturation (named levels), or a one-click auto-enhance. NOT crop/rotate/flip.",
+    "positiveExamples": [
+      "Brighten my last 10 photos",
+      "Make my Berlin photos pop",
+      "Auto-enhance my newest 5"
+    ],
+    "negativeExamples": [
+      "Rotate the sideways photos",
+      "Make these look amazing",
+      "Crop my newest photo"
+    ],
+    "slots": {
+      "params": {
+        "type": "object",
+        "required": true,
+        "description": "AdjustParameters: brightness/contrast/saturation level or autoEnhance."
+      },
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos to adjust."
+      }
+    },
+    "requiredReadTools": [
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAssetBatchFromSelection",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Adjust assets (tonal)",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves the source + tonal adjustment params; Gallery owns the batch asset.adjust plan from the handle."
+    }
+  },
+  {
+    "kind": "flip_assets",
+    "flow": "hybrid",
+    "title": "Flip photos (mirror H/V)",
+    "classifierDescription": "User wants to flip/mirror a metadata-describable set of photos horizontally or vertically. NOT rotate (degrees) or 'upside down' (that is a 180 rotation).",
+    "positiveExamples": [
+      "Flip my newest 5 photos horizontally",
+      "Mirror these",
+      "Flip these vertically"
+    ],
+    "negativeExamples": [
+      "Rotate these 90",
+      "Flip my photos upside down",
+      "Crop this"
+    ],
+    "slots": {
+      "axis": {
+        "type": "string",
+        "required": false,
+        "description": "horizontal (default) or vertical."
+      },
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos to flip."
+      }
+    },
+    "requiredReadTools": [
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAssetBatchFromSelection",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Flip assets (mirror H/V)",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves the source + flip axis (horizontal default); Gallery owns the batch asset.flip plan from the handle. \"Upside down\" deferred to rotate_assets (180°)."
+    }
+  },
+  {
+    "kind": "stack_assets",
+    "flow": "hybrid",
+    "title": "Stack photos",
+    "classifierDescription": "User wants to stack (group into a stack) a metadata-describable set of photos. The server automatically selects the stack cover using: favorite > highest rating > newest > id. Requires at least two photos — fewer asks the user to broaden the selection.",
+    "positiveExamples": [
+      "stack my newest 10 photos",
+      "group my photos from 2024 into a stack",
+      "stack my Berlin photos"
+    ],
+    "negativeExamples": [
+      "stack the best ones",
+      "group my photos by date",
+      "unstack my newest 10 photos"
+    ],
+    "slots": {
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos to stack."
+      }
+    },
+    "requiredReadTools": [
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAssetBatchFromSelection",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Stack photos",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves a bounded source (≥2 required); Gallery owns the batch stack plan from the handle. Cover rule: favorite > highest rating > newest > id."
+    }
+  },
+  {
+    "kind": "unstack_assets",
+    "flow": "hybrid",
+    "title": "Unstack photos",
+    "classifierDescription": "User wants to unstack (dissolve a stack of) a metadata-describable set of photos. Assets in no stack are silently skipped; no minimum count required.",
+    "positiveExamples": [
+      "unstack my newest 10 photos",
+      "un-stack my Berlin photos",
+      "ungroup my photos from 2024"
+    ],
+    "negativeExamples": [
+      "unstack the best ones",
+      "stack my newest 10 photos",
+      "archive my newest 10 photos"
+    ],
+    "slots": {
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos to unstack."
+      }
+    },
+    "requiredReadTools": [
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAssetBatchFromSelection",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Unstack photos",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves a bounded source; Gallery owns the batch unstack plan from the handle. Assets not in a stack are silently skipped."
+    }
+  },
+  {
+    "kind": "rename_or_describe_space",
+    "flow": "strict",
+    "title": "Rename or describe space",
+    "classifierDescription": "User wants to rename a shared space and/or change its description, leaving members and assets unchanged.",
+    "positiveExamples": [
+      "Rename the Family space to Family 2026",
+      "Set the description on the Trips space to Our adventures",
+      "Change the description on my Family space"
+    ],
+    "negativeExamples": [
+      "Rename the Family album to Family 2026",
+      "Add Alex to the Family space",
+      "Make Alex an editor in Family"
+    ],
+    "slots": {
+      "spaceRef": {
+        "type": "string",
+        "required": true,
+        "description": "How the user referred to the space."
+      },
+      "newName": {
+        "type": "string",
+        "required": false,
+        "description": "New space name, if renaming."
+      },
+      "description": {
+        "type": "string",
+        "required": false,
+        "description": "New description, if setting one."
+      }
+    },
+    "requiredReadTools": [
+      "listSpaces"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": true,
+    "matrixRow": {
+      "capability": "Update space details",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Direct space-detail update plan; preserve unspecified fields. Durable space disambiguation: ambiguous space gets a storable candidate list."
+    }
+  },
+  {
+    "kind": "rename_person",
+    "flow": "hybrid",
+    "title": "Rename a person",
+    "classifierDescription": "User wants to rename a person in their People view (change the displayed name). Requires both the current name/reference and a new name. Declines when the ref contains a container noun (album/space).",
+    "positiveExamples": [
+      "Rename Alejandra to Karina",
+      "rename alex to alexander",
+      "Change this person's name to Bob"
+    ],
+    "negativeExamples": [
+      "Rename the Family album to Family 2026",
+      "Rename the Trips space to Adventures",
+      "Hide Alex"
+    ],
+    "slots": {
+      "personRef": {
+        "type": "string",
+        "required": true,
+        "description": "Current person name or reference."
+      },
+      "newName": {
+        "type": "string",
+        "required": true,
+        "description": "New name to assign to the person."
+      }
+    },
+    "requiredReadTools": [
+      "searchPeople"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": true,
+    "matrixRow": {
+      "capability": "Rename person",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves the person via searchPeople (durable disambiguation); Gallery owns the person.update plan with { name } payload."
+    }
+  },
+  {
+    "kind": "set_person_birthdate",
+    "flow": "hybrid",
+    "title": "Set a person's birthday",
+    "classifierDescription": "User wants to record a person's date of birth / birthday / birthdate. Accepts ISO dates (1990-05-01) and natural English dates (\"May 1 1990\", \"1st May 1990\"). Future dates are rejected.",
+    "positiveExamples": [
+      "set Alex's birthday to 1990-05-01",
+      "set Alex's birthdate to May 1 1990",
+      "set Alex's date of birth to 1st May 1990"
+    ],
+    "negativeExamples": [
+      "Rename Alex to Alexander",
+      "Hide Alex",
+      "set Alex's birthday"
+    ],
+    "slots": {
+      "personRef": {
+        "type": "string",
+        "required": true,
+        "description": "Person name or reference."
+      },
+      "dateStr": {
+        "type": "string",
+        "required": true,
+        "description": "Birth date string (ISO or natural English)."
+      }
+    },
+    "requiredReadTools": [
+      "searchPeople"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": true,
+    "matrixRow": {
+      "capability": "Set person birthday",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves the person via searchPeople (durable disambiguation) and parses the date; Gallery owns the person.update plan with { birthDate } payload. Future dates and unparseable strings are rejected with needsInput."
+    }
+  },
+  {
+    "kind": "lock_assets",
+    "flow": "hybrid",
+    "title": "Move photos to the Locked folder",
+    "classifierDescription": "User wants to move a metadata-describable set of photos (recency/date/type bound) or a named entity into the Locked (private) folder: \"lock my passport scans\", \"move my 2024 receipts to the locked folder\", \"put these in my private folder\", \"hide my newest 20 in the locked folder\". One-directional (lock only, never unlock). Plain \"hide <person>\" with no folder cue (hide_person), archive, and trash are out of scope.",
+    "positiveExamples": [
+      "Lock my passport scans",
+      "Move my 2024 receipts to the locked folder",
+      "Put these in my private folder",
+      "Hide my newest 20 in the locked folder"
+    ],
+    "negativeExamples": [
+      "Hide Alex",
+      "Archive my newest 50 photos",
+      "Trash my newest 20 photos",
+      "Lock the best ones"
+    ],
+    "slots": {
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos to move to the Locked folder."
+      }
+    },
+    "requiredReadTools": [
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAssetBatchFromSelection",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Move photos to the Locked folder",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves a bounded source; Gallery owns the batch asset.setVisibility (visibility: 'locked') plan from the handle. Lock only — no unlock. Subjective sources and bare \"hide <person>\" decline; lockAssets write-scope required."
+    }
+  },
+  {
+    "kind": "hide_person",
+    "flow": "hybrid",
+    "title": "Hide or unhide a person",
+    "classifierDescription": "User wants to hide a person from the People view (isHidden:true) or unhide/show a previously hidden person (isHidden:false). \"hide <name>\" hides; \"unhide/show/un-hide <name>\" unhides. For unhide, hidden people are included in the search. Declines when the ref contains a container noun (album/space).",
+    "positiveExamples": [
+      "hide Alex",
+      "hide Alex from my People list",
+      "unhide Alex",
+      "show Alex",
+      "un-hide Alex"
+    ],
+    "negativeExamples": [
+      "hide the Family album",
+      "rename Alex to Bob",
+      "archive my newest 20 photos"
+    ],
+    "slots": {
+      "personRef": {
+        "type": "string",
+        "required": true,
+        "description": "Person name or reference."
+      },
+      "verb": {
+        "type": "string",
+        "required": true,
+        "description": "\"hide\" or \"unhide\"."
+      }
+    },
+    "requiredReadTools": [
+      "searchPeople"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": true,
+    "matrixRow": {
+      "capability": "Hide/unhide person",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves the person via searchPeople (includeHidden:true for unhide); Gallery owns the person.update plan with { isHidden } payload. Durable disambiguation: ambiguous person gets a storable candidate list."
+    }
+  },
+  {
+    "kind": "merge_people",
+    "flow": "hybrid",
+    "title": "Merge two people",
+    "classifierDescription": "User wants to merge two people in their People view — reassigning the source person's faces to the kept person, then deleting the source. HIGH RISK: irreversible. Accepts \"merge A into B\" (keep=B) or \"merge A and B\" (keep=last-named, B).",
+    "positiveExamples": [
+      "Merge Alejandra into Karina",
+      "Merge Alex into Alexander",
+      "Merge Alex and Karina"
+    ],
+    "negativeExamples": [
+      "Merge duplicate photos",
+      "Merge the Summer and Spring albums"
+    ],
+    "slots": {
+      "sourceRef": {
+        "type": "string",
+        "required": true,
+        "description": "Person to merge FROM (will be deleted)."
+      },
+      "keepRef": {
+        "type": "string",
+        "required": true,
+        "description": "Person to merge INTO (will be kept)."
+      }
+    },
+    "requiredReadTools": [
+      "searchPeople"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": true,
+    "matrixRow": {
+      "capability": "Merge people",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves both people via searchPeople (two-stage durable disambiguation: source then keep); Gallery owns the person.merge plan (High risk, irreversible — faces reassigned, source deleted). Same-person guard declines self-merge. managePeople write-scope required."
+    }
+  },
+  {
+    "kind": "manage_album_access",
+    "flow": "strict",
+    "title": "Share an album with users",
+    "classifierDescription": "User wants to share an album with one or more Gallery users (add or remove access), optionally with a role (editor/viewer). Distinct from sharing as a public link (share_album) and from managing a space's member list (manage_space_members).",
+    "positiveExamples": [
+      "Share the Family album with Alex",
+      "Give Alex edit access to the Beach album",
+      "Add Sam to the Trips album as a viewer",
+      "Remove Bob from the Family album"
+    ],
+    "negativeExamples": [
+      "Share the Family album as a link",
+      "Add Alex to the Family space",
+      "Add my newest 20 photos to the Family album",
+      "Share my newest 20 photos as a link"
+    ],
+    "slots": {
+      "action": {
+        "type": "string",
+        "required": true,
+        "description": "add or remove."
+      },
+      "memberQueries": {
+        "type": "array",
+        "required": true,
+        "description": "User names or emails to add or remove."
+      },
+      "albumRef": {
+        "type": "string",
+        "required": true,
+        "description": "How the user referred to the album."
+      },
+      "role": {
+        "type": "string",
+        "required": false,
+        "description": "editor or viewer (default viewer on add)."
+      }
+    },
+    "requiredReadTools": [
+      "listAlbums",
+      "readAlbum",
+      "searchUsers"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": true,
+    "matrixRow": {
+      "capability": "Share an album with people",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Resolve album + users (durable two-stage disambiguation); guard owner/already-member; propose album.addUsers or album.removeUsers plan. shareAlbums write-scope required."
+    }
+  },
+  {
+    "kind": "change_album_member_role",
+    "flow": "strict",
+    "title": "Change an album member's role",
+    "classifierDescription": "User wants to change an existing album member's role to editor or viewer. The prompt MUST mention the word 'album'. Declines 'space' targets (those belong to change_member_role).",
+    "positiveExamples": [
+      "Make Alex an editor on the Family album",
+      "Change Bob's role to viewer in the Family album",
+      "Make Sam a viewer on the Beach album"
+    ],
+    "negativeExamples": [
+      "Make Alex an editor in the Family space",
+      "Add Alex to the Family album",
+      "Share the Family album with Alex"
+    ],
+    "slots": {
+      "memberQuery": {
+        "type": "string",
+        "required": true,
+        "description": "The member name or email."
+      },
+      "role": {
+        "type": "string",
+        "required": true,
+        "description": "editor or viewer."
+      },
+      "albumRef": {
+        "type": "string",
+        "required": true,
+        "description": "How the user referred to the album (trailing \"album\" word stripped)."
+      }
+    },
+    "requiredReadTools": [
+      "listAlbums",
+      "readAlbum",
+      "searchUsers"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": true,
+    "matrixRow": {
+      "capability": "Change an album member's role",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Resolve album + user (durable two-stage disambiguation); guard owner/no-op/non-member; propose album.updateUserRole plan. Requires \"album\" in the prompt (declines space targets)."
+    }
+  },
+  {
+    "kind": "manage_space_members",
+    "flow": "strict",
+    "title": "Add or remove space members",
+    "classifierDescription": "User wants to add or remove members of a shared space, optionally with a role.",
+    "positiveExamples": [
+      "Add Alex to the Family space as editor",
+      "Add Sam and Jo to the Trips space",
+      "Remove Bob from the Family space"
+    ],
+    "negativeExamples": [
+      "Add my newest 20 photos to the Family space",
+      "Make Alex an editor in Family",
+      "Rename the Family space to Family 2026"
+    ],
+    "slots": {
+      "action": {
+        "type": "string",
+        "required": true,
+        "description": "add or remove."
+      },
+      "memberQueries": {
+        "type": "array",
+        "required": true,
+        "description": "Member names or emails to add or remove."
+      },
+      "spaceRef": {
+        "type": "string",
+        "required": true,
+        "description": "How the user referred to the space."
+      },
+      "role": {
+        "type": "string",
+        "required": false,
+        "description": "editor or viewer (default viewer on add)."
+      }
+    },
+    "requiredReadTools": [
+      "listSpaces",
+      "readSpace",
+      "searchUsers"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": true,
+    "matrixRow": {
+      "capability": "Add or remove space members",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Resolve members; guard owner/self/last-owner removal; propose the membership plan. Durable two-stage disambiguation: ambiguous space then ambiguous user each get a storable candidate list."
+    }
+  },
+  {
+    "kind": "change_member_role",
+    "flow": "strict",
+    "title": "Change a space member's role",
+    "classifierDescription": "User wants to change a shared-space member's role to editor or viewer.",
+    "positiveExamples": [
+      "Make Alex an editor in the Family space",
+      "Change Bob's role to viewer in Trips",
+      "Make Sam a viewer in Family"
+    ],
+    "negativeExamples": [
+      "Add Alex to the Family space",
+      "Remove Bob from the Family space",
+      "Rename the Family space to Family 2026"
+    ],
+    "slots": {
+      "memberQuery": {
+        "type": "string",
+        "required": true,
+        "description": "The member name or email."
+      },
+      "role": {
+        "type": "string",
+        "required": true,
+        "description": "editor or viewer."
+      },
+      "spaceRef": {
+        "type": "string",
+        "required": true,
+        "description": "How the user referred to the space."
+      }
+    },
+    "requiredReadTools": [
+      "listSpaces",
+      "readSpace",
+      "searchUsers"
+    ],
+    "planTool": "proposeAlbumOperations",
+    "supportsContinuation": true,
+    "matrixRow": {
+      "capability": "Change space member roles",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Resolve the member; guard owner/self/no-op; propose the role-change plan. Durable two-stage disambiguation: ambiguous space then ambiguous user each get a storable candidate list."
+    }
+  },
+  {
+    "kind": "create_album_from_source",
+    "flow": "hybrid",
+    "title": "Create album from a source",
+    "classifierDescription": "User wants a NEW album built from a metadata-describable set of photos (recency, date, type, or a named entity like people/tag/camera/rating/favorites), not a recent trip, vacation, or getaway.",
+    "positiveExamples": [
+      "Make an album of my newest 50 photos",
+      "Create an album from my 2024 photos called Best of 2024",
+      "Build an album of my newest 100 photos",
+      "Make an album of my Sony photos"
+    ],
+    "negativeExamples": [
+      "Create an album for my recent trip to USA",
+      "Add my newest 20 photos to Family",
+      "Make an album of the best photos"
+    ],
+    "slots": {
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos for the new album."
+      },
+      "albumName": {
+        "type": "string",
+        "required": false,
+        "description": "Album name (defaults to New Album)."
+      }
+    },
+    "requiredReadTools": [
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeAlbumFromSelection",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Create album from a source",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves a recency/date/type source; Gallery owns album creation from the handle."
+    }
+  },
+  {
+    "kind": "create_space_from_source",
+    "flow": "hybrid",
+    "title": "Create space from a source",
+    "classifierDescription": "User wants a NEW shared space built from a metadata-describable set of photos — not a new album, not an existing-space photo add, and not a member add.",
+    "positiveExamples": [
+      "Make a Family space of my newest 50 photos",
+      "Create a shared space from my 2024 photos",
+      "Make a space of my newest 20 photos titled South Africa"
+    ],
+    "negativeExamples": [
+      "Make an album of my newest 50 photos",
+      "Add my newest 20 photos to the Family space",
+      "Rename the Family space to Family 2026"
+    ],
+    "slots": {
+      "sourceDescription": {
+        "type": "string",
+        "required": true,
+        "description": "Metadata description of the photos for the new space."
+      },
+      "spaceName": {
+        "type": "string",
+        "required": false,
+        "description": "Space name (defaults to New Space)."
+      }
+    },
+    "requiredReadTools": [
+      "resolveAssetSearchFilters",
+      "searchAssets"
+    ],
+    "planTool": "proposeSpaceFromSearch",
+    "supportsContinuation": false,
+    "matrixRow": {
+      "capability": "Create space from a source",
+      "tier": "Solid now",
+      "workflowOrBoundary": "Pi resolves the source; Gallery owns space creation from the wrapped selection handle (proposeSpaceFromSearch)."
+    }
+  }
+]

@@ -110,6 +110,12 @@ export interface SearchExifOptions {
   ratingIsMinimum?: boolean;
 }
 
+export interface SearchQualityOptions {
+  maxSharpness?: number;
+  maxBrightness?: number;
+  maxQuality?: number;
+}
+
 export interface SearchEmbeddingOptions {
   embedding: string;
   /**
@@ -153,6 +159,7 @@ export interface SearchAlbumOptions {
    * SearchService queries (database.ts:600-607) — do not flip this default.
    */
   albumAccessIsBoundary?: boolean;
+  albumMatchAny?: boolean;
 }
 
 export interface SearchSpaceOptions {
@@ -173,6 +180,7 @@ export interface SearchPaginationOptions {
 type BaseAssetSearchOptions = SearchDateOptions &
   SearchIdOptions &
   SearchExifOptions &
+  SearchQualityOptions &
   SearchOrderOptions &
   SearchPathOptions &
   SearchStatusOptions &
@@ -217,6 +225,7 @@ export interface AssetSearchPaginationV3Options {
 export type SmartSearchOptions = SearchDateOptions &
   SearchEmbeddingOptions &
   SearchExifOptions &
+  SearchQualityOptions &
   SearchOneToOneRelationOptions &
   Omit<SearchStatusOptions, 'visibility'> &
   SearchUserIdOptions &

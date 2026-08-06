@@ -68,6 +68,7 @@ export const newAccessRepositoryMock = (): IAccessRepositoryMock => {
 
     sharedSpace: {
       checkMemberAccess: vitest.fn().mockResolvedValue(new Set()),
+      checkRoleAccess: vitest.fn().mockResolvedValue(new Set()),
     },
 
     stack: {

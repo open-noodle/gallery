@@ -15,6 +15,11 @@ const resetEnv = () => {
     'IMMICH_WORKERS_EXCLUDE',
     'IMMICH_TRUSTED_PROXIES',
     'IMMICH_API_METRICS_PORT',
+    'IMMICH_AGENT_RUNNER_URL',
+    'IMMICH_AGENT_TOOL_GATEWAY_URL',
+    'IMMICH_AGENT_MCP_GATEWAY_URL',
+    'IMMICH_AGENT_RUNNER_HEALTH_TIMEOUT_MS',
+    'IMMICH_AGENT_RUNNER_MESSAGE_STREAM_TIMEOUT_MS',
     'IMMICH_MEDIA_LOCATION',
     'IMMICH_MICROSERVICES_METRICS_PORT',
     'IMMICH_TELEMETRY_INCLUDE',
@@ -121,6 +126,84 @@ describe('getEnv', () => {
     it('should throw an error for invalid value', () => {
       process.env.IMMICH_ALLOW_SETUP = 'invalid';
       expect(() => getEnv()).toThrowError('[IMMICH_ALLOW_SETUP] Invalid option: expected one of');
+    });
+  });
+
+  describe('agent runner', () => {
+    it('should default runner config to disabled with separate health and message stream timeouts', () => {
+      const { agent } = getEnv();
+
+      expect(agent).toMatchObject({
+        runnerUrl: undefined,
+        runnerHealthTimeoutMs: 2000,
+        runnerMessageStreamTimeoutMs: 300_000,
+      });
+    });
+
+    it('should parse runner URL, health timeout, and message stream timeout', () => {
+      process.env.IMMICH_AGENT_RUNNER_URL = 'http://agent-runner:4477';
+      process.env.IMMICH_AGENT_RUNNER_HEALTH_TIMEOUT_MS = '5000';
+      process.env.IMMICH_AGENT_RUNNER_MESSAGE_STREAM_TIMEOUT_MS = '120000';
+
+      const { agent } = getEnv();
+
+      expect(agent).toMatchObject({
+        runnerUrl: 'http://agent-runner:4477',
+        runnerHealthTimeoutMs: 5000,
+        runnerMessageStreamTimeoutMs: 120_000,
+      });
+    });
+
+    it('should parse MCP gateway URL', () => {
+      process.env.IMMICH_AGENT_MCP_GATEWAY_URL = 'http://immich-server:2283/api/agent/internal/mcp';
+
+      const { agent } = getEnv();
+
+      expect(agent.mcpGatewayUrl).toBe('http://immich-server:2283/api/agent/internal/mcp');
+      expect(agent).not.toHaveProperty('toolGatewayUrl');
+    });
+
+    it('should reject the retired tool gateway env name', () => {
+      process.env.IMMICH_AGENT_TOOL_GATEWAY_URL = 'http://immich-server:2283/api/agent/internal/tools';
+
+      expect(() => getEnv()).toThrowError('[IMMICH_AGENT_TOOL_GATEWAY_URL] Use IMMICH_AGENT_MCP_GATEWAY_URL instead');
+    });
+
+    it('should reject the retired tool gateway env name even when the MCP gateway is also set', () => {
+      process.env.IMMICH_AGENT_TOOL_GATEWAY_URL = 'http://immich-server:2283/api/agent/internal/tools';
+      process.env.IMMICH_AGENT_MCP_GATEWAY_URL = 'http://immich-server:2283/api/agent/internal/mcp';
+
+      expect(() => getEnv()).toThrowError('[IMMICH_AGENT_TOOL_GATEWAY_URL] Use IMMICH_AGENT_MCP_GATEWAY_URL instead');
+    });
+
+    it('should reject invalid runner URLs', () => {
+      process.env.IMMICH_AGENT_RUNNER_URL = 'not-a-url';
+
+      expect(() => getEnv()).toThrowError('[IMMICH_AGENT_RUNNER_URL] Invalid URL');
+    });
+
+    it('should reject non-http runner URLs', () => {
+      process.env.IMMICH_AGENT_RUNNER_URL = 'ftp://agent-runner.local';
+
+      expect(() => getEnv()).toThrowError('[IMMICH_AGENT_RUNNER_URL] Runner URL must use http or https');
+    });
+
+    it('should reject non-http MCP gateway URLs', () => {
+      process.env.IMMICH_AGENT_MCP_GATEWAY_URL = 'ftp://immich-server.local';
+
+      expect(() => getEnv()).toThrowError('[IMMICH_AGENT_MCP_GATEWAY_URL] MCP gateway URL must use http or https');
+    });
+
+    it('should reject non-positive runner health timeouts', () => {
+      process.env.IMMICH_AGENT_RUNNER_HEALTH_TIMEOUT_MS = '0';
+
+      expect(() => getEnv()).toThrowError('[IMMICH_AGENT_RUNNER_HEALTH_TIMEOUT_MS] Too small');
+    });
+
+    it('should reject non-positive runner message stream timeouts', () => {
+      process.env.IMMICH_AGENT_RUNNER_MESSAGE_STREAM_TIMEOUT_MS = '0';
+
+      expect(() => getEnv()).toThrowError('[IMMICH_AGENT_RUNNER_MESSAGE_STREAM_TIMEOUT_MS] Too small');
     });
   });
 

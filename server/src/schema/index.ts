@@ -26,6 +26,14 @@ import {
   user_metadata_audit,
 } from 'src/schema/functions';
 import { ActivityTable } from 'src/schema/tables/activity.table';
+import { AgentMessageTable } from 'src/schema/tables/agent-message.table';
+import { AgentOperationPlanTable } from 'src/schema/tables/agent-operation-plan.table';
+import { AgentOperationTable } from 'src/schema/tables/agent-operation.table';
+import { AgentProviderCredentialTable } from 'src/schema/tables/agent-provider-credential.table';
+import { AgentSelectionHandleTable } from 'src/schema/tables/agent-selection-handle.table';
+import { AgentSessionActivityEventTable } from 'src/schema/tables/agent-session-activity-event.table';
+import { AgentSessionTable } from 'src/schema/tables/agent-session.table';
+import { AgentToolCallTable } from 'src/schema/tables/agent-tool-call.table';
 import { AlbumAssetAuditTable } from 'src/schema/tables/album-asset-audit.table';
 import { AlbumAssetTable } from 'src/schema/tables/album-asset.table';
 import { AlbumAuditTable } from 'src/schema/tables/album-audit.table';
@@ -49,6 +57,7 @@ import { AssetMetadataAuditTable } from 'src/schema/tables/asset-metadata-audit.
 import { AssetMetadataTable } from 'src/schema/tables/asset-metadata.table';
 import { AssetOcrAuditTable } from 'src/schema/tables/asset-ocr-audit.table';
 import { AssetOcrTable } from 'src/schema/tables/asset-ocr.table';
+import { AssetQualityTable } from 'src/schema/tables/asset-quality.table';
 import { AssetTable } from 'src/schema/tables/asset.table';
 import { FaceIdentityFaceTable } from 'src/schema/tables/face-identity-face.table';
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table';
@@ -136,6 +145,14 @@ export class ImmichDatabase {
     AlbumUserAuditTable,
     AlbumUserTable,
     AlbumTable,
+    AgentProviderCredentialTable,
+    AgentSessionTable,
+    AgentSessionActivityEventTable,
+    AgentMessageTable,
+    AgentToolCallTable,
+    AgentSelectionHandleTable,
+    AgentOperationPlanTable,
+    AgentOperationTable,
     ApiKeyTable,
     AssetAuditTable,
     AssetDuplicateChecksumTable,
@@ -146,6 +163,7 @@ export class ImmichDatabase {
     AssetMetadataTable,
     AssetMetadataAuditTable,
     AssetJobStatusTable,
+    AssetQualityTable,
     AssetOcrTable,
     AssetOcrAuditTable,
     AssetTable,
@@ -267,6 +285,15 @@ export interface DB {
   album_user: AlbumUserTable;
   album_user_audit: AlbumUserAuditTable;
 
+  agent_provider_credential: AgentProviderCredentialTable;
+  agent_message: AgentMessageTable;
+  agent_tool_call: AgentToolCallTable;
+  agent_selection_handle: AgentSelectionHandleTable;
+  agent_session_activity_event: AgentSessionActivityEventTable;
+  agent_session: AgentSessionTable;
+  agent_operation_plan: AgentOperationPlanTable;
+  agent_operation: AgentOperationTable;
+
   api_key: ApiKeyTable;
 
   asset: AssetTable;
@@ -281,6 +308,7 @@ export interface DB {
   asset_metadata: AssetMetadataTable;
   asset_metadata_audit: AssetMetadataAuditTable;
   asset_job_status: AssetJobStatusTable;
+  asset_quality: AssetQualityTable;
   asset_ocr: AssetOcrTable;
   asset_ocr_audit: AssetOcrAuditTable;
   asset_audio: AssetAudioTable;

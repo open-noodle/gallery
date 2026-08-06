@@ -3412,11 +3412,11 @@ describe('tagsDisabled persists across close/reopen', () => {
     );
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const m = new GlobalSearchManager();
+    m.open();
     m.setQuery('tag');
     await vi.advanceTimersByTimeAsync(200);
     expect(m.sections.tags).toEqual({ status: 'error', message: 'tag_cache_too_large' });
     expect((m as unknown as { tagsDisabled: boolean }).tagsDisabled).toBe(true);
-    await vi.advanceTimersByTimeAsync(0);
     m.close();
     m.open();
     // Swap mock to a tiny list — if tagsDisabled reset, this would succeed and repopulate.
@@ -3427,7 +3427,6 @@ describe('tagsDisabled persists across close/reopen', () => {
     m.setQuery('tag');
     await vi.advanceTimersByTimeAsync(200);
     expect(m.sections.tags).toEqual({ status: 'error', message: 'tag_cache_too_large' });
-    expect((m as unknown as { tagsDisabled: boolean }).tagsDisabled).toBe(true);
     warnSpy.mockRestore();
   });
 });

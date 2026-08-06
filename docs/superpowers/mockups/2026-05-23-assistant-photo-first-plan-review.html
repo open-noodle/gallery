@@ -1,0 +1,1680 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Assistant Photo-first Plan Review Mockup</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --page: #050607;
+        --panel: #0d0f11;
+        --panel-soft: #12161b;
+        --panel-raised: #191d22;
+        --line: #2b323b;
+        --line-soft: #222830;
+        --text: #f3f6f8;
+        --muted: #9ba4ad;
+        --dim: #717b86;
+        --blue: #8fbaff;
+        --blue-strong: #62a1ff;
+        --green: #5cd69b;
+        --amber: #f2bc57;
+        --red: #f56d7a;
+        --shadow: 0 22px 80px rgba(0, 0, 0, 0.42);
+        --radius-lg: 28px;
+        --radius-md: 20px;
+        --radius-sm: 14px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 88% 12%, rgba(98, 161, 255, 0.12), transparent 28rem),
+          linear-gradient(180deg, #070809 0%, var(--page) 52%, #020303 100%);
+        color: var(--text);
+        font:
+          14px/1.45 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: 236px minmax(0, 1fr);
+        grid-template-rows: 64px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .topbar {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: 210px minmax(220px, 1fr) auto;
+        align-items: center;
+        gap: 24px;
+        border-bottom: 1px solid #15191e;
+        background: rgba(5, 6, 7, 0.92);
+        padding: 0 16px;
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        backdrop-filter: blur(18px);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 24px;
+        font-weight: 650;
+        letter-spacing: 0;
+      }
+
+      .logo {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 11px;
+        background:
+          linear-gradient(135deg, #ef6461 0 28%, transparent 29%),
+          linear-gradient(225deg, #8fbaff 0 28%, transparent 29%),
+          linear-gradient(45deg, #f4c95d 0 28%, transparent 29%),
+          linear-gradient(315deg, #6bdc9a 0 28%, transparent 29%), #111;
+        box-shadow: inset 0 0 0 3px #0c0c0c;
+      }
+
+      .lens {
+        width: 20px;
+        height: 20px;
+        border: 3px solid #8fbaff;
+        border-radius: 999px;
+        background: #08090a;
+      }
+
+      .search {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        height: 42px;
+        max-width: 960px;
+        border: 1px solid #1f252c;
+        border-radius: 999px;
+        background: #17191c;
+        padding: 0 14px;
+        color: var(--muted);
+      }
+
+      .key {
+        margin-left: auto;
+        border: 1px solid #303741;
+        border-radius: 999px;
+        padding: 2px 8px;
+        color: #cbd1d8;
+        font-size: 11px;
+      }
+
+      .top-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .icon-button,
+      .pill-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 38px;
+        border: 1px solid #303741;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+        padding: 0 15px;
+        transition:
+          transform 140ms ease,
+          border-color 140ms ease,
+          background 140ms ease;
+      }
+
+      .icon-button {
+        width: 38px;
+        padding: 0;
+      }
+
+      .pill-button:hover,
+      .icon-button:hover {
+        border-color: #4b5664;
+        background: rgba(255, 255, 255, 0.07);
+        transform: translateY(-1px);
+      }
+
+      .pill-button.primary {
+        border-color: transparent;
+        background: linear-gradient(135deg, #b8d4ff, #7eadff);
+        color: #07111d;
+        font-weight: 750;
+      }
+
+      .pill-button.danger {
+        border-color: rgba(245, 109, 122, 0.45);
+        color: #ff9ba4;
+      }
+
+      .avatar {
+        display: grid;
+        place-items: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #8fbaff, #306eea);
+        color: white;
+        font-weight: 800;
+      }
+
+      .sidebar {
+        border-right: 1px solid #15191e;
+        background: #060708;
+        padding: 28px 14px 22px;
+      }
+
+      .nav-section {
+        margin-bottom: 28px;
+      }
+
+      .nav-label {
+        color: #68717b;
+        font-size: 12px;
+        margin: 0 0 8px 8px;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 42px;
+        border-radius: 999px;
+        color: #c5cbd1;
+        padding: 0 12px;
+        font-weight: 620;
+      }
+
+      .nav-item.active {
+        background: #151b21;
+        color: #b8d4ff;
+      }
+
+      .nav-icon {
+        display: grid;
+        place-items: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 8px;
+        background: #242a32;
+        color: #dde6ef;
+        font-size: 12px;
+      }
+
+      .storage {
+        margin-top: auto;
+        border-radius: 18px;
+        background: #17191b;
+        padding: 16px;
+        color: #dbe0e6;
+      }
+
+      .storage-bar {
+        height: 6px;
+        margin-top: 12px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #2b323b;
+      }
+
+      .storage-bar span {
+        display: block;
+        width: 31%;
+        height: 100%;
+        border-radius: inherit;
+        background: #a9c9ff;
+      }
+
+      .workspace {
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      .session-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        min-height: 76px;
+        border-bottom: 1px solid #161b21;
+        padding: 0 24px;
+        background: rgba(5, 6, 7, 0.76);
+      }
+
+      .session-title {
+        min-width: 0;
+      }
+
+      .session-title h1 {
+        margin: 0 0 3px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 17px;
+        font-weight: 780;
+      }
+
+      .session-title p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        margin-left: 10px;
+        border-radius: 999px;
+        background: rgba(242, 188, 87, 0.16);
+        color: #ffd78b;
+        padding: 3px 10px;
+        font-size: 12px;
+        font-weight: 760;
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .content {
+        height: calc(100vh - 140px);
+        overflow: auto;
+        padding: 26px 24px 126px;
+      }
+
+      .conversation {
+        width: min(1040px, 100%);
+        margin: 0 auto;
+        display: grid;
+        gap: 18px;
+      }
+
+      .assistant-copy {
+        width: min(640px, 100%);
+        color: #dce2e8;
+      }
+
+      .assistant-copy p {
+        margin: 0 0 10px;
+      }
+
+      .activity-card,
+      .plan-sheet {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 36%), var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .activity-card {
+        width: min(760px, 100%);
+        padding: 16px;
+      }
+
+      .activity-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 12px;
+      }
+
+      .eyebrow {
+        margin: 0;
+        color: var(--blue);
+        font-size: 12px;
+        font-weight: 780;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+      }
+
+      .activity-head h2,
+      .plan-copy h2 {
+        margin: 2px 0 0;
+        font-size: 18px;
+        letter-spacing: 0;
+      }
+
+      .activity-rail {
+        position: relative;
+        display: grid;
+        gap: 10px;
+        padding-left: 18px;
+      }
+
+      .activity-rail::before {
+        content: '';
+        position: absolute;
+        left: 5px;
+        top: 9px;
+        bottom: 9px;
+        width: 2px;
+        border-radius: 999px;
+        background: linear-gradient(#5cd69b, #8fbaff, #f2bc57);
+      }
+
+      .activity-step {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
+        border: 1px solid #222933;
+        border-radius: var(--radius-sm);
+        background: rgba(255, 255, 255, 0.025);
+        padding: 12px 14px;
+      }
+
+      .activity-step::before {
+        content: '';
+        position: absolute;
+        left: -18px;
+        top: 18px;
+        width: 12px;
+        height: 12px;
+        border: 2px solid var(--panel);
+        border-radius: 999px;
+        background: var(--green);
+        box-shadow: 0 0 0 3px rgba(92, 214, 155, 0.2);
+      }
+
+      .activity-step.pending::before {
+        background: var(--amber);
+        box-shadow: 0 0 0 3px rgba(242, 188, 87, 0.2);
+      }
+
+      .activity-step h3,
+      .change-row h3 {
+        margin: 0;
+        font-size: 14px;
+      }
+
+      .activity-step p,
+      .change-row p,
+      .plan-copy p,
+      .photo-copy p,
+      .technical-content {
+        margin: 3px 0 0;
+        color: var(--muted);
+      }
+
+      .mini-pill {
+        display: inline-flex;
+        align-items: center;
+        height: 25px;
+        border-radius: 999px;
+        background: #1f2630;
+        color: #cdd6df;
+        padding: 0 10px;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .plan-sheet {
+        overflow: hidden;
+      }
+
+      .plan-sheet.collapsed .photo-stage,
+      .plan-sheet.collapsed .plan-body,
+      .plan-sheet.collapsed .apply-dock {
+        display: none;
+      }
+
+      .plan-hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 24px;
+        padding: 22px 24px 14px;
+      }
+
+      .plan-title-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .plan-copy h2 {
+        max-width: 720px;
+        font-size: clamp(22px, 3vw, 34px);
+        line-height: 1.04;
+      }
+
+      .plan-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .safety-card {
+        align-self: start;
+        min-width: 170px;
+        border: 1px solid rgba(92, 214, 155, 0.28);
+        border-radius: 22px;
+        background: rgba(92, 214, 155, 0.08);
+        padding: 14px;
+        color: #caf4dc;
+        text-align: right;
+      }
+
+      .safety-card strong {
+        display: block;
+        font-size: 20px;
+      }
+
+      .plan-collapsed-summary {
+        display: none;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 14px;
+        align-items: center;
+        margin: 0 16px 16px;
+        border: 1px solid #252c35;
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.025);
+        padding: 12px;
+      }
+
+      .plan-sheet.collapsed .plan-collapsed-summary {
+        display: grid;
+      }
+
+      .collapsed-thumbs {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .collapsed-thumb {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: var(--photo);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+      }
+
+      .photo-stage {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 250px;
+        gap: 18px;
+        margin: 8px 14px 0;
+        border-radius: 24px;
+        background: #060708;
+        padding: 10px;
+      }
+
+      .mosaic {
+        display: grid;
+        grid-template-columns: 1.35fr repeat(3, minmax(78px, 1fr));
+        grid-template-rows: repeat(2, minmax(112px, 1fr));
+        gap: 8px;
+        min-height: 300px;
+      }
+
+      .photo {
+        position: relative;
+        overflow: hidden;
+        border-radius: 18px;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), transparent), var(--photo);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+      }
+
+      .photo::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.28), transparent 18%),
+          linear-gradient(180deg, transparent 56%, rgba(0, 0, 0, 0.38));
+      }
+
+      .photo.main {
+        grid-row: 1 / 3;
+      }
+
+      .photo .badge {
+        position: absolute;
+        left: 12px;
+        bottom: 12px;
+        z-index: 1;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.54);
+        color: white;
+        padding: 5px 10px;
+        font-size: 12px;
+        font-weight: 780;
+        backdrop-filter: blur(10px);
+      }
+
+      .photo.more {
+        display: grid;
+        place-items: center;
+        background: linear-gradient(135deg, #1d2633, #314057);
+      }
+
+      .photo.more strong {
+        z-index: 1;
+        font-size: 26px;
+      }
+
+      .photo-copy {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 18px;
+        border: 1px solid #222933;
+        border-radius: 20px;
+        background: #0f1216;
+        padding: 16px;
+      }
+
+      .photo-copy h3 {
+        margin: 4px 0 0;
+        font-size: 18px;
+      }
+
+      .photo-copy .count {
+        font-size: 42px;
+        line-height: 0.95;
+        font-weight: 830;
+      }
+
+      .soft-list {
+        display: grid;
+        gap: 7px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        color: #cbd3db;
+      }
+
+      .soft-list li {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        border-top: 1px solid #20262e;
+        padding-top: 7px;
+      }
+
+      .plan-body {
+        display: grid;
+        gap: 10px;
+        padding: 14px 16px 18px;
+      }
+
+      .change-row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: start;
+        gap: 12px;
+        border: 1px solid #252c35;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.025);
+        padding: 14px;
+      }
+
+      .check {
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        background: var(--blue-strong);
+        color: #061326;
+        font-weight: 900;
+      }
+
+      .inline-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      details {
+        border-radius: 16px;
+      }
+
+      summary {
+        width: fit-content;
+        border: 1px solid #303741;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.03);
+        color: #ccd5de;
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 740;
+        list-style: none;
+        cursor: pointer;
+      }
+
+      summary::-webkit-details-marker {
+        display: none;
+      }
+
+      summary::after {
+        content: ' +';
+      }
+
+      details[open] summary::after {
+        content: ' -';
+      }
+
+      .technical-content {
+        margin-top: 10px;
+        border: 1px solid #232a33;
+        border-radius: 16px;
+        background: #080a0d;
+        padding: 12px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        overflow: auto;
+      }
+
+      .apply-dock {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin: 0 16px 16px;
+        border: 1px solid #2a323c;
+        border-radius: 24px;
+        background: rgba(25, 29, 34, 0.94);
+        padding: 12px;
+        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.34);
+      }
+
+      .composer {
+        position: fixed;
+        right: 24px;
+        bottom: 18px;
+        left: 260px;
+        z-index: 4;
+      }
+
+      .composer-inner {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: min(780px, 100%);
+        margin: 0 auto;
+        border: 1px solid #303741;
+        border-radius: 24px;
+        background: rgba(18, 21, 25, 0.96);
+        padding: 10px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px);
+      }
+
+      .composer textarea {
+        min-height: 48px;
+        flex: 1;
+        resize: none;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--text);
+        padding: 12px;
+      }
+
+      .review-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: none;
+        align-items: flex-end;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.58);
+        padding: 26px;
+        backdrop-filter: blur(12px);
+      }
+
+      body.review-open {
+        overflow: hidden;
+      }
+
+      body.review-open .review-backdrop {
+        display: flex;
+      }
+
+      .review-sheet {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        width: min(1180px, 100%);
+        max-height: min(860px, calc(100vh - 52px));
+        overflow: hidden;
+        border: 1px solid #343d49;
+        border-radius: 30px;
+        background: linear-gradient(180deg, rgba(143, 186, 255, 0.12), transparent 18rem), #0b0d10;
+        box-shadow: 0 32px 110px rgba(0, 0, 0, 0.64);
+      }
+
+      .review-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 18px;
+        align-items: start;
+        border-bottom: 1px solid #242b34;
+        padding: 22px 24px 16px;
+      }
+
+      .review-header h2 {
+        margin: 2px 0 4px;
+        font-size: clamp(22px, 2.4vw, 30px);
+        line-height: 1.08;
+      }
+
+      .review-header p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .review-close {
+        min-width: 86px;
+      }
+
+      .review-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .review-search {
+        display: flex;
+        align-items: center;
+        min-width: min(340px, 100%);
+        min-height: 40px;
+        border: 1px solid #303741;
+        border-radius: 999px;
+        background: #11151a;
+        padding: 0 14px;
+        color: #c6d0da;
+      }
+
+      .review-chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 40px;
+        border: 1px solid #303741;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.035);
+        color: #d8e0e8;
+        padding: 0 13px;
+        font-weight: 720;
+      }
+
+      .review-chip.active {
+        border-color: rgba(143, 186, 255, 0.5);
+        background: rgba(143, 186, 255, 0.14);
+        color: #cfe0ff;
+      }
+
+      .review-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 280px;
+        min-height: 0;
+      }
+
+      .review-grid-wrap {
+        min-width: 0;
+        overflow: auto;
+        padding: 18px;
+      }
+
+      .review-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+        gap: 10px;
+      }
+
+      .review-thumb {
+        position: relative;
+        aspect-ratio: 1;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 18px;
+        background: radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.25), transparent 18%), var(--photo);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+      }
+
+      .review-thumb::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, transparent 45%, rgba(0, 0, 0, 0.45));
+      }
+
+      .review-thumb.selected {
+        border-color: rgba(143, 186, 255, 0.92);
+        box-shadow:
+          inset 0 0 0 2px rgba(143, 186, 255, 0.85),
+          0 0 0 3px rgba(143, 186, 255, 0.14);
+      }
+
+      .review-thumb.excluded {
+        filter: saturate(0.35);
+        opacity: 0.44;
+      }
+
+      .review-thumb .mark {
+        position: absolute;
+        top: 9px;
+        right: 9px;
+        z-index: 1;
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        background: rgba(5, 8, 12, 0.66);
+        color: #dce6f2;
+        font-size: 13px;
+        font-weight: 900;
+        backdrop-filter: blur(10px);
+      }
+
+      .review-thumb.selected .mark {
+        background: #8fbaff;
+        color: #07111d;
+      }
+
+      .review-thumb.excluded .mark {
+        background: rgba(0, 0, 0, 0.56);
+        color: #f6a6ad;
+      }
+
+      .review-thumb .caption {
+        position: absolute;
+        left: 10px;
+        right: 10px;
+        bottom: 9px;
+        z-index: 1;
+        overflow: hidden;
+        color: white;
+        font-size: 12px;
+        font-weight: 780;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .review-side {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 0;
+        border-left: 1px solid #242b34;
+        background: rgba(255, 255, 255, 0.025);
+        padding: 18px;
+      }
+
+      .summary-card {
+        border: 1px solid #28313b;
+        border-radius: 22px;
+        background: #11151a;
+        padding: 16px;
+      }
+
+      .summary-card h3 {
+        margin: 0 0 8px;
+        font-size: 15px;
+      }
+
+      .summary-number {
+        margin: 0;
+        font-size: 42px;
+        line-height: 1;
+        font-weight: 840;
+      }
+
+      .summary-card p {
+        margin: 5px 0 0;
+        color: var(--muted);
+      }
+
+      .review-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-top: 1px solid #242b34;
+        padding: 14px 18px;
+        background: rgba(17, 21, 26, 0.95);
+      }
+
+      @media (max-width: 980px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar {
+          grid-template-columns: auto minmax(0, 1fr) auto;
+        }
+
+        .sidebar {
+          display: none;
+        }
+
+        .session-header {
+          align-items: flex-start;
+          flex-direction: column;
+          padding: 14px;
+        }
+
+        .content {
+          height: calc(100vh - 170px);
+          padding: 18px 12px 128px;
+        }
+
+        .plan-hero,
+        .photo-stage {
+          grid-template-columns: 1fr;
+        }
+
+        .plan-title-row {
+          flex-direction: column;
+        }
+
+        .safety-card {
+          text-align: left;
+        }
+
+        .mosaic {
+          grid-template-columns: repeat(3, minmax(72px, 1fr));
+          grid-template-rows: repeat(3, minmax(96px, 1fr));
+        }
+
+        .photo.main {
+          grid-column: 1 / 3;
+          grid-row: 1 / 3;
+        }
+
+        .change-row {
+          grid-template-columns: auto minmax(0, 1fr);
+        }
+
+        .plan-collapsed-summary {
+          grid-template-columns: 1fr;
+        }
+
+        .change-row > .mini-pill {
+          grid-column: 2;
+          justify-self: start;
+        }
+
+        .composer {
+          left: 12px;
+          right: 12px;
+        }
+
+        .review-backdrop {
+          padding: 10px;
+        }
+
+        .review-sheet {
+          max-height: calc(100vh - 20px);
+          border-radius: 24px;
+        }
+
+        .review-body {
+          grid-template-columns: 1fr;
+        }
+
+        .review-side {
+          border-top: 1px solid #242b34;
+          border-left: 0;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .brand span,
+        .top-actions .pill-button:not(.primary) {
+          display: none;
+        }
+
+        .topbar {
+          gap: 10px;
+          padding: 0 10px;
+        }
+
+        .search {
+          min-width: 0;
+        }
+
+        .session-title h1 {
+          white-space: normal;
+        }
+
+        .apply-dock {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .review-header,
+        .review-footer {
+          grid-template-columns: 1fr;
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .review-header {
+          display: flex;
+        }
+
+        .review-grid {
+          grid-template-columns: repeat(auto-fill, minmax(94px, 1fr));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand" aria-label="Gallery">
+          <div class="logo"><div class="lens"></div></div>
+          <span>Gallery</span>
+        </div>
+        <div class="search">
+          <span>Search Gallery - try @ for people, # tags, / albums, &gt; pages</span>
+          <span class="key">Ctrl+K</span>
+        </div>
+        <div class="top-actions">
+          <button class="pill-button">Upload</button>
+          <button class="icon-button" aria-label="Theme">M</button>
+          <button class="icon-button" aria-label="Notifications">N</button>
+          <div class="avatar">P</div>
+        </div>
+      </header>
+
+      <aside class="sidebar">
+        <div class="nav-section">
+          <div class="nav-item"><span class="nav-icon">P</span>Photos</div>
+          <div class="nav-item"><span class="nav-icon">S</span>Spaces</div>
+          <div class="nav-item"><span class="nav-icon">E</span>Explore</div>
+          <div class="nav-item active"><span class="nav-icon">A</span>Assistant</div>
+          <div class="nav-item"><span class="nav-icon">M</span>Map</div>
+        </div>
+        <p class="nav-label">Library</p>
+        <div class="nav-section">
+          <div class="nav-item"><span class="nav-icon">F</span>Favorites</div>
+          <div class="nav-item"><span class="nav-icon">R</span>Memories</div>
+          <div class="nav-item"><span class="nav-icon">L</span>Albums</div>
+        </div>
+        <div class="storage">
+          <strong>Storage space</strong>
+          <div>255.2 GiB of 1 TiB used</div>
+          <div class="storage-bar"><span></span></div>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <section class="session-header">
+          <div class="session-title">
+            <h1>
+              I went to South Africa in January this year - create an album
+              <span class="status">Waiting for plan review</span>
+            </h1>
+            <p>OpenAI · gpt-5.1 · Ask before applying plans</p>
+          </div>
+          <div class="header-actions">
+            <button class="pill-button danger">Cancel</button>
+            <button class="pill-button">Activity: Expanded</button>
+            <button class="pill-button">Details</button>
+            <button class="pill-button primary">New chat</button>
+          </div>
+        </section>
+
+        <div class="content">
+          <div class="conversation">
+            <article class="activity-card">
+              <div class="activity-head">
+                <div>
+                  <p class="eyebrow">Activity</p>
+                  <h2>Preparing the plan</h2>
+                </div>
+                <button class="pill-button">Collapse</button>
+              </div>
+              <div class="activity-rail">
+                <div class="activity-step">
+                  <div>
+                    <h3>Understood the destination and date window</h3>
+                    <p>Country: South Africa · Date range: Jan 1-31, 2026</p>
+                    <details>
+                      <summary>Technical details</summary>
+                      <div class="technical-content">
+                        source: user_message · confidence: high · parser: trip_date_range
+                      </div>
+                    </details>
+                  </div>
+                  <span class="mini-pill">Done</span>
+                </div>
+                <div class="activity-step">
+                  <div>
+                    <h3>Matched photos with people and smart search</h3>
+                    <p>Found mountain photos featuring Pierre or Aurelia.</p>
+                    <details>
+                      <summary>Technical details</summary>
+                      <div class="technical-content">
+                        search: country:South Africa date:2026-01 smart:mountain people:any(Pierre,Aurelia)
+                      </div>
+                    </details>
+                  </div>
+                  <span class="mini-pill">733 photos</span>
+                </div>
+                <div class="activity-step pending">
+                  <div>
+                    <h3>Waiting for you to review the changes</h3>
+                    <p>No edits will apply until the selected changes are approved.</p>
+                  </div>
+                  <span class="mini-pill">Review</span>
+                </div>
+              </div>
+            </article>
+
+            <div class="assistant-copy">
+              <p>
+                I found a matching South Africa photo set and prepared a shared space plan. Review the photos first,
+                then apply the selected changes when it looks right.
+              </p>
+            </div>
+
+            <article class="plan-sheet" data-plan-sheet>
+              <div class="plan-hero">
+                <div class="plan-copy">
+                  <div class="plan-title-row">
+                    <div>
+                      <p class="eyebrow">Plan review</p>
+                      <h2>South Africa with Pierre and Aurelia - Jan 2026</h2>
+                    </div>
+                    <button class="pill-button" type="button" data-toggle-plan aria-expanded="true">
+                      Collapse plan
+                    </button>
+                  </div>
+                  <p>
+                    Creates one shared space and adds the matching trip photos. The photo set is shown first because it
+                    is the thing you are approving.
+                  </p>
+                  <div class="plan-summary">
+                    <span class="mini-pill">1 destination</span>
+                    <span class="mini-pill">2 selected changes</span>
+                    <span class="mini-pill">733 selected photos</span>
+                  </div>
+                </div>
+                <div class="safety-card">
+                  <strong>0</strong>
+                  photos deleted
+                  <br />
+                  <strong>2</strong>
+                  changes selected
+                </div>
+              </div>
+
+              <div class="plan-collapsed-summary" aria-label="Collapsed plan summary">
+                <div class="collapsed-thumbs">
+                  <div
+                    class="collapsed-thumb"
+                    style="--photo: linear-gradient(145deg, #9fb76f, #364c34 46%, #192028 100%)"
+                  ></div>
+                  <div
+                    class="collapsed-thumb"
+                    style="--photo: linear-gradient(145deg, #e4be8b, #8b6043 52%, #1e2730)"
+                  ></div>
+                  <div
+                    class="collapsed-thumb"
+                    style="--photo: linear-gradient(145deg, #bfd3e9, #6b8da7 44%, #253242)"
+                  ></div>
+                </div>
+                <div>
+                  <strong>Plan collapsed</strong>
+                  <div style="color: var(--muted)">2 changes · 733 photos selected · no photos will be deleted</div>
+                </div>
+                <button class="pill-button primary" type="button" data-toggle-plan aria-expanded="false">
+                  Expand plan
+                </button>
+              </div>
+
+              <div class="photo-stage">
+                <div class="mosaic" aria-label="Selected photo thumbnails">
+                  <div class="photo main" style="--photo: linear-gradient(145deg, #9fb76f, #364c34 46%, #192028 100%)">
+                    <span class="badge">Cover candidate</span>
+                  </div>
+                  <div class="photo" style="--photo: linear-gradient(145deg, #e4be8b, #8b6043 52%, #1e2730)"></div>
+                  <div class="photo" style="--photo: linear-gradient(145deg, #bfd3e9, #6b8da7 44%, #253242)"></div>
+                  <div class="photo" style="--photo: linear-gradient(145deg, #d7c4a2, #58725f 48%, #222c2b)"></div>
+                  <div class="photo" style="--photo: linear-gradient(145deg, #b7c9dc, #4f6178 46%, #1f2229)"></div>
+                  <div class="photo" style="--photo: linear-gradient(145deg, #f0d0a0, #9b714c 46%, #25313c)"></div>
+                  <div class="photo more"><strong>+727</strong></div>
+                </div>
+
+                <aside class="photo-copy">
+                  <div>
+                    <p class="eyebrow">Photos in this plan</p>
+                    <div class="count">733</div>
+                    <h3>Selected trip photos</h3>
+                    <p>Mountain scenes from South Africa in January 2026, filtered to Pierre or Aurelia.</p>
+                  </div>
+                  <ul class="soft-list">
+                    <li><span>Date range</span><strong>Jan 2026</strong></li>
+                    <li><span>Location</span><strong>South Africa</strong></li>
+                    <li><span>Smart search</span><strong>mountain</strong></li>
+                  </ul>
+                  <button class="pill-button primary" type="button" data-open-review>Review photos</button>
+                </aside>
+              </div>
+
+              <div class="plan-body">
+                <div class="change-row">
+                  <span class="check">✓</span>
+                  <div>
+                    <h3>Create shared space "South Africa with Pierre and Aurelia - Jan 2026"</h3>
+                    <p>New space · Pierre and Aurelia included.</p>
+                    <div class="inline-actions">
+                      <details>
+                        <summary>Technical details</summary>
+                        <div class="technical-content">
+                          operation: create_space · visibility: shared · title_source: assistant_plan
+                        </div>
+                      </details>
+                    </div>
+                  </div>
+                  <span class="mini-pill">Selected</span>
+                </div>
+
+                <div class="change-row">
+                  <span class="check">✓</span>
+                  <div>
+                    <h3>Add 733 photos</h3>
+                    <p>733 of 733 photos selected. Thumbnails stay visible even when details are collapsed.</p>
+                    <div class="inline-actions">
+                      <button class="pill-button" type="button" data-open-review>Change selection</button>
+                      <details>
+                        <summary>Technical details</summary>
+                        <div class="technical-content">
+                          operation: add_assets_to_space · asset_count: 733 · evidence_handle:
+                          search_result_2026_01_sa_mountain
+                        </div>
+                      </details>
+                    </div>
+                  </div>
+                  <span class="mini-pill">Selected</span>
+                </div>
+              </div>
+
+              <div class="apply-dock">
+                <div>
+                  <strong>2 changes · 733 photos selected</strong>
+                  <div style="color: var(--muted)">Ready to create the shared space.</div>
+                </div>
+                <div class="header-actions">
+                  <button class="pill-button">Revise</button>
+                  <button class="pill-button primary">Apply 2 selected</button>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div class="composer">
+          <div class="composer-inner">
+            <textarea aria-label="Send revision feedback" placeholder="Send revision feedback for this plan"></textarea>
+            <button class="pill-button primary">Send</button>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <div
+      class="review-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="photo-review-title"
+      aria-hidden="true"
+    >
+      <section class="review-sheet">
+        <header class="review-header">
+          <div>
+            <p class="eyebrow">Photo review</p>
+            <h2 id="photo-review-title">733 selected photos for South Africa with Pierre and Aurelia</h2>
+            <p>Use this when the user wants to inspect or change the exact photos before applying the plan.</p>
+            <div class="review-toolbar">
+              <div class="review-search">Search within selected photos</div>
+              <span class="review-chip active">Selected only</span>
+              <span class="review-chip">Jan 2026</span>
+              <span class="review-chip">South Africa</span>
+              <span class="review-chip">Mountain</span>
+              <span class="review-chip">Pierre or Aurelia</span>
+            </div>
+          </div>
+          <button class="pill-button review-close" type="button" data-close-review>Close</button>
+        </header>
+
+        <div class="review-body">
+          <div class="review-grid-wrap">
+            <div class="review-grid" aria-label="Editable photo selection grid">
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #9fb76f, #364c34 46%, #192028 100%)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Table Mountain</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #e4be8b, #8b6043 52%, #1e2730)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Camp lunch</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #bfd3e9, #6b8da7 44%, #253242)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Cloud ridge</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #d7c4a2, #58725f 48%, #222c2b)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Trail view</span>
+              </button>
+              <button
+                class="review-thumb excluded"
+                style="--photo: linear-gradient(145deg, #b7c9dc, #4f6178 46%, #1f2229)"
+                aria-pressed="false"
+              >
+                <span class="mark">-</span>
+                <span class="caption">Blurred frame</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #f0d0a0, #9b714c 46%, #25313c)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Golden hour</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #738f61, #2f4536 48%, #11181f)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Lookout</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #d9b48a, #78644b 52%, #202733)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Aurelia</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #9cb9cf, #465e77 44%, #1b2028)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Pierre</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #c6d49d, #697f5a 48%, #1e2727)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Fynbos</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #e7c5a2, #936847 46%, #252d37)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Road stop</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #c6d7eb, #6d829a 44%, #222b38)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Peak line</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #a8bc83, #4f633f 50%, #1b2427)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Valley</span>
+              </button>
+              <button
+                class="review-thumb excluded"
+                style="--photo: linear-gradient(145deg, #d3c1aa, #736655 48%, #242934)"
+                aria-pressed="false"
+              >
+                <span class="mark">-</span>
+                <span class="caption">Duplicate</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #a3c2dd, #50708c 46%, #202835)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Overlook</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #e6cba6, #9a7a54 50%, #27303a)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Rest stop</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #b2c88f, #637647 48%, #1c2522)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Green trail</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #cedbe9, #778ba0 44%, #222b32)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Mist</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #ddb489, #8d5f42 48%, #202631)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Trail snack</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #8aa478, #405842 50%, #172021)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Mountain path</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #bdcde0, #5d7692 45%, #1d2530)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Blue ridge</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #ecd0a6, #a57952 50%, #28313a)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Sunset</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #a9bf8b, #596f4b 46%, #1c2526)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">Wide shot</span>
+              </button>
+              <button
+                class="review-thumb selected"
+                style="--photo: linear-gradient(145deg, #d5e0ea, #71869a 48%, #202934)"
+                aria-pressed="true"
+              >
+                <span class="mark">✓</span>
+                <span class="caption">More photos</span>
+              </button>
+            </div>
+          </div>
+
+          <aside class="review-side">
+            <div class="summary-card">
+              <h3>Selection</h3>
+              <p class="summary-number">731</p>
+              <p>photos still selected after removing 2 from this review.</p>
+            </div>
+            <div class="summary-card">
+              <h3>Quick actions</h3>
+              <div class="inline-actions">
+                <button class="pill-button">Select all</button>
+                <button class="pill-button">Hide removed</button>
+                <button class="pill-button danger">Clear all</button>
+              </div>
+            </div>
+            <div class="summary-card">
+              <h3>Why these matched</h3>
+              <ul class="soft-list">
+                <li><span>Location</span><strong>South Africa</strong></li>
+                <li><span>Date</span><strong>Jan 2026</strong></li>
+                <li><span>Query</span><strong>mountain</strong></li>
+                <li><span>People</span><strong>Pierre or Aurelia</strong></li>
+              </ul>
+              <details style="margin-top: 12px">
+                <summary>Technical details</summary>
+                <div class="technical-content">
+                  operation: edit_asset_selection · original_count: 733 · selected_count: 731 · excluded_count: 2
+                </div>
+              </details>
+            </div>
+          </aside>
+        </div>
+
+        <footer class="review-footer">
+          <div>
+            <strong>731 photos selected</strong>
+            <div style="color: var(--muted)">The plan summary updates when this review closes.</div>
+          </div>
+          <div class="header-actions">
+            <button class="pill-button" type="button" data-close-review>Keep original 733</button>
+            <button class="pill-button primary" type="button" data-close-review>Done reviewing</button>
+          </div>
+        </footer>
+      </section>
+    </div>
+
+    <script>
+      const reviewBackdrop = document.querySelector('.review-backdrop');
+      const planSheet = document.querySelector('[data-plan-sheet]');
+      const planToggleButtons = document.querySelectorAll('[data-toggle-plan]');
+
+      const setPlanCollapsed = (collapsed) => {
+        planSheet?.classList.toggle('collapsed', collapsed);
+        planToggleButtons.forEach((button) => {
+          button.textContent = collapsed ? 'Expand plan' : 'Collapse plan';
+          button.setAttribute('aria-expanded', String(!collapsed));
+        });
+      };
+
+      const openReview = () => {
+        document.body.classList.add('review-open');
+        reviewBackdrop?.setAttribute('aria-hidden', 'false');
+      };
+      const closeReview = () => {
+        document.body.classList.remove('review-open');
+        reviewBackdrop?.setAttribute('aria-hidden', 'true');
+      };
+
+      document.querySelectorAll('[data-open-review]').forEach((button) => {
+        button.addEventListener('click', openReview);
+      });
+
+      planToggleButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          setPlanCollapsed(!planSheet?.classList.contains('collapsed'));
+        });
+      });
+
+      document.querySelectorAll('[data-close-review]').forEach((button) => {
+        button.addEventListener('click', closeReview);
+      });
+
+      reviewBackdrop?.addEventListener('click', (event) => {
+        if (event.target === reviewBackdrop) {
+          closeReview();
+        }
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          closeReview();
+        }
+      });
+    </script>
+  </body>
+</html>

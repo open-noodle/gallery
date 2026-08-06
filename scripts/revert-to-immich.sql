@@ -152,6 +152,17 @@ DROP TABLE IF EXISTS "classification_category" CASCADE;
 -- Storage migration log and asset duplicate checksum
 DROP TABLE IF EXISTS "storage_migration_log" CASCADE;
 DROP TABLE IF EXISTS "asset_duplicate_checksum" CASCADE;
+DROP TABLE IF EXISTS "asset_quality" CASCADE;
+
+-- Agent provider credentials, sessions, activity events, messages, tool calls, selection handles, and operation plans
+DROP TABLE IF EXISTS "agent_operation" CASCADE;
+DROP TABLE IF EXISTS "agent_operation_plan" CASCADE;
+DROP TABLE IF EXISTS "agent_selection_handle" CASCADE;
+DROP TABLE IF EXISTS "agent_tool_call" CASCADE;
+DROP TABLE IF EXISTS "agent_message" CASCADE;
+DROP TABLE IF EXISTS "agent_session_activity_event" CASCADE;
+DROP TABLE IF EXISTS "agent_session" CASCADE;
+DROP TABLE IF EXISTS "agent_provider_credential" CASCADE;
 
 -- -----------------------------------------------------------------------------
 -- 3. Drop Gallery-only functions.
@@ -192,6 +203,7 @@ ALTER TABLE "person"            DROP COLUMN IF EXISTS "type";
 ALTER TABLE "person"            DROP COLUMN IF EXISTS "species";
 ALTER TABLE "asset_job_status"  DROP COLUMN IF EXISTS "petsDetectedAt";
 ALTER TABLE "asset_job_status"  DROP COLUMN IF EXISTS "classifiedAt";
+ALTER TABLE "asset_job_status"  DROP COLUMN IF EXISTS "qualityScoredAt";
 ALTER TABLE "library"           DROP COLUMN IF EXISTS "createId";
 DROP INDEX IF EXISTS "asset_face_personId_idx";
 DROP INDEX IF EXISTS "person_ownerId_identityId_key";
@@ -286,7 +298,11 @@ DELETE FROM "migration_overrides"
    'trigger_shared_space_member_updatedAt',
    'trigger_shared_space_person_updatedAt',
    'trigger_shared_space_updatedAt',
-   'trigger_user_group_updatedAt'
+   'trigger_user_group_updatedAt',
+   'trigger_agent_provider_credential_updatedAt',
+   'trigger_agent_session_updatedAt',
+   'trigger_agent_operation_plan_updatedAt',
+   'trigger_agent_operation_updatedAt'
  );
 
 -- -----------------------------------------------------------------------------
@@ -455,6 +471,18 @@ DELETE FROM "kysely_migrations"
    -- trips "corrupted migrations: previously executed migration ... is missing" on boot.
    '1782000000000-AddFaceRepairScanFlaggedFace',
    '1783000000000-AddFaceRepairScanInFlightIndex',
+   '1777000000000-AgentProviderCredential',
+   '1777100000000-AgentSession',
+   '1778800000000-AgentMessage',
+   '1778778147082-AddAgentSessionProviderCredentialIndex',
+   '1778900000000-AgentToolCall',
+   '1778910000000-BackfillAgentReadSessionLimits',
+   '1778920000000-AgentOperationPlan',
+   '1778930000000-AgentSessionTitle',
+   '1778940000000-AgentSessionActivityEvent',
+   '1778950000000-AgentSelectionHandle',
+   '1779000000000-AddAgentSessionWorkflowState',
+   '1779100000000-AddAssetQualityScoring',
 
    -- Build-time compatibility alias (server/bin/sync-gallery-migrations.mjs).
    -- Gallery's postbuild records ChangeDurationToInteger under BOTH its current
@@ -501,6 +529,7 @@ BEGIN
       OR "name" LIKE '%LibraryUser%'
       OR "name" LIKE '%AddAssetDuplicateChecksum%'
       OR "name" LIKE '%AddFaceIdentities%'
+      OR "name" LIKE '%AddAssetQualityScoring%'
       OR "name" LIKE '%AddSpacePersonRepresentativeFaceSource%'
       OR "name" LIKE '%SortSpacePeopleByNameIndex%'
       OR "name" LIKE '%ReconcileFaceIdentityIndexOverrides%'
@@ -513,7 +542,13 @@ BEGIN
       OR "name" LIKE '%AddFaceRepairDecline%'
       OR "name" LIKE '%AddFaceRepairLock%'
       OR "name" LIKE '%AddFaceRepairScanFlaggedFace%'
-      OR "name" LIKE '%AddFaceRepairScanInFlightIndex%';
+      OR "name" LIKE '%AddFaceRepairScanInFlightIndex%'
+      OR "name" LIKE '%AgentProviderCredential%'
+      OR "name" LIKE '%AgentToolCall%'
+      OR "name" LIKE '%AgentMessage%'
+      OR "name" LIKE '%AgentOperation%'
+      OR "name" LIKE '%AgentSelectionHandle%'
+      OR "name" LIKE '%AgentSession%';
   IF fork_rows_left > 0 THEN
     RAISE EXCEPTION 'revert-to-immich: % Gallery row(s) still present in kysely_migrations after cleanup — aborting.', fork_rows_left;
   END IF;
@@ -537,9 +572,12 @@ BEGIN
        'face_identity_face', 'face_identity',
        'shared_space', 'user_group_member', 'user_group',
        'classification_prompt_embedding', 'classification_category',
-       'storage_migration_log', 'asset_duplicate_checksum',
+       'storage_migration_log', 'asset_duplicate_checksum', 'asset_quality',
        'face_person_verdict', 'face_repair_scan', 'face_repair_decline',
-       'face_repair_scan_flagged_face', 'face_repair_lock'
+       'face_repair_scan_flagged_face', 'face_repair_lock',
+       'agent_provider_credential', 'agent_session', 'agent_session_activity_event',
+       'agent_message', 'agent_tool_call', 'agent_selection_handle',
+       'agent_operation_plan', 'agent_operation'
      );
   IF fork_tables_left > 0 THEN
     RAISE EXCEPTION 'revert-to-immich: % Gallery table(s) still present after cleanup — aborting.', fork_tables_left;

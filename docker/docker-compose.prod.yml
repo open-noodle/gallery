@@ -29,9 +29,22 @@ services:
     depends_on:
       - redis
       - database
+      - agent-runner
     restart: always
     healthcheck:
       disable: false
+
+  agent-runner:
+    container_name: gallery_agent_runner
+    image: immich-server:latest
+    build:
+      context: ../
+      dockerfile: server/Dockerfile
+    command: ['agent-runner']
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4477
+    restart: always
 
   immich-machine-learning:
     container_name: immich_machine_learning

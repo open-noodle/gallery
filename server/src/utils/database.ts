@@ -591,6 +591,50 @@ export function inAlbums<O>(
   );
 }
 
+export function inAnyAlbum<O>(
+  qb: SelectQueryBuilder<DB, 'asset', O>,
+  albumIds: string[],
+  // Same #764 contribution arm as inAlbums — see the comment there. Only the match semantics
+  // differ: any-match groups without the all-albums HAVING count.
+  timelineSpaceIds?: string[],
+) {
+  const includeContributions = !!timelineSpaceIds && timelineSpaceIds.length > 0;
+  return qb.innerJoin(
+    (eb) =>
+      eb
+        .selectFrom((inner) => {
+          const albumAssetMembers = inner
+            .selectFrom('album_asset')
+            .select('album_asset.assetId as assetId')
+            .where('album_asset.albumId', '=', anyUuid(albumIds));
+          return (
+            includeContributions
+              ? albumAssetMembers.unionAll(
+                  inner
+                    .selectFrom('album_space_asset')
+                    .select('album_space_asset.assetId as assetId')
+                    .where('album_space_asset.albumId', '=', anyUuid(albumIds))
+                    .where('album_space_asset.spaceId', '=', anyUuid(timelineSpaceIds!))
+                    .where((wb) =>
+                      wb.exists(
+                        wb
+                          .selectFrom('shared_space_album')
+                          .whereRef('shared_space_album.albumId', '=', 'album_space_asset.albumId')
+                          .whereRef('shared_space_album.spaceId', '=', 'album_space_asset.spaceId')
+                          .select(wb.lit(1).as('one')),
+                      ),
+                    ),
+                )
+              : albumAssetMembers
+          ).as('album_members');
+        })
+        .select('album_members.assetId')
+        .groupBy('album_members.assetId')
+        .as('has_any_album'),
+    (join) => join.onRef('has_any_album.assetId', '=', 'asset.id'),
+  );
+}
+
 export function hasTags<O>(qb: SelectQueryBuilder<DB, 'asset', O>, tagIds: string[]) {
   return qb.innerJoin(
     (eb) =>
@@ -822,7 +866,9 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
       })
       .$if(!!options.forceEmptyResult, (qb) => qb.where(sql<SqlBool>`false`))
       .$if(!!options.albumIds && options.albumIds.length > 0, (qb) =>
-        inAlbums(qb, options.albumIds!, options.timelineSpaceIds),
+        options.albumMatchAny
+          ? inAnyAlbum(qb, options.albumIds!, options.timelineSpaceIds)
+          : inAlbums(qb, options.albumIds!, options.timelineSpaceIds),
       )
       .$if(!!options.spaceId && !options.timelineSpaceIds, (qb) =>
         qb.where((eb) =>
@@ -939,6 +985,21 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
             options.rating === null ? 'is' : options.ratingIsMinimum ? '>=' : '=',
             options.rating!,
           ),
+      )
+      .$if(
+        options.maxSharpness !== undefined || options.maxBrightness !== undefined || options.maxQuality !== undefined,
+        (qb) =>
+          qb
+            .innerJoin('asset_quality', 'asset.id', 'asset_quality.assetId')
+            .$if(options.maxSharpness !== undefined, (qb) =>
+              qb.where('asset_quality.sharpness', '<=', options.maxSharpness!),
+            )
+            .$if(options.maxBrightness !== undefined, (qb) =>
+              qb.where('asset_quality.brightness', '<=', options.maxBrightness!),
+            )
+            .$if(options.maxQuality !== undefined, (qb) =>
+              qb.where('asset_quality.quality', '<=', options.maxQuality!),
+            ),
       )
       .$if(!!options.checksum, (qb) => qb.where('asset.checksum', '=', options.checksum!))
       .$if(!!options.id, (qb) => qb.where('asset.id', '=', asUuid(options.id!)))

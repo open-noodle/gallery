@@ -1,7 +1,7 @@
 import {
   RepresentativeFaceSource,
   SharedSpaceRole,
-  Type,
+  Type5 as Type,
   type PeopleFaceStatisticsResponseDto,
   type PeopleResponseDto,
   type PeopleStatisticsResponseDto,

@@ -1,4 +1,4 @@
-import { Type, type PersonResponseDto } from '@immich/sdk';
+import { Type5 as Type, type PersonResponseDto } from '@immich/sdk';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { load } from './+page';
 

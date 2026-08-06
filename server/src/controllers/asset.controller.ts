@@ -1,6 +1,22 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Query } from '@nestjs/common';
-import { ApiExcludeEndpoint, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Next,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Res,
+} from '@nestjs/common';
+import { ApiExcludeEndpoint, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { NextFunction, Response } from 'express';
 import { Endpoint, HistoryBuilder } from 'src/decorators';
+import { AssetMediaSize } from 'src/dtos/asset-media.dto';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto';
 import {
   AssetBulkDeleteDto,
@@ -18,17 +34,22 @@ import {
   UpdateAssetDto,
 } from 'src/dtos/asset.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
-import { AssetEditsCreateDto, AssetEditsResponseDto } from 'src/dtos/editing.dto';
+import { AssetEditPreviewQueryDto, AssetEditsCreateDto, AssetEditsResponseDto } from 'src/dtos/editing.dto';
 import { AssetOcrResponseDto } from 'src/dtos/ocr.dto';
 import { ApiTag, Permission, RouteKey } from 'src/enum';
-import { Auth, Authenticated } from 'src/middleware/auth.guard';
+import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard';
+import { LoggingRepository } from 'src/repositories/logging.repository';
 import { AssetService } from 'src/services/asset.service';
+import { ImmichStreamResponse, sendFile } from 'src/utils/file';
 import { UUIDParamDto } from 'src/validation';
 
 @ApiTags(ApiTag.Assets)
 @Controller(RouteKey.Asset)
 export class AssetController {
-  constructor(private service: AssetService) {}
+  constructor(
+    private logger: LoggingRepository,
+    private service: AssetService,
+  ) {}
 
   @Get('statistics')
   @Authenticated({ permission: Permission.AssetStatistics })
@@ -272,5 +293,24 @@ export class AssetController {
   })
   removeAssetEdits(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<void> {
     return this.service.removeAssetEdits(auth, id);
+  }
+
+  @Post(':id/edits/preview')
+  @Authenticated({ permission: Permission.AssetEditGet })
+  @FileResponse()
+  @ApiOperation({
+    summary: 'Preview edits without saving',
+    description: 'Render an image with the given edit actions applied, without persisting them.',
+  })
+  async previewAssetEdits(
+    @Res() res: Response,
+    @Next() next: NextFunction,
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Query() { size }: AssetEditPreviewQueryDto,
+    @Body() dto: AssetEditsCreateDto,
+  ): Promise<ImmichStreamResponse | void> {
+    const mediaSize = size === 'thumbnail' ? AssetMediaSize.THUMBNAIL : AssetMediaSize.PREVIEW;
+    await sendFile(res, next, () => this.service.previewAssetEdits(auth, id, dto, mediaSize), this.logger);
   }
 }

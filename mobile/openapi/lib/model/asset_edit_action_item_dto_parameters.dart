@@ -21,6 +21,10 @@ class AssetEditActionItemDtoParameters {
     required this.axis,
     required this.endTime,
     required this.startTime,
+    this.autoEnhance = const Optional.absent(),
+    this.brightness = const Optional.absent(),
+    this.contrast = const Optional.absent(),
+    this.saturation = const Optional.absent(),
   });
 
   /// Height of the crop
@@ -62,6 +66,39 @@ class AssetEditActionItemDtoParameters {
   /// Minimum value: 0
   num startTime;
 
+  /// Auto-enhance (contrast stretch)
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  Optional<bool?> autoEnhance;
+
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  Optional<TonalLevel?> brightness;
+
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  Optional<TonalLevel?> contrast;
+
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  Optional<TonalLevel?> saturation;
+
   @override
   bool operator ==(Object other) => identical(this, other) || other is AssetEditActionItemDtoParameters &&
     other.height == height &&
@@ -71,7 +108,11 @@ class AssetEditActionItemDtoParameters {
     other.angle == angle &&
     other.axis == axis &&
     other.endTime == endTime &&
-    other.startTime == startTime;
+    other.startTime == startTime &&
+    other.autoEnhance == autoEnhance &&
+    other.brightness == brightness &&
+    other.contrast == contrast &&
+    other.saturation == saturation;
 
   @override
   int get hashCode =>
@@ -83,10 +124,14 @@ class AssetEditActionItemDtoParameters {
     (angle.hashCode) +
     (axis.hashCode) +
     (endTime.hashCode) +
-    (startTime.hashCode);
+    (startTime.hashCode) +
+    (autoEnhance == null ? 0 : autoEnhance!.hashCode) +
+    (brightness == null ? 0 : brightness!.hashCode) +
+    (contrast == null ? 0 : contrast!.hashCode) +
+    (saturation == null ? 0 : saturation!.hashCode);
 
   @override
-  String toString() => 'AssetEditActionItemDtoParameters[height=$height, width=$width, x=$x, y=$y, angle=$angle, axis=$axis, endTime=$endTime, startTime=$startTime]';
+  String toString() => 'AssetEditActionItemDtoParameters[height=$height, width=$width, x=$x, y=$y, angle=$angle, axis=$axis, endTime=$endTime, startTime=$startTime, autoEnhance=$autoEnhance, brightness=$brightness, contrast=$contrast, saturation=$saturation]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -98,6 +143,22 @@ class AssetEditActionItemDtoParameters {
       json[r'axis'] = this.axis;
       json[r'endTime'] = this.endTime;
       json[r'startTime'] = this.startTime;
+    if (this.autoEnhance.isPresent) {
+      final value = this.autoEnhance.value;
+      json[r'autoEnhance'] = value;
+    }
+    if (this.brightness.isPresent) {
+      final value = this.brightness.value;
+      json[r'brightness'] = value;
+    }
+    if (this.contrast.isPresent) {
+      final value = this.contrast.value;
+      json[r'contrast'] = value;
+    }
+    if (this.saturation.isPresent) {
+      final value = this.saturation.value;
+      json[r'saturation'] = value;
+    }
     return json;
   }
 
@@ -118,6 +179,10 @@ class AssetEditActionItemDtoParameters {
         axis: MirrorAxis.fromJson(json[r'axis'])!,
         endTime: num.parse('${json[r'endTime']}'),
         startTime: num.parse('${json[r'startTime']}'),
+        autoEnhance: json.containsKey(r'autoEnhance') ? Optional.present(mapValueOfType<bool>(json, r'autoEnhance')) : const Optional.absent(),
+        brightness: json.containsKey(r'brightness') ? Optional.present(TonalLevel.fromJson(json[r'brightness'])) : const Optional.absent(),
+        contrast: json.containsKey(r'contrast') ? Optional.present(TonalLevel.fromJson(json[r'contrast'])) : const Optional.absent(),
+        saturation: json.containsKey(r'saturation') ? Optional.present(TonalLevel.fromJson(json[r'saturation'])) : const Optional.absent(),
       );
     }
     return null;

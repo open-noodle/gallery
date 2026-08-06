@@ -1,4 +1,4 @@
-import { AssetTypeEnum, getFilterSuggestions, getSearchSuggestions, Type } from '@immich/sdk';
+import { AssetTypeEnum, getFilterSuggestions, getSearchSuggestions, Type5 as Type } from '@immich/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFilterState } from '$lib/components/filter-panel/filter-panel';
 import { buildAlbumAssetPickerFilterConfig, buildAlbumDetailFilterConfig } from '$lib/utils/album-filter-config';

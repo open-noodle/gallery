@@ -200,6 +200,38 @@ export class MapRepository {
       .$narrowType<{ lat: NotNull; lon: NotNull }>();
   }
 
+  async searchPlaces(
+    query: string,
+    limit = 25,
+  ): Promise<
+    {
+      name: string;
+      latitude: number;
+      longitude: number;
+      countryCode: string;
+      admin1Name: string | null;
+      admin2Name: string | null;
+      similarity: number;
+    }[]
+  > {
+    return this.db
+      .selectFrom('geodata_places')
+      .select([
+        'name',
+        'latitude',
+        'longitude',
+        'countryCode',
+        'admin1Name',
+        'admin2Name',
+        sql<number>`similarity(f_unaccent(name), f_unaccent(${query}))`.as('similarity'),
+      ])
+      .where(sql<boolean>`f_unaccent(name) % f_unaccent(${query})`)
+      .orderBy(sql`similarity(f_unaccent(name), f_unaccent(${query}))`, 'desc')
+      .orderBy(sql`char_length(name)`, 'asc')
+      .limit(limit)
+      .execute();
+  }
+
   async reverseGeocode(point: GeoPoint): Promise<ReverseGeocodeResult> {
     this.logger.debug(`Request: ${point.latitude},${point.longitude}`);
 

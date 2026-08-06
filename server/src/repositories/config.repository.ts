@@ -50,6 +50,14 @@ export interface EnvData {
     thirdPartySupportUrl?: string;
   };
 
+  agent: {
+    secretKey?: string;
+    runnerUrl?: string;
+    mcpGatewayUrl?: string;
+    runnerHealthTimeoutMs: number;
+    runnerMessageStreamTimeoutMs: number;
+  };
+
   bull: {
     config: QueueOptions;
     queues: RegisterQueueOptions[];
@@ -291,6 +299,14 @@ const getEnv = (): EnvData => {
       thirdPartyBugFeatureUrl: dto.IMMICH_THIRD_PARTY_BUG_FEATURE_URL,
       thirdPartyDocumentationUrl: dto.IMMICH_THIRD_PARTY_DOCUMENTATION_URL,
       thirdPartySupportUrl: dto.IMMICH_THIRD_PARTY_SUPPORT_URL,
+    },
+
+    agent: {
+      secretKey: dto.IMMICH_AGENT_SECRET_KEY,
+      runnerUrl: dto.IMMICH_AGENT_RUNNER_URL,
+      mcpGatewayUrl: dto.IMMICH_AGENT_MCP_GATEWAY_URL,
+      runnerHealthTimeoutMs: dto.IMMICH_AGENT_RUNNER_HEALTH_TIMEOUT_MS ?? 2000,
+      runnerMessageStreamTimeoutMs: dto.IMMICH_AGENT_RUNNER_MESSAGE_STREAM_TIMEOUT_MS ?? 300_000,
     },
 
     bull: {

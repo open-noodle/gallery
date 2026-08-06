@@ -8,6 +8,7 @@ import { TagRepository } from 'src/repositories/tag.repository';
 import { DB } from 'src/schema';
 import { AssetTable } from 'src/schema/tables/asset.table';
 import { BaseService } from 'src/services/base.service';
+import { mimeTypes } from 'src/utils/mime-types';
 import { upsertTags } from 'src/utils/tag';
 import { newMediumService } from 'test/medium.factory';
 import { factory } from 'test/small.factory';
@@ -795,6 +796,316 @@ describe(AssetRepository.name, () => {
     });
   });
 
+  describe('getMemoryLocationDayBuckets', () => {
+    it('should group previewable timeline assets by UTC day, country, state, and city', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const addAsset = async ({
+        localDateTime,
+        country,
+        state = null,
+        city,
+        visibility = AssetVisibility.Timeline,
+        withPreview = true,
+      }: {
+        localDateTime: Date;
+        country: string | null;
+        state?: string | null;
+        city: string | null;
+        visibility?: AssetVisibility;
+        withPreview?: boolean;
+      }) => {
+        const { asset } = await ctx.newAsset({ ownerId: user.id, visibility, localDateTime });
+        await Promise.all([
+          ctx.newExif({ assetId: asset.id, country, state, city }),
+          withPreview
+            ? ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: `${asset.id}.jpg` })
+            : null,
+        ]);
+      };
+
+      await addAsset({
+        localDateTime: new Date('2026-04-15T09:00:00Z'),
+        country: 'France',
+        state: 'Ile-de-France',
+        city: 'Paris',
+      });
+      await addAsset({
+        localDateTime: new Date('2026-04-15T17:00:00Z'),
+        country: 'France',
+        state: 'Ile-de-France',
+        city: 'Paris',
+      });
+      await addAsset({
+        localDateTime: new Date('2026-04-16T10:00:00Z'),
+        country: 'France',
+        state: 'Auvergne-Rhone-Alpes',
+        city: 'Lyon',
+      });
+      await addAsset({
+        localDateTime: new Date('2026-04-17T10:00:00Z'),
+        country: 'Italy',
+        state: 'Lazio',
+        city: 'Rome',
+      });
+      await addAsset({
+        localDateTime: new Date('2026-04-18T10:00:00Z'),
+        country: 'France',
+        city: 'Paris',
+        withPreview: false,
+      });
+      await addAsset({
+        localDateTime: new Date('2026-04-19T10:00:00Z'),
+        country: null,
+        city: null,
+      });
+      await addAsset({
+        localDateTime: new Date('2026-04-20T10:00:00Z'),
+        country: 'France',
+        city: 'Nice',
+        visibility: AssetVisibility.Archive,
+      });
+
+      await expect(
+        sut.getMemoryLocationDayBuckets(user.id, {
+          takenAfter: new Date('2026-04-01T00:00:00Z'),
+          takenBefore: new Date('2026-04-30T23:59:59Z'),
+        }),
+      ).resolves.toEqual([
+        {
+          localDate: new Date('2026-04-15T00:00:00.000Z'),
+          country: 'France',
+          state: 'Ile-de-France',
+          city: 'Paris',
+          assetCount: 2,
+          firstDate: new Date('2026-04-15T09:00:00.000Z'),
+          lastDate: new Date('2026-04-15T17:00:00.000Z'),
+        },
+        {
+          localDate: new Date('2026-04-16T00:00:00.000Z'),
+          country: 'France',
+          state: 'Auvergne-Rhone-Alpes',
+          city: 'Lyon',
+          assetCount: 1,
+          firstDate: new Date('2026-04-16T10:00:00.000Z'),
+          lastDate: new Date('2026-04-16T10:00:00.000Z'),
+        },
+        {
+          localDate: new Date('2026-04-17T00:00:00.000Z'),
+          country: 'Italy',
+          state: 'Lazio',
+          city: 'Rome',
+          assetCount: 1,
+          firstDate: new Date('2026-04-17T10:00:00.000Z'),
+          lastDate: new Date('2026-04-17T10:00:00.000Z'),
+        },
+      ]);
+    });
+  });
+
+  describe('getTripCandidateAssets', () => {
+    it('should materialize previewable timeline assets for trip source places with stack and duplicate metadata', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const addAsset = async ({
+        localDateTime,
+        country,
+        state = null,
+        city,
+        duplicateId = null,
+        fileSizeInByte = 100,
+        exif = {},
+        visibility = AssetVisibility.Timeline,
+        withPreview = true,
+      }: {
+        localDateTime: Date;
+        country: string | null;
+        state?: string | null;
+        city: string | null;
+        duplicateId?: string | null;
+        fileSizeInByte?: number | null;
+        exif?: {
+          description?: string;
+          projectionType?: string;
+          rating?: number;
+          timeZone?: string;
+        };
+        visibility?: AssetVisibility;
+        withPreview?: boolean;
+      }) => {
+        const { asset } = await ctx.newAsset({ ownerId: user.id, visibility, localDateTime, duplicateId });
+        await Promise.all([
+          ctx.newExif({ assetId: asset.id, country, state, city, fileSizeInByte, ...exif }),
+          withPreview
+            ? ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: `${asset.id}.jpg` })
+            : null,
+        ]);
+        return asset;
+      };
+
+      const duplicateId = factory.uuid();
+      const primary = await addAsset({
+        localDateTime: new Date('2026-04-15T09:00:00Z'),
+        country: 'France',
+        state: 'Ile-de-France',
+        city: 'Paris',
+        duplicateId,
+        fileSizeInByte: 300,
+        exif: { description: 'A photo', projectionType: 'EQUIRECTANGULAR', rating: 0, timeZone: 'UTC' },
+      });
+      const stackChild = await addAsset({
+        localDateTime: new Date('2026-04-15T10:00:00Z'),
+        country: 'France',
+        state: 'Ile-de-France',
+        city: 'Paris',
+        fileSizeInByte: 200,
+      });
+      await ctx.newStack({ ownerId: user.id }, [primary.id, stackChild.id]);
+      await addAsset({
+        localDateTime: new Date('2026-04-16T09:00:00Z'),
+        country: 'Italy',
+        state: 'Lazio',
+        city: 'Rome',
+      });
+      await addAsset({
+        localDateTime: new Date('2026-04-17T09:00:00Z'),
+        country: 'France',
+        city: 'Paris',
+        withPreview: false,
+      });
+      await addAsset({
+        localDateTime: new Date('2026-04-18T09:00:00Z'),
+        country: 'France',
+        city: 'Nice',
+      });
+      await addAsset({
+        localDateTime: new Date('2026-04-15T09:00:00Z'),
+        country: 'France',
+        city: 'Paris',
+        visibility: AssetVisibility.Archive,
+      });
+
+      await expect(
+        sut.getTripCandidateAssets(user.id, {
+          takenAfter: new Date('2026-04-15T00:00:00Z'),
+          takenBefore: new Date('2026-04-16T23:59:59Z'),
+          places: [
+            { country: 'France', state: 'Ile-de-France', city: 'Paris' },
+            { country: 'Italy', state: 'Lazio', city: 'Rome' },
+          ],
+        }),
+      ).resolves.toEqual([
+        expect.objectContaining({
+          id: primary.id,
+          duplicateId,
+          stackPrimaryAssetId: primary.id,
+          fileSizeInByte: 300,
+          exifValueCount: 7,
+        }),
+        expect.objectContaining({
+          id: stackChild.id,
+          stackPrimaryAssetId: primary.id,
+          fileSizeInByte: 200,
+        }),
+        expect.objectContaining({
+          country: 'Italy',
+          state: 'Lazio',
+          city: 'Rome',
+          stackId: null,
+          stackPrimaryAssetId: null,
+        }),
+      ]);
+    });
+
+    it('should support explicit null and omitted optional place filters', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const addAsset = async (country: string, state: string | null, city: string | null) => {
+        const { asset } = await ctx.newAsset({
+          ownerId: user.id,
+          visibility: AssetVisibility.Timeline,
+          localDateTime: new Date('2026-04-15T09:00:00Z'),
+        });
+        await Promise.all([
+          ctx.newExif({ assetId: asset.id, country, state, city, fileSizeInByte: 100 }),
+          ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: `${asset.id}.jpg` }),
+        ]);
+        return asset;
+      };
+
+      const franceUnknown = await addAsset('France', null, null);
+      await addAsset('France', null, 'Paris');
+      const italyRome = await addAsset('Italy', 'Lazio', 'Rome');
+      const italyMilan = await addAsset('Italy', 'Lombardy', 'Milan');
+
+      const result = await sut.getTripCandidateAssets(user.id, {
+        takenAfter: new Date('2026-04-15T00:00:00Z'),
+        takenBefore: new Date('2026-04-15T23:59:59Z'),
+        places: [{ country: 'France', state: null, city: null }, { country: 'Italy' }],
+      });
+
+      expect(result.map(({ id }) => id).toSorted()).toEqual([franceUnknown.id, italyMilan.id, italyRome.id].toSorted());
+    });
+
+    it('should return duplicate group assets for owned timeline previewable assets only', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { user: otherUser } = await ctx.newUser();
+      const duplicateId = factory.uuid();
+
+      const addAsset = async (ownerId: string, withPreview = true, visibility = AssetVisibility.Timeline) => {
+        const { asset } = await ctx.newAsset({
+          ownerId,
+          visibility,
+          duplicateId,
+          localDateTime: new Date('2026-04-15T09:00:00Z'),
+        });
+        await Promise.all([
+          ctx.newExif({ assetId: asset.id, country: 'France', city: 'Paris', fileSizeInByte: 100 }),
+          withPreview
+            ? ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: `${asset.id}.jpg` })
+            : null,
+        ]);
+        return asset;
+      };
+
+      const first = await addAsset(user.id);
+      const second = await addAsset(user.id);
+      const stackedPrimary = await addAsset(user.id);
+      const { asset: stackChild } = await ctx.newAsset({
+        ownerId: user.id,
+        visibility: AssetVisibility.Timeline,
+        localDateTime: new Date('2026-04-15T10:00:00Z'),
+      });
+      await Promise.all([
+        ctx.newExif({ assetId: stackChild.id, country: 'France', city: 'Paris', fileSizeInByte: 90 }),
+        ctx.newAssetFile({ assetId: stackChild.id, type: AssetFileType.Preview, path: `${stackChild.id}.jpg` }),
+      ]);
+      await ctx.newStack({ ownerId: user.id }, [stackedPrimary.id, stackChild.id]);
+      await addAsset(user.id, false);
+      await addAsset(user.id, true, AssetVisibility.Archive);
+      await addAsset(otherUser.id);
+
+      const result = await sut.getDuplicateGroupAssets(user.id, [duplicateId]);
+
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: first.id, duplicateId }),
+          expect.objectContaining({ id: second.id, duplicateId }),
+          expect.objectContaining({
+            id: stackedPrimary.id,
+            duplicateId,
+            stackPrimaryAssetId: stackedPrimary.id,
+          }),
+        ]),
+      );
+      expect(result).toHaveLength(3);
+    });
+  });
+
   describe('getMemoryAssetsForLocation', () => {
     it('should return previewable timeline assets for the requested country and city, including city=null', async () => {
       const { ctx, sut } = setup();
@@ -1506,6 +1817,601 @@ describe(AssetRepository.name, () => {
     });
   });
 
+  describe('getAgentMetadataByIds', () => {
+    it('returns only the redacted metadata shape for requested assets', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({
+        ownerId: user.id,
+        originalFileName: 'IMG_0001.jpg',
+        originalPath: '/uploads/user/original/IMG_0001.jpg',
+        isFavorite: true,
+        visibility: AssetVisibility.Timeline,
+      });
+      const tag = await ctx.get(TagRepository).upsertValue({ userId: user.id, value: 'Portugal' });
+      await Promise.all([
+        ctx.newExif({
+          assetId: asset.id,
+          city: 'Lisbon',
+          state: 'Lisbon',
+          country: 'Portugal',
+          description: 'private caption',
+          fileSizeInByte: 123_456,
+          make: 'Canon',
+          model: 'R5',
+          lensModel: 'RF 24-70',
+          latitude: 38.7223,
+          longitude: -9.1393,
+          rating: 5,
+          tags: ['private'],
+          lockedProperties: ['description'],
+        }),
+        ctx.newTagAsset({ tagIds: [tag.id], assetIds: [asset.id] }),
+        ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: 'preview/IMG_0001.jpg' }),
+      ]);
+
+      const result = await sut.getAgentMetadataByIds([asset.id]);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        id: asset.id,
+        ownerId: user.id,
+        type: asset.type,
+        originalFileName: 'IMG_0001.jpg',
+        localDateTime: asset.localDateTime,
+        fileCreatedAt: asset.fileCreatedAt,
+        fileModifiedAt: asset.fileModifiedAt,
+        isFavorite: true,
+        visibility: AssetVisibility.Timeline,
+        exifInfo: expect.objectContaining({
+          city: 'Lisbon',
+          state: 'Lisbon',
+          country: 'Portugal',
+          make: 'Canon',
+          model: 'R5',
+          lensModel: 'RF 24-70',
+          latitude: 38.7223,
+          longitude: -9.1393,
+          rating: 5,
+        }),
+        tags: [expect.objectContaining({ id: tag.id, value: 'Portugal' })],
+      });
+      expect(result[0]).not.toHaveProperty('originalPath');
+      expect(result[0]).not.toHaveProperty('checksum');
+      expect(result[0]).not.toHaveProperty('files');
+      expect(result[0]).not.toHaveProperty('faces');
+      expect(result[0].exifInfo).not.toHaveProperty('description');
+      expect(result[0].exifInfo).not.toHaveProperty('fileSizeInByte');
+      expect(result[0].exifInfo).not.toHaveProperty('tags');
+      expect(result[0].exifInfo).not.toHaveProperty('lockedProperties');
+      expect(result[0].exifInfo).not.toHaveProperty('updatedAt');
+      expect(result[0].exifInfo).not.toHaveProperty('updateId');
+    });
+
+    it('excludes hidden, deleted, and offline assets from direct agent metadata reads', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: visible } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { asset: archived } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Archive });
+      const { asset: locked } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
+      const { asset: hidden } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Hidden });
+      const { asset: deleted } = await ctx.newAsset({ ownerId: user.id, deletedAt: new Date() });
+      const { asset: offline } = await ctx.newAsset({ ownerId: user.id, isOffline: true });
+
+      const result = await sut.getAgentMetadataByIds([
+        visible.id,
+        archived.id,
+        locked.id,
+        hidden.id,
+        deleted.id,
+        offline.id,
+      ]);
+
+      expect(result.map((asset) => asset.id).toSorted()).toEqual([visible.id, archived.id, locked.id].toSorted());
+    });
+  });
+
+  describe('searchAgentMetadata', () => {
+    const agentScope = { owned: true, sharedSpaces: false, locked: false };
+
+    it('searches agent asset metadata without paths or media file rows', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({
+        ownerId: user.id,
+        originalFileName: 'lisbon.jpg',
+        originalPath: '/uploads/user/original/lisbon.jpg',
+      });
+      const tag = await ctx.get(TagRepository).upsertValue({ userId: user.id, value: 'Lisbon' });
+      await Promise.all([
+        ctx.newExif({ assetId: asset.id, city: 'Lisbon', country: 'Portugal', make: 'Canon', model: 'R5' }),
+        ctx.newTagAsset({ tagIds: [tag.id], assetIds: [asset.id] }),
+        ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: 'preview/lisbon.jpg' }),
+      ]);
+
+      const result = await sut.searchAgentMetadata({
+        userId: user.id,
+        filters: { city: 'Lisbon', country: 'Portugal' },
+        limit: 10,
+        scope: agentScope,
+      });
+
+      expect(result).toMatchObject({
+        nextPage: null,
+        assets: [
+          expect.objectContaining({
+            id: asset.id,
+            ownerId: user.id,
+            originalFileName: 'lisbon.jpg',
+            exifInfo: expect.objectContaining({ city: 'Lisbon', country: 'Portugal' }),
+            tags: [expect.objectContaining({ id: tag.id, value: 'Lisbon' })],
+          }),
+        ],
+      });
+      expect(JSON.stringify(result.assets)).not.toContain(asset.originalPath);
+      expect(JSON.stringify(result.assets)).not.toContain('preview/lisbon.jpg');
+    });
+
+    it('enforces owned, shared-space, locked, deleted, and offline scope', async () => {
+      const { ctx, sut } = setup();
+      const { user: viewer } = await ctx.newUser();
+      const { user: owner } = await ctx.newUser();
+      const { asset: owned } = await ctx.newAsset({ ownerId: viewer.id, visibility: AssetVisibility.Timeline });
+      const { asset: locked } = await ctx.newAsset({ ownerId: viewer.id, visibility: AssetVisibility.Locked });
+      const { asset: deleted } = await ctx.newAsset({ ownerId: viewer.id, deletedAt: new Date() });
+      const { asset: offline } = await ctx.newAsset({ ownerId: viewer.id, isOffline: true });
+      const { asset: shared } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await Promise.all([
+        ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id, role: SharedSpaceRole.Viewer }),
+        ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: shared.id, addedById: owner.id }),
+        ctx.newExif({ assetId: owned.id, country: 'Portugal' }),
+        ctx.newExif({ assetId: locked.id, country: 'Portugal' }),
+        ctx.newExif({ assetId: deleted.id, country: 'Portugal' }),
+        ctx.newExif({ assetId: offline.id, country: 'Portugal' }),
+        ctx.newExif({ assetId: shared.id, country: 'Portugal' }),
+      ]);
+
+      await expect(
+        sut.searchAgentMetadata({
+          userId: viewer.id,
+          filters: { country: 'Portugal' },
+          limit: 10,
+          scope: { owned: true, sharedSpaces: false, locked: false },
+        }),
+      ).resolves.toMatchObject({ assets: [expect.objectContaining({ id: owned.id })] });
+
+      const withShared = await sut.searchAgentMetadata({
+        userId: viewer.id,
+        filters: { country: 'Portugal' },
+        limit: 10,
+        scope: { owned: true, sharedSpaces: true, locked: false },
+      });
+      expect(withShared.assets.map(({ id }) => id).toSorted()).toEqual([owned.id, shared.id].toSorted());
+
+      const withLocked = await sut.searchAgentMetadata({
+        userId: viewer.id,
+        filters: { country: 'Portugal' },
+        limit: 10,
+        scope: { owned: true, sharedSpaces: false, locked: true },
+      });
+      expect(withLocked.assets.map(({ id }) => id).toSorted()).toEqual([locked.id, owned.id].toSorted());
+    });
+
+    it('excludes hidden assets when locked assets are included in agent metadata search', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: hidden } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Hidden });
+      const { asset: locked } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
+      await Promise.all([
+        ctx.newExif({ assetId: hidden.id, country: 'Portugal' }),
+        ctx.newExif({ assetId: locked.id, country: 'Portugal' }),
+      ]);
+
+      const result = await sut.searchAgentMetadata({
+        userId: user.id,
+        filters: { country: 'Portugal' },
+        limit: 10,
+        scope: { owned: true, sharedSpaces: false, locked: true },
+      });
+
+      expect(result.assets.map(({ id }) => id)).toEqual([locked.id]);
+    });
+
+    it('includes archived assets in normal agent metadata search', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Archive });
+      await ctx.newExif({ assetId: asset.id, country: 'Portugal' });
+
+      const result = await sut.searchAgentMetadata({
+        userId: user.id,
+        filters: { country: 'Portugal' },
+        limit: 10,
+        scope: agentScope,
+      });
+
+      expect(result.assets.map(({ id }) => id)).toEqual([asset.id]);
+    });
+
+    it('returns visible shared-space assets but not owned assets for shared-only scope', async () => {
+      const { ctx, sut } = setup();
+      const { user: viewer } = await ctx.newUser();
+      const { user: owner } = await ctx.newUser();
+      const { asset: owned } = await ctx.newAsset({ ownerId: viewer.id, visibility: AssetVisibility.Timeline });
+      const { asset: shared } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Archive });
+      const { asset: hiddenShared } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Hidden });
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await Promise.all([
+        ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id, role: SharedSpaceRole.Viewer }),
+        ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: shared.id, addedById: owner.id }),
+        ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: hiddenShared.id, addedById: owner.id }),
+        ctx.newExif({ assetId: owned.id, country: 'Portugal' }),
+        ctx.newExif({ assetId: shared.id, country: 'Portugal' }),
+        ctx.newExif({ assetId: hiddenShared.id, country: 'Portugal' }),
+      ]);
+
+      const result = await sut.searchAgentMetadata({
+        userId: viewer.id,
+        filters: { country: 'Portugal' },
+        limit: 10,
+        scope: { owned: false, sharedSpaces: true, locked: false },
+      });
+
+      expect(result.assets.map(({ id }) => id)).toEqual([shared.id]);
+    });
+  });
+
+  describe('agent media references', () => {
+    it('returns preview references in requested order without filesystem paths and omits missing ids', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: first } = await ctx.newAsset({ ownerId: user.id, originalFileName: 'first.jpg' });
+      const { asset: second } = await ctx.newAsset({ ownerId: user.id, originalFileName: 'second.jpg' });
+      const { asset: missingPreview } = await ctx.newAsset({ ownerId: user.id, originalFileName: 'missing.jpg' });
+      await Promise.all([
+        ctx.newExif({ assetId: first.id, exifImageWidth: 100, exifImageHeight: 80 }),
+        ctx.newExif({ assetId: second.id, exifImageWidth: 200, exifImageHeight: 160 }),
+        ctx.newAssetFile({ assetId: first.id, type: AssetFileType.Preview, path: 'preview/first.jpg' }),
+        ctx.newAssetFile({ assetId: second.id, type: AssetFileType.Preview, path: 'preview/second.jpg' }),
+      ]);
+
+      const result = await sut.getAgentPreviewReferencesByIds([second.id, missingPreview.id, factory.uuid(), first.id]);
+
+      expect(result).toEqual([
+        {
+          assetId: second.id,
+          mediaUrl: `/api/assets/${second.id}/thumbnail?size=preview`,
+          mimeType: 'image/jpeg',
+          fileName: 'second.jpg',
+          width: 200,
+          height: 160,
+        },
+        {
+          assetId: first.id,
+          mediaUrl: `/api/assets/${first.id}/thumbnail?size=preview`,
+          mimeType: 'image/jpeg',
+          fileName: 'first.jpg',
+          width: 100,
+          height: 80,
+        },
+      ]);
+      expect(JSON.stringify(result)).not.toContain('preview/second.jpg');
+    });
+
+    it('infers preview media reference MIME types from generated preview file names', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const previewPath = 'upload/thumbs/image-preview.jpg';
+      const { asset } = await ctx.newAsset({ ownerId: user.id, originalFileName: 'image.heic' });
+      await ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: previewPath });
+
+      const result = await sut.getAgentPreviewReferencesByIds([asset.id]);
+
+      expect(result).toEqual([
+        expect.objectContaining({
+          assetId: asset.id,
+          mimeType: 'image/jpeg',
+          fileName: 'image.heic',
+        }),
+      ]);
+      expect(JSON.stringify(result)).not.toContain(previewPath);
+    });
+
+    it('excludes hidden, deleted, and offline assets from direct preview references', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: visible } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { asset: hidden } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Hidden });
+      const { asset: deleted } = await ctx.newAsset({ ownerId: user.id, deletedAt: new Date() });
+      const { asset: offline } = await ctx.newAsset({ ownerId: user.id, isOffline: true });
+      await Promise.all(
+        [visible, hidden, deleted, offline].map((asset) =>
+          ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: `preview/${asset.id}.jpg` }),
+        ),
+      );
+
+      const result = await sut.getAgentPreviewReferencesByIds([visible.id, hidden.id, deleted.id, offline.id]);
+
+      expect(result.map((reference) => reference.assetId)).toEqual([visible.id]);
+    });
+
+    it('returns original references in requested order without filesystem paths and omits missing ids', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: first } = await ctx.newAsset({
+        ownerId: user.id,
+        originalFileName: 'first.jpg',
+        originalPath: '/uploads/original/first.jpg',
+      });
+      const { asset: second } = await ctx.newAsset({
+        ownerId: user.id,
+        originalFileName: 'second.png',
+        originalPath: '/uploads/original/second.png',
+      });
+      await Promise.all([
+        ctx.newExif({ assetId: first.id, exifImageWidth: 300, exifImageHeight: 200 }),
+        ctx.newExif({ assetId: second.id, exifImageWidth: 640, exifImageHeight: 480 }),
+      ]);
+
+      const result = await sut.getAgentOriginalReferencesByIds([second.id, factory.uuid(), first.id]);
+
+      expect(result).toEqual([
+        {
+          assetId: second.id,
+          mediaUrl: `/api/assets/${second.id}/original`,
+          mimeType: 'image/png',
+          fileName: 'second.png',
+          width: 640,
+          height: 480,
+        },
+        {
+          assetId: first.id,
+          mediaUrl: `/api/assets/${first.id}/original`,
+          mimeType: 'image/jpeg',
+          fileName: 'first.jpg',
+          width: 300,
+          height: 200,
+        },
+      ]);
+      expect(JSON.stringify(result)).not.toContain(first.originalPath);
+      expect(JSON.stringify(result)).not.toContain(second.originalPath);
+    });
+
+    it('infers original media reference MIME types from supported file names', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id, originalFileName: 'image.heic' });
+
+      const result = await sut.getAgentOriginalReferencesByIds([asset.id]);
+
+      expect(result[0]).toMatchObject({
+        assetId: asset.id,
+        mimeType: mimeTypes.lookup('image.heic'),
+        fileName: 'image.heic',
+      });
+    });
+
+    it('excludes hidden, deleted, and offline assets from direct original references', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: visible } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { asset: hidden } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Hidden });
+      const { asset: deleted } = await ctx.newAsset({ ownerId: user.id, deletedAt: new Date() });
+      const { asset: offline } = await ctx.newAsset({ ownerId: user.id, isOffline: true });
+
+      const result = await sut.getAgentOriginalReferencesByIds([visible.id, hidden.id, deleted.id, offline.id]);
+
+      expect(result.map((reference) => reference.assetId)).toEqual([visible.id]);
+    });
+  });
+
+  describe('searchAgentMetadata', () => {
+    const agentScope = { owned: true, sharedSpaces: false, locked: false };
+
+    it('searches agent asset metadata without paths or media file rows', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({
+        ownerId: user.id,
+        originalFileName: 'lisbon.jpg',
+        originalPath: '/uploads/user/original/lisbon.jpg',
+      });
+      const tag = await ctx.get(TagRepository).upsertValue({ userId: user.id, value: 'Lisbon' });
+      await Promise.all([
+        ctx.newExif({ assetId: asset.id, city: 'Lisbon', country: 'Portugal', make: 'Canon', model: 'R5' }),
+        ctx.newTagAsset({ tagIds: [tag.id], assetIds: [asset.id] }),
+        ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: 'preview/lisbon.jpg' }),
+      ]);
+
+      const result = await sut.searchAgentMetadata({
+        userId: user.id,
+        filters: { city: 'Lisbon', country: 'Portugal' },
+        limit: 10,
+        scope: agentScope,
+      });
+
+      expect(result).toMatchObject({
+        nextPage: null,
+        assets: [
+          expect.objectContaining({
+            id: asset.id,
+            ownerId: user.id,
+            originalFileName: 'lisbon.jpg',
+            exifInfo: expect.objectContaining({ city: 'Lisbon', country: 'Portugal' }),
+            tags: [expect.objectContaining({ id: tag.id, value: 'Lisbon' })],
+          }),
+        ],
+      });
+      expect(JSON.stringify(result.assets)).not.toContain(asset.originalPath);
+      expect(JSON.stringify(result.assets)).not.toContain('preview/lisbon.jpg');
+    });
+
+    it('enforces owned, shared-space, locked, deleted, and offline scope', async () => {
+      const { ctx, sut } = setup();
+      const { user: viewer } = await ctx.newUser();
+      const { user: owner } = await ctx.newUser();
+      const { asset: owned } = await ctx.newAsset({ ownerId: viewer.id, visibility: AssetVisibility.Timeline });
+      const { asset: locked } = await ctx.newAsset({ ownerId: viewer.id, visibility: AssetVisibility.Locked });
+      const { asset: deleted } = await ctx.newAsset({ ownerId: viewer.id, deletedAt: new Date() });
+      const { asset: offline } = await ctx.newAsset({ ownerId: viewer.id, isOffline: true });
+      const { asset: shared } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await Promise.all([
+        ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id, role: SharedSpaceRole.Viewer }),
+        ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: shared.id, addedById: owner.id }),
+        ctx.newExif({ assetId: owned.id, country: 'Portugal' }),
+        ctx.newExif({ assetId: locked.id, country: 'Portugal' }),
+        ctx.newExif({ assetId: deleted.id, country: 'Portugal' }),
+        ctx.newExif({ assetId: offline.id, country: 'Portugal' }),
+        ctx.newExif({ assetId: shared.id, country: 'Portugal' }),
+      ]);
+
+      await expect(
+        sut.searchAgentMetadata({
+          userId: viewer.id,
+          filters: { country: 'Portugal' },
+          limit: 10,
+          scope: { owned: true, sharedSpaces: false, locked: false },
+        }),
+      ).resolves.toMatchObject({ assets: [expect.objectContaining({ id: owned.id })] });
+
+      const withShared = await sut.searchAgentMetadata({
+        userId: viewer.id,
+        filters: { country: 'Portugal' },
+        limit: 10,
+        scope: { owned: true, sharedSpaces: true, locked: false },
+      });
+      expect(withShared.assets.map(({ id }) => id).toSorted()).toEqual([owned.id, shared.id].toSorted());
+
+      const withLocked = await sut.searchAgentMetadata({
+        userId: viewer.id,
+        filters: { country: 'Portugal' },
+        limit: 10,
+        scope: { owned: true, sharedSpaces: false, locked: true },
+      });
+      expect(withLocked.assets.map(({ id }) => id).toSorted()).toEqual([locked.id, owned.id].toSorted());
+    });
+  });
+
+  describe('agent media references', () => {
+    it('returns preview references in requested order without filesystem paths and omits missing ids', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: first } = await ctx.newAsset({ ownerId: user.id, originalFileName: 'first.jpg' });
+      const { asset: second } = await ctx.newAsset({ ownerId: user.id, originalFileName: 'second.jpg' });
+      const { asset: missingPreview } = await ctx.newAsset({ ownerId: user.id, originalFileName: 'missing.jpg' });
+      await Promise.all([
+        ctx.newExif({ assetId: first.id, exifImageWidth: 100, exifImageHeight: 80 }),
+        ctx.newExif({ assetId: second.id, exifImageWidth: 200, exifImageHeight: 160 }),
+        ctx.newAssetFile({ assetId: first.id, type: AssetFileType.Preview, path: 'preview/first.jpg' }),
+        ctx.newAssetFile({ assetId: second.id, type: AssetFileType.Preview, path: 'preview/second.jpg' }),
+      ]);
+
+      const result = await sut.getAgentPreviewReferencesByIds([second.id, missingPreview.id, factory.uuid(), first.id]);
+
+      expect(result).toEqual([
+        {
+          assetId: second.id,
+          mediaUrl: `/api/assets/${second.id}/thumbnail?size=preview`,
+          mimeType: 'image/jpeg',
+          fileName: 'second.jpg',
+          width: 200,
+          height: 160,
+        },
+        {
+          assetId: first.id,
+          mediaUrl: `/api/assets/${first.id}/thumbnail?size=preview`,
+          mimeType: 'image/jpeg',
+          fileName: 'first.jpg',
+          width: 100,
+          height: 80,
+        },
+      ]);
+      expect(JSON.stringify(result)).not.toContain('preview/second.jpg');
+    });
+
+    it('returns original references in requested order without filesystem paths and omits missing ids', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: first } = await ctx.newAsset({
+        ownerId: user.id,
+        originalFileName: 'first.jpg',
+        originalPath: '/uploads/original/first.jpg',
+      });
+      const { asset: second } = await ctx.newAsset({
+        ownerId: user.id,
+        originalFileName: 'second.png',
+        originalPath: '/uploads/original/second.png',
+      });
+      await Promise.all([
+        ctx.newExif({ assetId: first.id, exifImageWidth: 300, exifImageHeight: 200 }),
+        ctx.newExif({ assetId: second.id, exifImageWidth: 640, exifImageHeight: 480 }),
+      ]);
+
+      const result = await sut.getAgentOriginalReferencesByIds([second.id, factory.uuid(), first.id]);
+
+      expect(result).toEqual([
+        {
+          assetId: second.id,
+          mediaUrl: `/api/assets/${second.id}/original`,
+          mimeType: 'image/png',
+          fileName: 'second.png',
+          width: 640,
+          height: 480,
+        },
+        {
+          assetId: first.id,
+          mediaUrl: `/api/assets/${first.id}/original`,
+          mimeType: 'image/jpeg',
+          fileName: 'first.jpg',
+          width: 300,
+          height: 200,
+        },
+      ]);
+      expect(JSON.stringify(result)).not.toContain(first.originalPath);
+      expect(JSON.stringify(result)).not.toContain(second.originalPath);
+    });
+  });
+
+  describe('getAgentLockedIds', () => {
+    it('returns only requested locked asset ids', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: locked } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
+      const { asset: timeline } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { asset: nonRequestedLocked } = await ctx.newAsset({
+        ownerId: user.id,
+        visibility: AssetVisibility.Locked,
+      });
+
+      const result = await sut.getAgentLockedIds(new Set([locked.id, timeline.id]));
+
+      expect(result).toEqual(new Set([locked.id]));
+      expect(result).not.toContain(timeline.id);
+      expect(result).not.toContain(nonRequestedLocked.id);
+    });
+  });
+
+  describe('getAgentReadableIds', () => {
+    it('returns requested timeline, archived, and locked ids while excluding hidden, deleted, and offline ids', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: visible } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { asset: archived } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Archive });
+      const { asset: locked } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
+      const { asset: hidden } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Hidden });
+      const { asset: deleted } = await ctx.newAsset({ ownerId: user.id, deletedAt: new Date() });
+      const { asset: offline } = await ctx.newAsset({ ownerId: user.id, isOffline: true });
+
+      const result = await sut.getAgentReadableIds(
+        new Set([visible.id, archived.id, locked.id, hidden.id, deleted.id, offline.id]),
+      );
+
+      expect(result).toEqual(new Set([visible.id, archived.id, locked.id]));
+    });
+  });
+
   describe('upsertExif', () => {
     it('should append to locked columns', async () => {
       const { ctx, sut } = setup();
@@ -2130,6 +3036,47 @@ describe(AssetRepository.name, () => {
       // own gate must ALSO exclude `trashed` — pre-fix, the album arm had no deletedAt condition,
       // so `trashed` alone satisfied `deletedAt IS NOT NULL AND album_asset match`, leaking it.
       expect(ids).toEqual([]);
+    });
+  });
+
+  describe('getTimeBucket — tag navigation with shared-space access (issue #647)', () => {
+    it('returns an owner-tagged asset to a member only when the shared-space scope is included', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const memberAuth = factory.auth({ user: { id: member.id } });
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+
+      // Owner tags their own asset and shares it into the space the member belongs to.
+      const asset = await createTimelineAssetWithPeople(ctx, owner.id, []);
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+      // upsertValue (not create) so tag_closure is populated — the tag-id timeline filter
+      // (withAnyTagId) joins through tag_closure, matching production's tag creation path.
+      const tag = await ctx.get(TagRepository).upsertValue({ userId: owner.id, value: 'family' });
+      await ctx.newTagAsset({ tagIds: [tag.id], assetIds: [asset.id] });
+
+      // Mirrors what the tags page now sends for a non-admin member (own + shared-space
+      // assets, tag-filtered): the owner's tagged asset must show up.
+      const withSpace = await sut.getTimeBucket(
+        '2026-03-01',
+        {
+          userIds: [member.id],
+          timelineSpaceIds: [space.id],
+          tagIds: [tag.id],
+          visibility: AssetVisibility.Timeline,
+        },
+        memberAuth,
+      );
+      expect((JSON.parse(withSpace.assets) as TimeBucketAssets).id).toEqual([asset.id]);
+
+      // Without the shared-space scope the member only sees their own assets — none here.
+      const ownOnly = await sut.getTimeBucket(
+        '2026-03-01',
+        { userIds: [member.id], tagIds: [tag.id], visibility: AssetVisibility.Timeline },
+        memberAuth,
+      );
+      expect((JSON.parse(ownOnly.assets) as TimeBucketAssets).id ?? []).not.toContain(asset.id);
     });
   });
 

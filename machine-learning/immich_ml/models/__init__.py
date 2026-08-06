@@ -13,6 +13,12 @@ from .facial_recognition.recognition import FaceRecognizer
 
 
 def get_model_class(model_name: str, model_type: ModelType, model_task: ModelTask) -> type[InferenceModel]:
+    # Task-based dispatch: no source look-up needed for built-in heuristics.
+    if model_task == ModelTask.IMAGE_QUALITY:
+        from immich_ml.models.quality import QualityScorer
+
+        return QualityScorer
+
     source = get_model_source(model_name)
     match source, model_type, model_task:
         case ModelSource.OPENCLIP | ModelSource.MCLIP, ModelType.VISUAL, ModelTask.SEARCH:

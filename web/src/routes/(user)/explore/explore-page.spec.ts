@@ -1,4 +1,4 @@
-import { Type, type PersonResponseDto, type SearchExploreResponseDto } from '@immich/sdk';
+import { Type5 as Type, type PersonResponseDto, type SearchExploreResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';

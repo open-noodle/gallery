@@ -28,6 +28,7 @@ services:
       - cli_node_modules:/usr/src/app/packages/cli/node_modules
       - docs_node_modules:/usr/src/app/docs/node_modules
       - e2e_node_modules:/usr/src/app/e2e/node_modules
+      - agent_runner_node_modules:/usr/src/app/agent-runner/node_modules
       - sdk_node_modules:/usr/src/app/packages/sdk/node_modules
       - app_node_modules:/usr/src/app/node_modules
       - sveltekit:/usr/src/app/web/.svelte-kit
@@ -92,6 +93,9 @@ services:
       IMMICH_THIRD_PARTY_DOCUMENTATION_URL: https://docs.immich.app
       IMMICH_THIRD_PARTY_SUPPORT_URL: https://docs.immich.app/community-guides
       IMMICH_HELMET_FILE: 'true'
+      IMMICH_AGENT_SECRET_KEY: ${IMMICH_AGENT_SECRET_KEY:-dev-agent-secret-key-change-me}
+      IMMICH_AGENT_RUNNER_URL: http://agent-runner:4477
+      IMMICH_AGENT_MCP_GATEWAY_URL: http://immich-server:2283/api/agent/internal/mcp
     ports:
       - 9230:9230
       - 9231:9231
@@ -103,8 +107,29 @@ services:
         condition: service_started
       database:
         condition: service_started
+      agent-runner:
+        condition: service_started
     healthcheck:
       disable: false
+
+  agent-runner:
+    extends:
+      service: immich-app-base
+    profiles: !reset []
+    container_name: agent_runner
+    image: immich-server-dev:latest
+    build:
+      context: ../
+      dockerfile: server/Dockerfile.dev
+      target: dev
+    command: ['exec pnpm --dir agent-runner dev']
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4477
+    depends_on:
+      immich-init:
+        condition: service_healthy
+    restart: unless-stopped
 
   immich-web:
     extends:
@@ -208,6 +233,7 @@ volumes:
   cli_node_modules:
   docs_node_modules:
   e2e_node_modules:
+  agent_runner_node_modules:
   sdk_node_modules:
   app_node_modules:
   sveltekit:

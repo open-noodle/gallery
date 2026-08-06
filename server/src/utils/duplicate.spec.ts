@@ -1,7 +1,12 @@
 import { AssetResponseDto } from 'src/dtos/asset-response.dto';
 import { ExifResponseSchema } from 'src/dtos/exif.dto';
 import { AssetType, AssetVisibility } from 'src/enum';
-import { getExifCount, suggestDuplicate, suggestDuplicateKeepAssetIds } from 'src/utils/duplicate';
+import {
+  getExifCount,
+  suggestDuplicate,
+  suggestDuplicateByMetadata,
+  suggestDuplicateKeepAssetIds,
+} from 'src/utils/duplicate';
 import { describe, expect, it } from 'vitest';
 import type { z } from 'zod';
 
@@ -159,6 +164,37 @@ describe('duplicate utils', () => {
       });
 
       expect(suggestDuplicate([largeWithLessExif, smallWithMoreExif])?.id).toBe('large-less-exif');
+    });
+  });
+
+  describe('suggestDuplicateByMetadata', () => {
+    it('keeps the largest file size and uses exif count as a tie breaker for non-DTO rows', () => {
+      const rows = [
+        { id: 'small-more-exif', fileSizeInByte: 100, exifValueCount: 8 },
+        { id: 'large-less-exif', fileSizeInByte: 200, exifValueCount: 1 },
+        { id: 'large-more-exif', fileSizeInByte: 200, exifValueCount: 4 },
+      ];
+
+      expect(
+        suggestDuplicateByMetadata(rows, {
+          getFileSizeInByte: (row) => row.fileSizeInByte,
+          getExifCount: (row) => row.exifValueCount,
+        })?.id,
+      ).toBe('large-more-exif');
+    });
+
+    it('treats missing file size and exif values as zero', () => {
+      const rows = [
+        { id: 'empty', fileSizeInByte: null, exifValueCount: null },
+        { id: 'with-file-size', fileSizeInByte: 50, exifValueCount: null },
+      ];
+
+      expect(
+        suggestDuplicateByMetadata(rows, {
+          getFileSizeInByte: (row) => row.fileSizeInByte,
+          getExifCount: (row) => row.exifValueCount,
+        })?.id,
+      ).toBe('with-file-size');
     });
   });
 

@@ -15,6 +15,8 @@ services:
     build:
       context: ../
       dockerfile: server/Dockerfile
+      secrets:
+        - github_token
     environment:
       DB_HOSTNAME: database
       DB_USERNAME: postgres
@@ -25,6 +27,11 @@ services:
       IMMICH_ENV: testing
       IMMICH_PORT: '2285'
       IMMICH_IGNORE_MOUNT_CHECK_ERRORS: 'true'
+      IMMICH_AGENT_SECRET_KEY: e2e-agent-secret-key-change-me
+      IMMICH_AGENT_RUNNER_URL: http://agent-runner:4477
+      IMMICH_AGENT_MCP_GATEWAY_URL: http://immich-server:2285/api/agent/internal/mcp
+      IMMICH_AGENT_RUNNER_HEALTH_TIMEOUT_MS: '5000'
+      IMMICH_AGENT_RUNNER_MESSAGE_STREAM_TIMEOUT_MS: '30000'
     volumes:
       - ./test-assets:/test-assets
     depends_on:
@@ -32,8 +39,20 @@ services:
         condition: service_started
       database:
         condition: service_healthy
+      agent-runner:
+        condition: service_started
     ports:
       - 2285:2285
+
+  agent-runner:
+    container_name: immich-e2e-agent-runner
+    build:
+      context: ../
+      dockerfile: agent-runner/Dockerfile
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4477
+      GALLERY_AGENT_RUNNER_RUNTIME: e2e
 
   redis:
     container_name: immich-e2e-redis
@@ -58,3 +77,7 @@ services:
       timeout: 5s
       retries: 30
       start_period: 10s
+
+secrets:
+  github_token:
+    environment: GITHUB_TOKEN

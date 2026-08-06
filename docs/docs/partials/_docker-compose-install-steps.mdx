@@ -20,6 +20,14 @@ wget -O docker-compose.yml https://github.com/open-noodle/gallery/releases/lates
 wget -O .env https://github.com/open-noodle/gallery/releases/latest/download/example.env
 ```
 
+```bash title="Generate the agent assistant secret"
+if grep -q '^IMMICH_AGENT_SECRET_KEY=$' .env; then
+  AGENT_SECRET="$(openssl rand -base64 32 | tr -d '\n')"
+  sed -i.bak "s|^IMMICH_AGENT_SECRET_KEY=$|IMMICH_AGENT_SECRET_KEY=${AGENT_SECRET}|" .env
+  rm -f .env.bak
+fi
+```
+
 You can alternatively download these two files from your browser and move them to the directory that you created, in which case ensure that you rename `example.env` to `.env`.
 
 ### Step 2 - Populate the .env file with custom values
@@ -32,6 +40,7 @@ You can alternatively download these two files from your browser and move them t
 - Consider changing `DB_PASSWORD` to a custom value. Postgres is not publicly exposed, so this password is only used for local authentication.
   To avoid issues with Docker parsing this value, it is best to use only the characters `A-Za-z0-9`. `pwgen` is a handy utility for this.
 - Set your timezone by uncommenting the `TZ=` line.
+- Keep `IMMICH_AGENT_SECRET_KEY` unchanged after the first install. Gallery uses it for assistant provider credential encryption and session-scoped MCP runner tokens.
 - Populate custom database information if necessary.
 
 ### Step 3 - Start the containers

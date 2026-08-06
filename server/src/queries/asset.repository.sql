@@ -231,6 +231,180 @@ group by
 order by
   "assetCount" desc
 
+-- AssetRepository.getMemoryLocationDayBuckets
+select
+  date_trunc('day', asset."localDateTime" at time zone 'UTC') at time zone 'UTC' as "localDate",
+  "asset_exif"."country" as "country",
+  "asset_exif"."state" as "state",
+  "asset_exif"."city" as "city",
+  count(*)::int as "assetCount",
+  min(asset."localDateTime") as "firstDate",
+  max(asset."localDateTime") as "lastDate"
+from
+  "asset"
+  inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
+where
+  "asset"."ownerId" = $1
+  and "asset"."visibility" = $2
+  and "asset"."deletedAt" is null
+  and "asset"."localDateTime" >= $3
+  and "asset"."localDateTime" <= $4
+  and "asset_exif"."country" is not null
+  and exists (
+    select
+      "asset_file"."assetId"
+    from
+      "asset_file"
+    where
+      "asset_file"."assetId" = "asset"."id"
+      and "asset_file"."type" = $5
+  )
+group by
+  date_trunc('day', asset."localDateTime" at time zone 'UTC') at time zone 'UTC',
+  "asset_exif"."country",
+  "asset_exif"."state",
+  "asset_exif"."city"
+order by
+  "localDate" asc,
+  "assetCount" desc
+
+-- AssetRepository.getTripCandidateAssets
+select
+  "asset"."id",
+  "asset"."localDateTime",
+  "asset_exif"."country",
+  "asset_exif"."state",
+  "asset_exif"."city",
+  "asset"."duplicateId",
+  "asset"."stackId",
+  "stack"."primaryAssetId" as "stackPrimaryAssetId",
+  asset_exif."fileSizeInByte"::float8 as "fileSizeInByte",
+  (
+    (nullif(asset_exif.make, '') is not null)::int + (nullif(asset_exif.model, '') is not null)::int + (
+      (asset_exif."exifImageWidth" is not null)
+      and (asset_exif."exifImageWidth" <> 0)
+    )::int + (
+      (asset_exif."exifImageHeight" is not null)
+      and (asset_exif."exifImageHeight" <> 0)
+    )::int + (
+      (asset_exif."fileSizeInByte" is not null)
+      and (asset_exif."fileSizeInByte" <> 0)
+    )::int + (nullif(asset_exif.orientation, '') is not null)::int + (asset_exif."dateTimeOriginal" is not null)::int + (asset_exif."modifyDate" is not null)::int + (nullif(asset_exif."timeZone", '') is not null)::int + (nullif(asset_exif."lensModel", '') is not null)::int + (
+      (asset_exif."fNumber" is not null)
+      and (asset_exif."fNumber" <> 0)
+    )::int + (
+      (asset_exif."focalLength" is not null)
+      and (asset_exif."focalLength" <> 0)
+    )::int + (
+      (asset_exif.iso is not null)
+      and (asset_exif.iso <> 0)
+    )::int + (nullif(asset_exif."exposureTime", '') is not null)::int + (
+      (asset_exif.latitude is not null)
+      and (asset_exif.latitude <> 0)
+    )::int + (
+      (asset_exif.longitude is not null)
+      and (asset_exif.longitude <> 0)
+    )::int + (nullif(asset_exif.city, '') is not null)::int + (nullif(asset_exif.state, '') is not null)::int + (nullif(asset_exif.country, '') is not null)::int + (nullif(asset_exif.description, '') is not null)::int + (
+      nullif(asset_exif."projectionType", '') is not null
+    )::int + (
+      (asset_exif.rating is not null)
+      and (asset_exif.rating <> 0)
+    )::int
+  )::int as "exifValueCount"
+from
+  "asset"
+  inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
+  left join "stack" on "stack"."id" = "asset"."stackId"
+where
+  "asset"."ownerId" = $1
+  and "asset"."visibility" = $2
+  and "asset"."deletedAt" is null
+  and "asset"."localDateTime" >= $3
+  and "asset"."localDateTime" <= $4
+  and (
+    "asset_exif"."country" = $5
+    and "asset_exif"."state" = $6
+    and "asset_exif"."city" = $7
+  )
+  and exists (
+    select
+      "asset_file"."assetId"
+    from
+      "asset_file"
+    where
+      "asset_file"."assetId" = "asset"."id"
+      and "asset_file"."type" = $8
+  )
+order by
+  "asset"."localDateTime" asc,
+  "asset"."id" asc
+
+-- AssetRepository.getDuplicateGroupAssets
+select
+  "asset"."id",
+  "asset"."localDateTime",
+  "asset_exif"."country",
+  "asset_exif"."state",
+  "asset_exif"."city",
+  "asset"."duplicateId",
+  "asset"."stackId",
+  "stack"."primaryAssetId" as "stackPrimaryAssetId",
+  asset_exif."fileSizeInByte"::float8 as "fileSizeInByte",
+  (
+    (nullif(asset_exif.make, '') is not null)::int + (nullif(asset_exif.model, '') is not null)::int + (
+      (asset_exif."exifImageWidth" is not null)
+      and (asset_exif."exifImageWidth" <> 0)
+    )::int + (
+      (asset_exif."exifImageHeight" is not null)
+      and (asset_exif."exifImageHeight" <> 0)
+    )::int + (
+      (asset_exif."fileSizeInByte" is not null)
+      and (asset_exif."fileSizeInByte" <> 0)
+    )::int + (nullif(asset_exif.orientation, '') is not null)::int + (asset_exif."dateTimeOriginal" is not null)::int + (asset_exif."modifyDate" is not null)::int + (nullif(asset_exif."timeZone", '') is not null)::int + (nullif(asset_exif."lensModel", '') is not null)::int + (
+      (asset_exif."fNumber" is not null)
+      and (asset_exif."fNumber" <> 0)
+    )::int + (
+      (asset_exif."focalLength" is not null)
+      and (asset_exif."focalLength" <> 0)
+    )::int + (
+      (asset_exif.iso is not null)
+      and (asset_exif.iso <> 0)
+    )::int + (nullif(asset_exif."exposureTime", '') is not null)::int + (
+      (asset_exif.latitude is not null)
+      and (asset_exif.latitude <> 0)
+    )::int + (
+      (asset_exif.longitude is not null)
+      and (asset_exif.longitude <> 0)
+    )::int + (nullif(asset_exif.city, '') is not null)::int + (nullif(asset_exif.state, '') is not null)::int + (nullif(asset_exif.country, '') is not null)::int + (nullif(asset_exif.description, '') is not null)::int + (
+      nullif(asset_exif."projectionType", '') is not null
+    )::int + (
+      (asset_exif.rating is not null)
+      and (asset_exif.rating <> 0)
+    )::int
+  )::int as "exifValueCount"
+from
+  "asset"
+  inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
+  left join "stack" on "stack"."id" = "asset"."stackId"
+where
+  "asset"."ownerId" = $1
+  and "asset"."visibility" = $2
+  and "asset"."deletedAt" is null
+  and "asset"."duplicateId" in ($3)
+  and "asset"."duplicateId" is not null
+  and exists (
+    select
+      "asset_file"."assetId"
+    from
+      "asset_file"
+    where
+      "asset_file"."assetId" = "asset"."id"
+      and "asset_file"."type" = $4
+  )
+order by
+  "asset"."localDateTime" asc,
+  "asset"."id" asc
+
 -- AssetRepository.getMemoryAssetsForLocation
 select
   "asset"."id",
@@ -486,6 +660,290 @@ from
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
 where
   "asset"."id" = any ($1::uuid[])
+
+-- AssetRepository.getAgentLockedIds
+select
+  "asset"."id"
+from
+  "asset"
+where
+  "asset"."id" in ($1)
+  and "asset"."visibility" = $2
+
+-- AssetRepository.getAgentReadableIds
+select
+  "asset"."id"
+from
+  "asset"
+where
+  "asset"."id" in ($1)
+  and "asset"."deletedAt" is null
+  and "asset"."isOffline" = $2
+  and "asset"."visibility" in ($3, $4, $5)
+
+-- AssetRepository.getAgentMetadataByIds
+select
+  "asset"."id",
+  "asset"."ownerId",
+  "asset"."type",
+  "asset"."originalFileName",
+  "asset"."localDateTime",
+  "asset"."fileCreatedAt",
+  "asset"."fileModifiedAt",
+  "asset"."isFavorite",
+  "asset"."visibility",
+  (
+    select
+      coalesce(json_agg(agg), '[]')
+    from
+      (
+        select
+          "tag"."id",
+          "tag"."value",
+          "tag"."createdAt",
+          "tag"."updatedAt",
+          "tag"."color",
+          "tag"."parentId"
+        from
+          "tag"
+          inner join "tag_asset" on "tag"."id" = "tag_asset"."tagId"
+        where
+          "asset"."id" = "tag_asset"."assetId"
+      ) as agg
+  ) as "tags",
+  (
+    select
+      to_json(obj)
+    from
+      (
+        select
+          "asset_exif"."dateTimeOriginal",
+          "asset_exif"."city",
+          "asset_exif"."state",
+          "asset_exif"."country",
+          "asset_exif"."make",
+          "asset_exif"."model",
+          "asset_exif"."lensModel",
+          "asset_exif"."latitude",
+          "asset_exif"."longitude",
+          "asset_exif"."rating"
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+      ) as obj
+  ) as "exifInfo",
+  (
+    select
+      to_json(obj)
+    from
+      (
+        select
+          "asset_quality"."sharpness",
+          "asset_quality"."exposure",
+          "asset_quality"."brightness",
+          "asset_quality"."quality"
+        from
+          "asset_quality"
+        where
+          "asset_quality"."assetId" = "asset"."id"
+      ) as obj
+  ) as "qualityInfo"
+from
+  "asset"
+where
+  "asset"."id" = any ($1::uuid[])
+  and "asset"."deletedAt" is null
+  and "asset"."isOffline" = $2
+  and "asset"."visibility" in ($3, $4, $5)
+
+-- AssetRepository.getAgentMetadataReviewByIds
+select
+  "asset"."id",
+  (
+    select
+      to_json(obj)
+    from
+      (
+        select
+          "asset_exif"."description",
+          "asset_exif"."dateTimeOriginal",
+          "asset_exif"."timeZone",
+          "asset_exif"."latitude",
+          "asset_exif"."longitude",
+          "asset_exif"."rating"
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+      ) as obj
+  ) as "exifInfo"
+from
+  "asset"
+where
+  "asset"."id" = any ($1::uuid[])
+  and "asset"."deletedAt" is null
+  and "asset"."isOffline" = $2
+  and "asset"."visibility" in ($3, $4, $5)
+
+-- AssetRepository.getAssetQualityByIds
+select
+  "asset_quality"."assetId",
+  "asset_quality"."sharpness"
+from
+  "asset_quality"
+where
+  "asset_quality"."assetId" = any ($1::uuid[])
+
+-- AssetRepository.searchAgentMetadata
+select
+  "asset"."id",
+  "asset"."ownerId",
+  "asset"."type",
+  "asset"."originalFileName",
+  "asset"."localDateTime",
+  "asset"."fileCreatedAt",
+  "asset"."fileModifiedAt",
+  "asset"."isFavorite",
+  "asset"."visibility",
+  (
+    select
+      coalesce(json_agg(agg), '[]')
+    from
+      (
+        select
+          "tag"."id",
+          "tag"."value",
+          "tag"."createdAt",
+          "tag"."updatedAt",
+          "tag"."color",
+          "tag"."parentId"
+        from
+          "tag"
+          inner join "tag_asset" on "tag"."id" = "tag_asset"."tagId"
+        where
+          "asset"."id" = "tag_asset"."assetId"
+      ) as agg
+  ) as "tags",
+  (
+    select
+      to_json(obj)
+    from
+      (
+        select
+          "asset_exif"."dateTimeOriginal",
+          "asset_exif"."city",
+          "asset_exif"."state",
+          "asset_exif"."country",
+          "asset_exif"."make",
+          "asset_exif"."model",
+          "asset_exif"."lensModel",
+          "asset_exif"."latitude",
+          "asset_exif"."longitude",
+          "asset_exif"."rating"
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+      ) as obj
+  ) as "exifInfo",
+  (
+    select
+      to_json(obj)
+    from
+      (
+        select
+          "asset_quality"."sharpness",
+          "asset_quality"."exposure",
+          "asset_quality"."brightness",
+          "asset_quality"."quality"
+        from
+          "asset_quality"
+        where
+          "asset_quality"."assetId" = "asset"."id"
+      ) as obj
+  ) as "qualityInfo"
+from
+  "asset"
+where
+  "asset"."deletedAt" is null
+  and "asset"."isOffline" = $1
+  and "asset"."visibility" in ($2, $3)
+  and (
+    "asset"."ownerId" = $4
+    or exists (
+      select
+      from
+        "shared_space_asset"
+        inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
+      where
+        "shared_space_asset"."assetId" = "asset"."id"
+        and "shared_space_member"."userId" = $5
+    )
+    or exists (
+      select
+      from
+        "shared_space_library"
+        inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_library"."spaceId"
+      where
+        "shared_space_library"."libraryId" = "asset"."libraryId"
+        and "shared_space_member"."userId" = $6
+    )
+  )
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and "asset_exif"."city" = $7
+  )
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and "asset_exif"."country" = $8
+  )
+order by
+  "asset"."localDateTime" desc,
+  "asset"."id" desc
+limit
+  $9
+
+-- AssetRepository.getAgentPreviewReferencesByIds
+select
+  "asset"."id" as "assetId",
+  "asset"."originalFileName" as "fileName",
+  "asset_file"."path" as "previewPath",
+  "asset_exif"."exifImageWidth" as "width",
+  "asset_exif"."exifImageHeight" as "height"
+from
+  "asset"
+  inner join "asset_file" on "asset_file"."assetId" = "asset"."id"
+  left join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
+where
+  "asset"."id" = any ($1::uuid[])
+  and "asset"."deletedAt" is null
+  and "asset"."isOffline" = $2
+  and "asset"."visibility" in ($3, $4, $5)
+  and "asset_file"."type" = $6
+
+-- AssetRepository.getAgentOriginalReferencesByIds
+select
+  "asset"."id" as "assetId",
+  "asset"."originalFileName" as "fileName",
+  "asset_exif"."exifImageWidth" as "width",
+  "asset_exif"."exifImageHeight" as "height"
+from
+  "asset"
+  left join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
+where
+  "asset"."id" = any ($1::uuid[])
+  and "asset"."deletedAt" is null
+  and "asset"."isOffline" = $2
+  and "asset"."visibility" in ($3, $4, $5)
 
 -- AssetRepository.deleteAll
 delete from "asset"

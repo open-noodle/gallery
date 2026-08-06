@@ -1,4 +1,4 @@
-import { Type, type PersonResponseDto } from '@immich/sdk';
+import { Type5 as Type, type PersonResponseDto } from '@immich/sdk';
 import { getGlobalPersonHref, getGlobalPersonThumbnailUrl } from './global-person-route';
 
 const person = (overrides: Partial<PersonResponseDto> = {}): PersonResponseDto =>

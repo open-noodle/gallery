@@ -1,4 +1,4 @@
-import { Type2 as ScopedPersonProfileType, type PersonResponseDto, type ScopedPersonProfileRefDto } from '@immich/sdk';
+import { Type6 as ScopedPersonProfileType, type PersonResponseDto, type ScopedPersonProfileRefDto } from '@immich/sdk';
 
 export const toScopedPersonRef = (person: PersonResponseDto): ScopedPersonProfileRefDto => {
   if (person.primaryProfile?.type === 'space-person' && person.primaryProfile.spaceId) {

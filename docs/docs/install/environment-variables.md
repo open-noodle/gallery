@@ -66,6 +66,17 @@ These environment variables are used by the `docker-compose.yml` file and do **N
 Information on the current workers can be found [here](/administration/jobs-workers).
 :::
 
+## Agent Assistant
+
+| Variable                       | Description                                                                                                                                                                                                                     | Default | Services | Workers |
+| :----------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :-----: | :------- | :------ |
+| `IMMICH_AGENT_SECRET_KEY`      | Stable secret used by Gallery to encrypt assistant provider credentials and sign session-scoped MCP runner tokens. Generate once and keep unchanged across restarts.                                                            |         | server   | api     |
+| `IMMICH_AGENT_RUNNER_URL`      | Internal HTTP URL of the first-party agent runner. In Docker Compose this is `http://agent-runner:4477`.                                                                                                                        |         | server   | api     |
+| `IMMICH_AGENT_MCP_GATEWAY_URL` | Internal HTTP base URL the runner uses to call back into Gallery's MCP endpoint. In Docker Compose this is `http://immich-server:2283/api/agent/internal/mcp`. Gallery appends `/sessions/<sessionId>` for each runner session. |         | server   | api     |
+
+`IMMICH_AGENT_TOOL_GATEWAY_URL` is retired. Use `IMMICH_AGENT_MCP_GATEWAY_URL`.
+Do not pass `IMMICH_AGENT_SECRET_KEY`, database credentials, Redis credentials, or S3 credentials to the `agent-runner` service.
+
 ## Diagnostics
 
 | Variable                | Description                                                                                                                                                                                                                                                                                             | Default | Containers          |

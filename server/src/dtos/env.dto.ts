@@ -13,6 +13,10 @@ enum DatabaseSslMode {
 
 const DatabaseSslModeSchema = z.enum(DatabaseSslMode).describe('Database SSL mode').meta({ id: 'DatabaseSslMode' });
 const absolutePath = z.string().regex(/^\//, 'Must be an absolute path').optional();
+const httpUrl = (message: string) =>
+  z.url().refine((value) => /^https?:\/\//i.test(value), {
+    message,
+  });
 /**
  * Treat certain strings as booleans and coerce them to boolean
  * Ideal for environment variables that are strings but should be treated as booleans
@@ -60,6 +64,12 @@ export const EnvSchema = z
     IMMICH_S3_SERVE_MODE: z.enum(['redirect', 'proxy']).optional(),
     IMMICH_MICROSERVICES_METRICS_PORT: z.coerce.number().int().optional(),
     IMMICH_ALLOW_EXTERNAL_PLUGINS: stringBool.optional(),
+    IMMICH_AGENT_SECRET_KEY: z.string().optional(),
+    IMMICH_AGENT_RUNNER_URL: httpUrl('Runner URL must use http or https').optional(),
+    IMMICH_AGENT_MCP_GATEWAY_URL: httpUrl('MCP gateway URL must use http or https').optional(),
+    IMMICH_AGENT_TOOL_GATEWAY_URL: z.undefined({ error: 'Use IMMICH_AGENT_MCP_GATEWAY_URL instead' }).optional(),
+    IMMICH_AGENT_RUNNER_HEALTH_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
+    IMMICH_AGENT_RUNNER_MESSAGE_STREAM_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
     IMMICH_PLUGINS_INSTALL_FOLDER: absolutePath,
     IMMICH_PORT: z.coerce.number().int().optional(),
     IMMICH_REPOSITORY: z.string().optional(),

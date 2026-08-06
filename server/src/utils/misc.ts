@@ -109,6 +109,8 @@ export const isOcrEnabled = (machineLearning: SystemConfig['machineLearning']) =
   isMachineLearningEnabled(machineLearning) && machineLearning.ocr.enabled;
 export const isPetDetectionEnabled = (machineLearning: SystemConfig['machineLearning']) =>
   isMachineLearningEnabled(machineLearning) && machineLearning.petDetection.enabled;
+export const isImageQualityEnabled = (machineLearning: SystemConfig['machineLearning']) =>
+  isMachineLearningEnabled(machineLearning);
 export const isFacialRecognitionEnabled = (machineLearning: SystemConfig['machineLearning']) =>
   isMachineLearningEnabled(machineLearning) && machineLearning.facialRecognition.enabled;
 // Deliberately gated on `facialRecognition.enabled` rather than `isFacialRecognitionEnabled`: face

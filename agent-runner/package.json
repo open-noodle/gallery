@@ -1,0 +1,19 @@
+{
+  "name": "@open-noodle/agent-runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.mjs",
+    "start": "node src/server.mjs",
+    "test": "node --test 'src/**/*.test.mjs'",
+    "eval": "node --env-file-if-exists=.env eval/run.mjs",
+    "eval:l3": "node --env-file-if-exists=.env eval/run.mjs --layer L3"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "^0.74.0",
+    "@earendil-works/pi-coding-agent": "^0.74.0",
+    "pi-mcp-extension": "1.5.0",
+    "typebox": "^1.1.38"
+  }
+}

@@ -13,11 +13,11 @@ import {
   Updateable,
   UpdateResult,
 } from 'kysely';
-import { jsonArrayFrom } from 'kysely/helpers/postgres';
+import { jsonArrayFrom, jsonObjectFrom } from 'kysely/helpers/postgres';
 import { isEmpty, isUndefined, omitBy } from 'lodash';
 import { InjectKysely } from 'nestjs-kysely';
 import { lockableProperties, LockableProperty, Stack } from 'src/database';
-import { Chunked, ChunkedArray, DummyValue, GenerateSql } from 'src/decorators';
+import { Chunked, ChunkedArray, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
 import {
   AssetFileType,
@@ -35,7 +35,9 @@ import { AssetExifTable } from 'src/schema/tables/asset-exif.table';
 import { AssetFileTable } from 'src/schema/tables/asset-file.table';
 import { AssetJobStatusTable } from 'src/schema/tables/asset-job-status.table';
 import { AssetMetadataTable } from 'src/schema/tables/asset-metadata.table';
+import { AssetQualityTable } from 'src/schema/tables/asset-quality.table';
 import { AssetTable } from 'src/schema/tables/asset.table';
+import { AgentAssetMediaReference, AgentAssetMetadata, AgentSearchAssetsFilters } from 'src/types/agent-tool.types';
 import {
   anyUuid,
   asUuid,
@@ -60,6 +62,7 @@ import {
   withSmartSearch,
   withTags,
 } from 'src/utils/database';
+import { mimeTypes } from 'src/utils/mime-types';
 import { globToSqlPattern } from 'src/utils/misc';
 import { spaceAssetPathBranches, spaceVisibilityGate } from 'src/utils/shared-space-album-scope';
 
@@ -216,6 +219,39 @@ export interface MemoryPeriodOptions {
   type?: AssetType;
   /** exclude assets taken after this instant (defensive guard against future-dated assets) */
   takenBefore: Date;
+export interface MemoryLocationDayBucket {
+  localDate: Date;
+  country: string | null;
+  state: string | null;
+  city: string | null;
+  assetCount: number;
+  firstDate: Date;
+  lastDate: Date;
+}
+
+export interface TripCandidateAssetPlace {
+  country: string;
+  state?: string | null;
+  city?: string | null;
+}
+
+export interface TripCandidateAssetSource {
+  takenAfter: Date;
+  takenBefore: Date;
+  places: TripCandidateAssetPlace[];
+}
+
+export interface TripCandidateAssetRow {
+  id: string;
+  localDateTime: Date;
+  country: string | null;
+  state: string | null;
+  city: string | null;
+  duplicateId: string | null;
+  stackId: string | null;
+  stackPrimaryAssetId: string | null;
+  fileSizeInByte: number | null;
+  exifValueCount: number;
 }
 
 interface AssetExploreFieldOptions {
@@ -247,6 +283,17 @@ interface GetByIdsRelations {
   edits?: boolean;
 }
 
+export interface AgentAssetMetadataReviewRow {
+  id: string;
+  exifInfo: {
+    description: string | null;
+    dateTimeOriginal: Date | null;
+    timeZone: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    rating: number | null;
+  } | null;
+}
 type UpsertExifOptions = {
   exif: Insertable<AssetExifTable>;
   audio?: Insertable<AssetAudioTable>;
@@ -257,6 +304,33 @@ type UpsertExifOptions = {
 
 const distinctLocked = <T extends LockableProperty[] | null>(eb: ExpressionBuilder<DB, 'asset_exif'>, columns: T) =>
   sql<T>`nullif(array(select distinct unnest(${eb.ref('asset_exif.lockedProperties')} || ${columns})), '{}')`;
+
+const agentDirectReadVisibilities = [AssetVisibility.Timeline, AssetVisibility.Archive, AssetVisibility.Locked];
+
+const tripCandidateExifValueCount = sql<number>`(
+  (nullif(asset_exif.make, '') is not null)::int +
+  (nullif(asset_exif.model, '') is not null)::int +
+  ((asset_exif."exifImageWidth" is not null) and (asset_exif."exifImageWidth" <> 0))::int +
+  ((asset_exif."exifImageHeight" is not null) and (asset_exif."exifImageHeight" <> 0))::int +
+  ((asset_exif."fileSizeInByte" is not null) and (asset_exif."fileSizeInByte" <> 0))::int +
+  (nullif(asset_exif.orientation, '') is not null)::int +
+  (asset_exif."dateTimeOriginal" is not null)::int +
+  (asset_exif."modifyDate" is not null)::int +
+  (nullif(asset_exif."timeZone", '') is not null)::int +
+  (nullif(asset_exif."lensModel", '') is not null)::int +
+  ((asset_exif."fNumber" is not null) and (asset_exif."fNumber" <> 0))::int +
+  ((asset_exif."focalLength" is not null) and (asset_exif."focalLength" <> 0))::int +
+  ((asset_exif.iso is not null) and (asset_exif.iso <> 0))::int +
+  (nullif(asset_exif."exposureTime", '') is not null)::int +
+  ((asset_exif.latitude is not null) and (asset_exif.latitude <> 0))::int +
+  ((asset_exif.longitude is not null) and (asset_exif.longitude <> 0))::int +
+  (nullif(asset_exif.city, '') is not null)::int +
+  (nullif(asset_exif.state, '') is not null)::int +
+  (nullif(asset_exif.country, '') is not null)::int +
+  (nullif(asset_exif.description, '') is not null)::int +
+  (nullif(asset_exif."projectionType", '') is not null)::int +
+  ((asset_exif.rating is not null) and (asset_exif.rating <> 0))::int
+)::int`;
 
 const getBoundingCircle = (bbox: BoundingBox) => {
   const { west, south, east, north } = bbox;
@@ -519,6 +593,44 @@ export function withTimeBucketAssetFilters<O>(
     .$if(!!options.takenBefore, (qb) => qb.where('asset.localDateTime', '<=', new Date(options.takenBefore!)));
 }
 
+function withAgentExif<O>(qb: SelectQueryBuilder<DB, 'asset', O>) {
+  return qb.select((eb) =>
+    jsonObjectFrom(
+      eb
+        .selectFrom('asset_exif')
+        .select([
+          'asset_exif.dateTimeOriginal',
+          'asset_exif.city',
+          'asset_exif.state',
+          'asset_exif.country',
+          'asset_exif.make',
+          'asset_exif.model',
+          'asset_exif.lensModel',
+          'asset_exif.latitude',
+          'asset_exif.longitude',
+          'asset_exif.rating',
+        ])
+        .whereRef('asset_exif.assetId', '=', 'asset.id'),
+    ).as('exifInfo'),
+  );
+}
+
+function withAgentQuality<O>(qb: SelectQueryBuilder<DB, 'asset', O>) {
+  return qb.select((eb) =>
+    jsonObjectFrom(
+      eb
+        .selectFrom('asset_quality')
+        .select([
+          'asset_quality.sharpness',
+          'asset_quality.exposure',
+          'asset_quality.brightness',
+          'asset_quality.quality',
+        ])
+        .whereRef('asset_quality.assetId', '=', 'asset.id'),
+    ).as('qualityInfo'),
+  );
+}
+
 @Injectable()
 export class AssetRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
@@ -718,6 +830,7 @@ export class AssetRepository {
                 ocrAt: eb.ref('excluded.ocrAt'),
                 petsDetectedAt: eb.ref('excluded.petsDetectedAt'),
                 classifiedAt: eb.ref('excluded.classifiedAt'),
+                qualityScoredAt: eb.ref('excluded.qualityScoredAt'),
               } satisfies Record<JobStatusColumns, unknown>,
               values[0],
             ),
@@ -734,6 +847,30 @@ export class AssetRepository {
         return;
       }
 
+      throw error;
+    }
+  }
+
+  async upsertAssetQuality(
+    quality: Pick<Insertable<AssetQualityTable>, 'assetId' | 'sharpness' | 'exposure' | 'brightness' | 'quality'>,
+  ): Promise<void> {
+    try {
+      await this.db
+        .insertInto('asset_quality')
+        .values(quality)
+        .onConflict((oc) =>
+          oc.column('assetId').doUpdateSet((eb) => ({
+            sharpness: eb.ref('excluded.sharpness'),
+            exposure: eb.ref('excluded.exposure'),
+            brightness: eb.ref('excluded.brightness'),
+            quality: eb.ref('excluded.quality'),
+          })),
+        )
+        .execute();
+    } catch (error) {
+      if (isStaleAssetForeignKeyConstraint(error)) {
+        return;
+      }
       throw error;
     }
   }
@@ -930,6 +1067,156 @@ export class AssetRepository {
       .groupBy(['asset_exif.country', 'asset_exif.city'])
       .orderBy('assetCount', 'desc')
       .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, { takenAfter: DummyValue.DATE, takenBefore: DummyValue.DATE }] })
+  getMemoryLocationDayBuckets(
+    ownerId: string,
+    { takenAfter, takenBefore }: { takenAfter: Date; takenBefore: Date },
+  ): Promise<MemoryLocationDayBucket[]> {
+    const localDate = sql<Date>`date_trunc('day', asset."localDateTime" at time zone 'UTC') at time zone 'UTC'`;
+
+    return this.db
+      .selectFrom('asset')
+      .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .select([
+        localDate.as('localDate'),
+        'asset_exif.country as country',
+        'asset_exif.state as state',
+        'asset_exif.city as city',
+        sql<number>`count(*)::int`.as('assetCount'),
+        sql<Date>`min(asset."localDateTime")`.as('firstDate'),
+        sql<Date>`max(asset."localDateTime")`.as('lastDate'),
+      ])
+      .where('asset.ownerId', '=', ownerId)
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.localDateTime', '>=', takenAfter)
+      .where('asset.localDateTime', '<=', takenBefore)
+      .where('asset_exif.country', 'is not', null)
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('asset_file')
+            .select('asset_file.assetId')
+            .whereRef('asset_file.assetId', '=', 'asset.id')
+            .where('asset_file.type', '=', AssetFileType.Preview),
+        ),
+      )
+      .groupBy([localDate, 'asset_exif.country', 'asset_exif.state', 'asset_exif.city'])
+      .orderBy('localDate', 'asc')
+      .orderBy('assetCount', 'desc')
+      .execute();
+  }
+
+  @GenerateSql({
+    params: [
+      DummyValue.UUID,
+      {
+        takenAfter: DummyValue.DATE,
+        takenBefore: DummyValue.DATE,
+        places: [{ country: DummyValue.STRING, state: DummyValue.STRING, city: DummyValue.STRING }],
+      },
+    ],
+  })
+  getTripCandidateAssets(ownerId: string, { takenAfter, takenBefore, places }: TripCandidateAssetSource) {
+    if (places.length === 0) {
+      return Promise.resolve([]);
+    }
+
+    return this.db
+      .selectFrom('asset')
+      .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .leftJoin('stack', 'stack.id', 'asset.stackId')
+      .select([
+        'asset.id',
+        'asset.localDateTime',
+        'asset_exif.country',
+        'asset_exif.state',
+        'asset_exif.city',
+        'asset.duplicateId',
+        'asset.stackId',
+        'stack.primaryAssetId as stackPrimaryAssetId',
+        sql<number | null>`asset_exif."fileSizeInByte"::float8`.as('fileSizeInByte'),
+        tripCandidateExifValueCount.as('exifValueCount'),
+      ])
+      .where('asset.ownerId', '=', ownerId)
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.localDateTime', '>=', takenAfter)
+      .where('asset.localDateTime', '<=', takenBefore)
+      .where((eb) =>
+        eb.or(
+          places.map((place) =>
+            eb.and([
+              eb('asset_exif.country', '=', place.country),
+              ...(place.state === undefined
+                ? []
+                : [
+                    place.state === null
+                      ? eb('asset_exif.state', 'is', null)
+                      : eb('asset_exif.state', '=', place.state),
+                  ]),
+              ...(place.city === undefined
+                ? []
+                : [place.city === null ? eb('asset_exif.city', 'is', null) : eb('asset_exif.city', '=', place.city)]),
+            ]),
+          ),
+        ),
+      )
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('asset_file')
+            .select('asset_file.assetId')
+            .whereRef('asset_file.assetId', '=', 'asset.id')
+            .where('asset_file.type', '=', AssetFileType.Preview),
+        ),
+      )
+      .orderBy('asset.localDateTime', 'asc')
+      .orderBy('asset.id', 'asc')
+      .execute() as Promise<TripCandidateAssetRow[]>;
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
+  getDuplicateGroupAssets(ownerId: string, duplicateIds: string[]) {
+    if (duplicateIds.length === 0) {
+      return Promise.resolve([]);
+    }
+
+    return this.db
+      .selectFrom('asset')
+      .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .leftJoin('stack', 'stack.id', 'asset.stackId')
+      .select([
+        'asset.id',
+        'asset.localDateTime',
+        'asset_exif.country',
+        'asset_exif.state',
+        'asset_exif.city',
+        'asset.duplicateId',
+        'asset.stackId',
+        'stack.primaryAssetId as stackPrimaryAssetId',
+        sql<number | null>`asset_exif."fileSizeInByte"::float8`.as('fileSizeInByte'),
+        tripCandidateExifValueCount.as('exifValueCount'),
+      ])
+      .where('asset.ownerId', '=', ownerId)
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.duplicateId', 'in', duplicateIds)
+      .where('asset.duplicateId', 'is not', null)
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('asset_file')
+            .select('asset_file.assetId')
+            .whereRef('asset_file.assetId', '=', 'asset.id')
+            .where('asset_file.type', '=', AssetFileType.Preview),
+        ),
+      )
+      .orderBy('asset.localDateTime', 'asc')
+      .orderBy('asset.id', 'asc')
+      .execute() as Promise<TripCandidateAssetRow[]>;
   }
 
   @GenerateSql({
@@ -1184,6 +1471,395 @@ export class AssetRepository {
       .$call(withExif)
       .where('asset.id', '=', anyUuid(ids))
       .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID_SET] })
+  @ChunkedSet()
+  async getAgentLockedIds(ids: Set<string>): Promise<Set<string>> {
+    if (ids.size === 0) {
+      return new Set();
+    }
+
+    const results = await this.db
+      .selectFrom('asset')
+      .select('asset.id')
+      .where('asset.id', 'in', [...ids])
+      .where('asset.visibility', '=', AssetVisibility.Locked)
+      .execute();
+
+    return new Set(results.map(({ id }) => id));
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID_SET] })
+  @ChunkedSet()
+  async getAgentReadableIds(ids: Set<string>): Promise<Set<string>> {
+    if (ids.size === 0) {
+      return new Set();
+    }
+
+    const results = await this.db
+      .selectFrom('asset')
+      .select('asset.id')
+      .where('asset.id', 'in', [...ids])
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', '=', false)
+      .where('asset.visibility', 'in', agentDirectReadVisibilities)
+      .execute();
+
+    return new Set(results.map(({ id }) => id));
+  }
+
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  @ChunkedArray()
+  getAgentMetadataByIds(ids: string[]) {
+    return this.db
+      .selectFrom('asset')
+      .select([
+        'asset.id',
+        'asset.ownerId',
+        'asset.type',
+        'asset.originalFileName',
+        'asset.localDateTime',
+        'asset.fileCreatedAt',
+        'asset.fileModifiedAt',
+        'asset.isFavorite',
+        'asset.visibility',
+      ])
+      .select(withTags)
+      .$call(withAgentExif)
+      .$call(withAgentQuality)
+      .where('asset.id', '=', anyUuid(ids))
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', '=', false)
+      .where('asset.visibility', 'in', agentDirectReadVisibilities)
+      .execute();
+  }
+
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  @ChunkedArray()
+  getAgentMetadataReviewByIds(ids: string[]): Promise<AgentAssetMetadataReviewRow[]> {
+    return this.db
+      .selectFrom('asset')
+      .select('asset.id')
+      .select((eb) =>
+        jsonObjectFrom(
+          eb
+            .selectFrom('asset_exif')
+            .select([
+              'asset_exif.description',
+              'asset_exif.dateTimeOriginal',
+              'asset_exif.timeZone',
+              'asset_exif.latitude',
+              'asset_exif.longitude',
+              'asset_exif.rating',
+            ])
+            .whereRef('asset_exif.assetId', '=', 'asset.id'),
+        ).as('exifInfo'),
+      )
+      .where('asset.id', '=', anyUuid(ids))
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', '=', false)
+      .where('asset.visibility', 'in', agentDirectReadVisibilities)
+      .execute() as Promise<AgentAssetMetadataReviewRow[]>;
+  }
+
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  getAssetQualityByIds(ids: string[]) {
+    if (ids.length === 0) {
+      return Promise.resolve([]);
+    }
+    return this.db
+      .selectFrom('asset_quality')
+      .select(['asset_quality.assetId', 'asset_quality.sharpness'])
+      .where('asset_quality.assetId', '=', anyUuid(ids))
+      .execute();
+  }
+
+  @GenerateSql({
+    params: [
+      {
+        userId: DummyValue.UUID,
+        filters: { city: DummyValue.STRING, country: DummyValue.STRING },
+        limit: 10,
+        scope: { owned: true, sharedSpaces: true, locked: false },
+      },
+    ],
+  })
+  async searchAgentMetadata({
+    userId,
+    filters,
+    limit,
+    scope,
+  }: {
+    userId: string;
+    filters: AgentSearchAssetsFilters;
+    limit: number;
+    scope: { owned: boolean; sharedSpaces: boolean; locked: boolean };
+  }): Promise<{ assets: AgentAssetMetadata[]; nextPage: string | null }> {
+    if (!scope.owned && !scope.sharedSpaces) {
+      return { assets: [], nextPage: null };
+    }
+
+    const assets = await this.db
+      .selectFrom('asset')
+      .select([
+        'asset.id',
+        'asset.ownerId',
+        'asset.type',
+        'asset.originalFileName',
+        'asset.localDateTime',
+        'asset.fileCreatedAt',
+        'asset.fileModifiedAt',
+        'asset.isFavorite',
+        'asset.visibility',
+      ])
+      .select(withTags)
+      .$call(withAgentExif)
+      .$call(withAgentQuality)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', '=', false)
+      .where(
+        'asset.visibility',
+        'in',
+        scope.locked
+          ? [AssetVisibility.Timeline, AssetVisibility.Archive, AssetVisibility.Locked]
+          : [AssetVisibility.Timeline, AssetVisibility.Archive],
+      )
+      .where((eb) =>
+        scope.owned && scope.sharedSpaces
+          ? eb.or([
+              eb('asset.ownerId', '=', userId),
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_asset')
+                  .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
+                  .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                  .where('shared_space_member.userId', '=', userId),
+              ),
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_library')
+                  .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_library.spaceId')
+                  .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                  .where('shared_space_member.userId', '=', userId),
+              ),
+            ])
+          : scope.owned
+            ? eb('asset.ownerId', '=', userId)
+            : eb.or([
+                eb.exists(
+                  eb
+                    .selectFrom('shared_space_asset')
+                    .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
+                    .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                    .where('shared_space_member.userId', '=', userId),
+                ),
+                eb.exists(
+                  eb
+                    .selectFrom('shared_space_library')
+                    .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_library.spaceId')
+                    .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                    .where('shared_space_member.userId', '=', userId),
+                ),
+              ]),
+      )
+      .$if(filters.takenAfter !== undefined, (qb) => qb.where('asset.localDateTime', '>=', filters.takenAfter!))
+      .$if(filters.takenBefore !== undefined, (qb) => qb.where('asset.localDateTime', '<=', filters.takenBefore!))
+      .$if(filters.city !== undefined, (qb) =>
+        qb.where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('asset_exif')
+              .whereRef('asset_exif.assetId', '=', 'asset.id')
+              .$if(filters.city === null, (qb) => qb.where('asset_exif.city', 'is', null))
+              .$if(filters.city !== null, (qb) => qb.where('asset_exif.city', '=', filters.city as string)),
+          ),
+        ),
+      )
+      .$if(filters.state !== undefined, (qb) =>
+        qb.where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('asset_exif')
+              .whereRef('asset_exif.assetId', '=', 'asset.id')
+              .$if(filters.state === null, (qb) => qb.where('asset_exif.state', 'is', null))
+              .$if(filters.state !== null, (qb) => qb.where('asset_exif.state', '=', filters.state as string)),
+          ),
+        ),
+      )
+      .$if(filters.country !== undefined, (qb) =>
+        qb.where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('asset_exif')
+              .whereRef('asset_exif.assetId', '=', 'asset.id')
+              .$if(filters.country === null, (qb) => qb.where('asset_exif.country', 'is', null))
+              .$if(filters.country !== null, (qb) => qb.where('asset_exif.country', '=', filters.country as string)),
+          ),
+        ),
+      )
+      .$if(filters.make !== undefined, (qb) =>
+        qb.where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('asset_exif')
+              .whereRef('asset_exif.assetId', '=', 'asset.id')
+              .$if(filters.make === null, (qb) => qb.where('asset_exif.make', 'is', null))
+              .$if(filters.make !== null, (qb) => qb.where('asset_exif.make', '=', filters.make as string)),
+          ),
+        ),
+      )
+      .$if(filters.model !== undefined, (qb) =>
+        qb.where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('asset_exif')
+              .whereRef('asset_exif.assetId', '=', 'asset.id')
+              .$if(filters.model === null, (qb) => qb.where('asset_exif.model', 'is', null))
+              .$if(filters.model !== null, (qb) => qb.where('asset_exif.model', '=', filters.model as string)),
+          ),
+        ),
+      )
+      .$if(filters.lensModel !== undefined, (qb) =>
+        qb.where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('asset_exif')
+              .whereRef('asset_exif.assetId', '=', 'asset.id')
+              .$if(filters.lensModel === null, (qb) => qb.where('asset_exif.lensModel', 'is', null))
+              .$if(filters.lensModel !== null, (qb) =>
+                qb.where('asset_exif.lensModel', '=', filters.lensModel as string),
+              ),
+          ),
+        ),
+      )
+      .$if(filters.rating !== undefined, (qb) =>
+        qb.where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('asset_exif')
+              .whereRef('asset_exif.assetId', '=', 'asset.id')
+              .$if(filters.rating === null, (qb) => qb.where('asset_exif.rating', 'is', null))
+              .$if(filters.rating !== null, (qb) => qb.where('asset_exif.rating', '=', filters.rating as number)),
+          ),
+        ),
+      )
+      .$if(filters.isFavorite !== undefined, (qb) => qb.where('asset.isFavorite', '=', filters.isFavorite!))
+      .$if(filters.type !== undefined, (qb) => qb.where('asset.type', '=', filters.type!))
+      .$if(Boolean(filters.tagIds?.length), (qb) =>
+        qb.where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('tag_asset')
+              .whereRef('tag_asset.assetId', '=', 'asset.id')
+              .where('tag_asset.tagId', '=', anyUuid(filters.tagIds!)),
+          ),
+        ),
+      )
+      .$if(Boolean(filters.albumIds?.length), (qb) =>
+        qb.where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('album_asset')
+              .whereRef('album_asset.assetId', '=', 'asset.id')
+              .where('album_asset.albumId', '=', anyUuid(filters.albumIds!)),
+          ),
+        ),
+      )
+      .$if(filters.isNotInAlbum === true, (qb) =>
+        qb.where((eb) =>
+          eb.not(eb.exists(eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id'))),
+        ),
+      )
+      .orderBy('asset.localDateTime', 'desc')
+      .orderBy('asset.id', 'desc')
+      .limit(limit)
+      .execute();
+
+    return { assets: assets as AgentAssetMetadata[], nextPage: null };
+  }
+
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  @ChunkedArray()
+  async getAgentPreviewReferencesByIds(ids: string[]): Promise<AgentAssetMediaReference[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const rows = await this.db
+      .selectFrom('asset')
+      .innerJoin('asset_file', 'asset_file.assetId', 'asset.id')
+      .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .select([
+        'asset.id as assetId',
+        'asset.originalFileName as fileName',
+        'asset_file.path as previewPath',
+        'asset_exif.exifImageWidth as width',
+        'asset_exif.exifImageHeight as height',
+      ])
+      .where('asset.id', '=', anyUuid(ids))
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', '=', false)
+      .where('asset.visibility', 'in', agentDirectReadVisibilities)
+      .where('asset_file.type', '=', AssetFileType.Preview)
+      .execute();
+    const byId = new Map(rows.map((row) => [row.assetId, row]));
+
+    return ids.flatMap((assetId) => {
+      const row = byId.get(assetId);
+      return row
+        ? [
+            {
+              assetId,
+              mediaUrl: `/api/assets/${assetId}/thumbnail?size=preview`,
+              mimeType: mimeTypes.lookup(row.previewPath),
+              fileName: row.fileName,
+              width: row.width,
+              height: row.height,
+            },
+          ]
+        : [];
+    });
+  }
+
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  @ChunkedArray()
+  async getAgentOriginalReferencesByIds(ids: string[]): Promise<AgentAssetMediaReference[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const rows = await this.db
+      .selectFrom('asset')
+      .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .select([
+        'asset.id as assetId',
+        'asset.originalFileName as fileName',
+        'asset_exif.exifImageWidth as width',
+        'asset_exif.exifImageHeight as height',
+      ])
+      .where('asset.id', '=', anyUuid(ids))
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', '=', false)
+      .where('asset.visibility', 'in', agentDirectReadVisibilities)
+      .execute();
+    const byId = new Map(rows.map((row) => [row.assetId, row]));
+
+    return ids.flatMap((assetId) => {
+      const row = byId.get(assetId);
+      return row
+        ? [
+            {
+              assetId,
+              mediaUrl: `/api/assets/${assetId}/original`,
+              mimeType: mimeTypes.lookup(row.fileName),
+              fileName: row.fileName,
+              width: row.width,
+              height: row.height,
+            },
+          ]
+        : [];
+    });
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })

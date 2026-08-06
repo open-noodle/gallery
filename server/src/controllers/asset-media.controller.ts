@@ -14,7 +14,7 @@ import {
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiBody, ApiConsumes, ApiHeader, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiHeader, ApiOkResponse, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { NextFunction, Request, Response } from 'express';
 import { Endpoint, HistoryBuilder } from 'src/decorators';
 import {
@@ -193,6 +193,7 @@ export class AssetMediaController {
     description: 'Determine which assets have already been uploaded to the server based on their SHA1 checksums.',
     history: new HistoryBuilder().added('v1').beta('v1').stable('v2'),
   })
+  @ApiOkResponse({ type: AssetBulkUploadCheckResponseDto })
   @HttpCode(HttpStatus.OK)
   checkBulkUpload(
     @Auth() auth: AuthDto,

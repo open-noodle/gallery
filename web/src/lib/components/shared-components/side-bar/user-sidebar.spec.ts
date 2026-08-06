@@ -85,6 +85,8 @@ describe('UserSidebar', () => {
     sidebarMocks.sidebarModeStore.layout = 'expanded';
     sidebarMocks.sidebarModeStore.hoverExpanded = false;
     sidebarMocks.sidebarModeStore.railExpanded = false;
+    mocks.featureFlagsManager.value.map = false;
+    mocks.featureFlagsManager.value.search = false;
   });
 
   // The Spaces row expands into the individual spaces (and their albums), which highlight
@@ -122,6 +124,29 @@ describe('UserSidebar', () => {
     render(UserSidebar);
 
     expect(screen.getByRole('link', { name: /^memories$/i })).toHaveAttribute('href', '/memories');
+  });
+
+  it('shows an assistant link', () => {
+    render(UserSidebar);
+
+    expect(screen.getByRole('link', { name: /^assistant$/i })).toHaveAttribute('href', '/assistant');
+  });
+
+  it('shows the assistant link after explore and before map', () => {
+    mocks.featureFlagsManager.value.search = true;
+    mocks.featureFlagsManager.value.map = true;
+
+    render(UserSidebar);
+
+    expect(screen.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual(
+      expect.arrayContaining(['/explore', '/assistant', '/map']),
+    );
+    expect(
+      screen
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href'))
+        .slice(2, 5),
+    ).toEqual(['/explore', '/assistant', '/map']);
   });
 
   it('hides the memories link when memories are disabled', () => {

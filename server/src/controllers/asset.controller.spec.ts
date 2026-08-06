@@ -455,6 +455,20 @@ describe(AssetController.name, () => {
     });
   });
 
+  describe('POST /assets/:id/edits/preview', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).post(`/assets/${factory.uuid()}/edits/preview`).send({ edits: [] });
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('rejects an empty edits array', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .post(`/assets/${factory.uuid()}/edits/preview`)
+        .send({ edits: [] });
+      expect(status).toBe(400);
+    });
+  });
+
   describe('DELETE /assets/:id/metadata/:key', () => {
     it('should be an authenticated route', async () => {
       await request(ctx.getHttpServer()).delete(`/assets/${factory.uuid()}/metadata/mobile-app`);

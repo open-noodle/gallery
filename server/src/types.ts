@@ -581,6 +581,10 @@ export type JobItem =
   | { name: JobName.OcrQueueAll; data: IBaseJob }
   | { name: JobName.Ocr; data: IEntityJob }
 
+  // Image Quality
+  | { name: JobName.ImageQualityQueueAll; data: IBaseJob }
+  | { name: JobName.ImageQuality; data: IEntityJob }
+
   // Pet Detection
   | { name: JobName.PetDetectionQueueAll; data: IBaseJob }
   | { name: JobName.PetDetection; data: IEntityJob }

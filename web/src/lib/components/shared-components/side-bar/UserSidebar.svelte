@@ -35,6 +35,8 @@
     mdiMagnify,
     mdiMap,
     mdiMapOutline,
+    mdiRobot,
+    mdiRobotOutline,
     mdiTagMultipleOutline,
     mdiToolbox,
     mdiToolboxOutline,
@@ -76,6 +78,8 @@
   {#if featureFlagsManager.value.search}
     <SidebarNavItem title={$t('explore')} href={Route.explore()} icon={mdiMagnify} />
   {/if}
+
+  <NavbarItem title={$t('assistant')} href={Route.assistant()} icon={mdiRobotOutline} activeIcon={mdiRobot} />
 
   {#if featureFlagsManager.value.map}
     <SidebarNavItem title={$t('map')} href={Route.map()} icon={mdiMapOutline} activeIcon={mdiMap} />

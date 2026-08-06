@@ -3,7 +3,7 @@ import {
   getPersonFaces,
   getSpacePersonFaces,
   SharedSpaceRole,
-  Type,
+  Type5 as Type,
   updatePerson,
   updateRepresentativeFace,
   updateSpacePerson,
