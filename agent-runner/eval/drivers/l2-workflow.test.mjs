@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { PLAN_ID } from '../fixtures/dataset.mjs';
+import { ALBUM_JAPAN_ID, PLAN_ID } from '../fixtures/dataset.mjs';
 import { createL2Driver, findRawAssetIdLeak } from './l2-workflow.mjs';
 
 // Forces a specific routing decision without a model. The regex classifier
@@ -27,6 +27,10 @@ describe('L2 driver — planned arm', () => {
       decision.planOps.map((op) => op.type),
       ['album.updateDetails'],
     );
+    // Pins the op to the Japan album specifically — "Japan" happens to be
+    // index 0 in the seeded dataset, so a bug that always resolved albums[0]
+    // would otherwise pass this test undetected.
+    assert.equal(decision.planOps[0]?.targetId, ALBUM_JAPAN_ID);
     assert.equal(decision.handled, true);
     assert.match(decision.text, /Review the plan/);
   });
@@ -74,7 +78,15 @@ describe('L2 driver — failed arm', () => {
 
 describe('L2 driver — handoff_open arm', () => {
   it('declines and proposes nothing when there is nothing to clean up', async () => {
-    const driver = createL2Driver({ overrides: { listDuplicateGroups: { status: 'success', groups: [] } } });
+    // No override needed: the seeded DATASET's duplicate groups ('dup-1',
+    // 'dup-2') carry only an assetCount, no `assets` array, so
+    // cleanup-duplicates.mjs treats every group as having zero keepable
+    // assets and hands off with "nothing to trash" on its own. An override
+    // repeating `{ status: 'success', groups: [] }` here would be redundant —
+    // it would exercise a different handoff branch (no groups at all) but
+    // assert exactly the same outward shape, so it would prove nothing this
+    // default doesn't already prove.
+    const driver = createL2Driver();
     const decision = await driver.classify('clean up duplicates');
 
     assert.equal(decision.outcomeStatus, 'handoff_open');
@@ -126,8 +138,8 @@ describe('L2 driver — isolation', () => {
 });
 
 describe('findRawAssetIdLeak — the invariant must be able to fail', () => {
-  it('detects a raw assetIds array in a plan-tool argument', () => {
-    const calls = [{ name: 'proposeAlbumOperations', args: { operations: [{ assetIds: ['a', 'b'] }] } }];
+  it('detects a raw assetIds array in a handle-based plan-tool argument', () => {
+    const calls = [{ name: 'proposeAssetBatchFromSelection', args: { operations: [{ assetIds: ['a', 'b'] }] } }];
     assert.match(findRawAssetIdLeak(calls) ?? '', /assetIds/);
   });
 
@@ -137,7 +149,7 @@ describe('findRawAssetIdLeak — the invariant must be able to fail', () => {
   });
 
   it('ignores an empty assetIds array', () => {
-    const calls = [{ name: 'proposeAlbumOperations', args: { assetIds: [] } }];
+    const calls = [{ name: 'proposeAssetBatchFromSelection', args: { assetIds: [] } }];
     assert.equal(findRawAssetIdLeak(calls), null);
   });
 
@@ -150,6 +162,21 @@ describe('findRawAssetIdLeak — the invariant must be able to fail', () => {
     const calls = [{ name: 'proposeAlbumFromSelection', args: { albumName: 'X', selectionHandleId: 'h-1' } }];
     assert.equal(findRawAssetIdLeak(calls), null);
   });
+
+  it('does NOT flag proposeAlbumOperations even when it legitimately carries assetIds', () => {
+    // Real production workflows pass a materialised assetIds array as an
+    // operation payload on proposeAlbumOperations: set-album-cover.mjs's
+    // album.setCover and cleanup-duplicates.mjs's asset.trash. That is
+    // correct by design (ids are already materialised server-side by the
+    // time these workflows run) and must never be reported as a leak.
+    const calls = [
+      {
+        name: 'proposeAlbumOperations',
+        args: { operations: [{ type: 'album.setCover', assetIds: ['cover-1'] }] },
+      },
+    ];
+    assert.equal(findRawAssetIdLeak(calls), null);
+  });
 });
 
 describe('L2 driver — the invariant is wired into every plan scenario', () => {
@@ -157,14 +184,54 @@ describe('L2 driver — the invariant is wired into every plan scenario', () => 
     const driver = createL2Driver({
       overrides: {
         // Echo a leaky arg back through the recorded call by having the plan
-        // tool succeed while the workflow's args are inspected.
-        proposeAlbumOperations: (args) => {
+        // tool succeed while the workflow's args are inspected. Uses
+        // create_album_from_source (proposeAlbumFromSelection is a
+        // handle-based tool the leak scan actually covers) rather than
+        // rename_or_describe_album's proposeAlbumOperations, which is exempt.
+        proposeAlbumFromSelection: (args) => {
           args.assetIds = ['leaked-1'];
           return { status: 'success', plan: { id: PLAN_ID } };
         },
       },
     });
-    const decision = await driver.classify('rename my Japan album to Japan 2026');
+    const decision = await driver.classify('make an album from my newest 20 photos called Test');
+    assert.equal(decision.outcomeStatus, 'planned');
     assert.match(decision.rawAssetIdLeak ?? '', /assetIds/);
+  });
+
+  it('does not fail a planned rename even though proposeAlbumOperations carries assetIds internally', async () => {
+    // set-album-cover / cleanup-duplicates route through proposeAlbumOperations
+    // with a real assetIds payload. Simulate that shape on the rename workflow's
+    // own plan call to prove the invariant does not fail a scenario just because
+    // the exempted tool happens to carry an assetIds array.
+    const driver = createL2Driver({
+      overrides: {
+        proposeAlbumOperations: (args) => {
+          args.assetIds = ['materialised-server-side'];
+          return { status: 'success', plan: { id: PLAN_ID } };
+        },
+      },
+    });
+    const decision = await driver.classify('rename my Japan album to Japan 2026');
+    assert.equal(decision.outcomeStatus, 'planned');
+    assert.equal(decision.rawAssetIdLeak, null);
+  });
+});
+
+describe('L2 driver — copy helpers', () => {
+  const summary = { label: 'Portugal', dateRange: 'May 3–12', albumName: 'Portugal Trip', assetCount: 84 };
+
+  it('polishCopy renders a non-empty string from a success summary', async () => {
+    const driver = createL2Driver();
+    const text = await driver.polishCopy(summary);
+    assert.equal(typeof text, 'string');
+    assert.ok(text.length > 0, 'polishCopy must not return an empty string');
+  });
+
+  it('templateCopy renders a non-empty string from a success summary', async () => {
+    const driver = createL2Driver();
+    const text = await driver.templateCopy(summary);
+    assert.equal(typeof text, 'string');
+    assert.ok(text.length > 0, 'templateCopy must not return an empty string');
   });
 });

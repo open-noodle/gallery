@@ -13,6 +13,27 @@ import { createFakeMcpClient, PLAN_TOOLS } from '../fixtures/fake-mcp-client.mjs
 // A fixed instant so trip-window arithmetic and any date in the copy are stable.
 export const FIXED_NOW_MS = Date.UTC(2026, 4, 20, 12, 0, 0);
 
+// The subset of PLAN_TOOLS where a raw assetIds array is ALWAYS a bug: these
+// tools exist specifically to take a selection handle (or a search-derived
+// selection) instead of ids, so any assetIds array here means a workflow
+// bypassed the handle plumbing. Deliberately narrower than PLAN_TOOLS —
+// `proposeAlbumOperations` is excluded because two real production
+// workflows legitimately pass a non-empty `assetIds` array as an operation
+// payload (`set-album-cover.mjs`'s `album.setCover`, `cleanup-duplicates.mjs`'s
+// `asset.trash`); Gallery's server-side tool-registry pruning of `assetIds`
+// applies only to the schema the MODEL sees, not to what Gallery's own
+// deterministic workflows may pass once ids are already materialised
+// server-side. Scanning `proposeAlbumOperations` here would fail every
+// correct `planned` run of either workflow.
+const HANDLE_BASED_PLAN_TOOLS = Object.freeze(
+  new Set([
+    'proposeAlbumFromSelection',
+    'proposeAssetBatchFromSelection',
+    'proposeSpaceFromSearch',
+    'proposeAddAssetsToSpaceFromSearch',
+  ]),
+);
+
 const scanForAssetIds = (value, path) => {
   if (Array.isArray(value)) {
     for (const [index, item] of value.entries()) {
@@ -33,16 +54,24 @@ const scanForAssetIds = (value, path) => {
 };
 
 /**
- * The no-raw-asset-IDs invariant. Gallery prunes `assetIds` from provider-facing
- * planning schemas so ids are materialised server-side; a workflow must pass a
- * selection handle or source ref instead. Applied to every plan call, so a
- * regression turns every plan scenario red at once.
+ * The no-raw-asset-IDs invariant for HANDLE-BASED plan tools. These tools
+ * (`proposeAlbumFromSelection`, `proposeAssetBatchFromSelection`,
+ * `proposeSpaceFromSearch`, `proposeAddAssetsToSpaceFromSearch`) exist so a
+ * workflow proposes a plan over a selection handle or search-derived
+ * selection instead of enumerating raw asset ids — an assetIds array
+ * anywhere in their args means that plumbing was bypassed. Deliberately does
+ * NOT scan `proposeAlbumOperations`: two real workflows (`set-album-cover`'s
+ * `album.setCover`, `cleanup-duplicates`'s `asset.trash`) legitimately pass a
+ * materialised `assetIds` array as an operation payload, and flagging that
+ * would fail every correct `planned` run of either. Applied to every plan
+ * call in scope, so a regression turns every affected plan scenario red at
+ * once.
  *
  * @returns {string|null} the offending path, or null when clean.
  */
 export const findRawAssetIdLeak = (calls) => {
   for (const call of calls) {
-    if (!PLAN_TOOLS.has(call.name)) continue;
+    if (!HANDLE_BASED_PLAN_TOOLS.has(call.name)) continue;
     const hit = scanForAssetIds(call.args, '');
     if (hit) return `${call.name}.${hit}`;
   }
