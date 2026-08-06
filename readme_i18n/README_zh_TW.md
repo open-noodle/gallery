@@ -1,8 +1,8 @@
 <p align="center">
   <br/>
   <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=授權條款&logoColor=000000&labelColor=ececec" alt="授權條款：AGPLv3"></a>
-  <a href="https://discord.immich.app">
-    <img src="https://img.shields.io/discord/979116623879368755.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" alt="Discord"/>
+  <a href="https://discord.gg/cxBfbuxyG4">
+    <img src="https://img.shields.io/discord/1480633426376921239.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" alt="Discord"/>
   </a>
   <br/>
   <br/>
@@ -13,8 +13,8 @@
 </p>
 <h3 align="center">高效能的自架照片和影片管理解決方案</h3>
 <br/>
-<a href="https://immich.app">
-<img src="../design/immich-screenshots.png" title="主要螢幕截圖">
+<a href="https://opennoodle.de">
+<img src="../design/gallery-screenshot.webp" title="主要螢幕截圖">
 </a>
 <br/>
 
@@ -50,28 +50,22 @@
 >
 
 > [!NOTE]
-> 主要說明文件（包含安裝指南）可於 https://immich.app/ 取得。
+> 主要說明文件（包含安裝指南）可於 https://opennoodle.de/ 取得。
 
 ## 連結
 
-- [說明文件](https://docs.immich.app/)
-- [關於](https://docs.immich.app/overview/introduction)
-- [安裝](https://docs.immich.app/install/requirements)
-- [發展藍圖](https://immich.app/roadmap)
+- [說明文件](https://docs.opennoodle.de/)
+- [關於](https://docs.opennoodle.de/overview/quick-start)
+- [安裝](https://docs.opennoodle.de/install/requirements)
+- [發展藍圖](https://opennoodle.de/roadmap)
 - [線上體驗](#線上體驗)
 - [功能](#功能)
-- [翻譯](https://docs.immich.app/developer/translations)
-- [貢獻指南](https://docs.immich.app/overview/support-the-project)
+- [翻譯](https://docs.opennoodle.de/developer/translations)
+- [貢獻指南](https://docs.opennoodle.de/overview/support-the-project)
 
 ## 線上體驗
 
-請前往 [Demoo 網站](https://demo.immich.app) 立即體驗 Immich。若要在手機 App 試用，請在 `伺服器端點 URL` 欄位輸入 `https://demo.immich.app`。
-
-### 登入資訊
-
-| 電子郵件        | 密碼   |
-| --------------- | ------ |
-| demo@immich.app | demo   |
+請前往 [Demoo 網站](https://demo.opennoodle.de) 立即體驗 Noodle Gallery。若要在手機 App 試用，請在 `伺服器端點 URL` 欄位輸入 `https://demo.opennoodle.de`。
 
 ## 功能
 
@@ -110,28 +104,4 @@
 
 ## 翻譯
 
-更多翻譯相關資訊請見 [此處](https://docs.immich.app/developer/translations)。
-
-<a href="https://hosted.weblate.org/engage/immich/">
-<img src="https://hosted.weblate.org/widget/immich/immich/multi-auto.svg" alt="翻譯狀態" />
-</a>
-
-## 專案活躍度
-
-![專案活躍度](https://repobeats.axiom.co/api/embed/9e86d9dc3ddd137161f2f6d2e758d7863b1789cb.svg "Repobeats 分析圖片")
-
-## Star 數量歷史紀錄
-
-<a href="https://star-history.com/#immich-app/immich&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=Date" />
-   <img alt="Star 歷史紀錄圖表" src="https://api.star-history.com/svg?repos=immich-app/immich&type=Date" width="100%" />
- </picture>
-</a>
-
-## 貢獻者
-
-<a href="https://github.com/alextran1502/immich/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=immich-app/immich" width="100%"/>
-</a>
+更多翻譯相關資訊請見 [此處](https://docs.opennoodle.de/developer/translations)。
