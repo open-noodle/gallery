@@ -34,10 +34,12 @@
   const canTest = $derived(isConnectComplete(connectState) && status !== 'testing');
 
   const markDirty = () => {
-    if (status === 'connected' || status === 'error') {
-      status = 'idle';
-      onConnected('', '', provider);
+    if (!(status === 'connected' || status === 'error')) {
+    	return;
     }
+
+    status = 'idle';
+    onConnected('', '', provider);
   };
 
   const selectProvider = (next: OnboardingProviderId) => {

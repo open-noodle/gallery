@@ -107,7 +107,7 @@ export const filterAgentPlanReviewAssets = (
   return assets.filter((asset) => {
     if (
       normalizedQuery &&
-      !getSearchableAssetText(asset).some((part) => part.toLocaleLowerCase().includes(normalizedQuery))
+      getSearchableAssetText(asset).every((part) => !part.toLocaleLowerCase().includes(normalizedQuery))
     ) {
       return false;
     }
@@ -169,6 +169,7 @@ export const getAgentPlanAvailableFilterFacets = (
     hasTags: assets.some((asset) => Boolean(asset.tagNames?.length)),
     hasLocations: assets.some((asset) => Boolean(asset.locationLabel)),
     hasScreenshots: assets.some((asset) => asset.isScreenshot === true),
+    // eslint-disable-next-line unicorn/prefer-iterator-helpers -- Iterator#some() is unsupported on our browserslist targets (tscompat).
     hasDuplicates: [...duplicateCounts.values()].some((count) => count > 1),
   };
 };

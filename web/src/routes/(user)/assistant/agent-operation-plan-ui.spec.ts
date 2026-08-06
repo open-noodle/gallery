@@ -35,7 +35,7 @@ const rawText = (text: string) => ({ kind: 'raw' as const, text });
 const translatedText = (key: string, values?: Record<string, string | number>) => ({
   kind: 'translation' as const,
   key,
-  ...(values ? { values } : {}),
+  ...(values && { values }),
 });
 
 const planId = '00000000-0000-4000-8000-000000000100';
@@ -752,7 +752,7 @@ describe('agent operation plan UI helpers', () => {
       ]),
       { [spaceUpdateId]: true },
       {},
-      { [spaceUpdateId]: { spaceName: '   ', description: tooLongDescription, color: 'teal' } },
+      { [spaceUpdateId]: { spaceName: ' '.repeat(3), description: tooLongDescription, color: 'teal' } },
     );
 
     expect(model.operationsById.get(spaceUpdateId)?.fieldErrors).toEqual({
@@ -1072,7 +1072,7 @@ describe('agent operation plan UI helpers', () => {
       {},
       {
         [createId]: { albumName: 'Disabled album' },
-        [updateId]: { albumName: '   ', description: tooLongDescription },
+        [updateId]: { albumName: ' '.repeat(3), description: tooLongDescription },
       },
     );
 
@@ -1611,7 +1611,7 @@ describe('agent operation plan UI helpers', () => {
       ]),
       { [updateId]: true },
       {},
-      { [updateId]: { albumName: '   ' } },
+      { [updateId]: { albumName: ' '.repeat(3) } },
     );
 
     expect(model.operationsById.get(updateId)).toMatchObject({

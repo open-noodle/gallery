@@ -37,7 +37,7 @@ vi.mock('svelte-i18n', () => {
 
   return {
     t: readable((key: string, options?: { values?: Record<string, string | number> }) =>
-      (messages[key] ?? key).replace('{count}', String(options?.values?.count ?? '')),
+      (messages[key] ?? key).replace('{count}', () => String(options?.values?.count ?? '')),
     ),
   };
 });

@@ -196,10 +196,12 @@
   };
 
   const stopPolling = () => {
-    if (interval) {
-      clearInterval(interval);
-      interval = undefined;
+    if (!interval) {
+    	return;
     }
+
+    clearInterval(interval);
+    interval = undefined;
   };
 
   $effect(() => {
@@ -252,7 +254,7 @@
     <AgentToolApprovalCard
       {session}
       {toolCall}
-      busy={busyByToolCallId[toolCall.id] === true}
+      busy={busyByToolCallId[toolCall.id]}
       errorMessage={errorByToolCallId[toolCall.id] ?? null}
       onApprove={(id) => decide(id, AgentToolApprovalDecision.Approved)}
       onDeny={(id, reason) => decide(id, AgentToolApprovalDecision.Denied, reason)}

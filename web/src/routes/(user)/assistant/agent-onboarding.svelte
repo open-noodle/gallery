@@ -63,7 +63,7 @@
       model: connectedModel,
       permissionPreset: preset,
       approvalMode: approval,
-      ...(initialPrompt ? { initialPrompt } : {}),
+      ...(initialPrompt && { initialPrompt }),
     });
   };
 

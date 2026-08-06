@@ -134,22 +134,22 @@ vi.mock('svelte-i18n', () => {
   return {
     t: readable((key: string, options?: { values?: Record<string, string | number> }) =>
       (messages[key] ?? key)
-        .replace('{count}', String(options?.values?.count ?? ''))
-        .replace('{applied}', String(options?.values?.applied ?? ''))
-        .replace('{failed}', String(options?.values?.failed ?? ''))
-        .replace('{field}', String(options?.values?.field ?? ''))
-        .replace('{dependencies}', String(options?.values?.dependencies ?? ''))
-        .replace('{assets}', String(options?.values?.assets ?? ''))
-        .replace('{changes}', String(options?.values?.changes ?? ''))
-        .replace('{name}', String(options?.values?.name ?? ''))
-        .replace('{criteria}', String(options?.values?.criteria ?? ''))
-        .replace('{selected}', String(options?.values?.selected ?? ''))
-        .replace('{total}', String(options?.values?.total ?? ''))
-        .replace('{summary}', String(options?.values?.summary ?? ''))
-        .replace('{visible}', String(options?.values?.visible ?? ''))
-        .replace('{index}', String(options?.values?.index ?? ''))
-        .replace('{rating}', String(options?.values?.rating ?? ''))
-        .replace('{minutes}', String(options?.values?.minutes ?? '')),
+        .replace('{count}', () => String(options?.values?.count ?? ''))
+        .replace('{applied}', () => String(options?.values?.applied ?? ''))
+        .replace('{failed}', () => String(options?.values?.failed ?? ''))
+        .replace('{field}', () => String(options?.values?.field ?? ''))
+        .replace('{dependencies}', () => String(options?.values?.dependencies ?? ''))
+        .replace('{assets}', () => String(options?.values?.assets ?? ''))
+        .replace('{changes}', () => String(options?.values?.changes ?? ''))
+        .replace('{name}', () => String(options?.values?.name ?? ''))
+        .replace('{criteria}', () => String(options?.values?.criteria ?? ''))
+        .replace('{selected}', () => String(options?.values?.selected ?? ''))
+        .replace('{total}', () => String(options?.values?.total ?? ''))
+        .replace('{summary}', () => String(options?.values?.summary ?? ''))
+        .replace('{visible}', () => String(options?.values?.visible ?? ''))
+        .replace('{index}', () => String(options?.values?.index ?? ''))
+        .replace('{rating}', () => String(options?.values?.rating ?? ''))
+        .replace('{minutes}', () => String(options?.values?.minutes ?? '')),
     ),
   };
 });

@@ -125,7 +125,7 @@ vi.mock('svelte-i18n', () => {
       let message = messages[key] ?? key;
 
       for (const [name, value] of Object.entries(options?.values ?? {})) {
-        message = message.replaceAll(`{${name}}`, String(value));
+        message = message.replaceAll(`{${name}}`, () => String(value));
       }
 
       return message;
@@ -454,7 +454,7 @@ describe(AgentConversationPane.name, () => {
     expect(timeline).toHaveTextContent('Found matching photos');
 
     const transcript = screen.getByTestId('agent-session-chat-transcript');
-    expect(Array.from(transcript.querySelectorAll('[data-chat-item]')).map((item) => item.textContent)).toEqual([
+    expect(Array.from(transcript.querySelectorAll('[data-chat-item]'), (item) => item.textContent)).toEqual([
       expect.stringContaining('Find my beach photos'),
       expect.stringContaining('1 step'),
       expect.stringContaining('I found the best candidates.'),

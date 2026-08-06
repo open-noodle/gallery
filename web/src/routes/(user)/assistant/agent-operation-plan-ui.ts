@@ -123,8 +123,7 @@ export type OperationReviewApplyStateSummary = {
 export type AgentOperationMetadataValueKind = 'known' | 'empty' | 'clear' | 'relative' | 'unknown';
 
 export type AgentOperationMetadataDisplayText =
-  | { kind: 'raw'; text: string }
-  | { kind: 'translation'; key: Translations; values?: Record<string, string | number> };
+  { kind: 'raw'; text: string } | { kind: 'translation'; key: Translations; values?: Record<string, string | number> };
 
 export type AgentOperationMetadataFieldReview = {
   key: string;
@@ -405,7 +404,7 @@ export const buildSelectionPayload = (model: OperationReviewModel): AgentOperati
         {
           itemKind: operation.review.selection.itemKind,
           mode: operation.review.selection.mode,
-          ...(operation.review.selection.itemIds ? { itemIds: operation.review.selection.itemIds } : {}),
+          ...(operation.review.selection.itemIds && { itemIds: operation.review.selection.itemIds }),
         },
       ]),
   );
@@ -421,8 +420,8 @@ export const buildSelectionPayload = (model: OperationReviewModel): AgentOperati
     planId: model.plan.id,
     planRevision: model.plan.revision,
     operationIds,
-    ...(Object.keys(itemSelections).length > 0 ? { itemSelections } : {}),
-    ...(Object.keys(fieldOverrides).length > 0 ? { fieldOverrides } : {}),
+    ...(Object.keys(itemSelections).length > 0 && { itemSelections }),
+    ...(Object.keys(fieldOverrides).length > 0 && { fieldOverrides }),
   };
 };
 
@@ -509,25 +508,21 @@ export const buildOperationTechnicalDetails = (item: OperationReviewItem): Opera
     operationType: item.operation.type,
     status: item.operation.status,
     targetKind: item.operation.targetKind,
-    ...(item.operation.targetId ? { targetId: item.operation.targetId } : {}),
-    ...(item.operation.temporaryTargetId ? { temporaryTargetId: item.operation.temporaryTargetId } : {}),
-    ...(item.operation.error ? { error: item.operation.error } : {}),
+    ...(item.operation.targetId && { targetId: item.operation.targetId }),
+    ...(item.operation.temporaryTargetId && { temporaryTargetId: item.operation.temporaryTargetId }),
+    ...(item.operation.error && { error: item.operation.error }),
     assetIdPreview: item.operation.assetIds.slice(0, technicalDetailsVisibleLimit),
     assetOverflowCount: Math.max(item.operation.assetIds.length - technicalDetailsVisibleLimit, 0),
-    ...(typeof result?.albumId === 'string' ? { resultAlbumId: result.albumId } : {}),
-    ...(resultAssetIds
-      ? {
-          resultAssetIdPreview: resultAssetIds.slice(0, technicalDetailsVisibleLimit),
-          resultAssetOverflowCount: Math.max(resultAssetIds.length - technicalDetailsVisibleLimit, 0),
-        }
-      : {}),
-    ...(resultAssetResults
-      ? {
-          resultAssetResultsPreview: resultAssetResults.slice(0, technicalDetailsVisibleLimit),
-          resultAssetResultsOverflowCount: Math.max(resultAssetResults.length - technicalDetailsVisibleLimit, 0),
-        }
-      : {}),
-    ...(typeof result?.skippedReason === 'string' ? { resultSkippedReason: result.skippedReason } : {}),
+    ...(typeof result?.albumId === 'string' && { resultAlbumId: result.albumId }),
+    ...(resultAssetIds && {
+      resultAssetIdPreview: resultAssetIds.slice(0, technicalDetailsVisibleLimit),
+      resultAssetOverflowCount: Math.max(resultAssetIds.length - technicalDetailsVisibleLimit, 0),
+    }),
+    ...(resultAssetResults && {
+      resultAssetResultsPreview: resultAssetResults.slice(0, technicalDetailsVisibleLimit),
+      resultAssetResultsOverflowCount: Math.max(resultAssetResults.length - technicalDetailsVisibleLimit, 0),
+    }),
+    ...(typeof result?.skippedReason === 'string' && { resultSkippedReason: result.skippedReason }),
   };
 };
 
@@ -937,8 +932,8 @@ const buildOperationApplyState = (operation: AgentOperationResponseDto): Operati
 
     return {
       kind: 'applied',
-      ...(operation.assetIds.length > 0 ? { appliedAssetCount: operation.assetIds.length } : {}),
-      ...(appliedUserIds && appliedUserIds.length > 0 ? { appliedAssetCount: appliedUserIds.length } : {}),
+      ...(operation.assetIds.length > 0 && { appliedAssetCount: operation.assetIds.length }),
+      ...(appliedUserIds && appliedUserIds.length > 0 && { appliedAssetCount: appliedUserIds.length }),
     };
   }
 
@@ -946,7 +941,7 @@ const buildOperationApplyState = (operation: AgentOperationResponseDto): Operati
     const result = isRecord(operation.result) ? operation.result : undefined;
     return {
       kind: 'skipped',
-      ...(typeof result?.skippedReason === 'string' ? { reason: result.skippedReason } : {}),
+      ...(typeof result?.skippedReason === 'string' && { reason: result.skippedReason }),
     };
   }
 
@@ -959,13 +954,13 @@ const buildOperationApplyState = (operation: AgentOperationResponseDto): Operati
         kind: 'partial',
         appliedAssetCount,
         failedAssetCount: assetResults.filter((result) => !result.success).length,
-        ...(operation.error ? { error: operation.error } : {}),
+        ...(operation.error && { error: operation.error }),
       };
     }
 
     return {
       kind: 'failed',
-      ...(operation.error ? { error: operation.error } : {}),
+      ...(operation.error && { error: operation.error }),
     };
   }
 
@@ -1128,10 +1123,19 @@ const buildPayloadOnlyMetadataReviewFields = (
   return fields;
 };
 
+const metadataValueKinds = new Set<string>([
+  'known',
+  'empty',
+  'clear',
+  'relative',
+  'unknown',
+] satisfies AgentOperationMetadataValueKind[]);
+
+const isMetadataValueKind = (value: unknown): value is AgentOperationMetadataValueKind =>
+  typeof value === 'string' && metadataValueKinds.has(value);
+
 const getMetadataValueKind = (value: unknown): AgentOperationMetadataValueKind =>
-  value === 'known' || value === 'empty' || value === 'clear' || value === 'relative' || value === 'unknown'
-    ? value
-    : 'known';
+  isMetadataValueKind(value) ? value : 'known';
 
 const rawMetadataText = (text: string): AgentOperationMetadataDisplayText => ({ kind: 'raw', text });
 
@@ -1141,7 +1145,7 @@ const translatedMetadataText = (
 ): AgentOperationMetadataDisplayText => ({
   kind: 'translation',
   key,
-  ...(values ? { values } : {}),
+  ...(values && { values }),
 });
 
 const getMetadataFieldLabel = (key: string) => {
@@ -1236,7 +1240,7 @@ const getAssetResultDetails = (value: unknown) => {
       {
         id: item.id,
         success: item.success,
-        ...(typeof item.errorMessage === 'string' ? { errorMessage: item.errorMessage } : {}),
+        ...(typeof item.errorMessage === 'string' && { errorMessage: item.errorMessage }),
       },
     ];
   });
@@ -1399,10 +1403,13 @@ const getOperationForReview = (operation: AgentOperationResponseDto): AgentOpera
 const getOperationSelectableItemIds = (operation: Pick<AgentOperationResponseDto, 'assetIds' | 'payload' | 'type'>) =>
   isMemberOperation(operation.type) ? getOperationUserIds(operation) : [...new Set(operation.assetIds)];
 
-const isMemberOperation = (operationType: AgentOperationType | string) =>
-  operationType === AgentOperationType.SpaceAddMembers ||
-  operationType === AgentOperationType.SpaceRemoveMembers ||
-  operationType === AgentOperationType.SpaceUpdateMemberRole;
+const memberOperationTypes = new Set<string>([
+  AgentOperationType.SpaceAddMembers,
+  AgentOperationType.SpaceRemoveMembers,
+  AgentOperationType.SpaceUpdateMemberRole,
+]);
+
+const isMemberOperation = (operationType: AgentOperationType | string) => memberOperationTypes.has(operationType);
 
 const getOperationUserIds = (operation: Pick<AgentOperationResponseDto, 'payload' | 'type'>) => {
   if (operation.type === AgentOperationType.SpaceAddMembers) {
@@ -1648,7 +1655,8 @@ const getReviewDestination = (
     const createOperation =
       operation.temporaryTargetId === null
         ? undefined
-        : [...operationById.values()].find(
+        : // eslint-disable-next-line unicorn/prefer-iterator-helpers -- Iterator#find() is unsupported on our browserslist targets (tscompat).
+          [...operationById.values()].find(
             (candidate) =>
               candidate.type === AgentOperationType.AlbumCreate &&
               candidate.temporaryTargetId === operation.temporaryTargetId,
@@ -1678,7 +1686,8 @@ const getReviewDestination = (
     const createOperation =
       operation.temporaryTargetId === null
         ? undefined
-        : [...operationById.values()].find(
+        : // eslint-disable-next-line unicorn/prefer-iterator-helpers -- Iterator#find() is unsupported on our browserslist targets (tscompat).
+          [...operationById.values()].find(
             (candidate) =>
               candidate.targetKind === AgentOperationTargetKind.NewSpace &&
               candidate.temporaryTargetId === operation.temporaryTargetId,
@@ -1701,7 +1710,7 @@ const getReviewDestination = (
     return destination;
   }
 
-  const rawTargetKind = String(operation.targetKind);
+  const rawTargetKind = operation.targetKind;
   if (rawTargetKind.includes('space')) {
     return { kind: 'space', name: operation.summary };
   }

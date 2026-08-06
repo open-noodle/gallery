@@ -247,7 +247,7 @@ describe('agent session workspace UI helpers', () => {
     const current = session({ id: 'current' });
 
     expect(getAgentSessionTitle(current, { current: '  Organize screenshots  ' })).toBe('Organize screenshots');
-    expect(getAgentSessionTitle(current, { current: '   ' })).toBe('New chat');
+    expect(getAgentSessionTitle(current, { current: ' '.repeat(3) })).toBe('New chat');
     expect(getAgentSessionTitle(current, {})).toBe('New chat');
   });
 
@@ -256,7 +256,7 @@ describe('agent session workspace UI helpers', () => {
       expect(
         deriveAgentSessionTitleFromMessages([
           message('assistant-first', AgentMessageRole.Assistant, [textBlock('Assistant title')]),
-          message('blank-user', AgentMessageRole.User, [textBlock('   ')]),
+          message('blank-user', AgentMessageRole.User, [textBlock(' '.repeat(3))]),
           message('first-user', AgentMessageRole.User, [textBlock('Organize screenshots')]),
           message('second-user', AgentMessageRole.User, [textBlock('Rename everything')]),
         ]),
@@ -405,6 +405,6 @@ describe('agent session workspace UI helpers', () => {
     expect(filterAgentSessionsForSidebar(sessions, 'needs approval', {}, statusLabels)).toEqual([sessions[0]]);
     expect(filterAgentSessionsForSidebar(sessions, 'WAITING_FOR_TOOL', {}, statusLabels)).toEqual([sessions[0]]);
     expect(filterAgentSessionsForSidebar(sessions, 'no matches', {}, statusLabels)).toEqual([]);
-    expect(filterAgentSessionsForSidebar([...sessions].reverse(), '   ', {}, statusLabels)).toEqual(sessions);
+    expect(filterAgentSessionsForSidebar([...sessions].reverse(), ' '.repeat(3), {}, statusLabels)).toEqual(sessions);
   });
 });

@@ -39,10 +39,12 @@
   // identity churns on periodic refreshes (dock poll), which must not affect the drawer.
   let detailsOpenSessionId = session.id;
   $effect(() => {
-    if (session.id !== detailsOpenSessionId) {
-      detailsOpenSessionId = session.id;
-      detailsOpen = false;
+    if (session.id === detailsOpenSessionId) {
+    	return;
     }
+
+    detailsOpenSessionId = session.id;
+    detailsOpen = false;
   });
   let pendingApprovalCount = $state(0);
   let approvalResumePending = $state(false);

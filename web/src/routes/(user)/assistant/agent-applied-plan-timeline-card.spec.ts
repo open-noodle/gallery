@@ -35,13 +35,13 @@ vi.mock('svelte-i18n', () => {
   return {
     t: readable((key: string, options?: { values?: Record<string, string | number> }) =>
       (messages[key] ?? key)
-        .replace('{summary}', String(options?.values?.summary ?? ''))
-        .replace('{count}', String(options?.values?.count ?? ''))
-        .replace('{selected}', String(options?.values?.selected ?? ''))
-        .replace('{total}', String(options?.values?.total ?? ''))
-        .replace('{applied}', String(options?.values?.applied ?? ''))
-        .replace('{skipped}', String(options?.values?.skipped ?? ''))
-        .replace('{failed}', String(options?.values?.failed ?? '')),
+        .replace('{summary}', () => String(options?.values?.summary ?? ''))
+        .replace('{count}', () => String(options?.values?.count ?? ''))
+        .replace('{selected}', () => String(options?.values?.selected ?? ''))
+        .replace('{total}', () => String(options?.values?.total ?? ''))
+        .replace('{applied}', () => String(options?.values?.applied ?? ''))
+        .replace('{skipped}', () => String(options?.values?.skipped ?? ''))
+        .replace('{failed}', () => String(options?.values?.failed ?? '')),
     ),
   };
 });

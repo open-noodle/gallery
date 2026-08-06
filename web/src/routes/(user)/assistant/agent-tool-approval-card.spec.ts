@@ -33,7 +33,7 @@ vi.mock('svelte-i18n', () => {
 
   return {
     t: readable((key: string, options?: { values?: Record<string, string | number> }) =>
-      (messages[key] ?? key).replace('{count}', String(options?.values?.count ?? '')),
+      (messages[key] ?? key).replace('{count}', () => String(options?.values?.count ?? '')),
     ),
   };
 });
@@ -232,7 +232,7 @@ describe(AgentToolApprovalCard.name, () => {
 
     await view.rerender({ session, toolCall: toolCall(), onApprove, onDeny, busy: false });
     await fireEvent.click(screen.getByRole('button', { name: 'Reason' }));
-    await fireEvent.input(screen.getByLabelText('Reason'), { target: { value: '   ' } });
+    await fireEvent.input(screen.getByLabelText('Reason'), { target: { value: ' '.repeat(3) } });
     await fireEvent.click(screen.getByRole('button', { name: 'Deny' }));
     expect(onDeny).toHaveBeenCalledWith('tool-call-1', undefined);
   });

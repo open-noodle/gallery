@@ -185,7 +185,7 @@ describe('agent tool approval UI helpers', () => {
       decision: AgentToolApprovalDecision.Denied,
       reason: 'Use fewer assets',
     });
-    expect(buildToolApprovalPayload(AgentToolApprovalDecision.Denied, '   ')).toEqual({
+    expect(buildToolApprovalPayload(AgentToolApprovalDecision.Denied, ' '.repeat(3))).toEqual({
       decision: AgentToolApprovalDecision.Denied,
     });
     expect(buildToolApprovalPayload(AgentToolApprovalDecision.Denied)).toEqual({

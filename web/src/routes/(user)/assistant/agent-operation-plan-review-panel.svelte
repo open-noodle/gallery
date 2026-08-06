@@ -327,8 +327,8 @@
         planId: applyingPlanId,
         agentOperationPlanApplyRequestDto: {
           operationIds: selectionPayload.operationIds,
-          ...(itemSelections ? { itemSelections } : {}),
-          ...(selectionPayload.fieldOverrides ? { fieldOverrides: selectionPayload.fieldOverrides } : {}),
+          ...(itemSelections && { itemSelections }),
+          ...(selectionPayload.fieldOverrides && { fieldOverrides: selectionPayload.fieldOverrides }),
           planRevision: selectionPayload.planRevision,
         },
       });

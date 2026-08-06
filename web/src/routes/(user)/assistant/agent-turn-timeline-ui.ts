@@ -189,7 +189,7 @@ const buildSummary = (rows: AgentTurnTimelineRow[]): AgentTurnTimeline['summary'
 
   // wall-clock: first row startedAt → last non-null completedAt
   const firstStartedAt = rows[0].detail.startedAt;
-  const lastCompletedAt = [...rows].reverse().find((r) => r.detail.completedAt !== null)?.detail.completedAt ?? null;
+  const lastCompletedAt = rows.findLast((r) => r.detail.completedAt !== null)?.detail.completedAt ?? null;
   const durationMs = lastCompletedAt === null ? null : Date.parse(lastCompletedAt) - Date.parse(firstStartedAt);
 
   return { steps, durationMs, failedCount, cancelled };

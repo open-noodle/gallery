@@ -88,6 +88,7 @@
   const defaultsStorageKey = 'gallery.assistant.defaults';
 
   const selectedSession = $derived(localSessions.find((session) => session.id === selectedSessionId) ?? null);
+  const selectedSentMessage = $derived(selectedSession ? sentMessageBySessionId[selectedSession.id] : undefined);
   const selectedTitle = $derived(
     selectedSession ? getAgentSessionTitle(selectedSession, titleBySessionId) : $t('assistant_new_chat'),
   );
@@ -293,7 +294,7 @@
     }
   });
   const buildAssistantPath = (sessionId: string | null) => {
-    const url = new URL(globalThis.location.href);
+    const url = new URL(location.href);
 
     if (sessionId) {
       url.searchParams.set('session', sessionId);
@@ -408,7 +409,7 @@
   };
 
   const handleTitleDiscovered = (sessionId: string, title: string) => {
-    if (sessionId !== selectedSessionId || !localSessions.some((session) => session.id === sessionId)) {
+    if (sessionId !== selectedSessionId || localSessions.every((session) => session.id !== sessionId)) {
       return;
     }
 
@@ -931,7 +932,7 @@
         <AgentConversationPane
           session={selectedSession}
           title={selectedTitle}
-          seedMessages={sentMessageBySessionId[selectedSession.id] ? [sentMessageBySessionId[selectedSession.id]] : []}
+          seedMessages={selectedSentMessage ? [selectedSentMessage] : []}
           assistantResponsePending={isStartingFromMessage && startingFromMessageSessionId === selectedSession.id}
           onNewChat={startNewChat}
           onTitleDiscovered={handleTitleDiscovered}
@@ -1003,8 +1004,7 @@
                       bind:value={newChatDraft}
                       placeholder={$t('assistant_new_chat_placeholder')}
                       disabled={isStartingFromMessage || !isRunnerAvailable}
-                      onkeydown={handleNewChatComposerKeydown}
-                    ></textarea>
+                      onkeydown={handleNewChatComposerKeydown}></textarea>
                     <Button type="submit" disabled={!canSendNewChat} loading={isStartingFromMessage}
                       >{$t('assistant_send')}</Button
                     >

@@ -18,8 +18,8 @@ vi.mock('svelte-i18n', () => {
   return {
     t: readable((key: string, options?: { values?: Record<string, string | number> }) =>
       (messages[key] ?? key)
-        .replace('{field}', String(options?.values?.field ?? ''))
-        .replace('{index}', String(options?.values?.index ?? '')),
+        .replace('{field}', () => String(options?.values?.field ?? ''))
+        .replace('{index}', () => String(options?.values?.index ?? '')),
     ),
   };
 });

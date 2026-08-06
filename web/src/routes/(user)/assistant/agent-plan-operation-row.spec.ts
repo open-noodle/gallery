@@ -97,19 +97,19 @@ vi.mock('svelte-i18n', () => {
   return {
     t: readable((key: string, options?: { values?: Record<string, string | number> }) =>
       (messages[key] ?? key)
-        .replace('{count}', String(options?.values?.count ?? ''))
-        .replace('{index}', String(options?.values?.index ?? ''))
-        .replace('{selected}', String(options?.values?.selected ?? ''))
-        .replace('{summary}', String(options?.values?.summary ?? ''))
-        .replace('{total}', String(options?.values?.total ?? ''))
-        .replace('{visible}', String(options?.values?.visible ?? ''))
-        .replace('{dependencies}', String(options?.values?.dependencies ?? ''))
-        .replace('{applied}', String(options?.values?.applied ?? ''))
-        .replace('{failed}', String(options?.values?.failed ?? ''))
-        .replace('{reason}', String(options?.values?.reason ?? ''))
-        .replace('{field}', String(options?.values?.field ?? ''))
-        .replace('{rating}', String(options?.values?.rating ?? ''))
-        .replace('{minutes}', String(options?.values?.minutes ?? '')),
+        .replace('{count}', () => String(options?.values?.count ?? ''))
+        .replace('{index}', () => String(options?.values?.index ?? ''))
+        .replace('{selected}', () => String(options?.values?.selected ?? ''))
+        .replace('{summary}', () => String(options?.values?.summary ?? ''))
+        .replace('{total}', () => String(options?.values?.total ?? ''))
+        .replace('{visible}', () => String(options?.values?.visible ?? ''))
+        .replace('{dependencies}', () => String(options?.values?.dependencies ?? ''))
+        .replace('{applied}', () => String(options?.values?.applied ?? ''))
+        .replace('{failed}', () => String(options?.values?.failed ?? ''))
+        .replace('{reason}', () => String(options?.values?.reason ?? ''))
+        .replace('{field}', () => String(options?.values?.field ?? ''))
+        .replace('{rating}', () => String(options?.values?.rating ?? ''))
+        .replace('{minutes}', () => String(options?.values?.minutes ?? '')),
     ),
   };
 });

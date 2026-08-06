@@ -24,7 +24,7 @@ vi.mock('svelte-i18n', () => {
       let message = messages[key] ?? key;
 
       for (const [name, value] of Object.entries(options?.values ?? {})) {
-        message = message.replaceAll(`{${name}}`, String(value));
+        message = message.replaceAll(`{${name}}`, () => String(value));
       }
 
       return message;

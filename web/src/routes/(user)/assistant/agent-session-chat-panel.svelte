@@ -161,12 +161,13 @@
       latestActivityNeedingAssistantAt !== null &&
       (latestAssistantMessageAt === null || latestActivityNeedingAssistantAt > latestAssistantMessageAt),
   );
-  const canHavePendingAssistantResponse = $derived(
-    session.status === AgentSessionStatus.Created ||
-      session.status === AgentSessionStatus.Running ||
-      session.status === AgentSessionStatus.WaitingForToolApproval ||
-      session.status === AgentSessionStatus.WaitingForPlanReview,
-  );
+  const pendingAssistantResponseStatuses = new Set<AgentSessionStatus>([
+    AgentSessionStatus.Created,
+    AgentSessionStatus.Running,
+    AgentSessionStatus.WaitingForToolApproval,
+    AgentSessionStatus.WaitingForPlanReview,
+  ]);
+  const canHavePendingAssistantResponse = $derived(pendingAssistantResponseStatuses.has(session.status));
   const isResponsePending = $derived(
     isSending ||
       (canHavePendingAssistantResponse &&
@@ -465,7 +466,8 @@
         continue;
       }
 
-      if (isTableDataRow(line) && lines[index + 1] && isTableSeparatorRow(lines[index + 1])) {
+      const nextLine = lines[index + 1];
+      if (isTableDataRow(line) && nextLine && isTableSeparatorRow(nextLine)) {
         flushParagraph();
         flushList();
 
@@ -1052,7 +1054,7 @@
           {@const toolStatus = getToolCallStatusLabel(toolCall.status)}
           {@const actionText = getAgentToolCallCompletedText(toolCall)}
           {@const scopeText = getAgentToolCallScopeText(toolCall)}
-          {@const detailsOpen = expandedToolCallIds[toolCall.id] === true}
+          {@const detailsOpen = expandedToolCallIds[toolCall.id]}
           <article
             data-chat-item
             class="mr-auto w-full max-w-4xl rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-slate-700 shadow-sm dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200"
@@ -1164,8 +1166,7 @@
         bind:value={draft}
         placeholder={composerPlaceholder ?? $t('assistant_message_placeholder')}
         disabled={isResponsePending || composerDisabled}
-        onkeydown={handleComposerKeydown}
-      ></textarea>
+        onkeydown={handleComposerKeydown}></textarea>
 
       {#if terminalActionLabel && onTerminalAction}
         <Button type="button" onclick={onTerminalAction}>{terminalActionLabel}</Button>

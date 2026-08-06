@@ -219,12 +219,12 @@
     let changed = false;
 
     for (const credential of credentials) {
-      if (!(credential.id in nextDrafts)) {
+      if (!Object.hasOwn(nextDrafts, credential.id)) {
         nextDrafts[credential.id] = credential.models.join(', ');
         changed = true;
       }
 
-      if (!(credential.id in nextDefaultDrafts)) {
+      if (!Object.hasOwn(nextDefaultDrafts, credential.id)) {
         nextDefaultDrafts[credential.id] = credential.defaultModel ?? '';
         changed = true;
       }
@@ -280,7 +280,7 @@
         {:else}
           <div class="mt-3 grid gap-2">
             {#each credentials as credential (credential.id)}
-              {@const isRevealed = Boolean(revealedCredentialIds[credential.id])}
+              {@const isRevealed = revealedCredentialIds[credential.id]}
               {@const isEditingModels = editingModelsCredentialId === credential.id}
               <div
                 class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900/60"

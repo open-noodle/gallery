@@ -16,6 +16,9 @@
   let failedAssetIds = $state(new Set<string>());
 
   const errors = $derived(fieldErrors ?? item.fieldErrors);
+  // Reads the error *message* — a falsy (empty/missing) message means "no error", so this is a
+  // value read rather than a key-existence check.
+  const fieldError = (fieldKey: string) => errors[fieldKey];
 
   const isChanged = (field: AgentOperationEditableField) => field.value !== field.originalValue;
 
@@ -60,8 +63,8 @@
             maxlength={field.maxLength}
             required={field.required}
             disabled={!canChangeSelection}
-            aria-invalid={errors[field.key] ? 'true' : undefined}
-            aria-describedby={errors[field.key] ? `${item.id}-${field.key}-error` : undefined}
+            aria-invalid={fieldError(field.key) ? 'true' : undefined}
+            aria-describedby={fieldError(field.key) ? `${item.id}-${field.key}-error` : undefined}
             oninput={(event) => setFieldOverride(field.key, event.currentTarget.value)}
           />
         {:else if field.input === 'textarea'}
@@ -75,10 +78,9 @@
             maxlength={field.maxLength}
             required={field.required}
             disabled={!canChangeSelection}
-            aria-invalid={errors[field.key] ? 'true' : undefined}
-            aria-describedby={errors[field.key] ? `${item.id}-${field.key}-error` : undefined}
-            oninput={(event) => setFieldOverride(field.key, event.currentTarget.value)}
-          ></textarea>
+            aria-invalid={fieldError(field.key) ? 'true' : undefined}
+            aria-describedby={fieldError(field.key) ? `${item.id}-${field.key}-error` : undefined}
+            oninput={(event) => setFieldOverride(field.key, event.currentTarget.value)}></textarea>
         {:else if field.input === 'coverAsset'}
           <div class="text-xs font-medium text-gray-600 dark:text-gray-300">{field.label}</div>
           <div class="flex flex-wrap gap-2">
@@ -122,8 +124,8 @@
             class="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             value={field.value}
             disabled={!canChangeSelection}
-            aria-invalid={errors[field.key] ? 'true' : undefined}
-            aria-describedby={errors[field.key] ? `${item.id}-${field.key}-error` : undefined}
+            aria-invalid={fieldError(field.key) ? 'true' : undefined}
+            aria-describedby={fieldError(field.key) ? `${item.id}-${field.key}-error` : undefined}
             onchange={(event) => setFieldOverride(field.key, event.currentTarget.value)}
           >
             {#each field.options as option (option.value)}

@@ -99,20 +99,20 @@ vi.mock('svelte-i18n', () => {
   return {
     t: readable((key: string, options?: { values?: Record<string, string | number> }) =>
       (messages[key] ?? key)
-        .replace('{assets}', String(options?.values?.assets ?? ''))
-        .replace('{applied}', String(options?.values?.applied ?? ''))
-        .replace('{changes}', String(options?.values?.changes ?? ''))
-        .replace('{count}', String(options?.values?.count ?? ''))
-        .replace('{dependencies}', String(options?.values?.dependencies ?? ''))
-        .replace('{index}', String(options?.values?.index ?? ''))
-        .replace('{field}', String(options?.values?.field ?? ''))
-        .replace('{name}', String(options?.values?.name ?? ''))
-        .replace('{selected}', String(options?.values?.selected ?? ''))
-        .replace('{skipped}', String(options?.values?.skipped ?? ''))
-        .replace('{failed}', String(options?.values?.failed ?? ''))
-        .replace('{summary}', String(options?.values?.summary ?? ''))
-        .replace('{total}', String(options?.values?.total ?? ''))
-        .replace('{visible}', String(options?.values?.visible ?? '')),
+        .replace('{assets}', () => String(options?.values?.assets ?? ''))
+        .replace('{applied}', () => String(options?.values?.applied ?? ''))
+        .replace('{changes}', () => String(options?.values?.changes ?? ''))
+        .replace('{count}', () => String(options?.values?.count ?? ''))
+        .replace('{dependencies}', () => String(options?.values?.dependencies ?? ''))
+        .replace('{index}', () => String(options?.values?.index ?? ''))
+        .replace('{field}', () => String(options?.values?.field ?? ''))
+        .replace('{name}', () => String(options?.values?.name ?? ''))
+        .replace('{selected}', () => String(options?.values?.selected ?? ''))
+        .replace('{skipped}', () => String(options?.values?.skipped ?? ''))
+        .replace('{failed}', () => String(options?.values?.failed ?? ''))
+        .replace('{summary}', () => String(options?.values?.summary ?? ''))
+        .replace('{total}', () => String(options?.values?.total ?? ''))
+        .replace('{visible}', () => String(options?.values?.visible ?? '')),
     ),
   };
 });

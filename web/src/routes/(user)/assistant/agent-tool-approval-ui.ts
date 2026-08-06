@@ -179,6 +179,6 @@ export const buildToolApprovalPayload = (
 
   return {
     decision,
-    ...(decision === AgentToolApprovalDecision.Denied && trimmedReason ? { reason: trimmedReason } : {}),
+    ...(decision === AgentToolApprovalDecision.Denied && trimmedReason && { reason: trimmedReason }),
   };
 };

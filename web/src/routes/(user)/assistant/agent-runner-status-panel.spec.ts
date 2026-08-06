@@ -15,7 +15,7 @@ vi.mock('svelte-i18n', async () => {
 
   return {
     t: readable((key: string, options?: { values?: Record<string, string> }) =>
-      (messages[key] ?? key).replace('{protocol}', options?.values?.protocol ?? ''),
+      (messages[key] ?? key).replace('{protocol}', () => options?.values?.protocol ?? ''),
     ),
   };
 });

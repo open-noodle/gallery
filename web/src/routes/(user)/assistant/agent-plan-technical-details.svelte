@@ -14,7 +14,7 @@
   const detailsId = $derived(`operation-technical-details-${item.id}`);
   const open = $derived(showToggle ? internalOpen : expanded);
 
-  const sanitizeError = (error: string | undefined) => error?.split('\n')[0]?.trim();
+  const sanitizeError = (error: string | undefined) => error?.split('\n', 1)[0]?.trim();
 
   const statusLabelKey = (reviewItem: OperationReviewItem) => {
     if (reviewItem.applyState.kind === 'partial') {

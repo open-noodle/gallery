@@ -43,17 +43,17 @@ vi.mock('svelte-i18n', () => {
   };
 
   const formatValue = (value: string | number | undefined) =>
-    typeof value === 'number' ? new Intl.NumberFormat('en-US').format(value) : String(value ?? '');
+    typeof value === 'number' ? new Intl.NumberFormat('en-US').format(value) : (value ?? '');
 
   return {
     t: readable((key: string, options?: { values?: Record<string, string | number> }) =>
       (messages[key] ?? key)
-        .replace('{summary}', String(options?.values?.summary ?? ''))
-        .replace('{selected}', formatValue(options?.values?.selected))
-        .replace('{visible}', formatValue(options?.values?.visible))
-        .replace('{total}', formatValue(options?.values?.total))
-        .replace('{count}', formatValue(options?.values?.count))
-        .replace('{index}', formatValue(options?.values?.index)),
+        .replace('{summary}', () => String(options?.values?.summary ?? ''))
+        .replace('{selected}', () => formatValue(options?.values?.selected))
+        .replace('{visible}', () => formatValue(options?.values?.visible))
+        .replace('{total}', () => formatValue(options?.values?.total))
+        .replace('{count}', () => formatValue(options?.values?.count))
+        .replace('{index}', () => formatValue(options?.values?.index)),
     ),
   };
 });

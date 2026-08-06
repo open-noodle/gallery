@@ -73,11 +73,11 @@ vi.mock('svelte-i18n', () => {
   return {
     t: readable((key: string, options?: { values?: Record<string, string | number> }) =>
       (messages[key] ?? key)
-        .replace('{count}', String(options?.values?.count ?? ''))
-        .replace('{applied}', String(options?.values?.applied ?? ''))
-        .replace('{failed}', String(options?.values?.failed ?? ''))
-        .replace('{protocol}', String(options?.values?.protocol ?? ''))
-        .replace('{version}', String(options?.values?.version ?? '')),
+        .replace('{count}', () => String(options?.values?.count ?? ''))
+        .replace('{applied}', () => String(options?.values?.applied ?? ''))
+        .replace('{failed}', () => String(options?.values?.failed ?? ''))
+        .replace('{protocol}', () => String(options?.values?.protocol ?? ''))
+        .replace('{version}', () => String(options?.values?.version ?? '')),
     ),
   };
 });

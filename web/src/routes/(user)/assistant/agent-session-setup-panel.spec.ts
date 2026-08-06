@@ -276,7 +276,7 @@ describe(AgentSessionSetupPanel.name, () => {
 
     await rerender({ runnerStatus: healthyRunner, credentials: [manualModelCredential], onSessionCreated: vi.fn() });
     expect(screen.getByRole('button', { name: 'Start session' })).toBeDisabled();
-    await fireEvent.input(screen.getByLabelText('Model'), { target: { value: '   ' } });
+    await fireEvent.input(screen.getByLabelText('Model'), { target: { value: ' '.repeat(3) } });
     expect(screen.getByRole('button', { name: 'Start session' })).toBeDisabled();
   });
 

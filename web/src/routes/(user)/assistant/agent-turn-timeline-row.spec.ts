@@ -43,7 +43,7 @@ describe('AgentTurnTimelineRow', () => {
 
     const btn = screen.getByRole('button', { name: 'searchAssets' });
     expect(btn).toHaveAttribute('aria-expanded', 'false');
-    expect(btn.innerHTML).toContain('bg-green-500');
+    expect(btn.getHTML()).toContain('bg-green-500');
     expect(screen.getByText('searchAssets')).toBeInTheDocument();
     expect(screen.getByText('Found 5 matching photos')).toBeInTheDocument();
     expect(screen.getByText('2.3s')).toBeInTheDocument();
@@ -71,7 +71,7 @@ describe('AgentTurnTimelineRow', () => {
     });
 
     const btn = screen.getByRole('button', { name: 'searchAssets' });
-    expect(btn.innerHTML).toContain('bg-red-500');
+    expect(btn.getHTML()).toContain('bg-red-500');
 
     await user.click(btn);
 
@@ -90,7 +90,7 @@ describe('AgentTurnTimelineRow', () => {
     });
 
     const btn = screen.getByRole('button', { name: 'searchAssets' });
-    expect(btn.innerHTML).toContain('bg-amber-500');
+    expect(btn.getHTML()).toContain('bg-amber-500');
     expect(screen.getByText('denied')).toBeInTheDocument();
     expect(screen.queryByText(/\ds$/)).not.toBeInTheDocument();
   });
@@ -106,7 +106,7 @@ describe('AgentTurnTimelineRow', () => {
     });
 
     const btn = screen.getByRole('button', { name: 'searchAssets' });
-    expect(btn.innerHTML).toContain('animate-pulse');
+    expect(btn.getHTML()).toContain('animate-pulse');
   });
 
   it('cancelled row: grey dot + cancelled text', () => {
@@ -120,7 +120,7 @@ describe('AgentTurnTimelineRow', () => {
     });
 
     const btn = screen.getByRole('button', { name: 'searchAssets' });
-    expect(btn.innerHTML).toContain('bg-gray-400');
+    expect(btn.getHTML()).toContain('bg-gray-400');
     expect(screen.getByText('cancelled')).toBeInTheDocument();
   });
 

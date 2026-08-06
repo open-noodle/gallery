@@ -104,7 +104,7 @@ vi.mock('svelte-i18n', () => {
       let message = messages[key] ?? key;
 
       for (const [name, value] of Object.entries(options?.values ?? {})) {
-        message = message.replaceAll(`{${name}}`, String(value));
+        message = message.replaceAll(`{${name}}`, () => String(value));
       }
 
       return message;
@@ -561,7 +561,7 @@ describe(AgentSessionChatPanel.name, () => {
     // Summary line button present (replaces the old 'Activity summary' article)
     expect(screen.getByRole('button', { name: /1 step/i })).toBeInTheDocument();
     expect(screen.queryByRole('article', { name: 'Activity summary' })).not.toBeInTheDocument();
-    expect(Array.from(transcript.querySelectorAll('[data-chat-item]')).map((item) => item.textContent)).toEqual([
+    expect(Array.from(transcript.querySelectorAll('[data-chat-item]'), (item) => item.textContent)).toEqual([
       expect.stringContaining('Find my Portugal photos'),
       expect.stringContaining('1 step'),
       expect.stringContaining('I found them.'),
@@ -631,7 +631,7 @@ describe(AgentSessionChatPanel.name, () => {
 
     expect(screen.getByTestId('agent-turn-timeline')).toBeInTheDocument();
     expect(screen.queryByRole('article', { name: 'Pi checked your albums: Done' })).not.toBeInTheDocument();
-    expect(Array.from(transcript.querySelectorAll('[data-chat-item]')).map((item) => item.textContent)).toEqual([
+    expect(Array.from(transcript.querySelectorAll('[data-chat-item]'), (item) => item.textContent)).toEqual([
       expect.stringContaining('List my albums'),
       expect.stringContaining('1 step'),
       expect.stringContaining('You have one album.'),
@@ -700,7 +700,7 @@ describe(AgentSessionChatPanel.name, () => {
     expect(await screen.findByText('Understanding request…')).toBeInTheDocument();
     // Activity event secrets must never appear
     expect(screen.queryByText(/secret-token/)).not.toBeInTheDocument();
-    expect(Array.from(transcript.querySelectorAll('[data-chat-item]')).map((item) => item.textContent)).toEqual([
+    expect(Array.from(transcript.querySelectorAll('[data-chat-item]'), (item) => item.textContent)).toEqual([
       expect.stringContaining('Make a plan'),
       expect.stringContaining('Understanding request'),
     ]);
@@ -842,7 +842,7 @@ describe(AgentSessionChatPanel.name, () => {
 
     expect(screen.getAllByTestId('agent-turn-timeline')).toHaveLength(2);
     expect(screen.queryByRole('article', { name: 'Pi checked your albums: Done' })).not.toBeInTheDocument();
-    expect(Array.from(transcript.querySelectorAll('[data-chat-item]')).map((item) => item.textContent)).toEqual([
+    expect(Array.from(transcript.querySelectorAll('[data-chat-item]'), (item) => item.textContent)).toEqual([
       expect.stringContaining('First request'),
       expect.stringContaining('1 step'),
       expect.stringContaining('First response'),
@@ -882,7 +882,7 @@ describe(AgentSessionChatPanel.name, () => {
     expect(screen.queryByTestId('agent-turn-timeline')).not.toBeInTheDocument();
     // The late tool call falls outside the turn window — shown as raw uncovered tool-call article
     expect(screen.getByRole('article', { name: 'Pi checked your albums: Done' })).toBeInTheDocument();
-    expect(Array.from(transcript.querySelectorAll('[data-chat-item]')).map((item) => item.textContent)).toEqual([
+    expect(Array.from(transcript.querySelectorAll('[data-chat-item]'), (item) => item.textContent)).toEqual([
       expect.stringContaining('List my albums'),
       expect.stringContaining('Done listing albums.'),
       expect.stringContaining('Pi checked your albums.'),
@@ -1350,7 +1350,7 @@ describe(AgentSessionChatPanel.name, () => {
     const transcript = screen.getByTestId('agent-session-chat-transcript');
     expect(screen.getByTestId('agent-turn-timeline')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /1 step/i })).toBeInTheDocument();
-    expect(Array.from(transcript.querySelectorAll('[data-chat-item]')).map((item) => item.textContent)).toEqual([
+    expect(Array.from(transcript.querySelectorAll('[data-chat-item]'), (item) => item.textContent)).toEqual([
       expect.stringContaining('List my albums'),
       expect.stringContaining('1 step'),
       expect.stringContaining('You have one album.'),
@@ -2063,7 +2063,7 @@ describe(AgentSessionChatPanel.name, () => {
     const transcript = await screen.findByTestId('agent-session-chat-transcript');
     await screen.findByText('Later assistant response');
 
-    expect(Array.from(transcript.querySelectorAll('[data-chat-item]')).map((item) => item.textContent)).toEqual([
+    expect(Array.from(transcript.querySelectorAll('[data-chat-item]'), (item) => item.textContent)).toEqual([
       expect.stringContaining('First same-time message'),
       expect.stringContaining('Second same-time message'),
       // the turn is answered (assistant response below), so the timeline shows the settled summary line
@@ -2113,7 +2113,7 @@ describe(AgentSessionChatPanel.name, () => {
     expect(within(appliedCard).queryByRole('textbox')).not.toBeInTheDocument();
 
     const transcript = screen.getByTestId('agent-session-chat-transcript');
-    expect(Array.from(transcript.querySelectorAll('[data-chat-item]')).map((item) => item.textContent)).toEqual([
+    expect(Array.from(transcript.querySelectorAll('[data-chat-item]'), (item) => item.textContent)).toEqual([
       expect.stringContaining('Please organize Portugal'),
       expect.stringContaining('Applied plan'),
       expect.stringContaining('Now add Porto'),
@@ -2847,7 +2847,7 @@ describe(AgentSessionChatPanel.name, () => {
     const transcript = screen.getByTestId('agent-session-chat-transcript');
     expect(await screen.findByText('Searching photos…')).toBeInTheDocument();
     expect(screen.getAllByTestId('agent-turn-timeline')).toHaveLength(1);
-    expect(Array.from(transcript.querySelectorAll('[data-chat-item]')).map((item) => item.textContent)).toEqual([
+    expect(Array.from(transcript.querySelectorAll('[data-chat-item]'), (item) => item.textContent)).toEqual([
       expect.stringContaining('Find beach photos'),
       expect.stringContaining('Searching photos'),
     ]);

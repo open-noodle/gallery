@@ -84,16 +84,16 @@ vi.mock('svelte-i18n', () => {
   return {
     t: readable((key: string, options?: { values?: Record<string, string | number> }) =>
       (messages[key] ?? key)
-        .replace('{count}', String(options?.values?.count ?? ''))
-        .replace('{index}', String(options?.values?.index ?? ''))
-        .replace('{field}', String(options?.values?.field ?? ''))
-        .replace('{selected}', String(options?.values?.selected ?? ''))
-        .replace('{summary}', String(options?.values?.summary ?? ''))
-        .replace('{total}', String(options?.values?.total ?? ''))
-        .replace('{visible}', String(options?.values?.visible ?? ''))
-        .replace('{name}', String(options?.values?.name ?? ''))
-        .replace('{criteria}', String(options?.values?.criteria ?? ''))
-        .replace('{dependencies}', String(options?.values?.dependencies ?? '')),
+        .replace('{count}', () => String(options?.values?.count ?? ''))
+        .replace('{index}', () => String(options?.values?.index ?? ''))
+        .replace('{field}', () => String(options?.values?.field ?? ''))
+        .replace('{selected}', () => String(options?.values?.selected ?? ''))
+        .replace('{summary}', () => String(options?.values?.summary ?? ''))
+        .replace('{total}', () => String(options?.values?.total ?? ''))
+        .replace('{visible}', () => String(options?.values?.visible ?? ''))
+        .replace('{name}', () => String(options?.values?.name ?? ''))
+        .replace('{criteria}', () => String(options?.values?.criteria ?? ''))
+        .replace('{dependencies}', () => String(options?.values?.dependencies ?? '')),
     ),
   };
 });
