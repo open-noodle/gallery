@@ -1325,6 +1325,78 @@ describe('pi runtime adapter', () => {
     assert.equal(calls.prompts.length, 0);
   });
 
+  it('queues no routing context when transcript compaction throws before the prompt', async () => {
+    const { sdk, ai, calls, session } = createFakeDependencies({
+      mcpToolNames: ['mcp_gallery_findTripCandidates'],
+    });
+    ai.classifyIntent = async () => ({ workflow: 'create_recent_trip_album', slots: {}, confidence: 'high' });
+
+    // The second abandon path: `compactGalleryToolTranscript` throws, so the turn
+    // ends without ever prompting, and a block queued before it would strand onto
+    // the user's NEXT message. Compaction's only write is `block.text = …` on a
+    // compactable gallery tool result, so a throwing setter on exactly that block is
+    // the cheapest reliable trigger — and it can only fire if compaction really
+    // reached that write.
+    const rawToolText = JSON.stringify({
+      status: 'success',
+      toolCall: { id: '00000000-0000-4000-8000-000000000333', toolName: 'searchAssets', status: 'completed' },
+      assets: { items: [{ id: '66666666-6666-4666-8666-666666666666', city: 'Kyoto' }] },
+    });
+    const transcriptBlock = {
+      type: 'text',
+      get text() {
+        return rawToolText;
+      },
+      set text(_compacted) {
+        throw new Error('compaction write exploded');
+      },
+    };
+    session.messages.push({ role: 'tool', content: [transcriptBlock] });
+
+    const customMessages = [];
+    session.sendCustomMessage = async (message, options) => customMessages.push({ message, options });
+
+    const runtime = createPiRuntime({ sdk, ai });
+    await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
+
+    const events = await collect(
+      runtime.sendMessage(
+        createMessageRequest({
+          content: { blocks: [{ type: 'text', text: 'put my Japan trip from last week into an album' }] },
+        }),
+      ),
+    );
+
+    // Proves compaction actually threw, rather than this turn failing earlier or
+    // quietly succeeding: the prompt chain's catch turns that throw into a
+    // runner-error and nothing else in the turn raises this message.
+    assert.equal(events.at(-1).type, 'runner-error');
+    assert.match(events.at(-1).message, /compaction write exploded/);
+    assert.deepEqual(customMessages, []);
+    assert.equal(calls.prompts.length, 0);
+  });
+
+  it('queues no routing context on a turn with no MCP gateway', async () => {
+    const { sdk, ai, calls, session } = createFakeDependencies();
+    // Without an `mcpGateway` the strict block is skipped entirely, so
+    // `handoffRoutingContext` is never assigned — yet the delivery helper is still
+    // reachable from the prompt chain on this path. Pins that it delivers nothing
+    // here, instead of leaving that resting on `formatRoutingContext(undefined)`
+    // returning null with nothing observing it: every other no-gateway test uses the
+    // default fake session, which defines no `sendCustomMessage` at all.
+    const customMessages = [];
+    session.sendCustomMessage = async (message, options) => customMessages.push({ message, options });
+
+    const runtime = createPiRuntime({ sdk, ai });
+    await runtime.createSession(createSessionBody());
+
+    const events = await collect(runtime.sendMessage(createMessageRequest()));
+
+    assert.deepEqual(customMessages, []);
+    assert.equal(calls.prompts.length, 1);
+    assert.equal(events.at(-1).type, 'assistant-message-completed');
+  });
+
   it('sends no routing context when the router matches nothing', async () => {
     const { sdk, ai, calls, session } = createFakeDependencies({
       mcpToolNames: ['mcp_gallery_searchAssets'],
