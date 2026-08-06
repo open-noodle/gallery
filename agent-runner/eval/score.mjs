@@ -5,6 +5,17 @@
 const avg = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 const lc = (v) => String(v ?? '').toLowerCase();
 
+// L3 turns are always strings; L2 widened a turn to also allow an approval
+// (`{ approve: boolean }`) or a clock advance (`{ advanceMs: number }`).
+// Render those readably instead of the default `[object Object]` — string
+// turns are untouched so L3 output (and existing scorecards) don't change.
+const renderTurn = (turn) => {
+  if (typeof turn === 'string') return turn;
+  if (turn && typeof turn.advanceMs === 'number') return `+${turn.advanceMs}ms`;
+  if (turn && typeof turn.approve === 'boolean') return `approve:${turn.approve}`;
+  return String(turn);
+};
+
 const slotMatches = (parsed, expected) => {
   for (const [key, want] of Object.entries(expected)) {
     const got = parsed?.[key];
@@ -131,7 +142,7 @@ export const evalScenario = async (driver, sc, defaultRuns) => {
   return {
     id: sc.id,
     category: sc.category,
-    prompt: sc.prompt ?? (sc.turns ? sc.turns.join(' → ') : undefined),
+    prompt: sc.prompt ?? (sc.turns ? sc.turns.map(renderTurn).join(' → ') : undefined),
     score,
     passed: score >= threshold,
     threshold,

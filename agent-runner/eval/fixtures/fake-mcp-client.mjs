@@ -5,8 +5,11 @@
 // the driver can assert the exact tool sequence a workflow issued.
 import { DATASET } from './dataset.mjs';
 
-// Every tool that creates a reviewable plan. The driver's no-raw-asset-IDs
-// invariant only inspects these.
+// Every tool that creates a reviewable plan. Used by the driver to extract
+// `planOps` (the operations a `proposeAlbumOperations` call proposed). The
+// no-raw-asset-IDs leak scan uses a narrower set — see `HANDLE_BASED_PLAN_TOOLS`
+// in `eval/drivers/l2-workflow.mjs`, which deliberately excludes
+// `proposeAlbumOperations`.
 export const PLAN_TOOLS = Object.freeze(
   new Set([
     'proposeAlbumOperations',

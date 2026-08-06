@@ -59,8 +59,13 @@ friendly. (Not in CI yet — it needs a local model.)
 `--layer L2` drives the real dispatcher and the real workflow `run()` against a
 seeded in-memory MCP client (`eval/fixtures/`). It asserts what L1 cannot: the
 **exact ordered tool sequence** a workflow issues, the **plan operations** it
-proposes, and which **outcome arm** it lands in — plus a global invariant that no
-plan call ever carries raw asset ids.
+proposes, and which **outcome arm** it lands in — plus a no-raw-asset-IDs
+invariant scanning the handle-based plan tools (`proposeAlbumFromSelection`,
+`proposeAssetBatchFromSelection`, `proposeSpaceFromSearch`,
+`proposeAddAssetsToSpaceFromSearch`). `proposeAlbumOperations` is exempt by
+design: real workflows (e.g. `set-album-cover`, `cleanup-duplicates`)
+legitimately pass a materialised `assetIds` array as an operation payload once
+ids are already resolved server-side.
 
 ```bash
 pnpm eval:l2                       # or: pnpm eval -- --layer L2
@@ -76,6 +81,12 @@ so those scenarios assert `toolSequence` and `outcomeStatus` instead.
 L2 is deterministic: a fixed clock, a frozen dataset, and regex routing. Scenarios
 run once with a threshold of 1, so any failure is a real regression rather than
 model variance.
+
+The scored scenario set is a deliberate proving slice, not full coverage: it
+scores 2 of the design spec's 7 workflows (`rename_or_describe_album`,
+`create_recent_trip_album`) out of 38 in the system, with `cleanup_duplicates`
+exercised only by a driver unit test — extending it to more workflows is
+follow-up work, not a gap in what's here.
 
 ## Adding scenarios
 

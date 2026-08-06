@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { aggregate, classificationPass, renderScorecard } from './score.mjs';
+import { aggregate, classificationPass, evalScenario, renderScorecard } from './score.mjs';
 
 const base = { kind: 'rename_or_describe_album', parsedSlots: { albumRef: 'Japan' } };
 
@@ -121,6 +121,40 @@ describe('classificationPass — existing keys still work', () => {
   it('still fails on the wrong kind', () => {
     const decision = { ...base, toolSequence: [] };
     assert.equal(classificationPass(decision, { kind: 'delete_album', toolSequence: [] }), false);
+  });
+});
+
+describe('evalScenario — multi-turn prompt rendering', () => {
+  // L2 widened a turn to `string | { approve: boolean } | { advanceMs: number }`
+  // (Task 4). `sc.prompt` used to render an object turn as the default
+  // `[object Object]` in both the scorecard and --json output. This pins the
+  // readable rendering without touching pass/fail: the driver's decision
+  // always matches `expect`, so any regression here is caught by the prompt
+  // assertion alone.
+  const passingDriver = {
+    converse: async () => ({ kind: 'rename_or_describe_album', toolSequence: [], rawAssetIdLeak: null }),
+  };
+
+  it('renders a mixed turns array (string + approval + advanceMs) readably', async () => {
+    const sc = {
+      id: 'mixed.turns',
+      category: 'execution',
+      turns: ['rename my Japan album', { approve: true }, { advanceMs: 660000 }],
+      expect: { kind: 'rename_or_describe_album' },
+    };
+    const result = await evalScenario(passingDriver, sc, 1);
+    assert.equal(result.prompt, 'rename my Japan album → approve:true → +660000ms');
+  });
+
+  it('leaves a string-only turns array unchanged', async () => {
+    const sc = {
+      id: 'string.turns',
+      category: 'execution',
+      turns: ['hello', 'world'],
+      expect: { kind: 'rename_or_describe_album' },
+    };
+    const result = await evalScenario(passingDriver, sc, 1);
+    assert.equal(result.prompt, 'hello → world');
   });
 });
 

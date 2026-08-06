@@ -50,6 +50,7 @@ export default [
     prompt: 'create an album for my recent trip to Japan',
     expect: {
       kind: 'create_recent_trip_album',
+      toolSequence: ['findTripCandidates', 'proposeAlbumFromSelection'],
       outcomeStatus: 'planned',
       // Selection-based plan tool: no operations array, so planOps is not asserted.
     },
