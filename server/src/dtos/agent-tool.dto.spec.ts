@@ -1250,7 +1250,7 @@ describe('Agent tool DTOs', () => {
     });
 
     it('rejects empty queries after trim when query is provided', () => {
-      const result = parseSearchUsersRequest({ query: '   ' });
+      const result = parseSearchUsersRequest({ query: ' '.repeat(3) });
 
       expectIssue(result, ['query'], 'Too small');
     });
@@ -1279,7 +1279,7 @@ describe('Agent tool DTOs', () => {
     });
 
     it('rejects blank denial reason after trim', () => {
-      const result = parseApproval({ decision: AgentToolApprovalDecision.Denied, reason: '   ' });
+      const result = parseApproval({ decision: AgentToolApprovalDecision.Denied, reason: ' '.repeat(3) });
 
       expectIssue(result, ['reason'], 'Too small');
     });

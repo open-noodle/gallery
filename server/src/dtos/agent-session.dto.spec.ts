@@ -602,7 +602,7 @@ describe('AgentSessionUpdateDto', () => {
 
   it.each([
     { name: 'missing', input: {}, message: 'Invalid input: expected string, received undefined' },
-    { name: 'blank', input: { title: '   ' }, message: 'Too small: expected string to have >=1 characters' },
+    { name: 'blank', input: { title: ' '.repeat(3) }, message: 'Too small: expected string to have >=1 characters' },
     {
       name: 'too long',
       input: { title: 'x'.repeat(121) },

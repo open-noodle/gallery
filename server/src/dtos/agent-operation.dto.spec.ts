@@ -736,7 +736,7 @@ describe('Agent operation DTOs', () => {
       },
       {
         name: 'blank timezone',
-        payload: { timeZone: '   ' },
+        payload: { timeZone: ' '.repeat(3) },
         path: ['operations', 0, 'payload', 'timeZone'],
         message: 'Invalid IANA time zone',
       },
@@ -784,7 +784,7 @@ describe('Agent operation DTOs', () => {
       },
       {
         name: 'non-finite coordinate',
-        payload: { latitude: Number.POSITIVE_INFINITY, longitude: 2.3522 },
+        payload: { latitude: Infinity, longitude: 2.3522 },
         path: ['operations', 0, 'payload', 'latitude'],
         message: 'Invalid input',
       },
@@ -1869,7 +1869,7 @@ describe('Agent operation DTOs', () => {
     const result = AgentOperationPlanApplyRequestDto.schema.safeParse({
       operationIds: [operationId],
       fieldOverrides: {
-        [operationId]: Object.fromEntries(Array.from({ length: 21 }, (_, index) => [`field${index}`, `${index}`])),
+        [operationId]: Object.fromEntries(Array.from({ length: 21 }, (_, index) => [`field${index}`, String(index)])),
       },
     });
 

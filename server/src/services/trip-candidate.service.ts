@@ -325,7 +325,7 @@ export class TripCandidateService {
     if (bucket.country) {
       const place = { country: bucket.country, state: bucket.state ?? null, city: bucket.city ?? null };
       const key = this.sourcePlaceKey(place);
-      if (!window.places.some((item) => this.sourcePlaceKey(item) === key)) {
+      if (window.places.every((item) => this.sourcePlaceKey(item) !== key)) {
         window.places.push(place);
       }
     }

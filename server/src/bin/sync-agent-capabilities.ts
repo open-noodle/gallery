@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+/*
+ * This file is both the `sync:agent-capabilities` CLI entrypoint (see the `process.argv[1]`
+ * guard at the bottom) and the module `src/services/agent-capability-matrix.spec.ts` imports
+ * the pure renderers/markers from, so the shebang and the exports have to coexist. Same
+ * escape hatch upstream uses for `SqlLogger` in `src/bin/sync-sql.ts`.
+ */
+/* eslint-disable unicorn/no-exports-in-scripts */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 

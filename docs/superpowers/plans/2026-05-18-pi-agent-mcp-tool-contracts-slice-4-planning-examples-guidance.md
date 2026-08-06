@@ -496,9 +496,7 @@ In `server/src/types/agent-mcp-contract.types.ts`, add after `AgentMcpReadToolCo
 
 ```ts
 export type AgentMcpPlanningToolName =
-  | AgentToolName.ProposeAlbumOperations
-  | AgentToolName.ReviseProposedOperations
-  | AgentToolName.SummarizePlan;
+  AgentToolName.ProposeAlbumOperations | AgentToolName.ReviseProposedOperations | AgentToolName.SummarizePlan;
 
 export type AgentMcpPlanningToolContract = AgentMcpToolContract<AgentMcpPlanningToolName>;
 ```

@@ -35,7 +35,7 @@ export class AgentRunnerToolTokenService {
   }
 
   verify(token: string, now = new Date()): AgentRunnerToolTokenClaims {
-    const [version, encodedClaims, signature, extra] = token.split('.');
+    const [version, encodedClaims, signature, extra] = token.split('.', 4);
     if (version !== FORMAT_VERSION || !encodedClaims || !signature || extra !== undefined) {
       throw new UnauthorizedException(INVALID_TOKEN);
     }

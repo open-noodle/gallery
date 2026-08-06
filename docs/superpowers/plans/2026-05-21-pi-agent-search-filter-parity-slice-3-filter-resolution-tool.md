@@ -337,13 +337,7 @@ export type AgentToolResolveAssetSearchFiltersRequestMetadata = {
 };
 
 export type AgentResolvedAssetSearchFilterKind =
-  | 'person'
-  | 'tag'
-  | 'album'
-  | 'space'
-  | 'cameraMake'
-  | 'cameraModel'
-  | 'lensModel';
+  'person' | 'tag' | 'album' | 'space' | 'cameraMake' | 'cameraModel' | 'lensModel';
 
 export type AgentResolvedAssetSearchFilterChoice = {
   id?: string;

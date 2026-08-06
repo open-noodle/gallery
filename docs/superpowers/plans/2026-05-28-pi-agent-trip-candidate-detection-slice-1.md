@@ -291,8 +291,7 @@ export interface TripCandidate {
 }
 
 type HomeBaseline =
-  | { status: 'confident'; home: MemoryLocationCluster }
-  | { status: 'ambiguous'; home?: MemoryLocationCluster };
+  { status: 'confident'; home: MemoryLocationCluster } | { status: 'ambiguous'; home?: MemoryLocationCluster };
 
 export class TripCandidateService {
   private static readonly HOME_DOMINANCE_RATIO = 1.25;

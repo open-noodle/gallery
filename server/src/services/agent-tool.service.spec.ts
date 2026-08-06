@@ -4016,9 +4016,9 @@ describe(AgentToolService.name, () => {
       expect(searchRepository.searchMetadata).toHaveBeenCalledWith(
         expect.any(Object),
         expect.not.objectContaining({
-          ...(mode === 'description' ? {} : { description: expect.anything() }),
-          ...(mode === 'ocr' ? {} : { ocr: expect.anything() }),
-          ...(mode === 'filename' ? {} : { originalFileName: expect.anything() }),
+          ...(mode !== 'description' && { description: expect.anything() }),
+          ...(mode !== 'ocr' && { ocr: expect.anything() }),
+          ...(mode !== 'filename' && { originalFileName: expect.anything() }),
         }),
       );
       expect(searchRepository.searchSmart).not.toHaveBeenCalled();

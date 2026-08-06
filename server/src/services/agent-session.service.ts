@@ -294,9 +294,7 @@ export class AgentSessionService {
     }
 
     if (
-      session.status === AgentSessionStatus.Applying ||
-      session.status === AgentSessionStatus.Completed ||
-      session.status === AgentSessionStatus.Failed
+      [AgentSessionStatus.Applying, AgentSessionStatus.Completed, AgentSessionStatus.Failed].includes(session.status)
     ) {
       throw new BadRequestException('Agent session cannot be cancelled in its current state');
     }

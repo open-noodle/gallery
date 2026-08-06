@@ -47,9 +47,9 @@ entity sources. Advertise it + broaden the classifier copy.
 - [ ] `manifest.test.mjs`: add a test —
       `js
 it('lists resolveAssetSearchFilters for every entity-source workflow', () => {
-  for (const kind of ['add_photos_to_album', 'archive_assets', 'favorite_assets', 'tag_assets', 'create_album_from_source']) {
-    assert.ok(getWorkflowManifestEntry(kind).requiredReadTools.includes('resolveAssetSearchFilters'), kind);
-  }
+for (const kind of ['add_photos_to_album', 'archive_assets', 'favorite_assets', 'tag_assets', 'create_album_from_source']) {
+assert.ok(getWorkflowManifestEntry(kind).requiredReadTools.includes('resolveAssetSearchFilters'), kind);
+}
 });
 `
 
@@ -67,13 +67,13 @@ config already exist (Slice 2). Add the missing filter-value validation.
       `type` enum check, add:
       ``js
 if (args.filters.rating !== undefined && args.filters.rating !== null) {
-  const r = args.filters.rating;
-  if (typeof r !== 'number' || !Number.isInteger(r) || r < 1 || r > 5) {
-    fail(`invalid searchAssets filter rating "${r}"`);
-  }
+const r = args.filters.rating;
+if (typeof r !== 'number' || !Number.isInteger(r) || r < 1 || r > 5) {
+fail(`invalid searchAssets filter rating "${r}"`);
+}
 }
 if (args.filters.visibility !== undefined && !KNOWN_VISIBILITY.has(args.filters.visibility)) {
-  fail(`invalid searchAssets filter visibility "${args.filters.visibility}"`);
+fail(`invalid searchAssets filter visibility "${args.filters.visibility}"`);
 }
 ``
 - [ ] `contract-fixtures.test.mjs`: add tests:

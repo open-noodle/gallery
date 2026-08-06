@@ -12,7 +12,7 @@ describe('trip place hints', () => {
 
   it('treats empty hints as absent', () => {
     expect(parseTripPlaceHint()).toEqual({ status: 'none' });
-    expect(parseTripPlaceHint('   ')).toEqual({ status: 'none' });
+    expect(parseTripPlaceHint(' '.repeat(3))).toEqual({ status: 'none' });
   });
 
   it('rejects overlong hints after trimming', () => {

@@ -112,10 +112,7 @@ test('run proposes asset.adjust via proposeAssetBatchFromSelection', async () =>
   const client = {
     call: async (tool, args) => {
       calls.push({ tool, args });
-      if (tool === 'resolveAssetSearchFilters')
-        return {
-          /* shape resolveAssetSource expects */
-        };
+      if (tool === 'resolveAssetSearchFilters') return {/* shape resolveAssetSource expects */};
       return { planId: 'p1', operations: [{ type: 'asset.adjust' }] };
     },
   };

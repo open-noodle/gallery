@@ -494,7 +494,7 @@ const assetRotatePayloadSchema = z.strictObject({
   angle: z
     .number()
     .int()
-    .refine((angle): angle is 90 | 180 | 270 => angle === 90 || angle === 180 || angle === 270, {
+    .refine((angle): angle is 90 | 180 | 270 => [90, 180, 270].includes(angle), {
       message: 'angle must be 90, 180, or 270',
     }),
 });
@@ -564,7 +564,7 @@ const ianaTimeZoneSchema = z
   .refine(
     (timeZone) => {
       try {
-        Intl.DateTimeFormat(undefined, { timeZone });
+        new Intl.DateTimeFormat(undefined, { timeZone });
         return true;
       } catch {
         return false;

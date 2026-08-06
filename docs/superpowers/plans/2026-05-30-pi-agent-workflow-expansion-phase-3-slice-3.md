@@ -54,7 +54,7 @@ export const parseUploadRange = (source, now = new Date()) => {
 
 ### 2. Use it in `resolveAssetSource` (capture vs upload)
 
-Where `dateRange` is computed (~`:339`) and `dateFilters` built (~`:352`):
+Where `dateRange` is computed (~~`:339`) and `dateFilters` built (~~`:352`):
 
 ```js
 const uploadRange = parseUploadRange(source, now);

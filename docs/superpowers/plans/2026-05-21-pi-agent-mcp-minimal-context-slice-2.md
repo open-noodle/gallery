@@ -351,15 +351,7 @@ In `server/src/types/agent-tool.types.ts`, add near the existing search types:
 export type AgentSearchAssetsDetail = 'ids' | 'summary' | 'metadata';
 
 export type AgentSearchAssetsField =
-  | 'type'
-  | 'dates'
-  | 'location'
-  | 'camera'
-  | 'tags'
-  | 'rating'
-  | 'filename'
-  | 'favorite'
-  | 'visibility';
+  'type' | 'dates' | 'location' | 'camera' | 'tags' | 'rating' | 'filename' | 'favorite' | 'visibility';
 ```
 
 Update `AgentToolSearchAssetsRequestMetadata`:

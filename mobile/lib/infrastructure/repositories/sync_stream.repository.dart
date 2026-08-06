@@ -1583,5 +1583,8 @@ extension on api.AssetEditAction {
     // previously fell through the `_ => AssetEditAction.other` arm that upstream
     // dropped when openapi-generator v7.24 made these enums exhaustive.
     api.AssetEditAction.trim => AssetEditAction.other,
+    // Same for `adjust` (agent image adjustments): server-side only, no local
+    // AssetEditAction member to map onto.
+    api.AssetEditAction.adjust => AssetEditAction.other,
   };
 }

@@ -576,10 +576,12 @@ export class AgentOperationPlanService {
   private getAssetBatchWorkflowTargetKind(
     dto: AgentProposeAssetBatchFromSearchToolRequestDto['action'],
   ): AgentOperationTargetKind {
-    return dto.type === AgentOperationType.AssetRotate ||
-      dto.type === AgentOperationType.AssetCrop ||
-      dto.type === AgentOperationType.AssetAdjust ||
-      dto.type === AgentOperationType.AssetFlip
+    return [
+      AgentOperationType.AssetRotate,
+      AgentOperationType.AssetCrop,
+      AgentOperationType.AssetAdjust,
+      AgentOperationType.AssetFlip,
+    ].includes(dto.type)
       ? AgentOperationTargetKind.ImageEditBatch
       : AgentOperationTargetKind.AssetBatch;
   }
@@ -1107,7 +1109,7 @@ export class AgentOperationPlanService {
         ownerSpaceIds,
         SharedSpaceRole.Owner,
       );
-      const requestedWritableSpaceIds = new Set([...writableSpaceIds].filter((id) => ownerSpaceIds.has(id)));
+      const requestedWritableSpaceIds = writableSpaceIds.intersection(ownerSpaceIds);
       if (requestedWritableSpaceIds.size !== ownerSpaceIds.size) {
         throw new BadRequestException('One or more target spaces are not accessible');
       }
@@ -1129,7 +1131,7 @@ export class AgentOperationPlanService {
         editorSpaceIds,
         SharedSpaceRole.Editor,
       );
-      const requestedWritableSpaceIds = new Set([...writableSpaceIds].filter((id) => editorSpaceIds.has(id)));
+      const requestedWritableSpaceIds = writableSpaceIds.intersection(editorSpaceIds);
       if (requestedWritableSpaceIds.size !== editorSpaceIds.size) {
         throw new BadRequestException('One or more target spaces are not accessible');
       }
@@ -1165,7 +1167,7 @@ export class AgentOperationPlanService {
     );
     if (tagIds.size > 0) {
       const writableTagIds = await this.accessRepository.tag.checkOwnerAccess(auth.user.id, tagIds);
-      const requestedWritableTagIds = new Set([...writableTagIds].filter((id) => tagIds.has(id)));
+      const requestedWritableTagIds = writableTagIds.intersection(tagIds);
       if (requestedWritableTagIds.size !== tagIds.size) {
         throw new BadRequestException('One or more tags are not accessible');
       }
@@ -1506,28 +1508,28 @@ export class AgentOperationPlanService {
   }
 
   private isAssetBearingOperation(type: AgentOperationType) {
-    return (
-      type === AgentOperationType.AlbumAddAssets ||
-      type === AgentOperationType.AlbumRemoveAssets ||
-      type === AgentOperationType.AlbumSetCover ||
-      type === AgentOperationType.SpaceAddAssets ||
-      type === AgentOperationType.SpaceRemoveAssets ||
-      type === AgentOperationType.AssetRotate ||
-      type === AgentOperationType.AssetCrop ||
-      type === AgentOperationType.AssetAdjust ||
-      type === AgentOperationType.AssetFlip ||
-      type === AgentOperationType.AssetStack ||
-      type === AgentOperationType.AssetUnstack ||
-      type === AgentOperationType.AssetSetFavorite ||
-      type === AgentOperationType.AssetSetArchive ||
-      type === AgentOperationType.AssetSetVisibility ||
-      type === AgentOperationType.AssetUpdateMetadata ||
-      type === AgentOperationType.AssetAddTag ||
-      type === AgentOperationType.AssetRemoveTag ||
-      type === AgentOperationType.AssetTrash ||
-      type === AgentOperationType.AssetRestore ||
-      type === AgentOperationType.ShareLinkCreate
-    );
+    return [
+      AgentOperationType.AlbumAddAssets,
+      AgentOperationType.AlbumRemoveAssets,
+      AgentOperationType.AlbumSetCover,
+      AgentOperationType.SpaceAddAssets,
+      AgentOperationType.SpaceRemoveAssets,
+      AgentOperationType.AssetRotate,
+      AgentOperationType.AssetCrop,
+      AgentOperationType.AssetAdjust,
+      AgentOperationType.AssetFlip,
+      AgentOperationType.AssetStack,
+      AgentOperationType.AssetUnstack,
+      AgentOperationType.AssetSetFavorite,
+      AgentOperationType.AssetSetArchive,
+      AgentOperationType.AssetSetVisibility,
+      AgentOperationType.AssetUpdateMetadata,
+      AgentOperationType.AssetAddTag,
+      AgentOperationType.AssetRemoveTag,
+      AgentOperationType.AssetTrash,
+      AgentOperationType.AssetRestore,
+      AgentOperationType.ShareLinkCreate,
+    ].includes(type);
   }
 
   private async resolveAssetSourceAssetIds(
@@ -1590,7 +1592,7 @@ export class AgentOperationPlanService {
       throw new BadRequestException(unsupportedRequestReason);
     }
 
-    if ((mode === 'description' || mode === 'ocr' || mode === 'filename') && !assetSource.query?.trim()) {
+    if (['description', 'ocr', 'filename'].includes(mode) && !assetSource.query?.trim()) {
       throw new BadRequestException(`assetSource.search ${mode} mode requires query`);
     }
 
@@ -1810,8 +1812,8 @@ export class AgentOperationPlanService {
     id: string,
     selectionAudit: PlanningSelectionAudit,
     source?:
-      | { toolName: AgentToolName; sourceKind: 'previousSearch'; sourceRef: AgentSearchSourceRef }
-      | SelectionHandleResolutionContext,
+      | SelectionHandleResolutionContext
+      | { toolName: AgentToolName; sourceKind: 'previousSearch'; sourceRef: AgentSearchSourceRef },
   ) {
     const handle = await this.selectionHandleRepository.getValidForPlanning({
       id,
@@ -1835,7 +1837,7 @@ export class AgentOperationPlanService {
       id: handle.id,
       assetCount: handle.assetCount,
       sampleAssetIds: handle.sampleAssetIds,
-      ...(source && 'sourceRef' in source ? { sourceKind: source.sourceKind, sourceRef: source.sourceRef } : {}),
+      ...(source && 'sourceRef' in source && { sourceKind: source.sourceKind, sourceRef: source.sourceRef }),
     });
 
     return handle.assetIds;
@@ -1931,7 +1933,7 @@ export class AgentOperationPlanService {
       attemptedSelectionHandleId: id,
       looksLikeExamplePlaceholder: knownExampleSelectionHandleIds.has(id),
       availableSelectionHandles: availableSelectionHandles.map((handle) => this.toSelectionHandleRecoveryHint(handle)),
-      ...(expiredSelectionHandle ? { expiredSelectionHandle } : {}),
+      ...(expiredSelectionHandle && { expiredSelectionHandle }),
       instruction: `Retry ${context.toolName} with a valid same-session selection handle, or rerun searchAssets.`,
     };
     const error = 'Selection handle is expired or not available for this session';
@@ -2030,19 +2032,23 @@ export class AgentOperationPlanService {
     }
 
     if (
-      (type === AgentOperationType.AlbumAddUsers ||
-        type === AgentOperationType.AlbumRemoveUsers ||
-        type === AgentOperationType.AlbumUpdateUserRole) &&
+      [
+        AgentOperationType.AlbumAddUsers,
+        AgentOperationType.AlbumRemoveUsers,
+        AgentOperationType.AlbumUpdateUserRole,
+      ].includes(type) &&
       !writeScope.shareAlbums
     ) {
       throw new BadRequestException('Agent permission policy does not allow sharing albums');
     }
 
     if (
-      (type === AgentOperationType.AssetRotate ||
-        type === AgentOperationType.AssetCrop ||
-        type === AgentOperationType.AssetAdjust ||
-        type === AgentOperationType.AssetFlip) &&
+      [
+        AgentOperationType.AssetRotate,
+        AgentOperationType.AssetCrop,
+        AgentOperationType.AssetAdjust,
+        AgentOperationType.AssetFlip,
+      ].includes(type) &&
       !writeScope.editAssets
     ) {
       throw new BadRequestException('Agent permission policy does not allow editing assets');
@@ -3795,7 +3801,7 @@ export class AgentOperationPlanService {
           break;
         }
         case 'rating': {
-          if (value !== null && (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 5)) {
+          if (value !== null && (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1 || value > 5)) {
             throw invalidPayloadError();
           }
           updatePayload[key] = value;
@@ -3809,7 +3815,7 @@ export class AgentOperationPlanService {
           break;
         }
         case 'dateTimeRelative': {
-          if (typeof value !== 'number' || !Number.isInteger(value)) {
+          if (typeof value !== 'number' || !Number.isSafeInteger(value)) {
             throw invalidPayloadError();
           }
           updatePayload[key] = value;
@@ -4002,7 +4008,7 @@ export class AgentOperationPlanService {
         kind: AgentSessionActivityEventKind.PlanComposing,
         status,
         summary: options.summary,
-        ...(total === undefined ? {} : { counts: { total } }),
+        ...(total !== undefined && { counts: { total } }),
       });
     } catch {
       // Activity events are visibility hints and must not block planning.
@@ -4117,7 +4123,7 @@ export class AgentOperationPlanService {
         attemptedSourceRef: recovery.attemptedSourceRef,
         expectedSourceKind: recovery.expectedSourceKind,
         instruction: recovery.instruction,
-        ...(recovery.expiredSourceRef ? { expiredSourceRef: recovery.expiredSourceRef } : {}),
+        ...(recovery.expiredSourceRef && { expiredSourceRef: recovery.expiredSourceRef }),
       };
     }
 
@@ -4137,12 +4143,12 @@ export class AgentOperationPlanService {
 
       return {
         sourceKind: handle.sourceKind ?? 'selectionHandle',
-        ...(handle.id ? { selectionHandleId: handle.id } : {}),
-        ...(handle.sourceRef ? { sourceRef: handle.sourceRef } : {}),
+        ...(handle.id && { selectionHandleId: handle.id }),
+        ...(handle.sourceRef && { sourceRef: handle.sourceRef }),
         assetCount: handle.assetCount,
         sampleAssetCount: handle.sampleAssetIds.length,
-        ...(filterKeys?.length ? { filterKeys } : {}),
-        ...(resolvedFilterKeys?.length ? { resolvedFilterKeys } : {}),
+        ...(filterKeys?.length && { filterKeys }),
+        ...(resolvedFilterKeys?.length && { resolvedFilterKeys }),
       };
     });
   }
@@ -4287,7 +4293,7 @@ export class AgentOperationPlanService {
 
     if (
       Object.hasOwn(payload, 'rating') &&
-      (payload.rating === null || (typeof payload.rating === 'number' && Number.isInteger(payload.rating)))
+      (payload.rating === null || (typeof payload.rating === 'number' && Number.isSafeInteger(payload.rating)))
     ) {
       fields.push({
         key: 'rating',
@@ -4509,7 +4515,7 @@ export class AgentOperationPlanService {
       enabled: operation.enabled,
       status: operation.status,
       result: operation.result,
-      ...(reviewMetadata ? { reviewMetadata } : {}),
+      ...(reviewMetadata && { reviewMetadata }),
       error: operation.error,
       createdAt: operation.createdAt,
       updatedAt: operation.updatedAt,

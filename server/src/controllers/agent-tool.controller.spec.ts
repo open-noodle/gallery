@@ -106,9 +106,11 @@ describe(AgentToolController.name, () => {
     ['readSpace', AgentReadSpaceToolResponseDto, 'AgentReadSpaceToolResponseDto'],
     ['searchAgentUsers', AgentSearchUsersToolResponseDto, 'AgentSearchUsersToolResponseDto'],
   ] as const)('documents %s with its typed tool response DTO', (methodName, responseDto, schemaName) => {
+    // `Reflect.getMetadata` comes from the `reflect-metadata` polyfill NestJS decorators rely on, so it is
+    // intentionally a non-standard `Reflect` property here.
+    // eslint-disable-next-line unicorn/no-nonstandard-builtin-properties
     const responses = Reflect.getMetadata(DECORATORS.API_RESPONSE, AgentToolController.prototype[methodName]) as
-      | Record<number, { type?: unknown }>
-      | undefined;
+      Record<number, { type?: unknown }> | undefined;
 
     expect(responses?.[201]?.type).toBe(responseDto);
     expect(responseDto.name).toBe(schemaName);

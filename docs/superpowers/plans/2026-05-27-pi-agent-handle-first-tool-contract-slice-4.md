@@ -363,10 +363,7 @@ In `server/src/types/agent-tool.types.ts`, add:
 
 ```ts
 export type AgentCurateSelectionStrategy =
-  | 'metadata-highlights'
-  | 'date-spread'
-  | 'favorites-first'
-  | 'cover-candidate';
+  'metadata-highlights' | 'date-spread' | 'favorites-first' | 'cover-candidate';
 
 export type AgentCurateSelectionDiversifyBy = 'date' | 'location' | 'people' | 'tags';
 

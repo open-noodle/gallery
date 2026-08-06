@@ -293,7 +293,11 @@ describe(AgentMcpToolContractService.name, () => {
   });
 
   it('defines approved retry mode and example for every read tool', () => {
-    for (const contract of sut.listReadToolContracts().filter((c) => c.name !== AgentToolName.SearchAssets)) {
+    for (const contract of sut.listReadToolContracts()) {
+      if (contract.name === AgentToolName.SearchAssets) {
+        continue;
+      }
+
       expect(contract.argumentModes).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -1637,18 +1641,14 @@ describe(AgentMcpToolContractService.name, () => {
 
         expect(example, `${failureCase.id} should reference an existing example`).toBeTruthy();
 
-        if (failureCase.toolName! in AgentReadToolRequestSchemas) {
-          const schema = AgentReadToolRequestSchemas[failureCase.toolName as keyof typeof AgentReadToolRequestSchemas];
+        const schema =
+          failureCase.toolName! in AgentReadToolRequestSchemas
+            ? AgentReadToolRequestSchemas[failureCase.toolName as keyof typeof AgentReadToolRequestSchemas]
+            : AgentOperationPlanToolRequestSchemas[
+                failureCase.toolName as keyof typeof AgentOperationPlanToolRequestSchemas
+              ];
 
-          expect(schema.safeParse(example!.arguments).success, `${failureCase.id} example should parse`).toBe(true);
-        } else {
-          const schema =
-            AgentOperationPlanToolRequestSchemas[
-              failureCase.toolName as keyof typeof AgentOperationPlanToolRequestSchemas
-            ];
-
-          expect(schema.safeParse(example!.arguments).success, `${failureCase.id} example should parse`).toBe(true);
-        }
+        expect(schema.safeParse(example!.arguments).success, `${failureCase.id} example should parse`).toBe(true);
       }
     });
 

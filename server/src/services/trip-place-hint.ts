@@ -7,9 +7,7 @@ export interface TripPlaceHint {
 }
 
 export type TripPlaceHintParseResult =
-  | { status: 'none' }
-  | { status: 'invalid'; reason: 'too_long' }
-  | { status: 'valid'; hint: TripPlaceHint };
+  { status: 'none' } | { status: 'invalid'; reason: 'too_long' } | { status: 'valid'; hint: TripPlaceHint };
 
 type PlaceLike = {
   country?: string | null;
@@ -32,7 +30,7 @@ const COUNTRY_ALIAS_GROUPS = [UNITED_STATES_ALIASES];
 export const normalizeTripPlaceLabel = (value: string) => {
   return value
     .normalize('NFKD')
-    .replaceAll(/[\u0300-\u036F]/g, '')
+    .replaceAll(/[\u{300}-\u{36F}]/gu, '')
     .toLowerCase()
     .replaceAll('&', ' and ')
     .replaceAll(/[^a-z0-9]+/g, ' ')

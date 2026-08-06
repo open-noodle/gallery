@@ -95,6 +95,9 @@ beforeAll(async () => {
 
 describe(AgentSelectionHandleRepository.name, () => {
   it('registers getValidForPlanning SQL generation with one lookup object parameter', () => {
+    // `Reflect.getMetadata` comes from the `reflect-metadata` polyfill the `@GenerateSql` decorator relies on, so it
+    // is intentionally a non-standard `Reflect` property here.
+    // eslint-disable-next-line unicorn/no-nonstandard-builtin-properties
     const queries = Reflect.getMetadata(
       GENERATE_SQL_KEY,
       AgentSelectionHandleRepository.prototype.getValidForPlanning,

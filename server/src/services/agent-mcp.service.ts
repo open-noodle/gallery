@@ -95,6 +95,19 @@ export class AgentMcpService {
     AgentToolName.SummarizePlan,
   ]);
 
+  // Planning tools that accept a correction/retry round-trip. Deliberately excludes the
+  // two `*FromSelection` tools that `planningToolNames` above does contain.
+  private readonly planningCorrectionToolNames = new Set<AgentToolName>([
+    AgentToolName.ProposeAlbumOperations,
+    AgentToolName.ProposeAlbumFromSearch,
+    AgentToolName.ProposeAddAssetsToAlbumFromSearch,
+    AgentToolName.ProposeSpaceFromSearch,
+    AgentToolName.ProposeAddAssetsToSpaceFromSearch,
+    AgentToolName.ProposeAssetBatchFromSearch,
+    AgentToolName.ReviseProposedOperations,
+    AgentToolName.SummarizePlan,
+  ]);
+
   constructor(
     private readonly toolRegistry: AgentMcpToolRegistryService,
     private readonly toolContractService: AgentMcpToolContractService,
@@ -200,16 +213,7 @@ export class AgentMcpService {
   }
 
   private isPlanningCorrectionToolName(name: AgentToolName): name is AgentMcpPlanningToolName {
-    return (
-      name === AgentToolName.ProposeAlbumOperations ||
-      name === AgentToolName.ProposeAlbumFromSearch ||
-      name === AgentToolName.ProposeAddAssetsToAlbumFromSearch ||
-      name === AgentToolName.ProposeSpaceFromSearch ||
-      name === AgentToolName.ProposeAddAssetsToSpaceFromSearch ||
-      name === AgentToolName.ProposeAssetBatchFromSearch ||
-      name === AgentToolName.ReviseProposedOperations ||
-      name === AgentToolName.SummarizePlan
-    );
+    return this.planningCorrectionToolNames.has(name);
   }
 
   private async invokeTool<TDto>(
@@ -445,8 +449,8 @@ export class AgentMcpService {
 
     return {
       ...rest,
-      ...(redactedReviewMetadata === undefined ? {} : { reviewMetadata: redactedReviewMetadata }),
-      ...(Array.isArray(assetIds) ? { assetCount: assetIds.length } : {}),
+      ...(redactedReviewMetadata !== undefined && { reviewMetadata: redactedReviewMetadata }),
+      ...(Array.isArray(assetIds) && { assetCount: assetIds.length }),
       result: redactedResult,
     };
   }
@@ -467,9 +471,9 @@ export class AgentMcpService {
 
     return {
       ...rest,
-      ...(redactedReviewMetadata === undefined ? {} : { reviewMetadata: redactedReviewMetadata }),
-      ...(assetCount === undefined ? {} : { assetCount }),
-      ...(assetResultsCount === undefined ? {} : { assetResultsCount }),
+      ...(redactedReviewMetadata !== undefined && { reviewMetadata: redactedReviewMetadata }),
+      ...(assetCount !== undefined && { assetCount }),
+      ...(assetResultsCount !== undefined && { assetResultsCount }),
     };
   }
 
@@ -516,8 +520,8 @@ export class AgentMcpService {
 
     return {
       ...rest,
-      ...(Array.isArray(sampleAssetIds) ? { sampleAssetCount: sampleAssetIds.length } : {}),
-      ...(fields === undefined ? {} : { fields: redactedFields }),
+      ...(Array.isArray(sampleAssetIds) && { sampleAssetCount: sampleAssetIds.length }),
+      ...(fields !== undefined && { fields: redactedFields }),
     };
   }
 
@@ -757,11 +761,11 @@ export class AgentMcpService {
       issues: issues.map((issue) => ({
         path: issue.path,
         message: this.sanitizeIssueMessage(issue.message),
-        ...(correction?.hint && correction.issuePath === issue.path ? { hint: correction.hint } : {}),
+        ...(correction?.hint && correction.issuePath === issue.path && { hint: correction.hint }),
       })),
-      ...(correction?.expected ? { expected: correction.expected } : {}),
-      ...(correction?.hint ? { hint: correction.hint } : {}),
-      ...(correction?.exampleArguments ? { exampleArguments: correction.exampleArguments } : {}),
+      ...(correction?.expected && { expected: correction.expected }),
+      ...(correction?.hint && { hint: correction.hint }),
+      ...(correction?.exampleArguments && { exampleArguments: correction.exampleArguments }),
     };
 
     return {
@@ -802,7 +806,7 @@ export class AgentMcpService {
       error: {
         code,
         message,
-        ...(data === undefined ? {} : { data }),
+        ...(data !== undefined && { data }),
       },
     };
   }

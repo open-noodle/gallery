@@ -26,7 +26,7 @@ export class AgentRunnerTokenGuard implements CanActivate {
       throw new UnauthorizedException(INVALID_TOKEN);
     }
 
-    const [scheme, token, extra] = authorization.split(' ');
+    const [scheme, token, extra] = authorization.split(' ', 3);
     if (scheme !== 'Bearer' || !token || extra !== undefined) {
       throw new UnauthorizedException(INVALID_TOKEN);
     }

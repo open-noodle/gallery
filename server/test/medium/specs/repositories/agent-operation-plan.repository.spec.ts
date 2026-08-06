@@ -329,7 +329,7 @@ describe(AgentOperationPlanRepository.name, () => {
     ]);
 
     expect(replacements).toEqual([expect.any(Object), expect.any(Object)]);
-    expect(replacements.map((plan) => plan!.revision).toSorted()).toEqual([2, 3]);
+    expect(replacements.map((plan) => plan!.revision).toSorted((a, b) => a - b)).toEqual([2, 3]);
     await expect(sut.getNextRevision(session.id)).resolves.toBe(4);
   });
 

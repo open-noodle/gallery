@@ -62,7 +62,7 @@ describe('AgentMessage DTOs', () => {
     });
 
     it('rejects blank text after trim', () => {
-      const result = parseCreate({ content: { blocks: [{ type: 'text', text: '   ' }] } });
+      const result = parseCreate({ content: { blocks: [{ type: 'text', text: ' '.repeat(3) }] } });
 
       expectIssue(result, ['content', 'blocks', 0, 'text'], 'Too small');
     });

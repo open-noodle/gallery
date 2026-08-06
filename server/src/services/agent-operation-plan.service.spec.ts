@@ -6860,7 +6860,7 @@ describe(AgentOperationPlanService.name, () => {
       sut.applyApprovedOperations(auth, session.id, plan.id, {
         operationIds: [createOperation.id],
         fieldOverrides: {
-          [createOperation.id]: { albumName: '   ' },
+          [createOperation.id]: { albumName: ' '.repeat(3) },
         },
       }),
     ).rejects.toThrow('albumName must be 1-200 characters');

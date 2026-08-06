@@ -651,9 +651,7 @@ import {
 } from 'src/enum';
 
 export type AgentOperationPayload =
-  | { albumName: string; description?: string }
-  | { albumName?: string; description?: string }
-  | Record<string, never>;
+  { albumName: string; description?: string } | { albumName?: string; description?: string } | Record<string, never>;
 
 export type AgentOperationResult = {
   albumId?: string;

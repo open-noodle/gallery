@@ -80,7 +80,7 @@ void main() {
         'toolCall': toolCall,
       });
       expect(approvalRequired, isNotNull);
-      expect(approvalRequired!.status.value, 'approval-required');
+      expect(approvalRequired!.status.toJson(), 'approval-required');
       expect(approvalRequired.reason, isNull);
       expect(approvalRequired.selectionHandle, isNull);
       expect(approvalRequired.sample, isNull);
@@ -91,7 +91,7 @@ void main() {
         'toolCall': {...toolCall, 'status': 'denied'},
       });
       expect(denied, isNotNull);
-      expect(denied!.status.value, 'denied');
+      expect(denied!.status.toJson(), 'denied');
       expect(denied.reason, 'Too broad');
 
       final success = AgentSearchAssetsToolResponseDto.fromJson({
@@ -125,10 +125,10 @@ void main() {
         },
       });
       expect(success, isNotNull);
-      expect(success!.status.value, 'success');
+      expect(success!.status.toJson(), 'success');
       expect(success.reason, isNull);
       expect(success.summary, 'Created a selection handle for 1 asset');
-      expect(success.detail?.value, 'summary');
+      expect(success.detail?.toJson(), 'summary');
       expect(success.nextPage, isNull);
       expect(success.selectionHandle?.assetCount, 1);
       expect(success.sample?.items.first.itemRef, 'item:001');

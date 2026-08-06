@@ -106,7 +106,7 @@ export class AgentAssetSearchFilterResolverService {
       (request.cameraMakes?.length ?? 0) > 0 ||
       (request.cameraModels?.length ?? 0) > 0 ||
       (request.lensModels?.length ?? 0) > 0;
-    const resolverScope = { ...scope, ...(resolvedFilters.spaceId ? { spaceId: resolvedFilters.spaceId } : {}) };
+    const resolverScope = { ...scope, ...(resolvedFilters.spaceId && { spaceId: resolvedFilters.spaceId }) };
     const canUseRepositoryCandidates = this.canUseResolverRepositoryCandidates(session, resolverScope);
     const shouldLoadTimelineSpaceIds =
       !resolvedFilters.spaceId &&
@@ -120,7 +120,7 @@ export class AgentAssetSearchFilterResolverService {
     const timelineSpaceIds = timelineSpaceRows.map((row) => row.spaceId);
     const repositoryScope = resolvedFilters.spaceId
       ? { spaceId: resolvedFilters.spaceId }
-      : { ...scope, ...(shouldLoadTimelineSpaceIds ? { timelineSpaceIds } : {}) };
+      : { ...scope, ...(shouldLoadTimelineSpaceIds && { timelineSpaceIds }) };
     const needsSuggestions =
       (request.people?.length ?? 0) > 0 || (request.tags?.length ?? 0) > 0 || (request.cameraMakes?.length ?? 0) > 0;
     const suggestions =
@@ -186,7 +186,7 @@ export class AgentAssetSearchFilterResolverService {
       const models = canUseRepositoryCandidates
         ? await this.searchRepository.getCameraModels([auth.user.id], {
             ...repositoryScope,
-            ...(resolvedFilters.make ? { make: resolvedFilters.make } : {}),
+            ...(resolvedFilters.make && { make: resolvedFilters.make }),
           })
         : [];
       for (const query of request.cameraModels) {
@@ -208,8 +208,8 @@ export class AgentAssetSearchFilterResolverService {
       const lensModels = canUseRepositoryCandidates
         ? await this.searchRepository.getCameraLensModels([auth.user.id], {
             ...repositoryScope,
-            ...(resolvedFilters.make ? { make: resolvedFilters.make } : {}),
-            ...(resolvedFilters.model ? { model: resolvedFilters.model } : {}),
+            ...(resolvedFilters.make && { make: resolvedFilters.make }),
+            ...(resolvedFilters.model && { model: resolvedFilters.model }),
           })
         : [];
       for (const query of request.lensModels) {
@@ -349,17 +349,17 @@ export class AgentAssetSearchFilterResolverService {
     filters: AgentDeclarativeAssetFilters,
   ): AgentResolveAssetSearchFiltersToolRequestDto | null {
     const request: AgentResolveAssetSearchFiltersToolRequestDto = {
-      ...(filters.people ? { people: filters.people.names } : {}),
-      ...(filters.tags ? { tags: filters.tags.names } : {}),
-      ...(filters.albums ? { albums: filters.albums.names } : {}),
-      ...(filters.space ? { spaces: [filters.space.name] } : {}),
-      ...(filters.camera?.make ? { cameraMakes: [filters.camera.make] } : {}),
-      ...(filters.camera?.model ? { cameraModels: [filters.camera.model] } : {}),
-      ...(filters.camera?.lensModel ? { lensModels: [filters.camera.lensModel] } : {}),
+      ...(filters.people && { people: filters.people.names }),
+      ...(filters.tags && { tags: filters.tags.names }),
+      ...(filters.albums && { albums: filters.albums.names }),
+      ...(filters.space && { spaces: [filters.space.name] }),
+      ...(filters.camera?.make && { cameraMakes: [filters.camera.make] }),
+      ...(filters.camera?.model && { cameraModels: [filters.camera.model] }),
+      ...(filters.camera?.lensModel && { lensModels: [filters.camera.lensModel] }),
       scope: {
-        ...(filters.withSharedSpaces === undefined ? {} : { withSharedSpaces: filters.withSharedSpaces }),
-        ...(filters.takenAfter ? { takenAfter: new Date(filters.takenAfter) } : {}),
-        ...(filters.takenBefore ? { takenBefore: new Date(filters.takenBefore) } : {}),
+        ...(filters.withSharedSpaces !== undefined && { withSharedSpaces: filters.withSharedSpaces }),
+        ...(filters.takenAfter && { takenAfter: new Date(filters.takenAfter) }),
+        ...(filters.takenBefore && { takenBefore: new Date(filters.takenBefore) }),
       },
     };
     const hasResolverField =
@@ -585,7 +585,7 @@ export class AgentAssetSearchFilterResolverService {
     if (exactMatches.length === 1) {
       const candidate = exactMatches[0];
       return {
-        ...(selected ? { selectionReplay: 'fallback' as const } : {}),
+        ...(selected && { selectionReplay: 'fallback' as const }),
         result: {
           kind,
           query,
@@ -601,7 +601,7 @@ export class AgentAssetSearchFilterResolverService {
 
     if (exactMatches.length > 1) {
       return {
-        ...(selected ? { selectionReplay: 'fallback' as const } : {}),
+        ...(selected && { selectionReplay: 'fallback' as const }),
         result: {
           kind,
           query,
@@ -613,7 +613,7 @@ export class AgentAssetSearchFilterResolverService {
     }
 
     return {
-      ...(selected ? { selectionReplay: 'fallback' as const } : {}),
+      ...(selected && { selectionReplay: 'fallback' as const }),
       result: {
         kind,
         query,
@@ -705,10 +705,8 @@ export class AgentAssetSearchFilterResolverService {
     query?: string,
   ): AgentResolvedAssetSearchFilterChoice {
     return {
-      ...(candidate.id ? { id: candidate.id } : {}),
-      ...(sessionId && query
-        ? { choiceRef: this.buildChoiceRef(sessionId, kind, query, candidate, searchFilter) }
-        : {}),
+      ...(candidate.id && { id: candidate.id }),
+      ...(sessionId && query && { choiceRef: this.buildChoiceRef(sessionId, kind, query, candidate, searchFilter) }),
       value: candidate.value,
       label: candidate.value,
       searchFilter,

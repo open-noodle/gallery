@@ -1890,11 +1890,9 @@ describe(AgentRunnerService.name, () => {
     const content: AgentMessageContent = { blocks: [{ type: 'text', text: 'Organize my photos.' }] };
     const assistantContent: AgentMessageContent = { blocks: [{ type: 'text', text: 'Done.' }] };
     const assistantMessage = makeAssistantMessage({ sessionId, content: assistantContent });
-    let finishStream!: () => void;
+    const { promise: streamGate, resolve: finishStream } = Promise.withResolvers<void>();
     async function* controlledStream(): AsyncGenerator<AgentRunnerStreamEvent> {
-      await new Promise<void>((resolve) => {
-        finishStream = resolve;
-      });
+      await streamGate;
       yield {
         type: 'assistant-message-completed',
         sessionId,
@@ -1932,7 +1930,7 @@ describe(AgentRunnerService.name, () => {
   it('waits for an active message dispatch before resuming after tool approval', async () => {
     const sessionId = '00000000-0000-4000-8000-000000000100';
     const runnerSessionId = 'runner-session-1';
-    let releaseMessageStream: (() => void) | undefined;
+    const { promise: messageStreamGate, resolve: releaseMessageStream } = Promise.withResolvers<void>();
     const assistantContent: AgentMessageContent = { blocks: [{ type: 'text', text: 'Continued.' }] };
 
     configRepository.getEnv.mockReturnValue({
@@ -1944,9 +1942,7 @@ describe(AgentRunnerService.name, () => {
     } as never);
     agentRunnerRepository.streamMessage.mockReturnValue(
       (async function* () {
-        await new Promise<void>((resolve) => {
-          releaseMessageStream = resolve;
-        });
+        await messageStreamGate;
         yield {
           type: 'tool-approval-needed',
           sessionId,
@@ -1994,7 +1990,7 @@ describe(AgentRunnerService.name, () => {
     await Promise.resolve();
     expect(agentRunnerRepository.streamResume).not.toHaveBeenCalled();
 
-    releaseMessageStream?.();
+    releaseMessageStream();
     await activeSend;
     await resume;
 
@@ -2171,19 +2167,16 @@ describe(AgentRunnerService.name, () => {
       },
     } as never);
 
-    let resolveProbe: (value: Awaited<ReturnType<AgentRunnerRepository['getStatus']>>) => void;
-    agentRunnerRepository.getStatus.mockReturnValue(
-      new Promise((resolve) => {
-        resolveProbe = resolve;
-      }),
-    );
+    const { promise: probe, resolve: resolveProbe } =
+      Promise.withResolvers<Awaited<ReturnType<AgentRunnerRepository['getStatus']>>>();
+    agentRunnerRepository.getStatus.mockReturnValue(probe);
 
     const first = sut.getStatus();
     const second = sut.getStatus();
 
     expect(agentRunnerRepository.getStatus).toHaveBeenCalledTimes(1);
 
-    resolveProbe!({
+    resolveProbe({
       healthy: true,
       reason: 'healthy',
       version: null,
@@ -2227,19 +2220,11 @@ describe(AgentRunnerService.name, () => {
         },
       } as never);
 
-    let resolveFirst: (value: Awaited<ReturnType<AgentRunnerRepository['getStatus']>>) => void;
-    let resolveSecond: (value: Awaited<ReturnType<AgentRunnerRepository['getStatus']>>) => void;
-    agentRunnerRepository.getStatus
-      .mockReturnValueOnce(
-        new Promise((resolve) => {
-          resolveFirst = resolve;
-        }),
-      )
-      .mockReturnValueOnce(
-        new Promise((resolve) => {
-          resolveSecond = resolve;
-        }),
-      );
+    const { promise: firstProbe, resolve: resolveFirst } =
+      Promise.withResolvers<Awaited<ReturnType<AgentRunnerRepository['getStatus']>>>();
+    const { promise: secondProbe, resolve: resolveSecond } =
+      Promise.withResolvers<Awaited<ReturnType<AgentRunnerRepository['getStatus']>>>();
+    agentRunnerRepository.getStatus.mockReturnValueOnce(firstProbe).mockReturnValueOnce(secondProbe);
 
     const first = sut.getStatus();
     const second = sut.getStatus();
@@ -2254,13 +2239,13 @@ describe(AgentRunnerService.name, () => {
       timeoutMs: 5000,
     });
 
-    resolveFirst!({
+    resolveFirst({
       healthy: true,
       reason: 'healthy',
       version: 'a',
       capabilities: { protocolVersion: null, streaming: false, tools: [], models: [] },
     });
-    resolveSecond!({
+    resolveSecond({
       healthy: true,
       reason: 'healthy',
       version: 'b',
@@ -2295,19 +2280,11 @@ describe(AgentRunnerService.name, () => {
         },
       } as never);
 
-    let resolveFirst: (value: Awaited<ReturnType<AgentRunnerRepository['getStatus']>>) => void;
-    let resolveSecond: (value: Awaited<ReturnType<AgentRunnerRepository['getStatus']>>) => void;
-    agentRunnerRepository.getStatus
-      .mockReturnValueOnce(
-        new Promise((resolve) => {
-          resolveFirst = resolve;
-        }),
-      )
-      .mockReturnValueOnce(
-        new Promise((resolve) => {
-          resolveSecond = resolve;
-        }),
-      );
+    const { promise: firstProbe, resolve: resolveFirst } =
+      Promise.withResolvers<Awaited<ReturnType<AgentRunnerRepository['getStatus']>>>();
+    const { promise: secondProbe, resolve: resolveSecond } =
+      Promise.withResolvers<Awaited<ReturnType<AgentRunnerRepository['getStatus']>>>();
+    agentRunnerRepository.getStatus.mockReturnValueOnce(firstProbe).mockReturnValueOnce(secondProbe);
 
     const first = sut.getStatus();
     const second = sut.getStatus();
@@ -2315,13 +2292,13 @@ describe(AgentRunnerService.name, () => {
 
     expect(agentRunnerRepository.getStatus).toHaveBeenCalledTimes(2);
 
-    resolveFirst!({
+    resolveFirst({
       healthy: true,
       reason: 'healthy',
       version: 'a',
       capabilities: { protocolVersion: null, streaming: false, tools: [], models: [] },
     });
-    resolveSecond!({
+    resolveSecond({
       healthy: true,
       reason: 'healthy',
       version: 'b',

@@ -1629,39 +1629,21 @@ export class AssetRepository {
         scope.owned && scope.sharedSpaces
           ? eb.or([
               eb('asset.ownerId', '=', userId),
-              eb.exists(
-                eb
-                  .selectFrom('shared_space_asset')
-                  .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
-                  .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-                  .where('shared_space_member.userId', '=', userId),
-              ),
-              eb.exists(
-                eb
-                  .selectFrom('shared_space_library')
-                  .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_library.spaceId')
-                  .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                  .where('shared_space_member.userId', '=', userId),
-              ),
+              ...spaceAssetPathBranches(eb, {
+                correlateAssetId: 'asset.id',
+                correlateLibraryId: 'asset.libraryId',
+                scope: { memberUserId: userId },
+              }),
             ])
           : scope.owned
             ? eb('asset.ownerId', '=', userId)
-            : eb.or([
-                eb.exists(
-                  eb
-                    .selectFrom('shared_space_asset')
-                    .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
-                    .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-                    .where('shared_space_member.userId', '=', userId),
-                ),
-                eb.exists(
-                  eb
-                    .selectFrom('shared_space_library')
-                    .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_library.spaceId')
-                    .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                    .where('shared_space_member.userId', '=', userId),
-                ),
-              ]),
+            : eb.or(
+                spaceAssetPathBranches(eb, {
+                  correlateAssetId: 'asset.id',
+                  correlateLibraryId: 'asset.libraryId',
+                  scope: { memberUserId: userId },
+                }),
+              ),
       )
       .$if(filters.takenAfter !== undefined, (qb) => qb.where('asset.localDateTime', '>=', filters.takenAfter!))
       .$if(filters.takenBefore !== undefined, (qb) => qb.where('asset.localDateTime', '<=', filters.takenBefore!))

@@ -169,7 +169,7 @@ describe('Agent asset source DTOs', () => {
 
   it('rejects empty, whitespace, and raw UUID source refs', () => {
     const empty = AgentSourceRefSchema.safeParse('');
-    const whitespace = AgentSourceRefSchema.safeParse('   ');
+    const whitespace = AgentSourceRefSchema.safeParse(' '.repeat(3));
     const rawUuid = AgentSourceRefSchema.safeParse(factory.uuid());
 
     expect(empty.success).toBe(false);
@@ -203,7 +203,7 @@ describe('Agent asset source DTOs', () => {
     const result = AgentDeclarativeAssetFiltersSchema.safeParse({
       people: { match: 'any', names: [] },
       tags: { match: 'any', names: [''] },
-      albums: { match: 'any', names: ['   '] },
+      albums: { match: 'any', names: [' '.repeat(3)] },
     });
 
     expect(result.success).toBe(false);

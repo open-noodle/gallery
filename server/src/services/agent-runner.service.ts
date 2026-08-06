@@ -26,7 +26,7 @@ import {
 const RUNNER_STATUS_CACHE_MS = 15_000;
 
 const buildMcpSessionUrl = (mcpGatewayBaseUrl: string, sessionId: string) =>
-  new URL(`sessions/${encodeURIComponent(sessionId)}`, `${mcpGatewayBaseUrl.replace(/\/+$/, '')}/`).toString();
+  new URL(`sessions/${encodeURIComponent(sessionId)}`, `${mcpGatewayBaseUrl.replace(/\/+$/, '')}/`).href;
 
 class RunnerReportedError extends Error {}
 
@@ -315,7 +315,7 @@ export class AgentRunnerService {
             gallerySessionId: sessionId,
             messageId,
             content,
-            ...(workflowState === undefined ? {} : { workflowState }),
+            ...(workflowState !== undefined && { workflowState }),
           },
         }),
         emptyStreamMessage: 'Agent runner message stream ended before completion',
@@ -357,10 +357,10 @@ export class AgentRunnerService {
       ]);
       const body = {
         gallerySessionId: sessionId,
-        ...(toolCallId ? { toolCallId } : {}),
-        ...(approvalDecision ? { approvalDecision } : {}),
-        ...(toolResult === undefined ? {} : { toolResult }),
-        ...(workflowState === undefined ? {} : { workflowState }),
+        ...(toolCallId && { toolCallId }),
+        ...(approvalDecision && { approvalDecision }),
+        ...(toolResult !== undefined && { toolResult }),
+        ...(workflowState !== undefined && { workflowState }),
       };
 
       const activityContext = {

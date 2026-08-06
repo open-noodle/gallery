@@ -44,7 +44,7 @@ export const AgentChoiceRefSchema = z
   .regex(/^choice:(person|tag|album|space|cameraMake|cameraModel|lensModel):[A-Za-z0-9_-]{8,120}$/, {
     message: 'choiceRef must use the choice:<kind>:<token> format',
   })
-  .refine((choiceRef) => !uuidPattern.test(choiceRef.split(':')[2] ?? ''), {
+  .refine((choiceRef) => !uuidPattern.test(choiceRef.split(':', 3)[2] ?? ''), {
     message: 'choiceRef token must not be a UUID',
   })
   .meta({ id: 'AgentChoiceRef' });

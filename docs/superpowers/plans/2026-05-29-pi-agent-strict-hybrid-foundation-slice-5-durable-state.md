@@ -118,9 +118,7 @@ Expected: PASS.
 ```js
 it('rehydrates pending workflow state after a simulated runtime restart', async () => {
   const { sdk, ai } = createFakeDependencies({
-    mcpToolNames: [
-      /* trip tools */
-    ],
+    mcpToolNames: [/* trip tools */],
   });
   const { fetchImplementation } = createStrictWorkflowFetch({
     recommendation: { action: 'ask_user' },
@@ -151,9 +149,7 @@ it('rehydrates pending workflow state after a simulated runtime restart', async 
 
 it('rehydrates approval-pending state so resume works on a cold runtime', async () => {
   const { sdk, ai } = createFakeDependencies({
-    mcpToolNames: [
-      /* trip tools */
-    ],
+    mcpToolNames: [/* trip tools */],
   });
   const approvalFetch = createStrictWorkflowFetch({
     planResponse: { status: 'approval-required', toolCall: { id: '00000000-0000-4000-8000-000000000999' } },

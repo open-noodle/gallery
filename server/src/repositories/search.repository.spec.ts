@@ -774,13 +774,19 @@ describe(SearchRepository.name, () => {
     });
   });
 
+  // inAlbums wraps the member rows in an aliased subquery, so the all-match HAVING is emitted
+  // against a qualified column ("album_members"."albumId"). Keep the qualifier optional rather
+  // than pinning the alias — an unqualified regex silently matches nothing and turns the
+  // any-match `not.toMatch` below into an assertion that can never fail.
+  const ALL_MATCH_HAVING = /having\s+count\(distinct\s+(?:"\w+"\.)?"albumId"\)/i;
+
   describe('searchAssetBuilder album match semantics', () => {
     it('keeps albumIds as all-match by default', () => {
       const sql = buildAssetSearchSql({
         albumIds: ['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'],
       });
 
-      expect(sql).toMatch(/having\s+count\(distinct\s+"albumId"\)/i);
+      expect(sql).toMatch(ALL_MATCH_HAVING);
     });
 
     it('uses any-match album filtering when albumMatchAny is true', () => {
@@ -790,7 +796,7 @@ describe(SearchRepository.name, () => {
       });
 
       expect(sql).toMatch(/"albumId"\s*=\s*any\(\$\d+::uuid\[\]\)/i);
-      expect(sql).not.toMatch(/having\s+count\(distinct\s+"albumId"\)/i);
+      expect(sql).not.toMatch(ALL_MATCH_HAVING);
     });
   });
 

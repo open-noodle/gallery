@@ -233,10 +233,12 @@ const providerBoundaryAdjustedPlanningRequest = <T extends { id: string; request
   const args = request.params?.arguments;
   const operations = args && typeof args === 'object' && Array.isArray(args.operations) ? args.operations : [];
   for (const operation of operations) {
-    if (operation && typeof operation === 'object' && Array.isArray(operation.assetIds)) {
-      delete operation.assetIds;
-      operation.assetSelectionHandleId = '00000000-0000-4000-8000-000000000901';
+    if (!(operation && typeof operation === 'object' && Array.isArray(operation.assetIds))) {
+      continue;
     }
+
+    delete operation.assetIds;
+    operation.assetSelectionHandleId = '00000000-0000-4000-8000-000000000901';
   }
 
   return request;
@@ -1662,9 +1664,11 @@ describe(AgentMcpService.name, () => {
     });
 
     it('adds correction fields for every read-tool failure matrix case', async () => {
-      for (const failureCase of contractService
-        .listSlice1RuntimeFailureMatrixCases()
-        .filter((candidate) => candidate.expectedResult.kind === 'tool-validation')) {
+      for (const failureCase of contractService.listSlice1RuntimeFailureMatrixCases()) {
+        if (failureCase.expectedResult.kind !== 'tool-validation') {
+          continue;
+        }
+
         const response = (await sut.handle(auth, sessionId, failureCase.request)) as AgentMcpSuccessResponse;
         const result = response.result as AgentMcpToolCallResult;
         const structuredContent = result.structuredContent as Record<string, unknown>;

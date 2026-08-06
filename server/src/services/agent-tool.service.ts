@@ -797,8 +797,8 @@ export class AgentToolService {
         `Find trip candidates${request.placeHint ? ` matching ${request.placeHint}` : ''} (lookback ${request.lookbackDays ?? 180} days, max ${request.maxCandidates ?? 3})`,
       requestMetadata: (request) =>
         ({
-          ...(request.placeHint ? { placeHint: request.placeHint } : {}),
-          ...(request.targetDate ? { targetDate: request.targetDate } : {}),
+          ...(request.placeHint && { placeHint: request.placeHint }),
+          ...(request.targetDate && { targetDate: request.targetDate }),
           lookbackDays: request.lookbackDays ?? 180,
           maxCandidates: request.maxCandidates ?? 3,
         }) as AgentToolFindTripCandidatesRequestMetadata,
@@ -1019,10 +1019,10 @@ export class AgentToolService {
           page: request.page ?? 1,
           detail: request.detail ?? 'handle',
           fields: request.fields ?? [],
-          ...(request.createSelectionHandle ? { createSelectionHandle: true } : {}),
-          ...(request.sampleSize === undefined ? {} : { sampleSize: request.sampleSize }),
-          ...(mode === 'smart' && request.order === undefined ? {} : { order: request.order ?? 'desc' }),
-          ...(request.query === undefined ? {} : { query: request.query }),
+          ...(request.createSelectionHandle && { createSelectionHandle: true }),
+          ...(request.sampleSize !== undefined && { sampleSize: request.sampleSize }),
+          ...(!(mode === 'smart' && request.order === undefined) && { order: request.order ?? 'desc' }),
+          ...(request.query !== undefined && { query: request.query }),
         } as AgentToolSearchAssetsRequestMetadata;
       },
       requestedAssetCount: (request) => this.getSearchLimit(request),
@@ -1103,7 +1103,7 @@ export class AgentToolService {
           return {
             ...pageResult,
             summary,
-            ...(sample ? { sample } : {}),
+            ...(sample && { sample }),
           };
         }
 
@@ -1117,7 +1117,7 @@ export class AgentToolService {
         return {
           ...pageResult,
           summary,
-          ...(sample ? { sample } : {}),
+          ...(sample && { sample }),
         };
       },
       responseSummary: (result) => result.summary,
@@ -1216,7 +1216,7 @@ export class AgentToolService {
       attemptedSelectionHandleId: id,
       looksLikeExamplePlaceholder: knownExampleSelectionHandleIds.has(id),
       availableSelectionHandles: available,
-      ...(expiredSelectionHandle ? { expiredSelectionHandle } : {}),
+      ...(expiredSelectionHandle && { expiredSelectionHandle }),
       instruction: 'Retry readSelectionMetadata with a valid same-session selectionHandle.id, or rerun searchAssets.',
     };
 
@@ -1260,8 +1260,8 @@ export class AgentToolService {
     return {
       itemRef: `item:${String(index + 1).padStart(3, '0')}`,
       ...rest,
-      ...(originalFileName && !this.containsUuidLikeValue(originalFileName) ? { originalFileName } : {}),
-      ...(tags ? { tags: tags.map(({ value, color }) => ({ value, color })) } : {}),
+      ...(originalFileName && !this.containsUuidLikeValue(originalFileName) && { originalFileName }),
+      ...(tags && { tags: tags.map(({ value, color }) => ({ value, color })) }),
     };
   }
 
@@ -1452,7 +1452,7 @@ export class AgentToolService {
       groups.set(key, [...(groups.get(key) ?? []), candidate]);
     }
 
-    const groupQueues = [...groups.entries()]
+    const groupQueues = [...groups]
       .map(([key, group]) => ({ key, group: this.sortCurateCandidates(group) }))
       .toSorted((left, right) => {
         if (groupOrder === 'key-desc') {
@@ -1518,14 +1518,14 @@ export class AgentToolService {
       requestSummary: (request) => `Resolve asset search filters (${this.getResolverTermCount(request)} term(s))`,
       requestMetadata: (request) =>
         ({
-          ...(request.people === undefined ? {} : { people: request.people }),
-          ...(request.tags === undefined ? {} : { tags: request.tags }),
-          ...(request.albums === undefined ? {} : { albums: request.albums }),
-          ...(request.spaces === undefined ? {} : { spaces: request.spaces }),
-          ...(request.cameraMakes === undefined ? {} : { cameraMakes: request.cameraMakes }),
-          ...(request.cameraModels === undefined ? {} : { cameraModels: request.cameraModels }),
-          ...(request.lensModels === undefined ? {} : { lensModels: request.lensModels }),
-          ...(request.scope === undefined ? {} : { scope: request.scope }),
+          ...(request.people !== undefined && { people: request.people }),
+          ...(request.tags !== undefined && { tags: request.tags }),
+          ...(request.albums !== undefined && { albums: request.albums }),
+          ...(request.spaces !== undefined && { spaces: request.spaces }),
+          ...(request.cameraMakes !== undefined && { cameraMakes: request.cameraMakes }),
+          ...(request.cameraModels !== undefined && { cameraModels: request.cameraModels }),
+          ...(request.lensModels !== undefined && { lensModels: request.lensModels }),
+          ...(request.scope !== undefined && { scope: request.scope }),
         }) as AgentToolResolveAssetSearchFiltersRequestMetadata,
       requestedAssetCount: () => 0,
       requestedAlbumCount: () => 0,
@@ -1538,13 +1538,11 @@ export class AgentToolService {
       responseSummary: (result) =>
         `Resolved ${result.results.filter((item) => item.status === 'matched').length} search filter(s)`,
       responseMetadata: (result) => ({
-        ...(result.resolvedFilters.tagIds?.length ? { tagIds: result.resolvedFilters.tagIds } : {}),
-        ...(result.resolvedFilters.albumIds?.length ? { albumIds: result.resolvedFilters.albumIds } : {}),
-        ...(result.resolvedFilters.spaceId ? { spaceIds: [result.resolvedFilters.spaceId] } : {}),
-        ...(result.resolvedFilters.personIds?.length ? { personIds: result.resolvedFilters.personIds } : {}),
-        ...(result.resolvedFilters.spacePersonIds?.length
-          ? { spacePersonIds: result.resolvedFilters.spacePersonIds }
-          : {}),
+        ...(result.resolvedFilters.tagIds?.length && { tagIds: result.resolvedFilters.tagIds }),
+        ...(result.resolvedFilters.albumIds?.length && { albumIds: result.resolvedFilters.albumIds }),
+        ...(result.resolvedFilters.spaceId && { spaceIds: [result.resolvedFilters.spaceId] }),
+        ...(result.resolvedFilters.personIds?.length && { personIds: result.resolvedFilters.personIds }),
+        ...(result.resolvedFilters.spacePersonIds?.length && { spacePersonIds: result.resolvedFilters.spacePersonIds }),
       }),
       resultAssetCount: () => 0,
       resultAlbumCount: () => 0,
@@ -1611,7 +1609,7 @@ export class AgentToolService {
         seen.set(key, row);
       }
     }
-    const distinct = [...seen.values()];
+    const distinct = seen.values().toArray();
 
     const best = distinct[0];
     if (best.similarity < 0.3) {
@@ -1760,7 +1758,7 @@ export class AgentToolService {
           selectionHandleId: request.selectionHandleId ?? '',
           targetCount: request.targetCount ?? 0,
           strategy: request.strategy ?? 'metadata-highlights',
-          ...(request.criteria ? { criteria: request.criteria } : {}),
+          ...(request.criteria && { criteria: request.criteria }),
           constraints: request.constraints ?? {},
           sampleSize: request.sampleSize ?? 10,
         }) as AgentToolCurateSelectionRequestMetadata,
@@ -1847,8 +1845,8 @@ export class AgentToolService {
           sourceAssetCount: handle.assetCount,
           selectedAssetCount: selectedIds.length,
           criteriaSummary,
-          ...(warnings.length > 0 ? { warnings } : {}),
-          ...(sample ? { sample } : {}),
+          ...(warnings.length > 0 && { warnings }),
+          ...(sample && { sample }),
         };
       },
       responseSummary: (result) => result.summary,
@@ -1922,7 +1920,7 @@ export class AgentToolService {
           selectionHandle: this.mapSearchSelectionHandle(handle),
           fields,
           counts: { assets: handle.assetCount, sampled },
-          ...(sample ? { sample } : {}),
+          ...(sample && { sample }),
         };
       },
       responseSummary: (result) => result.summary,
@@ -1992,7 +1990,7 @@ export class AgentToolService {
 
         return {
           summary: this.getReadAssetMetadataResponseSummary(detail ?? 'custom', assets.length),
-          ...(detail ? { detail } : {}),
+          ...(detail && { detail }),
           fields,
           assets: assets.map((asset) => this.mapSelectedAssetMetadata(asset, fields)),
         };
@@ -2263,18 +2261,16 @@ export class AgentToolService {
         const sharpnessById = new Map(qualityRows.map((r) => [r.assetId, r.sharpness]));
         const groups: AgentDuplicateGroup[] = slicedRows.map(({ duplicateId, assets }) => ({
           duplicateId,
-          assets: assets.map(
-            (asset): AgentDuplicateAsset => ({
-              id: asset.id,
-              originalFileName: asset.originalFileName,
-              fileCreatedAt: asset.fileCreatedAt,
-              isFavorite: asset.isFavorite,
-              rating: asset.exifInfo?.rating ?? null,
-              width: asset.exifInfo?.exifImageWidth ?? null,
-              height: asset.exifInfo?.exifImageHeight ?? null,
-              sharpness: sharpnessById.get(asset.id) ?? null,
-            }),
-          ),
+          assets: assets.map((asset): AgentDuplicateAsset => ({
+            id: asset.id,
+            originalFileName: asset.originalFileName,
+            fileCreatedAt: asset.fileCreatedAt,
+            isFavorite: asset.isFavorite,
+            rating: asset.exifInfo?.rating ?? null,
+            width: asset.exifInfo?.exifImageWidth ?? null,
+            height: asset.exifInfo?.exifImageHeight ?? null,
+            sharpness: sharpnessById.get(asset.id) ?? null,
+          })),
         }));
         return { groups };
       },
@@ -3680,7 +3676,7 @@ export class AgentToolService {
       startedAt: toolCall.startedAt,
       completedAt: toolCall.completedAt,
       error: toolCall.error,
-      ...(resultSize ? { resultSize } : {}),
+      ...(resultSize && { resultSize }),
     };
   }
 

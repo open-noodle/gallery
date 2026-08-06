@@ -391,6 +391,11 @@ const VIS_ALLOWLIST: Record<string, string> = {
   // which was never gate-scanned before this arm's shared_space_album reference existed).
   'database.ts::inAlbums':
     'live-link EXISTS(shared_space_album) correlated on albumId+spaceId; link-existence check, no asset content (Task 9)',
+  // Same arm as inAlbums above, mirrored into the any-match sibling so the agent's
+  // albumMatchAny filter does not silently drop cross-owner contributions that
+  // all-match includes. Identical reasoning: link-existence only, no asset content.
+  'database.ts::inAnyAlbum':
+    'live-link EXISTS(shared_space_album) correlated on albumId+spaceId; link-existence check, no asset content (Task 9)',
 };
 
 const VIS_WINDOW = 50;

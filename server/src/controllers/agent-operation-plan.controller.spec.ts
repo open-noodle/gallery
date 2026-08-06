@@ -96,6 +96,7 @@ describe(AgentOperationPlanController.name, () => {
     ['summarizePlan', AgentOperationPlanToolResponseDto, 'AgentOperationPlanToolResponseDto', 201],
     ['applyApprovedOperations', AgentOperationPlanApplyResponseDto, 'AgentOperationPlanApplyResponseDto', 201],
   ] as const)('documents %s with a typed response DTO', (methodName, responseDto, schemaName, statusCode) => {
+    // eslint-disable-next-line unicorn/no-nonstandard-builtin-properties -- reflect-metadata adds Reflect.getMetadata
     const responses = Reflect.getMetadata(
       DECORATORS.API_RESPONSE,
       AgentOperationPlanController.prototype[methodName],
@@ -106,6 +107,7 @@ describe(AgentOperationPlanController.name, () => {
   });
 
   it('documents getCurrentOperationPlan as a nullable plan response', () => {
+    // eslint-disable-next-line unicorn/no-nonstandard-builtin-properties -- reflect-metadata adds Reflect.getMetadata
     const responses = Reflect.getMetadata(
       DECORATORS.API_RESPONSE,
       AgentOperationPlanController.prototype.getCurrentOperationPlan,
@@ -120,6 +122,7 @@ describe(AgentOperationPlanController.name, () => {
   });
 
   it('documents getAppliedOperationPlans as a typed plan array response', () => {
+    // eslint-disable-next-line unicorn/no-nonstandard-builtin-properties -- reflect-metadata adds Reflect.getMetadata
     const responses = Reflect.getMetadata(
       DECORATORS.API_RESPONSE,
       AgentOperationPlanController.prototype.getAppliedOperationPlans,

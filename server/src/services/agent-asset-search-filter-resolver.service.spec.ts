@@ -601,24 +601,25 @@ describe(AgentAssetSearchFilterResolverService.name, () => {
     sharedSpaceRepository.getAllByUserId.mockResolvedValue([{ id: spaceId, name: 'Family' }] as never);
     searchRepository.getFilterSuggestions.mockImplementation((_userIds, scope) =>
       Promise.resolve(
-        scope?.spaceId === spaceId
-          ? filterSuggestions({
-              people: [
-                {
-                  id: newUuid(),
-                  name: 'Pierre',
-                  primaryProfile: { type: 'space-person', id: firstSpacePersonId, spaceId },
-                },
-                {
-                  id: newUuid(),
-                  name: 'Pierre',
-                  primaryProfile: { type: 'space-person', id: secondSpacePersonId, spaceId },
-                },
-              ],
-              tags: [],
-              cameraMakes: [],
-            })
-          : filterSuggestions({ people: [], tags: [], cameraMakes: [] }),
+        filterSuggestions({
+          people:
+            scope?.spaceId === spaceId
+              ? [
+                  {
+                    id: newUuid(),
+                    name: 'Pierre',
+                    primaryProfile: { type: 'space-person', id: firstSpacePersonId, spaceId },
+                  },
+                  {
+                    id: newUuid(),
+                    name: 'Pierre',
+                    primaryProfile: { type: 'space-person', id: secondSpacePersonId, spaceId },
+                  },
+                ]
+              : [],
+          tags: [],
+          cameraMakes: [],
+        }),
       ),
     );
 

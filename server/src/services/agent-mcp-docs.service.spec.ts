@@ -195,11 +195,9 @@ describe(AgentMcpDocsService.name, () => {
 
   it('parses every marked tool-argument JSON block from the generated Markdown as JSON', () => {
     const markdown = sut.generateMarkdown();
-    const blocks = [
-      ...markdown.matchAll(
-        /<!-- mcp-docs:tool-arguments tool="([^"]+)" example="([^"]+)" -->\n\n```json\n([\s\S]*?)\n```/g,
-      ),
-    ];
+    const blocks = markdown
+      .matchAll(/<!-- mcp-docs:tool-arguments tool="([^"]+)" example="([^"]+)" -->\n\n```json\n([\s\S]*?)\n```/g)
+      .toArray();
 
     expect(blocks).toHaveLength(sut.listDocumentedToolArgumentExamples().length);
     for (const [, toolNameValue, exampleName, jsonText] of blocks) {
@@ -249,7 +247,11 @@ describe(AgentMcpDocsService.name, () => {
     expect(examples.map((example) => example.name)).toEqual(
       expect.arrayContaining(['initialize', 'tools-list', 'tools-call-read', 'tools-call-plan']),
     );
-    for (const example of examples.filter((candidate) => candidate.request.method === 'tools/call')) {
+    for (const example of examples) {
+      if (example.request.method !== 'tools/call') {
+        continue;
+      }
+
       const params = example.request.params as Record<string, unknown>;
 
       expect(example.request).toMatchObject({
@@ -268,7 +270,10 @@ describe(AgentMcpDocsService.name, () => {
 
   it('renders parseable JSON code fences', () => {
     const markdown = sut.generateMarkdown();
-    const blocks = [...markdown.matchAll(/```json\n([\s\S]*?)\n```/g)].map((match) => match[1]);
+    const blocks = markdown
+      .matchAll(/```json\n([\s\S]*?)\n```/g)
+      .map((match) => match[1])
+      .toArray();
 
     expect(blocks.length).toBeGreaterThan(10);
     for (const block of blocks) {

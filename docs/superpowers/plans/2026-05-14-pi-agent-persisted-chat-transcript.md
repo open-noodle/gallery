@@ -367,10 +367,7 @@ export type AgentMessagePlanBlock = {
 };
 
 export type AgentMessageBlock =
-  | AgentMessageTextBlock
-  | AgentMessageToolCallBlock
-  | AgentMessageAssetBlock
-  | AgentMessagePlanBlock;
+  AgentMessageTextBlock | AgentMessageToolCallBlock | AgentMessageAssetBlock | AgentMessagePlanBlock;
 
 export type AgentMessageContent = {
   blocks: AgentMessageBlock[];

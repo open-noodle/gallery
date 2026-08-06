@@ -9,6 +9,14 @@ import type {
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
+// Mirrors the `TimeoutError` an aborted `fetch`/body read rejects with.
+class TimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TimeoutError';
+  }
+}
+
 const permissionPlan = {
   read: { metadata: true, previews: false, originals: false },
   providerExposure: {
@@ -73,10 +81,7 @@ const openSseBody = (body: string, cancel: () => void) =>
   });
 
 const collectStream = async <T>(stream: AsyncGenerator<T>): Promise<T[]> => {
-  const events: T[] = [];
-  for await (const event of stream) {
-    events.push(event);
-  }
+  const events: T[] = await Array.fromAsync(stream);
   return events;
 };
 
@@ -220,8 +225,7 @@ describe(AgentRunnerRepository.name, () => {
   });
 
   it('returns timeout for abort timeout errors', async () => {
-    const error = new Error('Timeout');
-    error.name = 'TimeoutError';
+    const error = new TimeoutError('Timeout');
     mockFetch.mockRejectedValue(error);
 
     await expect(sut.getStatus({ url: 'http://agent-runner:4477', timeoutMs: 2500 })).resolves.toEqual({
@@ -233,8 +237,7 @@ describe(AgentRunnerRepository.name, () => {
   });
 
   it('returns timeout for body read timeout errors', async () => {
-    const error = new Error('Timeout');
-    error.name = 'TimeoutError';
+    const error = new TimeoutError('Timeout');
     mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.reject(error),
@@ -395,9 +398,7 @@ describe(AgentRunnerRepository.name, () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      body: sseBody(
-        `event: delta\ndata: ${JSON.stringify(deltaEvent)}\n\n` + `data: ${JSON.stringify(completedEvent)}\n\n`,
-      ),
+      body: sseBody(`event: delta\ndata: ${JSON.stringify(deltaEvent)}\n\ndata: ${JSON.stringify(completedEvent)}\n\n`),
     });
 
     await expect(
@@ -529,7 +530,7 @@ describe(AgentRunnerRepository.name, () => {
     {
       name: 'blank query',
       mutate: (block: ReturnType<typeof validClarificationBlock>) => {
-        block.query = '   ';
+        block.query = ' '.repeat(3);
       },
     },
     {
@@ -547,7 +548,7 @@ describe(AgentRunnerRepository.name, () => {
     {
       name: 'blank choice label',
       mutate: (block: ReturnType<typeof validClarificationBlock>) => {
-        block.choices[0].label = '   ';
+        block.choices[0].label = ' '.repeat(3);
       },
     },
     {
@@ -664,7 +665,7 @@ describe(AgentRunnerRepository.name, () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      body: sseBody(`data: ${JSON.stringify(deltaEvent)}\n\n` + `data: ${JSON.stringify(completedEvent)}\n\n`),
+      body: sseBody(`data: ${JSON.stringify(deltaEvent)}\n\ndata: ${JSON.stringify(completedEvent)}\n\n`),
     });
 
     await expect(
@@ -707,7 +708,7 @@ describe(AgentRunnerRepository.name, () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      body: sseBody(`data: ${JSON.stringify(deltaEvent)}\r\n\r\n` + `data: ${JSON.stringify(completedEvent)}\r\n\r\n`),
+      body: sseBody(`data: ${JSON.stringify(deltaEvent)}\r\n\r\ndata: ${JSON.stringify(completedEvent)}\r\n\r\n`),
     });
 
     await expect(
@@ -980,10 +981,7 @@ describe(AgentRunnerRepository.name, () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      body: openSseBody(
-        `data: ${JSON.stringify(deltaEvent)}\n\n` + `data: ${JSON.stringify(completedEvent)}\n\n`,
-        cancel,
-      ),
+      body: openSseBody(`data: ${JSON.stringify(deltaEvent)}\n\ndata: ${JSON.stringify(completedEvent)}\n\n`, cancel),
     });
 
     const events: unknown[] = [];
@@ -1047,7 +1045,7 @@ describe(AgentRunnerRepository.name, () => {
   });
 
   it.each([
-    { name: 'blank text block', block: { type: 'text', text: '   ' } },
+    { name: 'blank text block', block: { type: 'text', text: ' '.repeat(3) } },
     { name: 'overlong text block', block: { type: 'text', text: 'x'.repeat(8001) } },
     { name: 'invalid asset UUID', block: { type: 'asset', assetId: 'asset-1' } },
     {

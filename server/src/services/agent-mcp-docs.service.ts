@@ -24,7 +24,10 @@ type AgentMcpJsonRpcExample = {
 
 const compactShortStringArrays = (value: string): string =>
   value.replaceAll(/\[\n((?:\s{2,}"[^"\n]*",?\n)+)(\s*)\]/g, (match, entries: string, indent: string) => {
-    const values = [...entries.matchAll(/"[^"\n]*"/g)].map(([entry]) => entry);
+    const values = entries
+      .matchAll(/"[^"\n]*"/g)
+      .map(([entry]) => entry)
+      .toArray();
     const compact = `[${values.join(', ')}]`;
     return indent.length + compact.length <= 100 ? compact : match;
   });
@@ -189,7 +192,7 @@ export class AgentMcpDocsService {
       '',
     ];
 
-    return `${lines.join('\n').replaceAll(/\n{3,}/g, '\n\n')}`;
+    return lines.join('\n').replaceAll(/\n{3,}/g, '\n\n');
   }
 
   private renderTool(contract: AgentMcpToolContract): string[] {
@@ -269,7 +272,7 @@ export class AgentMcpDocsService {
     return [
       `### ${contract.title}`,
       '',
-      ...contract.commonMistakes.flatMap((mistake) => [`- \`${mistake.id}\`: ${sanitizeText(mistake.hint)}`]),
+      ...contract.commonMistakes.map((mistake) => `- \`${mistake.id}\`: ${sanitizeText(mistake.hint)}`),
       '',
     ];
   }

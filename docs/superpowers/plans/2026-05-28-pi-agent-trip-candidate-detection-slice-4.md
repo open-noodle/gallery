@@ -151,9 +151,7 @@ export interface TripPlaceHint {
 }
 
 export type TripPlaceHintParseResult =
-  | { status: 'none' }
-  | { status: 'invalid'; reason: 'too_long' }
-  | { status: 'valid'; hint: TripPlaceHint };
+  { status: 'none' } | { status: 'invalid'; reason: 'too_long' } | { status: 'valid'; hint: TripPlaceHint };
 
 type PlaceLike = {
   country?: string | null;

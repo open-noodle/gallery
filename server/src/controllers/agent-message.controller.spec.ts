@@ -110,7 +110,7 @@ describe(AgentMessageController.name, () => {
     it('should reject blank text blocks', async () => {
       const { status, body: result } = await request(ctx.getHttpServer())
         .post(`/agent/sessions/${sessionId}/messages`)
-        .send({ content: { blocks: [{ type: 'text', text: '   ' }] } });
+        .send({ content: { blocks: [{ type: 'text', text: ' '.repeat(3) }] } });
 
       expect(status).toBe(400);
       expect(result).toEqual(

@@ -474,9 +474,9 @@ const AgentSearchAssetsToolRequestSchema = z
       page: value.page ?? DEFAULT_SEARCH_PAGE,
       detail: value.detail ?? 'handle',
       fields: value.fields ?? [],
-      ...(value.createSelectionHandle === undefined ? {} : { createSelectionHandle: value.createSelectionHandle }),
-      ...(value.sampleSize === undefined ? {} : { sampleSize: value.sampleSize }),
-      ...(order === undefined ? {} : { order }),
+      ...(value.createSelectionHandle !== undefined && { createSelectionHandle: value.createSelectionHandle }),
+      ...(value.sampleSize !== undefined && { sampleSize: value.sampleSize }),
+      ...(order !== undefined && { order }),
     };
 
     return value.query === undefined ? request : { ...request, query: value.query };
@@ -533,8 +533,8 @@ const AgentFindTripCandidatesToolRequestSchema = z
     }
 
     return {
-      ...(value.placeHint === undefined ? {} : { placeHint: value.placeHint }),
-      ...(value.targetDate === undefined ? {} : { targetDate: value.targetDate }),
+      ...(value.placeHint !== undefined && { placeHint: value.placeHint }),
+      ...(value.targetDate !== undefined && { targetDate: value.targetDate }),
       lookbackDays: value.lookbackDays ?? DEFAULT_TRIP_LOOKBACK_DAYS,
       maxCandidates: value.maxCandidates ?? DEFAULT_TRIP_MAX_CANDIDATES,
     };

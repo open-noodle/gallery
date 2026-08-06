@@ -423,7 +423,7 @@ describe(AgentSessionController.name, () => {
     it('should reject blank titles', async () => {
       const { status, body: result } = await request(ctx.getHttpServer())
         .put(`/agent/sessions/${id}`)
-        .send({ title: '   ' });
+        .send({ title: ' '.repeat(3) });
 
       expect(status).toBe(400);
       expect(result).toEqual(
