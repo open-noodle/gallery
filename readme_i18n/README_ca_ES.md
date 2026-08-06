@@ -1,8 +1,8 @@
 <p align="center"> 
   <br/>  
-  <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=Llicència&logoColor=000000&labelColor=ececec" alt="Llicència: MIT"></a>
-  <a href="https://discord.immich.app">
-    <img src="https://img.shields.io/discord/979116623879368755.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" atl="Discord"/>
+  <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=Llicència&logoColor=000000&labelColor=ececec" alt="Llicència: AGPL-3.0"></a>
+  <a href="https://discord.gg/cxBfbuxyG4">
+    <img src="https://img.shields.io/discord/1480633426376921239.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" atl="Discord"/>
   </a>
   <br/>  
   <br/>   
@@ -11,10 +11,10 @@
 <p align="center">
 <img src="../design/gallery-logo-stacked-light.svg" width="300" title="Iniciar sessió amb URL personalitzada">
 </p>
-<h3 align="center">Immich - Solució de còpia de seguretat d'alta rendiment per a fotos i vídeos auto-allotjada</h3>
+<h3 align="center">Noodle Gallery - Solució de còpia de seguretat d'alta rendiment per a fotos i vídeos auto-allotjada</h3>
 <br/>
-<a href="https://immich.app">
-<img src="../design/immich-screenshots.png" title="Captura de pantalla principal">
+<a href="https://opennoodle.de">
+<img src="../design/gallery-screenshot.webp" title="Captura de pantalla principal">
 </a>
 <br/>
 <p align="center">
@@ -47,55 +47,15 @@
 >
 
 > [!NOTE]
-> Podeu trobar la documentació principal, incloent les guies d'instal·lació, a https://immich.app/.
+> Podeu trobar la documentació principal, incloent les guies d'instal·lació, a https://opennoodle.de/.
 
 ## Contingut
 
-- [Documentació](https://docs.immich.app/)
-- [Introducció](https://docs.immich.app/overview/introduction)
-- [Instal·lació](https://docs.immich.app/install/requirements)
-- [Mapa de ruta](https://immich.app/roadmap)
+- [Documentació](https://docs.opennoodle.de/)
+- [Introducció](https://docs.opennoodle.de/overview/quick-start)
+- [Instal·lació](https://docs.opennoodle.de/install/requirements)
+- [Mapa de ruta](https://opennoodle.de/roadmap)
 - [Demo](#demo)
 - [Funcionalitats](#funcionalitats)
-- [Traduccions](https://docs.immich.app/developer/translations)
-- [Directrius de contribució](https://docs.immich.app/overview/support-the-project)
-
-## Demo
-
-Podeu accedir a la demostració web a https://demo.immich.app. Per a l'aplicació mòbil, podeu utilitzar `https://demo.immich.app` com a "URL de punt final del servidor".
-
-```bash title="Credencials de la demo"
-Les credencials
-email: demo@immich.app
-contrasenya: demo
-```
-
-# Funcionalitats
-
-| Característiques                              | Mòbil  | Web |
-| -------------------------------------------- | ------ | --- |
-| Pujar i veure vídeos i fotos                  | Sí     | Sí  |
-| Còpia de seguretat automàtica en obrir l'aplicació | Sí | N/A |
-| Selecció d'àlbums per a la còpia de seguretat | Sí     | N/A |
-| Descarregar fotos i vídeos a l'aparell local  | Sí     | Sí  |
-| Suport per a múltiples usuaris                | Sí     | Sí  |
-| Àlbums i àlbums compartits                    | Sí     | Sí  |
-| Barra de desplaçament amb funció de rasclet/arrossegament | Sí | Sí |
-| Suport per a formats raw                      | Sí     | Sí  |
-| Visualització de metadades (EXIF, mapa)       | Sí     | Sí  |
-| Cerca per metadades, objectes, cares i CLIP   | Sí     | Sí  |
-| Funcions administratives (gestió d'usuaris)   | No     | Sí  |
-| Còpia de seguretat en segon pla               | Sí     | N/A |
-| Desplaçament virtual                          | Sí     | Sí  |
-| Suport per a OAuth                            | Sí     | Sí  |
-| Claus d'API                                   | N/A    | Sí  |
-| Còpia de seguretat i reproducció de LivePhoto  | iOS    | Sí  |
-| Estructura d'emmagatzematge definida per l'usuari | Sí  | Sí  |
-| Compartició pública                           | No     | Sí  |
-| Arxiu i preferits                             | Sí     | Sí  |
-| Mapa global                                   | No     | Sí  |
-| Compartició amb associats                      | Sí     | Sí  |
-| Reconeixement facial i agrupament              | Sí     | Sí  |
-| Records (fa x anys)                           | Sí     | Sí  |
-| Suport fora de línia                          | Sí     | No  |
-| Galeria de només lectura                      | Sí     | Sí  |
+- [Traduccions](https://docs.opennoodle.de/developer/translations)
+- [Directrius de contribució](https://docs.opennoodle.de/overview/support-the-project)
