@@ -269,7 +269,7 @@ it('never bisects a surrogate pair when truncating', () => {
   const body = line.slice('stop_reason: '.length).replace(/…$/, '');
   assert.equal([...body].length, 500);
   // A lone surrogate would appear as an unpaired D800-DFFF code unit.
-  assert.doesNotMatch(body, /[\uD800-\uDFFF](?![\uDC00-\uDFFF])/);
+  assert.doesNotMatch(body, /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
   assert.doesNotMatch(body, /(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
 });
 ```
