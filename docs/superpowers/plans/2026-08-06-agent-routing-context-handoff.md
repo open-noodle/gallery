@@ -1086,7 +1086,9 @@ This also interacts with the standing gap from the design's §10: `agent-runner`
 
 ## Outcome and follow-ups
 
-Phase 1 shipped in 9 commits, `a297a4b187a..97a0e6269b7`. Final state: **1875/1875** unit tests pass (from 1845 pre-feature), **L2 eval 6/6, 100%, +0.0pp** against `baseline.l2.json`, exit 0.
+Phase 1 shipped in 13 commits, `a297a4b187a..4526cd1fa77` (including the Option C follow-up below).
+Final state: **1879/1879** unit tests pass (from 1845 pre-feature), **L2 eval 6/6, 100%, +0.0pp**
+against `baseline.l2.json`, exit 0.
 
 **L1 eval was NOT run.** It requires a local OpenAI-compatible server (`EVAL_LLAMA_URL`, default `127.0.0.1:8080/v1`), which was down. Its 0.998 baseline is untouched on disk. L1 is unverified, not passing — nothing in Tasks 1-3 touches classification, but that remains an argument, not evidence.
 
