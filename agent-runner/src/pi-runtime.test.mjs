@@ -1175,6 +1175,62 @@ describe('pi runtime adapter', () => {
     assert.equal(events.at(-1).type, 'assistant-message-completed');
   });
 
+  it('delivers routing context to the open agent when slot parsing fails', async () => {
+    const { sdk, ai, calls, session } = createFakeDependencies({
+      mcpToolNames: ['mcp_gallery_findTripCandidates'],
+    });
+    // Real workflow kind, slots the real parseSlots rejects (needs albumName OR
+    // placeHint) → the slots_unparsed exit, reached before any MCP call.
+    //
+    // The prompt MUST miss the regex fast-path or `ai.classifyIntent` is never
+    // consulted: hybrid mode tries regex first, and any "recent trip" phrasing
+    // matches it with a usable albumName, so the workflow would run and handle
+    // the turn — silently making this test assert nothing.
+    ai.classifyIntent = async () => ({
+      workflow: 'create_recent_trip_album',
+      slots: {},
+      confidence: 'high',
+    });
+
+    const customMessages = [];
+    session.sendCustomMessage = async (message, options) => {
+      // Capture how many open turns had started, to assert ordering for real.
+      customMessages.push({ message, options, promptsSoFar: calls.prompts.length });
+    };
+
+    const mcpCalls = [];
+    const fetchImplementation = async (url, init) => {
+      mcpCalls.push({ url: String(url), body: JSON.parse(init.body) });
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: {} }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    };
+
+    const runtime = createPiRuntime({ sdk, ai, fetch: fetchImplementation });
+    await runtime.createSession(createSessionBody({ mcpGateway: createMcpGateway() }));
+
+    await collect(
+      runtime.sendMessage(
+        createMessageRequest({
+          content: { blocks: [{ type: 'text', text: 'put my Japan trip from last week into an album' }] },
+        }),
+      ),
+    );
+
+    assert.equal(customMessages.length, 1);
+    assert.equal(customMessages[0].message.customType, 'gallery_routing_context');
+    assert.equal(customMessages[0].message.display, false);
+    assert.equal(customMessages[0].options.deliverAs, 'nextTurn');
+    assert.match(customMessages[0].message.content, /^router_matched: Create recent trip album$/m);
+    assert.match(customMessages[0].message.content, /^note: The router matched this request/m);
+    // Queued BEFORE the open turn that consumes it.
+    assert.equal(customMessages[0].promptsSoFar, 0);
+    assert.equal(calls.prompts.length, 1);
+    // The slots_unparsed exit precedes any tool call.
+    assert.equal(mcpCalls.length, 0);
+  });
+
   it('keeps a strict handled Pi runner session usable for a later open prompt', async () => {
     const { sdk, ai, calls } = createFakeDependencies({
       mcpToolNames: ['mcp_gallery_findTripCandidates', 'mcp_gallery_proposeAlbumFromSelection'],
