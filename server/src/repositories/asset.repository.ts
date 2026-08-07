@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  expressionBuilder,
   ExpressionBuilder,
   Insertable,
   Kysely,
@@ -174,6 +175,12 @@ export interface MemoryLocationCluster {
 interface AssetExploreFieldOptions {
   maxFields: number;
   minAssetsPerField: number;
+  /**
+   * #867: spaces the viewer kept on their home timeline. When set, the city scan widens from
+   * "assets I own" to "assets I own OR reach through one of these spaces", so the Explore places
+   * strip matches what the location filter and the filtered timeline already show.
+   */
+  timelineSpaceIds?: string[];
 }
 
 interface AssetGetByChecksumOptions {
@@ -1640,8 +1647,13 @@ export class AssetRepository {
     return query.executeTakeFirstOrThrow();
   }
 
-  @GenerateSql({ params: [DummyValue.UUID, { minAssetsPerField: 5, maxFields: 12 }] })
-  async getAssetIdByCity(ownerId: string, { minAssetsPerField, maxFields }: AssetExploreFieldOptions) {
+  @GenerateSql({
+    params: [DummyValue.UUID, { minAssetsPerField: 5, maxFields: 12, timelineSpaceIds: [DummyValue.UUID] }],
+  })
+  async getAssetIdByCity(
+    ownerId: string,
+    { minAssetsPerField, maxFields, timelineSpaceIds }: AssetExploreFieldOptions,
+  ) {
     const items = await this.db
       .with('cities', (qb) =>
         qb
@@ -1657,7 +1669,27 @@ export class AssetRepository {
       .distinctOn('asset_exif.city')
       .select(['assetId as data', 'asset_exif.city as value'])
       .$narrowType<{ value: NotNull }>()
-      .where('ownerId', '=', asUuid(ownerId))
+      // #867: own assets, plus anything reachable through a space the viewer kept on their
+      // timeline. The Timeline-only visibility gate below already covers the space arms' own
+      // requirement (archived/hidden/locked space assets never reach the strip).
+      //
+      // The branches are built from a detached `expressionBuilder<DB, 'asset'>()` rather than the
+      // callback's own `eb`: the `cities` CTE widens this query's schema to `DB & { cities }`, which
+      // no longer satisfies the shared helpers' `ExpressionBuilder<DB, keyof DB>` parameter. The
+      // emitted SQL is identical — the branches only ever reference `asset.*`.
+      .where((eb) =>
+        eb.or([
+          eb('asset.ownerId', '=', asUuid(ownerId)),
+          ...(timelineSpaceIds?.length
+            ? spaceAssetPathBranches(expressionBuilder<DB, 'asset'>(), {
+                correlateAssetId: 'asset.id',
+                correlateLibraryId: 'asset.libraryId',
+                scope: { spaceIds: timelineSpaceIds },
+                requireShowInTimeline: true,
+              })
+            : []),
+        ]),
+      )
       .where('visibility', '=', AssetVisibility.Timeline)
       .where('type', '=', AssetType.Image)
       .where('deletedAt', 'is', null)
