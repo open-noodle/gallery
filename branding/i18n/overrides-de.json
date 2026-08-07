@@ -1,5 +1,11 @@
 {
+  "admin": {
+    "notification_email_from_address_description": "E-Mail-Adresse des Senders, zum Beispiel: \"Noodle Gallery <noreply@example.com>\". Stelle sicher, dass du eine Adresse verwendest, von der du E-Mails senden darfst."
+  },
   "buy": "Noodle Gallery unterstützen",
+  "install_app_title": "Noodle Gallery installieren",
+  "my_immich_description": "Einen Link zu dieser Seite kopieren",
+  "my_immich_title": "Seitenlink",
   "purchase_activated_subtitle": "Vielen Dank, dass du Noodle Gallery und Open-Source-Software unterstützt",
   "purchase_button_buy_immich": "Noodle Gallery unterstützen",
   "purchase_discord_button": "Tritt unserem Discord bei",
@@ -10,5 +16,6 @@
   "purchase_github_title": "Markiere uns mit einem Stern auf GitHub",
   "purchase_license_subtitle": "Unterstütze Noodle Gallery, um die kontinuierliche Weiterentwicklung des Dienstes zu fördern",
   "purchase_panel_info_1": "Die Entwicklung von Noodle Gallery erfordert viel Zeit und Mühe, und wir haben Vollzeit-Entwickler, die daran arbeiten, sie so gut wie möglich zu machen. Unsere Mission ist es, Open-Source-Software und ethische Geschäftspraktiken zu einer nachhaltigen Einnahmequelle für Entwickler zu machen und ein die Privatsphäre respektierendes Ökosystem mit echten Alternativen zu ausbeuterischen Cloud-Diensten zu schaffen.",
-  "purchase_panel_info_2": "Wir haben uns verpflichtet, keine Paywalls einzuführen. Wenn du die fortlaufende Entwicklung von Noodle Gallery unterstützen möchtest, melde dich auf Discord bei uns."
+  "purchase_panel_info_2": "Wir haben uns verpflichtet, keine Paywalls einzuführen. Wenn du die fortlaufende Entwicklung von Noodle Gallery unterstützen möchtest, melde dich auf Discord bei uns.",
+  "version_announcement_closing": "Dein Freund, Pierre"
 }
