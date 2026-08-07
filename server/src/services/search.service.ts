@@ -100,8 +100,16 @@ export class SearchService extends BaseService {
     return places.map((place) => mapPlaces(place));
   }
 
+  /**
+   * #867: the places strip is scoped like the home timeline (own + timeline-enabled spaces), not
+   * like an owner-private surface. Without it a space member saw no tile for a city that only
+   * exists on assets shared with them, even though the location filter listed that city and the
+   * filtered timeline returned those assets. The recently-added strip below stays owner-scoped — it
+   * answers "what did I just add", and /recently-added is itself an owner surface.
+   */
   async getExploreData(auth: AuthDto) {
-    const options = { maxFields: 12, minAssetsPerField: 5 };
+    const timelineSpaceIds = await this.getTimelineSpaceIds(auth, true);
+    const options = { maxFields: 12, minAssetsPerField: 5, timelineSpaceIds };
 
     const cities = await this.assetRepository.getAssetIdByCity(auth.user.id, options);
     const cityAssets = await this.assetRepository.getByIdsWithAllRelationsButStacks(
@@ -359,9 +367,11 @@ export class SearchService extends BaseService {
     return { ...result, people: result.people.toSorted((a, b) => a.name.localeCompare(b.name)) };
   }
 
+  /** #867: /places is the "view all" of the Explore strip, so it carries the same scope. */
   async getAssetsByCity(auth: AuthDto): Promise<AssetResponseDto[]> {
     const userIds = await this.getUserIdsToSearch(auth);
-    const assets = await this.searchRepository.getAssetsByCity(userIds);
+    const timelineSpaceIds = await this.getTimelineSpaceIds(auth, true);
+    const assets = await this.searchRepository.getAssetsByCity(userIds, timelineSpaceIds);
     return assets.map((asset) => mapAsset(asset));
   }
 
